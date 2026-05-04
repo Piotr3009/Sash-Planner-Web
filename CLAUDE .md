@@ -32,31 +32,43 @@ Fazy 6 i 7 (Manual Creator + SaaS) — NIE rób teraz.
 
 ---
 
-## REPOZYTORIA
+## REPOZYTORIA (3 repo)
 
-### 1. Prime Sash Windows — TYLKO DO ODCZYTU (referencja + źródło kodu)
+### 1. Prime Sash Windows — TYLKO DO ODCZYTU (referencja)
 - **Repo:** `https://github.com/Piotr3009/Prime-Sash-Windows.git`
 - **Clone:** `git clone -c http.proxyAuthMethod=basic https://github.com/Piotr3009/Prime-Sash-Windows.git`
-- **⚠️ NIE EDYTUJ tego repo. NIE twórz branchy. NIE pushuj. Tylko czytaj i kopiuj.**
+- **⚠️ NIE EDYTUJ. NIE twórz branchy. NIE pushuj. Tylko czytaj i kopiuj.**
 
 #### Co wziąć z Prime-Sash-Windows:
 
 | Plik źródłowy | Docelowo w Sash-Planner-Web | Do czego |
 |---|---|---|
-| `js/estimate-renderer.js` | Referencja | Logika renderowania estimates, PDF, Excel — wzoruj się na tym |
-| `js/price-calculator.js` | Referencja | Logika cenowa — do zrozumienia fullConfig |
-| `3d-src/` (cały folder) | `src/3d/` | React Three Fiber source — 3D preview okien |
-| `3d-src/package.json` | Referencja | Dependencje 3D (three, @react-three/fiber, drei) |
-| `online-estimate.html` | Referencja | Główny konfigurator — struktura fullConfig, typy okien |
-| `js/bars-unified.js` | Referencja | Logika szprosów (bars) |
+| `js/estimate-renderer.js` | Referencja | Logika renderowania estimates, PDF, Excel |
+| `js/price-calculator.js` | Referencja | Logika cenowa, zrozumienie fullConfig |
+| `3d-src/` (cały folder) | `src/3d/` | React Three Fiber source — 3D preview |
+| `3d-src/package.json` | Referencja | Dependencje 3D |
+| `online-estimate.html` | Referencja | Główny konfigurator — struktura fullConfig |
+| `js/bars-unified.js` | Referencja | Logika szprosów |
 | `js/ironmongery-gallery.js` | Referencja | Galeria okuć |
 
-**KRYTYCZNE:** Przeczytaj `online-estimate.html` i `js/estimate-renderer.js` żeby zrozumieć:
-- Strukturę obiektu `fullConfig` (co zawiera specification JSON w estimate_items)
-- Typy okien: sash, casement, fix-frame, french-doors, sliding-doors, bifold-doors
-- Jak kalkulowana jest cena, materiały, wymiary
+### 2. Windows App Electron — TYLKO DO ODCZYTU (źródło kalkulacji + 2D renderer)
+- **Repo:** `https://github.com/Piotr3009/Windows-App-electron-.git`
+- **Clone:** `git clone -c http.proxyAuthMethod=basic https://github.com/Piotr3009/Windows-App-electron-.git`
+- **⚠️ NIE EDYTUJ. Tylko czytaj i kopiuj.**
 
-### 2. Sash Planner Web — TU PRACUJEMY
+#### Co wziąć z Windows-App-electron-:
+
+| Plik źródłowy | Docelowo w Sash-Planner-Web | Do czego |
+|---|---|---|
+| `calculations.js` (lub podobna nazwa) | `src/engine/calculations.js` | Kalkulacje sash window — wymiary, components, cut list |
+| `optimizer.js` (lub podobna nazwa) | `src/engine/optimizer.js` | Pre-cut optimizer (best-fit-decreasing) |
+| `renderer.js` (lub podobna nazwa) | `src/engine/canvas-renderer.js` | 2D Canvas renderer — rysunki techniczne |
+| `state.js` | Referencja | Stan aplikacji — przerobić na Zustand |
+| `app.js` | Referencja | DXF generator + ogólna logika |
+
+**WAŻNE:** Nazwy plików mogą się różnić. Przejrzyj strukturę repo i znajdź odpowiedniki. Kluczowe moduły to: kalkulacje wymiarów/cięć, optimizer prętów, renderer canvas 2D.
+
+### 3. Sash Planner Web — TU PRACUJEMY
 - **Repo:** `https://github.com/Piotr3009/Sash-Planner-Web.git`
 - **Clone:** `git clone -c http.proxyAuthMethod=basic https://github.com/Piotr3009/Sash-Planner-Web.git`
 - **Branch roboczy:** `claude/full-build` (od main)
@@ -65,7 +77,7 @@ Fazy 6 i 7 (Manual Creator + SaaS) — NIE rób teraz.
 
 ## KRYTYCZNE ZASADY
 
-1. **NIGDY nie usuwaj funkcji/kodu bez uzasadnienia.** Przy kopiowaniu z Prime-Sash-Windows — nie wycinaj logiki którą nie rozumiesz.
+1. **NIGDY nie usuwaj funkcji/kodu bez uzasadnienia.** Przy kopiowaniu z innych repo — nie wycinaj logiki którą nie rozumiesz.
 2. **Nie kłam.** Jeśli czegoś nie potrafisz zrobić — napisz w BLOCKERS.md.
 3. **Minimalne, działające rozwiązania.** Każda faza powinna dać coś co działa w przeglądarce.
 4. **Zawsze diffuj przed commit.**
@@ -120,8 +132,6 @@ Co nie jest zweryfikowane? Bądź szczery.
 NIGDY nie usuwaj istniejącego kodu chyba że:
 - jest bezpośrednim celem zmiany
 - usunięcie zostało uzasadnione
-
-Dotyczy: funkcji, helperów, warunków, error handling, fallbacków, importów, configów.
 
 **Zapisuj verdykty w pliku `BUILD-LOG.md` — po jednej sekcji na fazę.**
 
@@ -181,11 +191,11 @@ src/
 │   ├── viewer/          # 3D preview, 2D canvas viewer
 │   ├── export/          # Export controls (PDF/Excel/DXF)
 │   └── common/          # Buttons, modals, loaders
-├── engine/              # Logika kalkulacyjna
+├── engine/              # Logika kalkulacyjna (Z ELECTRON APP)
 │   ├── calculations.js  # Kalkulacje sash window
 │   ├── optimizer.js     # Pre-cut optimizer
 │   └── canvas-renderer.js # 2D Canvas renderer
-├── 3d/                  # React Three Fiber (z Prime-Sash-Windows/3d-src/)
+├── 3d/                  # React Three Fiber (Z PRIME-SASH-WINDOWS/3d-src/)
 ├── stores/              # Zustand
 │   ├── projectStore.js
 │   └── authStore.js
@@ -251,12 +261,11 @@ VITE_SUPABASE_ANON_KEY=eyJhbG...
 3. Estimate Detail: fetch `estimate_items` dla wybranego estimate
 4. Parse `specification` JSON → extract fullConfig
 5. Karty okien: typ, wymiary W×H, kolor, bars pattern, ilość
-6. Kalkulacje: components, cut lengths, glass sizes
+6. Kalkulacje z `calculations.js` (z Electron app): components, cut lengths, glass sizes
 7. Summary: łączna ilość okien, łączna cena
 
 **Jeśli brak Supabase:** Stwórz `src/mocks/mockEstimates.js` z realistycznymi danymi.
-
-**WAŻNE:** Przeczytaj online-estimate.html z Prime-Sash-Windows żeby mock data był realistyczny.
+**Jeśli calculations.js wymaga adaptacji do ES modules:** Przeróbki minimalne, zachowaj oryginalną logikę.
 
 **Acceptance:** Lista estimates → klik → karty okien z danymi. Commit + push.
 
@@ -283,10 +292,10 @@ VITE_SUPABASE_ANON_KEY=eyJhbG...
 
 **Cel:** Canvas-based rysunek techniczny.
 
-1. Komponent `TechnicalDrawing2D` z Canvas API
-2. Rysuj: obrys ramy, skrzydła, szprosy, wymiary
-3. Styl CAD: czarne linie, białe tło, wymiary z strzałkami
-4. Responsywny canvas
+1. Skopiuj `renderer.js` z Electron app → `src/engine/canvas-renderer.js`
+2. Adaptuj do React (komponent `TechnicalDrawing2D` z Canvas ref)
+3. Rysuj: obrys ramy, skrzydła, szprosy, wymiary z strzałkami
+4. Styl CAD: czarne linie, białe tło
 5. Tab "2D Drawing" obok "3D Preview"
 
 **Minimum:** Rysunek elewacyjny z wymiarami ramy i szyb.
@@ -299,11 +308,11 @@ VITE_SUPABASE_ANON_KEY=eyJhbG...
 
 **Cel:** Listy cięć i materiałów.
 
-1. Cut list per okno + aggregated per projekt
-2. Pre-cut optimizer (best-fit-decreasing)
-3. Wizualizacja bar layout
-4. Glass order list
-5. Timber order list
+1. Cut list per okno (z calculations.js) + aggregated per projekt
+2. Pre-cut optimizer (optimizer.js z Electron app) — best-fit-decreasing
+3. Wizualizacja bar layout (Canvas lub SVG)
+4. Glass order list (wymiary, typ, ilości)
+5. Timber order list (sekcje, długości, materiał)
 6. Hardware/ironmongery list
 
 **Acceptance:** Tabelki z danymi, poprawne wartości. Commit + push.
