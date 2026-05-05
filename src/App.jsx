@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AppLayout from './components/layout/AppLayout.jsx';
 import LoginPage from './pages/LoginPage.jsx';
@@ -8,11 +9,20 @@ import { useAuthStore } from './stores/authStore.js';
 
 function ProtectedRoute({ children }) {
   const session = useAuthStore((s) => s.session);
+  const loading = useAuthStore((s) => s.loading);
+  console.log('[ProtectedRoute] session:', session, 'loading:', loading);
+  if (loading) return <div className="min-h-screen grid place-items-center"><p>Loading…</p></div>;
   if (!session) return <Navigate to="/login" replace />;
   return children;
 }
 
 export default function App() {
+  const init = useAuthStore((s) => s.init);
+
+  useEffect(() => {
+    init();
+  }, [init]);
+
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />

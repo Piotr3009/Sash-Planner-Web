@@ -6,7 +6,6 @@ import { hasSupabaseConfig } from '../services/supabase.js';
 export default function LoginPage() {
   const navigate = useNavigate();
   const session = useAuthStore((s) => s.session);
-  const init = useAuthStore((s) => s.init);
   const signIn = useAuthStore((s) => s.signIn);
   const signInWithMockData = useAuthStore((s) => s.signInWithMockData);
   const error = useAuthStore((s) => s.error);
@@ -16,11 +15,11 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    init();
-  }, [init]);
-
-  useEffect(() => {
-    if (session) navigate('/dashboard', { replace: true });
+    console.log('[LoginPage] session changed:', session);
+    if (session) {
+      console.log('[LoginPage] navigating to /dashboard');
+      navigate('/dashboard', { replace: true });
+    }
   }, [session, navigate]);
 
   const handleSubmit = async (e) => {
@@ -84,7 +83,9 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => {
+              console.log('[LoginPage] mock button clicked');
               signInWithMockData();
+              console.log('[LoginPage] session after mock:', useAuthStore.getState().session);
             }}
             className="btn btn-secondary w-full"
           >
