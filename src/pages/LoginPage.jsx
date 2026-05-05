@@ -85,7 +85,6 @@ export default function LoginPage() {
             type="button"
             onClick={() => {
               signInWithMockData();
-              navigate('/dashboard');
             }}
             className="btn btn-secondary w-full"
           >
