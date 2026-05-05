@@ -12,6 +12,11 @@ export const useAuthStore = create((set, get) => ({
   error: null,
 
   init: async () => {
+    // Don't wipe an existing session (e.g. mock session already set)
+    if (get().session) {
+      set({ loading: false });
+      return;
+    }
     if (!hasSupabaseConfig) {
       set({ session: null, loading: false });
       return;

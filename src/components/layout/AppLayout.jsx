@@ -1,15 +1,8 @@
-import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Header from './Header.jsx';
 import Sidebar from './Sidebar.jsx';
-import { useAuthStore } from '../../stores/authStore.js';
 
 export default function AppLayout() {
-  const init = useAuthStore((s) => s.init);
-  useEffect(() => {
-    init();
-  }, [init]);
-
   return (
     <div className="h-screen flex flex-col">
       <Header />
