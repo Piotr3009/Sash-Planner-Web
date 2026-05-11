@@ -50,89 +50,136 @@ export default function ConfiguratorPage() {
   const navigate = useNavigate();
   const addWindow = useProjectStore((s) => s.addWindowToEstimate);
 
+  // Window name
+  const [winName, setWinName] = useState('');
+
+  // Product Range
   const [sashType, setSashType] = useState('double');
   const [splitRatio, setSplitRatio] = useState('1/4-1/2-1/4');
   const [headType, setHeadType] = useState('flat');
+
+  // Dimensions
   const [mType, setMType] = useState('box-to-box');
   const [inW, setInW] = useState(1000);
   const [inH, setInH] = useState(1500);
   const extW = mType === 'brick-to-brick' ? (Number(inW) || 400) + 150 : (Number(inW) || 400);
   const extH = mType === 'brick-to-brick' ? (Number(inH) || 400) + 75 : (Number(inH) || 400);
+
+  // Bars
   const [uBars, setUBars] = useState('none');
   const [lBars, setLBars] = useState('none');
   const [sameBars, setSameBars] = useState(true);
-  const [uCustomV, setUCustomV] = useState([]);
-  const [uCustomH, setUCustomH] = useState([]);
-  const [lCustomV, setLCustomV] = useState([]);
-  const [lCustomH, setLCustomH] = useState([]);
+  // Custom bars as array of { type: 'v'|'h', position: number }
+  const [uCustom, setUCustom] = useState([]);
+  const [lCustom, setLCustom] = useState([]);
+
+  // Frame
   const [boxType, setBoxType] = useState('standard');
+
+  // Horns
   const [horn, setHorn] = useState('A');
+
+  // Colour — default RAL 9016 Traffic White
   const [colType, setColType] = useState('single');
-  const [wc, setWc] = useState('#FAFAFA');
-  const [wcE, setWcE] = useState('#FAFAFA');
-  const [wcI, setWcI] = useState('#FAFAFA');
+  const [wc, setWc] = useState('#F6F6F6');
+  const [wcE, setWcE] = useState('#F6F6F6');
+  const [wcI, setWcI] = useState('#F6F6F6');
+
+  // Glass
   const [gType, setGType] = useState('double');
   const [gSpec, setGSpec] = useState('toughened');
   const [gFin, setGFin] = useState('clear');
   const [frostLoc, setFrostLoc] = useState('bottom');
   const [spacer, setSpacer] = useState('silver');
+
+  // Opening
   const [opening, setOpening] = useState('both');
+
+  // Hardware
   const [pas24, setPas24] = useState(false);
   const [iron, setIron] = useState('brass');
 
   const isSingle = colType === 'single';
 
+  // Frame depth: triple glazing requires 172mm
+  const frameDepth = gType === 'triple' ? 172 : (boxType === 'standard' ? 164 : 144);
+
+  // ─── Sync with 3D ───
   const sync = useCallback(() => {
     if (typeof window.update3D !== 'function') return;
+    const effectiveLBars = sameBars ? uBars : lBars;
     window.update3D({
       windowCategory: 'sash', extWidth: extW, extHeight: extH,
-      upperBars: uBars, lowerBars: sameBars ? uBars : lBars, sameBars,
-      upperCustomBars: uBars === 'custom' ? { vertical: uCustomV, horizontal: uCustomH } : [],
-      lowerCustomBars: (sameBars ? uBars : lBars) === 'custom' ? { vertical: sameBars ? uCustomV : lCustomV, horizontal: sameBars ? uCustomH : lCustomH } : [],
+      upperBars: uBars, lowerBars: effectiveLBars, sameBars,
+      upperCustomBars: uBars === 'custom' ? uCustom : [],
+      lowerCustomBars: effectiveLBars === 'custom' ? (sameBars ? uCustom : lCustom) : [],
       showHorns: horn !== 'none', hornType: horn === 'none' ? 'A' : horn,
       woodColor: wc, woodColorExt: isSingle ? wc : wcE, woodColorInt: isSingle ? wc : wcI, sameColor: isSingle,
       ironmongery: iron,
       upperGlass: gFin === 'frosted' && frostLoc === 'both' ? 'frosted' : 'clear',
       lowerGlass: gFin === 'frosted' ? 'frosted' : 'clear',
-      spacerColor: spacer, sashType, splitRatio, headType, openingType: opening, boxType,
+      spacerColor: spacer, sashType, splitRatio, headType, openingType: opening,
+      boxType: gType === 'triple' ? 'standard' : boxType,
+      boxDepth: frameDepth,
     });
-  }, [extW, extH, uBars, lBars, sameBars, uCustomV, uCustomH, lCustomV, lCustomH, horn, wc, wcE, wcI, isSingle, iron, gFin, frostLoc, spacer, sashType, splitRatio, headType, opening, boxType]);
+  }, [extW, extH, uBars, lBars, sameBars, uCustom, lCustom, horn, wc, wcE, wcI, isSingle, iron, gFin, frostLoc, spacer, sashType, splitRatio, headType, opening, boxType, gType, frameDepth]);
   useEffect(() => { sync(); }, [sync]);
 
   const setColor = (hex) => { setWc(hex); if (isSingle) { setWcE(hex); setWcI(hex); } };
 
+  // ─── Save ───
   const save = () => {
+    const effectiveLBars = sameBars ? uBars : lBars;
     addWindow(estimateId, {
       windowCategory: 'sash', extWidth: extW, extHeight: extH,
-      upperBars: uBars, lowerBars: sameBars ? uBars : lBars, sameBars,
-      upperCustomBars: uBars === 'custom' ? { vertical: uCustomV, horizontal: uCustomH } : [],
-      lowerCustomBars: (sameBars ? uBars : lBars) === 'custom' ? { vertical: sameBars ? uCustomV : lCustomV, horizontal: sameBars ? uCustomH : lCustomH } : [],
+      windowName: winName || undefined,
+      upperBars: uBars, lowerBars: effectiveLBars, sameBars,
+      upperCustomBars: uBars === 'custom' ? uCustom : [],
+      lowerCustomBars: effectiveLBars === 'custom' ? (sameBars ? uCustom : lCustom) : [],
       showHorns: horn !== 'none', hornType: horn,
       woodColor: wc, woodColorExt: isSingle ? wc : wcE, woodColorInt: isSingle ? wc : wcI, sameColor: isSingle,
       ironmongery: iron, doubleGlazing: gType !== 'single',
       upperGlass: gFin === 'frosted' && frostLoc === 'both' ? 'frosted' : 'clear',
       lowerGlass: gFin === 'frosted' ? 'frosted' : 'clear',
       glassType: gType, glassSpec: gSpec, glassFinish: gFin, frostedLocation: frostLoc,
-      spacerColor: spacer, sashType, splitRatio, headType, openingType: opening, boxType, pas24,
+      spacerColor: spacer, sashType, splitRatio, headType, openingType: opening,
+      boxType: gType === 'triple' ? 'standard' : boxType, frameDepth, pas24,
     });
     navigate(`/estimates/${estimateId}`);
   };
 
-  const addCustomBar = (setter, list) => {
-    const pos = prompt('Position in mm from left/top edge:');
-    if (pos && !isNaN(Number(pos))) setter([...list, Number(pos)].sort((a, b) => a - b));
+  // Custom bar helpers
+  const addBar = (setter, list, type) => {
+    const pos = prompt(`Position in mm from ${type === 'v' ? 'left' : 'top'} edge:`);
+    if (pos && !isNaN(Number(pos)) && Number(pos) > 0) {
+      setter([...list, { type, position: Number(pos) }].sort((a, b) => a.position - b.position));
+    }
   };
-  const removeCustomBar = (setter, list, idx) => setter(list.filter((_, i) => i !== idx));
+  const removeBar = (setter, list, idx) => setter(list.filter((_, i) => i !== idx));
 
+  // ─── RENDER ───
   return (
     <div className="h-full flex flex-col">
+      {/* TOP BAR */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-ink-200 bg-white shrink-0">
-        <div>
-          <button onClick={() => navigate(`/estimates/${estimateId}`)} className="text-xs text-ink-400 hover:text-ink-600">← Back to estimate</button>
-          <h1 className="text-lg font-semibold">Sash Window Configurator</h1>
+        <div className="flex items-center gap-4">
+          <div>
+            <button onClick={() => navigate(`/estimates/${estimateId}`)} className="text-xs text-ink-400 hover:text-ink-600">← Back to estimate</button>
+            <h1 className="text-lg font-semibold">Sash Window Configurator</h1>
+          </div>
         </div>
-        <button onClick={save} className="px-5 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700">✓ Save to Estimate</button>
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            placeholder="Window name (e.g. W1, Kitchen Left)"
+            value={winName}
+            onChange={e => setWinName(e.target.value)}
+            className={`px-3 py-2 border-2 rounded-lg text-sm w-64 ${winName.trim() ? 'border-emerald-400 bg-emerald-50' : 'border-red-300 bg-red-50'}`}
+          />
+          <button onClick={save} className="px-5 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700">✓ Save to Estimate</button>
+        </div>
       </div>
+
       <div className="flex-1 flex overflow-hidden">
         <div className="w-96 shrink-0 border-r border-ink-200 bg-white overflow-y-auto">
 
@@ -186,14 +233,10 @@ export default function ConfiguratorPage() {
             <Lbl>Upper Sash</Lbl>
             <GChips o={BAR_OPTIONS} v={uBars} c={v => { setUBars(v); if (sameBars) setLBars(v); }} />
             {uBars === 'custom' && (
-              <CustomBarEditor
-                label="Upper custom"
-                vertical={uCustomV} horizontal={uCustomH}
-                onAddV={() => addCustomBar(setUCustomV, uCustomV)}
-                onAddH={() => addCustomBar(setUCustomH, uCustomH)}
-                onRemoveV={i => removeCustomBar(setUCustomV, uCustomV, i)}
-                onRemoveH={i => removeCustomBar(setUCustomH, uCustomH, i)}
-              />
+              <CBarEd bars={uCustom}
+                onAddV={() => addBar(setUCustom, uCustom, 'v')}
+                onAddH={() => addBar(setUCustom, uCustom, 'h')}
+                onRemove={i => removeBar(setUCustom, uCustom, i)} />
             )}
             <label className="flex items-center gap-2 text-xs text-ink-600 mb-3 cursor-pointer">
               <input type="checkbox" checked={sameBars} onChange={e => setSameBars(e.target.checked)} className="accent-accent-500" />
@@ -203,14 +246,10 @@ export default function ConfiguratorPage() {
               <Lbl>Lower Sash</Lbl>
               <GChips o={BAR_OPTIONS} v={lBars} c={setLBars} />
               {lBars === 'custom' && (
-                <CustomBarEditor
-                  label="Lower custom"
-                  vertical={lCustomV} horizontal={lCustomH}
-                  onAddV={() => addCustomBar(setLCustomV, lCustomV)}
-                  onAddH={() => addCustomBar(setLCustomH, lCustomH)}
-                  onRemoveV={i => removeCustomBar(setLCustomV, lCustomV, i)}
-                  onRemoveH={i => removeCustomBar(setLCustomH, lCustomH, i)}
-                />
+                <CBarEd bars={lCustom}
+                  onAddV={() => addBar(setLCustom, lCustom, 'v')}
+                  onAddH={() => addBar(setLCustom, lCustom, 'h')}
+                  onRemove={i => removeBar(setLCustom, lCustom, i)} />
               )}
             </>}
           </Sec>
@@ -218,7 +257,13 @@ export default function ConfiguratorPage() {
           {/* 4. FRAME & HORNS */}
           <Sec t="4. Frame & Horns">
             <Lbl>Frame</Lbl>
-            <HChips o={FRAME_TYPES} v={boxType} c={setBoxType} />
+            {gType === 'triple' ? (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 text-xs text-blue-800 mb-3">
+                Triple glazing requires 172mm frame (auto-set)
+              </div>
+            ) : (
+              <HChips o={FRAME_TYPES} v={boxType} c={setBoxType} />
+            )}
             <Lbl>Horns</Lbl>
             <HChips o={HORN_OPTIONS} v={horn} c={setHorn} />
           </Sec>
@@ -227,10 +272,10 @@ export default function ConfiguratorPage() {
           <Sec t="5. Colour">
             <HChips o={[{ value: 'single', label: 'Single' }, { value: 'dual', label: 'Dual (+15%)' }]} v={colType} c={setColType} />
             {isSingle ? (
-              <ColourPicker label="Colour" value={wc} onChange={setColor} />
+              <ColPick label="Colour" value={wc} onChange={setColor} />
             ) : (<>
-              <ColourPicker label="Exterior" value={wcE} onChange={setWcE} />
-              <ColourPicker label="Interior" value={wcI} onChange={setWcI} />
+              <ColPick label="Exterior" value={wcE} onChange={setWcE} />
+              <ColPick label="Interior" value={wcI} onChange={setWcI} />
             </>)}
           </Sec>
 
@@ -242,10 +287,7 @@ export default function ConfiguratorPage() {
             <HChips o={GLASS_SPECS} v={gSpec} c={setGSpec} />
             <Lbl>Finish</Lbl>
             <HChips o={GLASS_FINISHES} v={gFin} c={setGFin} />
-            {gFin === 'frosted' && <>
-              <Lbl>Frosted Location</Lbl>
-              <HChips o={FROSTED_LOCS} v={frostLoc} c={setFrostLoc} />
-            </>}
+            {gFin === 'frosted' && <><Lbl>Frosted Location</Lbl><HChips o={FROSTED_LOCS} v={frostLoc} c={setFrostLoc} /></>}
             <Lbl>Spacer</Lbl>
             <HChips o={SPACERS} v={spacer} c={setSpacer} />
           </Sec>
@@ -260,10 +302,8 @@ export default function ConfiguratorPage() {
             <Lbl>PAS 24</Lbl>
             <HChips o={[{ value: 'no', label: 'No — Standard' }, { value: 'yes', label: 'Yes — PAS 24' }]} v={pas24 ? 'yes' : 'no'} c={v => setPas24(v === 'yes')} />
             <Lbl>Ironmongery</Lbl>
-            <button
-              onClick={() => alert('Ironmongery database — coming soon')}
-              className="w-full px-4 py-3 border-2 border-dashed border-ink-300 rounded-lg text-xs text-ink-500 hover:border-accent-400 hover:text-accent-600 transition-colors text-center"
-            >
+            <button onClick={() => alert('Ironmongery database — coming soon')}
+              className="w-full px-4 py-3 border-2 border-dashed border-ink-300 rounded-lg text-xs text-ink-500 hover:border-accent-400 hover:text-accent-600 transition-colors text-center">
               🔧 Select ironmongery from database →
             </button>
             <div className="text-[10px] text-ink-400 mt-1">Current: {iron}</div>
@@ -272,11 +312,12 @@ export default function ConfiguratorPage() {
           {/* SUMMARY */}
           <Sec t="Summary" hl>
             <div className="space-y-1 text-xs">
+              {winName && <SR l="Name" v={winName} />}
               <SR l="Type" v={`Sash — ${sashType}`} />
               <SR l="Size" v={`${extW} × ${extH} mm`} />
               {mType === 'brick-to-brick' && <SR l="Input" v={`${inW} × ${inH} (structural)`} />}
               <SR l="Bars" v={`${uBars}${!sameBars ? ` / ${lBars}` : ''}`} />
-              <SR l="Frame" v={boxType === 'standard' ? '164mm' : '144mm'} />
+              <SR l="Frame" v={`${frameDepth}mm${gType === 'triple' ? ' (triple req.)' : ''}`} />
               <SR l="Horns" v={horn === 'none' ? 'None' : horn} />
               <SR l="Colour" v={isSingle ? 'Single' : 'Dual'} />
               <SR l="Glass" v={`${gType} / ${gSpec} / ${gFin}`} />
@@ -304,118 +345,67 @@ export default function ConfiguratorPage() {
 // ─── UI COMPONENTS ───
 
 function Sec({ t, hl, children }) {
-  return (
-    <div className={`px-5 py-4 border-b border-ink-200 ${hl ? 'bg-ink-50' : ''}`}>
-      <div className="text-xs font-semibold text-ink-800 uppercase tracking-wider mb-3">{t}</div>
-      {children}
-    </div>
-  );
+  return <div className={`px-5 py-4 border-b border-ink-200 ${hl ? 'bg-ink-50' : ''}`}><div className="text-xs font-semibold text-ink-800 uppercase tracking-wider mb-3">{t}</div>{children}</div>;
 }
-
 function Lbl({ children }) {
   return <div className="text-xs text-ink-500 font-medium mb-1.5 mt-2">{children}</div>;
 }
-
 function Pill({ children, active, disabled }) {
   if (disabled) return <span className="px-3 py-1.5 text-xs rounded-lg border border-ink-200 text-ink-300 cursor-not-allowed">{children}</span>;
   if (active) return <span className="px-3 py-1.5 text-xs rounded-lg border border-accent-500 bg-accent-50 text-accent-700 font-medium">{children}</span>;
   return <span className="px-3 py-1.5 text-xs rounded-lg border border-ink-200 text-ink-600">{children}</span>;
 }
-
-// Horizontal chips — inline row
 function HChips({ o, v, c }) {
-  return (
-    <div className="flex flex-wrap gap-1.5 mb-3">
-      {o.map(x => (
-        <button key={x.value} onClick={() => c(x.value)}
-          className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${v === x.value ? 'border-accent-500 bg-accent-50 text-accent-700 font-medium' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}>
-          {x.label}
-        </button>
-      ))}
-    </div>
-  );
+  return <div className="flex flex-wrap gap-1.5 mb-3">{o.map(x => (
+    <button key={x.value} onClick={() => c(x.value)} className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${v === x.value ? 'border-accent-500 bg-accent-50 text-accent-700 font-medium' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}>{x.label}</button>
+  ))}</div>;
 }
-
-// Grid chips for bars (4 cols)
 function GChips({ o, v, c }) {
-  return (
-    <div className="grid grid-cols-4 gap-1.5 mb-3">
-      {o.map(x => (
-        <button key={x.value} onClick={() => c(x.value)}
-          className={`px-2 py-1.5 text-xs rounded border transition-colors ${v === x.value ? 'border-accent-500 bg-accent-50 text-accent-700 font-medium' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}>
-          {x.label}
-        </button>
-      ))}
-    </div>
-  );
+  return <div className="grid grid-cols-4 gap-1.5 mb-3">{o.map(x => (
+    <button key={x.value} onClick={() => c(x.value)} className={`px-2 py-1.5 text-xs rounded border transition-colors ${v === x.value ? 'border-accent-500 bg-accent-50 text-accent-700 font-medium' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}>{x.label}</button>
+  ))}</div>;
 }
-
-// Custom bar editor
-function CustomBarEditor({ label, vertical, horizontal, onAddV, onAddH, onRemoveV, onRemoveH }) {
+function CBarEd({ bars, onAddV, onAddH, onRemove }) {
+  const vBars = bars.filter(b => b.type === 'v');
+  const hBars = bars.filter(b => b.type === 'h');
   return (
     <div className="bg-ink-50 rounded-lg p-3 mb-3 text-xs">
-      <div className="font-medium text-ink-700 mb-2">{label}</div>
       <div className="flex gap-2 mb-2">
-        <button onClick={onAddV} className="px-2 py-1 bg-white border border-ink-300 rounded text-xs hover:bg-ink-100">+ Vertical</button>
-        <button onClick={onAddH} className="px-2 py-1 bg-white border border-ink-300 rounded text-xs hover:bg-ink-100">+ Horizontal</button>
+        <button onClick={onAddV} className="px-2 py-1 bg-white border border-ink-300 rounded hover:bg-ink-100">+ Vertical</button>
+        <button onClick={onAddH} className="px-2 py-1 bg-white border border-ink-300 rounded hover:bg-ink-100">+ Horizontal</button>
       </div>
-      {vertical.length > 0 && (
-        <div className="mb-1">
-          <span className="text-ink-400">V: </span>
-          {vertical.map((pos, i) => (
-            <span key={i} className="inline-flex items-center gap-1 bg-white border border-ink-200 rounded px-1.5 py-0.5 mr-1 mb-1">
-              {pos}mm <button onClick={() => onRemoveV(i)} className="text-red-400 hover:text-red-600">×</button>
-            </span>
-          ))}
-        </div>
-      )}
-      {horizontal.length > 0 && (
-        <div>
-          <span className="text-ink-400">H: </span>
-          {horizontal.map((pos, i) => (
-            <span key={i} className="inline-flex items-center gap-1 bg-white border border-ink-200 rounded px-1.5 py-0.5 mr-1 mb-1">
-              {pos}mm <button onClick={() => onRemoveH(i)} className="text-red-400 hover:text-red-600">×</button>
-            </span>
-          ))}
-        </div>
-      )}
-      {vertical.length === 0 && horizontal.length === 0 && <div className="text-ink-400 italic">No custom bars yet</div>}
+      {vBars.length > 0 && <div className="mb-1"><span className="text-ink-400">V: </span>{vBars.map((b, i) => {
+        const realIdx = bars.indexOf(b);
+        return <span key={i} className="inline-flex items-center gap-1 bg-white border border-ink-200 rounded px-1.5 py-0.5 mr-1 mb-1">{b.position}mm <button onClick={() => onRemove(realIdx)} className="text-red-400 hover:text-red-600">×</button></span>;
+      })}</div>}
+      {hBars.length > 0 && <div><span className="text-ink-400">H: </span>{hBars.map((b, i) => {
+        const realIdx = bars.indexOf(b);
+        return <span key={i} className="inline-flex items-center gap-1 bg-white border border-ink-200 rounded px-1.5 py-0.5 mr-1 mb-1">{b.position}mm <button onClick={() => onRemove(realIdx)} className="text-red-400 hover:text-red-600">×</button></span>;
+      })}</div>}
+      {bars.length === 0 && <div className="text-ink-400 italic">No custom bars yet</div>}
     </div>
   );
 }
-
-// Colour picker — just RAL + F&B dropdowns + custom hex
-function ColourPicker({ label, value, onChange }) {
+function ColPick({ label, value, onChange }) {
   return (
     <div className="mb-3">
       <Lbl>{label}</Lbl>
       <div className="flex items-center gap-2 mb-2">
         <div className="w-6 h-6 rounded border-2 border-ink-200 shrink-0" style={{ backgroundColor: value }} />
         <span className="text-xs text-ink-400 font-mono">{value.toUpperCase()}</span>
-        <label className="ml-auto text-xs text-accent-600 cursor-pointer hover:underline">
-          Custom
-          <input type="color" value={value} onChange={e => onChange(e.target.value)} className="sr-only" />
-        </label>
+        <label className="ml-auto text-xs text-accent-600 cursor-pointer hover:underline">Custom<input type="color" value={value} onChange={e => onChange(e.target.value)} className="sr-only" /></label>
       </div>
-      <select value="" onChange={e => e.target.value && onChange(e.target.value)}
-        className="w-full px-3 py-2 border border-ink-300 rounded-lg text-xs mb-2">
+      <select value="" onChange={e => e.target.value && onChange(e.target.value)} className="w-full px-3 py-2 border border-ink-300 rounded-lg text-xs mb-2">
         <option value="">— RAL Colour —</option>
         {RAL.map(g => <optgroup key={g.g} label={g.g}>{g.o.map(([hex, lab]) => <option key={hex} value={hex}>{lab}</option>)}</optgroup>)}
       </select>
-      <select value="" onChange={e => e.target.value && onChange(e.target.value)}
-        className="w-full px-3 py-2 border border-ink-300 rounded-lg text-xs">
+      <select value="" onChange={e => e.target.value && onChange(e.target.value)} className="w-full px-3 py-2 border border-ink-300 rounded-lg text-xs">
         <option value="">— Farrow & Ball —</option>
         {FB.map(g => <optgroup key={g.g} label={g.g}>{g.o.map(([hex, lab]) => <option key={hex} value={hex}>{lab}</option>)}</optgroup>)}
       </select>
     </div>
   );
 }
-
 function SR({ l, v }) {
-  return (
-    <div className="flex justify-between gap-2">
-      <span className="text-ink-400">{l}</span>
-      <span className="text-ink-800 font-medium text-right">{v}</span>
-    </div>
-  );
+  return <div className="flex justify-between gap-2"><span className="text-ink-400">{l}</span><span className="text-ink-800 font-medium text-right">{v}</span></div>;
 }
