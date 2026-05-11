@@ -7,6 +7,7 @@ const Viewer3D = lazy(() => import('../3d/App.jsx'));
 const BAR_OPTIONS = [
   { value: 'none', label: 'None' }, { value: '2x2', label: '2×2' }, { value: '3x3', label: '3×3' },
   { value: '4x4', label: '4×4' }, { value: '6x6', label: '6×6' }, { value: '9x9', label: '9×9' },
+  { value: 'custom', label: 'Custom' },
 ];
 const HORN_OPTIONS = [{ value: 'none', label: 'No Horns' }, { value: 'A', label: 'Richmond' }, { value: 'D', label: 'Type D' }];
 const SASH_TYPES = [{ value: 'double', label: 'Double Hung' }, { value: 'triple', label: 'Triple Sash' }];
@@ -15,32 +16,24 @@ const SPLIT_RATIOS = [
   { value: '1/3-1/3-1/3', label: '1/3 – 1/3 – 1/3 (Equal)' },
   { value: '1/5-3/5-1/5', label: '1/5 – 3/5 – 1/5 (Wide Centre)' },
 ];
-const HEAD_TYPES = [{ value: 'flat', label: 'Standard (Flat)' }, { value: 'arch', label: 'Glazing Arch' }];
-const FRAME_TYPES = [{ value: 'standard', label: 'Standard Frame (164mm)' }, { value: 'slim', label: 'Slim Frame (144mm)' }];
+const HEAD_TYPES = [{ value: 'flat', label: 'Flat' }, { value: 'arch', label: 'Glazing Arch' }];
+const FRAME_TYPES = [{ value: 'standard', label: 'Standard (164mm)' }, { value: 'slim', label: 'Slim (144mm)' }];
 const GLASS_TYPES = [
-  { value: 'double', label: 'Double Glazing (U: 1.4)' }, { value: 'triple', label: 'Triple Glazing (U: 1.2)' },
-  { value: 'passive', label: 'Passive Glass (U: 0.8)' },
+  { value: 'double', label: 'Double (U: 1.4)' }, { value: 'triple', label: 'Triple (U: 1.2)' },
+  { value: 'passive', label: 'Passive (U: 0.8)' },
 ];
-const GLASS_SPECS = [{ value: 'toughened', label: 'Toughened (Standard)' }, { value: 'laminated', label: 'Laminated (Extra Security)' }];
+const GLASS_SPECS = [{ value: 'toughened', label: 'Toughened' }, { value: 'laminated', label: 'Laminated' }];
 const GLASS_FINISHES = [{ value: 'clear', label: 'Clear' }, { value: 'frosted', label: 'Frosted' }];
-const FROSTED_LOCS = [{ value: 'bottom', label: 'Bottom Sash Only' }, { value: 'both', label: 'Both Sashes' }];
-const SPACERS = [{ value: 'silver', label: 'Silver' }, { value: 'black', label: 'Black' }, { value: 'gold', label: 'Gold' }, { value: 'white', label: 'White' }];
-const OPENINGS = [{ value: 'both', label: 'Both Sashes Open' }, { value: 'bottom', label: 'Bottom Sash Only' }, { value: 'fixed', label: 'Fixed (Non-opening)' }];
-const IRON_FINISHES = [
-  { value: 'brass', label: 'Brass' }, { value: 'chrome', label: 'Chrome' }, { value: 'stainless', label: 'Stainless Steel' },
-  { value: 'antique_brass', label: 'Antique Brass' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' },
-];
-const SWATCHES = [
-  { n: 'Pure White', h: '#FAFAFA' }, { n: 'Jet Black', h: '#0A0A0A' }, { n: 'Anthracite', h: '#293133' },
-  { n: 'Olive Green', h: '#424632' }, { n: 'Off-White', h: '#F7F9F5' }, { n: 'Cream', h: '#F1EFDC' },
-  { n: 'Burgundy', h: '#5E2028' }, { n: 'Royal Blue', h: '#222D5A' },
-];
+const FROSTED_LOCS = [{ value: 'bottom', label: 'Bottom Only' }, { value: 'both', label: 'Both Sashes' }];
+const SPACERS = [{ value: 'silver', label: 'Silver' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' }];
+const OPENINGS = [{ value: 'both', label: 'Both Open' }, { value: 'bottom', label: 'Bottom Only' }, { value: 'fixed', label: 'Fixed' }];
+
 const RAL = [
-  { g: 'Whites', o: [['#FFFFFF','9010 Pure White'],['#F6F6F6','9016 Traffic White'],['#F4F4F4','9003 Signal White'],['#FDF4E3','9001 Cream White'],['#E7EBDA','9002 Grey White'],['#E6D690','1015 Light Ivory'],['#C2B078','1001 Beige']] },
-  { g: 'Greys', o: [['#D7D7D7','7035 Light Grey'],['#B5B8B1','7038 Agate Grey'],['#8D948D','7042 Traffic Grey A'],['#78858B','7000 Squirrel Grey'],['#474A51','7024 Graphite Grey'],['#293133','7016 Anthracite'],['#23282B','7021 Black Grey'],['#434750','7015 Slate Grey']] },
+  { g: 'Whites & Creams', o: [['#FFFFFF','9010 Pure White'],['#F6F6F6','9016 Traffic White'],['#F4F4F4','9003 Signal White'],['#FDF4E3','9001 Cream White'],['#E7EBDA','9002 Grey White'],['#E6D690','1015 Light Ivory'],['#C2B078','1001 Beige'],['#C6A664','1002 Sand Yellow']] },
+  { g: 'Greys', o: [['#D7D7D7','7035 Light Grey'],['#B5B8B1','7038 Agate Grey'],['#8D948D','7042 Traffic Grey A'],['#7D7F7D','7037 Dusty Grey'],['#78858B','7000 Squirrel Grey'],['#9EA0A1','7004 Signal Grey'],['#474A51','7024 Graphite Grey'],['#293133','7016 Anthracite'],['#23282B','7021 Black Grey'],['#434750','7015 Slate Grey']] },
   { g: 'Blacks', o: [['#0A0A0A','9005 Jet Black'],['#1C2023','9011 Graphite Black'],['#1E1E1E','9017 Traffic Black'],['#282828','9004 Signal Black']] },
-  { g: 'Greens', o: [['#31372B','6009 Fir Green'],['#2F4538','6005 Moss Green'],['#343B29','6007 Bottle Green'],['#4A4F3B','6003 Olive Green'],['#587246','6011 Reseda Green'],['#35682D','6010 Grass Green'],['#1E5945','6016 Turquoise Green']] },
-  { g: 'Blues', o: [['#1E2460','5002 Ultramarine Blue'],['#1B2A4A','5011 Steel Blue'],['#2271B3','5015 Sky Blue'],['#063971','5017 Traffic Blue'],['#3B83BD','5012 Light Blue']] },
+  { g: 'Greens', o: [['#31372B','6009 Fir Green'],['#2F4538','6005 Moss Green'],['#343B29','6007 Bottle Green'],['#1F3A3D','6004 Blue Green'],['#4A4F3B','6003 Olive Green'],['#587246','6011 Reseda Green'],['#35682D','6010 Grass Green'],['#1E5945','6016 Turquoise Green']] },
+  { g: 'Blues', o: [['#1E2460','5002 Ultramarine'],['#1B2A4A','5011 Steel Blue'],['#2271B3','5015 Sky Blue'],['#063971','5017 Traffic Blue'],['#3B83BD','5012 Light Blue']] },
   { g: 'Reds', o: [['#AF2B1E','3000 Flame Red'],['#9B111E','3003 Ruby Red'],['#75151E','3004 Purple Red'],['#5E2129','3005 Wine Red']] },
   { g: 'Browns', o: [['#955F20','8001 Ochre Brown'],['#6F4F28','8008 Olive Brown'],['#6F3B2A','8011 Nut Brown'],['#4E3B31','8028 Terra Brown'],['#45322E','8017 Chocolate Brown']] },
 ];
@@ -56,17 +49,22 @@ export default function ConfiguratorPage() {
   const { estimateId } = useParams();
   const navigate = useNavigate();
   const addWindow = useProjectStore((s) => s.addWindowToEstimate);
+
   const [sashType, setSashType] = useState('double');
   const [splitRatio, setSplitRatio] = useState('1/4-1/2-1/4');
   const [headType, setHeadType] = useState('flat');
   const [mType, setMType] = useState('box-to-box');
   const [inW, setInW] = useState(1000);
   const [inH, setInH] = useState(1500);
-  const extW = mType === 'brick-to-brick' ? inW + 150 : inW;
-  const extH = mType === 'brick-to-brick' ? inH + 75 : inH;
+  const extW = mType === 'brick-to-brick' ? (Number(inW) || 400) + 150 : (Number(inW) || 400);
+  const extH = mType === 'brick-to-brick' ? (Number(inH) || 400) + 75 : (Number(inH) || 400);
   const [uBars, setUBars] = useState('none');
   const [lBars, setLBars] = useState('none');
   const [sameBars, setSameBars] = useState(true);
+  const [uCustomV, setUCustomV] = useState([]);
+  const [uCustomH, setUCustomH] = useState([]);
+  const [lCustomV, setLCustomV] = useState([]);
+  const [lCustomH, setLCustomH] = useState([]);
   const [boxType, setBoxType] = useState('standard');
   const [horn, setHorn] = useState('A');
   const [colType, setColType] = useState('single');
@@ -83,11 +81,14 @@ export default function ConfiguratorPage() {
   const [iron, setIron] = useState('brass');
 
   const isSingle = colType === 'single';
+
   const sync = useCallback(() => {
     if (typeof window.update3D !== 'function') return;
     window.update3D({
       windowCategory: 'sash', extWidth: extW, extHeight: extH,
       upperBars: uBars, lowerBars: sameBars ? uBars : lBars, sameBars,
+      upperCustomBars: uBars === 'custom' ? { vertical: uCustomV, horizontal: uCustomH } : [],
+      lowerCustomBars: (sameBars ? uBars : lBars) === 'custom' ? { vertical: sameBars ? uCustomV : lCustomV, horizontal: sameBars ? uCustomH : lCustomH } : [],
       showHorns: horn !== 'none', hornType: horn === 'none' ? 'A' : horn,
       woodColor: wc, woodColorExt: isSingle ? wc : wcE, woodColorInt: isSingle ? wc : wcI, sameColor: isSingle,
       ironmongery: iron,
@@ -95,7 +96,7 @@ export default function ConfiguratorPage() {
       lowerGlass: gFin === 'frosted' ? 'frosted' : 'clear',
       spacerColor: spacer, sashType, splitRatio, headType, openingType: opening, boxType,
     });
-  }, [extW, extH, uBars, lBars, sameBars, horn, wc, wcE, wcI, isSingle, iron, gFin, frostLoc, spacer, sashType, splitRatio, headType, opening, boxType]);
+  }, [extW, extH, uBars, lBars, sameBars, uCustomV, uCustomH, lCustomV, lCustomH, horn, wc, wcE, wcI, isSingle, iron, gFin, frostLoc, spacer, sashType, splitRatio, headType, opening, boxType]);
   useEffect(() => { sync(); }, [sync]);
 
   const setColor = (hex) => { setWc(hex); if (isSingle) { setWcE(hex); setWcI(hex); } };
@@ -104,6 +105,8 @@ export default function ConfiguratorPage() {
     addWindow(estimateId, {
       windowCategory: 'sash', extWidth: extW, extHeight: extH,
       upperBars: uBars, lowerBars: sameBars ? uBars : lBars, sameBars,
+      upperCustomBars: uBars === 'custom' ? { vertical: uCustomV, horizontal: uCustomH } : [],
+      lowerCustomBars: (sameBars ? uBars : lBars) === 'custom' ? { vertical: sameBars ? uCustomV : lCustomV, horizontal: sameBars ? uCustomH : lCustomH } : [],
       showHorns: horn !== 'none', hornType: horn,
       woodColor: wc, woodColorExt: isSingle ? wc : wcE, woodColorInt: isSingle ? wc : wcI, sameColor: isSingle,
       ironmongery: iron, doubleGlazing: gType !== 'single',
@@ -114,6 +117,12 @@ export default function ConfiguratorPage() {
     });
     navigate(`/estimates/${estimateId}`);
   };
+
+  const addCustomBar = (setter, list) => {
+    const pos = prompt('Position in mm from left/top edge:');
+    if (pos && !isNaN(Number(pos))) setter([...list, Number(pos)].sort((a, b) => a - b));
+  };
+  const removeCustomBar = (setter, list, idx) => setter(list.filter((_, i) => i !== idx));
 
   return (
     <div className="h-full flex flex-col">
@@ -126,71 +135,287 @@ export default function ConfiguratorPage() {
       </div>
       <div className="flex-1 flex overflow-hidden">
         <div className="w-96 shrink-0 border-r border-ink-200 bg-white overflow-y-auto">
-          <P t="1. Product Range">
-            <L>Window Type</L>
-            <div className="flex gap-2 mb-3"><Tg active>Sash Window</Tg><Tg disabled>Casement</Tg><Tg disabled>Fix Frame</Tg><Tg disabled title="Door code not available">Door 🔒</Tg></div>
-            <L>Sash Type</L><RG n="st" o={SASH_TYPES} v={sashType} c={setSashType} />
-            {sashType==='triple'&&<><L>Panel Proportions</L><select value={splitRatio} onChange={e=>setSplitRatio(e.target.value)} className="w-full px-3 py-2 border border-ink-300 rounded-lg text-xs mb-3">{SPLIT_RATIOS.map(r=><option key={r.value} value={r.value}>{r.label}</option>)}</select></>}
-            <L>Head Type</L><RG n="ht" o={HEAD_TYPES} v={headType} c={setHeadType} />
-          </P>
-          <P t="2. Dimensions">
-            <L>Measurement Method</L>
-            <RG n="mt" o={[{value:'box-to-box',label:'Frame Dimensions'},{value:'brick-to-brick',label:'Structural Opening'}]} v={mType} c={setMType} />
-            {mType==='brick-to-brick'&&<div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 mb-3">Frame = structural + 150mm (W) / + 75mm (H)<br/>Frame: <strong>{extW} × {extH} mm</strong></div>}
+
+          {/* 1. PRODUCT RANGE */}
+          <Sec t="1. Product Range">
+            <Lbl>Window Type</Lbl>
+            <div className="flex gap-2 mb-3">
+              <Pill active>Sash</Pill><Pill disabled>Casement</Pill><Pill disabled>Fix Frame</Pill><Pill disabled>Door 🔒</Pill>
+            </div>
+            <Lbl>Sash Type</Lbl>
+            <HChips o={SASH_TYPES} v={sashType} c={setSashType} />
+            {sashType === 'triple' && <>
+              <Lbl>Proportions</Lbl>
+              <select value={splitRatio} onChange={e => setSplitRatio(e.target.value)} className="w-full px-3 py-2 border border-ink-300 rounded-lg text-xs mb-3">
+                {SPLIT_RATIOS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </select>
+            </>}
+            <Lbl>Head Type</Lbl>
+            <HChips o={HEAD_TYPES} v={headType} c={setHeadType} />
+          </Sec>
+
+          {/* 2. DIMENSIONS */}
+          <Sec t="2. Dimensions">
+            <Lbl>Measurement</Lbl>
+            <HChips o={[{ value: 'box-to-box', label: 'Frame' }, { value: 'brick-to-brick', label: 'Structural Opening' }]} v={mType} c={setMType} />
+            {mType === 'brick-to-brick' && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs text-amber-800 mb-3">
+                Frame = structural + 150 (W) / + 75 (H) → <strong>{extW} × {extH} mm</strong>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
-              <div><L>Width (mm)</L><input type="number" min={400} max={3000} step={10} value={inW} onChange={e=>setInW(Number(e.target.value)||400)} onBlur={e=>setInW(Math.max(400,Math.min(3000,Number(e.target.value)||400)))} className="w-full px-3 py-2 border border-ink-300 rounded-lg text-sm" /></div>
-              <div><L>Height (mm)</L><input type="number" min={400} max={3000} step={10} value={inH} onChange={e=>setInH(Number(e.target.value)||400)} onBlur={e=>setInH(Math.max(400,Math.min(3000,Number(e.target.value)||400)))} className="w-full px-3 py-2 border border-ink-300 rounded-lg text-sm" /></div>
+              <div>
+                <Lbl>Width (mm)</Lbl>
+                <input type="number" min={400} max={3000} step={10} value={inW}
+                  onChange={e => setInW(e.target.value === '' ? '' : Number(e.target.value))}
+                  onBlur={e => { const v = Number(e.target.value); setInW(isNaN(v) || v < 400 ? 400 : v > 3000 ? 3000 : v); }}
+                  className="w-full px-3 py-2 border border-ink-300 rounded-lg text-sm" />
+              </div>
+              <div>
+                <Lbl>Height (mm)</Lbl>
+                <input type="number" min={400} max={3000} step={10} value={inH}
+                  onChange={e => setInH(e.target.value === '' ? '' : Number(e.target.value))}
+                  onBlur={e => { const v = Number(e.target.value); setInH(isNaN(v) || v < 400 ? 400 : v > 3000 ? 3000 : v); }}
+                  className="w-full px-3 py-2 border border-ink-300 rounded-lg text-sm" />
+              </div>
             </div>
-          </P>
-          <P t="3. Georgian Bars">
-            <L>Upper Sash Bars</L><Ch o={BAR_OPTIONS} v={uBars} c={v=>{setUBars(v);if(sameBars)setLBars(v);}} />
-            <label className="flex items-center gap-2 text-xs text-ink-600 mb-3 cursor-pointer"><input type="checkbox" checked={sameBars} onChange={e=>setSameBars(e.target.checked)} className="accent-accent-500" />Same bars upper & lower</label>
-            {!sameBars&&<><L>Lower Sash Bars</L><Ch o={BAR_OPTIONS} v={lBars} c={setLBars} /></>}
-          </P>
-          <P t="4. Frame & Horns">
-            <L>Frame Version</L><RG n="ft" o={FRAME_TYPES} v={boxType} c={setBoxType} />
-            <L>Sash Horns</L><RG n="hn" o={HORN_OPTIONS} v={horn} c={setHorn} />
-          </P>
-          <P t="5. Colour">
-            <RG n="ct" o={[{value:'single',label:'Single Colour'},{value:'dual',label:'Dual Colour (+15%)'}]} v={colType} c={setColType} />
-            {isSingle?<><L>Select Colour</L><CP v={wc} c={setColor}/></>:<><L>Exterior</L><CP v={wcE} c={setWcE}/><L>Interior</L><CP v={wcI} c={setWcI}/></>}
-          </P>
-          <P t="6. Glass">
-            <L>Glass Type</L><RG n="gt" o={GLASS_TYPES} v={gType} c={setGType} />
-            <L>Specification</L><RG n="gs" o={GLASS_SPECS} v={gSpec} c={setGSpec} />
-            <L>Finish</L><RG n="gf" o={GLASS_FINISHES} v={gFin} c={setGFin} />
-            {gFin==='frosted'&&<><L>Frosted Location</L><RG n="fl" o={FROSTED_LOCS} v={frostLoc} c={setFrostLoc} /></>}
-            <L>Spacer Colour</L><Ch o={SPACERS} v={spacer} c={setSpacer} />
-          </P>
-          <P t="7. Opening"><RG n="op" o={OPENINGS} v={opening} c={setOpening} /></P>
-          <P t="8. Hardware">
-            <L>PAS 24 Security</L><RG n="p24" o={[{value:'no',label:'No — Standard'},{value:'yes',label:'Yes — PAS 24'}]} v={pas24?'yes':'no'} c={v=>setPas24(v==='yes')} />
-            <L>Ironmongery Finish</L><Ch o={IRON_FINISHES} v={iron} c={setIron} cols={3} />
-            <div className="mt-3 p-3 bg-ink-50 rounded-lg text-xs text-ink-500 italic">Ironmongery gallery coming soon — database needed.</div>
-          </P>
-          <P t="Summary" hl>
+          </Sec>
+
+          {/* 3. BARS */}
+          <Sec t="3. Georgian Bars">
+            <Lbl>Upper Sash</Lbl>
+            <GChips o={BAR_OPTIONS} v={uBars} c={v => { setUBars(v); if (sameBars) setLBars(v); }} />
+            {uBars === 'custom' && (
+              <CustomBarEditor
+                label="Upper custom"
+                vertical={uCustomV} horizontal={uCustomH}
+                onAddV={() => addCustomBar(setUCustomV, uCustomV)}
+                onAddH={() => addCustomBar(setUCustomH, uCustomH)}
+                onRemoveV={i => removeCustomBar(setUCustomV, uCustomV, i)}
+                onRemoveH={i => removeCustomBar(setUCustomH, uCustomH, i)}
+              />
+            )}
+            <label className="flex items-center gap-2 text-xs text-ink-600 mb-3 cursor-pointer">
+              <input type="checkbox" checked={sameBars} onChange={e => setSameBars(e.target.checked)} className="accent-accent-500" />
+              Same bars upper & lower
+            </label>
+            {!sameBars && <>
+              <Lbl>Lower Sash</Lbl>
+              <GChips o={BAR_OPTIONS} v={lBars} c={setLBars} />
+              {lBars === 'custom' && (
+                <CustomBarEditor
+                  label="Lower custom"
+                  vertical={lCustomV} horizontal={lCustomH}
+                  onAddV={() => addCustomBar(setLCustomV, lCustomV)}
+                  onAddH={() => addCustomBar(setLCustomH, lCustomH)}
+                  onRemoveV={i => removeCustomBar(setLCustomV, lCustomV, i)}
+                  onRemoveH={i => removeCustomBar(setLCustomH, lCustomH, i)}
+                />
+              )}
+            </>}
+          </Sec>
+
+          {/* 4. FRAME & HORNS */}
+          <Sec t="4. Frame & Horns">
+            <Lbl>Frame</Lbl>
+            <HChips o={FRAME_TYPES} v={boxType} c={setBoxType} />
+            <Lbl>Horns</Lbl>
+            <HChips o={HORN_OPTIONS} v={horn} c={setHorn} />
+          </Sec>
+
+          {/* 5. COLOUR */}
+          <Sec t="5. Colour">
+            <HChips o={[{ value: 'single', label: 'Single' }, { value: 'dual', label: 'Dual (+15%)' }]} v={colType} c={setColType} />
+            {isSingle ? (
+              <ColourPicker label="Colour" value={wc} onChange={setColor} />
+            ) : (<>
+              <ColourPicker label="Exterior" value={wcE} onChange={setWcE} />
+              <ColourPicker label="Interior" value={wcI} onChange={setWcI} />
+            </>)}
+          </Sec>
+
+          {/* 6. GLASS */}
+          <Sec t="6. Glass">
+            <Lbl>Type</Lbl>
+            <HChips o={GLASS_TYPES} v={gType} c={setGType} />
+            <Lbl>Spec</Lbl>
+            <HChips o={GLASS_SPECS} v={gSpec} c={setGSpec} />
+            <Lbl>Finish</Lbl>
+            <HChips o={GLASS_FINISHES} v={gFin} c={setGFin} />
+            {gFin === 'frosted' && <>
+              <Lbl>Frosted Location</Lbl>
+              <HChips o={FROSTED_LOCS} v={frostLoc} c={setFrostLoc} />
+            </>}
+            <Lbl>Spacer</Lbl>
+            <HChips o={SPACERS} v={spacer} c={setSpacer} />
+          </Sec>
+
+          {/* 7. OPENING */}
+          <Sec t="7. Opening">
+            <HChips o={OPENINGS} v={opening} c={setOpening} />
+          </Sec>
+
+          {/* 8. HARDWARE */}
+          <Sec t="8. Hardware">
+            <Lbl>PAS 24</Lbl>
+            <HChips o={[{ value: 'no', label: 'No — Standard' }, { value: 'yes', label: 'Yes — PAS 24' }]} v={pas24 ? 'yes' : 'no'} c={v => setPas24(v === 'yes')} />
+            <Lbl>Ironmongery</Lbl>
+            <button
+              onClick={() => alert('Ironmongery database — coming soon')}
+              className="w-full px-4 py-3 border-2 border-dashed border-ink-300 rounded-lg text-xs text-ink-500 hover:border-accent-400 hover:text-accent-600 transition-colors text-center"
+            >
+              🔧 Select ironmongery from database →
+            </button>
+            <div className="text-[10px] text-ink-400 mt-1">Current: {iron}</div>
+          </Sec>
+
+          {/* SUMMARY */}
+          <Sec t="Summary" hl>
             <div className="space-y-1 text-xs">
-              <SR l="Type" v={`Sash — ${sashType}`}/><SR l="Frame size" v={`${extW} × ${extH} mm`}/>
-              {mType==='brick-to-brick'&&<SR l="Structural" v={`${inW} × ${inH} mm`}/>}
-              <SR l="Bars" v={`${uBars}${!sameBars?` / ${lBars}`:''}`}/><SR l="Frame" v={boxType==='standard'?'164mm':'144mm'}/>
-              <SR l="Horns" v={horn==='none'?'None':horn}/><SR l="Colour" v={isSingle?'Single':'Dual (+15%)'}/>
-              <SR l="Glass" v={`${gType} / ${gSpec} / ${gFin}`}/>{gFin==='frosted'&&<SR l="Frosted" v={frostLoc}/>}
-              <SR l="Spacer" v={spacer}/><SR l="Opening" v={opening}/><SR l="PAS24" v={pas24?'Yes':'No'}/><SR l="Ironmongery" v={iron}/>
+              <SR l="Type" v={`Sash — ${sashType}`} />
+              <SR l="Size" v={`${extW} × ${extH} mm`} />
+              {mType === 'brick-to-brick' && <SR l="Input" v={`${inW} × ${inH} (structural)`} />}
+              <SR l="Bars" v={`${uBars}${!sameBars ? ` / ${lBars}` : ''}`} />
+              <SR l="Frame" v={boxType === 'standard' ? '164mm' : '144mm'} />
+              <SR l="Horns" v={horn === 'none' ? 'None' : horn} />
+              <SR l="Colour" v={isSingle ? 'Single' : 'Dual'} />
+              <SR l="Glass" v={`${gType} / ${gSpec} / ${gFin}`} />
+              {gFin === 'frosted' && <SR l="Frosted" v={frostLoc} />}
+              <SR l="Spacer" v={spacer} />
+              <SR l="Opening" v={opening} />
+              <SR l="PAS24" v={pas24 ? 'Yes' : 'No'} />
+              <SR l="Ironmongery" v={iron} />
             </div>
-          </P>
+          </Sec>
+
         </div>
+
+        {/* 3D VIEWER */}
         <div className="flex-1 bg-gradient-to-br from-ink-100 to-ink-200 relative">
-          <Suspense fallback={<div className="absolute inset-0 flex items-center justify-center text-ink-400 text-sm">Loading 3D…</div>}><Viewer3D /></Suspense>
+          <Suspense fallback={<div className="absolute inset-0 flex items-center justify-center text-ink-400 text-sm">Loading 3D…</div>}>
+            <Viewer3D />
+          </Suspense>
         </div>
       </div>
     </div>
   );
 }
 
-function P({t,hl,children}){return <div className={`px-5 py-4 border-b border-ink-200 ${hl?'bg-ink-50':''}`}><div className="text-xs font-semibold text-ink-800 uppercase tracking-wider mb-3">{t}</div>{children}</div>}
-function L({children}){return <div className="text-xs text-ink-500 font-medium mb-1.5 mt-2">{children}</div>}
-function Tg({children,active,disabled,title}){if(disabled)return<span className="px-3 py-1.5 text-xs rounded-lg border border-ink-200 text-ink-300 cursor-not-allowed" title={title}>{children}</span>;if(active)return<span className="px-3 py-1.5 text-xs rounded-lg border border-accent-500 bg-accent-50 text-accent-700 font-medium">{children}</span>;return<span className="px-3 py-1.5 text-xs rounded-lg border border-ink-200 text-ink-600">{children}</span>}
-function RG({n,o,v,c}){return<div className="space-y-1.5 mb-3">{o.map(x=><label key={x.value} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border cursor-pointer text-xs ${v===x.value?'border-accent-500 bg-accent-50 text-accent-700':'border-ink-200 text-ink-600 hover:bg-ink-50'}`}><input type="radio" name={n} value={x.value} checked={v===x.value} onChange={()=>c(x.value)} className="accent-accent-500"/>{x.label}</label>)}</div>}
-function Ch({o,v,c,cols=4}){return<div className="grid gap-1.5 mb-3" style={{gridTemplateColumns:`repeat(${cols},1fr)`}}>{o.map(x=><button key={x.value} onClick={()=>c(x.value)} className={`px-2 py-1.5 text-xs rounded border ${v===x.value?'border-accent-500 bg-accent-50 text-accent-700 font-medium':'border-ink-200 text-ink-600 hover:bg-ink-50'}`}>{x.label}</button>)}</div>}
-function CP({v,c}){return<div className="mb-3"><div className="flex items-center gap-2 mb-2"><div className="w-8 h-8 rounded-lg border-2 border-ink-200" style={{backgroundColor:v}}/><span className="text-xs text-ink-400 font-mono">{v.toUpperCase()}</span></div><div className="grid grid-cols-5 gap-2 mb-3">{SWATCHES.map(s=><div key={s.h} onClick={()=>c(s.h)} title={s.n} className="aspect-square rounded-lg cursor-pointer hover:scale-110 transition-transform" style={{backgroundColor:s.h,border:v===s.h?'3px solid #3B82F6':'2px solid rgba(0,0,0,0.12)'}}/>)}<label className="aspect-square rounded-lg cursor-pointer flex items-center justify-center text-lg text-ink-400" style={{border:'2px dashed rgba(0,0,0,0.2)'}}>+<input type="color" value={v} onChange={e=>c(e.target.value)} className="sr-only"/></label></div><select value="" onChange={e=>e.target.value&&c(e.target.value)} className="w-full px-3 py-2 border border-ink-300 rounded-lg text-xs mb-2"><option value="">— RAL —</option>{RAL.map(g=><optgroup key={g.g} label={g.g}>{g.o.map(([hex,lab])=><option key={hex} value={hex}>{lab}</option>)}</optgroup>)}</select><select value="" onChange={e=>e.target.value&&c(e.target.value)} className="w-full px-3 py-2 border border-ink-300 rounded-lg text-xs"><option value="">— Farrow & Ball —</option>{FB.map(g=><optgroup key={g.g} label={g.g}>{g.o.map(([hex,lab])=><option key={hex} value={hex}>{lab}</option>)}</optgroup>)}</select></div>}
-function SR({l,v}){return<div className="flex justify-between gap-2"><span className="text-ink-400">{l}</span><span className="text-ink-800 font-medium text-right">{v}</span></div>}
+// ─── UI COMPONENTS ───
+
+function Sec({ t, hl, children }) {
+  return (
+    <div className={`px-5 py-4 border-b border-ink-200 ${hl ? 'bg-ink-50' : ''}`}>
+      <div className="text-xs font-semibold text-ink-800 uppercase tracking-wider mb-3">{t}</div>
+      {children}
+    </div>
+  );
+}
+
+function Lbl({ children }) {
+  return <div className="text-xs text-ink-500 font-medium mb-1.5 mt-2">{children}</div>;
+}
+
+function Pill({ children, active, disabled }) {
+  if (disabled) return <span className="px-3 py-1.5 text-xs rounded-lg border border-ink-200 text-ink-300 cursor-not-allowed">{children}</span>;
+  if (active) return <span className="px-3 py-1.5 text-xs rounded-lg border border-accent-500 bg-accent-50 text-accent-700 font-medium">{children}</span>;
+  return <span className="px-3 py-1.5 text-xs rounded-lg border border-ink-200 text-ink-600">{children}</span>;
+}
+
+// Horizontal chips — inline row
+function HChips({ o, v, c }) {
+  return (
+    <div className="flex flex-wrap gap-1.5 mb-3">
+      {o.map(x => (
+        <button key={x.value} onClick={() => c(x.value)}
+          className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${v === x.value ? 'border-accent-500 bg-accent-50 text-accent-700 font-medium' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}>
+          {x.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Grid chips for bars (4 cols)
+function GChips({ o, v, c }) {
+  return (
+    <div className="grid grid-cols-4 gap-1.5 mb-3">
+      {o.map(x => (
+        <button key={x.value} onClick={() => c(x.value)}
+          className={`px-2 py-1.5 text-xs rounded border transition-colors ${v === x.value ? 'border-accent-500 bg-accent-50 text-accent-700 font-medium' : 'border-ink-200 text-ink-600 hover:bg-ink-50'}`}>
+          {x.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Custom bar editor
+function CustomBarEditor({ label, vertical, horizontal, onAddV, onAddH, onRemoveV, onRemoveH }) {
+  return (
+    <div className="bg-ink-50 rounded-lg p-3 mb-3 text-xs">
+      <div className="font-medium text-ink-700 mb-2">{label}</div>
+      <div className="flex gap-2 mb-2">
+        <button onClick={onAddV} className="px-2 py-1 bg-white border border-ink-300 rounded text-xs hover:bg-ink-100">+ Vertical</button>
+        <button onClick={onAddH} className="px-2 py-1 bg-white border border-ink-300 rounded text-xs hover:bg-ink-100">+ Horizontal</button>
+      </div>
+      {vertical.length > 0 && (
+        <div className="mb-1">
+          <span className="text-ink-400">V: </span>
+          {vertical.map((pos, i) => (
+            <span key={i} className="inline-flex items-center gap-1 bg-white border border-ink-200 rounded px-1.5 py-0.5 mr-1 mb-1">
+              {pos}mm <button onClick={() => onRemoveV(i)} className="text-red-400 hover:text-red-600">×</button>
+            </span>
+          ))}
+        </div>
+      )}
+      {horizontal.length > 0 && (
+        <div>
+          <span className="text-ink-400">H: </span>
+          {horizontal.map((pos, i) => (
+            <span key={i} className="inline-flex items-center gap-1 bg-white border border-ink-200 rounded px-1.5 py-0.5 mr-1 mb-1">
+              {pos}mm <button onClick={() => onRemoveH(i)} className="text-red-400 hover:text-red-600">×</button>
+            </span>
+          ))}
+        </div>
+      )}
+      {vertical.length === 0 && horizontal.length === 0 && <div className="text-ink-400 italic">No custom bars yet</div>}
+    </div>
+  );
+}
+
+// Colour picker — just RAL + F&B dropdowns + custom hex
+function ColourPicker({ label, value, onChange }) {
+  return (
+    <div className="mb-3">
+      <Lbl>{label}</Lbl>
+      <div className="flex items-center gap-2 mb-2">
+        <div className="w-6 h-6 rounded border-2 border-ink-200 shrink-0" style={{ backgroundColor: value }} />
+        <span className="text-xs text-ink-400 font-mono">{value.toUpperCase()}</span>
+        <label className="ml-auto text-xs text-accent-600 cursor-pointer hover:underline">
+          Custom
+          <input type="color" value={value} onChange={e => onChange(e.target.value)} className="sr-only" />
+        </label>
+      </div>
+      <select value="" onChange={e => e.target.value && onChange(e.target.value)}
+        className="w-full px-3 py-2 border border-ink-300 rounded-lg text-xs mb-2">
+        <option value="">— RAL Colour —</option>
+        {RAL.map(g => <optgroup key={g.g} label={g.g}>{g.o.map(([hex, lab]) => <option key={hex} value={hex}>{lab}</option>)}</optgroup>)}
+      </select>
+      <select value="" onChange={e => e.target.value && onChange(e.target.value)}
+        className="w-full px-3 py-2 border border-ink-300 rounded-lg text-xs">
+        <option value="">— Farrow & Ball —</option>
+        {FB.map(g => <optgroup key={g.g} label={g.g}>{g.o.map(([hex, lab]) => <option key={hex} value={hex}>{lab}</option>)}</optgroup>)}
+      </select>
+    </div>
+  );
+}
+
+function SR({ l, v }) {
+  return (
+    <div className="flex justify-between gap-2">
+      <span className="text-ink-400">{l}</span>
+      <span className="text-ink-800 font-medium text-right">{v}</span>
+    </div>
+  );
+}
