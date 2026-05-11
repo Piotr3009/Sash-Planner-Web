@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
 import { hasSupabaseConfig, supabase } from '../services/supabase.js';
 import { mockEstimates } from '../mocks/mockEstimates.js';
@@ -8,6 +8,7 @@ import WindowCard from '../components/dashboard/WindowCard.jsx';
 
 export default function EstimateDetailPage() {
   const { estimateId } = useParams();
+  const navigate = useNavigate();
   const currentEstimate = useProjectStore((s) => s.currentEstimate);
   const currentItems = useProjectStore((s) => s.currentItems);
   const loading = useProjectStore((s) => s.currentLoading);
@@ -15,6 +16,7 @@ export default function EstimateDetailPage() {
   const setCurrentEstimate = useProjectStore((s) => s.setCurrentEstimate);
   const setLoading = useProjectStore((s) => s.setCurrentLoading);
   const setError = useProjectStore((s) => s.setCurrentError);
+  const removeWindowFromEstimate = useProjectStore((s) => s.removeWindowFromEstimate);
 
   useEffect(() => {
     let cancelled = false;
@@ -23,6 +25,14 @@ export default function EstimateDetailPage() {
       setError(null);
       try {
         if (!hasSupabaseConfig) {
+          // Check user-created estimates first (in store)
+          const allEstimates = useProjectStore.getState().estimates;
+          const found = allEstimates.find((e) => e.id === estimateId);
+          if (found && !cancelled) {
+            setCurrentEstimate(found, found.items || []);
+            return;
+          }
+          // Fallback to mock
           const mock = mockEstimates.find((e) => e.id === estimateId);
           if (mock && !cancelled) {
             setCurrentEstimate(mock, mock.items);
@@ -55,6 +65,12 @@ export default function EstimateDetailPage() {
     };
   }, [estimateId, setCurrentEstimate, setLoading, setError]);
 
+  const handleDeleteWindow = (itemId) => {
+    if (window.confirm('Remove this window from the estimate?')) {
+      removeWindowFromEstimate(estimateId, itemId);
+    }
+  };
+
   if (loading) return <div className="p-8 text-sm text-ink-400">Loading estimate…</div>;
   if (!currentEstimate) return <div className="p-8 text-sm text-ink-400">Estimate not found.</div>;
 
@@ -71,26 +87,52 @@ export default function EstimateDetailPage() {
               <p className="text-sm text-ink-600">{currentEstimate.project_name}</p>
             )}
           </div>
-          <div className="text-right text-sm">
-            <div className="text-ink-400 text-xs">Total</div>
-            <div className="text-xl font-semibold">£{total.toFixed(2)}</div>
+          <div className="flex items-center gap-4">
+            {total > 0 && (
+              <div className="text-right text-sm">
+                <div className="text-ink-400 text-xs">Total</div>
+                <div className="text-xl font-semibold">£{total.toFixed(2)}</div>
+              </div>
+            )}
+            <button
+              onClick={() => navigate(`/estimates/${estimateId}/configurator`)}
+              className="px-4 py-2 bg-accent-500 text-white text-sm font-medium rounded-lg hover:bg-accent-600 transition-colors"
+            >
+              + Add Window
+            </button>
           </div>
         </div>
         {error && <div className="mt-2 text-xs text-amber-600">Showing mock data — {error}</div>}
       </div>
 
       {currentItems.length === 0 && (
-        <div className="card p-8 text-center text-ink-400">No windows in this estimate yet.</div>
+        <div className="card p-8 text-center text-ink-400">
+          <p className="mb-4">No windows in this estimate yet.</p>
+          <button
+            onClick={() => navigate(`/estimates/${estimateId}/configurator`)}
+            className="px-4 py-2 bg-accent-500 text-white text-sm font-medium rounded-lg hover:bg-accent-600"
+          >
+            + Add Your First Window
+          </button>
+        </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {currentItems.map((item) => (
-          <WindowCard
-            key={item.id}
-            item={item}
-            spec={parseSpecification(item.specification)}
-            estimateId={currentEstimate.id}
-          />
+          <div key={item.id} className="relative group">
+            <WindowCard
+              item={item}
+              spec={parseSpecification(item.specification)}
+              estimateId={currentEstimate.id}
+            />
+            <button
+              onClick={() => handleDeleteWindow(item.id)}
+              className="absolute top-3 right-3 w-7 h-7 rounded-full bg-ink-100 text-ink-400 hover:bg-red-100 hover:text-red-600 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity z-10"
+              title="Remove window"
+            >
+              ✕
+            </button>
+          </div>
         ))}
       </div>
     </div>
