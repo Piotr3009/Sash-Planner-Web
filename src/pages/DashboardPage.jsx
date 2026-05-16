@@ -6,10 +6,8 @@ import { mockProjects } from '../mocks/mockProjects.js';
 export default function DashboardPage() {
   const projects = useProjectStore((s) => s.projects);
   const loading = useProjectStore((s) => s.projectsLoading);
-  const error = useProjectStore((s) => s.projectsError);
   const setProjects = useProjectStore((s) => s.setProjects);
   const setLoading = useProjectStore((s) => s.setProjectsLoading);
-  const setError = useProjectStore((s) => s.setProjectsError);
   const createProject = useProjectStore((s) => s.createProject);
   const deleteProject = useProjectStore((s) => s.deleteProject);
   const navigate = useNavigate();
@@ -19,22 +17,13 @@ export default function DashboardPage() {
   const [projAddress, setProjAddress] = useState('');
 
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
+    if (projects.length === 0) {
       setLoading(true);
-      setError(null);
-      try {
-        // TODO: load from Supabase when connected
-        if (!cancelled) setProjects(mockProjects);
-      } catch (e) {
-        console.error('Failed to load projects:', e);
-        if (!cancelled) { setError(e.message); setProjects(mockProjects); }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    if (projects.length === 0) load();
-    return () => { cancelled = true; };
+      setTimeout(() => {
+        setProjects(mockProjects);
+        setLoading(false);
+      }, 200);
+    }
   }, []);
 
   const handleCreate = () => {
@@ -52,96 +41,132 @@ export default function DashboardPage() {
   const totalWindows = (proj) =>
     (proj.batches || []).reduce((sum, b) => sum + (b.windows?.length || 0), 0);
 
-  const statusSummary = (proj) => {
-    const batches = proj.batches || [];
-    if (batches.length === 0) return 'empty';
-    if (batches.every(b => b.status === 'complete')) return 'complete';
-    if (batches.some(b => b.status === 'in-production')) return 'in-production';
+  const statusOf = (proj) => {
+    const b = proj.batches || [];
+    if (b.length === 0) return 'empty';
+    if (b.every(x => x.status === 'complete')) return 'complete';
+    if (b.some(x => x.status === 'in-production')) return 'in-production';
     return 'preparation';
   };
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-semibold">Projects</h1>
-          <p className="text-sm text-ink-600">Production projects with batch windows.</p>
+          <h1 className="text-2xl font-bold text-ink-50">Projects</h1>
+          <p className="text-sm text-ink-400 mt-1">Production projects with batch windows.</p>
         </div>
-        <button onClick={() => setShowForm(true)}
-          className="px-4 py-2 bg-accent-500 text-white text-sm font-medium rounded-lg hover:bg-accent-600">
+        <button onClick={() => setShowForm(true)} className="btn btn-primary">
           + New Project
         </button>
       </div>
 
+      {/* Stats row */}
+      <div className="grid grid-cols-4 gap-4 mb-8">
+        <StatCard label="Total Projects" value={projects.length} icon="📋" />
+        <StatCard label="Total Windows" value={projects.reduce((s, p) => s + totalWindows(p), 0)} icon="🪟" />
+        <StatCard label="In Production" value={projects.filter(p => statusOf(p) === 'in-production').length} icon="🔧" accent />
+        <StatCard label="Complete" value={projects.filter(p => statusOf(p) === 'complete').length} icon="✅" />
+      </div>
+
+      {/* New project form */}
       {showForm && (
         <div className="card p-5 mb-6">
-          <div className="text-sm font-medium mb-3">New Project</div>
+          <div className="text-sm font-semibold text-ink-50 mb-3">New Project</div>
           <div className="space-y-3">
             <input type="text" placeholder="Project name (e.g. 12 Belgrave Square)" value={projName}
               onChange={(e) => setProjName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-              className="w-full px-3 py-2 border border-ink-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent-500" autoFocus />
+              className="input" autoFocus />
             <input type="text" placeholder="Address (optional)" value={projAddress}
               onChange={(e) => setProjAddress(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-              className="w-full px-3 py-2 border border-ink-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent-500" />
+              className="input" />
             <div className="flex gap-3">
-              <button onClick={handleCreate} className="px-4 py-2 bg-accent-500 text-white text-sm font-medium rounded-lg hover:bg-accent-600">Create</button>
-              <button onClick={() => { setShowForm(false); setProjName(''); setProjAddress(''); }}
-                className="px-4 py-2 bg-ink-200 text-ink-700 text-sm rounded-lg hover:bg-ink-300">Cancel</button>
+              <button onClick={handleCreate} className="btn btn-primary">Create</button>
+              <button onClick={() => { setShowForm(false); setProjName(''); setProjAddress(''); }} className="btn btn-secondary">Cancel</button>
             </div>
           </div>
         </div>
       )}
 
       {loading && <div className="text-sm text-ink-400">Loading projects…</div>}
-      {error && <div className="text-xs text-red-600 mb-4">{error}</div>}
+
       {!loading && projects.length === 0 && (
-        <div className="card p-8 text-center text-ink-400">No projects yet. Create one to get started.</div>
+        <div className="card p-12 text-center">
+          <div className="text-4xl mb-4">🏗️</div>
+          <div className="text-ink-200 mb-2">No projects yet</div>
+          <div className="text-ink-400 text-sm mb-6">Create your first production project to get started.</div>
+          <button onClick={() => setShowForm(true)} className="btn btn-primary">+ New Project</button>
+        </div>
       )}
 
+      {/* Projects grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {projects.map((proj) => (
-          <Link key={proj.id} to={`/projects/${proj.id}`} className="card p-5 hover:shadow-md transition-shadow relative group">
-            <button onClick={(e) => handleDelete(e, proj.id)}
-              className="absolute top-3 right-3 w-7 h-7 rounded-full bg-ink-100 text-ink-400 hover:bg-red-100 hover:text-red-600 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-              title="Delete project">✕</button>
-            <div className="flex items-center justify-between mb-2">
-              <div className="font-semibold">{proj.name}</div>
-              <StatusBadge status={statusSummary(proj)} />
-            </div>
-            {proj.address && <div className="text-xs text-ink-500 mb-3">{proj.address}</div>}
-            <div className="flex items-center justify-between text-xs text-ink-400 mb-2">
-              <span>{(proj.batches || []).length} batches</span>
-              <span>{totalWindows(proj)} windows</span>
-            </div>
-            {(proj.batches || []).length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {(proj.batches || []).map((b) => (
-                  <span key={b.id} className="text-[10px] px-2 py-0.5 rounded-full bg-ink-100 text-ink-600">
-                    {b.type} ({b.windows?.length || 0})
-                  </span>
-                ))}
+        {projects.map((proj) => {
+          const st = statusOf(proj);
+          const batches = proj.batches || [];
+          return (
+            <Link key={proj.id} to={`/projects/${proj.id}`}
+              className="card p-5 hover:border-accent-500/40 hover:shadow-glow transition-all relative group">
+              {/* Delete */}
+              <button onClick={(e) => handleDelete(e, proj.id)}
+                className="absolute top-3 right-3 w-7 h-7 rounded-full bg-surface-600 text-ink-400 hover:bg-red-500/20 hover:text-red-400 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Delete project">✕</button>
+
+              {/* Status + name */}
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-ink-50 truncate pr-8">{proj.name}</h3>
+                <StatusBadge status={st} />
               </div>
-            )}
-            <div className="text-[10px] text-ink-300 mt-3">{formatDate(proj.created_at)}</div>
-          </Link>
-        ))}
+
+              {/* Address */}
+              {proj.address && <div className="text-xs text-ink-400 mb-4 truncate">{proj.address}</div>}
+
+              {/* Batch chips */}
+              {batches.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-4">
+                  {batches.map((b) => (
+                    <span key={b.id} className="text-[10px] px-2 py-0.5 rounded-full bg-surface-600 text-ink-200 border border-surface-500">
+                      {b.type} ({b.windows?.length || 0})
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Footer */}
+              <div className="flex items-center justify-between text-xs text-ink-400 pt-3 border-t border-surface-500">
+                <span>{batches.length} batch{batches.length !== 1 ? 'es' : ''}</span>
+                <span>{totalWindows(proj)} window{totalWindows(proj) !== 1 ? 's' : ''}</span>
+                <span>{formatDate(proj.created_at)}</span>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ label, value, icon, accent }) {
+  return (
+    <div className={`card-elevated p-4 flex items-center gap-4 ${accent ? 'border-accent-500/30' : ''}`}>
+      <div className="text-2xl">{icon}</div>
+      <div>
+        <div className={`text-2xl font-bold ${accent ? 'text-accent-400' : 'text-ink-50'}`}>{value}</div>
+        <div className="text-[11px] text-ink-400 uppercase tracking-wider">{label}</div>
       </div>
     </div>
   );
 }
 
 function StatusBadge({ status }) {
-  const styles = {
-    'complete': 'bg-emerald-100 text-emerald-800',
-    'in-production': 'bg-blue-100 text-blue-800',
-    'preparation': 'bg-amber-100 text-amber-800',
-    'empty': 'bg-ink-200 text-ink-600',
+  const map = {
+    'complete': 'badge-done',
+    'in-production': 'badge-active',
+    'preparation': 'badge-prep',
+    'empty': 'text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-surface-600 text-ink-400 border border-surface-500',
   };
-  return (
-    <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${styles[status] || styles.empty}`}>
-      {status}
-    </span>
-  );
+  return <span className={map[status] || map.empty}>{status}</span>;
 }
 
 function formatDate(iso) {

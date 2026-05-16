@@ -8,7 +8,7 @@ export default function AppLayout() {
       <Header />
       <div className="flex-1 flex overflow-hidden">
         <Sidebar />
-        <main className="flex-1 overflow-auto bg-ink-50">
+        <main className="flex-1 overflow-auto bg-surface-800">
           <Outlet />
         </main>
       </div>
