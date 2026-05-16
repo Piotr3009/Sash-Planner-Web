@@ -4,6 +4,8 @@
 export const mockProjects = [
   {
     id: 'proj-001',
+    project_number: 'PRJ-2025-001',
+    client: 'Heritage Estates Ltd',
     name: '12 Belgrave Square',
     address: '12 Belgrave Square, London SW1X 8PH',
     created_at: '2025-09-12T10:00:00Z',
@@ -123,6 +125,8 @@ export const mockProjects = [
   },
   {
     id: 'proj-002',
+    project_number: 'PRJ-2025-002',
+    client: 'Northside Developments',
     name: '47 Highbury Park',
     address: '47 Highbury Park, London N5 1UA',
     created_at: '2025-10-02T14:00:00Z',

@@ -121,11 +121,13 @@ export const useProjectStore = create((set, get) => ({
   get currentItems() { return get().currentWindows; },
 
   // ─── PROJECT CRUD ───
-  createProject: (name, address) => {
+  createProject: (name, address, projectNumber, client) => {
     const id = uid();
     const project = {
       id,
       name: name || 'New Project',
+      project_number: projectNumber || `PRJ-${new Date().getFullYear()}-${String(get().projects.length + 1).padStart(3, '0')}`,
+      client: client || '',
       address: address || '',
       created_at: new Date().toISOString(),
       batches: [],

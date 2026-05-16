@@ -10,6 +10,7 @@ html, body, #root {
 
 body {
   @apply bg-surface-800 text-ink-50 font-sans antialiased;
+  color-scheme: dark;
 }
 
 /* Scrollbar — dark theme */
@@ -46,7 +47,6 @@ body {
     @apply text-ink-200 hover:bg-surface-600 hover:text-ink-50;
   }
 
-  /* Cards — visible contrast from background */
   .card {
     @apply bg-surface-700 rounded-xl border border-surface-500 shadow-card;
   }
@@ -63,7 +63,6 @@ body {
     @apply block text-xs font-medium text-ink-200 mb-1 uppercase tracking-wide;
   }
 
-  /* Status badges */
   .badge-prep {
     @apply text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-status-prep/15 text-status-prep border border-status-prep/30;
   }
