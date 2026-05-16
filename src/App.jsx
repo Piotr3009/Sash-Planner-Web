@@ -3,9 +3,10 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import AppLayout from './components/layout/AppLayout.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
-import EstimateDetailPage from './pages/EstimateDetailPage.jsx';
-import WindowDetailPage from './pages/WindowDetailPage.jsx';
+import ProjectDetailPage from './pages/ProjectDetailPage.jsx';
+import BatchDefaultsPage from './pages/BatchDefaultsPage.jsx';
 import ConfiguratorPage from './pages/ConfiguratorPage.jsx';
+import WindowDetailPage from './pages/WindowDetailPage.jsx';
 import { useAuthStore } from './stores/authStore.js';
 
 function ProtectedRoute({ children }) {
@@ -18,36 +19,25 @@ function ProtectedRoute({ children }) {
 
 export default function App() {
   const init = useAuthStore((s) => s.init);
-
-  useEffect(() => {
-    init();
-  }, [init]);
+  useEffect(() => { init(); }, [init]);
 
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <AppLayout />
-          </ProtectedRoute>
-        }
-      >
+
+      {/* Main layout with sidebar */}
+      <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="estimates/:estimateId" element={<EstimateDetailPage />} />
-        <Route path="estimates/:estimateId/windows/:itemId" element={<WindowDetailPage />} />
+        <Route path="projects/:projectId" element={<ProjectDetailPage />} />
+        <Route path="projects/:projectId/batches/:batchId/windows/:windowId" element={<WindowDetailPage />} />
       </Route>
-      {/* Configurator — full screen, outside AppLayout (no sidebar) */}
-      <Route
-        path="/estimates/:estimateId/configurator"
-        element={
-          <ProtectedRoute>
-            <ConfiguratorPage />
-          </ProtectedRoute>
-        }
-      />
+
+      {/* Full-screen pages (outside AppLayout — no sidebar) */}
+      <Route path="/projects/:projectId/batches/:batchId/defaults" element={<ProtectedRoute><BatchDefaultsPage /></ProtectedRoute>} />
+      <Route path="/projects/:projectId/batches/:batchId/configurator" element={<ProtectedRoute><ConfiguratorPage /></ProtectedRoute>} />
+
+      {/* Catch-all */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );

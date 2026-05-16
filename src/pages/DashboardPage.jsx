@@ -1,22 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
-import { hasSupabaseConfig, supabase } from '../services/supabase.js';
-import { mockEstimates } from '../mocks/mockEstimates.js';
+import { mockProjects } from '../mocks/mockProjects.js';
 
 export default function DashboardPage() {
-  const estimates = useProjectStore((s) => s.estimates);
-  const loading = useProjectStore((s) => s.estimatesLoading);
-  const error = useProjectStore((s) => s.estimatesError);
-  const setEstimates = useProjectStore((s) => s.setEstimates);
-  const setLoading = useProjectStore((s) => s.setEstimatesLoading);
-  const setError = useProjectStore((s) => s.setEstimatesError);
-  const createEstimate = useProjectStore((s) => s.createEstimate);
-  const deleteEstimate = useProjectStore((s) => s.deleteEstimate);
+  const projects = useProjectStore((s) => s.projects);
+  const loading = useProjectStore((s) => s.projectsLoading);
+  const error = useProjectStore((s) => s.projectsError);
+  const setProjects = useProjectStore((s) => s.setProjects);
+  const setLoading = useProjectStore((s) => s.setProjectsLoading);
+  const setError = useProjectStore((s) => s.setProjectsError);
+  const createProject = useProjectStore((s) => s.createProject);
+  const deleteProject = useProjectStore((s) => s.deleteProject);
   const navigate = useNavigate();
 
   const [showForm, setShowForm] = useState(false);
-  const [projectName, setProjectName] = useState('');
+  const [projName, setProjName] = useState('');
+  const [projAddress, setProjAddress] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -24,131 +24,105 @@ export default function DashboardPage() {
       setLoading(true);
       setError(null);
       try {
-        if (!hasSupabaseConfig) {
-          if (!cancelled) setEstimates(mockEstimates.map((e) => ({ ...e, window_count: e.items.length })));
-          return;
-        }
-        const { data, error: err } = await supabase
-          .from('estimates')
-          .select('id, estimate_number, status, created_at, total_price, project_name, customer_id, estimate_items(count)')
-          .order('created_at', { ascending: false });
-        if (err) throw err;
-        const enriched = (data || []).map((e) => ({
-          ...e,
-          window_count: Array.isArray(e.estimate_items) ? e.estimate_items[0]?.count ?? 0 : 0
-        }));
-        if (!cancelled) setEstimates(enriched);
+        // TODO: load from Supabase when connected
+        if (!cancelled) setProjects(mockProjects);
       } catch (e) {
-        console.error('Failed to load estimates:', e);
-        if (!cancelled) {
-          setError(e.message);
-          setEstimates(mockEstimates.map((m) => ({ ...m, window_count: m.items.length })));
-        }
+        console.error('Failed to load projects:', e);
+        if (!cancelled) { setError(e.message); setProjects(mockProjects); }
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [setEstimates, setLoading, setError]);
+    if (projects.length === 0) load();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleCreate = () => {
-    if (!projectName.trim()) return;
-    const est = createEstimate(projectName.trim());
-    setProjectName('');
-    setShowForm(false);
-    navigate(`/estimates/${est.id}`);
+    if (!projName.trim()) return;
+    const proj = createProject(projName.trim(), projAddress.trim());
+    setProjName(''); setProjAddress(''); setShowForm(false);
+    navigate(`/projects/${proj.id}`);
   };
 
-  const handleDelete = (e, estId) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (window.confirm('Delete this estimate and all its windows?')) {
-      deleteEstimate(estId);
-    }
+  const handleDelete = (e, id) => {
+    e.preventDefault(); e.stopPropagation();
+    if (window.confirm('Delete this project and all its batches?')) deleteProject(id);
+  };
+
+  const totalWindows = (proj) =>
+    (proj.batches || []).reduce((sum, b) => sum + (b.windows?.length || 0), 0);
+
+  const statusSummary = (proj) => {
+    const batches = proj.batches || [];
+    if (batches.length === 0) return 'empty';
+    if (batches.every(b => b.status === 'complete')) return 'complete';
+    if (batches.some(b => b.status === 'in-production')) return 'in-production';
+    return 'preparation';
   };
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">Estimates</h1>
-          <p className="text-sm text-ink-600">Pick an estimate to plan production for its windows.</p>
+          <h1 className="text-2xl font-semibold">Projects</h1>
+          <p className="text-sm text-ink-600">Production projects with batch windows.</p>
         </div>
-        <div className="flex items-center gap-3">
-          {error && <div className="text-xs text-red-600 max-w-sm">Backend error — showing mock data. {error}</div>}
-          <button
-            onClick={() => setShowForm(true)}
-            className="px-4 py-2 bg-accent-500 text-white text-sm font-medium rounded-lg hover:bg-accent-600 transition-colors"
-          >
-            + New Estimate
-          </button>
-        </div>
+        <button onClick={() => setShowForm(true)}
+          className="px-4 py-2 bg-accent-500 text-white text-sm font-medium rounded-lg hover:bg-accent-600">
+          + New Project
+        </button>
       </div>
 
-      {/* New Estimate Form */}
       {showForm && (
         <div className="card p-5 mb-6">
-          <div className="text-sm font-medium mb-3">New Estimate</div>
-          <div className="flex gap-3">
-            <input
-              type="text"
-              placeholder="Project name (e.g. 12 Belgrave Square)"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-              className="flex-1 px-3 py-2 border border-ink-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
-              autoFocus
-            />
-            <button
-              onClick={handleCreate}
-              className="px-4 py-2 bg-accent-500 text-white text-sm font-medium rounded-lg hover:bg-accent-600"
-            >
-              Create
-            </button>
-            <button
-              onClick={() => { setShowForm(false); setProjectName(''); }}
-              className="px-4 py-2 bg-ink-200 text-ink-700 text-sm rounded-lg hover:bg-ink-300"
-            >
-              Cancel
-            </button>
+          <div className="text-sm font-medium mb-3">New Project</div>
+          <div className="space-y-3">
+            <input type="text" placeholder="Project name (e.g. 12 Belgrave Square)" value={projName}
+              onChange={(e) => setProjName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+              className="w-full px-3 py-2 border border-ink-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent-500" autoFocus />
+            <input type="text" placeholder="Address (optional)" value={projAddress}
+              onChange={(e) => setProjAddress(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+              className="w-full px-3 py-2 border border-ink-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent-500" />
+            <div className="flex gap-3">
+              <button onClick={handleCreate} className="px-4 py-2 bg-accent-500 text-white text-sm font-medium rounded-lg hover:bg-accent-600">Create</button>
+              <button onClick={() => { setShowForm(false); setProjName(''); setProjAddress(''); }}
+                className="px-4 py-2 bg-ink-200 text-ink-700 text-sm rounded-lg hover:bg-ink-300">Cancel</button>
+            </div>
           </div>
         </div>
       )}
 
-      {loading && <div className="text-sm text-ink-400">Loading estimates…</div>}
-
-      {!loading && estimates.length === 0 && (
-        <div className="card p-8 text-center text-ink-400">No estimates available. Create one to get started.</div>
+      {loading && <div className="text-sm text-ink-400">Loading projects…</div>}
+      {error && <div className="text-xs text-red-600 mb-4">{error}</div>}
+      {!loading && projects.length === 0 && (
+        <div className="card p-8 text-center text-ink-400">No projects yet. Create one to get started.</div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {estimates.map((est) => (
-          <Link key={est.id} to={`/estimates/${est.id}`} className="card p-5 hover:shadow-md transition-shadow relative group">
-            <button
-              onClick={(e) => handleDelete(e, est.id)}
+        {projects.map((proj) => (
+          <Link key={proj.id} to={`/projects/${proj.id}`} className="card p-5 hover:shadow-md transition-shadow relative group">
+            <button onClick={(e) => handleDelete(e, proj.id)}
               className="absolute top-3 right-3 w-7 h-7 rounded-full bg-ink-100 text-ink-400 hover:bg-red-100 hover:text-red-600 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-              title="Delete estimate"
-            >
-              ✕
-            </button>
+              title="Delete project">✕</button>
             <div className="flex items-center justify-between mb-2">
-              <div className="font-semibold">{est.estimate_number || est.id.slice(0, 8)}</div>
-              <span className={statusClass(est.status)}>{est.status || 'draft'}</span>
+              <div className="font-semibold">{proj.name}</div>
+              <StatusBadge status={statusSummary(proj)} />
             </div>
-            {est.project_name && <div className="text-sm text-ink-600 mb-3">{est.project_name}</div>}
-            <div className="flex items-center justify-between text-xs text-ink-400">
-              <span>{est.window_count ?? 0} windows</span>
-              <span>{formatDate(est.created_at)}</span>
+            {proj.address && <div className="text-xs text-ink-500 mb-3">{proj.address}</div>}
+            <div className="flex items-center justify-between text-xs text-ink-400 mb-2">
+              <span>{(proj.batches || []).length} batches</span>
+              <span>{totalWindows(proj)} windows</span>
             </div>
-            {est.total_price != null && est.total_price > 0 && (
-              <div className="mt-3 pt-3 border-t border-ink-200 text-sm">
-                <span className="text-ink-400">Total</span>{' '}
-                <strong>£{Number(est.total_price).toFixed(2)}</strong>
+            {(proj.batches || []).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {(proj.batches || []).map((b) => (
+                  <span key={b.id} className="text-[10px] px-2 py-0.5 rounded-full bg-ink-100 text-ink-600">
+                    {b.type} ({b.windows?.length || 0})
+                  </span>
+                ))}
               </div>
             )}
+            <div className="text-[10px] text-ink-300 mt-3">{formatDate(proj.created_at)}</div>
           </Link>
         ))}
       </div>
@@ -156,26 +130,21 @@ export default function DashboardPage() {
   );
 }
 
-function statusClass(status) {
-  const base = 'text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full';
-  switch (status) {
-    case 'finished':
-    case 'won':
-      return `${base} bg-emerald-100 text-emerald-800`;
-    case 'sent':
-      return `${base} bg-blue-100 text-blue-800`;
-    case 'draft':
-      return `${base} bg-ink-200 text-ink-800`;
-    default:
-      return `${base} bg-ink-200 text-ink-800`;
-  }
+function StatusBadge({ status }) {
+  const styles = {
+    'complete': 'bg-emerald-100 text-emerald-800',
+    'in-production': 'bg-blue-100 text-blue-800',
+    'preparation': 'bg-amber-100 text-amber-800',
+    'empty': 'bg-ink-200 text-ink-600',
+  };
+  return (
+    <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full ${styles[status] || styles.empty}`}>
+      {status}
+    </span>
+  );
 }
 
 function formatDate(iso) {
   if (!iso) return '';
-  try {
-    return new Date(iso).toLocaleDateString();
-  } catch {
-    return iso;
-  }
+  try { return new Date(iso).toLocaleDateString(); } catch { return iso; }
 }

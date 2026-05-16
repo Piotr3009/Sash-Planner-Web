@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 
+// ─── Production settings (preserved from original — used by calculations engine) ───
 const defaultSettings = {
   kerf: 3,
   endTrim: 10,
@@ -17,32 +18,86 @@ const defaultSettings = {
   }
 };
 
+// ─── Default batch settings per window type ───
+const BATCH_DEFAULTS = {
+  sash: {
+    ironmongery: 'brass',
+    colourMode: 'single',
+    woodColor: '#F6F6F6',
+    woodColorExt: '#F6F6F6',
+    woodColorInt: '#F6F6F6',
+    glassType: 'double',
+    glassSpec: 'toughened',
+    spacerColor: 'silver',
+    pas24: false,
+    frameType: 'standard',
+    hornType: 'A',
+  },
+  casement: {
+    ironmongery: 'chrome',
+    colourMode: 'single',
+    woodColor: '#F6F6F6',
+    woodColorExt: '#F6F6F6',
+    woodColorInt: '#F6F6F6',
+    glassType: 'double',
+    glassSpec: 'toughened',
+    spacerColor: 'silver',
+    pas24: false,
+    frameType: 'standard',
+    hornType: 'none',
+  },
+  'fix-frame': {
+    ironmongery: 'none',
+    colourMode: 'single',
+    woodColor: '#F6F6F6',
+    woodColorExt: '#F6F6F6',
+    woodColorInt: '#F6F6F6',
+    glassType: 'double',
+    glassSpec: 'toughened',
+    spacerColor: 'silver',
+    pas24: false,
+    frameType: 'standard',
+    hornType: 'none',
+  },
+};
+
+const BATCH_STATUSES = ['preparation', 'in-production', 'complete'];
+
 const uid = () => `id-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-export const useProjectStore = create((set, get) => ({
-  estimates: [],
-  estimatesLoading: false,
-  estimatesError: null,
+export { BATCH_DEFAULTS, BATCH_STATUSES };
 
-  currentEstimate: null,
-  currentItems: [],
+export const useProjectStore = create((set, get) => ({
+
+  // ─── State ───
+  projects: [],
+  projectsLoading: false,
+  projectsError: null,
+
+  currentProject: null,
+  currentBatch: null,
+  currentWindows: [],    // windows in current batch
   currentLoading: false,
   currentError: null,
 
-  selectedItemId: null,
+  selectedWindowId: null,
   settings: { ...defaultSettings },
 
-  setEstimates: (estimates) => set({ estimates }),
-  setEstimatesLoading: (loading) => set({ estimatesLoading: loading }),
-  setEstimatesError: (error) => set({ estimatesError: error }),
+  // ─── Setters ───
+  setProjects: (projects) => set({ projects }),
+  setProjectsLoading: (loading) => set({ projectsLoading: loading }),
+  setProjectsError: (error) => set({ projectsError: error }),
 
-  setCurrentEstimate: (estimate, items) =>
-    set({ currentEstimate: estimate, currentItems: items || [] }),
+  setCurrentProject: (project) => set({ currentProject: project }),
+  setCurrentBatch: (batch) => {
+    set({ currentBatch: batch, currentWindows: batch?.windows || [] });
+  },
   setCurrentLoading: (loading) => set({ currentLoading: loading }),
   setCurrentError: (error) => set({ currentError: error }),
 
-  selectItem: (id) => set({ selectedItemId: id }),
+  selectWindow: (id) => set({ selectedWindowId: id }),
 
+  // ─── Settings (preserved — used by calculations engine) ───
   updateSettings: (patch) =>
     set((s) => ({
       settings: {
@@ -52,116 +107,250 @@ export const useProjectStore = create((set, get) => ({
       }
     })),
 
-  getItemById: (id) => get().currentItems.find((i) => i.id === id) || null,
+  // ─── Getters ───
+  getProjectById: (id) => get().projects.find((p) => p.id === id) || null,
+  getBatchById: (projectId, batchId) => {
+    const project = get().projects.find((p) => p.id === projectId);
+    return project?.batches?.find((b) => b.id === batchId) || null;
+  },
+  getWindowById: (id) => get().currentWindows.find((w) => w.id === id) || null,
 
-  // ─── NEW: Create estimate ───
-  createEstimate: (projectName) => {
+  // Backward compat: calculations engine uses getItemById
+  getItemById: (id) => get().currentWindows.find((w) => w.id === id) || null,
+  // Backward compat: some components read currentItems
+  get currentItems() { return get().currentWindows; },
+
+  // ─── PROJECT CRUD ───
+  createProject: (name, address) => {
     const id = uid();
-    const estimate = {
+    const project = {
       id,
-      estimate_number: `EST-${new Date().getFullYear()}-${String(get().estimates.length + 1).padStart(3, '0')}`,
-      project_name: projectName || 'New Project',
-      status: 'draft',
+      name: name || 'New Project',
+      address: address || '',
       created_at: new Date().toISOString(),
-      total_price: 0,
-      items: [],
-      window_count: 0,
+      batches: [],
     };
-    set((s) => ({ estimates: [...s.estimates, estimate] }));
-    return estimate;
+    set((s) => ({ projects: [...s.projects, project] }));
+    return project;
   },
 
-  // ─── NEW: Delete estimate ───
-  deleteEstimate: (estimateId) => {
+  deleteProject: (projectId) => {
     set((s) => ({
-      estimates: s.estimates.filter((e) => e.id !== estimateId),
-      currentEstimate: s.currentEstimate?.id === estimateId ? null : s.currentEstimate,
-      currentItems: s.currentEstimate?.id === estimateId ? [] : s.currentItems,
+      projects: s.projects.filter((p) => p.id !== projectId),
+      currentProject: s.currentProject?.id === projectId ? null : s.currentProject,
+      currentBatch: null,
+      currentWindows: [],
     }));
   },
 
-  // ─── NEW: Add window to estimate ───
-  addWindowToEstimate: (estimateId, windowConfig) => {
-    const itemId = uid();
-    const item = {
-      id: itemId,
-      estimate_id: estimateId,
-      window_number: `W${(get().currentItems.length || 0) + 1}`,
-      window_type: windowConfig.windowCategory || 'sash',
+  // ─── BATCH CRUD ───
+  createBatch: (projectId, windowType) => {
+    const id = uid();
+    const batchNum = (get().projects.find(p => p.id === projectId)?.batches?.length || 0) + 1;
+    const typeLabel = windowType === 'fix-frame' ? 'Fix Frame' : windowType.charAt(0).toUpperCase() + windowType.slice(1);
+    const batch = {
+      id,
+      project_id: projectId,
+      type: windowType,
+      label: `Batch ${batchNum} — ${typeLabel}`,
+      status: 'preparation',
+      defaults: { ...(BATCH_DEFAULTS[windowType] || BATCH_DEFAULTS.sash) },
+      windows: [],
+      created_at: new Date().toISOString(),
+    };
+    set((s) => {
+      const updatedProjects = s.projects.map((p) =>
+        p.id === projectId
+          ? { ...p, batches: [...(p.batches || []), batch] }
+          : p
+      );
+      const updatedCurrent = s.currentProject?.id === projectId
+        ? { ...s.currentProject, batches: [...(s.currentProject.batches || []), batch] }
+        : s.currentProject;
+      return { projects: updatedProjects, currentProject: updatedCurrent };
+    });
+    return batch;
+  },
+
+  deleteBatch: (projectId, batchId) => {
+    set((s) => {
+      const updatedProjects = s.projects.map((p) =>
+        p.id === projectId
+          ? { ...p, batches: (p.batches || []).filter((b) => b.id !== batchId) }
+          : p
+      );
+      const updatedCurrent = s.currentProject?.id === projectId
+        ? { ...s.currentProject, batches: (s.currentProject.batches || []).filter((b) => b.id !== batchId) }
+        : s.currentProject;
+      return {
+        projects: updatedProjects,
+        currentProject: updatedCurrent,
+        currentBatch: s.currentBatch?.id === batchId ? null : s.currentBatch,
+        currentWindows: s.currentBatch?.id === batchId ? [] : s.currentWindows,
+      };
+    });
+  },
+
+  updateBatchDefaults: (projectId, batchId, newDefaults) => {
+    set((s) => {
+      const updateBatch = (b) =>
+        b.id === batchId ? { ...b, defaults: { ...b.defaults, ...newDefaults } } : b;
+
+      const updatedProjects = s.projects.map((p) =>
+        p.id === projectId
+          ? { ...p, batches: (p.batches || []).map(updateBatch) }
+          : p
+      );
+      const updatedCurrent = s.currentProject?.id === projectId
+        ? { ...s.currentProject, batches: (s.currentProject.batches || []).map(updateBatch) }
+        : s.currentProject;
+      const updatedBatch = s.currentBatch?.id === batchId
+        ? { ...s.currentBatch, defaults: { ...s.currentBatch.defaults, ...newDefaults } }
+        : s.currentBatch;
+      return { projects: updatedProjects, currentProject: updatedCurrent, currentBatch: updatedBatch };
+    });
+  },
+
+  updateBatchStatus: (projectId, batchId, status) => {
+    set((s) => {
+      const updateBatch = (b) => b.id === batchId ? { ...b, status } : b;
+      const updatedProjects = s.projects.map((p) =>
+        p.id === projectId ? { ...p, batches: (p.batches || []).map(updateBatch) } : p
+      );
+      const updatedCurrent = s.currentProject?.id === projectId
+        ? { ...s.currentProject, batches: (s.currentProject.batches || []).map(updateBatch) }
+        : s.currentProject;
+      const updatedBatch = s.currentBatch?.id === batchId ? { ...s.currentBatch, status } : s.currentBatch;
+      return { projects: updatedProjects, currentProject: updatedCurrent, currentBatch: updatedBatch };
+    });
+  },
+
+  // ─── WINDOW CRUD ───
+  addWindowToBatch: (projectId, batchId, windowConfig) => {
+    const batch = get().getBatchById(projectId, batchId);
+    if (!batch) return null;
+
+    const windowId = uid();
+    const windowNum = (batch.windows?.length || 0) + 1;
+    const defaults = batch.defaults || {};
+
+    // Merge batch defaults with window-specific config
+    const win = {
+      id: windowId,
+      batch_id: batchId,
+      name: windowConfig.windowName || `W${windowNum}`,
+      window_type: batch.type,
       width: windowConfig.extWidth || 1000,
       height: windowConfig.extHeight || 1500,
-      quantity: 1,
-      unit_price: 0,
-      total_price: 0,
-      upper_bars: windowConfig.upperBars || 'none',
-      lower_bars: windowConfig.lowerBars || 'none',
-      horns: windowConfig.showHorns ? (windowConfig.hornType || 'A') : 'none',
-      glass_type: windowConfig.doubleGlazing ? 'double' : 'single',
-      glass_finish: windowConfig.glassFinish || windowConfig.upperGlass || 'clear',
-      spacer_color: windowConfig.spacerColor || 'silver',
-      color_type: windowConfig.sameColor ? 'single' : 'dual',
-      color_single: windowConfig.woodColor || '#F6F6F6',
-      color_exterior: windowConfig.woodColorExt || windowConfig.woodColor || '#F6F6F6',
-      color_interior: windowConfig.woodColorInt || windowConfig.woodColor || '#F6F6F6',
-      ironmongery_finish: windowConfig.ironmongery || 'brass',
+      measurementType: windowConfig.measurementType || 'box-to-box',
+      inputWidth: windowConfig.inputWidth || windowConfig.extWidth || 1000,
+      inputHeight: windowConfig.inputHeight || windowConfig.extHeight || 1500,
+      sashType: windowConfig.sashType || 'double',
+      splitRatio: windowConfig.splitRatio || '1/4-1/2-1/4',
+      headType: windowConfig.headType || 'flat',
+      upperBars: windowConfig.upperBars || 'none',
+      lowerBars: windowConfig.lowerBars || 'none',
+      sameBars: windowConfig.sameBars !== undefined ? windowConfig.sameBars : true,
+      upperCustomBars: windowConfig.upperCustomBars || [],
+      lowerCustomBars: windowConfig.lowerCustomBars || [],
+      openingType: windowConfig.openingType || 'both',
+      glassFinish: windowConfig.glassFinish || 'clear',
+      frostedLocation: windowConfig.frostedLocation || 'bottom',
+      // Inherited from batch defaults (can be overridden)
+      hornType: windowConfig.hornType || defaults.hornType || 'A',
+      frameType: windowConfig.frameType || defaults.frameType || 'standard',
+      frameDepth: windowConfig.frameDepth || (defaults.frameType === 'slim' ? 144 : 164),
+      ironmongery: windowConfig.ironmongery || defaults.ironmongery || 'brass',
+      colourMode: windowConfig.colourMode || defaults.colourMode || 'single',
+      woodColor: windowConfig.woodColor || defaults.woodColor || '#F6F6F6',
+      woodColorExt: windowConfig.woodColorExt || defaults.woodColorExt || '#F6F6F6',
+      woodColorInt: windowConfig.woodColorInt || defaults.woodColorInt || '#F6F6F6',
+      glassType: windowConfig.glassType || defaults.glassType || 'double',
+      glassSpec: windowConfig.glassSpec || defaults.glassSpec || 'toughened',
+      spacerColor: windowConfig.spacerColor || defaults.spacerColor || 'silver',
+      pas24: windowConfig.pas24 !== undefined ? windowConfig.pas24 : (defaults.pas24 || false),
+      // Full specification JSON for calculations engine
       specification: JSON.stringify({
-        windowType: windowConfig.windowCategory || 'sash',
+        windowType: batch.type,
         width: (windowConfig.extWidth || 1000) - 104,
         height: (windowConfig.extHeight || 1500) - 87,
         upperBars: windowConfig.upperBars || 'none',
         lowerBars: windowConfig.lowerBars || 'none',
-        horns: windowConfig.showHorns ? (windowConfig.hornType || 'A') : 'none',
-        glassType: windowConfig.doubleGlazing ? 'double' : 'single',
-        glassFinish: windowConfig.glassFinish || windowConfig.upperGlass || 'clear',
+        horns: (windowConfig.hornType || defaults.hornType || 'A') === 'none' ? 'none' : (windowConfig.hornType || defaults.hornType || 'A'),
+        glassType: windowConfig.glassType || defaults.glassType || 'double',
+        glassFinish: windowConfig.glassFinish || 'clear',
         fullConfig: {
+          ...defaults,
           ...windowConfig,
-          colorSingleName: windowConfig.woodColor || '#F6F6F6',
-          interiorColor: windowConfig.woodColorInt || windowConfig.woodColor || '#F6F6F6',
-          exteriorColor: windowConfig.woodColorExt || windowConfig.woodColor || '#F6F6F6',
-          ironmongeryFinish: windowConfig.ironmongery || 'brass',
-          spacerColor: windowConfig.spacerColor || 'silver',
+          colorSingleName: windowConfig.woodColor || defaults.woodColor || '#F6F6F6',
+          interiorColor: windowConfig.woodColorInt || defaults.woodColorInt || '#F6F6F6',
+          exteriorColor: windowConfig.woodColorExt || defaults.woodColorExt || '#F6F6F6',
+          ironmongeryFinish: windowConfig.ironmongery || defaults.ironmongery || 'brass',
+          spacerColor: windowConfig.spacerColor || defaults.spacerColor || 'silver',
         }
       }),
     };
 
     set((s) => {
-      const newItems = [...s.currentItems, item];
-      // Update estimate in estimates list
-      const updatedEstimates = s.estimates.map((e) =>
-        e.id === estimateId
-          ? { ...e, items: newItems, window_count: newItems.length }
-          : e
+      const addWinToBatch = (b) =>
+        b.id === batchId ? { ...b, windows: [...(b.windows || []), win] } : b;
+
+      const updatedProjects = s.projects.map((p) =>
+        p.id === projectId ? { ...p, batches: (p.batches || []).map(addWinToBatch) } : p
       );
-      // Update currentEstimate items
-      const updatedCurrent = s.currentEstimate?.id === estimateId
-        ? { ...s.currentEstimate, items: newItems, window_count: newItems.length }
-        : s.currentEstimate;
+      const updatedCurrent = s.currentProject?.id === projectId
+        ? { ...s.currentProject, batches: (s.currentProject.batches || []).map(addWinToBatch) }
+        : s.currentProject;
+      const updatedBatch = s.currentBatch?.id === batchId
+        ? { ...s.currentBatch, windows: [...(s.currentBatch.windows || []), win] }
+        : s.currentBatch;
+      const updatedWindows = s.currentBatch?.id === batchId
+        ? [...s.currentWindows, win]
+        : s.currentWindows;
+
       return {
-        estimates: updatedEstimates,
-        currentEstimate: updatedCurrent,
-        currentItems: newItems,
+        projects: updatedProjects,
+        currentProject: updatedCurrent,
+        currentBatch: updatedBatch,
+        currentWindows: updatedWindows,
       };
     });
-    return itemId;
+    return windowId;
   },
 
-  // ─── NEW: Remove window from estimate ───
-  removeWindowFromEstimate: (estimateId, itemId) => {
+  removeWindowFromBatch: (projectId, batchId, windowId) => {
     set((s) => {
-      const newItems = s.currentItems.filter((i) => i.id !== itemId);
-      const updatedEstimates = s.estimates.map((e) =>
-        e.id === estimateId
-          ? { ...e, items: newItems, window_count: newItems.length }
-          : e
+      const removeWin = (b) =>
+        b.id === batchId ? { ...b, windows: (b.windows || []).filter((w) => w.id !== windowId) } : b;
+
+      const updatedProjects = s.projects.map((p) =>
+        p.id === projectId ? { ...p, batches: (p.batches || []).map(removeWin) } : p
       );
-      const updatedCurrent = s.currentEstimate?.id === estimateId
-        ? { ...s.currentEstimate, items: newItems, window_count: newItems.length }
-        : s.currentEstimate;
+      const updatedCurrent = s.currentProject?.id === projectId
+        ? { ...s.currentProject, batches: (s.currentProject.batches || []).map(removeWin) }
+        : s.currentProject;
+      const updatedBatch = s.currentBatch?.id === batchId
+        ? { ...s.currentBatch, windows: (s.currentBatch.windows || []).filter((w) => w.id !== windowId) }
+        : s.currentBatch;
+      const updatedWindows = s.currentBatch?.id === batchId
+        ? s.currentWindows.filter((w) => w.id !== windowId)
+        : s.currentWindows;
+
       return {
-        estimates: updatedEstimates,
-        currentEstimate: updatedCurrent,
-        currentItems: newItems,
+        projects: updatedProjects,
+        currentProject: updatedCurrent,
+        currentBatch: updatedBatch,
+        currentWindows: updatedWindows,
       };
     });
   },
+
+  // ─── BACKWARD COMPAT (for components still referencing old names) ───
+  // These bridge old estimate-based code during migration
+  get estimates() { return get().projects; },
+  setEstimates: (p) => set({ projects: p }),
+  setEstimatesLoading: (l) => set({ projectsLoading: l }),
+  setEstimatesError: (e) => set({ projectsError: e }),
+  setCurrentEstimate: (est, items) => set({ currentProject: est, currentWindows: items || [] }),
+
 }));
