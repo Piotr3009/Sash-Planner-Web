@@ -1,0 +1,325 @@
+/**
+ * FrontElevation2D.jsx
+ * 
+ * Parametric SVG front elevation of a sash window.
+ * All dimensions in mm, scaled to fit viewport via viewBox.
+ * Uses derived data from calculations.js.
+ */
+import { useMemo } from 'react';
+import { CONSTANTS } from '../../engine/calculations.js';
+
+// Drawing style constants
+const STROKE = {
+  frame: '#94A3B8',      // box frame outline
+  sash: '#CBD5E1',       // sash outline
+  bar: '#94A3B8',        // glazing bars
+  glass: '#0EA5E9',      // glass fill
+  glassOpacity: 0.12,
+  dim: '#00B4A0',        // dimension lines (teal accent)
+  dimText: '#E2E8F0',    // dimension text
+  horn: '#F59E0B',       // horn highlight
+  bg: 'transparent',
+};
+
+const FONT = {
+  size: 14,
+  family: 'DM Sans, system-ui, sans-serif',
+};
+
+// Dimension line offset from drawing edge (mm)
+const DIM_OFFSET = 40;
+const DIM_GAP = 35;
+const MARGIN = 80;
+
+export default function FrontElevation2D({ windowSpec, derived }) {
+  const drawing = useMemo(() => {
+    if (!windowSpec || !derived) return null;
+
+    const fw = windowSpec.frame.width;
+    const fh = windowSpec.frame.height;
+    const frameDepth = windowSpec.frame.depth || 164;
+
+    // Box frame
+    const jw = CONSTANTS.JAMBS_WIDTH;       // 28
+    const hw = CONSTANTS.HEAD_WIDTH;        // 28
+    const sw = CONSTANTS.SILL_WIDTH;        // 46
+
+    // Sash
+    const sashW = derived.sashWidth;
+    const topH = derived.topSashHeight;
+    const botH = derived.bottomSashHeight;
+    const stile = CONSTANTS.STILE_WIDTH;    // 57
+    const topRail = CONSTANTS.TOP_RAIL_WIDTH; // 57
+    const botRail = CONSTANTS.BOTTOM_RAIL_WIDTH; // 90
+    const meetRail = CONSTANTS.MEETING_RAIL_WIDTH; // 43
+    const barW = CONSTANTS.GLAZING_BAR_WIDTH; // 18
+
+    // Horn
+    const hasHorns = windowSpec.sash?.horns;
+    const hornExt = hasHorns ? (windowSpec.sash?.hornExtension || 75) : 0;
+
+    // Sash position inside frame
+    const sashX = (fw - sashW) / 2;
+    const sashY = hw; // starts below head
+
+    // Meeting rail Y position (from top of frame)
+    const meetY = sashY + topH;
+
+    // Grid/bars
+    const gridMode = windowSpec.sash?.grid?.mode || 'none';
+    const bars = derived.barPositions || { vertical: [], horizontal: [] };
+
+    // Glass dimensions
+    const glassWDed = CONSTANTS.GLASS_WIDTH_DEDUCTION; // 90
+    const glassHDed = CONSTANTS.GLASS_HEIGHT_DEDUCTION; // 76
+
+    // Upper sash glass area
+    const uGlassX = sashX + stile;
+    const uGlassY = sashY + topRail;
+    const uGlassW = sashW - 2 * stile;
+    const uGlassH = topH - topRail - meetRail / 2;
+
+    // Lower sash glass area
+    const lGlassX = sashX + stile;
+    const lGlassY = meetY + meetRail / 2;
+    const lGlassW = sashW - 2 * stile;
+    const lGlassH = botH - botRail - meetRail / 2;
+
+    // Parse bar counts
+    let vBars = 0, hBarsUpper = 0, hBarsLower = 0;
+    if (gridMode !== 'none' && gridMode !== 'custom') {
+      const parts = gridMode.split('x');
+      const cols = parseInt(parts[0]) || 2;
+      const rows = parseInt(parts[1]) || 2;
+      vBars = cols - 1;
+      hBarsUpper = Math.floor(rows / 2);
+      hBarsLower = Math.ceil(rows / 2);
+    }
+
+    return {
+      fw, fh, jw, hw, sw, sashW, topH, botH, stile, topRail, botRail, meetRail, barW,
+      hasHorns, hornExt, sashX, sashY, meetY, gridMode, bars, vBars, hBarsUpper, hBarsLower,
+      uGlassX, uGlassY, uGlassW, uGlassH, lGlassX, lGlassY, lGlassW, lGlassH, frameDepth,
+    };
+  }, [windowSpec, derived]);
+
+  if (!drawing) {
+    return <div className="text-ink-400 text-sm p-8 text-center">No window data for drawing.</div>;
+  }
+
+  const d = drawing;
+  const totalW = d.fw + MARGIN * 2 + DIM_OFFSET * 3;
+  const totalH = d.fh + MARGIN * 2 + DIM_OFFSET * 3;
+
+  return (
+    <div className="w-full">
+      <svg
+        viewBox={`${-MARGIN - DIM_OFFSET * 2} ${-MARGIN - DIM_OFFSET} ${totalW} ${totalH}`}
+        xmlns="http://www.w3.org/2000/svg"
+        className="w-full h-auto"
+        style={{ maxHeight: '70vh' }}
+      >
+        {/* ── BOX FRAME ── */}
+        <rect x={0} y={0} width={d.fw} height={d.fh}
+          fill="none" stroke={STROKE.frame} strokeWidth={1.5} />
+
+        {/* Head */}
+        <rect x={0} y={0} width={d.fw} height={d.hw}
+          fill={STROKE.frame} fillOpacity={0.08} stroke={STROKE.frame} strokeWidth={0.5} />
+
+        {/* Sill */}
+        <rect x={0} y={d.fh - d.sw} width={d.fw} height={d.sw}
+          fill={STROKE.frame} fillOpacity={0.08} stroke={STROKE.frame} strokeWidth={0.5} />
+
+        {/* Jamb left */}
+        <rect x={0} y={0} width={d.jw} height={d.fh}
+          fill={STROKE.frame} fillOpacity={0.05} stroke={STROKE.frame} strokeWidth={0.5} />
+
+        {/* Jamb right */}
+        <rect x={d.fw - d.jw} y={0} width={d.jw} height={d.fh}
+          fill={STROKE.frame} fillOpacity={0.05} stroke={STROKE.frame} strokeWidth={0.5} />
+
+        {/* ── UPPER SASH ── */}
+        <rect x={d.sashX} y={d.sashY} width={d.sashW} height={d.topH}
+          fill="none" stroke={STROKE.sash} strokeWidth={1} />
+
+        {/* Upper sash stiles */}
+        <rect x={d.sashX} y={d.sashY} width={d.stile} height={d.topH}
+          fill={STROKE.sash} fillOpacity={0.06} stroke={STROKE.sash} strokeWidth={0.3} />
+        <rect x={d.sashX + d.sashW - d.stile} y={d.sashY} width={d.stile} height={d.topH}
+          fill={STROKE.sash} fillOpacity={0.06} stroke={STROKE.sash} strokeWidth={0.3} />
+
+        {/* Upper sash top rail */}
+        <rect x={d.sashX} y={d.sashY} width={d.sashW} height={d.topRail}
+          fill={STROKE.sash} fillOpacity={0.06} stroke={STROKE.sash} strokeWidth={0.3} />
+
+        {/* ── MEETING RAIL ── */}
+        <rect x={d.sashX} y={d.meetY - d.meetRail / 2} width={d.sashW} height={d.meetRail}
+          fill={STROKE.sash} fillOpacity={0.1} stroke={STROKE.sash} strokeWidth={0.8} />
+
+        {/* ── LOWER SASH ── */}
+        <rect x={d.sashX} y={d.meetY} width={d.sashW} height={d.botH}
+          fill="none" stroke={STROKE.sash} strokeWidth={1} />
+
+        {/* Lower sash stiles */}
+        <rect x={d.sashX} y={d.meetY} width={d.stile} height={d.botH}
+          fill={STROKE.sash} fillOpacity={0.06} stroke={STROKE.sash} strokeWidth={0.3} />
+        <rect x={d.sashX + d.sashW - d.stile} y={d.meetY} width={d.stile} height={d.botH}
+          fill={STROKE.sash} fillOpacity={0.06} stroke={STROKE.sash} strokeWidth={0.3} />
+
+        {/* Lower sash bottom rail */}
+        <rect x={d.sashX} y={d.meetY + d.botH - d.botRail} width={d.sashW} height={d.botRail}
+          fill={STROKE.sash} fillOpacity={0.06} stroke={STROKE.sash} strokeWidth={0.3} />
+
+        {/* ── GLASS PANES ── */}
+        {/* Upper glass */}
+        <rect x={d.uGlassX} y={d.uGlassY} width={d.uGlassW} height={d.uGlassH}
+          fill={STROKE.glass} fillOpacity={STROKE.glassOpacity} stroke="none" />
+        {/* Lower glass */}
+        <rect x={d.lGlassX} y={d.lGlassY} width={d.lGlassW} height={d.lGlassH}
+          fill={STROKE.glass} fillOpacity={STROKE.glassOpacity} stroke="none" />
+
+        {/* ── GLAZING BARS (Upper sash) ── */}
+        {d.vBars > 0 && Array.from({ length: d.vBars }).map((_, i) => {
+          const spacing = d.uGlassW / (d.vBars + 1);
+          const bx = d.uGlassX + spacing * (i + 1) - d.barW / 2;
+          return <rect key={`uv${i}`} x={bx} y={d.uGlassY} width={d.barW} height={d.uGlassH}
+            fill={STROKE.sash} fillOpacity={0.15} stroke={STROKE.bar} strokeWidth={0.5} />;
+        })}
+        {d.hBarsUpper > 0 && Array.from({ length: d.hBarsUpper }).map((_, i) => {
+          const spacing = d.uGlassH / (d.hBarsUpper + 1);
+          const by = d.uGlassY + spacing * (i + 1) - d.barW / 2;
+          return <rect key={`uh${i}`} x={d.uGlassX} y={by} width={d.uGlassW} height={d.barW}
+            fill={STROKE.sash} fillOpacity={0.15} stroke={STROKE.bar} strokeWidth={0.5} />;
+        })}
+
+        {/* ── GLAZING BARS (Lower sash) ── */}
+        {d.vBars > 0 && Array.from({ length: d.vBars }).map((_, i) => {
+          const spacing = d.lGlassW / (d.vBars + 1);
+          const bx = d.lGlassX + spacing * (i + 1) - d.barW / 2;
+          return <rect key={`lv${i}`} x={bx} y={d.lGlassY} width={d.barW} height={d.lGlassH}
+            fill={STROKE.sash} fillOpacity={0.15} stroke={STROKE.bar} strokeWidth={0.5} />;
+        })}
+        {d.hBarsLower > 0 && Array.from({ length: d.hBarsLower }).map((_, i) => {
+          const spacing = d.lGlassH / (d.hBarsLower + 1);
+          const by = d.lGlassY + spacing * (i + 1) - d.barW / 2;
+          return <rect key={`lh${i}`} x={d.lGlassX} y={by} width={d.lGlassW} height={d.barW}
+            fill={STROKE.sash} fillOpacity={0.15} stroke={STROKE.bar} strokeWidth={0.5} />;
+        })}
+
+        {/* ── HORNS ── */}
+        {d.hasHorns && <>
+          {/* Upper sash horns — extend below meeting rail */}
+          <line x1={d.sashX + 2} y1={d.meetY} x2={d.sashX + 2} y2={d.meetY + d.hornExt}
+            stroke={STROKE.horn} strokeWidth={2} strokeDasharray="4,3" />
+          <line x1={d.sashX + d.sashW - 2} y1={d.meetY} x2={d.sashX + d.sashW - 2} y2={d.meetY + d.hornExt}
+            stroke={STROKE.horn} strokeWidth={2} strokeDasharray="4,3" />
+          {/* Lower sash horns — extend above meeting rail */}
+          <line x1={d.sashX + 2} y1={d.meetY} x2={d.sashX + 2} y2={d.meetY - d.hornExt}
+            stroke={STROKE.horn} strokeWidth={2} strokeDasharray="4,3" />
+          <line x1={d.sashX + d.sashW - 2} y1={d.meetY} x2={d.sashX + d.sashW - 2} y2={d.meetY - d.hornExt}
+            stroke={STROKE.horn} strokeWidth={2} strokeDasharray="4,3" />
+        </>}
+
+        {/* ── DIMENSION LINES ── */}
+        {/* Frame Width — bottom */}
+        <DimH y={d.fh + DIM_OFFSET} x1={0} x2={d.fw} label={`${d.fw} mm`} />
+
+        {/* Frame Height — right */}
+        <DimV x={d.fw + DIM_OFFSET} y1={0} y2={d.fh} label={`${d.fh} mm`} />
+
+        {/* Sash Width — top */}
+        <DimH y={-DIM_OFFSET} x1={d.sashX} x2={d.sashX + d.sashW} label={`Sash: ${d.sashW} mm`} />
+
+        {/* Top Sash Height — left */}
+        <DimV x={-DIM_OFFSET} y1={d.sashY} y2={d.meetY} label={`${d.topH}`} />
+
+        {/* Bottom Sash Height — left */}
+        <DimV x={-DIM_OFFSET} y1={d.meetY} y2={d.sashY + d.topH + d.botH} label={`${d.botH}`} />
+
+        {/* Jamb width — bottom detail */}
+        <DimH y={d.fh + DIM_OFFSET + DIM_GAP} x1={0} x2={d.jw} label={`${d.jw}`} small />
+
+        {/* Stile width — bottom detail */}
+        <DimH y={d.fh + DIM_OFFSET + DIM_GAP} x1={d.sashX} x2={d.sashX + d.stile} label={`${d.stile}`} small />
+
+        {/* Head height */}
+        <DimV x={d.fw + DIM_OFFSET + DIM_GAP} y1={0} y2={d.hw} label={`${d.hw}`} small />
+
+        {/* Sill height */}
+        <DimV x={d.fw + DIM_OFFSET + DIM_GAP} y1={d.fh - d.sw} y2={d.fh} label={`${d.sw}`} small />
+
+        {/* Meeting rail label */}
+        <text x={d.fw + DIM_OFFSET + DIM_GAP + 15} y={d.meetY + 4}
+          fill={STROKE.dimText} fontSize={FONT.size * 0.8} fontFamily={FONT.family}
+          fillOpacity={0.6}>
+          MR {d.meetRail}
+        </text>
+
+        {/* Frame depth label */}
+        <text x={d.fw / 2} y={-DIM_OFFSET - DIM_GAP + 5}
+          fill={STROKE.dimText} fontSize={FONT.size * 0.75} fontFamily={FONT.family}
+          textAnchor="middle" fillOpacity={0.5}>
+          Frame depth: {d.frameDepth}mm
+        </text>
+
+        {/* Horn label */}
+        {d.hasHorns && (
+          <text x={d.sashX - 10} y={d.meetY + d.hornExt + 15}
+            fill={STROKE.horn} fontSize={FONT.size * 0.7} fontFamily={FONT.family}
+            textAnchor="end" fillOpacity={0.8}>
+            Horn {d.hornExt}mm
+          </text>
+        )}
+
+        {/* Title */}
+        <text x={d.fw / 2} y={d.fh + DIM_OFFSET * 2 + DIM_GAP + 10}
+          fill={STROKE.dimText} fontSize={FONT.size * 1.1} fontFamily={FONT.family}
+          textAnchor="middle" fontWeight="600">
+          FRONT ELEVATION — {d.fw} × {d.fh} mm
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+// ─── Dimension Line Components ───
+
+function DimH({ y, x1, x2, label, small }) {
+  const mid = (x1 + x2) / 2;
+  const fs = small ? FONT.size * 0.7 : FONT.size * 0.85;
+  const tick = small ? 4 : 6;
+  return (
+    <g>
+      <line x1={x1} y1={y} x2={x2} y2={y} stroke={STROKE.dim} strokeWidth={0.5} />
+      {/* Ticks */}
+      <line x1={x1} y1={y - tick} x2={x1} y2={y + tick} stroke={STROKE.dim} strokeWidth={0.5} />
+      <line x1={x2} y1={y - tick} x2={x2} y2={y + tick} stroke={STROKE.dim} strokeWidth={0.5} />
+      {/* Extension lines */}
+      <line x1={x1} y1={y - tick * 3} x2={x1} y2={y - tick} stroke={STROKE.dim} strokeWidth={0.3} strokeOpacity={0.4} />
+      <line x1={x2} y1={y - tick * 3} x2={x2} y2={y - tick} stroke={STROKE.dim} strokeWidth={0.3} strokeOpacity={0.4} />
+      {/* Label */}
+      <text x={mid} y={y - 6} fill={STROKE.dim} fontSize={fs} fontFamily={FONT.family}
+        textAnchor="middle" fontWeight="500">{label}</text>
+    </g>
+  );
+}
+
+function DimV({ x, y1, y2, label, small }) {
+  const mid = (y1 + y2) / 2;
+  const fs = small ? FONT.size * 0.7 : FONT.size * 0.85;
+  const tick = small ? 4 : 6;
+  return (
+    <g>
+      <line x1={x} y1={y1} x2={x} y2={y2} stroke={STROKE.dim} strokeWidth={0.5} />
+      {/* Ticks */}
+      <line x1={x - tick} y1={y1} x2={x + tick} y2={y1} stroke={STROKE.dim} strokeWidth={0.5} />
+      <line x1={x - tick} y1={y2} x2={x + tick} y2={y2} stroke={STROKE.dim} strokeWidth={0.5} />
+      {/* Label — rotated */}
+      <text x={x + 8} y={mid + 4} fill={STROKE.dim} fontSize={fs} fontFamily={FONT.family}
+        fontWeight="500"
+        transform={`rotate(-90, ${x + 8}, ${mid + 4})`}
+        textAnchor="middle">{label}</text>
+    </g>
+  );
+}
