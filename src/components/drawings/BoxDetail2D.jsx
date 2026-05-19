@@ -1,91 +1,220 @@
 /**
  * BoxDetail2D.jsx
  *
- * Simplified front view of the box frame only (no sashes).
- * Shows head, sill, jambs with inner cavity dimensions.
- * V1 placeholder — will be refined with profile details later.
+ * Parametric front elevation of box frame based on real DXF profiles.
+ * Constants extracted from OTD production drawings (box_front.dxf).
+ * Variable: frame width/height from windowSpec.
+ * Shows: External Jamb Liners (L/R), External Head Liner, Sill with details.
  */
 import { useMemo } from 'react';
-import { CONSTANTS } from '../../engine/calculations.js';
-import { STROKE, FONT, DimH, DimV, TitleBlock, Label, DIM_OFFSET, MARGIN } from './drawingUtils.jsx';
+import { FONT } from './drawingUtils.jsx';
 
+// ─── Constants from DXF (profile geometry — fixed) ───
+const BOX = {
+  jambW_bottom: 86,
+  jambW_top: 102,
+  headH: 102,
+  sillNose: 33,
+  sillWeatherbar: 46.5,
+  sillDrip: 58,
+  sillTop: 68,
+  sillCurveTop: 94,
+  bulge: 0.292123,
+};
+
+// ─── Colors ───
+const COL = {
+  frame: '#CBD5E1',
+  frameFill: 'rgba(148,163,184,0.06)',
+  sillDetail: '#94A3B8',
+  dim: '#EF4444',
+  label: '#64748b',
+  cavity: '#475569',
+  title: '#E2E8F0',
+};
+
+// ─── Bulge → SVG arc ───
+function bulgeArc(x1, y1, x2, y2, bulge) {
+  if (Math.abs(bulge) < 1e-6) return `L ${x2} ${y2}`;
+  const dx = x2 - x1, dy = y2 - y1;
+  const chord = Math.sqrt(dx * dx + dy * dy);
+  const sagitta = Math.abs(bulge) * chord / 2;
+  const r = ((chord / 2) ** 2 + sagitta ** 2) / (2 * sagitta);
+  const la = Math.abs(bulge) > 1 ? 1 : 0;
+  const sw = bulge > 0 ? 0 : 1;
+  return `A ${r} ${r} 0 ${la} ${sw} ${x2} ${y2}`;
+}
+
+// ─── Red dimension helpers ───
+function DimH({ y, x1, x2, label, small }) {
+  const fs = small ? FONT.size * 0.6 : FONT.size * 0.75;
+  const tick = small ? 4 : 5;
+  const mid = (x1 + x2) / 2;
+  return (
+    <g>
+      <line x1={x1} y1={y} x2={x2} y2={y} stroke={COL.dim} strokeWidth={0.6} />
+      <line x1={x1} y1={y - tick} x2={x1} y2={y + tick} stroke={COL.dim} strokeWidth={0.6} />
+      <line x1={x2} y1={y - tick} x2={x2} y2={y + tick} stroke={COL.dim} strokeWidth={0.6} />
+      <text x={mid} y={y - 5} fill={COL.dim} fontSize={fs} fontFamily={FONT.family}
+        textAnchor="middle" fontWeight="600">{label}</text>
+    </g>
+  );
+}
+
+function DimV({ x, y1, y2, label, small }) {
+  const fs = small ? FONT.size * 0.6 : FONT.size * 0.75;
+  const tick = small ? 4 : 5;
+  const mid = (y1 + y2) / 2;
+  return (
+    <g>
+      <line x1={x} y1={y1} x2={x} y2={y2} stroke={COL.dim} strokeWidth={0.6} />
+      <line x1={x - tick} y1={y1} x2={x + tick} y2={y1} stroke={COL.dim} strokeWidth={0.6} />
+      <line x1={x - tick} y1={y2} x2={x + tick} y2={y2} stroke={COL.dim} strokeWidth={0.6} />
+      <text x={x + 8} y={mid + 4} fill={COL.dim} fontSize={fs} fontFamily={FONT.family}
+        fontWeight="600" transform={`rotate(-90, ${x + 8}, ${mid + 4})`}
+        textAnchor="middle">{label}</text>
+    </g>
+  );
+}
+
+function Ext({ x1, y1, x2, y2 }) {
+  return <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={COL.dim} strokeWidth={0.3} strokeDasharray="3,2" />;
+}
+
+// ─── Main Component ───
 export default function BoxDetail2D({ windowSpec, derived }) {
   const d = useMemo(() => {
     if (!windowSpec || !derived) return null;
     const fw = windowSpec.frame.width;
     const fh = windowSpec.frame.height;
-    const jw = CONSTANTS.JAMBS_WIDTH;
-    const hw = CONSTANTS.HEAD_WIDTH;
-    const sw = CONSTANTS.SILL_WIDTH;
-    const depth = windowSpec.frame.depth || 164;
-    const innerW = fw - 2 * jw;
-    const innerH = fh - hw - sw;
-    return { fw, fh, jw, hw, sw, depth, innerW, innerH };
+    const innerW = fw - 2 * BOX.jambW_top;
+    return { fw, fh, innerW };
   }, [windowSpec, derived]);
 
   if (!d) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
 
-  const totalW = d.fw + MARGIN * 2 + DIM_OFFSET * 3;
-  const totalH = d.fh + MARGIN * 2 + DIM_OFFSET * 3;
+  const { fw, fh } = d;
+  const DM = 40;
+  const M = 60;
+  const totalW = fw + M * 2 + DM * 3;
+  const totalH = fh + M * 2 + DM * 3;
+
+  // Coordinate helpers (Y flipped)
+  const ox = M + DM * 2;
+  const oy = M + DM;
+  const X = (x) => ox + x;
+  const Y = (y) => oy + (fh - y);
+
+  // ─── Paths ───
+  const rJamb = [
+    `M ${X(fw - BOX.jambW_bottom)} ${Y(0)}`,
+    `L ${X(fw - BOX.jambW_bottom)} ${Y(BOX.sillTop)}`,
+    bulgeArc(X(fw - BOX.jambW_bottom), Y(BOX.sillTop), X(fw - BOX.jambW_top), Y(BOX.sillCurveTop), BOX.bulge),
+    `L ${X(fw - BOX.jambW_top)} ${Y(fh)}`,
+    `L ${X(fw)} ${Y(fh)}`,
+    `L ${X(fw)} ${Y(0)}`,
+    'Z',
+  ].join(' ');
+
+  const lJamb = [
+    `M ${X(BOX.jambW_bottom)} ${Y(0)}`,
+    `L ${X(BOX.jambW_bottom)} ${Y(BOX.sillTop)}`,
+    bulgeArc(X(BOX.jambW_bottom), Y(BOX.sillTop), X(BOX.jambW_top), Y(BOX.sillCurveTop), -BOX.bulge),
+    `L ${X(BOX.jambW_top)} ${Y(fh)}`,
+    `L ${X(0)} ${Y(fh)}`,
+    `L ${X(0)} ${Y(0)}`,
+    'Z',
+  ].join(' ');
+
+  const head = `M ${X(BOX.jambW_top)} ${Y(fh)} L ${X(fw - BOX.jambW_top)} ${Y(fh)} L ${X(fw - BOX.jambW_top)} ${Y(fh - BOX.headH)} L ${X(BOX.jambW_top)} ${Y(fh - BOX.headH)} Z`;
+
+  const sill = `M ${X(BOX.jambW_bottom)} ${Y(0)} L ${X(fw - BOX.jambW_bottom)} ${Y(0)} L ${X(fw - BOX.jambW_bottom)} ${Y(BOX.sillNose)} L ${X(BOX.jambW_bottom)} ${Y(BOX.sillNose)} Z`;
 
   return (
     <div className="w-full">
-      <svg
-        viewBox={`${-MARGIN - DIM_OFFSET * 2} ${-MARGIN - DIM_OFFSET} ${totalW} ${totalH}`}
-        xmlns="http://www.w3.org/2000/svg"
-        className="w-full h-auto"
-        style={{ maxHeight: '65vh' }}
-      >
-        {/* Outer frame */}
-        <rect x={0} y={0} width={d.fw} height={d.fh}
-          fill="none" stroke={STROKE.frame} strokeWidth={2} />
+      <svg viewBox={`0 0 ${totalW} ${totalH}`} xmlns="http://www.w3.org/2000/svg"
+        className="w-full h-auto" style={{ maxHeight: '70vh' }}>
 
-        {/* Head */}
-        <rect x={0} y={0} width={d.fw} height={d.hw}
-          fill={STROKE.sectionFill} fillOpacity={0.12} stroke={STROKE.frame} strokeWidth={1} />
-        <Label x={d.fw / 2} y={d.hw / 2 + 4} text="HEAD" />
+        {/* Frame geometry */}
+        <path d={rJamb} fill={COL.frameFill} stroke={COL.frame} strokeWidth={1.5} />
+        <path d={lJamb} fill={COL.frameFill} stroke={COL.frame} strokeWidth={1.5} />
+        <path d={head} fill={COL.frameFill} stroke={COL.frame} strokeWidth={1.5} />
+        <path d={sill} fill={COL.frameFill} stroke={COL.frame} strokeWidth={1.5} />
 
-        {/* Sill */}
-        <rect x={0} y={d.fh - d.sw} width={d.fw} height={d.sw}
-          fill={STROKE.sectionFill} fillOpacity={0.12} stroke={STROKE.frame} strokeWidth={1} />
-        <Label x={d.fw / 2} y={d.fh - d.sw / 2 + 4} text="SILL" />
+        {/* Sill detail lines */}
+        <line x1={X(BOX.jambW_bottom)} y1={Y(BOX.sillWeatherbar)} x2={X(fw - BOX.jambW_bottom)} y2={Y(BOX.sillWeatherbar)} stroke={COL.sillDetail} strokeWidth={0.6} />
+        <line x1={X(BOX.jambW_bottom)} y1={Y(BOX.sillDrip)} x2={X(fw - BOX.jambW_bottom)} y2={Y(BOX.sillDrip)} stroke={COL.sillDetail} strokeWidth={0.6} />
+        <line x1={X(BOX.jambW_bottom)} y1={Y(BOX.sillTop)} x2={X(fw - BOX.jambW_bottom)} y2={Y(BOX.sillTop)} stroke={COL.sillDetail} strokeWidth={0.6} />
 
-        {/* Left jamb */}
-        <rect x={0} y={0} width={d.jw} height={d.fh}
-          fill={STROKE.sectionFill} fillOpacity={0.08} stroke={STROKE.frame} strokeWidth={0.5} />
-        <Label x={d.jw / 2} y={d.fh / 2} text="JAMB" />
+        {/* Labels */}
+        <text x={X(BOX.jambW_bottom / 2)} y={Y(fh / 2)} fill={COL.label} fontSize={FONT.size * 0.5}
+          fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}
+          transform={`rotate(-90, ${X(BOX.jambW_bottom / 2)}, ${Y(fh / 2)})`}>
+          EXT. JAMB LINER (L)
+        </text>
+        <text x={X(fw - BOX.jambW_bottom / 2)} y={Y(fh / 2)} fill={COL.label} fontSize={FONT.size * 0.5}
+          fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}
+          transform={`rotate(90, ${X(fw - BOX.jambW_bottom / 2)}, ${Y(fh / 2)})`}>
+          EXT. JAMB LINER (R)
+        </text>
+        <text x={X(fw / 2)} y={Y(fh - BOX.headH / 2) + 4} fill={COL.label} fontSize={FONT.size * 0.55}
+          fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}>
+          EXT. HEAD LINER
+        </text>
+        <text x={X(fw / 2)} y={Y(BOX.sillNose / 2) + 4} fill={COL.label} fontSize={FONT.size * 0.55}
+          fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}>
+          SILL
+        </text>
+        <text x={X(fw / 2)} y={Y(fh / 2)} fill={COL.cavity} fontSize={FONT.size * 0.8}
+          fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.25}>
+          CAVITY
+        </text>
 
-        {/* Right jamb */}
-        <rect x={d.fw - d.jw} y={0} width={d.jw} height={d.fh}
-          fill={STROKE.sectionFill} fillOpacity={0.08} stroke={STROKE.frame} strokeWidth={0.5} />
-        <Label x={d.fw - d.jw / 2} y={d.fh / 2} text="JAMB" />
+        {/* ── Red dimensions ── */}
 
-        {/* Inner cavity (dashed) */}
-        <rect x={d.jw} y={d.hw} width={d.innerW} height={d.innerH}
-          fill={STROKE.glass} fillOpacity={0.04} stroke={STROKE.dim} strokeWidth={0.5} strokeDasharray="6,4" />
+        {/* Overall width — bottom */}
+        <Ext x1={X(0)} y1={Y(0)} x2={X(0)} y2={Y(0) + DM * 1.5} />
+        <Ext x1={X(fw)} y1={Y(0)} x2={X(fw)} y2={Y(0) + DM * 1.5} />
+        <DimH y={Y(0) + DM * 1.3} x1={X(0)} x2={X(fw)} label={`${fw} mm`} />
 
-        {/* ── Dimensions ── */}
-        {/* Frame width */}
-        <DimH y={d.fh + DIM_OFFSET} x1={0} x2={d.fw} label={`${d.fw} mm`} />
-        {/* Frame height */}
-        <DimV x={d.fw + DIM_OFFSET} y1={0} y2={d.fh} label={`${d.fh} mm`} />
+        {/* Overall height — right */}
+        <Ext x1={X(fw)} y1={Y(0)} x2={X(fw) + DM * 1.5} y2={Y(0)} />
+        <Ext x1={X(fw)} y1={Y(fh)} x2={X(fw) + DM * 1.5} y2={Y(fh)} />
+        <DimV x={X(fw) + DM * 1.3} y1={Y(fh)} y2={Y(0)} label={`${fh} mm`} />
 
-        {/* Inner width */}
-        <DimH y={-DIM_OFFSET} x1={d.jw} x2={d.fw - d.jw} label={`Inner: ${d.innerW} mm`} />
-        {/* Inner height */}
-        <DimV x={-DIM_OFFSET} y1={d.hw} y2={d.fh - d.sw} label={`${d.innerH}`} />
+        {/* Inner width — top */}
+        <Ext x1={X(BOX.jambW_top)} y1={Y(fh)} x2={X(BOX.jambW_top)} y2={Y(fh) - DM * 1.5} />
+        <Ext x1={X(fw - BOX.jambW_top)} y1={Y(fh)} x2={X(fw - BOX.jambW_top)} y2={Y(fh) - DM * 1.5} />
+        <DimH y={Y(fh) - DM * 1.2} x1={X(BOX.jambW_top)} x2={X(fw - BOX.jambW_top)}
+          label={`${d.innerW} (inner)`} small />
 
-        {/* Head height */}
-        <DimV x={d.fw + DIM_OFFSET + 30} y1={0} y2={d.hw} label={`${d.hw}`} small />
-        {/* Sill height */}
-        <DimV x={d.fw + DIM_OFFSET + 30} y1={d.fh - d.sw} y2={d.fh} label={`${d.sw}`} small />
-        {/* Jamb width */}
-        <DimH y={d.fh + DIM_OFFSET + 30} x1={0} x2={d.jw} label={`${d.jw}`} small />
+        {/* Jamb width — bottom */}
+        <Ext x1={X(0)} y1={Y(0)} x2={X(0)} y2={Y(0) + DM * 2.5} />
+        <Ext x1={X(BOX.jambW_bottom)} y1={Y(0)} x2={X(BOX.jambW_bottom)} y2={Y(0) + DM * 2.5} />
+        <DimH y={Y(0) + DM * 2.3} x1={X(0)} x2={X(BOX.jambW_bottom)} label={`${BOX.jambW_bottom}`} small />
+
+        {/* Head height — left */}
+        <Ext x1={X(0)} y1={Y(fh - BOX.headH)} x2={X(0) - DM * 1.2} y2={Y(fh - BOX.headH)} />
+        <Ext x1={X(0)} y1={Y(fh)} x2={X(0) - DM * 1.2} y2={Y(fh)} />
+        <DimV x={X(0) - DM} y1={Y(fh)} y2={Y(fh - BOX.headH)} label={`${BOX.headH}`} small />
+
+        {/* Sill details — far right */}
+        <Ext x1={X(fw)} y1={Y(0)} x2={X(fw) + DM * 2.8} y2={Y(0)} />
+        <Ext x1={X(fw)} y1={Y(BOX.sillNose)} x2={X(fw) + DM * 2.8} y2={Y(BOX.sillNose)} />
+        <Ext x1={X(fw)} y1={Y(BOX.sillTop)} x2={X(fw) + DM * 2.8} y2={Y(BOX.sillTop)} />
+        <DimV x={X(fw) + DM * 2.5} y1={Y(0)} y2={Y(BOX.sillNose)} label={`${BOX.sillNose}`} small />
+        <DimV x={X(fw) + DM * 2.5} y1={Y(BOX.sillNose)} y2={Y(BOX.sillTop)}
+          label={`${BOX.sillTop - BOX.sillNose}`} small />
 
         {/* Title */}
-        <TitleBlock x={d.fw / 2} y={d.fh + DIM_OFFSET * 2 + 30}
-          title={`BOX DETAIL — ${d.fw} × ${d.fh} mm`}
-          subtitle={`Depth: ${d.depth}mm · Section: ${CONSTANTS.FRAME_SECTION}`} />
+        <text x={totalW / 2} y={totalH - 8} fill={COL.title} fontSize={FONT.size * 0.85}
+          fontFamily={FONT.family} textAnchor="middle" fontWeight="600">
+          BOX DETAIL — {fw} × {fh} mm
+        </text>
+        <text x={totalW / 2} y={totalH + 6} fill={COL.label} fontSize={FONT.size * 0.6}
+          fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.5}>
+          Ext. Liners + Sill · Profile from DXF
+        </text>
       </svg>
     </div>
   );
