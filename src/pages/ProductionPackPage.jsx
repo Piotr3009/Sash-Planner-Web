@@ -22,6 +22,11 @@ import {
 import { optimisePrecut } from '../engine/optimizer.js';
 import { mockProjects } from '../mocks/mockProjects.js';
 import FrontElevation2D from '../components/drawings/FrontElevation2D.jsx';
+import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
+import SashDetail2D from '../components/drawings/SashDetail2D.jsx';
+import VerticalSection2D from '../components/drawings/VerticalSection2D.jsx';
+import HorizontalSection2D from '../components/drawings/HorizontalSection2D.jsx';
+import GlassDrawing2D from '../components/drawings/GlassDrawing2D.jsx';
 import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 
 // ─── Tab config ───
@@ -179,8 +184,8 @@ export default function ProductionPackPage() {
         {tab === 'overview'   && <OverviewTab batch={batch} windowsData={windowsData} projectId={projectId} batchId={batchId} />}
         {tab === '3d'         && <ThreeDTab windowsData={windowsData} />}
         {tab === 'elevations' && <ElevationsTab windowsData={windowsData} />}
-        {tab === 'sections'   && <PlaceholderTab title="2D Sections" desc="Cross-section drawings (head, sill, jamb, meeting rail) shared for this batch." />}
-        {tab === 'elements'   && <PlaceholderTab title="2D Elements" desc="Box detail, upper sash and lower sash detail drawings per window." />}
+        {tab === 'sections'   && <SectionsTab windowsData={windowsData} />}
+        {tab === 'elements'   && <ElementsTab windowsData={windowsData} />}
         {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} />}
         {tab === 'precut'     && <PreCutTab merged={merged} settings={settings} />}
         {tab === 'cutlist'    && <CutListTab merged={merged} />}
@@ -298,6 +303,79 @@ function ElevationsTab({ windowsData }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// TAB: 2D Sections (shared for batch — V-Section + H-Section)
+// ═══════════════════════════════════════════════════════════════
+function SectionsTab({ windowsData }) {
+  // Use first window's data — sections are shared (same profiles for entire batch)
+  const first = windowsData[0];
+  if (!first?.windowSpec || !first?.derived) {
+    return <div className="card p-8 text-center text-ink-400">No data available.</div>;
+  }
+  return (
+    <div className="space-y-6">
+      <div className="card p-4">
+        <div className="text-sm font-semibold text-ink-50 mb-3">Vertical Section</div>
+        <div className="text-[10px] text-ink-400 mb-2">
+          Cross-section from head to sill (shared for all windows in this batch — same profile type).
+        </div>
+        <VerticalSection2D windowSpec={first.windowSpec} derived={first.derived} />
+      </div>
+      <div className="card p-4">
+        <div className="text-sm font-semibold text-ink-50 mb-3">Horizontal Section</div>
+        <div className="text-[10px] text-ink-400 mb-2">
+          Cross-section at meeting rail level — exterior to interior.
+        </div>
+        <HorizontalSection2D windowSpec={first.windowSpec} derived={first.derived} />
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAB: 2D Elements (per window: Box + Upper Sash + Lower Sash)
+// ═══════════════════════════════════════════════════════════════
+function ElementsTab({ windowsData }) {
+  return (
+    <div className="space-y-8">
+      {windowsData.map(({ win, windowSpec, derived }) => (
+        <div key={win.id} className="space-y-4">
+          <div className="text-sm font-bold text-ink-50 border-b border-surface-500 pb-2">
+            {win.name} — {win.width}×{win.height} mm
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <div className="card p-4">
+              <div className="text-xs font-semibold text-ink-200 mb-2">Box Detail</div>
+              {derived ? (
+                <BoxDetail2D windowSpec={windowSpec} derived={derived} />
+              ) : (
+                <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
+              )}
+            </div>
+            <div className="card p-4">
+              <div className="text-xs font-semibold text-ink-200 mb-2">Upper Sash</div>
+              {derived ? (
+                <SashDetail2D windowSpec={windowSpec} derived={derived} type="upper" />
+              ) : (
+                <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
+              )}
+            </div>
+            <div className="card p-4">
+              <div className="text-xs font-semibold text-ink-200 mb-2">Lower Sash</div>
+              {derived ? (
+                <SashDetail2D windowSpec={windowSpec} derived={derived} type="lower" />
+              ) : (
+                <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // TAB: Glass Schedule
 // ═══════════════════════════════════════════════════════════════
 function GlassTab({ merged, windowsData }) {
@@ -344,6 +422,22 @@ function GlassTab({ merged, windowsData }) {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Glass drawings per window */}
+      <div className="space-y-4">
+        {windowsData.map(({ win, windowSpec, derived }) => (
+          <div key={win.id} className="card p-4">
+            <div className="text-sm font-semibold text-ink-50 mb-2">
+              {win.name} — Glass Drawing
+            </div>
+            {derived ? (
+              <GlassDrawing2D windowSpec={windowSpec} derived={derived} />
+            ) : (
+              <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
+            )}
+          </div>
+        ))}
       </div>
 
       {/* Summary */}

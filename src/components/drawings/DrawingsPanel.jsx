@@ -4,6 +4,10 @@
  */
 import { useState } from 'react';
 import FrontElevation2D from './FrontElevation2D.jsx';
+import BoxDetail2D from './BoxDetail2D.jsx';
+import SashDetail2D from './SashDetail2D.jsx';
+import VerticalSection2D from './VerticalSection2D.jsx';
+import HorizontalSection2D from './HorizontalSection2D.jsx';
 
 const SUB_TABS = [
   { id: 'elevation', label: 'Front Elevation' },
@@ -39,33 +43,20 @@ export default function DrawingsPanel({ windowSpec, settings, derived }) {
           <FrontElevation2D windowSpec={windowSpec} derived={derived} />
         )}
         {subTab === 'box' && (
-          <Placeholder title="Box Detail" desc="Cross-section of the box frame — head, sill, jamb profiles with dimensions." />
+          <BoxDetail2D windowSpec={windowSpec} derived={derived} />
         )}
         {subTab === 'upper' && (
-          <Placeholder title="Upper Sash Detail" desc="Upper sash with stiles, top rail, meeting rail, bars, horn detail." />
+          <SashDetail2D windowSpec={windowSpec} derived={derived} type="upper" />
         )}
         {subTab === 'lower' && (
-          <Placeholder title="Lower Sash Detail" desc="Lower sash with stiles, bottom rail, meeting rail, bars, horn detail." />
+          <SashDetail2D windowSpec={windowSpec} derived={derived} type="lower" />
         )}
         {subTab === 'vsection' && (
-          <Placeholder title="Vertical Section" desc="Full vertical cut through the window — head to sill, showing all profiles." />
+          <VerticalSection2D windowSpec={windowSpec} derived={derived} />
         )}
         {subTab === 'hsection' && (
-          <Placeholder title="Horizontal Section" desc="Horizontal cut at meeting rail level — parting bead, staff bead, sash overlap." />
+          <HorizontalSection2D windowSpec={windowSpec} derived={derived} />
         )}
-      </div>
-    </div>
-  );
-}
-
-function Placeholder({ title, desc }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-64 text-center">
-      <div className="text-3xl mb-3 opacity-30">📐</div>
-      <div className="text-sm font-medium text-ink-200 mb-1">{title}</div>
-      <div className="text-xs text-ink-400 max-w-sm">{desc}</div>
-      <div className="mt-4 px-3 py-1 rounded-full bg-surface-600 border border-surface-500 text-[10px] text-ink-400">
-        Coming soon
       </div>
     </div>
   );
