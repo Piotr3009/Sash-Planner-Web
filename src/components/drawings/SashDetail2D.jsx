@@ -1,247 +1,488 @@
 /**
  * SashDetail2D.jsx
  *
- * Detail view of a single sash (upper or lower).
- * Style: CAD-like thin lines, timber fill ≠ container bg, green labels, red dims.
- * Click to expand.
+ * 2D detail view of a single sash (upper or lower).
+ * Style matches approved bottom_sash_4x4_dims.svg reference.
+ *
+ * Conventions:
+ *  - BAR_PATTERNS per-sash (matches 3D ParametricSashWindow.jsx, not legacy CONFIGURATIONS)
+ *  - Bar width 22mm (matches 3D)
+ *  - Dimension chains on top + left, overall dims bottom + right
+ *  - V-notches at every bar–rail/stile junction, cross at every bar intersection
+ *  - Click to expand
+ *
+ * Props:
+ *  - windowSpec: full window specification
+ *  - derived: result from calculateWindow() — uses sashWidth, topSashHeight, bottomSashHeight
+ *  - type: 'upper' | 'lower'
  */
 import { useMemo, useState } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
-import { FONT } from './drawingUtils.jsx';
 
-// ─── CAD Drawing Colors ───
-const C = {
-  line: '#94A3B8',         // structural lines (solid, thin)
-  timber: 'rgba(139,90,43,0.08)',  // timber fill
-  glass: 'rgba(14,165,233,0.06)',  // glass fill
-  barFill: 'rgba(139,90,43,0.12)', // bar timber fill
-  label: '#00B4A0',        // green labels
-  dim: '#EF4444',          // red dimensions
-  horn: '#F59E0B',         // horn accent
-  title: '#E2E8F0',
-  subtitle: '#64748b',
+// BAR_PATTERNS (per-sash, matches 3D ParametricSashWindow.jsx)
+// 4x4 = 1+1 bar = 4 panes per sash, NOT 16 panes
+const BAR_PATTERNS = {
+  'none': { h: 0, v: 0 },
+  '2x2':  { h: 0, v: 1 },
+  '3x3':  { h: 0, v: 2 },
+  '4x4':  { h: 1, v: 1 },
+  '6x6':  { h: 1, v: 2 },
+  '9x9':  { h: 2, v: 2 },
 };
 
-const LW = 0.5; // CAD line weight
+// Constants matching approved reference SVG
+const BAR_WIDTH = 22; // mm — matches 3D (hardcoded; will sync with calculations.js in Stage 3)
 
-// ─── Red dimension helpers ───
-function DimH({ y, x1, x2, label, small }) {
-  const fs = small ? 8 : 10;
-  const tick = 4;
-  const mid = (x1 + x2) / 2;
-  return (
-    <g>
-      <line x1={x1} y1={y} x2={x2} y2={y} stroke={C.dim} strokeWidth={LW} />
-      <line x1={x1} y1={y - tick} x2={x1} y2={y + tick} stroke={C.dim} strokeWidth={LW} />
-      <line x1={x2} y1={y - tick} x2={x2} y2={y + tick} stroke={C.dim} strokeWidth={LW} />
-      <text x={mid} y={y - 5} fill={C.dim} fontSize={fs} fontFamily={FONT.family}
-        textAnchor="middle" fontWeight="600">{label}</text>
-    </g>
-  );
+const C = {
+  outer:     '#E2E8F0', // outer sash + glass rebate + cross + bar edges
+  rebate:    '#0EA5E9', // outer rebate (dashed)
+  glassFill: '#0EA5E9',
+  meeting:   '#64748b',
+  label:     '#00B4A0', // green labels
+  dim:       '#EF4444', // red dimensions
+  notch:     '#F59E0B', // orange V-notches
+  title:     '#E2E8F0',
+  subtitle:  '#475569',
+  bgFill:    'rgba(148,163,184,0.03)',
+};
+
+const FONT_FAMILY = 'DM Sans, system-ui, sans-serif';
+
+// Base font sizes (multiplied by sc factor)
+const FS_DIM_LARGE = 14;
+const FS_DIM_SMALL = 11;
+const FS_LABEL = 10;
+const FS_TITLE = 14;
+const FS_SUBTITLE = 11;
+const FS_NOTCH_NOTE = 9;
+
+// Base stroke widths (multiplied by sc factor)
+const SW_OUTER = 1;
+const SW_REBATE = 0.8;
+const SW_BAR = 1;
+const SW_NOTCH = 1.2;
+const SW_NOTCH_CIRCLE = 0.5;
+const SW_DIM = 0.7;
+const SW_EXT = 0.3;
+const SW_LEADER = 0.3;
+
+// Helper: compute segments of a line (used for breaking bars at crossings)
+function computeSegments(from, to, cutPairs) {
+  if (cutPairs.length === 0) return [{ a: from, b: to }];
+  const sortedCuts = [...cutPairs].sort((p, q) => p[0] - q[0]);
+  const segs = [];
+  let pos = from;
+  for (const [cStart, cEnd] of sortedCuts) {
+    if (cStart > pos) segs.push({ a: pos, b: cStart });
+    pos = Math.max(pos, cEnd);
+  }
+  if (pos < to) segs.push({ a: pos, b: to });
+  return segs;
 }
 
-function DimV({ x, y1, y2, label, small }) {
-  const fs = small ? 8 : 10;
-  const tick = 4;
-  const mid = (y1 + y2) / 2;
-  return (
-    <g>
-      <line x1={x} y1={y1} x2={x} y2={y2} stroke={C.dim} strokeWidth={LW} />
-      <line x1={x - tick} y1={y1} x2={x + tick} y2={y1} stroke={C.dim} strokeWidth={LW} />
-      <line x1={x - tick} y1={y2} x2={x + tick} y2={y2} stroke={C.dim} strokeWidth={LW} />
-      <text x={x + 7} y={mid + 3} fill={C.dim} fontSize={fs} fontFamily={FONT.family}
-        fontWeight="600" transform={`rotate(-90, ${x + 7}, ${mid + 3})`}
-        textAnchor="middle">{label}</text>
-    </g>
-  );
-}
-
-function Ext({ x1, y1, x2, y2 }) {
-  return <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={C.dim} strokeWidth={0.3} strokeDasharray="3,2" />;
-}
-
-// ─── Main Component ───
 export default function SashDetail2D({ windowSpec, derived, type = 'upper' }) {
   const [expanded, setExpanded] = useState(false);
 
-  const d = useMemo(() => {
+  const geom = useMemo(() => {
     if (!windowSpec || !derived) return null;
 
+    const isUpper = type === 'upper';
     const sashW = derived.sashWidth;
+    const sashH = isUpper ? derived.topSashHeight : derived.bottomSashHeight;
+    if (!sashW || !sashH) return null;
+
     const stile = CONSTANTS.STILE_WIDTH;
     const topRail = CONSTANTS.TOP_RAIL_WIDTH;
-    const botRail = CONSTANTS.BOTTOM_RAIL_WIDTH;
     const meetRail = CONSTANTS.MEETING_RAIL_WIDTH;
-    const barW = CONSTANTS.GLAZING_BAR_WIDTH;
+    const botRail = CONSTANTS.BOTTOM_RAIL_WIDTH;
 
-    const isUpper = type === 'upper';
-    const sashH = isUpper ? derived.topSashHeight : derived.bottomSashHeight;
-    const topR = isUpper ? topRail : meetRail;
-    const botR = isUpper ? meetRail : botRail;
+    const topEdge = isUpper ? topRail : meetRail;
+    const botEdge = isUpper ? meetRail : botRail;
 
     const glassX = stile;
-    const glassY = topR;
+    const glassY = topEdge;
     const glassW = sashW - 2 * stile;
-    const glassH = sashH - topR - botR;
+    const glassH = sashH - topEdge - botEdge;
+
+    const REBATE_OFFSET = 9;
+    const rebateX = REBATE_OFFSET;
+    const rebateY = REBATE_OFFSET;
+    const rebateW = sashW - 2 * REBATE_OFFSET;
+    const rebateH = sashH - 2 * REBATE_OFFSET;
 
     const gridMode = windowSpec.sash?.grid?.mode || 'none';
-    let vBars = 0, hBars = 0;
-    if (gridMode !== 'none' && gridMode !== 'custom') {
-      const parts = gridMode.split('x');
-      const cols = parseInt(parts[0]) || 2;
-      const rows = parseInt(parts[1]) || 2;
-      vBars = cols - 1;
-      hBars = isUpper ? Math.floor(rows / 2) : Math.ceil(rows / 2);
+    const pattern = BAR_PATTERNS[gridMode] || BAR_PATTERNS['none'];
+    const v = pattern.v;
+    const h = pattern.h;
+
+    const vBars = [];
+    for (let i = 1; i <= v; i++) {
+      const cx = glassX + (glassW / (v + 1)) * i;
+      vBars.push({ cx, left: cx - BAR_WIDTH / 2, right: cx + BAR_WIDTH / 2 });
     }
 
-    const hasHorns = windowSpec.sash?.horns;
-    const hornExt = hasHorns ? (windowSpec.sash?.hornExtension || 75) : 0;
-    const section = CONSTANTS.SASH_SECTION;
-    const railSection = isUpper ? CONSTANTS.SASH_SECTION : CONSTANTS.BOTTOM_RAIL_SECTION;
+    const hBars = [];
+    for (let j = 1; j <= h; j++) {
+      const cy = glassY + (glassH / (h + 1)) * j;
+      hBars.push({ cy, top: cy - BAR_WIDTH / 2, bot: cy + BAR_WIDTH / 2 });
+    }
 
-    return { sashW, sashH, stile, topR, botR, barW, glassX, glassY, glassW, glassH, vBars, hBars, hasHorns, hornExt, section, railSection, isUpper };
+    const paneW = (glassW - v * BAR_WIDTH) / (v + 1);
+    const paneH = (glassH - h * BAR_WIDTH) / (h + 1);
+
+    const hasHorns = !!windowSpec.sash?.horns;
+    const hornExt = hasHorns ? (windowSpec.sash?.hornExtension || 75) : 0;
+
+    return {
+      sashW, sashH, stile, topEdge, botEdge,
+      glassX, glassY, glassW, glassH,
+      rebateX, rebateY, rebateW, rebateH,
+      vBars, hBars, v, h,
+      paneW, paneH,
+      isUpper, hasHorns, hornExt,
+      gridMode,
+    };
   }, [windowSpec, derived, type]);
 
-  if (!d) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
+  if (!geom) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
 
-  const DM = 35;
-  const M = 50;
-  const totalW = d.sashW + M * 2 + DM * 3;
-  const totalH = d.sashH + M * 2 + DM * 3 + (d.hornExt > 0 ? d.hornExt + 20 : 0);
-  const label = d.isUpper ? 'UPPER' : 'LOWER';
+  const sc = Math.max(geom.sashW, geom.sashH) / 500;
+  const fs = (n) => n * sc;
+  const sw = (n) => n * sc;
 
-  const ox = M + DM * 2;
-  const oy = M + DM + (d.isUpper ? 0 : (d.hornExt > 0 ? d.hornExt + 20 : 0));
+  const MGN_TOP_DIM = 80 * sc;
+  const MGN_LEFT_DIM = 80 * sc;
+  const MGN_RIGHT_DIM = 60 * sc;
+  const MGN_BOT_DIM = 60 * sc;
+  const MGN_TITLE = 40 * sc;
+  const MGN_HORN = geom.isUpper && geom.hornExt > 0 ? geom.hornExt + 20 * sc : 0;
+
+  const ox = MGN_LEFT_DIM;
+  const oy = MGN_TOP_DIM;
+  const totalW = ox + geom.sashW + MGN_RIGHT_DIM;
+  const totalH = oy + geom.sashH + MGN_HORN + MGN_BOT_DIM + MGN_TITLE;
+
   const X = (x) => ox + x;
   const Y = (y) => oy + y;
 
+  const hCuts = geom.hBars.map(hb => [hb.top, hb.bot]);
+  const verticalEdgeSegments = computeSegments(geom.glassY, geom.glassY + geom.glassH, hCuts);
+
+  const vCuts = geom.vBars.map(vb => [vb.left, vb.right]);
+  const horizontalEdgeSegments = computeSegments(geom.glassX, geom.glassX + geom.glassW, vCuts);
+
+  const label = geom.isUpper ? 'UPPER' : 'LOWER';
+  const titleText = `${label} SASH — FRONT — ${Math.round(geom.sashW)} × ${Math.round(geom.sashH)} mm`;
+  const subtitleText = `${geom.gridMode} · ${geom.v} v + ${geom.h} h bar${(geom.v + geom.h) === 1 ? '' : 's'}${geom.hasHorns ? ` · horns ${geom.hornExt}mm` : ''}`;
+
+  // Top dim chain cut points
+  const topCuts = [0, geom.stile];
+  geom.vBars.forEach(vb => { topCuts.push(vb.left); topCuts.push(vb.right); });
+  topCuts.push(geom.sashW - geom.stile);
+  topCuts.push(geom.sashW);
+  const topDimY = oy - 30 * sc;
+  const topExtLineEnd = oy - 5 * sc;
+
+  // Left dim chain cut points
+  const leftCuts = [0, geom.topEdge];
+  geom.hBars.forEach(hb => { leftCuts.push(hb.top); leftCuts.push(hb.bot); });
+  leftCuts.push(geom.sashH - geom.botEdge);
+  leftCuts.push(geom.sashH);
+  const leftDimX = ox - 30 * sc;
+  const leftExtLineEnd = ox - 5 * sc;
+
   return (
     <div className="w-full relative">
-      <div className="absolute top-2 right-2 z-10 text-[10px] text-ink-400 bg-surface-700/80 px-2 py-1 rounded cursor-pointer hover:text-accent-400"
-        onClick={() => setExpanded(!expanded)}>
+      <div
+        className="absolute top-2 right-2 z-10 text-[10px] text-ink-400 bg-surface-700/80 px-2 py-1 rounded cursor-pointer hover:text-accent-400"
+        onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+      >
         {expanded ? '⊖ Collapse' : '⊕ Expand'}
       </div>
 
       <div onClick={() => setExpanded(!expanded)} className="cursor-pointer">
-        <svg viewBox={`0 0 ${totalW} ${totalH}`} xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-auto" style={{ maxHeight: expanded ? 'none' : '65vh' }}>
+        <svg
+          viewBox={`0 0 ${totalW} ${totalH}`}
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-full h-auto"
+          style={{ maxHeight: expanded ? 'none' : '65vh', background: '#1a1f2e' }}
+        >
+          {/* OUTER SASH */}
+          <rect
+            x={X(0)} y={Y(0)} width={geom.sashW} height={geom.sashH}
+            fill={C.bgFill} stroke={C.outer} strokeWidth={sw(SW_OUTER)}
+          />
 
-          {/* Sash outline — solid thin */}
-          <rect x={X(0)} y={Y(0)} width={d.sashW} height={d.sashH}
-            fill="none" stroke={C.line} strokeWidth={LW} />
+          {/* OUTER REBATE — blue dashed */}
+          <rect
+            x={X(geom.rebateX)} y={Y(geom.rebateY)} width={geom.rebateW} height={geom.rebateH}
+            fill="none" stroke={C.rebate} strokeWidth={sw(SW_REBATE)} strokeOpacity={0.5}
+            strokeDasharray={`${sw(4)},${sw(3)}`}
+          />
 
-          {/* Left stile — timber fill */}
-          <rect x={X(0)} y={Y(0)} width={d.stile} height={d.sashH}
-            fill={C.timber} stroke={C.line} strokeWidth={LW} />
+          {/* GLASS REBATE — white solid */}
+          <rect
+            x={X(geom.glassX)} y={Y(geom.glassY)} width={geom.glassW} height={geom.glassH}
+            fill={C.glassFill} fillOpacity={0.06}
+            stroke={C.outer} strokeWidth={sw(SW_OUTER)}
+          />
 
-          {/* Right stile — timber fill */}
-          <rect x={X(d.sashW - d.stile)} y={Y(0)} width={d.stile} height={d.sashH}
-            fill={C.timber} stroke={C.line} strokeWidth={LW} />
+          {/* HORNS (upper sash only, dashed projection) */}
+          {geom.isUpper && geom.hasHorns && (
+            <g>
+              <line
+                x1={X(2)} y1={Y(geom.sashH)}
+                x2={X(2)} y2={Y(geom.sashH + geom.hornExt)}
+                stroke={C.notch} strokeWidth={sw(1)} strokeDasharray={`${sw(4)},${sw(3)}`} strokeOpacity={0.7}
+              />
+              <line
+                x1={X(geom.sashW - 2)} y1={Y(geom.sashH)}
+                x2={X(geom.sashW - 2)} y2={Y(geom.sashH + geom.hornExt)}
+                stroke={C.notch} strokeWidth={sw(1)} strokeDasharray={`${sw(4)},${sw(3)}`} strokeOpacity={0.7}
+              />
+              <text
+                x={X(geom.sashW + 5 * sc)} y={Y(geom.sashH + geom.hornExt / 2)}
+                fill={C.notch} fontSize={fs(FS_NOTCH_NOTE)} fontFamily={FONT_FAMILY} fillOpacity={0.7}
+              >
+                Horn {geom.hornExt}mm
+              </text>
+            </g>
+          )}
 
-          {/* Top rail — timber fill */}
-          <rect x={X(0)} y={Y(0)} width={d.sashW} height={d.topR}
-            fill={C.timber} stroke={C.line} strokeWidth={LW} />
+          {/* VERTICAL BAR EDGES (broken at horizontal bar crossings) */}
+          {geom.vBars.map((vb, i) => (
+            <g key={`vb-${i}`}>
+              {verticalEdgeSegments.map((seg, j) => (
+                <g key={`vb-${i}-s-${j}`}>
+                  <line
+                    x1={X(vb.left)} y1={Y(seg.a)} x2={X(vb.left)} y2={Y(seg.b)}
+                    stroke={C.outer} strokeWidth={sw(SW_BAR)}
+                  />
+                  <line
+                    x1={X(vb.right)} y1={Y(seg.a)} x2={X(vb.right)} y2={Y(seg.b)}
+                    stroke={C.outer} strokeWidth={sw(SW_BAR)}
+                  />
+                </g>
+              ))}
+            </g>
+          ))}
 
-          {/* Bottom rail — timber fill */}
-          <rect x={X(0)} y={Y(d.sashH - d.botR)} width={d.sashW} height={d.botR}
-            fill={C.timber} stroke={C.line} strokeWidth={LW} />
+          {/* HORIZONTAL BAR EDGES (broken at vertical bar crossings) */}
+          {geom.hBars.map((hb, j) => (
+            <g key={`hb-${j}`}>
+              {horizontalEdgeSegments.map((seg, i) => (
+                <g key={`hb-${j}-s-${i}`}>
+                  <line
+                    x1={X(seg.a)} y1={Y(hb.top)} x2={X(seg.b)} y2={Y(hb.top)}
+                    stroke={C.outer} strokeWidth={sw(SW_BAR)}
+                  />
+                  <line
+                    x1={X(seg.a)} y1={Y(hb.bot)} x2={X(seg.b)} y2={Y(hb.bot)}
+                    stroke={C.outer} strokeWidth={sw(SW_BAR)}
+                  />
+                </g>
+              ))}
+            </g>
+          ))}
 
-          {/* Glass area */}
-          <rect x={X(d.glassX)} y={Y(d.glassY)} width={d.glassW} height={d.glassH}
-            fill={C.glass} stroke="none" />
+          {/* CROSSES at bar intersections */}
+          {geom.vBars.flatMap((vb, vi) =>
+            geom.hBars.map((hb, hi) => (
+              <g key={`cross-${vi}-${hi}`}>
+                <line
+                  x1={X(vb.left)} y1={Y(hb.top)} x2={X(vb.right)} y2={Y(hb.bot)}
+                  stroke={C.outer} strokeWidth={sw(SW_BAR)}
+                />
+                <line
+                  x1={X(vb.right)} y1={Y(hb.top)} x2={X(vb.left)} y2={Y(hb.bot)}
+                  stroke={C.outer} strokeWidth={sw(SW_BAR)}
+                />
+              </g>
+            ))
+          )}
 
-          {/* Vertical bars — solid, timber fill */}
-          {d.vBars > 0 && Array.from({ length: d.vBars }).map((_, i) => {
-            const spacing = d.glassW / (d.vBars + 1);
-            const bx = d.glassX + spacing * (i + 1) - d.barW / 2;
-            return <rect key={`v${i}`} x={X(bx)} y={Y(d.glassY)} width={d.barW} height={d.glassH}
-              fill={C.barFill} stroke={C.line} strokeWidth={LW} />;
+          {/* V-NOTCHES — vertical bar ends meet top/bottom rails */}
+          {geom.vBars.map((vb, i) => (
+            <g key={`vn-${i}`}>
+              <line x1={X(vb.cx)} y1={Y(geom.glassY - 4)} x2={X(vb.left)} y2={Y(geom.glassY)}
+                stroke={C.notch} strokeWidth={sw(SW_NOTCH)} strokeOpacity={0.8} />
+              <line x1={X(vb.cx)} y1={Y(geom.glassY - 4)} x2={X(vb.right)} y2={Y(geom.glassY)}
+                stroke={C.notch} strokeWidth={sw(SW_NOTCH)} strokeOpacity={0.8} />
+              <circle cx={X(vb.cx)} cy={Y(geom.glassY - 2)} r={sw(12)}
+                fill="none" stroke={C.notch} strokeWidth={sw(SW_NOTCH_CIRCLE)} strokeOpacity={0.4}
+                strokeDasharray={`${sw(3)},${sw(2)}`} />
+
+              <line x1={X(vb.cx)} y1={Y(geom.glassY + geom.glassH + 4)} x2={X(vb.left)} y2={Y(geom.glassY + geom.glassH)}
+                stroke={C.notch} strokeWidth={sw(SW_NOTCH)} strokeOpacity={0.8} />
+              <line x1={X(vb.cx)} y1={Y(geom.glassY + geom.glassH + 4)} x2={X(vb.right)} y2={Y(geom.glassY + geom.glassH)}
+                stroke={C.notch} strokeWidth={sw(SW_NOTCH)} strokeOpacity={0.8} />
+              <circle cx={X(vb.cx)} cy={Y(geom.glassY + geom.glassH + 2)} r={sw(12)}
+                fill="none" stroke={C.notch} strokeWidth={sw(SW_NOTCH_CIRCLE)} strokeOpacity={0.4}
+                strokeDasharray={`${sw(3)},${sw(2)}`} />
+            </g>
+          ))}
+
+          {/* V-NOTCHES — horizontal bar ends meet left/right stiles */}
+          {geom.hBars.map((hb, j) => (
+            <g key={`hn-${j}`}>
+              <line x1={X(geom.glassX - 4)} y1={Y(hb.cy)} x2={X(geom.glassX)} y2={Y(hb.top)}
+                stroke={C.notch} strokeWidth={sw(SW_NOTCH)} strokeOpacity={0.8} />
+              <line x1={X(geom.glassX - 4)} y1={Y(hb.cy)} x2={X(geom.glassX)} y2={Y(hb.bot)}
+                stroke={C.notch} strokeWidth={sw(SW_NOTCH)} strokeOpacity={0.8} />
+              <circle cx={X(geom.glassX - 2)} cy={Y(hb.cy)} r={sw(12)}
+                fill="none" stroke={C.notch} strokeWidth={sw(SW_NOTCH_CIRCLE)} strokeOpacity={0.4}
+                strokeDasharray={`${sw(3)},${sw(2)}`} />
+
+              <line x1={X(geom.glassX + geom.glassW + 4)} y1={Y(hb.cy)} x2={X(geom.glassX + geom.glassW)} y2={Y(hb.top)}
+                stroke={C.notch} strokeWidth={sw(SW_NOTCH)} strokeOpacity={0.8} />
+              <line x1={X(geom.glassX + geom.glassW + 4)} y1={Y(hb.cy)} x2={X(geom.glassX + geom.glassW)} y2={Y(hb.bot)}
+                stroke={C.notch} strokeWidth={sw(SW_NOTCH)} strokeOpacity={0.8} />
+              <circle cx={X(geom.glassX + geom.glassW + 2)} cy={Y(hb.cy)} r={sw(12)}
+                fill="none" stroke={C.notch} strokeWidth={sw(SW_NOTCH_CIRCLE)} strokeOpacity={0.4}
+                strokeDasharray={`${sw(3)},${sw(2)}`} />
+            </g>
+          ))}
+
+          {/* LABELS — green, sentence case */}
+          <text x={X(geom.sashW / 2)} y={Y(geom.sashH - geom.botEdge / 2)}
+            fill={C.label} fontSize={fs(FS_LABEL)} fontFamily={FONT_FAMILY} textAnchor="middle">
+            {geom.isUpper ? 'MEETING RAIL' : 'BOTTOM RAIL'}
+          </text>
+          <text x={X(geom.sashW / 2)} y={Y(geom.topEdge / 2 + 3)}
+            fill={C.label} fontSize={fs(FS_LABEL)} fontFamily={FONT_FAMILY} textAnchor="middle">
+            {geom.isUpper ? 'TOP RAIL' : 'MEETING RAIL'}
+          </text>
+          <text x={X(geom.stile / 2)} y={Y(geom.sashH / 2)}
+            fill={C.label} fontSize={fs(FS_LABEL)} fontFamily={FONT_FAMILY} textAnchor="middle"
+            transform={`rotate(-90, ${X(geom.stile / 2)}, ${Y(geom.sashH / 2)})`}>
+            LEFT STILE
+          </text>
+          <text x={X(geom.sashW - geom.stile / 2)} y={Y(geom.sashH / 2)}
+            fill={C.label} fontSize={fs(FS_LABEL)} fontFamily={FONT_FAMILY} textAnchor="middle"
+            transform={`rotate(90, ${X(geom.sashW - geom.stile / 2)}, ${Y(geom.sashH / 2)})`}>
+            RIGHT STILE
+          </text>
+
+          {/* TOP DIMENSION CHAIN */}
+          {topCuts.map((cx, i) => (
+            <line key={`tdc-ext-${i}`}
+              x1={X(cx)} y1={topExtLineEnd} x2={X(cx)} y2={topDimY - 10 * sc}
+              stroke={C.dim} strokeWidth={sw(SW_EXT)} strokeDasharray={`${sw(3)},${sw(2)}`} />
+          ))}
+          <line x1={X(topCuts[0])} y1={topDimY} x2={X(topCuts[topCuts.length - 1])} y2={topDimY}
+            stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+          {topCuts.map((cx, i) => (
+            <line key={`tdc-tk-${i}`}
+              x1={X(cx)} y1={topDimY - 5 * sc} x2={X(cx)} y2={topDimY + 5 * sc}
+              stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+          ))}
+          {topCuts.slice(0, -1).map((cx, i) => {
+            const nx = topCuts[i + 1];
+            const width = nx - cx;
+            const mid = (cx + nx) / 2;
+            if (width < BAR_WIDTH * 2) {
+              return (
+                <g key={`tdc-lbl-${i}`}>
+                  <line x1={X(mid)} y1={topDimY} x2={X(mid)} y2={topDimY - 18 * sc}
+                    stroke={C.dim} strokeWidth={sw(SW_LEADER)} />
+                  <line x1={X(mid)} y1={topDimY - 18 * sc} x2={X(mid + 15 * sc)} y2={topDimY - 18 * sc}
+                    stroke={C.dim} strokeWidth={sw(SW_LEADER)} />
+                  <text x={X(mid + 17 * sc)} y={topDimY - 15 * sc}
+                    fill={C.dim} fontSize={fs(FS_DIM_SMALL)} fontFamily={FONT_FAMILY}
+                    fontWeight="600">{Math.round(width)}</text>
+                </g>
+              );
+            }
+            return (
+              <text key={`tdc-lbl-${i}`} x={X(mid)} y={topDimY - 8 * sc}
+                fill={C.dim} fontSize={fs(FS_DIM_SMALL)} fontFamily={FONT_FAMILY}
+                textAnchor="middle" fontWeight="600">{Math.round(width)}</text>
+            );
           })}
 
-          {/* Horizontal bars — solid, timber fill */}
-          {d.hBars > 0 && Array.from({ length: d.hBars }).map((_, i) => {
-            const spacing = d.glassH / (d.hBars + 1);
-            const by = d.glassY + spacing * (i + 1) - d.barW / 2;
-            return <rect key={`h${i}`} x={X(d.glassX)} y={Y(by)} width={d.glassW} height={d.barW}
-              fill={C.barFill} stroke={C.line} strokeWidth={LW} />;
+          {/* LEFT DIMENSION CHAIN */}
+          {leftCuts.map((cy, i) => (
+            <line key={`ldc-ext-${i}`}
+              x1={leftExtLineEnd} y1={Y(cy)} x2={leftDimX - 10 * sc} y2={Y(cy)}
+              stroke={C.dim} strokeWidth={sw(SW_EXT)} strokeDasharray={`${sw(3)},${sw(2)}`} />
+          ))}
+          <line x1={leftDimX} y1={Y(leftCuts[0])} x2={leftDimX} y2={Y(leftCuts[leftCuts.length - 1])}
+            stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+          {leftCuts.map((cy, i) => (
+            <line key={`ldc-tk-${i}`}
+              x1={leftDimX - 5 * sc} y1={Y(cy)} x2={leftDimX + 5 * sc} y2={Y(cy)}
+              stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+          ))}
+          {leftCuts.slice(0, -1).map((cy, i) => {
+            const ny = leftCuts[i + 1];
+            const height = ny - cy;
+            const mid = (cy + ny) / 2;
+            if (height < BAR_WIDTH * 2) {
+              return (
+                <g key={`ldc-lbl-${i}`}>
+                  <line x1={leftDimX} y1={Y(mid)} x2={leftDimX - 18 * sc} y2={Y(mid)}
+                    stroke={C.dim} strokeWidth={sw(SW_LEADER)} />
+                  <line x1={leftDimX - 18 * sc} y1={Y(mid)} x2={leftDimX - 18 * sc} y2={Y(mid) - 15 * sc}
+                    stroke={C.dim} strokeWidth={sw(SW_LEADER)} />
+                  <text x={leftDimX - 18 * sc} y={Y(mid) - 18 * sc}
+                    fill={C.dim} fontSize={fs(FS_DIM_SMALL)} fontFamily={FONT_FAMILY}
+                    textAnchor="middle" fontWeight="600">{Math.round(height)}</text>
+                </g>
+              );
+            }
+            return (
+              <text key={`ldc-lbl-${i}`} x={leftDimX - 8 * sc} y={Y(mid)}
+                fill={C.dim} fontSize={fs(FS_DIM_SMALL)} fontFamily={FONT_FAMILY}
+                textAnchor="middle" fontWeight="600"
+                transform={`rotate(-90, ${leftDimX - 8 * sc}, ${Y(mid)})`}>{Math.round(height)}</text>
+            );
           })}
 
-          {/* Horns (upper sash — extend below, dashed because hidden/projected) */}
-          {d.isUpper && d.hasHorns && <>
-            <line x1={X(2)} y1={Y(d.sashH)} x2={X(2)} y2={Y(d.sashH + d.hornExt)}
-              stroke={C.horn} strokeWidth={1} strokeDasharray="4,3" />
-            <line x1={X(d.sashW - 2)} y1={Y(d.sashH)} x2={X(d.sashW - 2)} y2={Y(d.sashH + d.hornExt)}
-              stroke={C.horn} strokeWidth={1} strokeDasharray="4,3" />
-            <text x={X(d.sashW + 10)} y={Y(d.sashH + d.hornExt / 2) + 3} fill={C.horn}
-              fontSize={7} fontFamily={FONT.family} fillOpacity={0.7}>Horn {d.hornExt}mm</text>
-          </>}
+          {/* OVERALL WIDTH (bottom) */}
+          <g>
+            <line x1={X(0)} y1={Y(geom.sashH) + 15 * sc} x2={X(0)} y2={Y(geom.sashH) + 35 * sc}
+              stroke={C.dim} strokeWidth={sw(SW_EXT)} strokeDasharray={`${sw(3)},${sw(2)}`} />
+            <line x1={X(geom.sashW)} y1={Y(geom.sashH) + 15 * sc} x2={X(geom.sashW)} y2={Y(geom.sashH) + 35 * sc}
+              stroke={C.dim} strokeWidth={sw(SW_EXT)} strokeDasharray={`${sw(3)},${sw(2)}`} />
+            <line x1={X(0)} y1={Y(geom.sashH) + 30 * sc} x2={X(geom.sashW)} y2={Y(geom.sashH) + 30 * sc}
+              stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+            <line x1={X(0)} y1={Y(geom.sashH) + 25 * sc} x2={X(0)} y2={Y(geom.sashH) + 35 * sc}
+              stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+            <line x1={X(geom.sashW)} y1={Y(geom.sashH) + 25 * sc} x2={X(geom.sashW)} y2={Y(geom.sashH) + 35 * sc}
+              stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+            <text x={X(geom.sashW / 2)} y={Y(geom.sashH) + 26 * sc}
+              fill={C.dim} fontSize={fs(FS_DIM_LARGE)} fontFamily={FONT_FAMILY}
+              textAnchor="middle" fontWeight="600">{Math.round(geom.sashW)}</text>
+          </g>
 
-          {/* Horns (lower sash — extend above) */}
-          {!d.isUpper && d.hasHorns && <>
-            <line x1={X(2)} y1={Y(0)} x2={X(2)} y2={Y(-d.hornExt)}
-              stroke={C.horn} strokeWidth={1} strokeDasharray="4,3" />
-            <line x1={X(d.sashW - 2)} y1={Y(0)} x2={X(d.sashW - 2)} y2={Y(-d.hornExt)}
-              stroke={C.horn} strokeWidth={1} strokeDasharray="4,3" />
-            <text x={X(d.sashW + 10)} y={Y(-d.hornExt / 2) + 3} fill={C.horn}
-              fontSize={7} fontFamily={FONT.family} fillOpacity={0.7}>Horn {d.hornExt}mm</text>
-          </>}
+          {/* OVERALL HEIGHT (right) */}
+          <g>
+            <line x1={X(geom.sashW) + 15 * sc} y1={Y(0)} x2={X(geom.sashW) + 35 * sc} y2={Y(0)}
+              stroke={C.dim} strokeWidth={sw(SW_EXT)} strokeDasharray={`${sw(3)},${sw(2)}`} />
+            <line x1={X(geom.sashW) + 15 * sc} y1={Y(geom.sashH)} x2={X(geom.sashW) + 35 * sc} y2={Y(geom.sashH)}
+              stroke={C.dim} strokeWidth={sw(SW_EXT)} strokeDasharray={`${sw(3)},${sw(2)}`} />
+            <line x1={X(geom.sashW) + 30 * sc} y1={Y(0)} x2={X(geom.sashW) + 30 * sc} y2={Y(geom.sashH)}
+              stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+            <line x1={X(geom.sashW) + 25 * sc} y1={Y(0)} x2={X(geom.sashW) + 35 * sc} y2={Y(0)}
+              stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+            <line x1={X(geom.sashW) + 25 * sc} y1={Y(geom.sashH)} x2={X(geom.sashW) + 35 * sc} y2={Y(geom.sashH)}
+              stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+            <text x={X(geom.sashW) + 26 * sc} y={Y(geom.sashH / 2)}
+              fill={C.dim} fontSize={fs(FS_DIM_LARGE)} fontFamily={FONT_FAMILY}
+              textAnchor="middle" fontWeight="600"
+              transform={`rotate(-90, ${X(geom.sashW) + 26 * sc}, ${Y(geom.sashH / 2)})`}>{Math.round(geom.sashH)}</text>
+          </g>
 
-          {/* ── Green labels ── */}
-          <text x={X(d.stile / 2)} y={Y(d.sashH / 2)} fill={C.label} fontSize={7}
-            fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.6}
-            transform={`rotate(-90, ${X(d.stile / 2)}, ${Y(d.sashH / 2)})`}>STILE</text>
-          <text x={X(d.sashW - d.stile / 2)} y={Y(d.sashH / 2)} fill={C.label} fontSize={7}
-            fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.6}
-            transform={`rotate(90, ${X(d.sashW - d.stile / 2)}, ${Y(d.sashH / 2)})`}>STILE</text>
-          <text x={X(d.sashW / 2)} y={Y(d.topR / 2 + 3)} fill={C.label} fontSize={7}
-            fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.6}>
-            {d.isUpper ? 'TOP RAIL' : 'MEETING RAIL'}
+          {/* TITLE / SUBTITLE */}
+          <text x={totalW / 2} y={totalH - 20 * sc}
+            fill={C.title} fontSize={fs(FS_TITLE)} fontFamily={FONT_FAMILY}
+            textAnchor="middle" fontWeight="600">
+            {titleText}
           </text>
-          <text x={X(d.sashW / 2)} y={Y(d.sashH - d.botR / 2 + 3)} fill={C.label} fontSize={7}
-            fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.6}>
-            {d.isUpper ? 'MEETING RAIL' : 'BOTTOM RAIL'}
-          </text>
-
-          {/* ── Red dimensions ── */}
-          {/* Overall width */}
-          <Ext x1={X(0)} y1={Y(d.sashH) + DM * 0.3} x2={X(0)} y2={Y(d.sashH) + DM * 1.2} />
-          <Ext x1={X(d.sashW)} y1={Y(d.sashH) + DM * 0.3} x2={X(d.sashW)} y2={Y(d.sashH) + DM * 1.2} />
-          <DimH y={Y(d.sashH) + DM * 1} x1={X(0)} x2={X(d.sashW)} label={`${d.sashW} mm`} />
-
-          {/* Overall height */}
-          <Ext x1={X(d.sashW) + DM * 0.3} y1={Y(0)} x2={X(d.sashW) + DM * 1.2} y2={Y(0)} />
-          <Ext x1={X(d.sashW) + DM * 0.3} y1={Y(d.sashH)} x2={X(d.sashW) + DM * 1.2} y2={Y(d.sashH)} />
-          <DimV x={X(d.sashW) + DM * 1} y1={Y(0)} y2={Y(d.sashH)} label={`${d.sashH} mm`} />
-
-          {/* Stile width */}
-          <Ext x1={X(0)} y1={Y(0) - DM * 0.3} x2={X(0)} y2={Y(0) - DM * 1} />
-          <Ext x1={X(d.stile)} y1={Y(0) - DM * 0.3} x2={X(d.stile)} y2={Y(0) - DM * 1} />
-          <DimH y={Y(0) - DM * 0.8} x1={X(0)} x2={X(d.stile)} label={`${d.stile}`} small />
-
-          {/* Top rail */}
-          <Ext x1={X(0) - DM * 0.3} y1={Y(0)} x2={X(0) - DM * 1} y2={Y(0)} />
-          <Ext x1={X(0) - DM * 0.3} y1={Y(d.topR)} x2={X(0) - DM * 1} y2={Y(d.topR)} />
-          <DimV x={X(0) - DM * 0.8} y1={Y(0)} y2={Y(d.topR)} label={`${d.topR}`} small />
-
-          {/* Bottom rail */}
-          <Ext x1={X(0) - DM * 0.3} y1={Y(d.sashH - d.botR)} x2={X(0) - DM * 1} y2={Y(d.sashH - d.botR)} />
-          <Ext x1={X(0) - DM * 0.3} y1={Y(d.sashH)} x2={X(0) - DM * 1} y2={Y(d.sashH)} />
-          <DimV x={X(0) - DM * 0.8} y1={Y(d.sashH - d.botR)} y2={Y(d.sashH)} label={`${d.botR}`} small />
-
-          {/* Glass width */}
-          <Ext x1={X(d.glassX)} y1={Y(d.sashH) + DM * 1.5} x2={X(d.glassX)} y2={Y(d.sashH) + DM * 2.2} />
-          <Ext x1={X(d.glassX + d.glassW)} y1={Y(d.sashH) + DM * 1.5} x2={X(d.glassX + d.glassW)} y2={Y(d.sashH) + DM * 2.2} />
-          <DimH y={Y(d.sashH) + DM * 2} x1={X(d.glassX)} x2={X(d.glassX + d.glassW)}
-            label={`Glass: ${Math.round(d.glassW)}`} small />
-
-          {/* Title */}
-          <text x={totalW / 2} y={totalH - 12} fill={C.title} fontSize={10}
-            fontFamily={FONT.family} textAnchor="middle" fontWeight="600">
-            {label} SASH DETAIL — {d.sashW} × {d.sashH} mm
-          </text>
-          <text x={totalW / 2} y={totalH} fill={C.subtitle} fontSize={7}
-            fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.5}>
-            Stile: {d.section} · {d.isUpper ? 'Top' : 'Bottom'} rail: {d.railSection}
+          <text x={totalW / 2} y={totalH - 6 * sc}
+            fill={C.subtitle} fontSize={fs(FS_SUBTITLE)} fontFamily={FONT_FAMILY}
+            textAnchor="middle" fillOpacity={0.6}>
+            {subtitleText}
           </text>
         </svg>
       </div>
