@@ -7,6 +7,7 @@ import ProjectDetailPage from './pages/ProjectDetailPage.jsx';
 import BatchDefaultsPage from './pages/BatchDefaultsPage.jsx';
 import ConfiguratorPage from './pages/ConfiguratorPage.jsx';
 import WindowDetailPage from './pages/WindowDetailPage.jsx';
+import ProductionPackPage from './pages/ProductionPackPage.jsx';
 import { useAuthStore } from './stores/authStore.js';
 
 function ProtectedRoute({ children }) {
@@ -36,6 +37,7 @@ export default function App() {
       {/* Full-screen pages (outside AppLayout — no sidebar) */}
       <Route path="/projects/:projectId/batches/:batchId/defaults" element={<ProtectedRoute><BatchDefaultsPage /></ProtectedRoute>} />
       <Route path="/projects/:projectId/batches/:batchId/configurator" element={<ProtectedRoute><ConfiguratorPage /></ProtectedRoute>} />
+      <Route path="/projects/:projectId/batches/:batchId/production-pack" element={<ProtectedRoute><ProductionPackPage /></ProtectedRoute>} />
 
       {/* Catch-all */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -113,11 +113,19 @@ export default function ProjectDetailPage() {
                     {TYPE_LABELS[batch.type] || batch.type} — {winCount} window{winCount !== 1 ? 's' : ''}
                   </div>
                 </div>
-                <select value={batch.status}
-                  onChange={(e) => updateBatchStatus(projectId, batch.id, e.target.value)}
-                  className="text-xs px-3 py-1.5 bg-surface-600 border border-surface-500 text-ink-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-accent-500">
-                  {BATCH_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <div className="flex items-center gap-2">
+                  {winCount > 0 && (
+                    <Link to={`/projects/${projectId}/batches/${batch.id}/production-pack`}
+                      className="px-3 py-1.5 text-xs font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-400 transition-colors">
+                      Production Pack
+                    </Link>
+                  )}
+                  <select value={batch.status}
+                    onChange={(e) => updateBatchStatus(projectId, batch.id, e.target.value)}
+                    className="text-xs px-3 py-1.5 w-36 bg-surface-600 border border-surface-500 text-ink-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-accent-500">
+                    {BATCH_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
               </div>
 
               {/* Batch defaults summary */}
