@@ -89,3 +89,37 @@ export function Label({ x, y, text, anchor = 'middle', opacity = 0.6 }) {
     </text>
   );
 }
+
+// ─── Bar positioning helper ───
+// Returns positions where ALL panes are equal width/height
+// (NOT equal centre-to-centre spacing — that was the legacy bug).
+//
+// Math: paneW = (glassW - vCount * barW) / (vCount + 1)
+//       bar[i].left = glassX + (i + 1) * paneW + i * barW
+//
+// For a sash with v=2 bars in a 807mm glass area, barW=22mm:
+//   paneW = (807 - 44) / 3 = 254.33mm  (all 3 panes equal)
+//
+// Returns: { vBars: [{cx, left, right}], hBars: [{cy, top, bot}], paneW, paneH }
+export function computeBarPositions({ glassX, glassY, glassW, glassH, vCount, hCount, barW }) {
+  const paneW = vCount > 0 ? Math.max((glassW - vCount * barW) / (vCount + 1), 0) : glassW;
+  const paneH = hCount > 0 ? Math.max((glassH - hCount * barW) / (hCount + 1), 0) : glassH;
+
+  const vBars = [];
+  for (let i = 0; i < vCount; i++) {
+    const left = glassX + (i + 1) * paneW + i * barW;
+    const right = left + barW;
+    const cx = left + barW / 2;
+    vBars.push({ cx, left, right });
+  }
+
+  const hBars = [];
+  for (let j = 0; j < hCount; j++) {
+    const top = glassY + (j + 1) * paneH + j * barW;
+    const bot = top + barW;
+    const cy = top + barW / 2;
+    hBars.push({ cy, top, bot });
+  }
+
+  return { vBars, hBars, paneW, paneH };
+}

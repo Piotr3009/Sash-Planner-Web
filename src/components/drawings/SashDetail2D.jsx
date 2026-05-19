@@ -18,6 +18,7 @@
  */
 import { useMemo, useState } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
+import { computeBarPositions } from './drawingUtils.jsx';
 
 // BAR_PATTERNS (per-sash, matches 3D ParametricSashWindow.jsx)
 // 4x4 = 1+1 bar = 4 panes per sash, NOT 16 panes
@@ -115,20 +116,10 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper' }) {
     const v = pattern.v;
     const h = pattern.h;
 
-    const vBars = [];
-    for (let i = 1; i <= v; i++) {
-      const cx = glassX + (glassW / (v + 1)) * i;
-      vBars.push({ cx, left: cx - BAR_WIDTH / 2, right: cx + BAR_WIDTH / 2 });
-    }
-
-    const hBars = [];
-    for (let j = 1; j <= h; j++) {
-      const cy = glassY + (glassH / (h + 1)) * j;
-      hBars.push({ cy, top: cy - BAR_WIDTH / 2, bot: cy + BAR_WIDTH / 2 });
-    }
-
-    const paneW = (glassW - v * BAR_WIDTH) / (v + 1);
-    const paneH = (glassH - h * BAR_WIDTH) / (h + 1);
+    const { vBars, hBars, paneW, paneH } = computeBarPositions({
+      glassX, glassY, glassW, glassH,
+      vCount: v, hCount: h, barW: BAR_WIDTH,
+    });
 
     const hasHorns = !!windowSpec.sash?.horns;
     const hornExt = hasHorns ? (windowSpec.sash?.hornExtension || 75) : 0;

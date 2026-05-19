@@ -7,6 +7,7 @@
  */
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
+import { computeBarPositions } from './drawingUtils.jsx';
 
 // Drawing style constants
 const STROKE = {
@@ -96,10 +97,21 @@ export default function FrontElevation2D({ windowSpec, derived }) {
       hBarsLower = Math.ceil(rows / 2);
     }
 
+    // Compute equal-pane bar positions for upper and lower sash glass areas
+    const upperBars = computeBarPositions({
+      glassX: uGlassX, glassY: uGlassY, glassW: uGlassW, glassH: uGlassH,
+      vCount: vBars, hCount: hBarsUpper, barW,
+    });
+    const lowerBars = computeBarPositions({
+      glassX: lGlassX, glassY: lGlassY, glassW: lGlassW, glassH: lGlassH,
+      vCount: vBars, hCount: hBarsLower, barW,
+    });
+
     return {
       fw, fh, jw, hw, sw, sashW, topH, botH, stile, topRail, botRail, meetRail, barW,
       hasHorns, hornExt, sashX, sashY, meetY, gridMode, bars, vBars, hBarsUpper, hBarsLower,
       uGlassX, uGlassY, uGlassW, uGlassH, lGlassX, lGlassY, lGlassW, lGlassH, frameDepth,
+      upperBars, lowerBars,
     };
   }, [windowSpec, derived]);
 
@@ -179,33 +191,25 @@ export default function FrontElevation2D({ windowSpec, derived }) {
         <rect x={d.lGlassX} y={d.lGlassY} width={d.lGlassW} height={d.lGlassH}
           fill={STROKE.glass} fillOpacity={STROKE.glassOpacity} stroke="none" />
 
-        {/* ── GLAZING BARS (Upper sash) ── */}
-        {d.vBars > 0 && Array.from({ length: d.vBars }).map((_, i) => {
-          const spacing = d.uGlassW / (d.vBars + 1);
-          const bx = d.uGlassX + spacing * (i + 1) - d.barW / 2;
-          return <rect key={`uv${i}`} x={bx} y={d.uGlassY} width={d.barW} height={d.uGlassH}
-            fill={STROKE.sash} fillOpacity={0.15} stroke={STROKE.bar} strokeWidth={0.5} />;
-        })}
-        {d.hBarsUpper > 0 && Array.from({ length: d.hBarsUpper }).map((_, i) => {
-          const spacing = d.uGlassH / (d.hBarsUpper + 1);
-          const by = d.uGlassY + spacing * (i + 1) - d.barW / 2;
-          return <rect key={`uh${i}`} x={d.uGlassX} y={by} width={d.uGlassW} height={d.barW}
-            fill={STROKE.sash} fillOpacity={0.15} stroke={STROKE.bar} strokeWidth={0.5} />;
-        })}
+        {/* ── GLAZING BARS (Upper sash) — equal-pane positions ── */}
+        {d.upperBars.vBars.map((bar, i) => (
+          <rect key={`uv${i}`} x={bar.left} y={d.uGlassY} width={d.barW} height={d.uGlassH}
+            fill={STROKE.sash} fillOpacity={0.15} stroke={STROKE.bar} strokeWidth={0.5} />
+        ))}
+        {d.upperBars.hBars.map((bar, i) => (
+          <rect key={`uh${i}`} x={d.uGlassX} y={bar.top} width={d.uGlassW} height={d.barW}
+            fill={STROKE.sash} fillOpacity={0.15} stroke={STROKE.bar} strokeWidth={0.5} />
+        ))}
 
-        {/* ── GLAZING BARS (Lower sash) ── */}
-        {d.vBars > 0 && Array.from({ length: d.vBars }).map((_, i) => {
-          const spacing = d.lGlassW / (d.vBars + 1);
-          const bx = d.lGlassX + spacing * (i + 1) - d.barW / 2;
-          return <rect key={`lv${i}`} x={bx} y={d.lGlassY} width={d.barW} height={d.lGlassH}
-            fill={STROKE.sash} fillOpacity={0.15} stroke={STROKE.bar} strokeWidth={0.5} />;
-        })}
-        {d.hBarsLower > 0 && Array.from({ length: d.hBarsLower }).map((_, i) => {
-          const spacing = d.lGlassH / (d.hBarsLower + 1);
-          const by = d.lGlassY + spacing * (i + 1) - d.barW / 2;
-          return <rect key={`lh${i}`} x={d.lGlassX} y={by} width={d.lGlassW} height={d.barW}
-            fill={STROKE.sash} fillOpacity={0.15} stroke={STROKE.bar} strokeWidth={0.5} />;
-        })}
+        {/* ── GLAZING BARS (Lower sash) — equal-pane positions ── */}
+        {d.lowerBars.vBars.map((bar, i) => (
+          <rect key={`lv${i}`} x={bar.left} y={d.lGlassY} width={d.barW} height={d.lGlassH}
+            fill={STROKE.sash} fillOpacity={0.15} stroke={STROKE.bar} strokeWidth={0.5} />
+        ))}
+        {d.lowerBars.hBars.map((bar, i) => (
+          <rect key={`lh${i}`} x={d.lGlassX} y={bar.top} width={d.lGlassW} height={d.barW}
+            fill={STROKE.sash} fillOpacity={0.15} stroke={STROKE.bar} strokeWidth={0.5} />
+        ))}
 
         {/* ── HORNS ── */}
         {d.hasHorns && <>
