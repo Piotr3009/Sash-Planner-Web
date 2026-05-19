@@ -320,6 +320,93 @@ export const useProjectStore = create((set, get) => ({
     return windowId;
   },
 
+  updateWindowInBatch: (projectId, batchId, windowId, windowConfig) => {
+    const batch = get().getBatchById(projectId, batchId);
+    if (!batch) return null;
+    const existing = batch.windows?.find((w) => w.id === windowId);
+    if (!existing) return null;
+
+    const defaults = batch.defaults || {};
+
+    const win = {
+      ...existing,
+      name: windowConfig.windowName || existing.name,
+      width: windowConfig.extWidth || existing.width,
+      height: windowConfig.extHeight || existing.height,
+      measurementType: windowConfig.measurementType || 'box-to-box',
+      inputWidth: windowConfig.inputWidth || windowConfig.extWidth || existing.width,
+      inputHeight: windowConfig.inputHeight || windowConfig.extHeight || existing.height,
+      sashType: windowConfig.sashType || 'double',
+      splitRatio: windowConfig.splitRatio || '1/4-1/2-1/4',
+      headType: windowConfig.headType || 'flat',
+      upperBars: windowConfig.upperBars || 'none',
+      lowerBars: windowConfig.lowerBars || 'none',
+      sameBars: windowConfig.sameBars !== undefined ? windowConfig.sameBars : true,
+      upperCustomBars: windowConfig.upperCustomBars || [],
+      lowerCustomBars: windowConfig.lowerCustomBars || [],
+      openingType: windowConfig.openingType || 'both',
+      glassFinish: windowConfig.glassFinish || 'clear',
+      frostedLocation: windowConfig.frostedLocation || 'bottom',
+      hornType: windowConfig.hornType || defaults.hornType || 'A',
+      frameType: windowConfig.frameType || defaults.frameType || 'standard',
+      frameDepth: windowConfig.frameDepth || (defaults.frameType === 'slim' ? 144 : 164),
+      ironmongery: windowConfig.ironmongery || defaults.ironmongery || 'brass',
+      colourMode: windowConfig.colourMode || defaults.colourMode || 'single',
+      woodColor: windowConfig.woodColor || defaults.woodColor || '#F6F6F6',
+      woodColorExt: windowConfig.woodColorExt || defaults.woodColorExt || '#F6F6F6',
+      woodColorInt: windowConfig.woodColorInt || defaults.woodColorInt || '#F6F6F6',
+      glassType: windowConfig.glassType || defaults.glassType || 'double',
+      glassSpec: windowConfig.glassSpec || defaults.glassSpec || 'toughened',
+      spacerColor: windowConfig.spacerColor || defaults.spacerColor || 'silver',
+      pas24: windowConfig.pas24 !== undefined ? windowConfig.pas24 : (defaults.pas24 || false),
+      specification: JSON.stringify({
+        windowType: batch.type,
+        width: (windowConfig.extWidth || existing.width) - 104,
+        height: (windowConfig.extHeight || existing.height) - 87,
+        upperBars: windowConfig.upperBars || 'none',
+        lowerBars: windowConfig.lowerBars || 'none',
+        horns: (windowConfig.hornType || defaults.hornType || 'A') === 'none' ? 'none' : (windowConfig.hornType || defaults.hornType || 'A'),
+        glassType: windowConfig.glassType || defaults.glassType || 'double',
+        glassFinish: windowConfig.glassFinish || 'clear',
+        fullConfig: {
+          ...defaults,
+          ...windowConfig,
+          colorSingleName: windowConfig.woodColor || defaults.woodColor || '#F6F6F6',
+          interiorColor: windowConfig.woodColorInt || defaults.woodColorInt || '#F6F6F6',
+          exteriorColor: windowConfig.woodColorExt || defaults.woodColorExt || '#F6F6F6',
+          ironmongeryFinish: windowConfig.ironmongery || defaults.ironmongery || 'brass',
+          spacerColor: windowConfig.spacerColor || defaults.spacerColor || 'silver',
+        }
+      }),
+    };
+
+    set((s) => {
+      const replaceWin = (b) =>
+        b.id === batchId ? { ...b, windows: (b.windows || []).map((w) => w.id === windowId ? win : w) } : b;
+
+      const updatedProjects = s.projects.map((p) =>
+        p.id === projectId ? { ...p, batches: (p.batches || []).map(replaceWin) } : p
+      );
+      const updatedCurrent = s.currentProject?.id === projectId
+        ? { ...s.currentProject, batches: (s.currentProject.batches || []).map(replaceWin) }
+        : s.currentProject;
+      const updatedBatch = s.currentBatch?.id === batchId
+        ? { ...s.currentBatch, windows: (s.currentBatch.windows || []).map((w) => w.id === windowId ? win : w) }
+        : s.currentBatch;
+      const updatedWindows = s.currentBatch?.id === batchId
+        ? s.currentWindows.map((w) => w.id === windowId ? win : w)
+        : s.currentWindows;
+
+      return {
+        projects: updatedProjects,
+        currentProject: updatedCurrent,
+        currentBatch: updatedBatch,
+        currentWindows: updatedWindows,
+      };
+    });
+    return windowId;
+  },
+
   removeWindowFromBatch: (projectId, batchId, windowId) => {
     set((s) => {
       const removeWin = (b) =>

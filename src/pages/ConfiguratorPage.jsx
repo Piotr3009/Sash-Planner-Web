@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
 import { mockProjects } from '../mocks/mockProjects.js';
 import '../3d/styles.css';
@@ -23,9 +23,11 @@ const OPENINGS = [{ value: 'both', label: 'Both Open' }, { value: 'bottom', labe
 
 export default function ConfiguratorPage() {
   const { projectId, batchId } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const projects = useProjectStore((s) => s.projects);
   const addWindow = useProjectStore((s) => s.addWindowToBatch);
+  const updateWindow = useProjectStore((s) => s.updateWindowInBatch);
 
   useEffect(() => {
     if (projects.length === 0) useProjectStore.getState().setProjects(mockProjects);
@@ -35,7 +37,15 @@ export default function ConfiguratorPage() {
   const batch = project?.batches?.find(b => b.id === batchId);
   const def = batch?.defaults || {};
 
-  // Per-window state
+  // ─── Edit mode ───
+  const editWindowId = searchParams.get('edit');
+  const editingWindow = useMemo(() => {
+    if (!editWindowId || !batch) return null;
+    return batch.windows?.find((w) => w.id === editWindowId) || null;
+  }, [editWindowId, batch]);
+  const isEditMode = !!editingWindow;
+
+  // Per-window state — prefilled from existing window in edit mode
   const [winName, setWinName] = useState('');
   const [sashType, setSashType] = useState('double');
   const [splitRatio, setSplitRatio] = useState('1/4-1/2-1/4');
@@ -50,6 +60,28 @@ export default function ConfiguratorPage() {
   const [opening, setOpening] = useState('both');
   const [gFin, setGFin] = useState('clear');
   const [frostLoc, setFrostLoc] = useState('bottom');
+  const [prefilled, setPrefilled] = useState(false);
+
+  // Prefill form when editing
+  useEffect(() => {
+    if (editingWindow && !prefilled) {
+      setWinName(editingWindow.name || '');
+      setSashType(editingWindow.sashType || 'double');
+      setSplitRatio(editingWindow.splitRatio || '1/4-1/2-1/4');
+      setHeadType(editingWindow.headType || 'flat');
+      setInW(editingWindow.width || 1000);
+      setInH(editingWindow.height || 1500);
+      setUBars(editingWindow.upperBars || 'none');
+      setLBars(editingWindow.lowerBars || 'none');
+      setSameBars(editingWindow.sameBars !== undefined ? editingWindow.sameBars : true);
+      setUCustom(editingWindow.upperCustomBars || []);
+      setLCustom(editingWindow.lowerCustomBars || []);
+      setOpening(editingWindow.openingType || 'both');
+      setGFin(editingWindow.glassFinish || 'clear');
+      setFrostLoc(editingWindow.frostedLocation || 'bottom');
+      setPrefilled(true);
+    }
+  }, [editingWindow, prefilled]);
 
   // From batch defaults (read-only in configurator)
   const horn = def.hornType || 'A';
@@ -90,7 +122,7 @@ export default function ConfiguratorPage() {
   useEffect(() => { sync(); }, [sync]);
 
   const save = () => {
-    addWindow(projectId, batchId, {
+    const config = {
       windowName: winName, windowCategory: batch?.type || 'sash',
       extWidth: extW, extHeight: extH, inputWidth: inW, inputHeight: inH, measurementType: 'box-to-box',
       upperBars: uBars, lowerBars: effectiveLBars, sameBars,
@@ -104,8 +136,15 @@ export default function ConfiguratorPage() {
       glassType: gType, glassSpec: gSpec, glassFinish: gFin, frostedLocation: frostLoc,
       spacerColor: spacer, sashType, splitRatio, headType, openingType: opening,
       frameType: gType === 'triple' ? 'standard' : boxType, frameDepth, pas24,
-    });
-    navigate(`/projects/${projectId}`);
+    };
+
+    if (isEditMode) {
+      updateWindow(projectId, batchId, editWindowId, config);
+      navigate(`/projects/${projectId}/batches/${batchId}/windows/${editWindowId}`);
+    } else {
+      addWindow(projectId, batchId, config);
+      navigate(`/projects/${projectId}`);
+    }
   };
 
   const addBar = (setter, list, type) => {
@@ -122,13 +161,15 @@ export default function ConfiguratorPage() {
       {/* Top bar */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-surface-500 bg-surface-900 shrink-0">
         <div>
-          <button onClick={() => navigate(`/projects/${projectId}`)} className="text-xs text-ink-400 hover:text-accent-400 transition-colors">← Back to {project?.name || 'project'}</button>
-          <h1 className="text-lg font-semibold text-ink-50">{batch.label} — Add Window</h1>
+          <button onClick={() => navigate(isEditMode ? `/projects/${projectId}/batches/${batchId}/windows/${editWindowId}` : `/projects/${projectId}`)} className="text-xs text-ink-400 hover:text-accent-400 transition-colors">← Back to {isEditMode ? (editingWindow?.name || 'window') : (project?.name || 'project')}</button>
+          <h1 className="text-lg font-semibold text-ink-50">{batch.label} — {isEditMode ? `Edit ${editingWindow?.name || 'Window'}` : 'Add Window'}</h1>
         </div>
         <div className="flex items-center gap-3">
           <input type="text" placeholder="Window name (W1, Kitchen Left)" value={winName} onChange={e => setWinName(e.target.value)}
             className={`px-3 py-2 border-2 rounded-lg text-sm w-56 bg-surface-800 ${winName.trim() ? 'border-accent-500 text-ink-50' : 'border-status-danger/50 text-ink-200'}`} />
-          <button onClick={save} className="btn btn-primary">✓ Save to Batch</button>
+          <button onClick={save} className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'}`}>
+            {isEditMode ? '✓ Update Window' : '✓ Save to Batch'}
+          </button>
         </div>
       </div>
 

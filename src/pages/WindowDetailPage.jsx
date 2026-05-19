@@ -56,9 +56,9 @@ export default function WindowDetailPage() {
   }, [windowSpec, settings]);
 
   const [tab, setTab] = useState('3d');
-  const [viewSide, setViewSide] = useState('exterior');
 
   const backUrl = `/projects/${projectId}`;
+  const editUrl = `/projects/${projectId}/batches/${batchId}/configurator?edit=${windowId}`;
 
   if (!item) {
     return (
@@ -80,6 +80,7 @@ export default function WindowDetailPage() {
             {currentBatch && <span> · {currentBatch.label}</span>}
           </p>
         </div>
+        <Link to={editUrl} className="btn btn-primary text-sm">✏️ Edit Configuration</Link>
       </div>
 
       {/* Main Tabs */}
@@ -103,15 +104,12 @@ export default function WindowDetailPage() {
             <div className="card p-2">
               <div className="flex items-center justify-between p-2">
                 <div className="text-sm font-medium text-ink-50">3D Preview</div>
-                <div className="flex gap-1">
-                  <button className={`px-3 py-1 text-xs rounded ${viewSide === 'exterior' ? 'bg-accent-500 text-white' : 'bg-surface-600 text-ink-200'}`}
-                    onClick={() => setViewSide('exterior')}>Exterior</button>
-                  <button className={`px-3 py-1 text-xs rounded ${viewSide === 'interior' ? 'bg-accent-500 text-white' : 'bg-surface-600 text-ink-200'}`}
-                    onClick={() => setViewSide('interior')}>Interior</button>
-                </div>
+                <Link to={editUrl} className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors">
+                  ✏️ Edit
+                </Link>
               </div>
               <div className="aspect-[4/3] bg-gradient-to-br from-surface-600 to-surface-700 rounded-lg overflow-hidden">
-                <WindowPreview3D windowSpec={windowSpec} side={viewSide} />
+                <WindowPreview3D windowSpec={windowSpec} side="exterior" />
               </div>
             </div>
           )}
