@@ -12,11 +12,11 @@ export const CONSTANTS = Object.freeze({
     SASH_HEIGHT_DIFFERENCE: 33,
 
     // Frame component deductions (verified against Excel)
-    JAMB_HEIGHT_DEDUCTION: 106,
+    JAMB_HEIGHT_DEDUCTION: 108,
     HEAD_WIDTH_DEDUCTION: 0,
     SILL_WIDTH_DEDUCTION: 0,
     EXTERNAL_HEAD_LINER_DEDUCTION: 204,
-    INTERNAL_HEAD_LINER_DEDUCTION: 170,
+    INTERNAL_HEAD_LINER_DEDUCTION: 172,
 
     // Timber dimensions (mm) - visible from front elevation
     JAMBS_WIDTH: 28,
@@ -52,7 +52,7 @@ export const CONSTANTS = Object.freeze({
     BOTTOM_RAIL_SECTION: '57 x 90',
     MEETING_RAIL_SECTION: '57 x 43',
     HEAD_LINER_EXT_SECTION: '17 x 102',
-    HEAD_LINER_INT_SECTION: '17 x 85',
+    HEAD_LINER_INT_SECTION: '17 x 86',
     JAMB_LINER_EXT_SECTION: '17 x 102',
     JAMB_LINER_INT_SECTION: '17 x 86',
 
@@ -128,7 +128,7 @@ export function calculateWindow(frameWidth, frameHeight, configuration = '2x2', 
 
     const sashWidth = frameWidth - CONSTANTS.SASH_WIDTH_DEDUCTION;
     const totalSashHeight = frameHeight - CONSTANTS.SASH_HEIGHT_DEDUCTION;
-    const topSashHeight = Math.floor((totalSashHeight - CONSTANTS.SASH_HEIGHT_DIFFERENCE) / 2);
+    const topSashHeight = (totalSashHeight - CONSTANTS.SASH_HEIGHT_DIFFERENCE) / 2;
     const bottomSashHeight = topSashHeight + CONSTANTS.SASH_HEIGHT_DIFFERENCE;
     // For legacy compatibility, sashHeight = totalSashHeight
     const sashHeight = totalSashHeight;
@@ -274,7 +274,7 @@ export function deriveWindowData(windowSpec, settings = {}) {
     const config = resolveConfiguration(gridMode, windowSpec.sash?.grid ?? {});
     const sashWidth = frameWidth - CONSTANTS.SASH_WIDTH_DEDUCTION;
     const totalSashHeight = frameHeight - CONSTANTS.SASH_HEIGHT_DEDUCTION;
-    const topSashHeight = Math.floor((totalSashHeight - CONSTANTS.SASH_HEIGHT_DIFFERENCE) / 2);
+    const topSashHeight = (totalSashHeight - CONSTANTS.SASH_HEIGHT_DIFFERENCE) / 2;
     const bottomSashHeight = topSashHeight + CONSTANTS.SASH_HEIGHT_DIFFERENCE;
     const sashHeight = totalSashHeight;
 
@@ -464,8 +464,9 @@ function calculateFrameComponents(frameWidth, frameHeight) {
 }
 
 function calculateSashComponents(sashWidth, sashHeight, config) {
-    const horizontalLength = sashWidth - 2 * CONSTANTS.STILE_WIDTH;
-    const availableWidth = horizontalLength;
+    // Rails are cut at sash width — tenons protrude into stile mortices
+    const horizontalLength = sashWidth;
+    const availableWidth = sashWidth - 2 * CONSTANTS.STILE_WIDTH;
     const availableHeight = sashHeight - CONSTANTS.TOP_RAIL_WIDTH - CONSTANTS.BOTTOM_RAIL_WIDTH;
 
     const stiles = buildComponent('Sash stiles', CONSTANTS.STILE_WIDTH, sashHeight, 2, CONSTANTS.SASH_SECTION, 'Hardwood', {
