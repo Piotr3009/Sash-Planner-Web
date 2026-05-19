@@ -182,10 +182,10 @@ export default function ProductionPackPage() {
       {/* Content */}
       <main className="max-w-[1400px] mx-auto p-6">
         {tab === 'overview'   && <OverviewTab batch={batch} windowsData={windowsData} projectId={projectId} batchId={batchId} />}
-        {tab === '3d'         && <ThreeDTab windowsData={windowsData} />}
-        {tab === 'elevations' && <ElevationsTab windowsData={windowsData} />}
+        {tab === '3d'         && <ThreeDTab windowsData={windowsData} projectId={projectId} batchId={batchId} />}
+        {tab === 'elevations' && <ElevationsTab windowsData={windowsData} projectId={projectId} batchId={batchId} />}
         {tab === 'sections'   && <SectionsTab windowsData={windowsData} />}
-        {tab === 'elements'   && <ElementsTab windowsData={windowsData} />}
+        {tab === 'elements'   && <ElementsTab windowsData={windowsData} projectId={projectId} batchId={batchId} />}
         {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} />}
         {tab === 'precut'     && <PreCutTab merged={merged} settings={settings} />}
         {tab === 'cutlist'    && <CutListTab merged={merged} />}
@@ -263,13 +263,17 @@ function OverviewTab({ batch, windowsData, projectId, batchId }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: 3D Views
 // ═══════════════════════════════════════════════════════════════
-function ThreeDTab({ windowsData }) {
+function ThreeDTab({ windowsData, projectId, batchId }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       {windowsData.map(({ win, windowSpec }) => (
         <div key={win.id} className="card overflow-hidden">
-          <div className="px-4 py-2 border-b border-surface-500 text-sm font-medium text-ink-50">
-            {win.name} — {win.width}×{win.height} mm
+          <div className="px-4 py-2 border-b border-surface-500 flex items-center justify-between">
+            <span className="text-sm font-medium text-ink-50">{win.name} — {win.width}×{win.height} mm</span>
+            <Link to={`/projects/${projectId}/batches/${batchId}/windows/${win.id}`}
+              className="text-[10px] text-accent-400 hover:text-accent-300 transition-colors">
+              View Details →
+            </Link>
           </div>
           <div className="aspect-[4/3] bg-gradient-to-br from-surface-600 to-surface-700">
             <WindowPreview3D windowSpec={windowSpec} side="exterior" />
@@ -283,13 +287,19 @@ function ThreeDTab({ windowsData }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: 2D Elevations
 // ═══════════════════════════════════════════════════════════════
-function ElevationsTab({ windowsData }) {
+function ElevationsTab({ windowsData, projectId, batchId }) {
   return (
     <div className="space-y-6">
       {windowsData.map(({ win, windowSpec, derived }) => (
         <div key={win.id} className="card p-4">
-          <div className="text-sm font-semibold text-ink-50 mb-3">
-            {win.name} — {win.width}×{win.height} mm
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-semibold text-ink-50">
+              {win.name} — {win.width}×{win.height} mm
+            </div>
+            <Link to={`/projects/${projectId}/batches/${batchId}/windows/${win.id}`}
+              className="text-[10px] text-accent-400 hover:text-accent-300 transition-colors">
+              View Details →
+            </Link>
           </div>
           {derived ? (
             <FrontElevation2D windowSpec={windowSpec} derived={derived} />
@@ -334,13 +344,19 @@ function SectionsTab({ windowsData }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: 2D Elements (per window: Box + Upper Sash + Lower Sash)
 // ═══════════════════════════════════════════════════════════════
-function ElementsTab({ windowsData }) {
+function ElementsTab({ windowsData, projectId, batchId }) {
   return (
     <div className="space-y-8">
       {windowsData.map(({ win, windowSpec, derived }) => (
         <div key={win.id} className="space-y-4">
-          <div className="text-sm font-bold text-ink-50 border-b border-surface-500 pb-2">
-            {win.name} — {win.width}×{win.height} mm
+          <div className="flex items-center justify-between border-b border-surface-500 pb-2">
+            <div className="text-sm font-bold text-ink-50">
+              {win.name} — {win.width}×{win.height} mm
+            </div>
+            <Link to={`/projects/${projectId}/batches/${batchId}/windows/${win.id}`}
+              className="text-[10px] text-accent-400 hover:text-accent-300 transition-colors">
+              View Details →
+            </Link>
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
