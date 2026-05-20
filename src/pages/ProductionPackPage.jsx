@@ -9,7 +9,7 @@
  * cut lists, glass, hardware using buildProjectAggregates.
  */
 import { useState, useMemo, useEffect, Suspense } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
@@ -45,7 +45,6 @@ const TABS = [
 // ─── Main Component ───
 export default function ProductionPackPage() {
   const { projectId, batchId, ppId } = useParams();
-  const navigate = useNavigate();
   const projects = useProjectStore((s) => s.projects);
   const productionPacks = useProjectStore((s) => s.productionPacks);
   const settings = useProjectStore((s) => s.settings);
@@ -179,7 +178,7 @@ export default function ProductionPackPage() {
       </div>
     );
   }
-  if (isPPMode && !pp) {
+  if (ppId && !pp) {
     return (
       <div className="min-h-screen bg-surface-800 p-8">
         <Link to="/dashboard" className="text-xs text-ink-400 hover:text-accent-400">← Back to dashboard</Link>
@@ -708,8 +707,8 @@ function BOMTab({ merged, batch, windowsData }) {
         </div>
         <div className="p-4 text-xs text-ink-300">
           Total panes: <strong className="text-ink-100">{merged.glass.reduce((s, g) => s + (g.quantity || 1), 0)}</strong> ·
-          Type: <strong className="text-ink-100">{batch.defaults?.glassType || 'double'}</strong> ·
-          Spacer: <strong className="text-ink-100">{batch.defaults?.spacerColor || 'black'}</strong>
+          Type: <strong className="text-ink-100">{batch?.defaults?.glassType || 'double'}</strong> ·
+          Spacer: <strong className="text-ink-100">{batch?.defaults?.spacerColor || 'black'}</strong>
           <span className="ml-4 text-ink-400">(See Glass Schedule tab for full breakdown)</span>
         </div>
       </div>
