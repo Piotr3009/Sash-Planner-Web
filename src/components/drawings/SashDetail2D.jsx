@@ -67,6 +67,13 @@ const SW_DIM = 0.7;
 const SW_EXT = 0.3;
 const SW_LEADER = 0.3;
 
+// Helper: format dimension to 0.5mm precision (keeps half-mm values like 437.5)
+// Math.round(437.5) = 438 (loses info); fmt(437.5) = "437.5"
+function fmt(n) {
+  const rounded = Math.round(n * 2) / 2; // round to nearest 0.5
+  return Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1);
+}
+
 // Helper: compute segments of a line (used for breaking bars at crossings)
 function computeSegments(from, to, cutPairs) {
   if (cutPairs.length === 0) return [{ a: from, b: to }];
@@ -163,7 +170,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper' }) {
   const horizontalEdgeSegments = computeSegments(geom.glassX, geom.glassX + geom.glassW, vCuts);
 
   const label = geom.isUpper ? 'UPPER' : 'LOWER';
-  const titleText = `${label} SASH — FRONT — ${Math.round(geom.sashW)} × ${Math.round(geom.sashH)} mm`;
+  const titleText = `${label} SASH — FRONT — ${fmt(geom.sashW)} × ${fmt(geom.sashH)} mm`;
   const subtitleText = `${geom.gridMode} · ${geom.v} v + ${geom.h} h bar${(geom.v + geom.h) === 1 ? '' : 's'}${geom.hasHorns ? ` · horns ${geom.hornExt}mm` : ''}`;
 
   // Top dim chain cut points
@@ -380,14 +387,14 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper' }) {
                     stroke={C.dim} strokeWidth={sw(SW_LEADER)} />
                   <text x={X(mid + 17 * sc)} y={topDimY - 15 * sc}
                     fill={C.dim} fontSize={fs(FS_DIM_SMALL)} fontFamily={FONT_FAMILY}
-                    fontWeight="600">{Math.round(width)}</text>
+                    fontWeight="600">{fmt(width)}</text>
                 </g>
               );
             }
             return (
               <text key={`tdc-lbl-${i}`} x={X(mid)} y={topDimY - 8 * sc}
                 fill={C.dim} fontSize={fs(FS_DIM_SMALL)} fontFamily={FONT_FAMILY}
-                textAnchor="middle" fontWeight="600">{Math.round(width)}</text>
+                textAnchor="middle" fontWeight="600">{fmt(width)}</text>
             );
           })}
 
@@ -417,7 +424,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper' }) {
                     stroke={C.dim} strokeWidth={sw(SW_LEADER)} />
                   <text x={leftDimX - 18 * sc} y={Y(mid) - 18 * sc}
                     fill={C.dim} fontSize={fs(FS_DIM_SMALL)} fontFamily={FONT_FAMILY}
-                    textAnchor="middle" fontWeight="600">{Math.round(height)}</text>
+                    textAnchor="middle" fontWeight="600">{fmt(height)}</text>
                 </g>
               );
             }
@@ -425,7 +432,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper' }) {
               <text key={`ldc-lbl-${i}`} x={leftDimX - 8 * sc} y={Y(mid)}
                 fill={C.dim} fontSize={fs(FS_DIM_SMALL)} fontFamily={FONT_FAMILY}
                 textAnchor="middle" fontWeight="600"
-                transform={`rotate(-90, ${leftDimX - 8 * sc}, ${Y(mid)})`}>{Math.round(height)}</text>
+                transform={`rotate(-90, ${leftDimX - 8 * sc}, ${Y(mid)})`}>{fmt(height)}</text>
             );
           })}
 
@@ -443,7 +450,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper' }) {
               stroke={C.dim} strokeWidth={sw(SW_DIM)} />
             <text x={X(geom.sashW / 2)} y={Y(geom.sashH) + 26 * sc}
               fill={C.dim} fontSize={fs(FS_DIM_LARGE)} fontFamily={FONT_FAMILY}
-              textAnchor="middle" fontWeight="600">{Math.round(geom.sashW)}</text>
+              textAnchor="middle" fontWeight="600">{fmt(geom.sashW)}</text>
           </g>
 
           {/* OVERALL HEIGHT (right) */}
@@ -461,7 +468,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper' }) {
             <text x={X(geom.sashW) + 26 * sc} y={Y(geom.sashH / 2)}
               fill={C.dim} fontSize={fs(FS_DIM_LARGE)} fontFamily={FONT_FAMILY}
               textAnchor="middle" fontWeight="600"
-              transform={`rotate(-90, ${X(geom.sashW) + 26 * sc}, ${Y(geom.sashH / 2)})`}>{Math.round(geom.sashH)}</text>
+              transform={`rotate(-90, ${X(geom.sashW) + 26 * sc}, ${Y(geom.sashH / 2)})`}>{fmt(geom.sashH)}</text>
           </g>
 
           {/* TITLE / SUBTITLE */}
