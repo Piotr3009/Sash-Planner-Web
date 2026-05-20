@@ -20,7 +20,7 @@ import {
   buildHardwareList,
 } from '../engine/lists.js';
 import { optimisePrecut } from '../engine/optimizer.js';
-import { mockProjects } from '../mocks/mockProjects.js';
+import { mockProjects, mockProductionPacks } from '../mocks/mockProjects.js';
 import FrontElevation2D from '../components/drawings/FrontElevation2D.jsx';
 import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
 import SashDetail2D from '../components/drawings/SashDetail2D.jsx';
@@ -44,31 +44,69 @@ const TABS = [
 
 // ─── Main Component ───
 export default function ProductionPackPage() {
-  const { projectId, batchId } = useParams();
+  const { projectId, batchId, ppId } = useParams();
   const navigate = useNavigate();
   const projects = useProjectStore((s) => s.projects);
+  const productionPacks = useProjectStore((s) => s.productionPacks);
   const settings = useProjectStore((s) => s.settings);
   const [tab, setTab] = useState('overview');
 
-  // Ensure projects loaded
+  // Ensure data loaded
   useEffect(() => {
     if (projects.length === 0) useProjectStore.getState().setProjects(mockProjects);
-  }, [projects.length]);
+    if (productionPacks.length === 0) useProjectStore.getState().setProductionPacks(mockProductionPacks);
+  }, [projects.length, productionPacks.length]);
 
-  // Find project + batch
+  // PP mode: cross-project merged windows
+  const pp = useMemo(
+    () => ppId ? productionPacks.find((p) => p.id === ppId) : null,
+    [ppId, productionPacks]
+  );
+
+  // Legacy mode: single project + batch
   const project = useMemo(
-    () => (useProjectStore.getState().projects || projects).find((p) => p.id === projectId),
-    [projectId, projects]
+    () => !ppId ? (useProjectStore.getState().projects || projects).find((p) => p.id === projectId) : null,
+    [projectId, projects, ppId]
   );
   const batch = useMemo(
     () => project?.batches?.find((b) => b.id === batchId),
     [project, batchId]
   );
 
+  // Resolve windows: PP mode = cross-project, legacy = single batch
+  const sourceWindows = useMemo(() => {
+    if (pp) {
+      // PP mode: gather windows from all assigned batches
+      const windows = [];
+      (pp.assignments || []).forEach(({ projectId: pId, batchId: bId }) => {
+        const proj = projects.find((p) => p.id === pId);
+        const b = proj?.batches?.find((bt) => bt.id === bId);
+        if (b?.windows) {
+          windows.push(...b.windows.map((w) => ({
+            ...w,
+            _projectId: pId,
+            _projectNumber: proj?.project_number || proj?.name || pId,
+            _batchId: bId,
+          })));
+        }
+      });
+      return windows;
+    }
+    if (batch?.windows) {
+      return batch.windows.map((w) => ({
+        ...w,
+        _projectId: projectId,
+        _projectNumber: project?.project_number || project?.name || '',
+        _batchId: batchId,
+      }));
+    }
+    return [];
+  }, [pp, batch, projects, projectId, batchId, project]);
+
   // Compute per-window data
   const windowsData = useMemo(() => {
-    if (!batch?.windows?.length) return [];
-    return batch.windows.map((win) => {
+    if (!sourceWindows.length) return [];
+    return sourceWindows.map((win) => {
       const spec = parseSpecification(win.specification);
       const windowSpec = normaliseToWindowSpec(win, spec);
       let derived = null;
@@ -79,7 +117,7 @@ export default function ProductionPackPage() {
       }
       return { win, spec, windowSpec, derived };
     });
-  }, [batch, settings]);
+  }, [sourceWindows, settings]);
 
   // Merged lists
   const merged = useMemo(() => {
@@ -132,16 +170,31 @@ export default function ProductionPackPage() {
   }, [windowsData, settings]);
 
   // ─── Render ───
-  if (!project || !batch) {
+  const isPPMode = !!pp;
+  if (!isPPMode && (!project || !batch)) {
     return (
       <div className="min-h-screen bg-surface-800 p-8">
-        <Link to={`/projects/${projectId || ''}`} className="text-xs text-ink-400 hover:text-accent-400">← Back to project</Link>
+        <Link to="/dashboard" className="text-xs text-ink-400 hover:text-accent-400">← Back to dashboard</Link>
         <div className="mt-8 text-center text-ink-400">Batch not found.</div>
       </div>
     );
   }
+  if (isPPMode && !pp) {
+    return (
+      <div className="min-h-screen bg-surface-800 p-8">
+        <Link to="/dashboard" className="text-xs text-ink-400 hover:text-accent-400">← Back to dashboard</Link>
+        <div className="mt-8 text-center text-ink-400">Production pack not found.</div>
+      </div>
+    );
+  }
 
-  const backUrl = `/projects/${projectId}`;
+  const headerTitle = isPPMode
+    ? pp.name
+    : `Production Pack — ${batch.label}`;
+  const headerSub = isPPMode
+    ? `${pp.type} · ${sourceWindows.length} windows · ${pp.assignments?.length || 0} batches · ${pp.status}`
+    : `${project.name} · ${batch.windows?.length || 0} windows · ${batch.status}`;
+  const backUrl = '/dashboard';
 
   return (
     <div className="min-h-screen bg-surface-800">
@@ -149,12 +202,12 @@ export default function ProductionPackPage() {
       <header className="border-b border-surface-500 bg-surface-900 px-6 py-4">
         <div className="max-w-[1400px] mx-auto flex items-center justify-between">
           <div>
-            <Link to={backUrl} className="text-xs text-ink-400 hover:text-accent-400 transition-colors">← Back to project</Link>
+            <Link to={backUrl} className="text-xs text-ink-400 hover:text-accent-400 transition-colors">← Back to dashboard</Link>
             <h1 className="text-xl font-bold text-ink-50 mt-1">
-              Production Pack — {batch.label}
+              {headerTitle}
             </h1>
             <p className="text-xs text-ink-400 mt-0.5">
-              {project.name} · {batch.windows?.length || 0} windows · {batch.status}
+              {headerSub}
             </p>
           </div>
           <div className="flex gap-2">
@@ -181,15 +234,15 @@ export default function ProductionPackPage() {
 
       {/* Content */}
       <main className="max-w-[1400px] mx-auto p-6">
-        {tab === 'overview'   && <OverviewTab batch={batch} windowsData={windowsData} projectId={projectId} batchId={batchId} />}
-        {tab === '3d'         && <ThreeDTab windowsData={windowsData} projectId={projectId} batchId={batchId} />}
-        {tab === 'elevations' && <ElevationsTab windowsData={windowsData} projectId={projectId} batchId={batchId} />}
+        {tab === 'overview'   && <OverviewTab batch={batch} pp={pp} isPPMode={isPPMode} windowsData={windowsData} />}
+        {tab === '3d'         && <ThreeDTab windowsData={windowsData} />}
+        {tab === 'elevations' && <ElevationsTab windowsData={windowsData} />}
         {tab === 'sections'   && <SectionsTab windowsData={windowsData} />}
-        {tab === 'elements'   && <ElementsTab windowsData={windowsData} projectId={projectId} batchId={batchId} />}
-        {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} />}
+        {tab === 'elements'   && <ElementsTab windowsData={windowsData} />}
+        {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} />}
         {tab === 'precut'     && <PreCutTab merged={merged} settings={settings} />}
-        {tab === 'cutlist'    && <CutListTab merged={merged} />}
-        {tab === 'bom'        && <BOMTab merged={merged} batch={batch} windowsData={windowsData} />}
+        {tab === 'cutlist'    && <CutListTab merged={merged} isPPMode={isPPMode} />}
+        {tab === 'bom'        && <BOMTab merged={merged} batch={batch} pp={pp} isPPMode={isPPMode} windowsData={windowsData} />}
       </main>
     </div>
   );
@@ -198,32 +251,47 @@ export default function ProductionPackPage() {
 // ═══════════════════════════════════════════════════════════════
 // TAB: Overview
 // ═══════════════════════════════════════════════════════════════
-function OverviewTab({ batch, windowsData, projectId, batchId }) {
+function OverviewTab({ batch, pp, isPPMode, windowsData }) {
   return (
     <div className="space-y-4">
-      {/* Batch defaults summary */}
-      <div className="card p-4">
-        <div className="text-sm font-semibold text-ink-50 mb-3">Batch Defaults</div>
-        <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-ink-400">
-          <span>Type: <strong className="text-ink-100">{batch.type}</strong></span>
-          <span>Colour: <strong className="text-ink-100">{batch.defaults?.colourMode === 'dual' ? 'Dual' : 'Single'}</strong></span>
-          <span>Glass: <strong className="text-ink-100">{batch.defaults?.glassType}</strong></span>
-          <span>Frame: <strong className="text-ink-100">{batch.defaults?.frameType}</strong></span>
-          <span>Ironmongery: <strong className="text-ink-100">{batch.defaults?.ironmongery}</strong></span>
-          {batch.type === 'sash' && <span>Horns: <strong className="text-ink-100">{batch.defaults?.hornType}</strong></span>}
-          <span>PAS24: <strong className="text-ink-100">{batch.defaults?.pas24 ? 'Yes' : 'No'}</strong></span>
+      {/* Batch/PP info summary */}
+      {!isPPMode && batch && (
+        <div className="card p-4">
+          <div className="text-sm font-semibold text-ink-50 mb-3">Batch Defaults</div>
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-ink-400">
+            <span>Type: <strong className="text-ink-100">{batch.type}</strong></span>
+            <span>Colour: <strong className="text-ink-100">{batch.defaults?.colourMode === 'dual' ? 'Dual' : 'Single'}</strong></span>
+            <span>Glass: <strong className="text-ink-100">{batch.defaults?.glassType}</strong></span>
+            <span>Frame: <strong className="text-ink-100">{batch.defaults?.frameType}</strong></span>
+            <span>Ironmongery: <strong className="text-ink-100">{batch.defaults?.ironmongery}</strong></span>
+            {batch.type === 'sash' && <span>Horns: <strong className="text-ink-100">{batch.defaults?.hornType}</strong></span>}
+            <span>PAS24: <strong className="text-ink-100">{batch.defaults?.pas24 ? 'Yes' : 'No'}</strong></span>
+          </div>
         </div>
-      </div>
+      )}
+      {isPPMode && pp && (
+        <div className="card p-4">
+          <div className="text-sm font-semibold text-ink-50 mb-3">Production Pack Info</div>
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-ink-400">
+            <span>Type: <strong className="text-ink-100">{pp.type}</strong></span>
+            <span>Status: <strong className="text-ink-100">{pp.status}</strong></span>
+            {pp.deadline && <span>Deadline: <strong className="text-ink-100">{new Date(pp.deadline).toLocaleDateString('en-GB')}</strong></span>}
+            <span>Batches: <strong className="text-ink-100">{pp.assignments?.length || 0}</strong></span>
+            <span>Windows: <strong className="text-ink-100">{windowsData.length}</strong></span>
+          </div>
+        </div>
+      )}
 
       {/* Windows table */}
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-surface-500">
-          <div className="text-sm font-semibold text-ink-50">Windows in Batch ({windowsData.length})</div>
+          <div className="text-sm font-semibold text-ink-50">Windows ({windowsData.length})</div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-surface-500 bg-surface-700/50">
+                {isPPMode && <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Project</th>}
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Name</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Type</th>
                 <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Width</th>
@@ -238,6 +306,7 @@ function OverviewTab({ batch, windowsData, projectId, batchId }) {
             <tbody>
               {windowsData.map(({ win }) => (
                 <tr key={win.id} className="border-b border-surface-500/50 hover:bg-surface-700/30">
+                  {isPPMode && <td className="px-4 py-2.5 text-accent-400 font-medium">{win._projectNumber}</td>}
                   <td className="px-4 py-2.5 text-ink-100 font-medium">{win.name}</td>
                   <td className="px-4 py-2.5 text-ink-300">{win.sashType || 'double'}</td>
                   <td className="px-4 py-2.5 text-right text-ink-200">{win.width} mm</td>
@@ -247,7 +316,7 @@ function OverviewTab({ batch, windowsData, projectId, batchId }) {
                   <td className="px-4 py-2.5 text-ink-300">{win.glassFinish || 'clear'}</td>
                   <td className="px-4 py-2.5 text-ink-300">{win.openingType || 'both'}</td>
                   <td className="px-4 py-2.5 text-center">
-                    <Link to={`/projects/${projectId}/batches/${batchId}/windows/${win.id}`}
+                    <Link to={`/projects/${win._projectId}/batches/${win._batchId || win.batch_id}/windows/${win.id}`}
                       className="text-accent-400 hover:text-accent-300 transition-colors">View →</Link>
                   </td>
                 </tr>
@@ -263,14 +332,16 @@ function OverviewTab({ batch, windowsData, projectId, batchId }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: 3D Views
 // ═══════════════════════════════════════════════════════════════
-function ThreeDTab({ windowsData, projectId, batchId }) {
+function ThreeDTab({ windowsData }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       {windowsData.map(({ win, windowSpec }) => (
         <div key={win.id} className="card overflow-hidden">
           <div className="px-4 py-2 border-b border-surface-500 flex items-center justify-between">
-            <span className="text-sm font-medium text-ink-50">{win.name} — {win.width}×{win.height} mm</span>
-            <Link to={`/projects/${projectId}/batches/${batchId}/windows/${win.id}`}
+            <span className="text-sm font-medium text-ink-50">
+              {win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — {win.width}×{win.height} mm
+            </span>
+            <Link to={`/projects/${win._projectId}/batches/${win._batchId || win.batch_id}/windows/${win.id}`}
               className="text-[10px] text-accent-400 hover:text-accent-300 transition-colors">
               View Details →
             </Link>
@@ -287,16 +358,16 @@ function ThreeDTab({ windowsData, projectId, batchId }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: 2D Elevations
 // ═══════════════════════════════════════════════════════════════
-function ElevationsTab({ windowsData, projectId, batchId }) {
+function ElevationsTab({ windowsData }) {
   return (
     <div className="space-y-6">
       {windowsData.map(({ win, windowSpec, derived }) => (
         <div key={win.id} className="card p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold text-ink-50">
-              {win.name} — {win.width}×{win.height} mm
+              {win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — {win.width}×{win.height} mm
             </div>
-            <Link to={`/projects/${projectId}/batches/${batchId}/windows/${win.id}`}
+            <Link to={`/projects/${win._projectId}/batches/${win._batchId || win.batch_id}/windows/${win.id}`}
               className="text-[10px] text-accent-400 hover:text-accent-300 transition-colors">
               View Details →
             </Link>
@@ -344,16 +415,16 @@ function SectionsTab({ windowsData }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: 2D Elements (per window: Box + Upper Sash + Lower Sash)
 // ═══════════════════════════════════════════════════════════════
-function ElementsTab({ windowsData, projectId, batchId }) {
+function ElementsTab({ windowsData }) {
   return (
     <div className="space-y-8">
       {windowsData.map(({ win, windowSpec, derived }) => (
         <div key={win.id} className="space-y-4">
           <div className="flex items-center justify-between border-b border-surface-500 pb-2">
             <div className="text-sm font-bold text-ink-50">
-              {win.name} — {win.width}×{win.height} mm
+              {win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — {win.width}×{win.height} mm
             </div>
-            <Link to={`/projects/${projectId}/batches/${batchId}/windows/${win.id}`}
+            <Link to={`/projects/${win._projectId}/batches/${win._batchId || win.batch_id}/windows/${win.id}`}
               className="text-[10px] text-accent-400 hover:text-accent-300 transition-colors">
               View Details →
             </Link>
