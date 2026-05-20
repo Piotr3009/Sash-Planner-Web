@@ -59,6 +59,32 @@ const BATCH_DEFAULTS = {
     frameType: 'standard',
     hornType: 'none',
   },
+  doors: {
+    ironmongery: 'chrome',
+    colourMode: 'single',
+    woodColor: '#F6F6F6',
+    woodColorExt: '#F6F6F6',
+    woodColorInt: '#F6F6F6',
+    glassType: 'double',
+    glassSpec: 'toughened',
+    spacerColor: 'silver',
+    pas24: true,
+    frameType: 'standard',
+    hornType: 'none',
+  },
+  special: {
+    ironmongery: 'chrome',
+    colourMode: 'single',
+    woodColor: '#F6F6F6',
+    woodColorExt: '#F6F6F6',
+    woodColorInt: '#F6F6F6',
+    glassType: 'double',
+    glassSpec: 'toughened',
+    spacerColor: 'silver',
+    pas24: false,
+    frameType: 'standard',
+    hornType: 'none',
+  },
 };
 
 const BATCH_STATUSES = ['preparation', 'in-production', 'complete'];
@@ -74,6 +100,8 @@ export const useProjectStore = create((set, get) => ({
   projectsLoading: false,
   projectsError: null,
 
+  productionPacks: [],
+
   currentProject: null,
   currentBatch: null,
   currentWindows: [],    // windows in current batch
@@ -85,6 +113,7 @@ export const useProjectStore = create((set, get) => ({
 
   // ─── Setters ───
   setProjects: (projects) => set({ projects }),
+  setProductionPacks: (packs) => set({ productionPacks: packs }),
   setProjectsLoading: (loading) => set({ projectsLoading: loading }),
   setProjectsError: (error) => set({ projectsError: error }),
 
@@ -225,6 +254,76 @@ export const useProjectStore = create((set, get) => ({
       const updatedBatch = s.currentBatch?.id === batchId ? { ...s.currentBatch, status } : s.currentBatch;
       return { projects: updatedProjects, currentProject: updatedCurrent, currentBatch: updatedBatch };
     });
+  },
+
+  // ─── PRODUCTION PACK CRUD ───
+  createProductionPack: (name, type, deadline) => {
+    const id = uid();
+    const pack = {
+      id,
+      name: name || `#${get().productionPacks.length + 1} ${type || 'Sash'}`,
+      type: type || 'sash',
+      deadline: deadline || '',
+      status: 'preparation',
+      assignments: [],
+      created_at: new Date().toISOString(),
+    };
+    set((s) => ({ productionPacks: [...s.productionPacks, pack] }));
+    return pack;
+  },
+
+  deleteProductionPack: (ppId) => {
+    set((s) => ({ productionPacks: s.productionPacks.filter((pp) => pp.id !== ppId) }));
+  },
+
+  updateProductionPack: (ppId, patch) => {
+    set((s) => ({
+      productionPacks: s.productionPacks.map((pp) =>
+        pp.id === ppId ? { ...pp, ...patch } : pp
+      ),
+    }));
+  },
+
+  assignBatchToProductionPack: (ppId, projectId, batchId) => {
+    set((s) => ({
+      productionPacks: s.productionPacks.map((pp) => {
+        if (pp.id !== ppId) return pp;
+        const already = pp.assignments.some((a) => a.projectId === projectId && a.batchId === batchId);
+        if (already) return pp;
+        return { ...pp, assignments: [...pp.assignments, { projectId, batchId }] };
+      }),
+    }));
+  },
+
+  unassignBatchFromProductionPack: (ppId, projectId, batchId) => {
+    set((s) => ({
+      productionPacks: s.productionPacks.map((pp) => {
+        if (pp.id !== ppId) return pp;
+        return {
+          ...pp,
+          assignments: pp.assignments.filter(
+            (a) => !(a.projectId === projectId && a.batchId === batchId)
+          ),
+        };
+      }),
+    }));
+  },
+
+  getProductionPackById: (id) => get().productionPacks.find((pp) => pp.id === id) || null,
+
+  // Helper: get all windows assigned to a production pack
+  getProductionPackWindows: (ppId) => {
+    const pp = get().productionPacks.find((p) => p.id === ppId);
+    if (!pp) return [];
+    const windows = [];
+    for (const { projectId, batchId } of pp.assignments) {
+      const project = get().projects.find((p) => p.id === projectId);
+      const batch = project?.batches?.find((b) => b.id === batchId);
+      if (batch?.windows) {
+        windows.push(...batch.windows.map((w) => ({ ...w, _projectId: projectId, _projectName: project.name })));
+      }
+    }
+    return windows;
   },
 
   // ─── WINDOW CRUD ───
