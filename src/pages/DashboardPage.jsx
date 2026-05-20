@@ -1,195 +1,445 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
-import { mockProjects } from '../mocks/mockProjects.js';
+import { mockProjects, mockProductionPacks } from '../mocks/mockProjects.js';
 
-export default function DashboardPage() {
-  const projects = useProjectStore((s) => s.projects);
-  const loading = useProjectStore((s) => s.projectsLoading);
-  const setProjects = useProjectStore((s) => s.setProjects);
-  const setLoading = useProjectStore((s) => s.setProjectsLoading);
-  const createProject = useProjectStore((s) => s.createProject);
-  const deleteProject = useProjectStore((s) => s.deleteProject);
-  const navigate = useNavigate();
+// ─── Type colors ───
+const TYPE_COLORS = {
+  sash:     { bg: 'rgba(127,119,221,0.12)', border: 'rgba(127,119,221,0.3)', text: '#AFA9EC', line: '#7F77DD', dot: '#7F77DD' },
+  casement: { bg: 'rgba(212,83,126,0.12)',  border: 'rgba(212,83,126,0.3)',  text: '#ED93B1', line: '#D4537E', dot: '#D4537E' },
+  doors:    { bg: 'rgba(239,159,39,0.12)',  border: 'rgba(239,159,39,0.3)',  text: '#FAC775', line: '#EF9F27', dot: '#EF9F27' },
+  special:  { bg: 'rgba(29,158,117,0.12)',  border: 'rgba(29,158,117,0.3)',  text: '#5DCAA5', line: '#1D9E75', dot: '#1D9E75' },
+};
+const typeColor = (type) => TYPE_COLORS[type] || TYPE_COLORS.sash;
+const typeLabel = (type) => ({ sash: 'Sash', casement: 'Casement', doors: 'Doors', special: 'Special' }[type] || type);
 
-  const [showForm, setShowForm] = useState(false);
-  const [projName, setProjName] = useState('');
-  const [projAddress, setProjAddress] = useState('');
-  const [projNumber, setProjNumber] = useState('');
-  const [projClient, setProjClient] = useState('');
+// ─── SVG connection lines ───
+function ConnectionLines({ containerRef, projects, productionPacks }) {
+  const [lines, setLines] = useState([]);
+
+  const compute = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const cRect = container.getBoundingClientRect();
+    const newLines = [];
+
+    productionPacks.forEach((pp) => {
+      const ppEl = container.querySelector(`[data-pp-id="${pp.id}"]`);
+      if (!ppEl) return;
+      const ppRect = ppEl.getBoundingClientRect();
+      const ppX = ppRect.left - cRect.left;
+      const ppY = ppRect.top - cRect.top + ppRect.height / 2;
+
+      pp.assignments.forEach(({ projectId, batchId }) => {
+        const batchEl = container.querySelector(`[data-batch-id="${batchId}"]`);
+        if (!batchEl) return;
+        const bRect = batchEl.getBoundingClientRect();
+        const bX = bRect.right - cRect.left;
+        const bY = bRect.top - cRect.top + bRect.height / 2;
+
+        const batch = projects
+          .find((p) => p.id === projectId)
+          ?.batches?.find((b) => b.id === batchId);
+
+        newLines.push({
+          key: `${batchId}-${pp.id}`,
+          x1: bX, y1: bY,
+          x2: ppX, y2: ppY,
+          color: typeColor(batch?.type || 'sash').line,
+        });
+      });
+    });
+    setLines(newLines);
+  }, [containerRef, projects, productionPacks]);
 
   useEffect(() => {
-    if (projects.length === 0) {
-      setLoading(true);
-      setTimeout(() => { setProjects(mockProjects); setLoading(false); }, 200);
-    }
+    compute();
+    const ro = new ResizeObserver(compute);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [compute]);
+
+  if (lines.length === 0) return null;
+
+  const maxY = Math.max(...lines.map((l) => Math.max(l.y1, l.y2)), 0) + 40;
+  const maxX = Math.max(...lines.map((l) => Math.max(l.x1, l.x2)), 0) + 40;
+
+  return (
+    <svg
+      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: maxY, pointerEvents: 'none', overflow: 'visible' }}
+    >
+      {lines.map((l) => {
+        const dx = (l.x2 - l.x1) * 0.45;
+        return (
+          <path
+            key={l.key}
+            d={`M${l.x1} ${l.y1} C${l.x1 + dx} ${l.y1}, ${l.x2 - dx} ${l.y2}, ${l.x2} ${l.y2}`}
+            fill="none"
+            stroke={l.color}
+            strokeWidth="1.5"
+            opacity="0.45"
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+// ─── New Production Pack form ───
+function NewPPForm({ onCreate, onCancel }) {
+  const [name, setName] = useState('');
+  const [type, setType] = useState('sash');
+  const [deadline, setDeadline] = useState('');
+
+  const submit = () => {
+    if (!name.trim()) return;
+    onCreate(name.trim(), type, deadline);
+    setName(''); setType('sash'); setDeadline('');
+  };
+
+  return (
+    <div className="card p-3 space-y-2">
+      <input className="input text-xs" placeholder="Name, e.g. #2 Sash windows" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+      <div className="flex gap-2">
+        <select className="input text-xs flex-1" value={type} onChange={(e) => setType(e.target.value)}>
+          <option value="sash">Sash</option>
+          <option value="casement">Casement</option>
+          <option value="doors">Doors</option>
+          <option value="special">Special</option>
+        </select>
+        <input type="date" className="input text-xs flex-1" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+      </div>
+      <div className="flex gap-2">
+        <button className="btn btn-primary text-xs flex-1" onClick={submit}>Create</button>
+        <button className="btn btn-secondary text-xs" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── New Project form ───
+function NewProjectForm({ onCreate, onCancel }) {
+  const [name, setName] = useState('');
+  const [address, setAddress] = useState('');
+  const [client, setClient] = useState('');
+
+  const submit = () => {
+    if (!name.trim()) return;
+    onCreate(name.trim(), address.trim(), '', client.trim());
+    setName(''); setAddress(''); setClient('');
+  };
+
+  return (
+    <div className="card p-3 space-y-2">
+      <input className="input text-xs" placeholder="Project name *" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+      <input className="input text-xs" placeholder="Client" value={client} onChange={(e) => setClient(e.target.value)} />
+      <input className="input text-xs" placeholder="Address" value={address} onChange={(e) => setAddress(e.target.value)} />
+      <div className="flex gap-2">
+        <button className="btn btn-primary text-xs flex-1" onClick={submit}>Create</button>
+        <button className="btn btn-secondary text-xs" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main ───
+export default function DashboardPage() {
+  const projects = useProjectStore((s) => s.projects);
+  const productionPacks = useProjectStore((s) => s.productionPacks);
+  const setProjects = useProjectStore((s) => s.setProjects);
+  const setProductionPacks = useProjectStore((s) => s.setProductionPacks);
+  const createProject = useProjectStore((s) => s.createProject);
+  const createProductionPack = useProjectStore((s) => s.createProductionPack);
+  const assignBatch = useProjectStore((s) => s.assignBatchToProductionPack);
+  const unassignBatch = useProjectStore((s) => s.unassignBatchFromProductionPack);
+  const getPackForBatch = useProjectStore((s) => s.getProductionPackForBatch);
+  const navigate = useNavigate();
+  const containerRef = useRef(null);
+
+  const [showNewPP, setShowNewPP] = useState(false);
+  const [showNewProject, setShowNewProject] = useState(false);
+
+  // Load mock data
+  useEffect(() => {
+    if (projects.length === 0) setProjects(mockProjects);
+    if (productionPacks.length === 0) setProductionPacks(mockProductionPacks);
   }, []);
 
-  const handleCreate = () => {
-    if (!projName.trim()) return;
-    const proj = createProject(projName.trim(), projAddress.trim(), projNumber.trim(), projClient.trim());
-    setProjName(''); setProjAddress(''); setProjNumber(''); setProjClient('');
-    setShowForm(false);
-    navigate(`/projects/${proj.id}`);
+  // Compute delivery data per project
+  const deliveryData = useMemo(() => {
+    return projects.map((project) => {
+      const batches = project.batches || [];
+      const summary = {};
+      let totalWindows = 0;
+      let completedBatches = 0;
+
+      batches.forEach((batch) => {
+        const winCount = batch.windows?.length || 0;
+        totalWindows += winCount;
+        if (batch.status === 'complete') completedBatches++;
+        const t = batch.type || 'sash';
+        summary[t] = (summary[t] || 0) + winCount;
+      });
+
+      return {
+        projectId: project.id,
+        projectName: project.name,
+        projectNumber: project.project_number,
+        summary,
+        totalWindows,
+        totalBatches: batches.length,
+        completedBatches,
+        allComplete: batches.length > 0 && completedBatches === batches.length,
+      };
+    });
+  }, [projects]);
+
+  const handleAssign = (batchId, projectId, ppId) => {
+    // If already assigned somewhere, unassign first
+    const currentPP = getPackForBatch(projectId, batchId);
+    if (currentPP) {
+      unassignBatch(currentPP.id, projectId, batchId);
+    }
+    if (ppId) {
+      assignBatch(ppId, projectId, batchId);
+    }
   };
 
-  const handleDelete = (e, id) => {
-    e.preventDefault(); e.stopPropagation();
-    if (window.confirm('Delete this project and all its batches?')) deleteProject(id);
+  const handleCreatePP = (name, type, deadline) => {
+    createProductionPack(name, type, deadline);
+    setShowNewPP(false);
   };
 
-  const totalWindows = (proj) =>
-    (proj.batches || []).reduce((sum, b) => sum + (b.windows?.length || 0), 0);
-
-  const statusOf = (proj) => {
-    const b = proj.batches || [];
-    if (b.length === 0) return 'empty';
-    if (b.every(x => x.status === 'complete')) return 'complete';
-    if (b.some(x => x.status === 'in-production')) return 'in-production';
-    return 'preparation';
+  const handleCreateProject = (name, address, number, client) => {
+    createProject(name, address, number, client);
+    setShowNewProject(false);
   };
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-6 h-full overflow-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-ink-50">Projects</h1>
-          <p className="text-sm text-ink-400 mt-1">Production projects with batch windows.</p>
+          <h1 className="text-xl font-semibold text-ink-50">Production planner</h1>
+          <p className="text-xs text-ink-400 mt-0.5">Assign batches to production packs · track delivery</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn btn-primary">+ New Project</button>
+        <div className="text-xs text-ink-400">
+          {projects.length} projects · {productionPacks.length} production packs
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
-        <StatCard label="Total Projects" value={projects.length} icon="📋" />
-        <StatCard label="Total Windows" value={projects.reduce((s, p) => s + totalWindows(p), 0)} icon="🪟" />
-        <StatCard label="In Production" value={projects.filter(p => statusOf(p) === 'in-production').length} icon="🔧" accent />
-        <StatCard label="Complete" value={projects.filter(p => statusOf(p) === 'complete').length} icon="✅" />
+      {/* Column headers */}
+      <div className="grid gap-4 mb-3" style={{ gridTemplateColumns: '160px 200px 1fr 170px' }}>
+        <div className="text-[10px] uppercase tracking-widest text-ink-400 font-semibold">Projects</div>
+        <div className="text-[10px] uppercase tracking-widest text-ink-400 font-semibold">Batches</div>
+        <div className="text-[10px] uppercase tracking-widest text-ink-400 font-semibold">Production packs</div>
+        <div className="text-[10px] uppercase tracking-widest text-ink-400 font-semibold">Delivery</div>
       </div>
 
-      {/* New Project form */}
-      {showForm && (
-        <div className="card p-5 mb-6">
-          <div className="text-sm font-semibold text-ink-50 mb-4">New Project</div>
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <div>
-              <label className="text-xs text-ink-400 mb-1 block">Project Number</label>
-              <input type="text" placeholder="PRJ-2025-003 (auto if empty)" value={projNumber}
-                onChange={(e) => setProjNumber(e.target.value)} className="input" />
-            </div>
-            <div>
-              <label className="text-xs text-ink-400 mb-1 block">Client</label>
-              <input type="text" placeholder="Client name" value={projClient}
-                onChange={(e) => setProjClient(e.target.value)} className="input" />
-            </div>
-          </div>
+      {/* Main grid with connections */}
+      <div ref={containerRef} className="relative">
+        <ConnectionLines containerRef={containerRef} projects={projects} productionPacks={productionPacks} />
+
+        <div className="grid gap-4" style={{ gridTemplateColumns: '160px 200px 1fr 170px' }}>
+
+          {/* ─── Col 1: Projects ─── */}
           <div className="space-y-3">
-            <div>
-              <label className="text-xs text-ink-400 mb-1 block">Project Name *</label>
-              <input type="text" placeholder="e.g. 12 Belgrave Square" value={projName}
-                onChange={(e) => setProjName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                className="input" autoFocus />
-            </div>
-            <div>
-              <label className="text-xs text-ink-400 mb-1 block">Address</label>
-              <input type="text" placeholder="Address (optional)" value={projAddress}
-                onChange={(e) => setProjAddress(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                className="input" />
-            </div>
-            <div className="flex gap-3">
-              <button onClick={handleCreate} className="btn btn-primary">Create</button>
-              <button onClick={() => { setShowForm(false); setProjName(''); setProjAddress(''); setProjNumber(''); setProjClient(''); }} className="btn btn-secondary">Cancel</button>
-            </div>
+            {projects.map((project) => (
+              <Link
+                key={project.id}
+                to={`/projects/${project.id}`}
+                className="card p-3 block hover:border-accent-500/40 transition-all"
+              >
+                <div className="text-xs font-semibold text-ink-50 truncate">{project.name}</div>
+                <div className="text-[10px] text-ink-400 mt-0.5">{project.project_number}</div>
+                <div className="text-[10px] text-ink-200 mt-1 truncate">{project.client}</div>
+              </Link>
+            ))}
+            {showNewProject ? (
+              <NewProjectForm onCreate={handleCreateProject} onCancel={() => setShowNewProject(false)} />
+            ) : (
+              <button
+                onClick={() => setShowNewProject(true)}
+                className="w-full py-2.5 rounded-xl border border-dashed border-surface-500 text-ink-400 text-xs hover:border-accent-500 hover:text-accent-400 transition-all"
+              >
+                + New project
+              </button>
+            )}
           </div>
-        </div>
-      )}
 
-      {loading && <div className="text-sm text-ink-400">Loading projects…</div>}
+          {/* ─── Col 2: Batches ─── */}
+          <div className="space-y-3">
+            {projects.map((project) => (
+              <div key={project.id} className="space-y-1.5" style={{ minHeight: '76px' }}>
+                {(project.batches || []).map((batch) => {
+                  const tc = typeColor(batch.type);
+                  const assignedPP = getPackForBatch(project.id, batch.id);
+                  const winCount = batch.windows?.length || 0;
 
-      {!loading && projects.length === 0 && (
-        <div className="card p-12 text-center">
-          <div className="text-4xl mb-4">🏗️</div>
-          <div className="text-ink-200 mb-2">No projects yet</div>
-          <button onClick={() => setShowForm(true)} className="btn btn-primary mt-4">+ New Project</button>
-        </div>
-      )}
-
-      {/* Projects grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {projects.map((proj) => {
-          const st = statusOf(proj);
-          const batches = proj.batches || [];
-          return (
-            <Link key={proj.id} to={`/projects/${proj.id}`}
-              className="card p-5 hover:border-accent-500/40 hover:shadow-glow transition-all relative group">
-              <button onClick={(e) => handleDelete(e, proj.id)}
-                className="absolute top-3 right-3 w-7 h-7 rounded-full bg-surface-600 text-ink-400 hover:bg-red-500/20 hover:text-red-400 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
-
-              {/* Project number + status */}
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-ink-400 font-mono">{proj.project_number || '—'}</span>
-                <StatusBadge status={st} />
+                  return (
+                    <div
+                      key={batch.id}
+                      data-batch-id={batch.id}
+                      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs"
+                      style={{ background: tc.bg, border: `0.5px solid ${tc.border}` }}
+                    >
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: tc.dot }} />
+                      <span className="font-medium truncate" style={{ color: tc.text }}>
+                        {typeLabel(batch.type)} ×{winCount}
+                      </span>
+                      <select
+                        className="ml-auto bg-transparent text-[10px] outline-none cursor-pointer appearance-none"
+                        style={{ color: assignedPP ? tc.text : '#6B7385', maxWidth: '70px' }}
+                        value={assignedPP?.id || ''}
+                        onChange={(e) => handleAssign(batch.id, project.id, e.target.value || null)}
+                      >
+                        <option value="">—</option>
+                        {productionPacks.map((pp) => (
+                          <option key={pp.id} value={pp.id}>
+                            {pp.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
+                {(project.batches || []).length === 0 && (
+                  <div className="text-[10px] text-ink-400 italic py-2">No batches</div>
+                )}
               </div>
+            ))}
+          </div>
 
-              {/* Name */}
-              <h3 className="font-semibold text-ink-50 mb-1">{proj.name}</h3>
+          {/* ─── Col 3: Production Packs ─── */}
+          <div className="space-y-3">
+            {productionPacks.map((pp) => {
+              const tc = typeColor(pp.type);
+              const assignedBatches = pp.assignments || [];
+              let totalWindows = 0;
+              const projectSummary = [];
 
-              {/* Client */}
-              {proj.client && (
-                <div className="text-xs text-accent-400 mb-1">👤 {proj.client}</div>
-              )}
+              assignedBatches.forEach(({ projectId, batchId }) => {
+                const project = projects.find((p) => p.id === projectId);
+                const batch = project?.batches?.find((b) => b.id === batchId);
+                const wc = batch?.windows?.length || 0;
+                totalWindows += wc;
+                if (project) {
+                  projectSummary.push({ name: project.project_number || project.name, count: wc });
+                }
+              });
 
-              {/* Address */}
-              {proj.address && <div className="text-xs text-ink-400 mb-3 truncate">{proj.address}</div>}
+              const statusColor = pp.status === 'complete' ? '#10B981' : pp.status === 'in-production' ? '#3B82F6' : '#F59E0B';
+              const statusLabel = pp.status === 'complete' ? 'Complete' : pp.status === 'in-production' ? 'In production' : 'Preparation';
 
-              {/* Batch chips */}
-              {batches.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {batches.map((b) => (
-                    <span key={b.id} className="text-[10px] px-2 py-0.5 rounded-full bg-surface-600 text-ink-200 border border-surface-500">
-                      {b.type} ({b.windows?.length || 0})
+              return (
+                <div
+                  key={pp.id}
+                  data-pp-id={pp.id}
+                  className="card-elevated p-3"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: tc.dot }} />
+                    <span className="text-xs font-semibold text-ink-50 truncate">{pp.name}</span>
+                    <span
+                      className="ml-auto text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full"
+                      style={{ background: `${statusColor}20`, color: statusColor, border: `0.5px solid ${statusColor}40` }}
+                    >
+                      {statusLabel}
                     </span>
-                  ))}
+                  </div>
+
+                  {pp.deadline && (
+                    <div className="text-[10px] text-ink-400 mb-1.5">
+                      DL {new Date(pp.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    </div>
+                  )}
+
+                  <div className="text-[10px] text-ink-200 mb-1.5">
+                    {totalWindows} window{totalWindows !== 1 ? 's' : ''} · {assignedBatches.length} batch{assignedBatches.length !== 1 ? 'es' : ''}
+                  </div>
+
+                  {projectSummary.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {projectSummary.map((ps, i) => (
+                        <span
+                          key={i}
+                          className="text-[9px] px-1.5 py-0.5 rounded"
+                          style={{ background: tc.bg, color: tc.text }}
+                        >
+                          {ps.name} ×{ps.count}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
+              );
+            })}
 
-              {/* Footer */}
-              <div className="flex items-center justify-between text-xs text-ink-400 pt-3 border-t border-surface-500">
-                <span>{batches.length} batch{batches.length !== 1 ? 'es' : ''}</span>
-                <span>{totalWindows(proj)} win</span>
-                <span>{formatDate(proj.created_at)}</span>
-              </div>
-            </Link>
-          );
-        })}
+            {showNewPP ? (
+              <NewPPForm onCreate={handleCreatePP} onCancel={() => setShowNewPP(false)} />
+            ) : (
+              <button
+                onClick={() => setShowNewPP(true)}
+                className="w-full py-2.5 rounded-xl border border-dashed border-surface-500 text-ink-400 text-xs hover:border-accent-500 hover:text-accent-400 transition-all"
+              >
+                + New production pack
+              </button>
+            )}
+          </div>
+
+          {/* ─── Col 4: Delivery ─── */}
+          <div className="space-y-3">
+            {deliveryData.map((d) => {
+              const progress = d.totalBatches > 0
+                ? Math.round((d.completedBatches / d.totalBatches) * 100)
+                : 0;
+
+              return (
+                <div key={d.projectId} className="card p-3">
+                  <div className="text-xs font-semibold text-ink-50 truncate">{d.projectNumber}</div>
+                  <div className="text-[10px] text-ink-200 mt-0.5 truncate">{d.projectName}</div>
+
+                  <div className="mt-2 space-y-0.5">
+                    {Object.entries(d.summary).map(([type, count]) => {
+                      const tc = typeColor(type);
+                      return (
+                        <div key={type} className="flex items-center gap-1.5 text-[10px]">
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: tc.dot }} />
+                          <span style={{ color: tc.text }}>{count} {typeLabel(type).toLowerCase()}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="mt-2">
+                    <div className="flex justify-between text-[9px] text-ink-400 mb-0.5">
+                      <span>{d.completedBatches}/{d.totalBatches} batches</span>
+                      <span>{progress}%</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-surface-500 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${progress}%`,
+                          background: d.allComplete ? '#10B981' : '#00B4A0',
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {d.allComplete && (
+                    <div className="text-[9px] text-green-400 mt-1.5 uppercase tracking-wider font-medium">
+                      Ready for delivery
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+        </div>
       </div>
     </div>
   );
-}
-
-function StatCard({ label, value, icon, accent }) {
-  return (
-    <div className={`card-elevated p-4 flex items-center gap-4 ${accent ? 'border-accent-500/30' : ''}`}>
-      <div className="text-2xl">{icon}</div>
-      <div>
-        <div className={`text-2xl font-bold ${accent ? 'text-accent-400' : 'text-ink-50'}`}>{value}</div>
-        <div className="text-[11px] text-ink-400 uppercase tracking-wider">{label}</div>
-      </div>
-    </div>
-  );
-}
-
-function StatusBadge({ status }) {
-  const map = {
-    'complete': 'badge-done',
-    'in-production': 'badge-active',
-    'preparation': 'badge-prep',
-    'empty': 'text-[10px] uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-surface-600 text-ink-400 border border-surface-500',
-  };
-  return <span className={map[status] || map.empty}>{status}</span>;
-}
-
-function formatDate(iso) {
-  if (!iso) return '';
-  try { return new Date(iso).toLocaleDateString(); } catch { return iso; }
 }
