@@ -950,24 +950,16 @@ function GlazingBars({ clearWidth, clearHeight, glassDepth, barPattern = 'none',
     if (!pattern) return [];
     const items = [];
     const { h, v } = pattern;
-    // Equal-pane positioning: paneW = (clearWidth - v * barW) / (v + 1)
-    // Bar i center: -clearWidth/2 + (i+1)*paneW + i*barW + barW/2
-    if (v > 0) {
-      const paneW = Math.max((clearWidth - v * barW) / (v + 1), 0);
-      for (let i = 0; i < v; i++) {
-        const x = -clearWidth / 2 + (i + 1) * paneW + i * barW + barW / 2;
-        items.push({ type: 'v', x, y: 0 });
-      }
+    for (let i = 1; i <= v; i++) {
+      const x = -clearWidth / 2 + (clearWidth / (v + 1)) * i;
+      items.push({ type: 'v', x, y: 0 });
     }
-    if (h > 0) {
-      const paneH = Math.max((clearHeight - h * barW) / (h + 1), 0);
-      for (let j = 0; j < h; j++) {
-        const y = -clearHeight / 2 + (j + 1) * paneH + j * barW + barW / 2;
-        items.push({ type: 'h', x: 0, y });
-      }
+    for (let i = 1; i <= h; i++) {
+      const y = -clearHeight / 2 + (clearHeight / (h + 1)) * i;
+      items.push({ type: 'h', x: 0, y });
     }
     return items;
-  }, [clearWidth, clearHeight, barPattern, customBars, pattern, barW]);
+  }, [clearWidth, clearHeight, barPattern, customBars, pattern]);
 
   if (bars.length === 0) return null;
 
