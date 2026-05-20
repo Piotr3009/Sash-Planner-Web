@@ -67,7 +67,7 @@ function ConnectionLines({ containerRef, projects, productionPacks }) {
           x1: ppRightX, y1: ppY,
           x2: dX, y2: dY,
           color: typeColor(pp.type || 'sash').line,
-          opacity: 0.25,
+          opacity: 0.45,
         });
       });
     });
@@ -249,37 +249,34 @@ export default function DashboardPage() {
         </div>
 
         {/* Column headers */}
-        <div className="grid gap-4 mb-2" style={{ gridTemplateColumns: '160px 200px 220px 1fr' }}>
-          <div className="text-[9px] uppercase tracking-widest text-ink-400 font-semibold">Projects</div>
-          <div className="text-[9px] uppercase tracking-widest text-ink-400 font-semibold">Batches</div>
-          <div className="text-[9px] uppercase tracking-widest text-ink-400 font-semibold">Production packs</div>
-          <div className="text-[9px] uppercase tracking-widest text-ink-400 font-semibold pl-8">Delivery</div>
+        <div className="flex mb-2">
+          <div style={{ width: 160 }} className="text-[9px] uppercase tracking-widest text-ink-400 font-semibold">Projects</div>
+          <div style={{ width: 200, marginLeft: 16 }} className="text-[9px] uppercase tracking-widest text-ink-400 font-semibold">Batches</div>
+          <div style={{ width: 500, marginLeft: 100 }} className="text-[9px] uppercase tracking-widest text-ink-400 font-semibold">Production packs</div>
+          <div style={{ marginLeft: 100 }} className="text-[9px] uppercase tracking-widest text-ink-400 font-semibold">Delivery</div>
         </div>
 
-        {/* Main grid with connections */}
+        {/* Main content with connections */}
         <div ref={containerRef} className="relative">
           <ConnectionLines containerRef={containerRef} projects={projects} productionPacks={productionPacks} />
 
-          <div className="grid gap-4" style={{ gridTemplateColumns: '160px 200px 220px 1fr' }}>
+          <div className="flex items-start">
 
-            {/* ─── Col 1: Projects ─── */}
-            <div className="space-y-3">
-              {projects.map((project) => {
-                const batchCount = project.batches?.length || 0;
-                return (
-                  <Link
-                    key={project.id}
-                    to={`/projects/${project.id}`}
-                    className="card p-3 block hover:border-accent-500/40 transition-all"
-                    style={{ minHeight: `${Math.max(90, batchCount * 28 + 16)}px` }}
-                  >
-                    <div className="text-xs font-semibold text-ink-50 truncate">{project.name}</div>
-                    <div className="text-[10px] text-ink-400 mt-0.5">{project.project_number}</div>
-                    <div className="text-[10px] text-ink-200 mt-1 truncate">{project.client}</div>
-                    <div className="text-[9px] text-ink-400 mt-1">{project.address}</div>
-                  </Link>
-                );
-              })}
+            {/* ─── Col 1: Projects (160px) ─── */}
+            <div style={{ width: 160 }} className="shrink-0 space-y-3">
+              {projects.map((project) => (
+                <Link
+                  key={project.id}
+                  to={`/projects/${project.id}`}
+                  className="card p-3 block hover:border-accent-500/40 transition-all overflow-hidden"
+                  style={{ height: 130 }}
+                >
+                  <div className="text-xs font-semibold text-ink-50 truncate">{project.name}</div>
+                  <div className="text-[10px] text-ink-400 mt-0.5">{project.project_number}</div>
+                  <div className="text-[10px] text-ink-200 mt-1 truncate">{project.client}</div>
+                  <div className="text-[9px] text-ink-400 mt-1 truncate">{project.address}</div>
+                </Link>
+              ))}
               {showNewProject ? (
                 <NewProjectForm onCreate={handleCreateProject} onCancel={() => setShowNewProject(false)} />
               ) : (
@@ -292,55 +289,60 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* ─── Col 2: Batches ─── */}
-            <div className="space-y-3">
+            {/* ─── Col 2: Batches (200px, 16px gap from projects) ─── */}
+            <div style={{ width: 200, marginLeft: 16 }} className="shrink-0 space-y-3">
               {projects.map((project) => {
-                const batchCount = project.batches?.length || 0;
-                return (
-                  <div key={project.id} className="space-y-1.5" style={{ minHeight: `${Math.max(90, batchCount * 28 + 16)}px` }}>
-                    {(project.batches || []).map((batch) => {
-                      const tc = typeColor(batch.type);
-                      const assignedPP = getPackForBatch(project.id, batch.id);
-                      const winCount = batch.windows?.length || 0;
+                const batches = project.batches || [];
+                const batchBlockHeight = batches.length * 28 + Math.max(0, batches.length - 1) * 6;
+                const topPad = Math.max(0, (130 - batchBlockHeight) / 2);
 
-                      return (
-                        <div
-                          key={batch.id}
-                          data-batch-id={batch.id}
-                          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs"
-                          style={{ background: tc.bg, border: `0.5px solid ${tc.border}` }}
-                        >
-                          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: tc.dot }} />
-                          <span className="font-medium truncate" style={{ color: tc.text }}>
-                            {typeLabel(batch.type)} ×{winCount}
-                          </span>
-                          <span className="ml-auto flex items-center gap-0.5">
-                            <select
-                              className="bg-transparent text-[9px] outline-none cursor-pointer"
-                              style={{ color: assignedPP ? tc.text : '#6B7385', maxWidth: '68px', appearance: 'none', WebkitAppearance: 'none' }}
-                              value={assignedPP?.id || ''}
-                              onChange={(e) => handleAssign(batch.id, project.id, e.target.value || null)}
-                            >
-                              <option value="">— assign</option>
-                              {productionPacks.map((pp) => (
-                                <option key={pp.id} value={pp.id}>{pp.name}</option>
-                              ))}
-                            </select>
-                            <span style={{ color: '#6B7385', fontSize: '8px', pointerEvents: 'none' }}>▾</span>
-                          </span>
-                        </div>
-                      );
-                    })}
-                    {(project.batches || []).length === 0 && (
-                      <div className="text-[10px] text-ink-400 italic py-2">No batches</div>
-                    )}
+                return (
+                  <div key={project.id} style={{ height: 130 }} className="flex flex-col justify-center">
+                    <div className="space-y-1.5">
+                      {batches.map((batch) => {
+                        const tc = typeColor(batch.type);
+                        const assignedPP = getPackForBatch(project.id, batch.id);
+                        const winCount = batch.windows?.length || 0;
+
+                        return (
+                          <div
+                            key={batch.id}
+                            data-batch-id={batch.id}
+                            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs"
+                            style={{ background: tc.bg, border: `0.5px solid ${tc.border}` }}
+                          >
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: tc.dot }} />
+                            <span className="font-medium truncate" style={{ color: tc.text }}>
+                              {typeLabel(batch.type)} ×{winCount}
+                            </span>
+                            <span className="ml-auto flex items-center gap-0.5">
+                              <select
+                                className="bg-transparent text-[9px] outline-none cursor-pointer"
+                                style={{ color: assignedPP ? tc.text : '#6B7385', maxWidth: '68px', appearance: 'none', WebkitAppearance: 'none' }}
+                                value={assignedPP?.id || ''}
+                                onChange={(e) => handleAssign(batch.id, project.id, e.target.value || null)}
+                              >
+                                <option value="">— assign</option>
+                                {productionPacks.map((pp) => (
+                                  <option key={pp.id} value={pp.id}>{pp.name}</option>
+                                ))}
+                              </select>
+                              <span style={{ color: '#6B7385', fontSize: '8px', pointerEvents: 'none' }}>▾</span>
+                            </span>
+                          </div>
+                        );
+                      })}
+                      {batches.length === 0 && (
+                        <div className="text-[10px] text-ink-400 italic">No batches</div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
             </div>
 
-            {/* ─── Col 3: Production Packs (v1 content, narrower) ─── */}
-            <div className="space-y-4">
+            {/* ─── Col 3: Production Packs (500px, 100px gap from batches) ─── */}
+            <div style={{ width: 500, marginLeft: 100 }} className="shrink-0 space-y-4">
               {productionPacks.map((pp) => {
                 const tc = typeColor(pp.type);
                 const assignedBatches = pp.assignments || [];
@@ -418,8 +420,8 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* ─── Col 4: Delivery ─── */}
-            <div className="space-y-3 pl-8">
+            {/* ─── Col 4: Delivery (1fr, 100px gap from PP) ─── */}
+            <div style={{ marginLeft: 100, minWidth: 160 }} className="flex-1 space-y-3">
               {deliveryData.map((d) => {
                 const progress = d.totalBatches > 0
                   ? Math.round((d.completedBatches / d.totalBatches) * 100)
