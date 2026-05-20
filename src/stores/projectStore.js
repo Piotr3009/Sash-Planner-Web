@@ -168,6 +168,11 @@ export const useProjectStore = create((set, get) => ({
   deleteProject: (projectId) => {
     set((s) => ({
       projects: s.projects.filter((p) => p.id !== projectId),
+      // Clean up production pack assignments referencing this project
+      productionPacks: s.productionPacks.map((pp) => ({
+        ...pp,
+        assignments: pp.assignments.filter((a) => a.projectId !== projectId),
+      })),
       currentProject: s.currentProject?.id === projectId ? null : s.currentProject,
       currentBatch: null,
       currentWindows: [],
@@ -213,9 +218,17 @@ export const useProjectStore = create((set, get) => ({
       const updatedCurrent = s.currentProject?.id === projectId
         ? { ...s.currentProject, batches: (s.currentProject.batches || []).filter((b) => b.id !== batchId) }
         : s.currentProject;
+      // Clean up production pack assignments referencing this batch
+      const updatedPacks = s.productionPacks.map((pp) => ({
+        ...pp,
+        assignments: pp.assignments.filter(
+          (a) => !(a.projectId === projectId && a.batchId === batchId)
+        ),
+      }));
       return {
         projects: updatedProjects,
         currentProject: updatedCurrent,
+        productionPacks: updatedPacks,
         currentBatch: s.currentBatch?.id === batchId ? null : s.currentBatch,
         currentWindows: s.currentBatch?.id === batchId ? [] : s.currentWindows,
       };
@@ -285,14 +298,22 @@ export const useProjectStore = create((set, get) => ({
   },
 
   assignBatchToProductionPack: (ppId, projectId, batchId) => {
-    set((s) => ({
-      productionPacks: s.productionPacks.map((pp) => {
-        if (pp.id !== ppId) return pp;
-        const already = pp.assignments.some((a) => a.projectId === projectId && a.batchId === batchId);
-        if (already) return pp;
-        return { ...pp, assignments: [...pp.assignments, { projectId, batchId }] };
-      }),
-    }));
+    set((s) => {
+      // Guard: batch already assigned to another production pack
+      const alreadyInOther = s.productionPacks.some((pp) =>
+        pp.id !== ppId && pp.assignments.some((a) => a.projectId === projectId && a.batchId === batchId)
+      );
+      if (alreadyInOther) return s;
+
+      return {
+        productionPacks: s.productionPacks.map((pp) => {
+          if (pp.id !== ppId) return pp;
+          const already = pp.assignments.some((a) => a.projectId === projectId && a.batchId === batchId);
+          if (already) return pp;
+          return { ...pp, assignments: [...pp.assignments, { projectId, batchId }] };
+        }),
+      };
+    });
   },
 
   unassignBatchFromProductionPack: (ppId, projectId, batchId) => {
@@ -310,6 +331,12 @@ export const useProjectStore = create((set, get) => ({
   },
 
   getProductionPackById: (id) => get().productionPacks.find((pp) => pp.id === id) || null,
+
+  // Reverse lookup: which production pack is this batch assigned to?
+  getProductionPackForBatch: (projectId, batchId) =>
+    get().productionPacks.find((pp) =>
+      pp.assignments.some((a) => a.projectId === projectId && a.batchId === batchId)
+    ) || null,
 
   // Helper: get all windows assigned to a production pack
   getProductionPackWindows: (ppId) => {
