@@ -1197,7 +1197,7 @@ export default function App() {
         .switch--on span { transform: translateX(22px); }
         input[type='range'] { width: 100%; accent-color: #00B4A0; }
       `}</style>
-      <main style={{ position: 'relative' }}>
+      <main style={{ position: 'relative', background: 'radial-gradient(ellipse at 55% 40%, #d8d8d8 0%, #b0b0b0 50%, #787878 100%)' }}>
         {/* Floating controls - top left */}
         <div style={{
           position: 'absolute', top: '12px', left: '12px', zIndex: 10,
