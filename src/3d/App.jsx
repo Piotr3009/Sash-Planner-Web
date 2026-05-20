@@ -350,7 +350,7 @@ function ColorPicker({ label, value, onChange, inputId }) {
 
 function WallBackground() {
   const texture = useMemo(() => {
-    const size = 1024;
+    const size = 512; // was 1024 — reduced for GPU memory (4× less)
     const canvas = document.createElement('canvas');
     canvas.width = size; canvas.height = size;
     const ctx = canvas.getContext('2d');
@@ -363,8 +363,8 @@ function WallBackground() {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
 
-    // Tynk — drobny pył, inny niż microcement
-    for (let i = 0; i < 100000; i++) {
+    // Tynk — drobny pył, inny niż microcement (count scaled with area)
+    for (let i = 0; i < 25000; i++) { // was 100000 — proportional to 4× smaller area
       const x = Math.random() * size;
       const y = Math.random() * size;
       const r = Math.random() * 0.6;
@@ -374,8 +374,8 @@ function WallBackground() {
       ctx.fillStyle = `rgba(${v},${v},${v},${Math.random() * 0.06})`;
       ctx.fill();
     }
-    // Poziome smugi tynku (inne niż pionowe smugi microcement)
-    for (let i = 0; i < 60; i++) {
+    // Poziome smugi tynku (count scaled)
+    for (let i = 0; i < 15; i++) { // was 60
       const y = Math.random() * size;
       ctx.strokeStyle = `rgba(160,160,160,${Math.random() * 0.04})`;
       ctx.lineWidth = Math.random() * 1.2;
@@ -399,7 +399,7 @@ function WallBackground() {
 
 function MicrocementFloor() {
   const { colorMap, roughnessMap } = useMemo(() => {
-    const size = 1024;
+    const size = 512; // was 1024 — reduced for GPU memory (4× less)
 
     // Color map — jasny szary z subtelnym grain
     const cCanvas = document.createElement('canvas');
@@ -408,8 +408,8 @@ function MicrocementFloor() {
     cCtx.fillStyle = '#cccccc';
     cCtx.fillRect(0, 0, size, size);
 
-    // Microcement grain — losowe plamki różnej jasności
-    for (let i = 0; i < 120000; i++) {
+    // Microcement grain — count scaled with area
+    for (let i = 0; i < 30000; i++) { // was 120000 — proportional to 4× smaller area
       const x = Math.random() * size;
       const y = Math.random() * size;
       const r = Math.random() * 1.8;
@@ -420,8 +420,8 @@ function MicrocementFloor() {
       cCtx.fillStyle = `rgba(${v},${v},${v},${a})`;
       cCtx.fill();
     }
-    // Subtelne smugi — charakterystyczne dla microcement
-    for (let i = 0; i < 150; i++) {
+    // Subtelne smugi (count scaled)
+    for (let i = 0; i < 38; i++) { // was 150
       const x1 = Math.random() * size;
       const y1 = Math.random() * size;
       const x2 = x1 + (Math.random() - 0.5) * 200;
