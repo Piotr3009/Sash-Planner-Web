@@ -20,7 +20,35 @@ function ProtectedRoute({ children }) {
 
 export default function App() {
   const init = useAuthStore((s) => s.init);
+  const session = useAuthStore((s) => s.session);
   useEffect(() => { init(); }, [init]);
+
+  // Preload heavy 3D modules in background after login.
+  // Without this, first visit to Configurator triggers a 2MB JS chunk parse
+  // + initial render simultaneously, causing GPU memory peak → WebGL Context Lost
+  // on slower machines / fresh browser sessions.
+  // This warms the module cache so when the user clicks "Add Window",
+  // the 3D viewer mounts instantly without a heavy parse step.
+  useEffect(() => {
+    if (!session) return;
+    // Use requestIdleCallback to avoid blocking the main thread
+    const idleHandle = ('requestIdleCallback' in window)
+      ? window.requestIdleCallback(() => {
+          import('./3d/App.jsx').catch(() => {});
+          import('./components/viewer/WindowPreview3D.jsx').catch(() => {});
+        }, { timeout: 3000 })
+      : setTimeout(() => {
+          import('./3d/App.jsx').catch(() => {});
+          import('./components/viewer/WindowPreview3D.jsx').catch(() => {});
+        }, 1500);
+    return () => {
+      if ('cancelIdleCallback' in window && typeof idleHandle === 'number') {
+        window.cancelIdleCallback(idleHandle);
+      } else {
+        clearTimeout(idleHandle);
+      }
+    };
+  }, [session]);
 
   return (
     <Routes>
