@@ -1183,8 +1183,21 @@ export default function App() {
   );
 
   return (
-    <div className="app-shell" style={{ gridTemplateColumns: '1fr' }}>
-      <main className="viewport" style={{ position: 'relative' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr', width: '100%', height: '100%' }}>
+      {/* Scoped styles for 3D overlay controls (replaces removed PSW styles.css) */}
+      <style>{`
+        .control { display: grid; gap: 8px; margin-bottom: 14px; }
+        .control__row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+        .control__row span, .toggle span { color: #A0A8B8; }
+        .control strong { font-weight: 600; color: #F0F2F5; }
+        .toggle { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; }
+        .switch { width: 54px; height: 32px; padding: 3px; border: none; border-radius: 999px; background: rgba(255,255,255,0.14); cursor: pointer; transition: background 180ms ease; }
+        .switch span { display: block; width: 26px; height: 26px; border-radius: 50%; background: white; box-shadow: 0 6px 14px rgba(0,0,0,0.14); transform: translateX(0); transition: transform 180ms ease; }
+        .switch--on { background: rgba(0,180,160,0.48); }
+        .switch--on span { transform: translateX(22px); }
+        input[type='range'] { width: 100%; accent-color: #00B4A0; }
+      `}</style>
+      <main style={{ position: 'relative' }}>
         {/* Floating controls - top left */}
         <div style={{
           position: 'absolute', top: '12px', left: '12px', zIndex: 10,

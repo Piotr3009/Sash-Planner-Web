@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
 import { mockProjects } from '../mocks/mockProjects.js';
-import '../3d/styles.css';
 const Viewer3D = lazy(() => import('../3d/App.jsx'));
 
 const BAR_OPTIONS = [
