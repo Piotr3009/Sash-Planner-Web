@@ -599,8 +599,8 @@ function Scene({ config, isMobile }) {
         position={[4, 6, 5]}
         intensity={1.12 * b}
         castShadow={!isMobile}
-        shadow-mapSize-width={isMobile ? 512 : 2048}
-        shadow-mapSize-height={isMobile ? 512 : 2048}
+        shadow-mapSize-width={isMobile ? 512 : 1024}
+        shadow-mapSize-height={isMobile ? 512 : 1024}
         shadow-bias={-0.0001}
       />
 
