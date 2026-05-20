@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { useProjectStore, BATCH_STATUSES } from '../stores/projectStore.js';
+import { useProjectStore } from '../stores/projectStore.js';
 import { mockProjects } from '../mocks/mockProjects.js';
 
-const TYPE_LABELS = { sash: 'Sash Windows', casement: 'Casement Windows', 'fix-frame': 'Fix Frame' };
+const TYPE_LABELS = { sash: 'Sash Windows', casement: 'Casement Windows', 'fix-frame': 'Fix Frame', doors: 'Doors', special: 'Special' };
 const STATUS_STYLES = {
   'preparation': { cls: 'badge-prep', icon: '📋' },
   'in-production': { cls: 'badge-active', icon: '🔧' },
@@ -18,7 +18,6 @@ export default function ProjectDetailPage() {
   const setCurrentProject = useProjectStore((s) => s.setCurrentProject);
   const createBatch = useProjectStore((s) => s.createBatch);
   const deleteBatch = useProjectStore((s) => s.deleteBatch);
-  const updateBatchStatus = useProjectStore((s) => s.updateBatchStatus);
 
   const [showAddBatch, setShowAddBatch] = useState(false);
 
@@ -54,9 +53,6 @@ export default function ProjectDetailPage() {
         </div>
         <div className="flex gap-3">
           <button onClick={() => setShowAddBatch(true)} className="btn btn-primary">+ Add Batch</button>
-          {batches.length > 1 && (
-            <button onClick={() => alert('Merge — coming soon')} className="btn btn-secondary">Merge Batches</button>
-          )}
         </div>
       </div>
 
@@ -68,16 +64,14 @@ export default function ProjectDetailPage() {
             {[
               { type: 'sash', icon: '🪟', label: 'Sash Windows' },
               { type: 'casement', icon: '🔲', label: 'Casement' },
-              { type: 'fix-frame', icon: '◻️', label: 'Fix Frame' },
+              { type: 'doors', icon: '🚪', label: 'Doors' },
+              { type: 'special', icon: '✦', label: 'Special' },
             ].map(({ type, icon, label }) => (
               <button key={type} onClick={() => handleAddBatch(type)}
                 className="px-5 py-3 bg-surface-600 border border-surface-500 rounded-lg text-sm text-ink-100 hover:border-accent-500 hover:bg-surface-500 transition-all">
                 {icon} {label}
               </button>
             ))}
-            <button disabled className="px-5 py-3 bg-surface-600 border border-surface-500 rounded-lg text-sm text-ink-600 cursor-not-allowed">
-              🚪 Door 🔒
-            </button>
             <button onClick={() => setShowAddBatch(false)} className="px-4 py-3 text-sm text-ink-400 hover:text-ink-200">Cancel</button>
           </div>
         </div>
@@ -112,19 +106,6 @@ export default function ProjectDetailPage() {
                   <div className="text-xs text-ink-400 mt-1">
                     {TYPE_LABELS[batch.type] || batch.type} — {winCount} window{winCount !== 1 ? 's' : ''}
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {winCount > 0 && (
-                    <Link to={`/projects/${projectId}/batches/${batch.id}/production-pack`}
-                      className="px-3 py-1.5 text-xs font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-400 transition-colors">
-                      Production Pack
-                    </Link>
-                  )}
-                  <select value={batch.status}
-                    onChange={(e) => updateBatchStatus(projectId, batch.id, e.target.value)}
-                    className="text-xs px-3 py-1.5 w-36 bg-surface-600 border border-surface-500 text-ink-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-accent-500">
-                    {BATCH_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
                 </div>
               </div>
 

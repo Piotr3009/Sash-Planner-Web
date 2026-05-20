@@ -78,6 +78,9 @@ export default function App() {
       <Route path="/projects/:projectId/batches/:batchId/production-pack" element={
         <ProtectedRoute><Suspense fallback={<PageLoading />}><ProductionPackPage /></Suspense></ProtectedRoute>
       } />
+      <Route path="/production-packs/:ppId" element={
+        <ProtectedRoute><Suspense fallback={<PageLoading />}><ProductionPackPage /></Suspense></ProtectedRoute>
+      } />
 
       {/* Catch-all */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

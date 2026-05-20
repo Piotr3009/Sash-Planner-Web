@@ -380,10 +380,11 @@ export default function DashboardPage() {
                   const statusLabel = pp.status === 'complete' ? 'Complete' : pp.status === 'in-production' ? 'In production' : 'Preparation';
 
                   return (
-                    <div
+                    <Link
                       key={pp.id}
+                      to={`/production-packs/${pp.id}`}
                       data-pp-id={pp.id}
-                      className="card-elevated p-3"
+                      className="card-elevated p-3 block hover:border-accent-500/40 transition-all"
                     >
                       <div className="flex items-center gap-2 mb-1">
                         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: tc.dot }} />
@@ -421,7 +422,7 @@ export default function DashboardPage() {
                           ))}
                         </div>
                       )}
-                    </div>
+                    </Link>
                   );
                 })}
 
