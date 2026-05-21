@@ -14,9 +14,9 @@ const typeColor = (type) => TYPE_COLORS[type] || TYPE_COLORS.sash;
 const typeLabel = (type) => ({ sash: 'Sash', casement: 'Casement', doors: 'Doors', special: 'Special' }[type] || type);
 
 const STATUS_CONFIG = {
-  preparation:     { label: 'Prep',    color: '#F59E0B', next: 'in-production' },
-  'in-production': { label: 'Prod',    color: '#3B82F6', next: 'complete' },
-  complete:        { label: 'Done',    color: '#10B981', next: 'preparation' },
+  preparation:     { label: 'Prep',    color: '#F59E0B' },
+  'in-production': { label: 'Prod',    color: '#3B82F6' },
+  complete:        { label: 'Done',    color: '#10B981' },
 };
 
 // ─── Confirmation modal ───
@@ -205,7 +205,6 @@ export default function DashboardPage() {
   const assignBatch = useProjectStore((s) => s.assignBatchToProductionPack);
   const unassignBatch = useProjectStore((s) => s.unassignBatchFromProductionPack);
   const getPackForBatch = useProjectStore((s) => s.getProductionPackForBatch);
-  const updateBatchStatus = useProjectStore((s) => s.updateBatchStatus);
   const updateProductionPack = useProjectStore((s) => s.updateProductionPack);
   const deleteProject = useProjectStore((s) => s.deleteProject);
   const deleteProductionPack = useProjectStore((s) => s.deleteProductionPack);
@@ -233,7 +232,11 @@ export default function DashboardPage() {
       batches.forEach((batch) => {
         const winCount = batch.windows?.length || 0;
         totalWindows += winCount;
-        if (batch.status === 'complete') completedBatches++;
+        // Completion is determined by Production Pack status, not batch status
+        const assignedPP = productionPacks.find((pp) =>
+          pp.assignments.some((a) => a.projectId === project.id && a.batchId === batch.id)
+        );
+        if (assignedPP?.status === 'complete') completedBatches++;
         const t = batch.type || 'sash';
         summary[t] = (summary[t] || 0) + winCount;
       });
@@ -247,7 +250,7 @@ export default function DashboardPage() {
         allComplete: batches.length > 0 && completedBatches === batches.length,
       };
     });
-  }, [projects]);
+  }, [projects, productionPacks]);
 
   const handleAssign = (batchId, projectId, ppId) => {
     const currentPP = getPackForBatch(projectId, batchId);
@@ -263,13 +266,6 @@ export default function DashboardPage() {
   const handleCreateProject = (name, address, number, client) => {
     createProject(name, address, number, client);
     setShowNewProject(false);
-  };
-
-  const handleCycleBatchStatus = (e, projectId, batchId, currentStatus) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const next = STATUS_CONFIG[currentStatus]?.next || 'preparation';
-    updateBatchStatus(projectId, batchId, next);
   };
 
   const handleDeleteProject = (e, project) => {
@@ -404,13 +400,7 @@ export default function DashboardPage() {
                               <span className="font-medium truncate" style={{ color: tc.text }}>
                                 {typeLabel(batch.type)} ×{winCount}
                               </span>
-                              <span className="ml-auto flex items-center gap-1">
-                                <button
-                                  onClick={(e) => handleCycleBatchStatus(e, project.id, batch.id, batch.status)}
-                                  className="w-3 h-3 rounded-full shrink-0 border border-white/10 hover:scale-125 transition-transform"
-                                  style={{ background: STATUS_CONFIG[batch.status]?.color || '#F59E0B' }}
-                                  title={`Status: ${STATUS_CONFIG[batch.status]?.label || batch.status} — click to cycle`}
-                                />
+                              <span className="ml-auto flex items-center gap-0.5">
                                 <select
                                   className="bg-transparent text-[9px] outline-none cursor-pointer"
                                   style={{ color: assignedPP ? tc.text : '#6B7385', maxWidth: '68px', appearance: 'none', WebkitAppearance: 'none' }}
