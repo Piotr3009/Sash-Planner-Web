@@ -10,7 +10,7 @@
  */
 import { useState, useMemo, useEffect, Suspense } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useProjectStore } from '../stores/projectStore.js';
+import { useProjectStore, BATCH_STATUSES } from '../stores/projectStore.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
 import {
@@ -42,12 +42,20 @@ const TABS = [
   { id: 'bom',          label: 'BOM',             icon: '📦' },
 ];
 
+// ─── Status config ───
+const STATUS_CONFIG = {
+  preparation:    { label: 'Preparation',    color: '#F59E0B' },
+  'in-production': { label: 'In production', color: '#3B82F6' },
+  complete:       { label: 'Complete',       color: '#10B981' },
+};
+
 // ─── Main Component ───
 export default function ProductionPackPage() {
   const { projectId, batchId, ppId } = useParams();
   const projects = useProjectStore((s) => s.projects);
   const productionPacks = useProjectStore((s) => s.productionPacks);
   const settings = useProjectStore((s) => s.settings);
+  const updateProductionPack = useProjectStore((s) => s.updateProductionPack);
   const [tab, setTab] = useState('overview');
 
   // Ensure data loaded
@@ -131,18 +139,18 @@ export default function ProductionPackPage() {
       if (!derived || !windowSpec) return;
       // Cut list
       const cuts = buildCutListForWindow(derived, windowSpec);
-      allCut.push(...cuts.map((r) => ({ ...r, windowName: win.name })));
+      allCut.push(...cuts.map((r) => ({ ...r, windowName: win.name, _projectNumber: win._projectNumber })));
 
       // Precut
       const pre = buildPrecutForWindow(derived, windowSpec, settings);
       pre.sashEngineering.forEach((g) => {
-        g.items.forEach((it) => { it.windowName = win.name; });
+        g.items.forEach((it) => { it.windowName = win.name; it._projectNumber = win._projectNumber; });
         const found = allPrecut.sashEngineering.find((x) => x.section === g.section);
         if (found) found.items.push(...g.items);
         else allPrecut.sashEngineering.push({ section: g.section, items: [...g.items] });
       });
       pre.boxSapele.forEach((g) => {
-        g.items.forEach((it) => { it.windowName = win.name; });
+        g.items.forEach((it) => { it.windowName = win.name; it._projectNumber = win._projectNumber; });
         const found = allPrecut.boxSapele.find((x) => x.preCutWidth === g.preCutWidth);
         if (found) found.items.push(...g.items);
         else allPrecut.boxSapele.push({ preCutWidth: g.preCutWidth, items: [...g.items] });
@@ -150,11 +158,11 @@ export default function ProductionPackPage() {
 
       // Glass
       const glass = buildGlassListForWindow(derived, windowSpec);
-      allGlass.push(...glass.map((g) => ({ ...g, windowName: win.name })));
+      allGlass.push(...glass.map((g) => ({ ...g, windowName: win.name, _projectNumber: win._projectNumber })));
 
       // Hardware
       const hw = buildHardwareList(windowSpec);
-      allHardware.push(...hw.map((h) => ({ ...h, windowName: win.name })));
+      allHardware.push(...hw.map((h) => ({ ...h, windowName: win.name, _projectNumber: win._projectNumber })));
     });
 
     // Optimization
@@ -205,9 +213,27 @@ export default function ProductionPackPage() {
             <h1 className="text-xl font-bold text-ink-50 mt-1">
               {headerTitle}
             </h1>
-            <p className="text-xs text-ink-400 mt-0.5">
-              {headerSub}
-            </p>
+            <div className="flex items-center gap-3 mt-0.5">
+              <p className="text-xs text-ink-400">
+                {headerSub}
+              </p>
+              {isPPMode && (
+                <select
+                  className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border cursor-pointer outline-none"
+                  style={{
+                    background: `${STATUS_CONFIG[pp.status]?.color || '#F59E0B'}20`,
+                    color: STATUS_CONFIG[pp.status]?.color || '#F59E0B',
+                    borderColor: `${STATUS_CONFIG[pp.status]?.color || '#F59E0B'}40`,
+                  }}
+                  value={pp.status}
+                  onChange={(e) => updateProductionPack(pp.id, { status: e.target.value })}
+                >
+                  {BATCH_STATUSES.map((s) => (
+                    <option key={s} value={s}>{STATUS_CONFIG[s]?.label || s}</option>
+                  ))}
+                </select>
+              )}
+            </div>
           </div>
           <div className="flex gap-2">
             <button onClick={() => window.print()} className="btn btn-secondary text-xs">🖨️ Print</button>
@@ -464,7 +490,7 @@ function ElementsTab({ windowsData }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: Glass Schedule
 // ═══════════════════════════════════════════════════════════════
-function GlassTab({ merged, windowsData }) {
+function GlassTab({ merged, windowsData, isPPMode }) {
   if (!merged?.glass?.length) {
     return <div className="card p-8 text-center text-ink-400">No glass data available.</div>;
   }
@@ -482,6 +508,7 @@ function GlassTab({ merged, windowsData }) {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-surface-500 bg-surface-700/50">
+                {isPPMode && <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Projects</th>}
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Width</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Height</th>
                 <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Total Qty</th>
@@ -495,6 +522,7 @@ function GlassTab({ merged, windowsData }) {
             <tbody>
               {grouped.map((g, i) => (
                 <tr key={i} className="border-b border-surface-500/50">
+                  {isPPMode && <td className="px-4 py-2.5 text-accent-400 text-[10px]">{g.projects.join(', ')}</td>}
                   <td className="px-4 py-2.5 text-ink-100 font-mono">{g.width} mm</td>
                   <td className="px-4 py-2.5 text-ink-100 font-mono">{g.height} mm</td>
                   <td className="px-4 py-2.5 text-right text-ink-100 font-semibold">{g.totalQty}</td>
@@ -515,7 +543,7 @@ function GlassTab({ merged, windowsData }) {
         {windowsData.map(({ win, windowSpec, derived }) => (
           <div key={win.id} className="card p-4">
             <div className="text-sm font-semibold text-ink-50 mb-2">
-              {win.name} — Glass Drawing
+              {isPPMode && win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — Glass Drawing
             </div>
             {derived ? (
               <GlassDrawing2D windowSpec={windowSpec} derived={derived} />
@@ -607,7 +635,7 @@ function PreCutTab({ merged, settings }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: Cut List (final, per element, grouped)
 // ═══════════════════════════════════════════════════════════════
-function CutListTab({ merged }) {
+function CutListTab({ merged, isPPMode }) {
   if (!merged?.cutList?.length) {
     return <div className="card p-8 text-center text-ink-400">No cut list data available.</div>;
   }
@@ -623,6 +651,7 @@ function CutListTab({ merged }) {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-surface-500 bg-surface-700/50">
+              {isPPMode && <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Projects</th>}
               <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Element</th>
               <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Section</th>
               <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Length</th>
@@ -634,6 +663,7 @@ function CutListTab({ merged }) {
           <tbody>
             {grouped.map((g, i) => (
               <tr key={i} className="border-b border-surface-500/50">
+                {isPPMode && <td className="px-4 py-2.5 text-accent-400 text-[10px]">{g.projects.join(', ')}</td>}
                 <td className="px-4 py-2.5 text-ink-100 font-medium">{g.element}</td>
                 <td className="px-4 py-2.5 text-ink-300">{g.section}</td>
                 <td className="px-4 py-2.5 text-right text-ink-100 font-mono">{g.length} mm</td>
@@ -655,7 +685,7 @@ function CutListTab({ merged }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: BOM
 // ═══════════════════════════════════════════════════════════════
-function BOMTab({ merged, batch, windowsData }) {
+function BOMTab({ merged, batch, pp, isPPMode, windowsData }) {
   if (!merged) {
     return <div className="card p-8 text-center text-ink-400">No data available.</div>;
   }
@@ -670,7 +700,7 @@ function BOMTab({ merged, batch, windowsData }) {
         <div className="px-4 py-3 border-b border-surface-500">
           <div className="text-sm font-semibold text-ink-50">Timber — Summary</div>
         </div>
-        <TimberSummaryTable cutList={merged.cutList} />
+        <TimberSummaryTable cutList={merged.cutList} isPPMode={isPPMode} />
       </div>
 
       {/* Hardware / Ironmongery */}
@@ -682,6 +712,7 @@ function BOMTab({ merged, batch, windowsData }) {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-surface-500 bg-surface-700/50">
+                {isPPMode && <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Projects</th>}
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Item</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Detail</th>
                 <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Total Qty</th>
@@ -690,6 +721,7 @@ function BOMTab({ merged, batch, windowsData }) {
             <tbody>
               {hardwareGrouped.map((h, i) => (
                 <tr key={i} className="border-b border-surface-500/50">
+                  {isPPMode && <td className="px-4 py-2.5 text-accent-400 text-[10px]">{h.projects.join(', ')}</td>}
                   <td className="px-4 py-2.5 text-ink-100 font-medium">{h.item}</td>
                   <td className="px-4 py-2.5 text-ink-300">{h.detail}</td>
                   <td className="px-4 py-2.5 text-right text-ink-100 font-semibold">{h.totalQty}</td>
@@ -707,7 +739,7 @@ function BOMTab({ merged, batch, windowsData }) {
         </div>
         <div className="p-4 text-xs text-ink-300">
           Total panes: <strong className="text-ink-100">{merged.glass.reduce((s, g) => s + (g.quantity || 1), 0)}</strong> ·
-          Type: <strong className="text-ink-100">{batch?.defaults?.glassType || 'double'}</strong> ·
+          Type: <strong className="text-ink-100">{batch?.defaults?.glassType || pp?.type || 'double'}</strong> ·
           Spacer: <strong className="text-ink-100">{batch?.defaults?.spacerColor || 'black'}</strong>
           <span className="ml-4 text-ink-400">(See Glass Schedule tab for full breakdown)</span>
         </div>
@@ -753,17 +785,18 @@ function PlaceholderTab({ title, desc }) {
 // ═══════════════════════════════════════════════════════════════
 
 /** Grouped element table — groups items by element+length, shows windows list */
-function GroupedElementTable({ items }) {
+function GroupedElementTable({ items, isPPMode }) {
   const grouped = useMemo(() => {
     const map = new Map();
     items.forEach((it) => {
       const key = `${it.elementName}|${it.length}`;
       if (!map.has(key)) {
-        map.set(key, { element: it.elementName, length: it.length, totalQty: 0, windows: [] });
+        map.set(key, { element: it.elementName, length: it.length, totalQty: 0, windows: [], projects: [] });
       }
       const g = map.get(key);
       g.totalQty += it.quantity;
       if (it.windowName && !g.windows.includes(it.windowName)) g.windows.push(it.windowName);
+      if (it._projectNumber && !g.projects.includes(it._projectNumber)) g.projects.push(it._projectNumber);
     });
     return Array.from(map.values()).sort((a, b) => a.element.localeCompare(b.element));
   }, [items]);
@@ -773,6 +806,7 @@ function GroupedElementTable({ items }) {
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b border-surface-500/50 bg-surface-700/30">
+            {isPPMode && <th className="px-4 py-2 text-left text-ink-400 font-medium">Projects</th>}
             <th className="px-4 py-2 text-left text-ink-400 font-medium">Element</th>
             <th className="px-4 py-2 text-right text-ink-400 font-medium">Length</th>
             <th className="px-4 py-2 text-right text-ink-400 font-medium">Total Qty</th>
@@ -782,6 +816,7 @@ function GroupedElementTable({ items }) {
         <tbody>
           {grouped.map((g, i) => (
             <tr key={i} className="border-b border-surface-500/30">
+              {isPPMode && <td className="px-4 py-2 text-accent-400 text-[10px]">{g.projects.join(', ')}</td>}
               <td className="px-4 py-2 text-ink-100">{g.element}</td>
               <td className="px-4 py-2 text-right text-ink-100 font-mono">{g.length} mm</td>
               <td className="px-4 py-2 text-right text-ink-100 font-semibold">{g.totalQty}</td>
@@ -795,17 +830,18 @@ function GroupedElementTable({ items }) {
 }
 
 /** Timber summary — group by material, sum total length */
-function TimberSummaryTable({ cutList }) {
+function TimberSummaryTable({ cutList, isPPMode }) {
   const groups = useMemo(() => {
     const map = new Map();
     cutList.forEach((c) => {
       const key = `${c.material || 'Unknown'}|${c.section || ''}`;
       if (!map.has(key)) {
-        map.set(key, { material: c.material || 'Unknown', section: c.section || '', totalLength: 0, totalPieces: 0 });
+        map.set(key, { material: c.material || 'Unknown', section: c.section || '', totalLength: 0, totalPieces: 0, projects: [] });
       }
       const g = map.get(key);
       g.totalLength += (c.length || 0) * (c.quantity || 1);
       g.totalPieces += c.quantity || 1;
+      if (c._projectNumber && !g.projects.includes(c._projectNumber)) g.projects.push(c._projectNumber);
     });
     return Array.from(map.values());
   }, [cutList]);
@@ -815,6 +851,7 @@ function TimberSummaryTable({ cutList }) {
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b border-surface-500 bg-surface-700/50">
+            {isPPMode && <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Projects</th>}
             <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Material</th>
             <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Section</th>
             <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Total Pieces</th>
@@ -824,6 +861,7 @@ function TimberSummaryTable({ cutList }) {
         <tbody>
           {groups.map((g, i) => (
             <tr key={i} className="border-b border-surface-500/50">
+              {isPPMode && <td className="px-4 py-2.5 text-accent-400 text-[10px]">{g.projects.join(', ')}</td>}
               <td className="px-4 py-2.5 text-ink-100">{g.material}</td>
               <td className="px-4 py-2.5 text-ink-300">{g.section}</td>
               <td className="px-4 py-2.5 text-right text-ink-200">{g.totalPieces}</td>
@@ -890,11 +928,13 @@ function groupCutListItems(cutList) {
         totalQty: 0,
         material: c.material,
         windows: [],
+        projects: [],
       });
     }
     const g = map.get(key);
     g.totalQty += c.quantity || 1;
     if (c.windowName && !g.windows.includes(c.windowName)) g.windows.push(c.windowName);
+    if (c._projectNumber && !g.projects.includes(c._projectNumber)) g.projects.push(c._projectNumber);
   });
   return Array.from(map.values()).sort((a, b) => a.element.localeCompare(b.element) || a.length - b.length);
 }
@@ -909,12 +949,13 @@ function groupGlassItems(glassList) {
         width: g.width, height: g.height,
         type: g.type, spacer: g.spacer, finish: g.finish,
         makeup: g.makeup,
-        totalQty: 0, windows: [],
+        totalQty: 0, windows: [], projects: [],
       });
     }
     const entry = map.get(key);
     entry.totalQty += g.quantity || 1;
     if (g.windowName && !entry.windows.includes(g.windowName)) entry.windows.push(g.windowName);
+    if (g._projectNumber && !entry.projects.includes(g._projectNumber)) entry.projects.push(g._projectNumber);
   });
   return Array.from(map.values()).sort((a, b) => a.width - b.width || a.height - b.height);
 }
@@ -925,9 +966,12 @@ function groupHardwareItems(hwList) {
   hwList.forEach((h) => {
     const key = `${h.item}|${h.detail}`;
     if (!map.has(key)) {
-      map.set(key, { item: h.item, detail: h.detail, totalQty: 0 });
+      map.set(key, { item: h.item, detail: h.detail, totalQty: 0, windows: [], projects: [] });
     }
-    map.get(key).totalQty += h.quantity || 1;
+    const g = map.get(key);
+    g.totalQty += h.quantity || 1;
+    if (h.windowName && !g.windows.includes(h.windowName)) g.windows.push(h.windowName);
+    if (h._projectNumber && !g.projects.includes(h._projectNumber)) g.projects.push(h._projectNumber);
   });
   return Array.from(map.values()).sort((a, b) => a.item.localeCompare(b.item));
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useProjectStore } from '../stores/projectStore.js';
+import { useProjectStore, BATCH_STATUSES } from '../stores/projectStore.js';
 import { mockProjects, mockProductionPacks } from '../mocks/mockProjects.js';
 
 // ─── Type colors ───
@@ -12,6 +12,29 @@ const TYPE_COLORS = {
 };
 const typeColor = (type) => TYPE_COLORS[type] || TYPE_COLORS.sash;
 const typeLabel = (type) => ({ sash: 'Sash', casement: 'Casement', doors: 'Doors', special: 'Special' }[type] || type);
+
+const STATUS_CONFIG = {
+  preparation:     { label: 'Prep',    color: '#F59E0B', next: 'in-production' },
+  'in-production': { label: 'Prod',    color: '#3B82F6', next: 'complete' },
+  complete:        { label: 'Done',    color: '#10B981', next: 'preparation' },
+};
+
+// ─── Confirmation modal ───
+function ConfirmModal({ title, message, onConfirm, onCancel }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onCancel}>
+      <div className="absolute inset-0 bg-black/60" />
+      <div className="relative bg-surface-800 border border-surface-500 rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="text-sm font-semibold text-ink-50 mb-2">{title}</div>
+        <div className="text-xs text-ink-300 mb-4">{message}</div>
+        <div className="flex gap-2 justify-end">
+          <button onClick={onCancel} className="btn btn-secondary text-xs px-4">Cancel</button>
+          <button onClick={onConfirm} className="text-xs px-4 py-1.5 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors">Delete</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const PROJECT_CARD_H = 130;
 const PROJECT_GAP = 12;
@@ -182,10 +205,15 @@ export default function DashboardPage() {
   const assignBatch = useProjectStore((s) => s.assignBatchToProductionPack);
   const unassignBatch = useProjectStore((s) => s.unassignBatchFromProductionPack);
   const getPackForBatch = useProjectStore((s) => s.getProductionPackForBatch);
+  const updateBatchStatus = useProjectStore((s) => s.updateBatchStatus);
+  const updateProductionPack = useProjectStore((s) => s.updateProductionPack);
+  const deleteProject = useProjectStore((s) => s.deleteProject);
+  const deleteProductionPack = useProjectStore((s) => s.deleteProductionPack);
   const containerRef = useRef(null);
 
   const [showNewPP, setShowNewPP] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null); // { title, message, onConfirm }
 
   useEffect(() => {
     if (projects.length === 0) setProjects(mockProjects);
@@ -237,6 +265,41 @@ export default function DashboardPage() {
     setShowNewProject(false);
   };
 
+  const handleCycleBatchStatus = (e, projectId, batchId, currentStatus) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const next = STATUS_CONFIG[currentStatus]?.next || 'preparation';
+    updateBatchStatus(projectId, batchId, next);
+  };
+
+  const handleDeleteProject = (e, project) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const batchCount = project.batches?.length || 0;
+    setConfirmAction({
+      title: `Delete "${project.name}"?`,
+      message: `This will permanently delete the project${batchCount > 0 ? `, all ${batchCount} batches, and their windows` : ''}. Batch assignments in production packs will be removed.`,
+      onConfirm: () => { deleteProject(project.id); setConfirmAction(null); },
+    });
+  };
+
+  const handleDeletePP = (e, pp) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const batchCount = pp.assignments?.length || 0;
+    setConfirmAction({
+      title: `Delete "${pp.name}"?`,
+      message: `This will permanently delete the production pack.${batchCount > 0 ? ` ${batchCount} batch assignments will be unlinked (batches themselves remain in their projects).` : ''}`,
+      onConfirm: () => { deleteProductionPack(pp.id); setConfirmAction(null); },
+    });
+  };
+
+  const handlePPStatusChange = (e, ppId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    updateProductionPack(ppId, { status: e.target.value });
+  };
+
   return (
     <div className="h-screen flex bg-surface-800">
 
@@ -279,17 +342,28 @@ export default function DashboardPage() {
             <div style={{ width: 160 }} className="shrink-0">
               <div style={{ display: 'flex', flexDirection: 'column', gap: PROJECT_GAP }}>
                 {projects.map((project) => (
-                  <Link
+                  <div
                     key={project.id}
-                    to={`/projects/${project.id}`}
-                    className="card p-3 block hover:border-accent-500/40 transition-all overflow-hidden"
+                    className="relative group"
                     style={{ height: PROJECT_CARD_H }}
                   >
-                    <div className="text-xs font-semibold text-ink-50 truncate">{project.name}</div>
-                    <div className="text-[10px] text-ink-400 mt-0.5">{project.project_number}</div>
-                    <div className="text-[10px] text-ink-200 mt-1 truncate">{project.client}</div>
-                    <div className="text-[9px] text-ink-400 mt-1 truncate">{project.address}</div>
-                  </Link>
+                    <Link
+                      to={`/projects/${project.id}`}
+                      className="card p-3 block hover:border-accent-500/40 transition-all overflow-hidden h-full"
+                    >
+                      <div className="text-xs font-semibold text-ink-50 truncate pr-5">{project.name}</div>
+                      <div className="text-[10px] text-ink-400 mt-0.5">{project.project_number}</div>
+                      <div className="text-[10px] text-ink-200 mt-1 truncate">{project.client}</div>
+                      <div className="text-[9px] text-ink-400 mt-1 truncate">{project.address}</div>
+                    </Link>
+                    <button
+                      onClick={(e) => handleDeleteProject(e, project)}
+                      className="absolute top-2 right-2 w-5 h-5 rounded flex items-center justify-center text-[10px] text-ink-400 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
+                      title="Delete project"
+                    >
+                      🗑️
+                    </button>
+                  </div>
                 ))}
               </div>
               <div className="mt-3">
@@ -330,7 +404,13 @@ export default function DashboardPage() {
                               <span className="font-medium truncate" style={{ color: tc.text }}>
                                 {typeLabel(batch.type)} ×{winCount}
                               </span>
-                              <span className="ml-auto flex items-center gap-0.5">
+                              <span className="ml-auto flex items-center gap-1">
+                                <button
+                                  onClick={(e) => handleCycleBatchStatus(e, project.id, batch.id, batch.status)}
+                                  className="w-3 h-3 rounded-full shrink-0 border border-white/10 hover:scale-125 transition-transform"
+                                  style={{ background: STATUS_CONFIG[batch.status]?.color || '#F59E0B' }}
+                                  title={`Status: ${STATUS_CONFIG[batch.status]?.label || batch.status} — click to cycle`}
+                                />
                                 <select
                                   className="bg-transparent text-[9px] outline-none cursor-pointer"
                                   style={{ color: assignedPP ? tc.text : '#6B7385', maxWidth: '68px', appearance: 'none', WebkitAppearance: 'none' }}
@@ -376,53 +456,73 @@ export default function DashboardPage() {
                     }
                   });
 
-                  const statusColor = pp.status === 'complete' ? '#10B981' : pp.status === 'in-production' ? '#3B82F6' : '#F59E0B';
-                  const statusLabel = pp.status === 'complete' ? 'Complete' : pp.status === 'in-production' ? 'In production' : 'Preparation';
+                  const statusColor = STATUS_CONFIG[pp.status]?.color || '#F59E0B';
 
                   return (
-                    <Link
-                      key={pp.id}
-                      to={`/production-packs/${pp.id}`}
-                      data-pp-id={pp.id}
-                      className="card-elevated p-3 block hover:border-accent-500/40 transition-all"
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: tc.dot }} />
-                        <span className="text-xs font-semibold text-ink-50 truncate">{pp.name}</span>
-                      </div>
-
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span
-                          className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full"
-                          style={{ background: `${statusColor}20`, color: statusColor, border: `0.5px solid ${statusColor}40` }}
-                        >
-                          {statusLabel}
-                        </span>
-                        {pp.deadline && (
-                          <span className="text-[9px] text-ink-400">
-                            DL {new Date(pp.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="text-[10px] text-ink-200 mb-1.5">
-                        {totalWindows} window{totalWindows !== 1 ? 's' : ''} · {assignedBatches.length} batch{assignedBatches.length !== 1 ? 'es' : ''}
-                      </div>
-
-                      {projectSummary.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {projectSummary.map((ps, i) => (
-                            <span
-                              key={i}
-                              className="text-[9px] px-1.5 py-0.5 rounded"
-                              style={{ background: tc.bg, color: tc.text }}
-                            >
-                              {ps.name} ×{ps.count}
-                            </span>
-                          ))}
+                    <div key={pp.id} className="relative group">
+                      <Link
+                        to={`/production-packs/${pp.id}`}
+                        data-pp-id={pp.id}
+                        className="card-elevated p-3 block hover:border-accent-500/40 transition-all"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: tc.dot }} />
+                          <span className="text-xs font-semibold text-ink-50 truncate pr-6">{pp.name}</span>
                         </div>
-                      )}
-                    </Link>
+
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <select
+                            className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full cursor-pointer outline-none"
+                            style={{
+                              background: `${statusColor}20`,
+                              color: statusColor,
+                              border: `0.5px solid ${statusColor}40`,
+                              appearance: 'none',
+                              WebkitAppearance: 'none',
+                              paddingRight: '14px',
+                            }}
+                            value={pp.status}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => handlePPStatusChange(e, pp.id)}
+                          >
+                            {BATCH_STATUSES.map((s) => (
+                              <option key={s} value={s}>{STATUS_CONFIG[s]?.label === 'Prep' ? 'Preparation' : STATUS_CONFIG[s]?.label === 'Prod' ? 'In production' : STATUS_CONFIG[s]?.label || s}</option>
+                            ))}
+                          </select>
+                          <span style={{ color: statusColor, fontSize: '7px', marginLeft: '-12px', pointerEvents: 'none' }}>▾</span>
+                          {pp.deadline && (
+                            <span className="text-[9px] text-ink-400">
+                              DL {new Date(pp.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="text-[10px] text-ink-200 mb-1.5">
+                          {totalWindows} window{totalWindows !== 1 ? 's' : ''} · {assignedBatches.length} batch{assignedBatches.length !== 1 ? 'es' : ''}
+                        </div>
+
+                        {projectSummary.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {projectSummary.map((ps, i) => (
+                              <span
+                                key={i}
+                                className="text-[9px] px-1.5 py-0.5 rounded"
+                                style={{ background: tc.bg, color: tc.text }}
+                              >
+                                {ps.name} ×{ps.count}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </Link>
+                      <button
+                        onClick={(e) => handleDeletePP(e, pp)}
+                        className="absolute top-2 right-2 w-5 h-5 rounded flex items-center justify-center text-[10px] text-ink-400 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
+                        title="Delete production pack"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   );
                 })}
 
@@ -500,6 +600,16 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Confirmation modal */}
+      {confirmAction && (
+        <ConfirmModal
+          title={confirmAction.title}
+          message={confirmAction.message}
+          onConfirm={confirmAction.onConfirm}
+          onCancel={() => setConfirmAction(null)}
+        />
+      )}
     </div>
   );
 }
