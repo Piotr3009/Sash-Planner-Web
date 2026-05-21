@@ -180,17 +180,15 @@ export default function ProductionPackPage() {
   const isPPMode = !!pp;
   if (!isPPMode && (!project || !batch)) {
     return (
-      <div className="min-h-screen bg-surface-800 p-8">
-        <Link to="/dashboard" className="text-xs text-ink-400 hover:text-accent-400">← Back to dashboard</Link>
-        <div className="mt-8 text-center text-ink-400">Batch not found.</div>
+      <div className="min-h-full bg-surface-800 p-8">
+        <div className="text-center text-ink-400">Batch not found.</div>
       </div>
     );
   }
   if (ppId && !pp) {
     return (
-      <div className="min-h-screen bg-surface-800 p-8">
-        <Link to="/dashboard" className="text-xs text-ink-400 hover:text-accent-400">← Back to dashboard</Link>
-        <div className="mt-8 text-center text-ink-400">Production pack not found.</div>
+      <div className="min-h-full bg-surface-800 p-8">
+        <div className="text-center text-ink-400">Production pack not found.</div>
       </div>
     );
   }
@@ -201,16 +199,14 @@ export default function ProductionPackPage() {
   const headerSub = isPPMode
     ? `${pp.type} · ${sourceWindows.length} windows · ${pp.assignments?.length || 0} batches · ${pp.status}`
     : `${project.name} · ${batch.windows?.length || 0} windows · ${batch.status}`;
-  const backUrl = '/dashboard';
 
   return (
-    <div className="min-h-screen bg-surface-800">
+    <div className="min-h-full bg-surface-800">
       {/* Header */}
       <header className="border-b border-surface-500 bg-surface-900 px-6 py-4">
         <div className="max-w-[1400px] mx-auto flex items-center justify-between">
           <div>
-            <Link to={backUrl} className="text-xs text-ink-400 hover:text-accent-400 transition-colors">← Back to dashboard</Link>
-            <h1 className="text-xl font-bold text-ink-50 mt-1">
+            <h1 className="text-xl font-bold text-ink-50">
               {headerTitle}
             </h1>
             <div className="flex items-center gap-3 mt-0.5">
