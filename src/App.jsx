@@ -1,6 +1,6 @@
 import { useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import AppLayout from './components/layout/AppLayout.jsx';
+import MainLayout from './components/layout/MainLayout.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import ProjectDetailPage from './pages/ProjectDetailPage.jsx';
@@ -58,29 +58,25 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
 
-      {/* Dashboard — full screen, no sidebar */}
-      <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-
-      {/* Main layout with sidebar */}
-      <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+      {/* All protected routes share the unified sidebar via MainLayout */}
+      <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dashboard" element={<DashboardPage />} />
         <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="projects/:projectId/batches/:batchId/windows/:windowId" element={
           <Suspense fallback={<PageLoading />}><WindowDetailPage /></Suspense>
         } />
+        <Route path="projects/:projectId/batches/:batchId/defaults" element={<BatchDefaultsPage />} />
+        <Route path="projects/:projectId/batches/:batchId/configurator" element={
+          <Suspense fallback={<PageLoading />}><ConfiguratorPage /></Suspense>
+        } />
+        <Route path="projects/:projectId/batches/:batchId/production-pack" element={
+          <Suspense fallback={<PageLoading />}><ProductionPackPage /></Suspense>
+        } />
+        <Route path="production-packs/:ppId" element={
+          <Suspense fallback={<PageLoading />}><ProductionPackPage /></Suspense>
+        } />
       </Route>
-
-      {/* Full-screen pages (outside AppLayout — no sidebar) */}
-      <Route path="/projects/:projectId/batches/:batchId/defaults" element={<ProtectedRoute><BatchDefaultsPage /></ProtectedRoute>} />
-      <Route path="/projects/:projectId/batches/:batchId/configurator" element={
-        <ProtectedRoute><Suspense fallback={<PageLoading />}><ConfiguratorPage /></Suspense></ProtectedRoute>
-      } />
-      <Route path="/projects/:projectId/batches/:batchId/production-pack" element={
-        <ProtectedRoute><Suspense fallback={<PageLoading />}><ProductionPackPage /></Suspense></ProtectedRoute>
-      } />
-      <Route path="/production-packs/:ppId" element={
-        <ProtectedRoute><Suspense fallback={<PageLoading />}><ProductionPackPage /></Suspense></ProtectedRoute>
-      } />
 
       {/* Catch-all */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

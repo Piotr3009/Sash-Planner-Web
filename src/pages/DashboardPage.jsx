@@ -297,18 +297,8 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="h-screen flex bg-surface-800">
-
-      {/* ─── Left placeholder (future menu) ─── */}
-      <div className="w-32 shrink-0 bg-surface-900 border-r border-surface-500">
-        <div className="p-4">
-          <div className="text-xs font-semibold text-accent-500">Sash Planner</div>
-          <div className="text-[9px] text-ink-400 mt-0.5">Production</div>
-        </div>
-      </div>
-
-      {/* ─── Main content ─── */}
-      <div className="flex-1 overflow-auto p-6">
+    <>
+      <div className="p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div>
@@ -600,6 +590,6 @@ export default function DashboardPage() {
           onCancel={() => setConfirmAction(null)}
         />
       )}
-    </div>
+    </>
   );
 }
