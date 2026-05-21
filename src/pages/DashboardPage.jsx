@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useProjectStore, BATCH_STATUSES } from '../stores/projectStore.js';
 import { mockProjects, mockProductionPacks } from '../mocks/mockProjects.js';
 
@@ -11,7 +11,7 @@ const TYPE_COLORS = {
   special:  { bg: 'rgba(29,158,117,0.12)',  border: 'rgba(29,158,117,0.3)',  text: '#5DCAA5', line: '#1D9E75', dot: '#1D9E75' },
 };
 const typeColor = (type) => TYPE_COLORS[type] || TYPE_COLORS.sash;
-const typeLabel = (type) => ({ sash: 'Sash', casement: 'Casement', doors: 'Doors', special: 'Special' }[type] || type);
+const typeLabel = (type) => ({ sash: 'Sash', casement: 'Casement', doors: 'Doors', special: 'Special / Other' }[type] || type);
 
 const STATUS_CONFIG = {
   preparation:     { label: 'Prep',    color: '#F59E0B' },
@@ -149,7 +149,7 @@ function NewPPForm({ onCreate, onCancel }) {
           <option value="sash">Sash</option>
           <option value="casement">Casement</option>
           <option value="doors">Doors</option>
-          <option value="special">Special</option>
+          <option value="special">Special / Other</option>
         </select>
         <input type="date" className="input text-xs flex-1" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
       </div>
@@ -196,6 +196,7 @@ function NewProjectForm({ onCreate, onCancel }) {
 
 // ─── Main ───
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const projects = useProjectStore((s) => s.projects);
   const productionPacks = useProjectStore((s) => s.productionPacks);
   const setProjects = useProjectStore((s) => s.setProjects);
@@ -440,10 +441,10 @@ export default function DashboardPage() {
 
                   return (
                     <div key={pp.id} className="relative group">
-                      <Link
-                        to={`/production-packs/${pp.id}`}
+                      <div
                         data-pp-id={pp.id}
-                        className="card-elevated p-3 block hover:border-accent-500/40 transition-all"
+                        className="card-elevated p-3 block hover:border-accent-500/40 transition-all cursor-pointer"
+                        onClick={() => navigate(`/production-packs/${pp.id}`)}
                       >
                         <div className="flex items-center gap-2 mb-1">
                           <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: tc.dot }} />
@@ -463,7 +464,7 @@ export default function DashboardPage() {
                             }}
                             value={pp.status}
                             onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => handlePPStatusChange(e, pp.id)}
+                            onChange={(e) => { e.stopPropagation(); handlePPStatusChange(e, pp.id); }}
                           >
                             {BATCH_STATUSES.map((s) => (
                               <option key={s} value={s}>{STATUS_CONFIG[s]?.label === 'Prep' ? 'Preparation' : STATUS_CONFIG[s]?.label === 'Prod' ? 'In production' : STATUS_CONFIG[s]?.label || s}</option>
@@ -494,7 +495,7 @@ export default function DashboardPage() {
                             ))}
                           </div>
                         )}
-                      </Link>
+                      </div>
                       <button
                         onClick={(e) => handleDeletePP(e, pp)}
                         className="absolute top-2 right-2 w-5 h-5 rounded flex items-center justify-center text-[10px] text-ink-400 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"

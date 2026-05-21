@@ -194,7 +194,7 @@ export default function ProductionPackPage() {
   }
 
   const headerTitle = isPPMode
-    ? pp.name
+    ? `Production Pack — ${pp.name}`
     : `Production Pack — ${batch.label}`;
   const headerSub = isPPMode
     ? `${pp.type} · ${sourceWindows.length} windows · ${pp.assignments?.length || 0} batches · ${pp.status}`

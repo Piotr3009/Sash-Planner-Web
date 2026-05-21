@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
 import { mockProjects } from '../mocks/mockProjects.js';
 
-const TYPE_LABELS = { sash: 'Sash Windows', casement: 'Casement Windows', 'fix-frame': 'Fix Frame', doors: 'Doors', special: 'Special' };
+const TYPE_LABELS = { sash: 'Sash Windows', casement: 'Casement Windows', 'fix-frame': 'Fix Frame', doors: 'Doors', special: 'Special / Other' };
 const STATUS_STYLES = {
   'preparation': { cls: 'badge-prep', icon: '📋' },
   'in-production': { cls: 'badge-active', icon: '🔧' },
@@ -65,7 +65,7 @@ export default function ProjectDetailPage() {
               { type: 'sash', icon: '🪟', label: 'Sash Windows' },
               { type: 'casement', icon: '🔲', label: 'Casement' },
               { type: 'doors', icon: '🚪', label: 'Doors' },
-              { type: 'special', icon: '✦', label: 'Special' },
+              { type: 'special', icon: '✦', label: 'Special / Other' },
             ].map(({ type, icon, label }) => (
               <button key={type} onClick={() => handleAddBatch(type)}
                 className="px-5 py-3 bg-surface-600 border border-surface-500 rounded-lg text-sm text-ink-100 hover:border-accent-500 hover:bg-surface-500 transition-all">
