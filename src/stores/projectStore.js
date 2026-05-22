@@ -583,12 +583,12 @@ export const useProjectStore = create(
         projectsLoaded: state.projectsLoaded,
       }),
       merge: (persisted, current) => {
-        if (!persisted || !persisted.projectsLoaded) {
-          // First visit — no saved data, use mocks
+        if (!persisted || !persisted.projects) {
+          // First visit — no saved data at all, use mocks
           return { ...current, projects: mockProjects, productionPacks: mockProductionPacks, projectsLoaded: true };
         }
-        // Subsequent visits — restore saved data
-        return { ...current, ...persisted };
+        // Saved data exists — always restore it
+        return { ...current, ...persisted, projectsLoaded: true };
       },
     }
   )

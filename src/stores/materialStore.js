@@ -136,10 +136,10 @@ export const useMaterialStore = create(
     {
       name: 'sp-materials',
       merge: (persisted, current) => {
-        if (!persisted || !persisted.materialsLoaded) {
+        if (!persisted || !persisted.materials) {
           return { ...current, materials: mockMaterials, materialsLoaded: true };
         }
-        return { ...current, ...persisted };
+        return { ...current, ...persisted, materialsLoaded: true };
       },
     }
   )
