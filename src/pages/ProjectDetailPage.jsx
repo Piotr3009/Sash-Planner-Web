@@ -122,6 +122,86 @@ export default function ProjectDetailPage() {
     if (window.confirm('Delete this batch and all its windows?')) deleteBatch(projectId, batchId);
   };
 
+  // ─── Export to PDF (print-friendly window) ───
+  const handleExportPDF = () => {
+    const totalWindows = batches.reduce((s, b) => s + (b.windows?.length || 0), 0);
+    const rows = projectMaterials.flatMap(({ material, parts, totalMeters }) =>
+      parts.map((p) => `
+        <tr>
+          <td style="padding:6px 8px;border-bottom:1px solid #ddd;">${material.item_number}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #ddd;">${material.name}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #ddd;">${p.name}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:center;">${p.section}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:center;">${p.pcsTotal}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:center;">${p.yield}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right;font-weight:bold;">${p.totalMeters.toFixed(2)} m</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right;">${material.cost_per_unit > 0 ? '£' + (p.totalMeters * material.cost_per_unit).toFixed(2) : '—'}</td>
+        </tr>
+      `)
+    ).join('');
+
+    const totalCost = projectMaterials.reduce((sum, { material, totalMeters }) =>
+      sum + (material.cost_per_unit > 0 ? totalMeters * material.cost_per_unit : 0), 0);
+
+    const html = `<!DOCTYPE html><html><head><title>Materials — ${currentProject.name}</title>
+      <style>body{font-family:Arial,sans-serif;padding:30px;color:#222;}
+      h1{font-size:18px;margin:0 0 4px;}h2{font-size:13px;color:#666;margin:0 0 20px;font-weight:normal;}
+      table{width:100%;border-collapse:collapse;font-size:12px;}
+      th{background:#f5f5f5;padding:8px;text-align:left;border-bottom:2px solid #ccc;font-size:11px;text-transform:uppercase;color:#555;}
+      .footer{margin-top:20px;font-size:11px;color:#888;}
+      .total{margin-top:10px;text-align:right;font-size:14px;font-weight:bold;}</style></head>
+      <body>
+      <h1>Project Materials — ${currentProject.name}</h1>
+      <h2>${currentProject.project_number} · ${batches.length} batches · ${totalWindows} windows</h2>
+      <table><thead><tr>
+        <th>Item #</th><th>Material</th><th>Part</th><th style="text-align:center;">Section</th>
+        <th style="text-align:center;">Pcs</th><th style="text-align:center;">Yield</th>
+        <th style="text-align:right;">Meters</th><th style="text-align:right;">Est. Cost</th>
+      </tr></thead><tbody>${rows}</tbody></table>
+      <div class="total">Estimated Total: £${totalCost.toFixed(2)}</div>
+      <div class="footer">Generated ${new Date().toLocaleDateString('en-GB')} · Cut list lengths · Yield applied</div>
+      <script>window.onload=()=>window.print()</script></body></html>`;
+
+    const w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+  };
+
+  // ─── Export CSV for Joinery Core ───
+  const handleExportJC = () => {
+    const rows = [];
+    projectMaterials.forEach(({ material, parts, totalMeters }) => {
+      if (!material.jc_uuid) return; // skip non-JC materials
+      rows.push({
+        jc_uuid: material.jc_uuid,
+        item_number: material.item_number,
+        name: material.name,
+        quantity_needed: Number(totalMeters.toFixed(3)),
+        unit: material.unit || 'm',
+      });
+    });
+
+    if (rows.length === 0) {
+      alert('No JC-linked materials to export. Import materials from Joinery Core first.');
+      return;
+    }
+
+    const headers = ['jc_uuid', 'item_number', 'name', 'quantity_needed', 'unit'];
+    const csv = [
+      headers.join(','),
+      ...rows.map((r) => headers.map((h) => `"${String(r[h] || '').replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const projNum = (currentProject.project_number || 'project').replace(/\//g, '-');
+    a.download = `sp-materials-${projNum}-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="p-8 max-w-6xl mx-auto">
       <Link to="/dashboard" className="text-xs text-ink-400 hover:text-accent-400 transition-colors">← All Projects</Link>
@@ -320,7 +400,19 @@ export default function ProjectDetailPage() {
               <div className="text-[10px] text-ink-400">
                 {projectMaterials.length} material{projectMaterials.length !== 1 ? 's' : ''} · Cut list lengths · Yield applied
               </div>
-              <button onClick={() => setShowMaterials(false)} className="btn btn-secondary text-xs">Close</button>
+              <div className="flex gap-2">
+                {projectMaterials.length > 0 && (
+                  <>
+                    <button onClick={handleExportPDF} className="btn btn-secondary text-xs">
+                      📄 Export PDF
+                    </button>
+                    <button onClick={handleExportJC} className="btn btn-secondary text-xs">
+                      ↑ Export to JC
+                    </button>
+                  </>
+                )}
+                <button onClick={() => setShowMaterials(false)} className="btn btn-secondary text-xs">Close</button>
+              </div>
             </div>
           </div>
         </div>
