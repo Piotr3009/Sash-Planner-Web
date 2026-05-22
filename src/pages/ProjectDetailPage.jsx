@@ -33,16 +33,13 @@ export default function ProjectDetailPage() {
     if (found) setCurrentProject(found);
   }, [projectId, projects.length]);
 
-  if (!currentProject) return <div className="p-8 text-sm text-ink-400">Project not found.</div>;
-
-  const batches = currentProject.batches || [];
+  const batches = currentProject?.batches || [];
 
   // ─── Project Materials Aggregation ───
   const projectMaterials = useMemo(() => {
     const totalWindows = batches.reduce((sum, b) => sum + (b.windows?.length || 0), 0);
     if (totalWindows === 0) return [];
 
-    // Group by material_id
     const matMap = {};
     ALL_PARTS.forEach((part) => {
       const assignment = assignments[part.id];
@@ -66,6 +63,8 @@ export default function ProjectDetailPage() {
 
     return Object.values(matMap);
   }, [batches, assignments, materials]);
+
+  if (!currentProject) return <div className="p-8 text-sm text-ink-400">Project not found.</div>;
 
   const handleAddBatch = (type) => {
     const batch = createBatch(projectId, type);
