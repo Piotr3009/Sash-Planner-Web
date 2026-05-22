@@ -35,12 +35,33 @@ export const useMaterialAssignmentStore = create(
       // assignments: { [part_id]: { material_id, yield } }
       assignments: {},
 
-      // Set assignment for a part
-      setAssignment: (partId, materialId, yieldCoeff = 1.0) => {
+      // Set assignment for a part (includes category/subcategory filter)
+      setAssignment: (partId, materialId, yieldCoeff = 1.0, category = '', subcategory = '') => {
         set((s) => ({
           assignments: {
             ...s.assignments,
-            [partId]: { material_id: materialId, yield: yieldCoeff },
+            [partId]: {
+              material_id: materialId,
+              yield: yieldCoeff,
+              category: category || s.assignments[partId]?.category || '',
+              subcategory: subcategory || s.assignments[partId]?.subcategory || '',
+            },
+          },
+        }));
+      },
+
+      // Update filter (category/subcategory) for a part
+      setFilter: (partId, category, subcategory = '') => {
+        set((s) => ({
+          assignments: {
+            ...s.assignments,
+            [partId]: {
+              ...s.assignments[partId],
+              material_id: s.assignments[partId]?.material_id || '',
+              yield: s.assignments[partId]?.yield ?? 1.0,
+              category,
+              subcategory,
+            },
           },
         }));
       },
