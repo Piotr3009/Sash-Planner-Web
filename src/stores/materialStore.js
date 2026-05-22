@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { mockMaterials } from '../mocks/mockMaterials.js';
 
 const uid = () => `mat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -22,7 +23,9 @@ export const MATERIAL_CATEGORIES = [
 
 export const MATERIAL_UNITS = ['pcs', 'm', 'kg', 'set', 'unit', 'litre', 'pair'];
 
-export const useMaterialStore = create((set, get) => ({
+export const useMaterialStore = create(
+  persist(
+    (set, get) => ({
   materials: [],
   materialsLoaded: false,
 
@@ -126,4 +129,9 @@ export const useMaterialStore = create((set, get) => ({
     }
     return imported.length;
   },
-}));
+}),
+    {
+      name: 'sp-materials',
+    }
+  )
+);
