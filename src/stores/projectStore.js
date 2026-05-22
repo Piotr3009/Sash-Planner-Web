@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 // ─── Production settings (preserved from original — used by calculations engine) ───
 const defaultSettings = {
@@ -93,7 +94,9 @@ const uid = () => `id-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 export { BATCH_DEFAULTS, BATCH_STATUSES };
 
-export const useProjectStore = create((set, get) => ({
+export const useProjectStore = create(
+  persist(
+    (set, get) => ({
 
   // ─── State ───
   projects: [],
@@ -568,4 +571,14 @@ export const useProjectStore = create((set, get) => ({
   setEstimatesError: (e) => set({ projectsError: e }),
   setCurrentEstimate: (est, items) => set({ currentProject: est, currentWindows: items || [] }),
 
-}));
+}),
+    {
+      name: 'sp-projects',
+      partialize: (state) => ({
+        projects: state.projects,
+        productionPacks: state.productionPacks,
+        settings: state.settings,
+      }),
+    }
+  )
+);
