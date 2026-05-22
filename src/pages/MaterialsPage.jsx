@@ -213,7 +213,9 @@ export default function MaterialsPage() {
       const file = e.target.files[0];
       if (!file) return;
       try {
-        const text = await file.text();
+        let text = await file.text();
+        // Strip UTF-8 BOM if present
+        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
         let data;
         if (file.name.endsWith('.json')) {
           data = JSON.parse(text);
@@ -230,8 +232,8 @@ export default function MaterialsPage() {
           });
         }
         if (Array.isArray(data) && data.length > 0) {
-          const count = useMaterialStore.getState().importFromCSV(data);
-          alert(`Imported ${count} new materials. Existing items updated by JC UUID.`);
+          const result = useMaterialStore.getState().importFromCSV(data);
+          alert(`Import complete: ${result.added} added, ${result.updated} updated.`);
         }
       } catch (err) {
         alert('Error importing file: ' + err.message);

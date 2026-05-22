@@ -96,30 +96,39 @@ export const useMaterialStore = create(
     // csvData = array of objects with JC fields
     const existing = get().materials;
     const imported = [];
+    let updated = 0;
+
+    // Normalize a row from CSV strings to proper types
+    const normalize = (row) => ({
+      name: row.name || '',
+      category: row.category || 'consumables',
+      subcategory: row.subcategory || '',
+      size: row.size || '',
+      thickness: row.thickness || '',
+      color: row.color || '',
+      unit: row.unit || 'pcs',
+      cost_per_unit: parseFloat(row.cost_per_unit) || 0,
+      image_url: row.image_url || '',
+      jc_uuid: row.jc_uuid || '',
+      project_types: row.project_types || '',
+      notes: row.notes || '',
+    });
+
     csvData.forEach((row) => {
-      // Check if already exists by jc_uuid
+      // Check if already exists by jc_uuid (upsert)
       if (row.jc_uuid && existing.some((m) => m.jc_uuid === row.jc_uuid)) {
-        // Update existing
+        // Update existing — keep local id & item_number, update rest from JC
         set((s) => ({
           materials: s.materials.map((m) =>
-            m.jc_uuid === row.jc_uuid ? { ...m, ...row } : m
+            m.jc_uuid === row.jc_uuid ? { ...m, ...normalize(row) } : m
           ),
         }));
+        updated++;
       } else {
         imported.push({
           id: uid(),
-          item_number: nextItemNumber([...existing, ...imported]),
-          name: row.name || '',
-          category: row.category || 'consumables',
-          subcategory: row.subcategory || '',
-          size: row.size || '',
-          thickness: row.thickness || '',
-          color: row.color || '',
-          unit: row.unit || 'pcs',
-          cost_per_unit: parseFloat(row.cost_per_unit) || 0,
-          image_url: row.image_url || '',
-          jc_uuid: row.jc_uuid || '',
-          notes: row.notes || '',
+          item_number: row.item_number || nextItemNumber([...existing, ...imported]),
+          ...normalize(row),
           created_at: new Date().toISOString(),
         });
       }
@@ -127,7 +136,7 @@ export const useMaterialStore = create(
     if (imported.length > 0) {
       set((s) => ({ materials: [...s.materials, ...imported] }));
     }
-    return imported.length;
+    return { added: imported.length, updated };
   },
 }),
     {
