@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
+import { useMaterialStore } from '../stores/materialStore.js';
+import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignmentStore.js';
 
 
 const TYPE_LABELS = { sash: 'Sash Windows', casement: 'Casement Windows', 'fix-frame': 'Fix Frame', doors: 'Doors', special: 'Special / Other' };
@@ -20,6 +22,10 @@ export default function ProjectDetailPage() {
   const deleteBatch = useProjectStore((s) => s.deleteBatch);
 
   const [showAddBatch, setShowAddBatch] = useState(false);
+  const [showMaterials, setShowMaterials] = useState(false);
+
+  const materials = useMaterialStore((s) => s.materials);
+  const assignments = useMaterialAssignmentStore((s) => s.assignments);
 
   useEffect(() => {
     const allProjects = useProjectStore.getState().projects;
@@ -30,6 +36,36 @@ export default function ProjectDetailPage() {
   if (!currentProject) return <div className="p-8 text-sm text-ink-400">Project not found.</div>;
 
   const batches = currentProject.batches || [];
+
+  // ─── Project Materials Aggregation ───
+  const projectMaterials = useMemo(() => {
+    const totalWindows = batches.reduce((sum, b) => sum + (b.windows?.length || 0), 0);
+    if (totalWindows === 0) return [];
+
+    // Group by material_id
+    const matMap = {};
+    ALL_PARTS.forEach((part) => {
+      const assignment = assignments[part.id];
+      if (!assignment?.material_id) return;
+
+      const matId = assignment.material_id;
+      const mat = materials.find((m) => m.id === matId);
+      if (!mat) return;
+
+      if (!matMap[matId]) {
+        matMap[matId] = {
+          material: mat,
+          parts: [],
+          totalPcs: 0,
+        };
+      }
+      const pcsTotal = part.pcs * totalWindows;
+      matMap[matId].parts.push({ ...part, pcsTotal, yield: assignment.yield || 1.0 });
+      matMap[matId].totalPcs += pcsTotal;
+    });
+
+    return Object.values(matMap);
+  }, [batches, assignments, materials]);
 
   const handleAddBatch = (type) => {
     const batch = createBatch(projectId, type);
@@ -51,6 +87,9 @@ export default function ProjectDetailPage() {
           {currentProject.address && <p className="text-sm text-ink-400 mt-1">{currentProject.address}</p>}
         </div>
         <div className="flex gap-3">
+          <button onClick={() => setShowMaterials(true)} className="btn btn-secondary text-sm">
+            📋 See Project Materials
+          </button>
           <button onClick={() => setShowAddBatch(true)} className="btn btn-primary">+ Add Batch</button>
         </div>
       </div>
@@ -150,6 +189,97 @@ export default function ProjectDetailPage() {
           );
         })}
       </div>
+
+      {/* Project Materials Modal */}
+      {showMaterials && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setShowMaterials(false)}>
+          <div className="absolute inset-0 bg-black/60" />
+          <div className="relative bg-surface-800 border border-surface-500 rounded-xl w-full max-w-3xl mx-4 shadow-xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-surface-500 flex items-center justify-between shrink-0">
+              <div>
+                <h2 className="text-sm font-semibold text-ink-50">Project Materials — {currentProject.name}</h2>
+                <p className="text-[10px] text-ink-400 mt-0.5">
+                  {batches.length} batch{batches.length !== 1 ? 'es' : ''} · {batches.reduce((s, b) => s + (b.windows?.length || 0), 0)} windows
+                </p>
+              </div>
+              <button onClick={() => setShowMaterials(false)} className="w-7 h-7 rounded-full bg-surface-600 text-ink-400 hover:text-ink-200 flex items-center justify-center text-sm">×</button>
+            </div>
+
+            {/* Content */}
+            <div className="overflow-auto flex-1 p-5">
+              {projectMaterials.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-3xl mb-3">📋</div>
+                  <div className="text-sm text-ink-300 mb-1">No materials assigned yet.</div>
+                  <p className="text-[10px] text-ink-400">Go to Materials → Assignments to assign timber to window parts.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {projectMaterials.map(({ material, parts, totalPcs }) => (
+                    <div key={material.id} className="card p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          {material.image_url ? (
+                            <img src={material.image_url} alt="" className="w-10 h-10 rounded object-cover border border-surface-500" />
+                          ) : (
+                            <div className="w-10 h-10 rounded bg-surface-600 border border-surface-500 grid place-items-center text-ink-500 text-xs">—</div>
+                          )}
+                          <div>
+                            <div className="text-sm font-semibold text-ink-50">{material.name}</div>
+                            <div className="text-[10px] text-ink-400 flex items-center gap-2">
+                              <span>{material.item_number}</span>
+                              <span>{material.size || '—'}</span>
+                              {material.cost_per_unit > 0 && <span>£{Number(material.cost_per_unit).toFixed(2)}/{material.unit}</span>}
+                              {material.jc_uuid && <span className="text-[8px] px-1 py-0.5 rounded bg-green-500/15 text-green-400 border border-green-500/25">JC</span>}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-semibold text-ink-100">{totalPcs} pcs</div>
+                          <div className="text-[10px] text-ink-400">across all windows</div>
+                        </div>
+                      </div>
+
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-surface-500/50">
+                            <th className="py-1.5 text-left text-ink-400 font-medium">Part</th>
+                            <th className="py-1.5 text-center text-ink-400 font-medium">Section</th>
+                            <th className="py-1.5 text-center text-ink-400 font-medium">Pcs/Win</th>
+                            <th className="py-1.5 text-center text-ink-400 font-medium">Total Pcs</th>
+                            <th className="py-1.5 text-center text-ink-400 font-medium">Yield</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {parts.map((p) => (
+                            <tr key={p.id} className="border-b border-surface-500/30">
+                              <td className="py-1.5 text-ink-200">{p.name}</td>
+                              <td className="py-1.5 text-center text-ink-300 font-mono">{p.section}</td>
+                              <td className="py-1.5 text-center text-ink-300">{p.pcs}</td>
+                              <td className="py-1.5 text-center text-ink-100 font-medium">{p.pcsTotal}</td>
+                              <td className="py-1.5 text-center text-ink-300">{p.yield}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-surface-500 flex justify-between items-center shrink-0">
+              <div className="text-[10px] text-ink-400">
+                {projectMaterials.length} material{projectMaterials.length !== 1 ? 's' : ''} assigned · Quantities are per-window totals (cutting lengths calculated in BOM)
+              </div>
+              <button onClick={() => setShowMaterials(false)} className="btn btn-secondary text-xs">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
