@@ -27,7 +27,6 @@ export default function WindowDetailPage() {
   const setCurrentBatch = useProjectStore((s) => s.setCurrentBatch);
 
   useEffect(() => {
-    if (projects.length === 0) useProjectStore.getState().loadProjects();
     const allProjects = useProjectStore.getState().projects;
     const project = allProjects.find(p => p.id === projectId);
     if (project) {

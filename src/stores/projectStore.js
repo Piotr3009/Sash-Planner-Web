@@ -116,12 +116,6 @@ export const useProjectStore = create(
   selectedWindowId: null,
   settings: { ...defaultSettings },
 
-  // ─── Init (load mocks only once, then persist takes over) ───
-  loadProjects: () => {
-    if (get().projectsLoaded) return;
-    set({ projects: mockProjects, productionPacks: mockProductionPacks, projectsLoaded: true });
-  },
-
   // ─── Setters ───
   setProjects: (projects) => set({ projects }),
   setProductionPacks: (packs) => set({ productionPacks: packs }),
@@ -588,6 +582,14 @@ export const useProjectStore = create(
         settings: state.settings,
         projectsLoaded: state.projectsLoaded,
       }),
+      merge: (persisted, current) => {
+        if (!persisted || !persisted.projectsLoaded) {
+          // First visit — no saved data, use mocks
+          return { ...current, projects: mockProjects, productionPacks: mockProductionPacks, projectsLoaded: true };
+        }
+        // Subsequent visits — restore saved data
+        return { ...current, ...persisted };
+      },
     }
   )
 );

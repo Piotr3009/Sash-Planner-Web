@@ -22,7 +22,6 @@ export default function ProjectDetailPage() {
   const [showAddBatch, setShowAddBatch] = useState(false);
 
   useEffect(() => {
-    if (projects.length === 0) useProjectStore.getState().loadProjects();
     const allProjects = useProjectStore.getState().projects;
     const found = allProjects.find((p) => p.id === projectId);
     if (found) setCurrentProject(found);

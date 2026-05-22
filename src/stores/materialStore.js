@@ -29,12 +29,6 @@ export const useMaterialStore = create(
   materials: [],
   materialsLoaded: false,
 
-  // ─── Init ───
-  loadMaterials: () => {
-    if (get().materialsLoaded) return;
-    set({ materials: mockMaterials, materialsLoaded: true });
-  },
-
   setMaterials: (materials) => set({ materials, materialsLoaded: true }),
 
   // ─── CRUD ───
@@ -141,6 +135,12 @@ export const useMaterialStore = create(
 }),
     {
       name: 'sp-materials',
+      merge: (persisted, current) => {
+        if (!persisted || !persisted.materialsLoaded) {
+          return { ...current, materials: mockMaterials, materialsLoaded: true };
+        }
+        return { ...current, ...persisted };
+      },
     }
   )
 );

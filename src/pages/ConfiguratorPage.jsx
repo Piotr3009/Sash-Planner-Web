@@ -28,10 +28,6 @@ export default function ConfiguratorPage() {
   const addWindow = useProjectStore((s) => s.addWindowToBatch);
   const updateWindow = useProjectStore((s) => s.updateWindowInBatch);
 
-  useEffect(() => {
-    if (projects.length === 0) useProjectStore.getState().loadProjects();
-  }, []);
-
   const project = useProjectStore((s) => s.projects.find(p => p.id === projectId));
   const batch = project?.batches?.find(b => b.id === batchId);
   const def = batch?.defaults || {};

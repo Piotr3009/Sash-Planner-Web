@@ -198,7 +198,6 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const projects = useProjectStore((s) => s.projects);
   const productionPacks = useProjectStore((s) => s.productionPacks);
-  const loadProjects = useProjectStore((s) => s.loadProjects);
   const createProject = useProjectStore((s) => s.createProject);
   const createProductionPack = useProjectStore((s) => s.createProductionPack);
   const assignBatch = useProjectStore((s) => s.assignBatchToProductionPack);
@@ -212,10 +211,6 @@ export default function DashboardPage() {
   const [showNewPP, setShowNewPP] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null); // { title, message, onConfirm }
-
-  useEffect(() => {
-    loadProjects();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Total height of projects column (for PP centering)
   const projectsBlockHeight = projects.length * PROJECT_CARD_H + Math.max(0, projects.length - 1) * PROJECT_GAP;

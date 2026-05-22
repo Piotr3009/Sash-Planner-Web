@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { useMaterialStore, MATERIAL_UNITS } from '../stores/materialStore.js';
 
 // ─── Dynamic category colors (consistent hash-based) ───
@@ -187,7 +187,6 @@ function MaterialFormModal({ material, existingCategories, existingSubcategories
 // ─── Main ───
 export default function MaterialsPage() {
   const materials = useMaterialStore((s) => s.materials);
-  const loadMaterials = useMaterialStore((s) => s.loadMaterials);
   const addMaterial = useMaterialStore((s) => s.addMaterial);
   const updateMaterial = useMaterialStore((s) => s.updateMaterial);
   const deleteMaterial = useMaterialStore((s) => s.deleteMaterial);
@@ -198,10 +197,6 @@ export default function MaterialsPage() {
   const [confirmDelete, setConfirmDelete] = useState(null); // null | 'bulk' | material
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [selected, setSelected] = useState(new Set());
-
-  useEffect(() => {
-    loadMaterials();
-  }, [loadMaterials]);
 
   // ─── Dynamic categories from data ───
   const categories = useMemo(() => {

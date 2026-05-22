@@ -37,10 +37,6 @@ export default function BatchDefaultsPage() {
   const updateBatchDefaults = useProjectStore((s) => s.updateBatchDefaults);
   const setCurrentProject = useProjectStore((s) => s.setCurrentProject);
 
-  useEffect(() => {
-    if (projects.length === 0) useProjectStore.getState().loadProjects();
-  }, []);
-
   const project = useProjectStore((s) => s.projects.find(p => p.id === projectId));
   const batch = project?.batches?.find(b => b.id === batchId);
   const [d, setD] = useState(batch?.defaults || BATCH_DEFAULTS[batch?.type] || BATCH_DEFAULTS.sash);

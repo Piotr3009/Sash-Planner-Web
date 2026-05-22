@@ -58,11 +58,6 @@ export default function ProductionPackPage() {
   const updateProductionPack = useProjectStore((s) => s.updateProductionPack);
   const [tab, setTab] = useState('overview');
 
-  // Ensure data loaded
-  useEffect(() => {
-    useProjectStore.getState().loadProjects();
-  }, [projects.length, productionPacks.length]);
-
   // PP mode: cross-project merged windows
   const pp = useMemo(
     () => ppId ? productionPacks.find((p) => p.id === ppId) : null,
