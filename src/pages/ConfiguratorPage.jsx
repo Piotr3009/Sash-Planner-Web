@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
-import { mockProjects } from '../mocks/mockProjects.js';
+
 const Viewer3D = lazy(() => import('../3d/App.jsx'));
 
 const BAR_OPTIONS = [
@@ -29,7 +29,7 @@ export default function ConfiguratorPage() {
   const updateWindow = useProjectStore((s) => s.updateWindowInBatch);
 
   useEffect(() => {
-    if (projects.length === 0) useProjectStore.getState().setProjects(mockProjects);
+    if (projects.length === 0) useProjectStore.getState().loadProjects();
   }, []);
 
   const project = useProjectStore((s) => s.projects.find(p => p.id === projectId));

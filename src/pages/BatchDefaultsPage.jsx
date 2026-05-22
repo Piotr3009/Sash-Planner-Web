@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProjectStore, BATCH_DEFAULTS } from '../stores/projectStore.js';
-import { mockProjects } from '../mocks/mockProjects.js';
+
 
 const HORN_OPTIONS = [{ value: 'none', label: 'No Horns' }, { value: 'A', label: 'Richmond' }, { value: 'D', label: 'Type D' }];
 const FRAME_TYPES = [{ value: 'standard', label: 'Standard (164mm)' }, { value: 'slim', label: 'Slim (144mm)' }];
@@ -38,7 +38,7 @@ export default function BatchDefaultsPage() {
   const setCurrentProject = useProjectStore((s) => s.setCurrentProject);
 
   useEffect(() => {
-    if (projects.length === 0) useProjectStore.getState().setProjects(mockProjects);
+    if (projects.length === 0) useProjectStore.getState().loadProjects();
   }, []);
 
   const project = useProjectStore((s) => s.projects.find(p => p.id === projectId));

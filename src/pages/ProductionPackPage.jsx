@@ -20,7 +20,7 @@ import {
   buildHardwareList,
 } from '../engine/lists.js';
 import { optimisePrecut } from '../engine/optimizer.js';
-import { mockProjects, mockProductionPacks } from '../mocks/mockProjects.js';
+
 import FrontElevation2D from '../components/drawings/FrontElevation2D.jsx';
 import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
 import SashDetail2D from '../components/drawings/SashDetail2D.jsx';
@@ -60,8 +60,7 @@ export default function ProductionPackPage() {
 
   // Ensure data loaded
   useEffect(() => {
-    if (projects.length === 0) useProjectStore.getState().setProjects(mockProjects);
-    if (productionPacks.length === 0) useProjectStore.getState().setProductionPacks(mockProductionPacks);
+    useProjectStore.getState().loadProjects();
   }, [projects.length, productionPacks.length]);
 
   // PP mode: cross-project merged windows

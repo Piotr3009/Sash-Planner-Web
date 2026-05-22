@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
-import { mockProjects } from '../mocks/mockProjects.js';
+
 
 const TYPE_LABELS = { sash: 'Sash Windows', casement: 'Casement Windows', 'fix-frame': 'Fix Frame', doors: 'Doors', special: 'Special / Other' };
 const STATUS_STYLES = {
@@ -22,7 +22,7 @@ export default function ProjectDetailPage() {
   const [showAddBatch, setShowAddBatch] = useState(false);
 
   useEffect(() => {
-    if (projects.length === 0) useProjectStore.getState().setProjects(mockProjects);
+    if (projects.length === 0) useProjectStore.getState().loadProjects();
     const allProjects = useProjectStore.getState().projects;
     const found = allProjects.find((p) => p.id === projectId);
     if (found) setCurrentProject(found);

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useProjectStore, BATCH_STATUSES } from '../stores/projectStore.js';
-import { mockProjects, mockProductionPacks } from '../mocks/mockProjects.js';
 
 // ─── Type colors ───
 const TYPE_COLORS = {
@@ -199,8 +198,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const projects = useProjectStore((s) => s.projects);
   const productionPacks = useProjectStore((s) => s.productionPacks);
-  const setProjects = useProjectStore((s) => s.setProjects);
-  const setProductionPacks = useProjectStore((s) => s.setProductionPacks);
+  const loadProjects = useProjectStore((s) => s.loadProjects);
   const createProject = useProjectStore((s) => s.createProject);
   const createProductionPack = useProjectStore((s) => s.createProductionPack);
   const assignBatch = useProjectStore((s) => s.assignBatchToProductionPack);
@@ -216,8 +214,7 @@ export default function DashboardPage() {
   const [confirmAction, setConfirmAction] = useState(null); // { title, message, onConfirm }
 
   useEffect(() => {
-    if (projects.length === 0) setProjects(mockProjects);
-    if (productionPacks.length === 0) setProductionPacks(mockProductionPacks);
+    loadProjects();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Total height of projects column (for PP centering)

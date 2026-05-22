@@ -7,7 +7,7 @@ import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 import DrawingsPanel from '../components/drawings/DrawingsPanel.jsx';
 import CutListPanel from '../components/dashboard/CutListPanel.jsx';
 import ExportControls from '../components/export/ExportControls.jsx';
-import { mockProjects } from '../mocks/mockProjects.js';
+
 
 const TABS = [
   { id: '3d', label: '3D Preview', icon: '🧊' },
@@ -27,7 +27,7 @@ export default function WindowDetailPage() {
   const setCurrentBatch = useProjectStore((s) => s.setCurrentBatch);
 
   useEffect(() => {
-    if (projects.length === 0) useProjectStore.getState().setProjects(mockProjects);
+    if (projects.length === 0) useProjectStore.getState().loadProjects();
     const allProjects = useProjectStore.getState().projects;
     const project = allProjects.find(p => p.id === projectId);
     if (project) {

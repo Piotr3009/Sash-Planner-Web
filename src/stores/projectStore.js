@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { mockProjects, mockProductionPacks } from '../mocks/mockProjects.js';
 
 // ─── Production settings (preserved from original — used by calculations engine) ───
 const defaultSettings = {
@@ -100,6 +101,7 @@ export const useProjectStore = create(
 
   // ─── State ───
   projects: [],
+  projectsLoaded: false,
   projectsLoading: false,
   projectsError: null,
 
@@ -113,6 +115,12 @@ export const useProjectStore = create(
 
   selectedWindowId: null,
   settings: { ...defaultSettings },
+
+  // ─── Init (load mocks only once, then persist takes over) ───
+  loadProjects: () => {
+    if (get().projectsLoaded) return;
+    set({ projects: mockProjects, productionPacks: mockProductionPacks, projectsLoaded: true });
+  },
 
   // ─── Setters ───
   setProjects: (projects) => set({ projects }),
@@ -578,6 +586,7 @@ export const useProjectStore = create(
         projects: state.projects,
         productionPacks: state.productionPacks,
         settings: state.settings,
+        projectsLoaded: state.projectsLoaded,
       }),
     }
   )
