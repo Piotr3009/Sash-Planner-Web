@@ -151,8 +151,6 @@ export const useProjectStore = create(
 
   // Backward compat: calculations engine uses getItemById
   getItemById: (id) => get().currentWindows.find((w) => w.id === id) || null,
-  // Backward compat: some components read currentItems
-  get currentItems() { return get().currentWindows; },
 
   // ─── PROJECT CRUD ───
   createProject: (name, address, projectNumber, client) => {
@@ -564,14 +562,6 @@ export const useProjectStore = create(
       };
     });
   },
-
-  // ─── BACKWARD COMPAT (for components still referencing old names) ───
-  // These bridge old estimate-based code during migration
-  get estimates() { return get().projects; },
-  setEstimates: (p) => set({ projects: p }),
-  setEstimatesLoading: (l) => set({ projectsLoading: l }),
-  setEstimatesError: (e) => set({ projectsError: e }),
-  setCurrentEstimate: (est, items) => set({ currentProject: est, currentWindows: items || [] }),
 
 }),
     {
