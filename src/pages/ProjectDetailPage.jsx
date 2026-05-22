@@ -35,12 +35,47 @@ export default function ProjectDetailPage() {
 
   const batches = currentProject?.batches || [];
 
-  // ─── Project Materials Aggregation ───
+  // ─── Project Materials — meters calculation ───
+  // Cut list lengths (pre-cut tolerance will be added in pre-cut calculation)
+  const SASH_WIDTH_DEDUCTION = 178;
+  const SASH_HEIGHT_DEDUCTION = 92;
+
+  // Part length calculator: returns cut length in mm for one piece
+  const getPartLength = (partId, win) => {
+    const W = win.width || 0;
+    const H = win.height || 0;
+    const sashW = W - SASH_WIDTH_DEDUCTION;
+    const sashH = H - SASH_HEIGHT_DEDUCTION;
+    const halfSash = sashH / 2;
+    const hornExtra = (win.hornType && win.hornType !== 'none') ? 70 : 0;
+
+    const lengths = {
+      head: W,
+      jambs: H,
+      cill: W,
+      cill_nose: W,
+      cill_extension: 0,
+      ext_head_liner: W,
+      int_head_liner: W,
+      ext_jamb_liner: H,
+      int_jamb_liner: H,
+      top_rail: sashW,
+      stiles_top_sash: halfSash + hornExtra,
+      stiles_bottom_sash: halfSash + hornExtra,
+      bottom_rail: sashW,
+      top_meet_rail: sashW,
+      bottom_meet_rail: sashW,
+    };
+    return lengths[partId] || 0;
+  };
+
   const projectMaterials = useMemo(() => {
-    const totalWindows = batches.reduce((sum, b) => sum + (b.windows?.length || 0), 0);
-    if (totalWindows === 0) return [];
+    // Collect all windows from all batches
+    const allWindows = batches.flatMap((b) => b.windows || []);
+    if (allWindows.length === 0) return [];
 
     const matMap = {};
+
     ALL_PARTS.forEach((part) => {
       const assignment = assignments[part.id];
       if (!assignment?.material_id) return;
@@ -53,12 +88,23 @@ export default function ProjectDetailPage() {
         matMap[matId] = {
           material: mat,
           parts: [],
-          totalPcs: 0,
+          totalMeters: 0,
         };
       }
-      const pcsTotal = part.pcs * totalWindows;
-      matMap[matId].parts.push({ ...part, pcsTotal, yield: assignment.yield || 1.0 });
-      matMap[matId].totalPcs += pcsTotal;
+
+      // Sum lengths across ALL windows for this part
+      let totalLengthMm = 0;
+      allWindows.forEach((win) => {
+        const lengthPerPiece = getPartLength(part.id, win);
+        totalLengthMm += lengthPerPiece * part.pcs; // pcs per window
+      });
+
+      const yieldCoeff = assignment.yield || 1.0;
+      const totalMeters = (totalLengthMm / 1000) * yieldCoeff;
+      const pcsTotal = part.pcs * allWindows.length;
+
+      matMap[matId].parts.push({ ...part, pcsTotal, totalMeters, yield: yieldCoeff });
+      matMap[matId].totalMeters += totalMeters;
     });
 
     return Object.values(matMap);
@@ -216,7 +262,7 @@ export default function ProjectDetailPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {projectMaterials.map(({ material, parts, totalPcs }) => (
+                  {projectMaterials.map(({ material, parts, totalMeters }) => (
                     <div key={material.id} className="card p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
@@ -236,8 +282,8 @@ export default function ProjectDetailPage() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-sm font-semibold text-ink-100">{totalPcs} pcs</div>
-                          <div className="text-[10px] text-ink-400">across all windows</div>
+                          <div className="text-sm font-semibold text-ink-100">{totalMeters.toFixed(2)} m</div>
+                          <div className="text-[10px] text-ink-400">cut list lengths</div>
                         </div>
                       </div>
 
@@ -246,9 +292,9 @@ export default function ProjectDetailPage() {
                           <tr className="border-b border-surface-500/50">
                             <th className="py-1.5 text-left text-ink-400 font-medium">Part</th>
                             <th className="py-1.5 text-center text-ink-400 font-medium">Section</th>
-                            <th className="py-1.5 text-center text-ink-400 font-medium">Pcs/Win</th>
-                            <th className="py-1.5 text-center text-ink-400 font-medium">Total Pcs</th>
+                            <th className="py-1.5 text-center text-ink-400 font-medium">Pcs</th>
                             <th className="py-1.5 text-center text-ink-400 font-medium">Yield</th>
+                            <th className="py-1.5 text-right text-ink-400 font-medium">Meters</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -256,9 +302,9 @@ export default function ProjectDetailPage() {
                             <tr key={p.id} className="border-b border-surface-500/30">
                               <td className="py-1.5 text-ink-200">{p.name}</td>
                               <td className="py-1.5 text-center text-ink-300 font-mono">{p.section}</td>
-                              <td className="py-1.5 text-center text-ink-300">{p.pcs}</td>
-                              <td className="py-1.5 text-center text-ink-100 font-medium">{p.pcsTotal}</td>
+                              <td className="py-1.5 text-center text-ink-300">{p.pcsTotal}</td>
                               <td className="py-1.5 text-center text-ink-300">{p.yield}</td>
+                              <td className="py-1.5 text-right text-ink-100 font-mono font-medium">{p.totalMeters.toFixed(2)} m</td>
                             </tr>
                           ))}
                         </tbody>
@@ -272,7 +318,7 @@ export default function ProjectDetailPage() {
             {/* Footer */}
             <div className="px-5 py-3 border-t border-surface-500 flex justify-between items-center shrink-0">
               <div className="text-[10px] text-ink-400">
-                {projectMaterials.length} material{projectMaterials.length !== 1 ? 's' : ''} assigned · Quantities are per-window totals (cutting lengths calculated in BOM)
+                {projectMaterials.length} material{projectMaterials.length !== 1 ? 's' : ''} · Cut list lengths · Yield applied
               </div>
               <button onClick={() => setShowMaterials(false)} className="btn btn-secondary text-xs">Close</button>
             </div>
