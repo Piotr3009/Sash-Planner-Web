@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { supabase, hasSupabaseConfig } from '../services/supabase.js';
 
 const MOCK_SESSION = {
@@ -6,13 +7,15 @@ const MOCK_SESSION = {
   mock: true
 };
 
-export const useAuthStore = create((set, get) => ({
+export const useAuthStore = create(
+  persist(
+    (set, get) => ({
   session: null,
   loading: true,
   error: null,
 
   init: async () => {
-    // Don't wipe an existing session (e.g. mock session already set)
+    // Don't wipe an existing session (e.g. mock session already set or restored from persist)
     if (get().session) {
       set({ loading: false });
       return;
@@ -51,4 +54,12 @@ export const useAuthStore = create((set, get) => ({
     }
     set({ session: null });
   }
-}));
+}),
+    {
+      name: 'sp-auth',
+      partialize: (state) => ({
+        session: state.session,
+      }),
+    }
+  )
+);
