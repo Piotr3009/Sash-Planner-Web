@@ -1,14 +1,11 @@
 /**
  * glassPdfExport.js
  *
- * Generates professional A4-landscape PDF for glass factory orders.
- * Matches GlassDrawing2D component style but on white background.
+ * Professional A4-landscape PDF for glass factory orders.
+ * Navy (#1a3a5c) glass lines, teal (#00897B) dimensions.
  *
- * Layout per page:
- *   - Title block (header) with batch/project/date info
- *   - Summary table (page 1 only)
- *   - 6 glass drawings per page (3 cols × 2 rows)
- *   - Footer with company info + page number
+ * Page 1: compact header + full summary table
+ * Page 2+: compact header + 6 CAD drawings per page (3×2)
  */
 import { jsPDF } from 'jspdf';
 import { CONSTANTS } from '../engine/calculations.js';
@@ -16,40 +13,47 @@ import { CONSTANTS } from '../engine/calculations.js';
 // ─── COLORS (RGB 0-255) ───
 const C = {
   black:    [26, 26, 26],
+  dark:     [60, 60, 60],
   gray:     [136, 136, 136],
   grayL:    [180, 180, 180],
   grayXL:   [220, 220, 220],
-  glass:    [0, 119, 187],
-  glassFill:[232, 244, 252],
+  rowBg:    [248, 248, 246],
+  glass:    [26, 58, 92],
+  glassFill:[240, 243, 247],
   dim:      [0, 137, 123],
   link:     [0, 85, 170],
-  white:    [255, 255, 255],
 };
 
-// ─── PAGE DIMENSIONS (mm) ───
-const PG = {
-  w: 297, h: 210,
-  mx: 10, my: 10,           // outer margins
-  bx: 8, by: 8,             // border offset
-  headerH: 40,
-  footerH: 10,
-  tableRowH: 4.5,
-  cellW: 89,                // drawing cell width (3 per row with gaps)
-  cellH: 80,                // drawing cell height (2 per column with gaps)
-  cellGapX: 3,
-  cellGapY: 3,
+// ─── LINE WIDTHS (mm) — CAD standard ───
+const LW = {
+  border:   0.5,
+  borderIn: 0.08,
+  outline:  0.25,     // glass outer edge
+  seal:     0.13,     // edge seal, spacer bars
+  cross:    0.1,      // bar intersection crosses
+  dimLine:  0.13,     // chain dimension lines
+  dimOver:  0.15,     // overall dimension lines
+  tick:     0.13,     // tick marks
+  ext:      0.05,     // extension lines (dashed)
+  cell:     0.2,      // drawing cell border
+  cellIn:   0.06,     // inner cell border
+  sep:      0.3,      // section separators
+  tableLine:0.15,
 };
 
-// ─── BAR PATTERNS (same as GlassDrawing2D) ───
+// ─── PAGE ───
+const PG = { w: 297, h: 210, bx: 8, by: 8 };
+const HEADER_H = 20;
+const FOOTER_H = 8;
+const TABLE_ROW_H = 5;
+
+// ─── GLASS CONSTANTS ───
 const BAR_PATTERNS = {
   'none': { h: 0, v: 0 }, '2x2': { h: 0, v: 1 }, '3x3': { h: 0, v: 2 },
   '4x4': { h: 1, v: 1 }, '6x6': { h: 1, v: 2 }, '9x9': { h: 2, v: 2 },
 };
-
 const SPACER_BAR = 18;
 const EDGE_SEAL = 11;
-
-// ─── HELPERS ───
 
 function fmt(n) {
   const r = Math.round(n * 10) / 10;
@@ -57,439 +61,387 @@ function fmt(n) {
 }
 
 function computeBarPositions(glassW, glassH, vCount, hCount) {
-  const barW = SPACER_BAR;
-  const paneW = vCount > 0 ? Math.max((glassW - vCount * barW) / (vCount + 1), 0) : glassW;
-  const paneH = hCount > 0 ? Math.max((glassH - hCount * barW) / (hCount + 1), 0) : glassH;
-  const vBars = [];
+  const bw = SPACER_BAR;
+  const pW = vCount > 0 ? (glassW - vCount * bw) / (vCount + 1) : glassW;
+  const pH = hCount > 0 ? (glassH - hCount * bw) / (hCount + 1) : glassH;
+  const vBars = [], hBars = [];
   for (let i = 0; i < vCount; i++) {
-    const left = (i + 1) * paneW + i * barW;
-    vBars.push({ left, right: left + barW, cx: left + barW / 2 });
+    const l = (i + 1) * pW + i * bw;
+    vBars.push({ left: l, right: l + bw, cx: l + bw / 2 });
   }
-  const hBars = [];
   for (let j = 0; j < hCount; j++) {
-    const top = (j + 1) * paneH + j * barW;
-    hBars.push({ top, bot: top + barW, cy: top + barW / 2 });
+    const t = (j + 1) * pH + j * bw;
+    hBars.push({ top: t, bot: t + bw, cy: t + bw / 2 });
   }
-  return { vBars, hBars, paneW, paneH };
+  return { vBars, hBars };
 }
 
-function segmentsBetween(from, to, cutPairs) {
+function segsBetween(from, to, cutPairs) {
   if (!cutPairs.length) return [{ a: from, b: to }];
-  const sorted = [...cutPairs].sort((p, q) => p[0] - q[0]);
+  const sorted = [...cutPairs].sort((a, b) => a[0] - b[0]);
   const segs = [];
   let pos = from;
-  for (const [cStart, cEnd] of sorted) {
-    if (cStart > pos) segs.push({ a: pos, b: cStart });
-    pos = Math.max(pos, cEnd);
+  for (const [s, e] of sorted) {
+    if (s > pos) segs.push({ a: pos, b: s });
+    pos = Math.max(pos, e);
   }
   if (pos < to) segs.push({ a: pos, b: to });
   return segs;
 }
 
-// ─── jsPDF DRAWING PRIMITIVES ───
+// ─── DRAWING PRIMITIVES ───
 
-function setColor(doc, rgb) {
-  doc.setDrawColor(...rgb);
-}
-function setFill(doc, rgb) {
-  doc.setFillColor(...rgb);
-}
-function setText(doc, rgb) {
-  doc.setTextColor(...rgb);
-}
+const dc = (d, c) => d.setDrawColor(...c);
+const fc = (d, c) => d.setFillColor(...c);
+const tc = (d, c) => d.setTextColor(...c);
 
-function line(doc, x1, y1, x2, y2, w = 0.3) {
-  doc.setLineWidth(w);
-  doc.line(x1, y1, x2, y2);
-}
+// ─── PAGE BORDER ───
 
-function rect(doc, x, y, w, h, lw = 0.3) {
-  doc.setLineWidth(lw);
-  doc.rect(x, y, w, h);
+function drawPageBorder(doc) {
+  dc(doc, C.black);
+  doc.setLineWidth(LW.border);
+  doc.rect(PG.bx, PG.by, PG.w - 2 * PG.bx, PG.h - 2 * PG.by);
+  doc.setLineWidth(LW.borderIn);
+  doc.rect(PG.bx + 0.7, PG.by + 0.7, PG.w - 2 * PG.bx - 1.4, PG.h - 2 * PG.by - 1.4);
 }
 
-function rectFill(doc, x, y, w, h) {
-  doc.rect(x, y, w, h, 'F');
-}
-
-function text(doc, str, x, y, opts = {}) {
-  doc.text(str, x, y, opts);
-}
-
-// ─── HEADER ───
+// ─── HEADER (compact ~20mm) ───
 
 function drawHeader(doc, info, pageNum, totalPages) {
-  const { bx, by, w, headerH } = PG;
-  const iw = w - 2 * bx;
-  const ix = bx;
-  const iy = by;
+  const x = PG.bx + 0.7, y = PG.by + 0.7;
+  const w = PG.w - 2 * PG.bx - 1.4;
+  const h = HEADER_H;
 
-  // Outer border
-  setColor(doc, C.black);
-  rect(doc, bx, by, iw, headerH, 0.6);
-  rect(doc, bx + 0.5, by + 0.5, iw - 1, headerH - 1, 0.1);
+  // Separators
+  dc(doc, C.black);
+  doc.setLineWidth(LW.sep);
+  doc.line(x, y + h, x + w, y + h);
 
-  // Company box
-  line(doc, ix + 60, iy, ix + 60, iy + headerH, 0.2);
-  line(doc, ix, iy + headerH / 2, ix + 60, iy + headerH / 2, 0.2);
+  // Vertical dividers
+  const col1 = 55, col2 = w - 50, col3 = w - 25;
+  doc.setLineWidth(LW.borderIn);
+  doc.line(x + col1, y, x + col1, y + h);
+  doc.line(x + col2, y, x + col2, y + h);
+  doc.line(x + col3, y, x + col3, y + h);
+  // Horizontal halves in right boxes
+  doc.line(x + col2, y + h / 2, x + w, y + h / 2);
 
+  // Company
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  setText(doc, C.black);
-  text(doc, info.companyName || 'COMPANY NAME', ix + 3, iy + 8);
+  doc.setFontSize(8);
+  tc(doc, C.black);
+  doc.text(info.companyName || 'COMPANY', x + 2, y + 7);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(5.5);
-  setText(doc, C.gray);
-  text(doc, 'GLASS ORDER — SEALED UNITS', ix + 3, iy + 14);
-
-  // Batch / Projects box
-  const batchX = ix + 60;
-  const batchW = iw - 60 - 65;
-  line(doc, batchX + batchW, iy, batchX + batchW, iy + headerH, 0.2);
-  line(doc, batchX, iy + headerH / 2, batchX + batchW, iy + headerH / 2, 0.2);
-
-  doc.setFontSize(5.5);
-  setText(doc, C.gray);
-  text(doc, 'Batch:', batchX + 3, iy + 8);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6.5);
-  setText(doc, C.black);
-  text(doc, info.batchName || '—', batchX + 18, iy + 8);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(5.5);
-  setText(doc, C.gray);
-  text(doc, 'Projects:', batchX + 3, iy + headerH / 2 + 8);
-  doc.setFontSize(6);
-  setText(doc, C.black);
-  const projText = (info.projects || []).join(' · ');
-  text(doc, projText.substring(0, 80), batchX + 22, iy + headerH / 2 + 8);
-
-  // Right info boxes
-  const riX = batchX + batchW;
-  const riW = 65;
-  line(doc, riX, iy + headerH / 2, riX + riW, iy + headerH / 2, 0.2);
-  line(doc, riX + riW / 2, iy, riX + riW / 2, iy + headerH, 0.2);
-
   doc.setFontSize(5);
-  setText(doc, C.gray);
-  text(doc, 'Date:', riX + 3, iy + 8);
-  text(doc, 'Units:', riX + 3, iy + headerH / 2 + 8);
-  text(doc, 'Rev:', riX + riW / 2 + 3, iy + 8);
-  text(doc, 'Page:', riX + riW / 2 + 3, iy + headerH / 2 + 8);
+  tc(doc, C.gray);
+  doc.text('GLASS ORDER — SEALED UNITS', x + 2, y + 13);
 
+  // Batch + Projects
+  doc.setFontSize(4.5);
+  tc(doc, C.grayL);
+  doc.text('Batch:', x + col1 + 3, y + 7);
+  doc.text('Projects:', x + col1 + 3, y + h / 2 + 7);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6);
-  setText(doc, C.black);
-  text(doc, info.date || new Date().toLocaleDateString('en-GB'), riX + 14, iy + 8);
-  text(doc, String(info.totalUnits || 0), riX + 16, iy + headerH / 2 + 8);
-  text(doc, info.revision || 'A', riX + riW / 2 + 12, iy + 8);
-  text(doc, `${pageNum} / ${totalPages}`, riX + riW / 2 + 14, iy + headerH / 2 + 8);
+  doc.setFontSize(5.5);
+  tc(doc, C.black);
+  doc.text(String(info.batchName || '—'), x + col1 + 18, y + 7);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(5);
+  tc(doc, C.black);
+  const projStr = (info.projects || []).join(' · ');
+  doc.text(projStr.substring(0, 90), x + col1 + 22, y + h / 2 + 7);
+
+  // Date / Units
+  doc.setFontSize(4.5);
+  tc(doc, C.grayL);
+  doc.text('Date:', x + col2 + 3, y + 7);
+  doc.text('Units:', x + col2 + 3, y + h / 2 + 7);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(5.5);
+  tc(doc, C.black);
+  doc.text(info.date, x + col2 + 14, y + 7);
+  doc.text(String(info.totalUnits), x + col2 + 15, y + h / 2 + 7);
+
+  // Rev / Page
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(4.5);
+  tc(doc, C.grayL);
+  doc.text('Rev:', x + col3 + 3, y + 7);
+  doc.text('Page:', x + col3 + 3, y + h / 2 + 7);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(5.5);
+  tc(doc, C.black);
+  doc.text(info.revision || 'A', x + col3 + 12, y + 7);
+  doc.text(`${pageNum} / ${totalPages}`, x + col3 + 14, y + h / 2 + 7);
 }
 
 // ─── SUMMARY TABLE ───
 
-function drawSummaryTable(doc, glassItems, startY) {
-  const x = PG.bx + 2;
-  let y = startY;
-  const rh = PG.tableRowH;
+function drawTable(doc, items, startY) {
+  const x = PG.bx + 3;
+  let y = startY + 5;
 
   // Title
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(5);
-  setText(doc, C.gray);
-  text(doc, 'SCHEDULE', x, y + 4);
-  y += 7;
+  doc.setFontSize(4.5);
+  tc(doc, C.grayL);
+  doc.text('GLASS SCHEDULE', x, y);
+  y += 5;
 
-  // Column headers
+  // Columns
   const cols = [
-    { label: '#', x: 0, w: 6 },
-    { label: 'Window', x: 8, w: 18 },
-    { label: 'Sash', x: 28, w: 14 },
-    { label: 'Width', x: 44, w: 18 },
-    { label: 'Height', x: 64, w: 18 },
-    { label: 'Type', x: 84, w: 16 },
-    { label: 'Makeup', x: 102, w: 18 },
-    { label: 'Spec', x: 122, w: 22 },
-    { label: 'Finish', x: 146, w: 16 },
-    { label: 'Spacer', x: 164, w: 14 },
-    { label: 'Bars', x: 180, w: 14 },
-    { label: 'Project', x: 196, w: 24 },
+    { l: '#',         dx: 0 },
+    { l: 'Window',    dx: 10 },
+    { l: 'Sash',      dx: 35 },
+    { l: 'Width (mm)',dx: 58 },
+    { l: 'Height (mm)',dx: 88 },
+    { l: 'Type',      dx: 120 },
+    { l: 'Makeup',    dx: 148 },
+    { l: 'Spec',      dx: 178 },
+    { l: 'Finish',    dx: 210 },
+    { l: 'Spacer',    dx: 238 },
+    { l: 'Bars',      dx: 262 },
   ];
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(4.5);
-  setText(doc, C.grayL);
-  cols.forEach(c => text(doc, c.label, x + c.x, y));
+  doc.setFontSize(5);
+  tc(doc, C.grayL);
+  cols.forEach(c => doc.text(c.l, x + c.dx, y));
 
-  // Header line
-  setColor(doc, C.grayL);
-  line(doc, x, y + 1, x + 220, y + 1, 0.2);
-  y += rh;
+  dc(doc, C.grayXL);
+  doc.setLineWidth(LW.tableLine);
+  doc.line(x, y + 1.5, x + 270, y + 1.5);
+  y += TABLE_ROW_H;
 
   // Rows
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(4.5);
-
-  glassItems.forEach((g, i) => {
-    const isEven = i % 2 === 0;
-    if (isEven) {
-      setFill(doc, [247, 247, 245]);
-      rectFill(doc, x - 1, y - 3, 222, rh);
+  items.forEach((g, i) => {
+    if (i % 2 === 0) {
+      fc(doc, C.rowBg);
+      doc.rect(x - 1, y - 3.5, 272, TABLE_ROW_H, 'F');
     }
 
-    const color = i % 2 === 0 ? C.black : [85, 85, 85];
-    setText(doc, color);
-    text(doc, String(i + 1), x + 0, y);
-    text(doc, g.windowName || '', x + 8, y);
-    text(doc, g.sash || '', x + 28, y);
+    const clr = i % 2 === 0 ? C.black : C.dark;
+    tc(doc, clr);
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(5);
+    doc.text(String(i + 1), x + 0, y);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(5);
+    doc.text(g.windowName || '', x + 10, y);
+    doc.text(g.sash || '', x + 35, y);
 
     doc.setFont('courier', 'normal');
-    doc.setFontSize(4.5);
-    text(doc, fmt(g.width), x + 44, y);
-    text(doc, fmt(g.height), x + 64, y);
+    doc.text(fmt(g.width), x + 58, y);
+    doc.text(fmt(g.height), x + 88, y);
+
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(4.5);
+    doc.text(g.type || '', x + 120, y);
+    doc.text(g.makeup || '', x + 148, y);
+    doc.text(g.spec || '', x + 178, y);
+    doc.text(g.finish || '', x + 210, y);
+    doc.text(g.spacer || '', x + 238, y);
+    doc.text(g.bars || '', x + 262, y);
 
-    text(doc, g.type || '', x + 84, y);
-    text(doc, g.makeup || '', x + 102, y);
-    text(doc, g.spec || '', x + 122, y);
-    text(doc, g.finish || '', x + 146, y);
-    text(doc, g.spacer || '', x + 164, y);
-    text(doc, g.bars || '', x + 180, y);
-
-    setText(doc, C.link);
-    text(doc, g.projectNumber || '', x + 196, y);
-    setText(doc, color);
-
-    y += rh;
+    y += TABLE_ROW_H;
   });
 
-  // Bottom line
-  setColor(doc, C.grayL);
-  line(doc, x, y - 2, x + 220, y - 2, 0.15);
-
-  return y + 2;
+  return y;
 }
 
 // ─── SINGLE GLASS DRAWING ───
 
-function drawGlassUnit(doc, cx, cy, cellW, cellH, g) {
-  // Cell border (double line)
-  setColor(doc, C.black);
-  rect(doc, cx, cy, cellW, cellH, 0.35);
-  rect(doc, cx + 0.3, cy + 0.3, cellW - 0.6, cellH - 0.6, 0.08);
+function drawGlass(doc, cx, cy, cw, ch, g) {
+  // Cell double border
+  dc(doc, C.black);
+  doc.setLineWidth(LW.cell);
+  doc.rect(cx, cy, cw, ch);
+  doc.setLineWidth(LW.cellIn);
+  doc.rect(cx + 0.3, cy + 0.3, cw - 0.6, ch - 0.6);
 
   // Title bar
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(5.5);
-  setText(doc, C.black);
-  text(doc, `${g.index} · ${g.windowName} — ${g.sash.toUpperCase()} GLASS`, cx + 2, cy + 4.5);
-
+  doc.setFontSize(5);
+  tc(doc, C.black);
+  doc.text(`${g.index} · ${g.windowName} — ${g.sash.toUpperCase()} GLASS`, cx + 2, cy + 4);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(4);
-  setText(doc, C.grayL);
-  text(doc, g.projectNumber || '', cx + cellW - 2, cy + 4.5, { align: 'right' });
+  doc.setFontSize(3.8);
+  tc(doc, C.grayL);
+  doc.text(g.projectNumber || '', cx + cw - 2, cy + 4, { align: 'right' });
+  dc(doc, C.black);
+  doc.setLineWidth(LW.cellIn);
+  doc.line(cx + 0.3, cy + 6, cx + cw - 0.3, cy + 6);
 
-  setColor(doc, C.black);
-  line(doc, cx + 0.3, cy + 6, cx + cellW - 0.3, cy + 6, 0.12);
+  // Drawing area
+  const dMargin = { l: 10, t: 8, r: 10, b: 14 };
+  const areaX = cx + 2;
+  const areaY = cy + 8;
+  const areaW = cw - 4;
+  const areaH = ch - 22;
 
-  // Available drawing area
-  const drawX = cx + 2;
-  const drawY = cy + 8;
-  const drawW = cellW - 4;
-  const drawH = cellH - 18; // leave room for title (6) + spec text (8) + margins
-
-  // Scale glass to fit
-  const dimMarginL = 8;  // left for chain V
-  const dimMarginT = 6;  // top for chain H
-  const dimMarginR = 8;  // right for overall V
-  const dimMarginB = 6;  // bottom for overall H
-
-  const availW = drawW - dimMarginL - dimMarginR;
-  const availH = drawH - dimMarginT - dimMarginB;
-
+  const availW = areaW - dMargin.l - dMargin.r;
+  const availH = areaH - dMargin.t - dMargin.b;
   const sc = Math.min(availW / g.glassW, availH / g.glassH);
 
   const gw = g.glassW * sc;
   const gh = g.glassH * sc;
+  const gx = areaX + dMargin.l + (availW - gw) / 2;
+  const gy = areaY + dMargin.t + (availH - gh) / 2;
 
-  // Center the glass in available area
-  const gx = drawX + dimMarginL + (availW - gw) / 2;
-  const gy = drawY + dimMarginT + (availH - gh) / 2;
-
-  // Glass fill
-  setFill(doc, C.glassFill);
-  setColor(doc, C.glass);
-  doc.setLineWidth(0.5);
+  // Glass fill + outline
+  fc(doc, C.glassFill);
+  dc(doc, C.glass);
+  doc.setLineWidth(LW.outline);
   doc.rect(gx, gy, gw, gh, 'FD');
 
-  // Edge seal 11mm
+  // Edge seal
   const es = EDGE_SEAL * sc;
-  setColor(doc, C.glass);
-  doc.setLineWidth(0.2);
-  doc.setLineDashPattern([0.6, 0.4], 0);
+  doc.setLineWidth(LW.seal);
   doc.rect(gx + es, gy + es, gw - 2 * es, gh - 2 * es);
-  doc.setLineDashPattern([], 0);
 
-  // Bar positions
-  const pattern = BAR_PATTERNS[g.bars] || BAR_PATTERNS['none'];
-  const bars = computeBarPositions(g.glassW, g.glassH, pattern.v, pattern.h);
+  // Bars
+  const pat = BAR_PATTERNS[g.bars] || BAR_PATTERNS['none'];
+  const bars = computeBarPositions(g.glassW, g.glassH, pat.v, pat.h);
 
-  // Draw spacer bars — parallel lines with segment breaks
-  setColor(doc, C.glass);
-  doc.setLineWidth(0.2);
+  doc.setLineWidth(LW.seal);
 
   // Vertical bars
   bars.vBars.forEach(vb => {
-    const hCutPairs = bars.hBars.map(hb => [hb.top * sc, hb.bot * sc]);
-    const segs = segmentsBetween(0, gh, hCutPairs);
-    segs.forEach(seg => {
-      line(doc, gx + vb.left * sc, gy + seg.a, gx + vb.left * sc, gy + seg.b, 0.2);
-      line(doc, gx + vb.right * sc, gy + seg.a, gx + vb.right * sc, gy + seg.b, 0.2);
+    const hPairs = bars.hBars.map(hb => [hb.top * sc, hb.bot * sc]);
+    segsBetween(0, gh, hPairs).forEach(s => {
+      doc.line(gx + vb.left * sc, gy + s.a, gx + vb.left * sc, gy + s.b);
+      doc.line(gx + vb.right * sc, gy + s.a, gx + vb.right * sc, gy + s.b);
     });
   });
 
   // Horizontal bars
   bars.hBars.forEach(hb => {
-    const vCutPairs = bars.vBars.map(vb => [vb.left * sc, vb.right * sc]);
-    const segs = segmentsBetween(0, gw, vCutPairs);
-    segs.forEach(seg => {
-      line(doc, gx + seg.a, gy + hb.top * sc, gx + seg.b, gy + hb.top * sc, 0.2);
-      line(doc, gx + seg.a, gy + hb.bot * sc, gx + seg.b, gy + hb.bot * sc, 0.2);
+    const vPairs = bars.vBars.map(vb => [vb.left * sc, vb.right * sc]);
+    segsBetween(0, gw, vPairs).forEach(s => {
+      doc.line(gx + s.a, gy + hb.top * sc, gx + s.b, gy + hb.top * sc);
+      doc.line(gx + s.a, gy + hb.bot * sc, gx + s.b, gy + hb.bot * sc);
     });
   });
 
-  // Crosses at intersections
+  // Crosses
+  doc.setLineWidth(LW.cross);
   bars.vBars.forEach(vb => {
     bars.hBars.forEach(hb => {
-      line(doc, gx + vb.left * sc, gy + hb.top * sc, gx + vb.right * sc, gy + hb.bot * sc, 0.15);
-      line(doc, gx + vb.right * sc, gy + hb.top * sc, gx + vb.left * sc, gy + hb.bot * sc, 0.15);
+      doc.line(gx + vb.left * sc, gy + hb.top * sc, gx + vb.right * sc, gy + hb.bot * sc);
+      doc.line(gx + vb.right * sc, gy + hb.top * sc, gx + vb.left * sc, gy + hb.bot * sc);
     });
   });
 
-  // ── CHAIN DIMENSIONS (top) ──
-  const chainY = gy - 3;
+  // ── CHAIN H (top) ──
   const hCuts = [0, EDGE_SEAL];
   bars.vBars.forEach(b => { hCuts.push(b.left); hCuts.push(b.right); });
   hCuts.push(g.glassW - EDGE_SEAL, g.glassW);
 
-  setColor(doc, C.dim);
-  doc.setLineWidth(0.15);
+  const chainY = gy - 4;
+  dc(doc, C.dim);
+  doc.setLineWidth(LW.dimLine);
+  doc.line(gx, chainY, gx + gw, chainY);
 
-  // Chain line
-  line(doc, gx, chainY, gx + gw, chainY, 0.18);
-
-  // Ticks + labels
   hCuts.forEach(cut => {
     const px = gx + cut * sc;
-    line(doc, px, chainY - 1, px, chainY + 1, 0.18);
-    // Extension line to glass
-    doc.setLineDashPattern([0.5, 0.5], 0);
-    line(doc, px, chainY + 1, px, gy, 0.08);
+    doc.setLineWidth(LW.tick);
+    doc.line(px, chainY - 1.2, px, chainY + 1.2);
+    doc.setLineWidth(LW.ext);
+    doc.setLineDashPattern([0.5, 0.4], 0);
+    doc.line(px, chainY + 1.2, px, gy);
     doc.setLineDashPattern([], 0);
   });
 
   doc.setFont('courier', 'normal');
-  doc.setFontSize(3.2);
-  setText(doc, C.dim);
+  doc.setFontSize(3.5);
+  tc(doc, C.dim);
   for (let i = 0; i < hCuts.length - 1; i++) {
     const segW = hCuts[i + 1] - hCuts[i];
     const midX = gx + (hCuts[i] + hCuts[i + 1]) / 2 * sc;
-    text(doc, fmt(segW), midX, chainY - 1.5, { align: 'center' });
+    doc.text(fmt(segW), midX, chainY - 1.8, { align: 'center' });
   }
 
-  // ── CHAIN DIMENSIONS (left) ──
-  const chainX = gx - 3;
+  // ── CHAIN V (left) ──
   const vCuts = [0, EDGE_SEAL];
   bars.hBars.forEach(b => { vCuts.push(b.top); vCuts.push(b.bot); });
   vCuts.push(g.glassH - EDGE_SEAL, g.glassH);
 
-  // Chain line
-  line(doc, chainX, gy, chainX, gy + gh, 0.18);
+  const chainX = gx - 4;
+  dc(doc, C.dim);
+  doc.setLineWidth(LW.dimLine);
+  doc.line(chainX, gy, chainX, gy + gh);
 
-  // Ticks + labels
   vCuts.forEach(cut => {
     const py = gy + cut * sc;
-    line(doc, chainX - 1, py, chainX + 1, py, 0.18);
-    doc.setLineDashPattern([0.5, 0.5], 0);
-    line(doc, chainX + 1, py, gx, py, 0.08);
+    doc.setLineWidth(LW.tick);
+    doc.line(chainX - 1.2, py, chainX + 1.2, py);
+    doc.setLineWidth(LW.ext);
+    doc.setLineDashPattern([0.5, 0.4], 0);
+    doc.line(chainX + 1.2, py, gx, py);
     doc.setLineDashPattern([], 0);
   });
 
   for (let i = 0; i < vCuts.length - 1; i++) {
     const segH = vCuts[i + 1] - vCuts[i];
     const midY = gy + (vCuts[i] + vCuts[i + 1]) / 2 * sc;
-    // Rotated text for vertical chain
-    doc.saveGraphicsState();
-    text(doc, fmt(segH), chainX - 1.5, midY, { angle: 90, align: 'center' });
-    doc.restoreGraphicsState();
+    doc.text(fmt(segH), chainX - 1.8, midY, { angle: 90, align: 'center' });
   }
 
   // ── OVERALL WIDTH (bottom) ──
-  const owY = gy + gh + 3;
-  line(doc, gx, owY, gx + gw, owY, 0.25);
-  line(doc, gx, owY - 1, gx, owY + 1, 0.25);
-  line(doc, gx + gw, owY - 1, gx + gw, owY + 1, 0.25);
+  const owY = gy + gh + 4;
+  dc(doc, C.dim);
+  doc.setLineWidth(LW.dimOver);
+  doc.line(gx, owY, gx + gw, owY);
+  doc.line(gx, owY - 1.2, gx, owY + 1.2);
+  doc.line(gx + gw, owY - 1.2, gx + gw, owY + 1.2);
   doc.setFont('courier', 'bold');
-  doc.setFontSize(4);
-  text(doc, `${fmt(g.glassW)} mm`, gx + gw / 2, owY + 3.5, { align: 'center' });
+  doc.setFontSize(4.5);
+  tc(doc, C.dim);
+  doc.text(`${fmt(g.glassW)} mm`, gx + gw / 2, owY + 3.5, { align: 'center' });
 
   // ── OVERALL HEIGHT (right) ──
-  const ohX = gx + gw + 3;
-  line(doc, ohX, gy, ohX, gy + gh, 0.25);
-  line(doc, ohX - 1, gy, ohX + 1, gy, 0.25);
-  line(doc, ohX - 1, gy + gh, ohX + 1, gy + gh, 0.25);
-  doc.saveGraphicsState();
-  text(doc, `${fmt(g.glassH)} mm`, ohX + 3.5, gy + gh / 2, { angle: 90, align: 'center' });
-  doc.restoreGraphicsState();
+  const ohX = gx + gw + 4;
+  doc.setLineWidth(LW.dimOver);
+  doc.line(ohX, gy, ohX, gy + gh);
+  doc.line(ohX - 1.2, gy, ohX + 1.2, gy);
+  doc.line(ohX - 1.2, gy + gh, ohX + 1.2, gy + gh);
+  doc.text(`${fmt(g.glassH)} mm`, ohX + 3.5, gy + gh / 2, { angle: 90, align: 'center' });
 
-  // ── TITLE + SPEC (bottom of cell) ──
+  // ── TITLE + SPEC ──
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(5.5);
-  setText(doc, C.black);
-  text(doc, `${g.sash.toUpperCase()} GLASS`, cx + cellW / 2, cy + cellH - 6, { align: 'center' });
+  tc(doc, C.black);
+  doc.text(`${g.sash.toUpperCase()} GLASS`, cx + cw / 2, cy + ch - 6, { align: 'center' });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(4.5);
-  setText(doc, C.glass);
-  const specLine = `${g.type} / ${g.finish} · spacer: ${g.spacer}`;
-  text(doc, specLine, cx + cellW / 2, cy + cellH - 2.5, { align: 'center' });
+  tc(doc, C.glass);
+  doc.text(`${g.type} / ${g.finish} · spacer: ${g.spacer}`, cx + cw / 2, cy + ch - 2, { align: 'center' });
 }
 
 // ─── FOOTER ───
 
 function drawFooter(doc, info, pageNum, totalPages) {
-  const y = PG.h - PG.by - 2;
-
-  setColor(doc, C.black);
-  line(doc, PG.bx, y - 3, PG.w - PG.bx, y - 3, 0.2);
+  const y = PG.h - PG.by - 3;
+  dc(doc, C.black);
+  doc.setLineWidth(LW.borderIn);
+  doc.line(PG.bx + 0.7, y - 1, PG.w - PG.bx - 0.7, y - 1);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(4.5);
-  setText(doc, C.grayL);
-  const footerText = [info.companyName, info.companyAddress, info.companyPhone, info.companyEmail]
-    .filter(Boolean).join(' · ');
-  text(doc, footerText, PG.bx + 4, y);
+  doc.setFontSize(4);
+  tc(doc, C.grayL);
+  const foot = [info.companyName, info.companyAddress, info.companyEmail].filter(Boolean).join(' · ');
+  doc.text(foot, PG.bx + 4, y + 1.5);
 
   doc.setFont('courier', 'bold');
   doc.setFontSize(5);
-  setText(doc, C.black);
-  text(doc, `${pageNum} / ${totalPages}`, PG.w - PG.bx - 4, y, { align: 'right' });
+  tc(doc, C.black);
+  doc.text(`${pageNum} / ${totalPages}`, PG.w - PG.bx - 4, y + 1.5, { align: 'right' });
 }
 
-// ─── OUTER BORDER (per page) ───
-
-function drawPageBorder(doc) {
-  setColor(doc, C.black);
-  rect(doc, PG.bx, PG.by, PG.w - 2 * PG.bx, PG.h - 2 * PG.by, 0.6);
-  rect(doc, PG.bx + 0.5, PG.by + 0.5, PG.w - 2 * PG.bx - 1, PG.h - 2 * PG.by - 1, 0.1);
-}
-
-// ─── MAIN EXPORT FUNCTION ───
+// ─── MAIN EXPORT ───
 
 export function exportGlassPDF({ batch, windowsData, projects = [], companySettings = {} }) {
-  // Build glass items list (same logic as buildGlassListForWindow but with extra info)
   const glassItems = [];
   let idx = 1;
 
@@ -501,124 +453,79 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
     if (!sw || !topH || !botH) return;
 
     const glassW = sw - CONSTANTS.GLASS_WIDTH_DEDUCTION;
+    const lowerDed = CONSTANTS.MEETING_RAIL_WIDTH + CONSTANTS.BOTTOM_RAIL_WIDTH - 25;
     const glassHupper = topH - CONSTANTS.GLASS_HEIGHT_DEDUCTION;
-    const lowerDed = CONSTANTS.MEETING_RAIL_WIDTH + CONSTANTS.BOTTOM_RAIL_WIDTH - 2 * 12.5;
     const glassHlower = botH - lowerDed;
 
-    const glassType = windowSpec?.glazing?.type || 'double';
-    const glassSpec = windowSpec?.glazing?.spec || 'toughened';
+    const type = windowSpec?.glazing?.type || 'double';
+    const spec = windowSpec?.glazing?.spec || 'toughened';
     const spacer = windowSpec?.glazing?.spacerColour || 'silver';
     const makeup = windowSpec?.glazing?.makeup || '4x16x4';
     const isFrosted = windowSpec?.glazing?.finish === 'frosted';
-    const frostedLoc = windowSpec?.glazing?.frostedLocation || 'bottom';
-    const gridMode = windowSpec?.sash?.grid?.mode || 'none';
+    const fLoc = windowSpec?.glazing?.frostedLocation || 'bottom';
+    const grid = windowSpec?.sash?.grid?.mode || 'none';
 
-    const upperFinish = isFrosted && frostedLoc === 'both' ? 'frosted' : 'clear';
-    const lowerFinish = isFrosted ? 'frosted' : 'clear';
+    const base = { windowName: win.name, projectNumber: win._projectNumber || '', type, spec, spacer, makeup, bars: grid };
 
-    const base = {
-      windowName: win.name,
-      projectNumber: win._projectNumber || '',
-      type: glassType, spec: glassSpec, spacer, makeup, bars: gridMode,
-    };
-
-    glassItems.push({
-      ...base, index: idx++, sash: 'Upper', glassW, glassH: glassHupper, finish: upperFinish,
-    });
-    glassItems.push({
-      ...base, index: idx++, sash: 'Lower', glassW, glassH: glassHlower, finish: lowerFinish,
-    });
+    glassItems.push({ ...base, index: idx++, sash: 'Upper', glassW, glassH: glassHupper, finish: isFrosted && fLoc === 'both' ? 'frosted' : 'clear' });
+    glassItems.push({ ...base, index: idx++, sash: 'Lower', glassW, glassH: glassHlower, finish: isFrosted ? 'frosted' : 'clear' });
   });
 
   if (!glassItems.length) return null;
 
-  // Calculate pages
-  const DRAWINGS_PER_PAGE = 6;
-  const tableRows = glassItems.length;
-  const drawingPages = Math.ceil(glassItems.length / DRAWINGS_PER_PAGE);
-  const totalPages = 1 + drawingPages; // page 1 = table, rest = drawings
-  // Actually, if few items, table + drawings fit on page 1
-  // Simplified: page 1 = header + table + first 6 drawings (if table is short)
-  // For now: page 1 = table only if >12 items, otherwise table + drawings page 1
+  // Pagination: page 1 = table, page 2+ = 6 drawings each
+  const drawPages = Math.ceil(glassItems.length / 6);
+  const totalPages = 1 + drawPages;
 
-  const tableOnlyPage = tableRows > 18; // if more than 18 rows, dedicate page 1 to table
-  const totalPgs = tableOnlyPage
-    ? 1 + Math.ceil(glassItems.length / DRAWINGS_PER_PAGE)
-    : Math.ceil(glassItems.length / DRAWINGS_PER_PAGE) || 1;
-
-  // Info object
   const info = {
     companyName: companySettings.companyName || 'COMPANY NAME',
     companyAddress: companySettings.companyAddress || '',
-    companyPhone: companySettings.companyPhone || '',
     companyEmail: companySettings.companyEmail || '',
     batchName: batch?.name || batch?.id || 'Batch',
-    projects: projects.map(p => `${p.number || p.id} (${p.name || ''})`).filter(Boolean),
+    projects: projects.map(p => `${p.number || p.id}${p.name ? ' (' + p.name + ')' : ''}`),
     date: new Date().toLocaleDateString('en-GB'),
     totalUnits: glassItems.length,
     revision: 'A',
   };
 
-  // Create PDF
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-  let pageNum = 1;
-  let drawingIdx = 0;
+  // ─ PAGE 1: TABLE ─
+  drawPageBorder(doc);
+  drawHeader(doc, info, 1, totalPages);
+  drawTable(doc, glassItems, PG.by + HEADER_H + 1);
+  drawFooter(doc, info, 1, totalPages);
 
-  if (tableOnlyPage) {
-    // Page 1: header + full table
+  // ─ PAGE 2+: DRAWINGS ─
+  const contentTop = PG.by + HEADER_H + 2;
+  const contentBot = PG.h - PG.by - FOOTER_H;
+  const drawAreaH = contentBot - contentTop;
+  const drawAreaW = PG.w - 2 * PG.bx - 4;
+
+  const gap = 2.5;
+  const cellW = (drawAreaW - 2 * gap) / 3;
+  const cellH = (drawAreaH - gap) / 2;
+
+  let di = 0;
+  for (let pg = 0; pg < drawPages; pg++) {
+    doc.addPage();
     drawPageBorder(doc);
-    drawHeader(doc, info, pageNum, totalPgs);
-    const separatorY = PG.by + PG.headerH;
-    setColor(doc, C.black);
-    line(doc, PG.bx, separatorY, PG.w - PG.bx, separatorY, 0.3);
-    drawSummaryTable(doc, glassItems, separatorY + 1);
-    drawFooter(doc, info, pageNum, totalPgs);
-    pageNum++;
-  }
+    drawHeader(doc, info, pg + 2, totalPages);
 
-  // Drawing pages
-  while (drawingIdx < glassItems.length) {
-    if (pageNum > 1 || tableOnlyPage) doc.addPage();
-
-    drawPageBorder(doc);
-    drawHeader(doc, info, pageNum, totalPgs);
-
-    let contentY = PG.by + PG.headerH;
-    setColor(doc, C.black);
-    line(doc, PG.bx, contentY, PG.w - PG.bx, contentY, 0.3);
-
-    // If first page and not table-only, draw compact table
-    if (pageNum === 1 && !tableOnlyPage) {
-      contentY = drawSummaryTable(doc, glassItems, contentY + 1);
-      setColor(doc, C.black);
-      line(doc, PG.bx, contentY, PG.w - PG.bx, contentY, 0.2);
-      contentY += 1;
-    } else {
-      contentY += 2;
-    }
-
-    // Calculate drawing grid for this page
-    const remainingH = PG.h - PG.by - PG.footerH - contentY - 4;
-    const cellH = (remainingH - PG.cellGapY) / 2;
-    const cellW = (PG.w - 2 * PG.bx - 4 - 2 * PG.cellGapX) / 3;
-
-    for (let row = 0; row < 2 && drawingIdx < glassItems.length; row++) {
-      for (let col = 0; col < 3 && drawingIdx < glassItems.length; col++) {
-        const cellX = PG.bx + 2 + col * (cellW + PG.cellGapX);
-        const cellY = contentY + row * (cellH + PG.cellGapY);
-
-        drawGlassUnit(doc, cellX, cellY, cellW, cellH, glassItems[drawingIdx]);
-        drawingIdx++;
+    for (let row = 0; row < 2; row++) {
+      for (let col = 0; col < 3; col++) {
+        if (di >= glassItems.length) break;
+        const cellX = PG.bx + 2 + col * (cellW + gap);
+        const cellY = contentTop + row * (cellH + gap);
+        drawGlass(doc, cellX, cellY, cellW, cellH, glassItems[di]);
+        di++;
       }
     }
 
-    drawFooter(doc, info, pageNum, totalPgs);
-    pageNum++;
+    drawFooter(doc, info, pg + 2, totalPages);
   }
 
-  // Save
-  const filename = `Glass_Order_${info.batchName.replace(/[^a-zA-Z0-9-]/g, '_')}_${info.date.replace(/\//g, '-')}.pdf`;
+  const filename = `Glass_Order_${(info.batchName || 'batch').replace(/[^a-zA-Z0-9-]/g, '_')}_${info.date.replace(/\//g, '-')}.pdf`;
   doc.save(filename);
   return filename;
 }
