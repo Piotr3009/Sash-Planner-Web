@@ -1,8 +1,11 @@
 /**
  * GlassDrawing2D.jsx
  *
- * Single glass pane drawing — one per sash (upper or lower).
- * Shows ONLY glass + spacer bars + dimensions. No wood, no frame, no sash.
+ * Single glass unit drawing — one per sash (upper or lower).
+ * Shows ONLY glass + spacer bars + dimensions. No wood.
+ *
+ * Bar positions: derived FROM WOOD (sash bar positions), then cross-checked
+ * mathematically from glass dimensions. If mismatch → alarm.
  */
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
@@ -12,6 +15,10 @@ const NS = { vectorEffect: 'non-scaling-stroke' };
 const MARGIN = 60;
 const DIM_OFF = 35;
 
+const WOOD_BAR = 22;    // drewniany bar na wierzchu
+const SPACER_BAR = 18;  // spacer bar w środku glass
+const REBATE = 12.5;    // glass overlap into wood
+
 export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) {
   const d = useMemo(() => {
     if (!windowSpec || !derived) return null;
@@ -20,39 +27,71 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
     const sashW = derived.sashWidth;
     const topH = derived.topSashHeight;
     const botH = derived.bottomSashHeight;
-    const barW = CONSTANTS.GLAZING_BAR_WIDTH;
 
-    // Glass = sash minus timber + rebate overlap (25mm)
-    const glassW = sashW - 114 + 25;
-    const glassH = isUpper
-      ? topH - 100 + 25    // topRail(57) + meetRail(43) = 100
-      : botH - 133 + 25;   // botRail(90) + meetRail(43) = 133
+    // Sash inner dimensions (between timber)
+    const innerW = sashW - 114;           // 2 × stile(57)
+    const innerH = isUpper
+      ? topH - 100                        // topRail(57) + meetRail(43)
+      : botH - 133;                       // botRail(90) + meetRail(43)
+
+    // Glass = inner + rebate overlap each side
+    const glassW = innerW + 2 * REBATE;   // = sashW - 89
+    const glassH = innerH + 2 * REBATE;   // = sashH - 75 or - 108
 
     // Bar counts
     const gridMode = windowSpec.sash?.grid?.mode || 'none';
-    let vBars = 0, hBars = 0;
+    let vCount = 0, hCount = 0;
     if (gridMode !== 'none' && gridMode !== 'custom') {
       const parts = gridMode.split('x');
       const cols = parseInt(parts[0]) || 2;
       const rows = parseInt(parts[1]) || 2;
-      vBars = cols - 1;
-      hBars = isUpper ? Math.floor(rows / 2) : Math.ceil(rows / 2);
+      vCount = cols - 1;
+      hCount = isUpper ? Math.floor(rows / 2) : Math.ceil(rows / 2);
     }
 
-    const { vBars: vBarPos, hBars: hBarPos, paneW, paneH } = computeBarPositions({
-      glassX: 0, glassY: 0, glassW, glassH,
-      vCount: vBars, hCount: hBars, barW,
+    // ── SOURCE: wood bar positions (drewno = source of truth) ──
+    const woodBars = computeBarPositions({
+      glassX: 0, glassY: 0, glassW: innerW, glassH: innerH,
+      vCount, hCount, barW: WOOD_BAR,
     });
 
-    const paneCols = vBars + 1;
-    const paneRows = hBars + 1;
+    // Convert wood centers → glass spacer positions (shift by rebate)
+    const spacerV = woodBars.vBars.map(b => ({
+      center: b.cx + REBATE,
+      left: b.cx + REBATE - SPACER_BAR / 2,
+      right: b.cx + REBATE + SPACER_BAR / 2,
+    }));
+    const spacerH = woodBars.hBars.map(b => ({
+      center: b.cy + REBATE,
+      top: b.cy + REBATE - SPACER_BAR / 2,
+      bot: b.cy + REBATE + SPACER_BAR / 2,
+    }));
+
+    // ── CROSS-CHECK: math from glass dimensions ──
+    const mathBars = computeBarPositions({
+      glassX: 0, glassY: 0, glassW, glassH,
+      vCount, hCount, barW: SPACER_BAR,
+    });
+
+    const tolerance = 0.1;
+    let crossCheckOk = true;
+    spacerV.forEach((s, i) => {
+      if (Math.abs(s.center - mathBars.vBars[i].cx) > tolerance) crossCheckOk = false;
+    });
+    spacerH.forEach((s, i) => {
+      if (Math.abs(s.center - mathBars.hBars[i].cy) > tolerance) crossCheckOk = false;
+    });
+
+    // Segment sizes (visible glass between spacers)
+    const segW = vCount > 0 ? Math.round((glassW - vCount * SPACER_BAR) / (vCount + 1) * 10) / 10 : glassW;
+    const segH = hCount > 0 ? Math.round((glassH - hCount * SPACER_BAR) / (hCount + 1) * 10) / 10 : glassH;
 
     const glassType = windowSpec?.glass?.type || windowSpec?.glazing?.type || 'double';
     const glassFinish = windowSpec?.glass?.finish || windowSpec?.glazing?.finish || 'clear';
-    const spacer = windowSpec?.glazing?.spacerColour || 'black';
+    const spacerColour = windowSpec?.glazing?.spacerColour || 'black';
 
-    return { glassW, glassH, barW, vBarPos, hBarPos, paneW: Math.round(paneW), paneH: Math.round(paneH),
-      paneCols, paneRows, glassType, glassFinish, spacer, gridMode, isUpper };
+    return { glassW, glassH, spacerV, spacerH, vCount, hCount,
+      segW, segH, crossCheckOk, glassType, glassFinish, spacerColour, gridMode, isUpper };
   }, [windowSpec, derived, type]);
 
   if (!d) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
@@ -68,47 +107,38 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
       <svg viewBox={`0 0 ${totalW} ${totalH}`} xmlns="http://www.w3.org/2000/svg"
         className="w-full h-auto" style={{ background: COLORS.bg }}>
 
-        {/* Glass area */}
+        {/* Glass unit */}
         <rect x={ox} y={oy} width={d.glassW} height={d.glassH}
           fill={STROKE.glass} fillOpacity={0.15} stroke={STROKE.glass} strokeWidth={STROKES.glass} {...NS} />
 
-        {/* Vertical bars */}
-        {d.vBarPos.map((bar, i) => (
-          <rect key={`v${i}`} x={ox + bar.left} y={oy} width={d.barW} height={d.glassH}
+        {/* Vertical spacer bars */}
+        {d.spacerV.map((bar, i) => (
+          <rect key={`v${i}`} x={ox + bar.left} y={oy} width={SPACER_BAR} height={d.glassH}
             fill={COLORS.bar} fillOpacity={0.25} stroke={COLORS.bar} strokeWidth={STROKES.bar} {...NS} />
         ))}
 
-        {/* Horizontal bars */}
-        {d.hBarPos.map((bar, i) => (
-          <rect key={`h${i}`} x={ox} y={oy + bar.top} width={d.glassW} height={d.barW}
+        {/* Horizontal spacer bars */}
+        {d.spacerH.map((bar, i) => (
+          <rect key={`h${i}`} x={ox} y={oy + bar.top} width={d.glassW} height={SPACER_BAR}
             fill={COLORS.bar} fillOpacity={0.25} stroke={COLORS.bar} strokeWidth={STROKES.bar} {...NS} />
         ))}
 
-        {/* Pane label in centre */}
-        <text x={ox + d.glassW / 2} y={oy + d.glassH / 2 + 5}
-          fill={STROKE.glass} fontSize={tfs(SIZES.label, totalW)} fontFamily={FONT.family}
-          textAnchor="middle" fillOpacity={0.7}>
-          {d.paneCols}×{d.paneRows} · {d.paneW}×{d.paneH}mm
-        </text>
-
-        {/* Dimensions — width bottom */}
+        {/* Glass overall dimensions */}
         <DimH y={oy + d.glassH + DIM_OFF} x1={ox} x2={ox + d.glassW}
           extFrom={oy + d.glassH} label={`${Math.round(d.glassW)} mm`} vbw={totalW} />
-
-        {/* Dimensions — height right */}
         <DimV x={ox + d.glassW + DIM_OFF} y1={oy} y2={oy + d.glassH}
           extFrom={ox + d.glassW} label={`${Math.round(d.glassH)} mm`} vbw={totalW} />
 
-        {/* Pane width — top (if bars exist) */}
-        {d.vBarPos.length > 0 && (
-          <DimH y={oy - DIM_OFF} x1={ox} x2={ox + d.paneW}
-            extFrom={oy} label={`${d.paneW}`} small vbw={totalW} />
+        {/* Segment dimension — top (if vertical bars) */}
+        {d.spacerV.length > 0 && (
+          <DimH y={oy - DIM_OFF} x1={ox} x2={ox + d.segW}
+            extFrom={oy} label={`${d.segW}`} small vbw={totalW} />
         )}
 
-        {/* Pane height — left (if bars exist) */}
-        {d.hBarPos.length > 0 && (
-          <DimV x={ox - DIM_OFF} y1={oy} y2={oy + d.paneH}
-            extFrom={ox} label={`${d.paneH}`} small vbw={totalW} />
+        {/* Segment dimension — left (if horizontal bars) */}
+        {d.spacerH.length > 0 && (
+          <DimV x={ox - DIM_OFF} y1={oy} y2={oy + d.segH}
+            extFrom={ox} label={`${d.segH}`} small vbw={totalW} />
         )}
 
         {/* Title */}
@@ -122,8 +152,17 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
         <text x={totalW / 2} y={totalH - 12 * totalW / VIEWBOX_REF}
           fill={STROKE.glass} fontSize={tfs(SIZES.subtitle, totalW)} fontFamily={FONT.family}
           textAnchor="middle" fillOpacity={0.7}>
-          {d.glassType} / {d.glassFinish} · spacer: {d.spacer}
+          {d.glassType} / {d.glassFinish} · spacer: {d.spacerColour}
         </text>
+
+        {/* Cross-check alarm */}
+        {!d.crossCheckOk && (
+          <text x={totalW / 2} y={oy - DIM_OFF - 15}
+            fill="#EF4444" fontSize={tfs(SIZES.annotation, totalW)} fontFamily={FONT.family}
+            textAnchor="middle" fontWeight="600">
+            ⚠ CROSS-CHECK FAIL: wood vs math bar positions mismatch
+          </text>
+        )}
       </svg>
     </div>
   );
