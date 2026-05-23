@@ -22,10 +22,11 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
     const botH = derived.bottomSashHeight;
     const barW = CONSTANTS.GLAZING_BAR_WIDTH;
 
-    const glassW = sashW - CONSTANTS.GLASS_WIDTH_DEDUCTION;
+    // Glass = sash minus timber + rebate overlap (25mm)
+    const glassW = sashW - 114 + 25;
     const glassH = isUpper
-      ? topH - CONSTANTS.GLASS_HEIGHT_DEDUCTION
-      : botH - CONSTANTS.GLASS_HEIGHT_DEDUCTION;
+      ? topH - 100 + 25    // topRail(57) + meetRail(43) = 100
+      : botH - 133 + 25;   // botRail(90) + meetRail(43) = 133
 
     // Bar counts
     const gridMode = windowSpec.sash?.grid?.mode || 'none';
