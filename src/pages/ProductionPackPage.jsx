@@ -519,11 +519,12 @@ function GlassTab({ merged, windowsData, isPPMode }) {
                 {isPPMode && <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Projects</th>}
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Width</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Height</th>
-                <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Total Qty</th>
+                <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Qty</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Type</th>
-                <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Spacer</th>
-                <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Finish</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Makeup</th>
+                <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Spec</th>
+                <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Finish</th>
+                <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Spacer</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Windows</th>
               </tr>
             </thead>
@@ -535,9 +536,10 @@ function GlassTab({ merged, windowsData, isPPMode }) {
                   <td className="px-4 py-2.5 text-ink-100 font-mono">{g.height} mm</td>
                   <td className="px-4 py-2.5 text-right text-ink-100 font-semibold">{g.totalQty}</td>
                   <td className="px-4 py-2.5 text-ink-300">{g.type}</td>
-                  <td className="px-4 py-2.5 text-ink-300">{g.spacer}</td>
-                  <td className="px-4 py-2.5 text-ink-300">{g.finish}</td>
                   <td className="px-4 py-2.5 text-ink-300">{g.makeup || '—'}</td>
+                  <td className="px-4 py-2.5 text-ink-300">{g.spec || '—'}</td>
+                  <td className="px-4 py-2.5 text-ink-300">{g.finish}</td>
+                  <td className="px-4 py-2.5 text-ink-300">{g.spacer}</td>
                   <td className="px-4 py-2.5 text-ink-400">{g.windows.join(', ')}</td>
                 </tr>
               ))}
@@ -575,7 +577,7 @@ function GlassTab({ merged, windowsData, isPPMode }) {
       {/* Summary */}
       <div className="card p-4">
         <div className="text-xs text-ink-400">
-          Total panes: <strong className="text-ink-100">{grouped.reduce((s, g) => s + g.totalQty, 0)}</strong> across{' '}
+          Total sealed units: <strong className="text-ink-100">{grouped.reduce((s, g) => s + g.totalQty, 0)}</strong> across{' '}
           <strong className="text-ink-100">{grouped.length}</strong> unique sizes
         </div>
       </div>
@@ -756,7 +758,7 @@ function BOMTab({ merged, batch, pp, isPPMode, windowsData }) {
           <div className="text-sm font-semibold text-ink-50">Glass — Summary</div>
         </div>
         <div className="p-4 text-xs text-ink-300">
-          Total panes: <strong className="text-ink-100">{merged.glass.reduce((s, g) => s + (g.quantity || 1), 0)}</strong> ·
+          Total units: <strong className="text-ink-100">{merged.glass.reduce((s, g) => s + (g.quantity || 1), 0)}</strong> ·
           Type: <strong className="text-ink-100">{batch?.defaults?.glassType || pp?.type || 'double'}</strong> ·
           Spacer: <strong className="text-ink-100">{batch?.defaults?.spacerColor || 'black'}</strong>
           <span className="ml-4 text-ink-400">(See Glass Schedule tab for full breakdown)</span>
@@ -957,15 +959,16 @@ function groupCutListItems(cutList) {
   return Array.from(map.values()).sort((a, b) => a.element.localeCompare(b.element) || a.length - b.length);
 }
 
-/** Group glass items by width+height+type+spacer+finish */
+/** Group glass items by width+height+type+spec+spacer+finish */
 function groupGlassItems(glassList) {
   const map = new Map();
   glassList.forEach((g) => {
-    const key = `${g.width}|${g.height}|${g.type}|${g.spacer}|${g.finish}`;
+    const key = `${g.width}|${g.height}|${g.type}|${g.spec}|${g.spacer}|${g.finish}`;
     if (!map.has(key)) {
       map.set(key, {
         width: g.width, height: g.height,
-        type: g.type, spacer: g.spacer, finish: g.finish,
+        type: g.type, spec: g.spec || 'toughened',
+        spacer: g.spacer, finish: g.finish,
         makeup: g.makeup,
         totalQty: 0, windows: [], projects: [],
       });

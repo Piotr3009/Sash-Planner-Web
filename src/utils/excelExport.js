@@ -69,9 +69,9 @@ export async function exportWindowToExcel({ item, windowSpec, settings, derived 
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(optRows), 'Optimiser');
 
   // Glass
-  const glassRows = [['Pane', 'Width', 'Height', 'Qty', 'Type', 'Spacer', 'Finish', 'Make-up']];
+  const glassRows = [['Unit', 'Width', 'Height', 'Qty', 'Type', 'Makeup', 'Spec', 'Finish', 'Spacer']];
   buildGlassListForWindow(derived, windowSpec).forEach((p) =>
-    glassRows.push([p.label, p.width, p.height, p.quantity, p.type, p.spacer, p.finish, p.makeup])
+    glassRows.push([p.label, p.width, p.height, p.quantity, p.type, p.makeup, p.spec, p.finish, p.spacer])
   );
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(glassRows), 'Glass');
 

@@ -128,21 +128,64 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg) {
 
 export function buildGlassListForWindow(derived, windowSpec) {
   if (!derived) return [];
-  const item = derived.glazingItems?.[0];
-  if (!item) return [];
-  const total = item.panes || (item.rows * item.cols * 2);
-  const finish = windowSpec?.glazing?.frosted ? 'frosted' : windowSpec?.glazing?.finish || 'clear';
+
+  const sw = derived.sashWidth;
+  const topH = derived.topSashHeight;
+  const botH = derived.bottomSashHeight;
+  if (!sw || !topH || !botH) return [];
+
+  // Sealed glass unit dimensions (verified against Excel)
+  const unitW = Math.round((sw - CONSTANTS.GLASS_WIDTH_DEDUCTION) * 100) / 100;
+  const unitHupper = Math.round((topH - CONSTANTS.GLASS_HEIGHT_DEDUCTION) * 100) / 100;
+  // Lower deduction: meetRail(43) + botRail(90) - 2×rebate(12.5) = 108
+  const LOWER_DEDUCTION = CONSTANTS.MEETING_RAIL_WIDTH + CONSTANTS.BOTTOM_RAIL_WIDTH - 2 * 12.5;
+  const unitHlower = Math.round((botH - LOWER_DEDUCTION) * 100) / 100;
+
+  const glassType = windowSpec?.glazing?.type || 'double';
+  const glassSpec = windowSpec?.glazing?.spec || 'toughened';
+  const spacer = windowSpec?.glazing?.spacerColour || 'silver';
+  const makeup = windowSpec?.glazing?.makeup || (glassType === 'triple' ? '4x12x4x12x4' : '4x16x4');
+  const isFrosted = windowSpec?.glazing?.finish === 'frosted';
+  const frostedLoc = windowSpec?.glazing?.frostedLocation || 'bottom';
+
+  // Determine finish per sash
+  let upperFinish = 'clear';
+  let lowerFinish = 'clear';
+  if (isFrosted) {
+    lowerFinish = 'frosted';
+    upperFinish = frostedLoc === 'both' ? 'frosted' : 'clear';
+  }
+
+  // Bar pattern info for reference
+  const gridMode = windowSpec?.sash?.grid?.mode || 'none';
+
   return [
     {
-      label: `${item.rows}×${item.cols} pane`,
-      width: item.width,
-      height: item.height,
-      quantity: total,
-      type: windowSpec?.glazing?.type || 'double',
-      spacer: item.spacerColour,
-      finish,
-      makeup: item.makeup
-    }
+      label: 'Upper Glass',
+      sash: 'upper',
+      width: unitW,
+      height: unitHupper,
+      quantity: 1,
+      type: glassType,
+      spec: glassSpec,
+      spacer,
+      finish: upperFinish,
+      makeup,
+      bars: gridMode,
+    },
+    {
+      label: 'Lower Glass',
+      sash: 'lower',
+      width: unitW,
+      height: unitHlower,
+      quantity: 1,
+      type: glassType,
+      spec: glassSpec,
+      spacer,
+      finish: lowerFinish,
+      makeup,
+      bars: gridMode,
+    },
   ];
 }
 
