@@ -96,6 +96,7 @@ export default function GlassDrawing2D({ windowSpec, derived }) {
 
   const totalW = d.fw + MARGIN * 2 + DIM_OFFSET * 3;
   const totalH = d.fh + MARGIN * 2 + DIM_OFFSET * 4;
+  const sc = Math.max(d.fw, d.fh) / 500;
 
   return (
     <div className="w-full">
@@ -149,11 +150,11 @@ export default function GlassDrawing2D({ windowSpec, derived }) {
 
         {/* ── Dimensions ── */}
         {/* Upper glass zone */}
-        <DimH y={d.uGlassY - 15} x1={d.uGlassX} x2={d.uGlassX + d.uGlassW} label={`${Math.round(d.uGlassW)} mm`} small />
-        <DimV x={d.fw + DIM_OFFSET} y1={d.uGlassY} y2={d.uGlassY + d.uGlassH} label={`${Math.round(d.uGlassH)}`} small />
+        <DimH y={d.uGlassY - 15} x1={d.uGlassX} x2={d.uGlassX + d.uGlassW} label={`${Math.round(d.uGlassW)} mm`} small sc={sc} />
+        <DimV x={d.fw + DIM_OFFSET} y1={d.uGlassY} y2={d.uGlassY + d.uGlassH} label={`${Math.round(d.uGlassH)}`} small sc={sc} />
 
         {/* Lower glass zone */}
-        <DimV x={d.fw + DIM_OFFSET} y1={d.lGlassY} y2={d.lGlassY + d.lGlassH} label={`${Math.round(d.lGlassH)}`} small />
+        <DimV x={d.fw + DIM_OFFSET} y1={d.lGlassY} y2={d.lGlassY + d.lGlassH} label={`${Math.round(d.lGlassH)}`} small sc={sc} />
 
         {/* Individual pane size */}
         <DimH y={d.fh + DIM_OFFSET} x1={d.uGlassX} x2={d.uGlassX + d.uPaneW}

@@ -80,6 +80,7 @@ export default function VerticalSection2D({ windowSpec, derived }) {
   const drawW = d.depth + 60; // extra space for labels
   const totalW = drawW + MARGIN * 2 + DIM_OFFSET * 3;
   const totalH = d.totalStackH + MARGIN * 2 + DIM_OFFSET * 3;
+  const sc = Math.max(drawW, d.totalStackH) / 500;
 
   return (
     <div className="w-full">
@@ -114,16 +115,16 @@ export default function VerticalSection2D({ windowSpec, derived }) {
             </text>
             {/* Height dimension on right side */}
             {b.h > 30 && (
-              <DimV x={d.depth + 80} y1={b.y} y2={b.y + b.h} label={`${Math.round(b.h)}`} small />
+              <DimV x={d.depth + 80} y1={b.y} y2={b.y + b.h} label={`${Math.round(b.h)}`} small sc={sc} />
             )}
           </g>
         ))}
 
         {/* Overall height — left */}
-        <DimV x={-DIM_OFFSET} y1={0} y2={d.totalStackH} label={`≈ ${d.totalStackH} mm`} />
+        <DimV x={-DIM_OFFSET} y1={0} y2={d.totalStackH} label={`≈ ${d.totalStackH} mm`} sc={sc} />
 
         {/* Depth dimension — bottom */}
-        <DimH y={d.totalStackH + DIM_OFFSET} x1={0} x2={d.depth} label={`Depth: ${d.depth} mm`} />
+        <DimH y={d.totalStackH + DIM_OFFSET} x1={0} x2={d.depth} label={`Depth: ${d.depth} mm`} sc={sc} />
 
         {/* Title */}
         <TitleBlock x={d.depth / 2} y={d.totalStackH + DIM_OFFSET * 2 + 20}

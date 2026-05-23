@@ -32,48 +32,59 @@ export const DIM_GAP = 35;
 export const MARGIN = 80;
 
 // ─── Horizontal dimension line ───
-export function DimH({ y, x1, x2, label, small }) {
+export function DimH({ y, x1, x2, label, small, sc }) {
   const mid = (x1 + x2) / 2;
-  const fs = small ? FONT.size * 0.7 : FONT.size * 0.85;
-  const tick = small ? 4 : 6;
+  const fs = sc
+    ? sc * (small ? SIZES.dimSmall : SIZES.dimLarge)
+    : (small ? FONT.size * 0.7 : FONT.size * 0.85);
+  const tick = sc ? sc * (small ? 8 : 14) : (small ? 4 : 6);
+  const sw = sc ? sc * 1.5 : 0.5;
+  const gap = sc ? sc * 10 : 6;
   return (
     <g>
-      <line x1={x1} y1={y} x2={x2} y2={y} stroke={STROKE.dim} strokeWidth={0.5} />
-      <line x1={x1} y1={y - tick} x2={x1} y2={y + tick} stroke={STROKE.dim} strokeWidth={0.5} />
-      <line x1={x2} y1={y - tick} x2={x2} y2={y + tick} stroke={STROKE.dim} strokeWidth={0.5} />
-      <text x={mid} y={y - 6} fill={STROKE.dim} fontSize={fs} fontFamily={FONT.family}
+      <line x1={x1} y1={y} x2={x2} y2={y} stroke={STROKE.dim} strokeWidth={sw} />
+      <line x1={x1} y1={y - tick} x2={x1} y2={y + tick} stroke={STROKE.dim} strokeWidth={sw} />
+      <line x1={x2} y1={y - tick} x2={x2} y2={y + tick} stroke={STROKE.dim} strokeWidth={sw} />
+      <text x={mid} y={y - gap} fill={STROKE.dim} fontSize={fs} fontFamily={FONT.family}
         textAnchor="middle" fontWeight={WEIGHTS.dim}>{label}</text>
     </g>
   );
 }
 
 // ─── Vertical dimension line ───
-export function DimV({ x, y1, y2, label, small }) {
+export function DimV({ x, y1, y2, label, small, sc }) {
   const mid = (y1 + y2) / 2;
-  const fs = small ? FONT.size * 0.7 : FONT.size * 0.85;
-  const tick = small ? 4 : 6;
+  const fs = sc
+    ? sc * (small ? SIZES.dimSmall : SIZES.dimLarge)
+    : (small ? FONT.size * 0.7 : FONT.size * 0.85);
+  const tick = sc ? sc * (small ? 8 : 14) : (small ? 4 : 6);
+  const sw = sc ? sc * 1.5 : 0.5;
+  const offset = sc ? sc * 18 : 8;
   return (
     <g>
-      <line x1={x} y1={y1} x2={x} y2={y2} stroke={STROKE.dim} strokeWidth={0.5} />
-      <line x1={x - tick} y1={y1} x2={x + tick} y2={y1} stroke={STROKE.dim} strokeWidth={0.5} />
-      <line x1={x - tick} y1={y2} x2={x + tick} y2={y2} stroke={STROKE.dim} strokeWidth={0.5} />
-      <text x={x + 8} y={mid + 4} fill={STROKE.dim} fontSize={fs} fontFamily={FONT.family}
-        fontWeight={WEIGHTS.dim} transform={`rotate(-90, ${x + 8}, ${mid + 4})`}
+      <line x1={x} y1={y1} x2={x} y2={y2} stroke={STROKE.dim} strokeWidth={sw} />
+      <line x1={x - tick} y1={y1} x2={x + tick} y2={y1} stroke={STROKE.dim} strokeWidth={sw} />
+      <line x1={x - tick} y1={y2} x2={x + tick} y2={y2} stroke={STROKE.dim} strokeWidth={sw} />
+      <text x={x + offset} y={mid + (sc ? sc * 8 : 4)} fill={STROKE.dim} fontSize={fs} fontFamily={FONT.family}
+        fontWeight={WEIGHTS.dim} transform={`rotate(-90, ${x + offset}, ${mid + (sc ? sc * 8 : 4)})`}
         textAnchor="middle">{label}</text>
     </g>
   );
 }
 
 // ─── Title block ───
-export function TitleBlock({ x, y, title, subtitle }) {
+export function TitleBlock({ x, y, title, subtitle, sc }) {
+  const titleFs = sc ? sc * SIZES.title : FONT.size * 1.1;
+  const subFs = sc ? sc * SIZES.subtitle : FONT.size * 0.75;
+  const subGap = sc ? sc * 25 : 18;
   return (
     <g>
-      <text x={x} y={y} fill={COLORS.title} fontSize={FONT.size * 1.1}
+      <text x={x} y={y} fill={COLORS.title} fontSize={titleFs}
         fontFamily={FONT.family} textAnchor="middle" fontWeight={WEIGHTS.title}>
         {title}
       </text>
       {subtitle && (
-        <text x={x} y={y + 18} fill={COLORS.subtitle} fontSize={FONT.size * 0.75}
+        <text x={x} y={y + subGap} fill={COLORS.subtitle} fontSize={subFs}
           fontFamily={FONT.family} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>
           {subtitle}
         </text>
@@ -83,9 +94,10 @@ export function TitleBlock({ x, y, title, subtitle }) {
 }
 
 // ─── Label helper ───
-export function Label({ x, y, text, anchor = 'middle', opacity = 0.8 }) {
+export function Label({ x, y, text, anchor = 'middle', opacity = 0.8, sc }) {
+  const fs = sc ? sc * SIZES.label : FONT.size * 0.7;
   return (
-    <text x={x} y={y} fill={COLORS.label} fontSize={FONT.size * 0.7}
+    <text x={x} y={y} fill={COLORS.label} fontSize={fs}
       fontFamily={FONT.family} textAnchor={anchor} fillOpacity={opacity} fontWeight={WEIGHTS.label}>
       {text}
     </text>

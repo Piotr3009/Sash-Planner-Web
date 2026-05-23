@@ -7,7 +7,7 @@
  */
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
-import { STROKE, FONT, DIM_OFFSET, DIM_GAP, MARGIN, computeBarPositions } from './drawingUtils.jsx';
+import { STROKE, FONT, DimH, DimV, TitleBlock, DIM_OFFSET, DIM_GAP, MARGIN, computeBarPositions } from './drawingUtils.jsx';
 
 export default function FrontElevation2D({ windowSpec, derived }) {
   const drawing = useMemo(() => {
@@ -97,6 +97,7 @@ export default function FrontElevation2D({ windowSpec, derived }) {
   }
 
   const d = drawing;
+  const sc = Math.max(d.fw, d.fh) / 500;
   const totalW = d.fw + MARGIN * 2 + DIM_OFFSET * 3;
   const totalH = d.fh + MARGIN * 2 + DIM_OFFSET * 3;
 
@@ -204,31 +205,31 @@ export default function FrontElevation2D({ windowSpec, derived }) {
 
         {/* ── DIMENSION LINES ── */}
         {/* Frame Width — bottom */}
-        <DimH y={d.fh + DIM_OFFSET} x1={0} x2={d.fw} label={`${d.fw} mm`} />
+        <DimH y={d.fh + DIM_OFFSET} x1={0} x2={d.fw} label={`${d.fw} mm`} sc={sc} />
 
         {/* Frame Height — right */}
-        <DimV x={d.fw + DIM_OFFSET} y1={0} y2={d.fh} label={`${d.fh} mm`} />
+        <DimV x={d.fw + DIM_OFFSET} y1={0} y2={d.fh} label={`${d.fh} mm`} sc={sc} />
 
         {/* Sash Width — top */}
-        <DimH y={-DIM_OFFSET} x1={d.sashX} x2={d.sashX + d.sashW} label={`Sash: ${d.sashW} mm`} />
+        <DimH y={-DIM_OFFSET} x1={d.sashX} x2={d.sashX + d.sashW} label={`Sash: ${d.sashW} mm`} sc={sc} />
 
         {/* Top Sash Height — left */}
-        <DimV x={-DIM_OFFSET} y1={d.sashY} y2={d.meetY} label={`${d.topH}`} />
+        <DimV x={-DIM_OFFSET} y1={d.sashY} y2={d.meetY} label={`${d.topH}`} sc={sc} />
 
         {/* Bottom Sash Height — left */}
-        <DimV x={-DIM_OFFSET} y1={d.meetY} y2={d.sashY + d.topH + d.botH} label={`${d.botH}`} />
+        <DimV x={-DIM_OFFSET} y1={d.meetY} y2={d.sashY + d.topH + d.botH} label={`${d.botH}`} sc={sc} />
 
         {/* Jamb width — bottom detail */}
-        <DimH y={d.fh + DIM_OFFSET + DIM_GAP} x1={0} x2={d.jw} label={`${d.jw}`} small />
+        <DimH y={d.fh + DIM_OFFSET + DIM_GAP} x1={0} x2={d.jw} label={`${d.jw}`} small sc={sc} />
 
         {/* Stile width — bottom detail */}
-        <DimH y={d.fh + DIM_OFFSET + DIM_GAP} x1={d.sashX} x2={d.sashX + d.stile} label={`${d.stile}`} small />
+        <DimH y={d.fh + DIM_OFFSET + DIM_GAP} x1={d.sashX} x2={d.sashX + d.stile} label={`${d.stile}`} small sc={sc} />
 
         {/* Head height */}
-        <DimV x={d.fw + DIM_OFFSET + DIM_GAP} y1={0} y2={d.hw} label={`${d.hw}`} small />
+        <DimV x={d.fw + DIM_OFFSET + DIM_GAP} y1={0} y2={d.hw} label={`${d.hw}`} small sc={sc} />
 
         {/* Sill height */}
-        <DimV x={d.fw + DIM_OFFSET + DIM_GAP} y1={d.fh - d.sw} y2={d.fh} label={`${d.sw}`} small />
+        <DimV x={d.fw + DIM_OFFSET + DIM_GAP} y1={d.fh - d.sw} y2={d.fh} label={`${d.sw}`} small sc={sc} />
 
         {/* Meeting rail label */}
         <text x={d.fw + DIM_OFFSET + DIM_GAP + 15} y={d.meetY + 4}
@@ -255,52 +256,11 @@ export default function FrontElevation2D({ windowSpec, derived }) {
 
         {/* Title */}
         <text x={d.fw / 2} y={d.fh + DIM_OFFSET * 2 + DIM_GAP + 10}
-          fill={STROKE.dimText} fontSize={FONT.size * 1.1} fontFamily={FONT.family}
+          fill={STROKE.dimText} fontSize={sc * 21} fontFamily={FONT.family}
           textAnchor="middle" fontWeight="600">
           FRONT ELEVATION — {d.fw} × {d.fh} mm
         </text>
       </svg>
     </div>
-  );
-}
-
-// ─── Dimension Line Components ───
-
-function DimH({ y, x1, x2, label, small }) {
-  const mid = (x1 + x2) / 2;
-  const fs = small ? FONT.size * 0.7 : FONT.size * 0.85;
-  const tick = small ? 4 : 6;
-  return (
-    <g>
-      <line x1={x1} y1={y} x2={x2} y2={y} stroke={STROKE.dim} strokeWidth={0.5} />
-      {/* Ticks */}
-      <line x1={x1} y1={y - tick} x2={x1} y2={y + tick} stroke={STROKE.dim} strokeWidth={0.5} />
-      <line x1={x2} y1={y - tick} x2={x2} y2={y + tick} stroke={STROKE.dim} strokeWidth={0.5} />
-      {/* Extension lines */}
-      <line x1={x1} y1={y - tick * 3} x2={x1} y2={y - tick} stroke={STROKE.dim} strokeWidth={0.3} strokeOpacity={0.4} />
-      <line x1={x2} y1={y - tick * 3} x2={x2} y2={y - tick} stroke={STROKE.dim} strokeWidth={0.3} strokeOpacity={0.4} />
-      {/* Label */}
-      <text x={mid} y={y - 6} fill={STROKE.dim} fontSize={fs} fontFamily={FONT.family}
-        textAnchor="middle" fontWeight="400">{label}</text>
-    </g>
-  );
-}
-
-function DimV({ x, y1, y2, label, small }) {
-  const mid = (y1 + y2) / 2;
-  const fs = small ? FONT.size * 0.7 : FONT.size * 0.85;
-  const tick = small ? 4 : 6;
-  return (
-    <g>
-      <line x1={x} y1={y1} x2={x} y2={y2} stroke={STROKE.dim} strokeWidth={0.5} />
-      {/* Ticks */}
-      <line x1={x - tick} y1={y1} x2={x + tick} y2={y1} stroke={STROKE.dim} strokeWidth={0.5} />
-      <line x1={x - tick} y1={y2} x2={x + tick} y2={y2} stroke={STROKE.dim} strokeWidth={0.5} />
-      {/* Label — rotated */}
-      <text x={x + 8} y={mid + 4} fill={STROKE.dim} fontSize={fs} fontFamily={FONT.family}
-        fontWeight="400"
-        transform={`rotate(-90, ${x + 8}, ${mid + 4})`}
-        textAnchor="middle">{label}</text>
-    </g>
   );
 }
