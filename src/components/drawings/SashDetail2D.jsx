@@ -52,7 +52,7 @@ const FONT_FAMILY = 'DM Sans, system-ui, sans-serif';
 // Base font sizes (multiplied by sc factor)
 const FS_DIM_LARGE = 21;
 const FS_DIM_SMALL = 17;
-const FS_LABEL = 10;
+const FS_LABEL = 13;
 const FS_TITLE = 21;
 const FS_SUBTITLE = 17;
 const FS_NOTCH_NOTE = 9;

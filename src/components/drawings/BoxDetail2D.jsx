@@ -27,8 +27,8 @@ const COL = {
   frameFill: 'rgba(148,163,184,0.06)',
   sillDetail: '#94A3B8',
   dim: '#EF4444',
-  label: '#64748b',
-  cavity: '#475569',
+  label: '#00B4A0',
+  cavity: '#00B4A0',
   title: '#E2E8F0',
 };
 
@@ -138,10 +138,10 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
 
   const sill = `M ${X(BOX.jambW_bottom)} ${Y(0)} L ${X(fw - BOX.jambW_bottom)} ${Y(0)} L ${X(fw - BOX.jambW_bottom)} ${Y(BOX.sillNose)} L ${X(BOX.jambW_bottom)} ${Y(BOX.sillNose)} Z`;
 
-  const labelFs = sc * 24;
+  const labelFs = sc * 14;
   const titleFs = sc * 36;
   const subtitleFs = sc * 24;
-  const cavityFs = sc * 40;
+  const cavityFs = sc * 22;
   const winName = windowSpec?.name || 'Window';
   const projNum = projectNumber || '';
 
