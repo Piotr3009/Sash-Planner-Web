@@ -546,20 +546,30 @@ function GlassTab({ merged, windowsData, isPPMode }) {
         </div>
       </div>
 
-      {/* Glass drawings per window */}
+      {/* Glass drawings per window — upper + lower */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {windowsData.map(({ win, windowSpec, derived }) => (
-          <div key={win.id} className="card p-4">
+        {windowsData.flatMap(({ win, windowSpec, derived }) => [
+          <div key={`${win.id}-upper`} className="card p-4">
             <div className="text-xs font-semibold text-ink-200 mb-2">
-              {isPPMode && win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — Glass Drawing
+              {isPPMode && win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — Upper Glass
             </div>
             {derived ? (
-              <GlassDrawing2D windowSpec={windowSpec} derived={derived} />
+              <GlassDrawing2D windowSpec={windowSpec} derived={derived} type="upper" />
             ) : (
               <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
             )}
-          </div>
-        ))}
+          </div>,
+          <div key={`${win.id}-lower`} className="card p-4">
+            <div className="text-xs font-semibold text-ink-200 mb-2">
+              {isPPMode && win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — Lower Glass
+            </div>
+            {derived ? (
+              <GlassDrawing2D windowSpec={windowSpec} derived={derived} type="lower" />
+            ) : (
+              <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
+            )}
+          </div>,
+        ])}
       </div>
 
       {/* Summary */}
