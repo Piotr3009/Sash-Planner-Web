@@ -46,13 +46,13 @@ export const FONT_FAMILY = 'DM Sans, system-ui, sans-serif';
 // SVG `font-size="Npx"` renders Npx on screen regardless of viewBox / aspect ratio.
 // To change text size everywhere, change values here only.
 export const SIZES = {
-  dimLarge:    16,
-  dimSmall:    13,
-  label:       12,
-  title:       18,
-  subtitle:    14,
-  annotation:  13,  // mid-size: glass specs, section labels
-  notch:       10,
+  dimLarge:    32,
+  dimSmall:    26,
+  label:       24,
+  title:       36,
+  subtitle:    28,
+  annotation:  26,  // mid-size: glass specs, section labels
+  notch:       20,
 };
 
 // ─── Weights ───
