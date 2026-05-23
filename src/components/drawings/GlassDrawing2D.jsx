@@ -2,13 +2,13 @@
  * GlassDrawing2D.jsx
  *
  * Single sealed glass unit — one per sash (upper or lower).
- * Glass dimensions from sash. Spacer bars equally spaced (math).
- * Cross-check: segments + bars must sum to total.
- * Shows 11mm edge seal border.
+ * Spacer bars equally spaced (math). Chain dimensioning like SashDetail2D.
+ * Shows 11mm edge seal + spacer bars + full dimension chains.
  */
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
-import { STROKE, COLORS, FONT, SIZES, WEIGHTS, STROKES, VIEWBOX_REF, DimH, DimV, tfs, computeBarPositions } from './drawingUtils.jsx';
+import { STROKE, COLORS, FONT, SIZES, WEIGHTS, STROKES, VIEWBOX_REF,
+  DimH, DimV, DimChainH, DimChainV, tfs, computeBarPositions } from './drawingUtils.jsx';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
 const MARGIN = 60;
@@ -16,6 +16,11 @@ const DIM_OFF = 35;
 const SPACER_BAR = 18;
 const REBATE = 12.5;
 const EDGE_SEAL = 11;
+
+function fmt(n) {
+  const r = Math.round(n * 10) / 10;
+  return Number.isInteger(r) ? r.toString() : r.toFixed(1);
+}
 
 export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) {
   const d = useMemo(() => {
@@ -26,7 +31,6 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
     const topH = derived.topSashHeight;
     const botH = derived.bottomSashHeight;
 
-    // Glass dimensions from sash
     const glassW = sashW - 114 + 2 * REBATE;
     const glassH = isUpper
       ? topH - 100 + 2 * REBATE
@@ -43,39 +47,36 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
       hCount = isUpper ? Math.floor(rows / 2) : Math.ceil(rows / 2);
     }
 
-    // Spacer bars — equal spacing within glass (math)
+    // Spacer bars — equal spacing within glass
     const bars = computeBarPositions({
       glassX: 0, glassY: 0, glassW, glassH,
       vCount, hCount, barW: SPACER_BAR,
     });
 
-    // Cross-check: segments + bars = total
+    // Chain cuts — horizontal: [0, edgeSeal, bar1.left, bar1.right, ..., glassW-edgeSeal, glassW]
+    const hChainCuts = [0, EDGE_SEAL];
+    bars.vBars.forEach(b => { hChainCuts.push(b.left); hChainCuts.push(b.right); });
+    hChainCuts.push(glassW - EDGE_SEAL, glassW);
+
+    // Chain cuts — vertical
+    const vChainCuts = [0, EDGE_SEAL];
+    bars.hBars.forEach(b => { vChainCuts.push(b.top); vChainCuts.push(b.bot); });
+    vChainCuts.push(glassH - EDGE_SEAL, glassH);
+
+    // Cross-check
     let crossCheckOk = true;
     const errors = [];
     const sumW = bars.paneW * (vCount + 1) + vCount * SPACER_BAR;
     const sumH = bars.paneH * (hCount + 1) + hCount * SPACER_BAR;
-    if (Math.abs(sumW - glassW) > 0.1) {
-      crossCheckOk = false;
-      errors.push(`W: ${sumW.toFixed(1)} ≠ ${glassW.toFixed(1)}`);
-    }
-    if (Math.abs(sumH - glassH) > 0.1) {
-      crossCheckOk = false;
-      errors.push(`H: ${sumH.toFixed(1)} ≠ ${glassH.toFixed(1)}`);
-    }
-    if (bars.paneW < 0 || bars.paneH < 0) {
-      crossCheckOk = false;
-      errors.push('segment < 0');
-    }
-
-    const segW = Math.round(bars.paneW * 10) / 10;
-    const segH = Math.round(bars.paneH * 10) / 10;
+    if (Math.abs(sumW - glassW) > 0.1) { crossCheckOk = false; errors.push(`W: ${sumW.toFixed(1)}≠${glassW.toFixed(1)}`); }
+    if (Math.abs(sumH - glassH) > 0.1) { crossCheckOk = false; errors.push(`H: ${sumH.toFixed(1)}≠${glassH.toFixed(1)}`); }
 
     const glassType = windowSpec?.glass?.type || windowSpec?.glazing?.type || 'double';
     const glassFinish = windowSpec?.glass?.finish || windowSpec?.glazing?.finish || 'clear';
     const spacerColour = windowSpec?.glazing?.spacerColour || 'black';
 
     return { glassW, glassH, vBars: bars.vBars, hBars: bars.hBars, vCount, hCount,
-      segW, segH, crossCheckOk, errors, glassType, glassFinish, spacerColour, isUpper };
+      hChainCuts, vChainCuts, crossCheckOk, errors, glassType, glassFinish, spacerColour, isUpper };
   }, [windowSpec, derived, type]);
 
   if (!d) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
@@ -85,6 +86,7 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
   const TITLE_SPACE = 50;
   const totalW = d.glassW + MARGIN * 2 + DIM_OFF * 2;
   const totalH = d.glassH + MARGIN * 2 + DIM_OFF * 2 + TITLE_SPACE;
+  const ts = totalW / VIEWBOX_REF;
 
   return (
     <div className="w-full" style={{ maxHeight: '65vh', overflow: 'auto' }}>
@@ -112,37 +114,35 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
             fill={COLORS.bar} fillOpacity={0.3} stroke={COLORS.bar} strokeWidth={STROKES.bar} {...NS} />
         ))}
 
-        {/* Glass dimensions */}
+        {/* ── CHAIN DIMENSIONS ── */}
+
+        {/* Top chain: 11 | seg | 18 | seg | 18 | seg | 11 */}
+        <DimChainH y={oy - 24 * ts} extFrom={oy - 4 * ts}
+          cuts={d.hChainCuts.map(cx => ox + cx)}
+          vbw={totalW} minSegment={SPACER_BAR * 1.5} fmt={fmt} />
+
+        {/* Left chain: 11 | seg | 18 | seg | 18 | seg | 11 */}
+        <DimChainV x={ox - 24 * ts} extFrom={ox - 4 * ts}
+          cuts={d.vChainCuts.map(cy => oy + cy)}
+          vbw={totalW} minSegment={SPACER_BAR * 1.5} fmt={fmt} />
+
+        {/* Overall glass — bottom */}
         <DimH y={oy + d.glassH + DIM_OFF} x1={ox} x2={ox + d.glassW}
           extFrom={oy + d.glassH} label={`${Math.round(d.glassW)} mm`} vbw={totalW} />
+
+        {/* Overall glass — right */}
         <DimV x={ox + d.glassW + DIM_OFF} y1={oy} y2={oy + d.glassH}
           extFrom={ox + d.glassW} label={`${Math.round(d.glassH)} mm`} vbw={totalW} />
 
-        {/* Edge seal dimension */}
-        <DimH y={oy - DIM_OFF * 0.5} x1={ox} x2={ox + EDGE_SEAL}
-          extFrom={oy} label={`${EDGE_SEAL}`} small vbw={totalW} />
-
-        {/* Segment width — top */}
-        {d.vCount > 0 && (
-          <DimH y={oy - DIM_OFF} x1={ox} x2={ox + d.segW}
-            extFrom={oy} label={`${d.segW}`} small vbw={totalW} />
-        )}
-
-        {/* Segment height — left */}
-        {d.hCount > 0 && (
-          <DimV x={ox - DIM_OFF} y1={oy} y2={oy + d.segH}
-            extFrom={ox} label={`${d.segH}`} small vbw={totalW} />
-        )}
-
         {/* Title */}
-        <text x={totalW / 2} y={totalH - 30 * totalW / VIEWBOX_REF}
+        <text x={totalW / 2} y={totalH - 30 * ts}
           fill={COLORS.title} fontSize={tfs(SIZES.title, totalW)} fontFamily={FONT.family}
           textAnchor="middle" fontWeight={WEIGHTS.title}>
           {d.isUpper ? 'UPPER' : 'LOWER'} GLASS
         </text>
 
         {/* Spec */}
-        <text x={totalW / 2} y={totalH - 12 * totalW / VIEWBOX_REF}
+        <text x={totalW / 2} y={totalH - 12 * ts}
           fill={STROKE.glass} fontSize={tfs(SIZES.subtitle, totalW)} fontFamily={FONT.family}
           textAnchor="middle" fillOpacity={0.7}>
           {d.glassType} / {d.glassFinish} · spacer: {d.spacerColour}
@@ -153,7 +153,7 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
           <text x={totalW / 2} y={oy - DIM_OFF - 15}
             fill="#EF4444" fontSize={tfs(SIZES.annotation, totalW)} fontFamily={FONT.family}
             textAnchor="middle" fontWeight="600">
-            ⚠ GLASS CHECK: {d.errors.join(' · ')}
+            ⚠ {d.errors.join(' · ')}
           </text>
         )}
       </svg>
