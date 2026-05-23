@@ -1,8 +1,13 @@
 /**
  * FrontElevation2D.jsx
  *
- * Front elevation = Box frame + Upper Sash + Lower Sash composed together.
- * Uses same bar logic as SashDetail2D (BAR_PATTERNS, segment breaks, crosses).
+ * Front elevation viewed from EXTERIOR.
+ * SVG z-order matches physical depth:
+ *   1. Box frame (in wall — furthest back)
+ *   2. Lower sash (interior track — behind)
+ *   3. Upper sash (exterior track — in front, covers lower at meeting rail)
+ *
+ * Uses BAR_PATTERNS from SashDetail2D (segment breaks, crosses).
  */
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
@@ -15,16 +20,14 @@ const BAR_PATTERNS = {
   'none': { h: 0, v: 0 }, '2x2': { h: 0, v: 1 }, '3x3': { h: 0, v: 2 },
   '4x4': { h: 1, v: 1 }, '6x6': { h: 1, v: 2 }, '9x9': { h: 2, v: 2 },
 };
-
 const BAR_WIDTH = 22;
 
 const C = {
   frame: COLORS.frame, frameFill: COLORS.frameFill,
   sash: COLORS.sash, glass: COLORS.glass,
   meeting: COLORS.meeting, bar: COLORS.bar,
-  horn: COLORS.horn, dim: COLORS.dim,
-  title: COLORS.title, subtitle: COLORS.subtitle,
-  label: COLORS.label, notch: COLORS.notch,
+  horn: COLORS.horn, title: COLORS.title,
+  subtitle: COLORS.subtitle, label: COLORS.label,
 };
 
 function fmt(n) {
@@ -33,8 +36,8 @@ function fmt(n) {
 }
 
 function computeSegments(from, to, cutPairs) {
-  if (cutPairs.length === 0) return [{ a: from, b: to }];
-  const sorted = [...cutPairs].sort((p, q) => p[0] - q[0]);
+  if (!cutPairs.length) return [{ a: from, b: to }];
+  const sorted = [...cutPairs].sort((a, b) => a[0] - b[0]);
   const segs = [];
   let pos = from;
   for (const [s, e] of sorted) {
@@ -43,6 +46,53 @@ function computeSegments(from, to, cutPairs) {
   }
   if (pos < to) segs.push({ a: pos, b: to });
   return segs;
+}
+
+/** Renders bars (parallel lines + segment breaks + crosses) for one sash */
+function SashBars({ bars, glassX, glassY, glassW, glassH, X, Y }) {
+  const hCuts = bars.hBars.map(hb => [hb.top, hb.bot]);
+  const vCuts = bars.vBars.map(vb => [vb.left, vb.right]);
+  const vertSegs = computeSegments(glassY, glassY + glassH, hCuts);
+  const horizSegs = computeSegments(glassX, glassX + glassW, vCuts);
+
+  return (
+    <g>
+      {bars.vBars.map((vb, i) => (
+        <g key={`v${i}`}>
+          {vertSegs.map((seg, j) => (
+            <g key={j}>
+              <line x1={X(vb.left)} y1={Y(seg.a)} x2={X(vb.left)} y2={Y(seg.b)}
+                stroke={C.sash} strokeWidth={STROKES.bar} {...NS} />
+              <line x1={X(vb.right)} y1={Y(seg.a)} x2={X(vb.right)} y2={Y(seg.b)}
+                stroke={C.sash} strokeWidth={STROKES.bar} {...NS} />
+            </g>
+          ))}
+        </g>
+      ))}
+      {bars.hBars.map((hb, j) => (
+        <g key={`h${j}`}>
+          {horizSegs.map((seg, i) => (
+            <g key={i}>
+              <line x1={X(seg.a)} y1={Y(hb.top)} x2={X(seg.b)} y2={Y(hb.top)}
+                stroke={C.sash} strokeWidth={STROKES.bar} {...NS} />
+              <line x1={X(seg.a)} y1={Y(hb.bot)} x2={X(seg.b)} y2={Y(hb.bot)}
+                stroke={C.sash} strokeWidth={STROKES.bar} {...NS} />
+            </g>
+          ))}
+        </g>
+      ))}
+      {bars.vBars.flatMap((vb, vi) =>
+        bars.hBars.map((hb, hi) => (
+          <g key={`x${vi}-${hi}`}>
+            <line x1={X(vb.left)} y1={Y(hb.top)} x2={X(vb.right)} y2={Y(hb.bot)}
+              stroke={C.sash} strokeWidth={STROKES.bar} {...NS} />
+            <line x1={X(vb.right)} y1={Y(hb.top)} x2={X(vb.left)} y2={Y(hb.bot)}
+              stroke={C.sash} strokeWidth={STROKES.bar} {...NS} />
+          </g>
+        ))
+      )}
+    </g>
+  );
 }
 
 export default function FrontElevation2D({ windowSpec, derived }) {
@@ -55,28 +105,31 @@ export default function FrontElevation2D({ windowSpec, derived }) {
     const topH = derived.topSashHeight;
     const botH = derived.bottomSashHeight;
 
-    const jw = CONSTANTS.JAMBS_WIDTH;       // 28
-    const headH = CONSTANTS.HEAD_WIDTH;     // 28
-    const sillH = CONSTANTS.SILL_WIDTH;     // 46
-    const stile = CONSTANTS.STILE_WIDTH;    // 57
-    const topRail = CONSTANTS.TOP_RAIL_WIDTH;   // 57
-    const botRail = CONSTANTS.BOTTOM_RAIL_WIDTH; // 90
-    const meetRail = CONSTANTS.MEETING_RAIL_WIDTH; // 43
+    const jw = CONSTANTS.JAMBS_WIDTH;             // 28
+    const headH = CONSTANTS.HEAD_WIDTH;           // 28
+    const sillH = CONSTANTS.SILL_WIDTH;           // 46
+    const stile = CONSTANTS.STILE_WIDTH;          // 57
+    const topRail = CONSTANTS.TOP_RAIL_WIDTH;     // 57
+    const botRail = CONSTANTS.BOTTOM_RAIL_WIDTH;  // 90
+    const meetRail = CONSTANTS.MEETING_RAIL_WIDTH;// 43
 
     // Sash position within frame
     const sashX = (fw - sashW) / 2;
-    const sashY = headH;
+    const sashTopY = headH;  // upper sash top edge
 
-    // Upper sash glass area
+    // Upper sash: from sashTopY to sashTopY + topH
+    const uTop = sashTopY;
+    const uBot = sashTopY + topH;
     const uGlassX = sashX + stile;
-    const uGlassY = sashY + topRail;
+    const uGlassY = uTop + topRail;
     const uGlassW = sashW - 2 * stile;
     const uGlassH = topH - topRail - meetRail;
 
-    // Lower sash glass area
-    const lSashY = sashY + topH;
+    // Lower sash: from uBot to uBot + botH
+    const lTop = uBot;
+    const lBot = uBot + botH;
     const lGlassX = sashX + stile;
-    const lGlassY = lSashY + meetRail;
+    const lGlassY = lTop + meetRail;
     const lGlassW = sashW - 2 * stile;
     const lGlassH = botH - meetRail - botRail;
 
@@ -94,52 +147,46 @@ export default function FrontElevation2D({ windowSpec, derived }) {
       vCount: v, hCount: h, barW: BAR_WIDTH,
     });
 
-    // Horns
+    // Horns (upper sash only, extend DOWN past meeting rail)
     const hasHorns = !!windowSpec.sash?.horns;
     const hornExt = hasHorns ? (windowSpec.sash?.hornExtension || 75) : 0;
+
+    // Gap between sash edge and jamb inner edge (bead area)
+    const beadGap = sashX - jw;
 
     return {
       fw, fh, sashW, topH, botH,
       jw, headH, sillH, stile, topRail, botRail, meetRail,
-      sashX, sashY, lSashY,
+      sashX, uTop, uBot, lTop, lBot,
       uGlassX, uGlassY, uGlassW, uGlassH,
       lGlassX, lGlassY, lGlassW, lGlassH,
       v, h, upperBars, lowerBars,
-      hasHorns, hornExt, gridMode,
+      hasHorns, hornExt, beadGap, gridMode,
     };
   }, [windowSpec, derived]);
 
   if (!d) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
 
   const layoutSc = Math.max(d.fw, d.fh) / 500;
-  const M = 70 * layoutSc;
+  const M = 60 * layoutSc;
   const DM = 50 * layoutSc;
   const ox = M + DM;
   const oy = M;
   const hornSpace = d.hasHorns ? d.hornExt + 10 * layoutSc : 0;
   const totalW = d.fw + M * 2 + DM * 2;
   const totalH = d.fh + M * 2 + DM + hornSpace;
+  const ts = totalW / VIEWBOX_REF;
 
   const X = (x) => ox + x;
   const Y = (y) => oy + y;
-
-  // Segment helpers for bars
-  const uHcuts = d.upperBars.hBars.map(hb => [hb.top, hb.bot]);
-  const uVcuts = d.upperBars.vBars.map(vb => [vb.left, vb.right]);
-  const lHcuts = d.lowerBars.hBars.map(hb => [hb.top, hb.bot]);
-  const lVcuts = d.lowerBars.vBars.map(vb => [vb.left, vb.right]);
-
-  const uVertSegs = computeSegments(d.uGlassY, d.uGlassY + d.uGlassH, uHcuts);
-  const uHorizSegs = computeSegments(d.uGlassX, d.uGlassX + d.uGlassW, uVcuts);
-  const lVertSegs = computeSegments(d.lGlassY, d.lGlassY + d.lGlassH, lHcuts);
-  const lHorizSegs = computeSegments(d.lGlassX, d.lGlassX + d.lGlassW, lVcuts);
 
   return (
     <div className="w-full" style={{ maxHeight: '70vh', overflow: 'auto' }}>
       <svg viewBox={`0 0 ${totalW} ${totalH}`} xmlns="http://www.w3.org/2000/svg"
         className="w-full h-auto" style={{ background: COLORS.bg }}>
 
-        {/* ═══ FRAME ═══ */}
+        {/* ═══ LAYER 1: BOX FRAME (furthest back) ═══ */}
+        {/* Outer frame */}
         <rect x={X(0)} y={Y(0)} width={d.fw} height={d.fh}
           fill="none" stroke={C.frame} strokeWidth={STROKES.frame} {...NS} />
         {/* Head */}
@@ -154,168 +201,114 @@ export default function FrontElevation2D({ windowSpec, derived }) {
         {/* Right jamb */}
         <rect x={X(d.fw - d.jw)} y={Y(0)} width={d.jw} height={d.fh}
           fill={C.frame} fillOpacity={0.05} stroke={C.frame} strokeWidth={STROKES.frameLight} {...NS} />
+        {/* Inner frame edge (jamb inner edges — parting bead line) */}
+        <rect x={X(d.jw)} y={Y(d.headH)} width={d.fw - 2 * d.jw} height={d.fh - d.headH - d.sillH}
+          fill="none" stroke={C.frame} strokeWidth={STROKES.frameLight} {...NS}
+          strokeDasharray="4,3" strokeOpacity={0.3} />
 
-        {/* ═══ UPPER SASH ═══ */}
-        <rect x={X(d.sashX)} y={Y(d.sashY)} width={d.sashW} height={d.topH}
-          fill="none" stroke={C.sash} strokeWidth={STROKES.sash} {...NS} />
-        {/* Top rail */}
-        <rect x={X(d.sashX)} y={Y(d.sashY)} width={d.sashW} height={d.topRail}
-          fill={C.sash} fillOpacity={0.06} stroke={C.sash} strokeWidth={STROKES.sashLight} {...NS} />
-        {/* Left stile */}
-        <rect x={X(d.sashX)} y={Y(d.sashY)} width={d.stile} height={d.topH}
-          fill={C.sash} fillOpacity={0.06} stroke={C.sash} strokeWidth={STROKES.sashLight} {...NS} />
-        {/* Right stile */}
-        <rect x={X(d.sashX + d.sashW - d.stile)} y={Y(d.sashY)} width={d.stile} height={d.topH}
-          fill={C.sash} fillOpacity={0.06} stroke={C.sash} strokeWidth={STROKES.sashLight} {...NS} />
-        {/* Upper glass fill */}
-        <rect x={X(d.uGlassX)} y={Y(d.uGlassY)} width={d.uGlassW} height={d.uGlassH}
-          fill={C.glass} fillOpacity={0.06} stroke="none" />
+        {/* ═══ LAYER 2: LOWER SASH (interior track — behind) ═══ */}
+        <g opacity={0.85}>
+          {/* Sash outline */}
+          <rect x={X(d.sashX)} y={Y(d.lTop)} width={d.sashW} height={d.botH}
+            fill="none" stroke={C.sash} strokeWidth={STROKES.sash} {...NS} />
+          {/* Meeting rail at TOP of lower sash */}
+          <rect x={X(d.sashX)} y={Y(d.lTop)} width={d.sashW} height={d.meetRail}
+            fill={C.sash} fillOpacity={0.06} stroke={C.sash} strokeWidth={STROKES.sashLight} {...NS} />
+          {/* Bottom rail */}
+          <rect x={X(d.sashX)} y={Y(d.lBot - d.botRail)} width={d.sashW} height={d.botRail}
+            fill={C.sash} fillOpacity={0.06} stroke={C.sash} strokeWidth={STROKES.sashLight} {...NS} />
+          {/* Left stile */}
+          <rect x={X(d.sashX)} y={Y(d.lTop)} width={d.stile} height={d.botH}
+            fill={C.sash} fillOpacity={0.04} stroke={C.sash} strokeWidth={STROKES.sashLight} {...NS} />
+          {/* Right stile */}
+          <rect x={X(d.sashX + d.sashW - d.stile)} y={Y(d.lTop)} width={d.stile} height={d.botH}
+            fill={C.sash} fillOpacity={0.04} stroke={C.sash} strokeWidth={STROKES.sashLight} {...NS} />
+          {/* Glass */}
+          <rect x={X(d.lGlassX)} y={Y(d.lGlassY)} width={d.lGlassW} height={d.lGlassH}
+            fill={C.glass} fillOpacity={0.06} stroke="none" />
+          {/* Bars */}
+          <SashBars bars={d.lowerBars}
+            glassX={d.lGlassX} glassY={d.lGlassY} glassW={d.lGlassW} glassH={d.lGlassH}
+            X={X} Y={Y} />
+        </g>
 
-        {/* ═══ MEETING RAIL ═══ */}
-        <rect x={X(d.sashX)} y={Y(d.sashY + d.topH - d.meetRail)} width={d.sashW} height={d.meetRail * 2}
-          fill={C.sash} fillOpacity={0.1} stroke={C.meeting} strokeWidth={STROKES.meeting} {...NS} />
+        {/* ═══ LAYER 3: UPPER SASH (exterior track — in front, covers lower MR) ═══ */}
+        <g>
+          {/* Sash outline */}
+          <rect x={X(d.sashX)} y={Y(d.uTop)} width={d.sashW} height={d.topH}
+            fill={COLORS.bg} fillOpacity={0.95} stroke={C.sash} strokeWidth={STROKES.sash} {...NS} />
+          {/* Top rail */}
+          <rect x={X(d.sashX)} y={Y(d.uTop)} width={d.sashW} height={d.topRail}
+            fill={C.sash} fillOpacity={0.06} stroke={C.sash} strokeWidth={STROKES.sashLight} {...NS} />
+          {/* Meeting rail at BOTTOM of upper sash */}
+          <rect x={X(d.sashX)} y={Y(d.uBot - d.meetRail)} width={d.sashW} height={d.meetRail}
+            fill={C.sash} fillOpacity={0.08} stroke={C.meeting} strokeWidth={STROKES.meeting} {...NS} />
+          {/* Left stile */}
+          <rect x={X(d.sashX)} y={Y(d.uTop)} width={d.stile} height={d.topH}
+            fill={C.sash} fillOpacity={0.04} stroke={C.sash} strokeWidth={STROKES.sashLight} {...NS} />
+          {/* Right stile */}
+          <rect x={X(d.sashX + d.sashW - d.stile)} y={Y(d.uTop)} width={d.stile} height={d.topH}
+            fill={C.sash} fillOpacity={0.04} stroke={C.sash} strokeWidth={STROKES.sashLight} {...NS} />
+          {/* Glass */}
+          <rect x={X(d.uGlassX)} y={Y(d.uGlassY)} width={d.uGlassW} height={d.uGlassH}
+            fill={C.glass} fillOpacity={0.06} stroke="none" />
+          {/* Bars */}
+          <SashBars bars={d.upperBars}
+            glassX={d.uGlassX} glassY={d.uGlassY} glassW={d.uGlassW} glassH={d.uGlassH}
+            X={X} Y={Y} />
+        </g>
 
-        {/* ═══ LOWER SASH ═══ */}
-        <rect x={X(d.sashX)} y={Y(d.lSashY)} width={d.sashW} height={d.botH}
-          fill="none" stroke={C.sash} strokeWidth={STROKES.sash} {...NS} />
-        {/* Bottom rail */}
-        <rect x={X(d.sashX)} y={Y(d.lSashY + d.botH - d.botRail)} width={d.sashW} height={d.botRail}
-          fill={C.sash} fillOpacity={0.06} stroke={C.sash} strokeWidth={STROKES.sashLight} {...NS} />
-        {/* Left stile */}
-        <rect x={X(d.sashX)} y={Y(d.lSashY)} width={d.stile} height={d.botH}
-          fill={C.sash} fillOpacity={0.06} stroke={C.sash} strokeWidth={STROKES.sashLight} {...NS} />
-        {/* Right stile */}
-        <rect x={X(d.sashX + d.sashW - d.stile)} y={Y(d.lSashY)} width={d.stile} height={d.botH}
-          fill={C.sash} fillOpacity={0.06} stroke={C.sash} strokeWidth={STROKES.sashLight} {...NS} />
-        {/* Lower glass fill */}
-        <rect x={X(d.lGlassX)} y={Y(d.lGlassY)} width={d.lGlassW} height={d.lGlassH}
-          fill={C.glass} fillOpacity={0.06} stroke="none" />
-
-        {/* ═══ UPPER BARS ═══ */}
-        {d.upperBars.vBars.map((vb, i) => (
-          <g key={`uv-${i}`}>
-            {uVertSegs.map((seg, j) => (
-              <g key={j}>
-                <line x1={X(vb.left)} y1={Y(seg.a)} x2={X(vb.left)} y2={Y(seg.b)}
-                  stroke={C.sash} strokeWidth={STROKES.bar} {...NS} />
-                <line x1={X(vb.right)} y1={Y(seg.a)} x2={X(vb.right)} y2={Y(seg.b)}
-                  stroke={C.sash} strokeWidth={STROKES.bar} {...NS} />
-              </g>
-            ))}
-          </g>
-        ))}
-        {d.upperBars.hBars.map((hb, j) => (
-          <g key={`uh-${j}`}>
-            {uHorizSegs.map((seg, i) => (
-              <g key={i}>
-                <line x1={X(seg.a)} y1={Y(hb.top)} x2={X(seg.b)} y2={Y(hb.top)}
-                  stroke={C.sash} strokeWidth={STROKES.bar} {...NS} />
-                <line x1={X(seg.a)} y1={Y(hb.bot)} x2={X(seg.b)} y2={Y(hb.bot)}
-                  stroke={C.sash} strokeWidth={STROKES.bar} {...NS} />
-              </g>
-            ))}
-          </g>
-        ))}
-        {/* Upper crosses */}
-        {d.upperBars.vBars.flatMap((vb, vi) =>
-          d.upperBars.hBars.map((hb, hi) => (
-            <g key={`uc-${vi}-${hi}`}>
-              <line x1={X(vb.left)} y1={Y(hb.top)} x2={X(vb.right)} y2={Y(hb.bot)}
-                stroke={C.sash} strokeWidth={STROKES.bar} {...NS} />
-              <line x1={X(vb.right)} y1={Y(hb.top)} x2={X(vb.left)} y2={Y(hb.bot)}
-                stroke={C.sash} strokeWidth={STROKES.bar} {...NS} />
-            </g>
-          ))
-        )}
-
-        {/* ═══ LOWER BARS ═══ */}
-        {d.lowerBars.vBars.map((vb, i) => (
-          <g key={`lv-${i}`}>
-            {lVertSegs.map((seg, j) => (
-              <g key={j}>
-                <line x1={X(vb.left)} y1={Y(seg.a)} x2={X(vb.left)} y2={Y(seg.b)}
-                  stroke={C.sash} strokeWidth={STROKES.bar} {...NS} />
-                <line x1={X(vb.right)} y1={Y(seg.a)} x2={X(vb.right)} y2={Y(seg.b)}
-                  stroke={C.sash} strokeWidth={STROKES.bar} {...NS} />
-              </g>
-            ))}
-          </g>
-        ))}
-        {d.lowerBars.hBars.map((hb, j) => (
-          <g key={`lh-${j}`}>
-            {lHorizSegs.map((seg, i) => (
-              <g key={i}>
-                <line x1={X(seg.a)} y1={Y(hb.top)} x2={X(seg.b)} y2={Y(hb.top)}
-                  stroke={C.sash} strokeWidth={STROKES.bar} {...NS} />
-                <line x1={X(seg.a)} y1={Y(hb.bot)} x2={X(seg.b)} y2={Y(hb.bot)}
-                  stroke={C.sash} strokeWidth={STROKES.bar} {...NS} />
-              </g>
-            ))}
-          </g>
-        ))}
-        {/* Lower crosses */}
-        {d.lowerBars.vBars.flatMap((vb, vi) =>
-          d.lowerBars.hBars.map((hb, hi) => (
-            <g key={`lc-${vi}-${hi}`}>
-              <line x1={X(vb.left)} y1={Y(hb.top)} x2={X(vb.right)} y2={Y(hb.bot)}
-                stroke={C.sash} strokeWidth={STROKES.bar} {...NS} />
-              <line x1={X(vb.right)} y1={Y(hb.top)} x2={X(vb.left)} y2={Y(hb.bot)}
-                stroke={C.sash} strokeWidth={STROKES.bar} {...NS} />
-            </g>
-          ))
-        )}
-
-        {/* ═══ HORNS ═══ */}
+        {/* ═══ HORNS (upper sash, extend DOWN past meeting rail) ═══ */}
         {d.hasHorns && (
           <g>
-            <line x1={X(d.sashX + 2)} y1={Y(d.sashY + d.topH)} x2={X(d.sashX + 2)} y2={Y(d.sashY + d.topH + d.hornExt)}
+            <line x1={X(d.sashX + 2)} y1={Y(d.uBot)} x2={X(d.sashX + 2)} y2={Y(d.uBot + d.hornExt)}
               stroke={C.horn} strokeWidth={STROKES.horn} {...NS} strokeDasharray="4,3" strokeOpacity={0.7} />
-            <line x1={X(d.sashX + d.sashW - 2)} y1={Y(d.sashY + d.topH)} x2={X(d.sashX + d.sashW - 2)} y2={Y(d.sashY + d.topH + d.hornExt)}
+            <line x1={X(d.sashX + d.sashW - 2)} y1={Y(d.uBot)} x2={X(d.sashX + d.sashW - 2)} y2={Y(d.uBot + d.hornExt)}
               stroke={C.horn} strokeWidth={STROKES.horn} {...NS} strokeDasharray="4,3" strokeOpacity={0.7} />
+            <text x={X(d.sashX + d.sashW + 4 * ts)} y={Y(d.uBot + d.hornExt / 2)}
+              fill={C.horn} fontSize={tfs(SIZES.notch, totalW)} fontFamily={FONT_FAMILY}
+              fillOpacity={0.7}>
+              Horn {d.hornExt}mm
+            </text>
           </g>
         )}
-
-        {/* ═══ DIMENSIONS ═══ */}
-        {/* Frame overall — bottom */}
-        <DimH y={Y(d.fh) + DM * 0.7} x1={X(0)} x2={X(d.fw)}
-          extFrom={Y(d.fh)} label={`${d.fw}`} vbw={totalW} />
-        {/* Frame overall — right */}
-        <DimV x={X(d.fw) + DM * 0.7} y1={Y(0)} y2={Y(d.fh)}
-          extFrom={X(d.fw)} label={`${d.fh}`} vbw={totalW} />
-        {/* Sash width — top */}
-        <DimH y={Y(0) - DM * 0.5} x1={X(d.sashX)} x2={X(d.sashX + d.sashW)}
-          extFrom={Y(0)} label={`${d.sashW}`} vbw={totalW} />
-        {/* Top sash height — left */}
-        <DimV x={X(0) - DM * 0.5} y1={Y(d.sashY)} y2={Y(d.sashY + d.topH)}
-          extFrom={X(0)} label={`${fmt(d.topH)}`} vbw={totalW} />
-        {/* Bottom sash height — left */}
-        <DimV x={X(0) - DM * 0.5} y1={Y(d.lSashY)} y2={Y(d.lSashY + d.botH)}
-          extFrom={X(0)} label={`${fmt(d.botH)}`} vbw={totalW} />
 
         {/* ═══ LABELS ═══ */}
         <text x={X(d.fw / 2)} y={Y(d.headH / 2 + 3)}
           fill={C.label} fontSize={tfs(SIZES.label, totalW)} fontFamily={FONT_FAMILY}
-          fontWeight={WEIGHTS.label} textAnchor="middle" fillOpacity={0.7}>
+          fontWeight={WEIGHTS.label} textAnchor="middle" fillOpacity={0.6}>
           HEAD
         </text>
         <text x={X(d.fw / 2)} y={Y(d.fh - d.sillH / 2 + 3)}
           fill={C.label} fontSize={tfs(SIZES.label, totalW)} fontFamily={FONT_FAMILY}
-          fontWeight={WEIGHTS.label} textAnchor="middle" fillOpacity={0.7}>
+          fontWeight={WEIGHTS.label} textAnchor="middle" fillOpacity={0.6}>
           SILL
         </text>
-        <text x={X(d.fw / 2)} y={Y(d.sashY + d.topH)}
-          fill={C.meeting} fontSize={tfs(SIZES.label, totalW)} fontFamily={FONT_FAMILY}
-          fontWeight={WEIGHTS.label} textAnchor="middle" fillOpacity={0.6}>
-          MEETING RAIL
-        </text>
+
+        {/* ═══ DIMENSIONS ═══ */}
+        {/* Frame overall — bottom */}
+        <DimH y={Y(d.fh) + DM * 0.6} x1={X(0)} x2={X(d.fw)}
+          extFrom={Y(d.fh)} label={`${d.fw}`} vbw={totalW} />
+        {/* Frame overall — right */}
+        <DimV x={X(d.fw) + DM * 0.6} y1={Y(0)} y2={Y(d.fh)}
+          extFrom={X(d.fw)} label={`${d.fh}`} vbw={totalW} />
+        {/* Sash width — top */}
+        <DimH y={Y(0) - DM * 0.4} x1={X(d.sashX)} x2={X(d.sashX + d.sashW)}
+          extFrom={Y(0)} label={`${d.sashW}`} vbw={totalW} />
+        {/* Top sash height — left */}
+        <DimV x={X(0) - DM * 0.4} y1={Y(d.uTop)} y2={Y(d.uBot)}
+          extFrom={X(0)} label={`${fmt(d.topH)}`} vbw={totalW} />
+        {/* Bottom sash height — left */}
+        <DimV x={X(0) - DM * 0.4} y1={Y(d.lTop)} y2={Y(d.lBot)}
+          extFrom={X(0)} label={`${fmt(d.botH)}`} vbw={totalW} />
 
         {/* ═══ TITLE ═══ */}
-        <text x={totalW / 2} y={totalH - 10 * (totalW / VIEWBOX_REF)}
+        <text x={totalW / 2} y={totalH - 12 * ts}
           fill={C.title} fontSize={tfs(SIZES.title, totalW)} fontFamily={FONT_FAMILY}
           textAnchor="middle" fontWeight={WEIGHTS.title}>
           FRONT ELEVATION — {d.fw} × {d.fh}
         </text>
-        <text x={totalW / 2} y={totalH - 2 * (totalW / VIEWBOX_REF)}
+        <text x={totalW / 2} y={totalH - 3 * ts}
           fill={C.subtitle} fontSize={tfs(SIZES.subtitle, totalW)} fontFamily={FONT_FAMILY}
           textAnchor="middle" fillOpacity={0.6}>
           {d.gridMode} · sash {d.sashW}
