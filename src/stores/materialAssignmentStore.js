@@ -23,10 +23,15 @@ export const SASH_WINDOW_PARTS = {
     { id: 'top_meet_rail',        name: 'Top Meeting Rail',       section: '63×63',  finishedSection: '57×43',  pcs: 1, materialType: 'hardwood' },
     { id: 'bottom_meet_rail',     name: 'Bottom Meeting Rail',    section: '63×63',  finishedSection: '57×43',  pcs: 1, materialType: 'hardwood' },
   ],
+  beading: [
+    { id: 'glazing_bar_beading',      name: 'Glazing Bar Beading',        section: 'profile',  pcs: 1, materialType: 'beading' },
+    { id: 'internal_georgian_beading', name: 'Internal Georgian Beading',  section: 'profile',  pcs: 1, materialType: 'beading' },
+    { id: 'triangle_beading_ext',      name: 'Triangle Beading (Ext)',     section: 'profile',  pcs: 1, materialType: 'beading' },
+  ],
 };
 
 // Flat list for lookups
-export const ALL_PARTS = [...SASH_WINDOW_PARTS.box, ...SASH_WINDOW_PARTS.sash];
+export const ALL_PARTS = [...SASH_WINDOW_PARTS.box, ...SASH_WINDOW_PARTS.sash, ...SASH_WINDOW_PARTS.beading];
 
 // ─── Store ───
 export const useMaterialAssignmentStore = create(

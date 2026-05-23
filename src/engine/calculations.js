@@ -268,6 +268,44 @@ function calculateGlazingSummaryForWindow(windowSpec, sashWidth, sashHeight, set
     };
 }
 
+const OFFCUT_FACTOR = 1.15; // 15% waste for off-cuts
+
+function calculateBeadingComponents(windowSpec, sashWidth, topSashHeight, bottomSashHeight, glazingBars) {
+    const stile = CONSTANTS.STILE_WIDTH;
+    const topRail = CONSTANTS.TOP_RAIL_WIDTH;
+    const meetRail = CONSTANTS.MEETING_RAIL_WIDTH;
+
+    const glassW = sashWidth - 2 * stile;
+    // Upper & lower glass heights are identical (rail diff = sash height diff = 33mm)
+    const glassH = topSashHeight - topRail - meetRail;
+
+    // 1. Glazing bar beading — perimeter of glass area × 2 sashes
+    const perimeterPerSash = 2 * (glassW + glassH);
+    const glazingTotal = round(perimeterPerSash * 2 * OFFCUT_FACTOR);
+
+    // 2 & 3. Georgian + Triangle — same lengths as wood bars × 2 sashes
+    const vLen = glazingBars.vertical.length;
+    const vQty = glazingBars.vertical.quantity;
+    const hLen = glazingBars.horizontal.length;
+    const hQty = glazingBars.horizontal.quantity;
+    const barTotalPerSash = (vLen * vQty) + (hLen * hQty);
+    const barTotal = round(barTotalPerSash * 2 * OFFCUT_FACTOR);
+
+    const beading = [];
+
+    beading.push(createComponentRecord(windowSpec, 'beading', 'GLAZING BAR BEADING', 'profile',
+        glazingTotal, 1, `Perimeter ${round(perimeterPerSash)} × 2 sashes + 15%`));
+
+    if (barTotal > 0) {
+        beading.push(createComponentRecord(windowSpec, 'beading', 'INTERNAL GEORGIAN BEADING', 'profile',
+            barTotal, 1, `GB lengths ${round(barTotalPerSash)} × 2 sashes + 15%`));
+        beading.push(createComponentRecord(windowSpec, 'beading', 'TRIANGLE BEADING (EXT)', 'profile',
+            barTotal, 1, `GB lengths ${round(barTotalPerSash)} × 2 sashes + 15%`));
+    }
+
+    return beading;
+}
+
 export function deriveWindowData(windowSpec, settings = {}) {
     const frameWidth = Number(windowSpec.frame?.width ?? 0);
     const frameHeight = Number(windowSpec.frame?.height ?? 0);
@@ -294,13 +332,18 @@ export function deriveWindowData(windowSpec, settings = {}) {
         horizontal: result.components.sash.glazingBars.horizontal.positions,
     };
 
+    const beadingComponents = calculateBeadingComponents(
+        windowSpec, sashWidth, topSashHeight, bottomSashHeight,
+        result.components.sash.glazingBars
+    );
+
     return {
         sashWidth,
         sashHeight,
         topSashHeight,
         bottomSashHeight,
         config,
-        components: { sash: sashComponents, box: boxComponents },
+        components: { sash: sashComponents, box: boxComponents, beading: beadingComponents },
         glazingItems: [glazingSummary],
         barPositions,
     };
@@ -310,15 +353,17 @@ function aggregateComponents(windows, settings) {
     const sash = [];
     const box = [];
     const glazing = [];
+    const beading = [];
 
     windows.forEach((windowSpec) => {
         const derived = deriveWindowData(windowSpec, settings);
         sash.push(...derived.components.sash);
         box.push(...derived.components.box);
         glazing.push(...derived.glazingItems);
+        beading.push(...derived.components.beading);
     });
 
-    return { sash, box, glazing };
+    return { sash, box, glazing, beading };
 }
 
 function aggregateCutList(components) {

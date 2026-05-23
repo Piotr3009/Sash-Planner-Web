@@ -128,6 +128,7 @@ export default function ProductionPackPage() {
     const allPrecut = { sashEngineering: [], boxSapele: [] };
     const allGlass = [];
     const allHardware = [];
+    const allBeading = [];
 
     windowsData.forEach(({ win, windowSpec, derived }) => {
       if (!derived || !windowSpec) return;
@@ -157,6 +158,11 @@ export default function ProductionPackPage() {
       // Hardware
       const hw = buildHardwareList(windowSpec);
       allHardware.push(...hw.map((h) => ({ ...h, windowName: win.name, _projectNumber: win._projectNumber })));
+
+      // Beading
+      if (derived.components?.beading) {
+        allBeading.push(...derived.components.beading.map((b) => ({ ...b, windowName: win.name, _projectNumber: win._projectNumber })));
+      }
     });
 
     // Optimization
@@ -167,7 +173,7 @@ export default function ProductionPackPage() {
       console.warn('Optimizer failed:', e);
     }
 
-    return { cutList: allCut, precut: allPrecut, glass: allGlass, hardware: allHardware, optimization };
+    return { cutList: allCut, precut: allPrecut, glass: allGlass, hardware: allHardware, beading: allBeading, optimization };
   }, [windowsData, settings]);
 
   // ─── Render ───
@@ -764,6 +770,39 @@ function BOMTab({ merged, batch, pp, isPPMode, windowsData }) {
           <span className="ml-4 text-ink-400">(See Glass Schedule tab for full breakdown)</span>
         </div>
       </div>
+
+      {/* Beading */}
+      {merged.beading && merged.beading.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="px-4 py-3 border-b border-surface-500">
+            <div className="text-sm font-semibold text-ink-50">Beading</div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-surface-500 bg-surface-700/50">
+                  {isPPMode && <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Project</th>}
+                  <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Window</th>
+                  <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Type</th>
+                  <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Length (mm)</th>
+                  <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {merged.beading.map((b, i) => (
+                  <tr key={i} className="border-b border-surface-500/50">
+                    {isPPMode && <td className="px-4 py-2.5 text-accent-400 text-[10px]">{b._projectNumber}</td>}
+                    <td className="px-4 py-2.5 text-ink-100">{b.windowName}</td>
+                    <td className="px-4 py-2.5 text-ink-200 font-medium">{b.elementName}</td>
+                    <td className="px-4 py-2.5 text-right text-ink-100 font-semibold">{Math.round(b.length)}</td>
+                    <td className="px-4 py-2.5 text-ink-400 text-[10px]">{b.notes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Consumables */}
       <div className="card p-4">

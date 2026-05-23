@@ -304,6 +304,21 @@ export default function MaterialAssignmentsPage() {
           onRemove={removeAssignment}
         />
 
+        {/* Beading */}
+        <PartGroupSection
+          title="Beading"
+          subtitle={`${SASH_WINDOW_PARTS.beading.length} parts · glazing, georgian, triangle`}
+          parts={SASH_WINDOW_PARTS.beading}
+          assignments={assignments}
+          materials={materials}
+          categories={categories}
+          subcategoriesByCategory={subcategoriesByCategory}
+          onAssign={setAssignment}
+          onFilter={setFilter}
+          onYieldChange={setYield}
+          onRemove={removeAssignment}
+        />
+
         {/* Legend */}
         <div className="mt-3 flex gap-4 flex-wrap text-[10px] text-ink-400">
           <span><span className="px-1 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/25 text-[8px]">mirror</span> — L/R mirror cutting pair</span>

@@ -228,6 +228,7 @@ function BOMPanel({ item, windowSpec, derived }) {
       <div className="space-y-3">
         <BOMGroup title="Timber" items={derived?.components?.box || []} />
         <BOMGroup title="Sash Components" items={derived?.components?.sash || []} />
+        <BOMGroup title="Beading" items={derived?.components?.beading || []} />
         <div className="bg-surface-600 rounded-lg border border-surface-500 p-4">
           <div className="text-xs font-medium text-ink-200 mb-2">Hardware & Consumables</div>
           <div className="space-y-1 text-xs text-ink-400">

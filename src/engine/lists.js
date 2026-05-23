@@ -82,6 +82,19 @@ export function buildCutListForWindow(derived, windowSpec) {
       notes: 'Per sash × 2'
     });
   }
+  // Beading
+  if (derived.components.beading) {
+    derived.components.beading.forEach((c) => {
+      out.push({
+        element: c.elementName,
+        section: c.section,
+        length: c.length,
+        quantity: c.quantity,
+        material: 'Beading',
+        notes: c.notes || ''
+      });
+    });
+  }
   return out.map((row) => ({ ...row, length: Math.round(row.length) }));
 }
 
@@ -212,6 +225,7 @@ export function buildProjectAggregates(items, windowSpecs, settingsArg) {
   const allPrecut = { sashEngineering: [], boxSapele: [] };
   const allGlass = [];
   const allHardware = [];
+  const allBeading = [];
 
   items.forEach((item, idx) => {
     const ws = windowSpecs[idx];
@@ -231,7 +245,10 @@ export function buildProjectAggregates(items, windowSpecs, settingsArg) {
     });
     allGlass.push(...buildGlassListForWindow(derived, ws));
     allHardware.push(...buildHardwareList(ws));
+    if (derived.components?.beading) {
+      allBeading.push(...derived.components.beading.map((b) => ({ ...b, windowId: ws.id, windowName: ws.name })));
+    }
   });
 
-  return { cutList: allCut, precut: allPrecut, glass: allGlass, hardware: allHardware };
+  return { cutList: allCut, precut: allPrecut, glass: allGlass, hardware: allHardware, beading: allBeading };
 }

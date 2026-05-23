@@ -41,6 +41,12 @@ export default function ProjectDetailPage() {
   const SASH_HEIGHT_DEDUCTION = 92;
 
   // Part length calculator: returns cut length in mm for one piece
+  const BAR_PATTERNS = {
+    'none': { h: 0, v: 0 }, '2x2': { h: 0, v: 1 }, '3x3': { h: 0, v: 2 },
+    '4x4': { h: 1, v: 1 }, '6x6': { h: 1, v: 2 }, '9x9': { h: 2, v: 2 },
+  };
+  const OFFCUT = 1.15;
+
   const getPartLength = (partId, win) => {
     const W = win.width || 0;
     const H = win.height || 0;
@@ -48,6 +54,14 @@ export default function ProjectDetailPage() {
     const sashH = H - SASH_HEIGHT_DEDUCTION;
     const halfSash = sashH / 2;
     const hornExtra = (win.hornType && win.hornType !== 'none') ? 70 : 0;
+
+    // Beading calculations
+    const glassW = sashW - 2 * 57;
+    const glassH = halfSash - 57 - 43;
+    const perimeterPerSash = 2 * (glassW + glassH);
+    const gridMode = win.upperBars || 'none';
+    const pattern = BAR_PATTERNS[gridMode] || BAR_PATTERNS['none'];
+    const barTotalPerSash = (pattern.v * glassH) + (pattern.h * glassW);
 
     const lengths = {
       head: W,
@@ -65,6 +79,9 @@ export default function ProjectDetailPage() {
       bottom_rail: sashW,
       top_meet_rail: sashW,
       bottom_meet_rail: sashW,
+      glazing_bar_beading: perimeterPerSash * 2 * OFFCUT,
+      internal_georgian_beading: barTotalPerSash * 2 * OFFCUT,
+      triangle_beading_ext: barTotalPerSash * 2 * OFFCUT,
     };
     return lengths[partId] || 0;
   };
