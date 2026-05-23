@@ -7,7 +7,7 @@
  */
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
-import { STROKE, FONT, SIZES, SC_DIVISOR, DimH, DimV, TitleBlock, Label, DIM_OFFSET, MARGIN } from './drawingUtils.jsx';
+import { STROKE, COLORS, FONT, SIZES, SC_DIVISOR, DimH, DimV, TitleBlock, Label, DIM_OFFSET, MARGIN } from './drawingUtils.jsx';
 
 // Profile depths (simplified — will be refined with real profile data)
 const PROFILE = {
@@ -88,7 +88,7 @@ export default function VerticalSection2D({ windowSpec, derived }) {
         viewBox={`${-MARGIN - DIM_OFFSET * 2} ${-MARGIN - DIM_OFFSET} ${totalW} ${totalH}`}
         xmlns="http://www.w3.org/2000/svg"
         className="w-full h-auto"
-        style={{ maxHeight: '70vh' }}
+        style={{ maxHeight: '70vh' , background: COLORS.bg }}
       >
         {/* Centre line */}
         <line x1={d.depth / 2} y1={-20} x2={d.depth / 2} y2={d.totalStackH + 20}
@@ -109,7 +109,7 @@ export default function VerticalSection2D({ windowSpec, derived }) {
             {/* Label to the right */}
             <text x={d.depth + 15} y={b.y + b.h / 2 + 4}
               fill={b.isGlass ? STROKE.glass : STROKE.label}
-              fontSize={`${SIZES.notch}px`} fontFamily={FONT.family}
+              style={{fontSize: `${SIZES.notch}px`}} fontFamily={FONT.family}
               fillOpacity={0.7}>
               {b.label}
             </text>

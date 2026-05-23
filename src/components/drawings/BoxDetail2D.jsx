@@ -121,7 +121,7 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
 
       <div onClick={isExternalExpand ? handleExpand : () => setExpanded(!expanded)} className="cursor-pointer">
         <svg viewBox={`0 0 ${totalW} ${totalH}`} xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-auto" style={{ maxHeight: (expanded && !isExternalExpand) ? 'none' : '65vh' }}>
+          className="w-full h-auto" style={{ maxHeight: (expanded && !isExternalExpand) ? 'none' : '65vh', background: COLORS.bg }}>
 
           {/* Frame geometry */}
           <path d={rJamb} fill={COL.frameFill} stroke={COL.frame} strokeWidth={sc * 3} />
@@ -135,25 +135,25 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
           <line x1={X(BOX.jambW_bottom)} y1={Y(BOX.sillTop)} x2={X(fw - BOX.jambW_bottom)} y2={Y(BOX.sillTop)} stroke={COL.sillDetail} strokeWidth={sc * 1.5} />
 
           {/* Labels */}
-          <text x={X(BOX.jambW_bottom / 2)} y={Y(fh / 2)} fill={COL.label} fontSize={labelFs} fontWeight={WEIGHTS.label}
+          <text x={X(BOX.jambW_bottom / 2)} y={Y(fh / 2)} fill={COL.label} style={{fontSize: labelFs}} fontWeight={WEIGHTS.label}
             fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}
             transform={`rotate(-90, ${X(BOX.jambW_bottom / 2)}, ${Y(fh / 2)})`}>
             EXT. JAMB LINER (L)
           </text>
-          <text x={X(fw - BOX.jambW_bottom / 2)} y={Y(fh / 2)} fill={COL.label} fontSize={labelFs} fontWeight={WEIGHTS.label}
+          <text x={X(fw - BOX.jambW_bottom / 2)} y={Y(fh / 2)} fill={COL.label} style={{fontSize: labelFs}} fontWeight={WEIGHTS.label}
             fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}
             transform={`rotate(90, ${X(fw - BOX.jambW_bottom / 2)}, ${Y(fh / 2)})`}>
             EXT. JAMB LINER (R)
           </text>
-          <text x={X(fw / 2)} y={Y(fh - BOX.headH / 2) + sc * 8} fill={COL.label} fontSize={labelFs} fontWeight={WEIGHTS.label}
+          <text x={X(fw / 2)} y={Y(fh - BOX.headH / 2) + sc * 8} fill={COL.label} style={{fontSize: labelFs}} fontWeight={WEIGHTS.label}
             fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}>
             EXT. HEAD LINER
           </text>
-          <text x={X(fw / 2)} y={Y(BOX.sillNose / 2) + sc * 8} fill={COL.label} fontSize={labelFs} fontWeight={WEIGHTS.label}
+          <text x={X(fw / 2)} y={Y(BOX.sillNose / 2) + sc * 8} fill={COL.label} style={{fontSize: labelFs}} fontWeight={WEIGHTS.label}
             fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}>
             SILL
           </text>
-          <text x={X(fw / 2)} y={Y(fh / 2)} fill={COL.cavity} fontSize={cavityFs}
+          <text x={X(fw / 2)} y={Y(fh / 2)} fill={COL.cavity} style={{fontSize: cavityFs}}
             fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.2}>
             CAVITY
           </text>
@@ -183,11 +183,11 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
             extFrom={X(fw)} label={`${BOX.sillTop - BOX.sillNose}`} small sc={sc} />
 
           {/* Title */}
-          <text x={totalW / 2} y={totalH - sc * 12} fill={COL.title} fontSize={titleFs}
+          <text x={totalW / 2} y={totalH - sc * 12} fill={COL.title} style={{fontSize: titleFs}}
             fontFamily={FONT.family} textAnchor="middle" fontWeight={WEIGHTS.title}>
             Box — Front{projNum ? ` — ${projNum}` : ''} — {winName}
           </text>
-          <text x={totalW / 2} y={totalH + sc * 18} fill={COL.title} fontSize={subtitleFs}
+          <text x={totalW / 2} y={totalH + sc * 18} fill={COL.title} style={{fontSize: subtitleFs}}
             fontFamily={FONT.family} textAnchor="middle">
             {fw} × {fh} mm
           </text>

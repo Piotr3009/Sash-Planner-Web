@@ -7,7 +7,7 @@
  */
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
-import { STROKE, FONT, SIZES, WEIGHTS, SC_DIVISOR, DimH, DimV, TitleBlock, DIM_OFFSET, DIM_GAP, MARGIN, computeBarPositions } from './drawingUtils.jsx';
+import { STROKE, COLORS, FONT, SIZES, WEIGHTS, SC_DIVISOR, DimH, DimV, TitleBlock, DIM_OFFSET, DIM_GAP, MARGIN, computeBarPositions } from './drawingUtils.jsx';
 
 export default function FrontElevation2D({ windowSpec, derived }) {
   const drawing = useMemo(() => {
@@ -107,7 +107,7 @@ export default function FrontElevation2D({ windowSpec, derived }) {
         viewBox={`${-MARGIN - DIM_OFFSET * 2} ${-MARGIN - DIM_OFFSET} ${totalW} ${totalH}`}
         xmlns="http://www.w3.org/2000/svg"
         className="w-full h-auto"
-        style={{ maxHeight: '70vh' }}
+        style={{ maxHeight: '70vh' , background: COLORS.bg }}
       >
         {/* ── BOX FRAME ── */}
         <rect x={0} y={0} width={d.fw} height={d.fh}
@@ -233,14 +233,14 @@ export default function FrontElevation2D({ windowSpec, derived }) {
 
         {/* Meeting rail label */}
         <text x={d.fw + DIM_OFFSET + DIM_GAP + 15} y={d.meetY + 4}
-          fill={STROKE.dimText} fontSize={`${SIZES.annotation}px`} fontFamily={FONT.family}
+          fill={STROKE.dimText} style={{fontSize: `${SIZES.annotation}px`}} fontFamily={FONT.family}
           fillOpacity={0.6}>
           MR {d.meetRail}
         </text>
 
         {/* Frame depth label */}
         <text x={d.fw / 2} y={-DIM_OFFSET - DIM_GAP + 5}
-          fill={STROKE.dimText} fontSize={`${SIZES.subtitle}px`} fontFamily={FONT.family}
+          fill={STROKE.dimText} style={{fontSize: `${SIZES.subtitle}px`}} fontFamily={FONT.family}
           textAnchor="middle" fillOpacity={0.5}>
           Frame depth: {d.frameDepth}mm
         </text>
@@ -248,7 +248,7 @@ export default function FrontElevation2D({ windowSpec, derived }) {
         {/* Horn label */}
         {d.hasHorns && (
           <text x={d.sashX - 10} y={d.meetY + d.hornExt + 15}
-            fill={STROKE.horn} fontSize={`${SIZES.label}px`} fontFamily={FONT.family}
+            fill={STROKE.horn} style={{fontSize: `${SIZES.label}px`}} fontFamily={FONT.family}
             textAnchor="end" fillOpacity={0.8}>
             Horn {d.hornExt}mm
           </text>
@@ -256,7 +256,7 @@ export default function FrontElevation2D({ windowSpec, derived }) {
 
         {/* Title */}
         <text x={d.fw / 2} y={d.fh + DIM_OFFSET * 2 + DIM_GAP + 10}
-          fill={STROKE.dimText} fontSize={`${SIZES.title}px`} fontFamily={FONT.family}
+          fill={STROKE.dimText} style={{fontSize: `${SIZES.title}px`}} fontFamily={FONT.family}
           textAnchor="middle" fontWeight={WEIGHTS.title}>
           FRONT ELEVATION — {d.fw} × {d.fh} mm
         </text>

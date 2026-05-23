@@ -50,18 +50,18 @@ export function DimH({ y, x1, x2, label, small, sc, extFrom }) {
       {extFrom !== undefined && (
         <>
           <line x1={x1} y1={extFrom} x2={x1} y2={y + (y > extFrom ? overshoot : -overshoot)}
-            stroke={STROKE.dim} strokeWidth={`${STROKES.ext}px`} strokeDasharray={dash} />
+            stroke={STROKE.dim} style={{strokeWidth: `${STROKES.ext}px`}} strokeDasharray={dash} />
           <line x1={x2} y1={extFrom} x2={x2} y2={y + (y > extFrom ? overshoot : -overshoot)}
-            stroke={STROKE.dim} strokeWidth={`${STROKES.ext}px`} strokeDasharray={dash} />
+            stroke={STROKE.dim} style={{strokeWidth: `${STROKES.ext}px`}} strokeDasharray={dash} />
         </>
       )}
       {/* Main dimension line */}
-      <line x1={x1} y1={y} x2={x2} y2={y} stroke={STROKE.dim} strokeWidth={`${STROKES.dim}px`} />
+      <line x1={x1} y1={y} x2={x2} y2={y} stroke={STROKE.dim} style={{strokeWidth: `${STROKES.dim}px`}} />
       {/* Ticks at endpoints */}
-      <line x1={x1} y1={y - tick} x2={x1} y2={y + tick} stroke={STROKE.dim} strokeWidth={`${STROKES.dim}px`} />
-      <line x1={x2} y1={y - tick} x2={x2} y2={y + tick} stroke={STROKE.dim} strokeWidth={`${STROKES.dim}px`} />
+      <line x1={x1} y1={y - tick} x2={x1} y2={y + tick} stroke={STROKE.dim} style={{strokeWidth: `${STROKES.dim}px`}} />
+      <line x1={x2} y1={y - tick} x2={x2} y2={y + tick} stroke={STROKE.dim} style={{strokeWidth: `${STROKES.dim}px`}} />
       {/* Label */}
-      <text x={mid} y={y - gap} fill={STROKE.dim} fontSize={fs} fontFamily={FONT.family}
+      <text x={mid} y={y - gap} fill={STROKE.dim} style={{fontSize: fs}} fontFamily={FONT.family}
         textAnchor="middle" fontWeight={WEIGHTS.dim}>{label}</text>
     </g>
   );
@@ -82,18 +82,18 @@ export function DimV({ x, y1, y2, label, small, sc, extFrom }) {
       {extFrom !== undefined && (
         <>
           <line x1={extFrom} y1={y1} x2={x + (x > extFrom ? overshoot : -overshoot)} y2={y1}
-            stroke={STROKE.dim} strokeWidth={`${STROKES.ext}px`} strokeDasharray={dash} />
+            stroke={STROKE.dim} style={{strokeWidth: `${STROKES.ext}px`}} strokeDasharray={dash} />
           <line x1={extFrom} y1={y2} x2={x + (x > extFrom ? overshoot : -overshoot)} y2={y2}
-            stroke={STROKE.dim} strokeWidth={`${STROKES.ext}px`} strokeDasharray={dash} />
+            stroke={STROKE.dim} style={{strokeWidth: `${STROKES.ext}px`}} strokeDasharray={dash} />
         </>
       )}
       {/* Main dimension line */}
-      <line x1={x} y1={y1} x2={x} y2={y2} stroke={STROKE.dim} strokeWidth={`${STROKES.dim}px`} />
+      <line x1={x} y1={y1} x2={x} y2={y2} stroke={STROKE.dim} style={{strokeWidth: `${STROKES.dim}px`}} />
       {/* Ticks */}
-      <line x1={x - tick} y1={y1} x2={x + tick} y2={y1} stroke={STROKE.dim} strokeWidth={`${STROKES.dim}px`} />
-      <line x1={x - tick} y1={y2} x2={x + tick} y2={y2} stroke={STROKE.dim} strokeWidth={`${STROKES.dim}px`} />
+      <line x1={x - tick} y1={y1} x2={x + tick} y2={y1} stroke={STROKE.dim} style={{strokeWidth: `${STROKES.dim}px`}} />
+      <line x1={x - tick} y1={y2} x2={x + tick} y2={y2} stroke={STROKE.dim} style={{strokeWidth: `${STROKES.dim}px`}} />
       {/* Label (rotated -90°) */}
-      <text x={x + offset} y={mid + sc * 8} fill={STROKE.dim} fontSize={fs} fontFamily={FONT.family}
+      <text x={x + offset} y={mid + sc * 8} fill={STROKE.dim} style={{fontSize: fs}} fontFamily={FONT.family}
         fontWeight={WEIGHTS.dim} transform={`rotate(-90, ${x + offset}, ${mid + sc * 8})`}
         textAnchor="middle">{label}</text>
     </g>
@@ -127,15 +127,15 @@ export function DimChainH({ y, cuts, extFrom, sc, minSegment = 40, fmt }) {
       {extFrom !== undefined && cuts.map((cx, i) => (
         <line key={`ext-${i}`}
           x1={cx} y1={extFrom} x2={cx} y2={y + extDir * overshoot}
-          stroke={STROKE.dim} strokeWidth={`${STROKES.ext}px`} strokeDasharray={dash} />
+          stroke={STROKE.dim} style={{strokeWidth: `${STROKES.ext}px`}} strokeDasharray={dash} />
       ))}
       {/* Main dimension line (full chain length) */}
-      <line x1={x0} y1={y} x2={xN} y2={y} stroke={STROKE.dim} strokeWidth={`${STROKES.dim}px`} />
+      <line x1={x0} y1={y} x2={xN} y2={y} stroke={STROKE.dim} style={{strokeWidth: `${STROKES.dim}px`}} />
       {/* Tick at each cut */}
       {cuts.map((cx, i) => (
         <line key={`tk-${i}`}
           x1={cx} y1={y - tick} x2={cx} y2={y + tick}
-          stroke={STROKE.dim} strokeWidth={`${STROKES.dim}px`} />
+          stroke={STROKE.dim} style={{strokeWidth: `${STROKES.dim}px`}} />
       ))}
       {/* Segment labels */}
       {cuts.slice(0, -1).map((cx, i) => {
@@ -148,18 +148,18 @@ export function DimChainH({ y, cuts, extFrom, sc, minSegment = 40, fmt }) {
           return (
             <g key={`lbl-${i}`}>
               <line x1={mid} y1={y} x2={mid} y2={y - leaderV}
-                stroke={STROKE.dim} strokeWidth={`${STROKES.leader}px`} />
+                stroke={STROKE.dim} style={{strokeWidth: `${STROKES.leader}px`}} />
               <line x1={mid} y1={y - leaderV} x2={mid + leaderHOff} y2={y - leaderV}
-                stroke={STROKE.dim} strokeWidth={`${STROKES.leader}px`} />
+                stroke={STROKE.dim} style={{strokeWidth: `${STROKES.leader}px`}} />
               <text x={mid + leaderHOff + sc * 2} y={y - leaderV + sc * 3}
-                fill={STROKE.dim} fontSize={fs} fontFamily={FONT.family}
+                fill={STROKE.dim} style={{fontSize: fs}} fontFamily={FONT.family}
                 fontWeight={WEIGHTS.dim}>{label}</text>
             </g>
           );
         }
         return (
           <text key={`lbl-${i}`} x={mid} y={y - gap}
-            fill={STROKE.dim} fontSize={fs} fontFamily={FONT.family}
+            fill={STROKE.dim} style={{fontSize: fs}} fontFamily={FONT.family}
             textAnchor="middle" fontWeight={WEIGHTS.dim}>{label}</text>
         );
       })}
@@ -188,15 +188,15 @@ export function DimChainV({ x, cuts, extFrom, sc, minSegment = 40, fmt }) {
       {extFrom !== undefined && cuts.map((cy, i) => (
         <line key={`ext-${i}`}
           x1={extFrom} y1={cy} x2={x + extDir * overshoot} y2={cy}
-          stroke={STROKE.dim} strokeWidth={`${STROKES.ext}px`} strokeDasharray={dash} />
+          stroke={STROKE.dim} style={{strokeWidth: `${STROKES.ext}px`}} strokeDasharray={dash} />
       ))}
       {/* Main dimension line */}
-      <line x1={x} y1={y0} x2={x} y2={yN} stroke={STROKE.dim} strokeWidth={`${STROKES.dim}px`} />
+      <line x1={x} y1={y0} x2={x} y2={yN} stroke={STROKE.dim} style={{strokeWidth: `${STROKES.dim}px`}} />
       {/* Tick at each cut */}
       {cuts.map((cy, i) => (
         <line key={`tk-${i}`}
           x1={x - tick} y1={cy} x2={x + tick} y2={cy}
-          stroke={STROKE.dim} strokeWidth={`${STROKES.dim}px`} />
+          stroke={STROKE.dim} style={{strokeWidth: `${STROKES.dim}px`}} />
       ))}
       {/* Segment labels (rotated -90°) */}
       {cuts.slice(0, -1).map((cy, i) => {
@@ -208,18 +208,18 @@ export function DimChainV({ x, cuts, extFrom, sc, minSegment = 40, fmt }) {
           return (
             <g key={`lbl-${i}`}>
               <line x1={x} y1={mid} x2={x - leaderV} y2={mid}
-                stroke={STROKE.dim} strokeWidth={`${STROKES.leader}px`} />
+                stroke={STROKE.dim} style={{strokeWidth: `${STROKES.leader}px`}} />
               <line x1={x - leaderV} y1={mid} x2={x - leaderV} y2={mid - leaderHOff}
-                stroke={STROKE.dim} strokeWidth={`${STROKES.leader}px`} />
+                stroke={STROKE.dim} style={{strokeWidth: `${STROKES.leader}px`}} />
               <text x={x - leaderV} y={mid - leaderHOff - sc * 2}
-                fill={STROKE.dim} fontSize={fs} fontFamily={FONT.family}
+                fill={STROKE.dim} style={{fontSize: fs}} fontFamily={FONT.family}
                 textAnchor="middle" fontWeight={WEIGHTS.dim}>{label}</text>
             </g>
           );
         }
         return (
           <text key={`lbl-${i}`} x={x + offset} y={mid + sc * 8}
-            fill={STROKE.dim} fontSize={fs} fontFamily={FONT.family}
+            fill={STROKE.dim} style={{fontSize: fs}} fontFamily={FONT.family}
             fontWeight={WEIGHTS.dim} transform={`rotate(-90, ${x + offset}, ${mid + sc * 8})`}
             textAnchor="middle">{label}</text>
         );
@@ -235,12 +235,12 @@ export function TitleBlock({ x, y, title, subtitle, sc }) {
   const subGap = sc * 25;
   return (
     <g>
-      <text x={x} y={y} fill={COLORS.title} fontSize={titleFs}
+      <text x={x} y={y} fill={COLORS.title} style={{fontSize: titleFs}}
         fontFamily={FONT.family} textAnchor="middle" fontWeight={WEIGHTS.title}>
         {title}
       </text>
       {subtitle && (
-        <text x={x} y={y + subGap} fill={COLORS.subtitle} fontSize={subFs}
+        <text x={x} y={y + subGap} fill={COLORS.subtitle} style={{fontSize: subFs}}
           fontFamily={FONT.family} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>
           {subtitle}
         </text>
@@ -253,7 +253,7 @@ export function TitleBlock({ x, y, title, subtitle, sc }) {
 export function Label({ x, y, text, anchor = 'middle', opacity = 0.8, sc }) {
   const fs = `${SIZES.label}px`;
   return (
-    <text x={x} y={y} fill={COLORS.label} fontSize={fs}
+    <text x={x} y={y} fill={COLORS.label} style={{fontSize: fs}}
       fontFamily={FONT.family} textAnchor={anchor} fillOpacity={opacity} fontWeight={WEIGHTS.label}>
       {text}
     </text>
