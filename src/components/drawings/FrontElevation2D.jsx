@@ -198,17 +198,34 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
         <path d={head} fill={COL.frameFill} stroke={COL.frame} strokeWidth={STROKES.frame} {...NS} />
         <path d={sill} fill={COL.frameFill} stroke={COL.frame} strokeWidth={STROKES.frame} {...NS} />
 
-        {/* Sill detail lines */}
-        <line x1={ox + BOX.jambW_bottom} y1={SY(BOX.sillWeatherbar)} x2={ox + fw - BOX.jambW_bottom} y2={SY(BOX.sillWeatherbar)}
-          stroke={COL.sillDetail} strokeWidth={STROKES.sash} {...NS} />
-        <line x1={ox + BOX.jambW_bottom} y1={SY(BOX.sillDrip)} x2={ox + fw - BOX.jambW_bottom} y2={SY(BOX.sillDrip)}
-          stroke={COL.sillDetail} strokeWidth={STROKES.sash} {...NS} />
-        <line x1={ox + BOX.jambW_bottom} y1={SY(BOX.sillTop)} x2={ox + fw - BOX.jambW_bottom} y2={SY(BOX.sillTop)}
-          stroke={COL.sillDetail} strokeWidth={STROKES.sash} {...NS} />
+        {/* Sill detail lines — only draw where NOT behind lower sash */}
+        {(() => {
+          const sillLineLeft = ox + BOX.jambW_bottom;
+          const sillLineRight = ox + fw - BOX.jambW_bottom;
+          const sashLeft = sashX;
+          const sashRight = sashX + sashW;
+          // sillWeatherbar & sillDrip are below sash bottom → fully visible
+          // sillTop is inside sash area → clip to segments outside sash
+          return (
+            <g>
+              <line x1={sillLineLeft} y1={SY(BOX.sillWeatherbar)} x2={sillLineRight} y2={SY(BOX.sillWeatherbar)}
+                stroke={COL.sillDetail} strokeWidth={STROKES.sash} {...NS} />
+              <line x1={sillLineLeft} y1={SY(BOX.sillDrip)} x2={sillLineRight} y2={SY(BOX.sillDrip)}
+                stroke={COL.sillDetail} strokeWidth={STROKES.sash} {...NS} />
+              {/* sillTop — only the tiny segments outside sash horizontal span */}
+              {sashLeft > sillLineLeft && (
+                <line x1={sillLineLeft} y1={SY(BOX.sillTop)} x2={sashLeft} y2={SY(BOX.sillTop)}
+                  stroke={COL.sillDetail} strokeWidth={STROKES.sash} {...NS} />
+              )}
+              {sashRight < sillLineRight && (
+                <line x1={sashRight} y1={SY(BOX.sillTop)} x2={sillLineRight} y2={SY(BOX.sillTop)}
+                  stroke={COL.sillDetail} strokeWidth={STROKES.sash} {...NS} />
+              )}
+            </g>
+          );
+        })()}
 
-        {/* ── UPPER SASH ── */}
-        <rect x={sashX} y={upperSashY} width={sashW} height={topSashH}
-          fill="none" stroke={COL.sash} strokeWidth={STROKES.sash} {...NS} />
+        {/* ── UPPER SASH (no outer rect — edges hidden behind head & jambs) ── */}
         {/* Upper glass */}
         <rect x={sashX + geom.uGlassX} y={upperSashY + geom.uGlassY}
           width={geom.uGlassW} height={geom.uGlassH}
@@ -217,9 +234,7 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
         {/* Upper bars */}
         {renderBars(geom.uBars, sashX, upperSashY, geom.uGlassX, geom.uGlassY, geom.uGlassW, geom.uGlassH)}
 
-        {/* ── LOWER SASH ── */}
-        <rect x={sashX} y={lowerSashY} width={sashW} height={botSashH}
-          fill="none" stroke={COL.sash} strokeWidth={STROKES.sash} {...NS} />
+        {/* ── LOWER SASH (only bottom edge visible) ── */}
         {/* Lower glass */}
         <rect x={sashX + geom.lGlassX} y={lowerSashY + geom.lGlassY}
           width={geom.lGlassW} height={geom.lGlassH}
@@ -227,9 +242,13 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
           stroke={COL.glass} strokeWidth={STROKES.glassLight} {...NS} />
         {/* Lower bars */}
         {renderBars(geom.lBars, sashX, lowerSashY, geom.lGlassX, geom.lGlassY, geom.lGlassW, geom.lGlassH)}
+        {/* Lower sash bottom edge (visible — sits in front of sill) */}
+        <line x1={sashX} y1={lowerSashY + botSashH} x2={sashX + sashW} y2={lowerSashY + botSashH}
+          stroke={COL.sash} strokeWidth={STROKES.sash} {...NS} />
 
-        {/* Meeting rail line (emphasized) — center of overlap zone */}
-        <line x1={sashX} y1={lowerSashY + meetRail / 2} x2={sashX + sashW} y2={lowerSashY + meetRail / 2}
+        {/* Meeting rail line — clipped to visible cavity between jambs */}
+        <line x1={ox + BOX.jambW_top} y1={lowerSashY + meetRail / 2}
+          x2={ox + fw - BOX.jambW_top} y2={lowerSashY + meetRail / 2}
           stroke={COL.meeting} strokeWidth={STROKES.meeting} {...NS} />
 
         {/* ── DIM LINES — overall only ── */}
