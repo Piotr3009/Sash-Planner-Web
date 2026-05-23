@@ -20,6 +20,7 @@ import {
   buildHardwareList,
 } from '../engine/lists.js';
 import { optimisePrecut } from '../engine/optimizer.js';
+import { exportGlassPDF } from '../utils/glassPdfExport.js';
 
 import FrontElevation2D from '../components/drawings/FrontElevation2D.jsx';
 import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
@@ -254,7 +255,7 @@ export default function ProductionPackPage() {
         {tab === 'elevations' && <ElevationsTab windowsData={windowsData} />}
         {tab === 'sections'   && <SectionsTab windowsData={windowsData} />}
         {tab === 'elements'   && <ElementsTab windowsData={windowsData} />}
-        {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} />}
+        {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} batch={batch} pp={pp} />}
         {tab === 'precut'     && <PreCutTab merged={merged} settings={settings} />}
         {tab === 'cutlist'    && <CutListTab merged={merged} isPPMode={isPPMode} />}
         {tab === 'bom'        && <BOMTab merged={merged} batch={batch} pp={pp} isPPMode={isPPMode} windowsData={windowsData} />}
@@ -498,7 +499,7 @@ function ElementsTab({ windowsData }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: Glass Schedule
 // ═══════════════════════════════════════════════════════════════
-function GlassTab({ merged, windowsData, isPPMode }) {
+function GlassTab({ merged, windowsData, isPPMode, batch, pp }) {
   if (!merged?.glass?.length) {
     return <div className="card p-8 text-center text-ink-400">No glass data available.</div>;
   }
@@ -506,11 +507,33 @@ function GlassTab({ merged, windowsData, isPPMode }) {
   // Group identical glass panes
   const grouped = groupGlassItems(merged.glass);
 
+  const handleExportPDF = () => {
+    const projects = isPPMode && pp?.projects
+      ? pp.projects.map(p => ({ number: p.number, name: p.name, id: p.id }))
+      : batch ? [{ number: batch.projectNumber || '', name: batch.projectName || '', id: batch.id }] : [];
+
+    exportGlassPDF({
+      batch: batch || pp,
+      windowsData,
+      projects,
+      companySettings: {
+        companyName: 'PRIME SASH WINDOWS',
+        companyAddress: 'London, UK',
+        companyPhone: '',
+        companyEmail: '',
+      },
+    });
+  };
+
   return (
     <div className="space-y-4">
       <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-surface-500">
+        <div className="px-4 py-3 border-b border-surface-500 flex items-center justify-between">
           <div className="text-sm font-semibold text-ink-50">Glass Order — All Windows</div>
+          <button onClick={handleExportPDF}
+            className="px-3 py-1.5 text-xs font-medium bg-accent-600 hover:bg-accent-500 text-white rounded transition-colors">
+            Export PDF
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
