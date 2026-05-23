@@ -32,14 +32,13 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
     const glassH = isUpper ? topH - 100 + 2 * REBATE : botH - 133 + 2 * REBATE;
 
     const gridMode = windowSpec.sash?.grid?.mode || 'none';
-    let vCount = 0, hCount = 0;
-    if (gridMode !== 'none' && gridMode !== 'custom') {
-      const parts = gridMode.split('x');
-      const cols = parseInt(parts[0]) || 2;
-      const rows = parseInt(parts[1]) || 2;
-      vCount = cols - 1;
-      hCount = isUpper ? Math.floor(rows / 2) : Math.ceil(rows / 2);
-    }
+    const BAR_PATTERNS = {
+      'none': { h: 0, v: 0 }, '2x2': { h: 0, v: 1 }, '3x3': { h: 0, v: 2 },
+      '4x4': { h: 1, v: 1 }, '6x6': { h: 1, v: 2 }, '9x9': { h: 2, v: 2 },
+    };
+    const pattern = BAR_PATTERNS[gridMode] || BAR_PATTERNS['none'];
+    const vCount = pattern.v;
+    const hCount = pattern.h;
 
     const bars = computeBarPositions({
       glassX: 0, glassY: 0, glassW, glassH,
