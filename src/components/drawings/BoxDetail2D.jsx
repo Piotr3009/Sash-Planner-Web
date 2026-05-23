@@ -45,9 +45,9 @@ function bulgeArc(x1, y1, x2, y2, bulge) {
   return `A ${r} ${r} 0 ${la} ${sw} ${x2} ${y2}`;
 }
 
-// ─── Red dimension helpers (unified with Sash system) ───
+// ─── Dimension helpers (unified via theme) ───
 function DimH({ y, x1, x2, label, small, sc }) {
-  const fs = small ? sc * 17 : sc * 21;
+  const fs = small ? sc * SIZES.dimSmall : sc * SIZES.dimLarge;
   const tick = sc * 14;
   const mid = (x1 + x2) / 2;
   return (
@@ -56,13 +56,13 @@ function DimH({ y, x1, x2, label, small, sc }) {
       <line x1={x1} y1={y - tick} x2={x1} y2={y + tick} stroke={COL.dim} strokeWidth={sc * 2} />
       <line x1={x2} y1={y - tick} x2={x2} y2={y + tick} stroke={COL.dim} strokeWidth={sc * 2} />
       <text x={mid} y={y - sc * 10} fill={COL.dim} fontSize={fs} fontFamily={FONT.family}
-        textAnchor="middle" fontWeight="400">{label}</text>
+        textAnchor="middle" fontWeight={WEIGHTS.dim}>{label}</text>
     </g>
   );
 }
 
 function DimV({ x, y1, y2, label, small, sc }) {
-  const fs = small ? sc * 17 : sc * 21;
+  const fs = small ? sc * SIZES.dimSmall : sc * SIZES.dimLarge;
   const tick = sc * 14;
   const mid = (y1 + y2) / 2;
   return (
@@ -71,7 +71,7 @@ function DimV({ x, y1, y2, label, small, sc }) {
       <line x1={x - tick} y1={y1} x2={x + tick} y2={y1} stroke={COL.dim} strokeWidth={sc * 2} />
       <line x1={x - tick} y1={y2} x2={x + tick} y2={y2} stroke={COL.dim} strokeWidth={sc * 2} />
       <text x={x + sc * 18} y={mid + sc * 8} fill={COL.dim} fontSize={fs} fontFamily={FONT.family}
-        fontWeight="400" transform={`rotate(-90, ${x + sc * 18}, ${mid + sc * 8})`}
+        fontWeight={WEIGHTS.dim} transform={`rotate(-90, ${x + sc * 18}, ${mid + sc * 8})`}
         textAnchor="middle">{label}</text>
     </g>
   );
@@ -139,10 +139,10 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
 
   const sill = `M ${X(BOX.jambW_bottom)} ${Y(0)} L ${X(fw - BOX.jambW_bottom)} ${Y(0)} L ${X(fw - BOX.jambW_bottom)} ${Y(BOX.sillNose)} L ${X(BOX.jambW_bottom)} ${Y(BOX.sillNose)} Z`;
 
-  const labelFs = sc * 14;
-  const titleFs = sc * 36;
-  const subtitleFs = sc * 24;
-  const cavityFs = sc * 22;
+  const labelFs = sc * SIZES.label;
+  const titleFs = sc * SIZES.title;
+  const subtitleFs = sc * SIZES.subtitle;
+  const cavityFs = sc * SIZES.annotation;
   const winName = windowSpec?.name || 'Window';
   const projNum = projectNumber || '';
 
@@ -170,21 +170,21 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
           <line x1={X(BOX.jambW_bottom)} y1={Y(BOX.sillTop)} x2={X(fw - BOX.jambW_bottom)} y2={Y(BOX.sillTop)} stroke={COL.sillDetail} strokeWidth={sc * 1.5} />
 
           {/* Labels */}
-          <text x={X(BOX.jambW_bottom / 2)} y={Y(fh / 2)} fill={COL.label} fontSize={labelFs}
+          <text x={X(BOX.jambW_bottom / 2)} y={Y(fh / 2)} fill={COL.label} fontSize={labelFs} fontWeight={WEIGHTS.label}
             fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}
             transform={`rotate(-90, ${X(BOX.jambW_bottom / 2)}, ${Y(fh / 2)})`}>
             EXT. JAMB LINER (L)
           </text>
-          <text x={X(fw - BOX.jambW_bottom / 2)} y={Y(fh / 2)} fill={COL.label} fontSize={labelFs}
+          <text x={X(fw - BOX.jambW_bottom / 2)} y={Y(fh / 2)} fill={COL.label} fontSize={labelFs} fontWeight={WEIGHTS.label}
             fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}
             transform={`rotate(90, ${X(fw - BOX.jambW_bottom / 2)}, ${Y(fh / 2)})`}>
             EXT. JAMB LINER (R)
           </text>
-          <text x={X(fw / 2)} y={Y(fh - BOX.headH / 2) + sc * 8} fill={COL.label} fontSize={labelFs}
+          <text x={X(fw / 2)} y={Y(fh - BOX.headH / 2) + sc * 8} fill={COL.label} fontSize={labelFs} fontWeight={WEIGHTS.label}
             fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}>
             EXT. HEAD LINER
           </text>
-          <text x={X(fw / 2)} y={Y(BOX.sillNose / 2) + sc * 8} fill={COL.label} fontSize={labelFs}
+          <text x={X(fw / 2)} y={Y(BOX.sillNose / 2) + sc * 8} fill={COL.label} fontSize={labelFs} fontWeight={WEIGHTS.label}
             fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}>
             SILL
           </text>
@@ -231,7 +231,7 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
 
           {/* Title */}
           <text x={totalW / 2} y={totalH - sc * 12} fill={COL.title} fontSize={titleFs}
-            fontFamily={FONT.family} textAnchor="middle" fontWeight="600">
+            fontFamily={FONT.family} textAnchor="middle" fontWeight={WEIGHTS.title}>
             Box — Front{projNum ? ` — ${projNum}` : ''} — {winName}
           </text>
           <text x={totalW / 2} y={totalH + sc * 18} fill={COL.title} fontSize={subtitleFs}

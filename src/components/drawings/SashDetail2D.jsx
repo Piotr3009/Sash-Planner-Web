@@ -352,20 +352,20 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
 
           {/* LABELS — green, sentence case */}
           <text x={X(geom.sashW / 2)} y={Y(geom.sashH - geom.botEdge / 2)}
-            fill={C.label} fontSize={fs(FS_LABEL)} fontFamily={FONT_FAMILY} textAnchor="middle">
+            fill={C.label} fontSize={fs(FS_LABEL)} fontFamily={FONT_FAMILY} fontWeight={WEIGHTS.label} textAnchor="middle">
             {geom.isUpper ? 'MEETING RAIL' : 'BOTTOM RAIL'}
           </text>
           <text x={X(geom.sashW / 2)} y={Y(geom.topEdge / 2 + 3)}
-            fill={C.label} fontSize={fs(FS_LABEL)} fontFamily={FONT_FAMILY} textAnchor="middle">
+            fill={C.label} fontSize={fs(FS_LABEL)} fontFamily={FONT_FAMILY} fontWeight={WEIGHTS.label} textAnchor="middle">
             {geom.isUpper ? 'TOP RAIL' : 'MEETING RAIL'}
           </text>
           <text x={X(geom.stile / 2)} y={Y(geom.sashH / 2)}
-            fill={C.label} fontSize={fs(FS_LABEL)} fontFamily={FONT_FAMILY} textAnchor="middle"
+            fill={C.label} fontSize={fs(FS_LABEL)} fontFamily={FONT_FAMILY} fontWeight={WEIGHTS.label} textAnchor="middle"
             transform={`rotate(-90, ${X(geom.stile / 2)}, ${Y(geom.sashH / 2)})`}>
             LEFT STILE
           </text>
           <text x={X(geom.sashW - geom.stile / 2)} y={Y(geom.sashH / 2)}
-            fill={C.label} fontSize={fs(FS_LABEL)} fontFamily={FONT_FAMILY} textAnchor="middle"
+            fill={C.label} fontSize={fs(FS_LABEL)} fontFamily={FONT_FAMILY} fontWeight={WEIGHTS.label} textAnchor="middle"
             transform={`rotate(90, ${X(geom.sashW - geom.stile / 2)}, ${Y(geom.sashH / 2)})`}>
             RIGHT STILE
           </text>
@@ -396,14 +396,14 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
                     stroke={C.dim} strokeWidth={sw(SW_LEADER)} />
                   <text x={X(mid + 17 * sc)} y={topDimY - 15 * sc}
                     fill={C.dim} fontSize={fs(FS_DIM_SMALL)} fontFamily={FONT_FAMILY}
-                    fontWeight="400">{fmt(width)}</text>
+                    fontWeight={WEIGHTS.dim}>{fmt(width)}</text>
                 </g>
               );
             }
             return (
               <text key={`tdc-lbl-${i}`} x={X(mid)} y={topDimY - 8 * sc}
                 fill={C.dim} fontSize={fs(FS_DIM_SMALL)} fontFamily={FONT_FAMILY}
-                textAnchor="middle" fontWeight="400">{fmt(width)}</text>
+                textAnchor="middle" fontWeight={WEIGHTS.dim}>{fmt(width)}</text>
             );
           })}
 
@@ -433,14 +433,14 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
                     stroke={C.dim} strokeWidth={sw(SW_LEADER)} />
                   <text x={leftDimX - 18 * sc} y={Y(mid) - 18 * sc}
                     fill={C.dim} fontSize={fs(FS_DIM_SMALL)} fontFamily={FONT_FAMILY}
-                    textAnchor="middle" fontWeight="400">{fmt(height)}</text>
+                    textAnchor="middle" fontWeight={WEIGHTS.dim}>{fmt(height)}</text>
                 </g>
               );
             }
             return (
               <text key={`ldc-lbl-${i}`} x={leftDimX - 8 * sc} y={Y(mid)}
                 fill={C.dim} fontSize={fs(FS_DIM_SMALL)} fontFamily={FONT_FAMILY}
-                textAnchor="middle" fontWeight="400"
+                textAnchor="middle" fontWeight={WEIGHTS.dim}
                 transform={`rotate(-90, ${leftDimX - 8 * sc}, ${Y(mid)})`}>{fmt(height)}</text>
             );
           })}
@@ -459,7 +459,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
               stroke={C.dim} strokeWidth={sw(SW_DIM)} />
             <text x={X(geom.sashW / 2)} y={Y(geom.sashH) + 26 * sc}
               fill={C.dim} fontSize={fs(FS_DIM_LARGE)} fontFamily={FONT_FAMILY}
-              textAnchor="middle" fontWeight="400">{fmt(geom.sashW)}</text>
+              textAnchor="middle" fontWeight={WEIGHTS.dim}>{fmt(geom.sashW)}</text>
           </g>
 
           {/* OVERALL HEIGHT (right) */}
@@ -476,14 +476,14 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
               stroke={C.dim} strokeWidth={sw(SW_DIM)} />
             <text x={X(geom.sashW) + 26 * sc} y={Y(geom.sashH / 2)}
               fill={C.dim} fontSize={fs(FS_DIM_LARGE)} fontFamily={FONT_FAMILY}
-              textAnchor="middle" fontWeight="400"
+              textAnchor="middle" fontWeight={WEIGHTS.dim}
               transform={`rotate(-90, ${X(geom.sashW) + 26 * sc}, ${Y(geom.sashH / 2)})`}>{fmt(geom.sashH)}</text>
           </g>
 
           {/* TITLE / SUBTITLE */}
           <text x={totalW / 2} y={totalH - 20 * sc}
             fill={C.title} fontSize={fs(FS_TITLE)} fontFamily={FONT_FAMILY}
-            textAnchor="middle" fontWeight="600">
+            textAnchor="middle" fontWeight={WEIGHTS.title}>
             {titleText}
           </text>
           <text x={totalW / 2} y={totalH - 6 * sc}
