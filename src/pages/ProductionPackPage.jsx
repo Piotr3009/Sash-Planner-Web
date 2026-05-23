@@ -375,19 +375,8 @@ function ThreeDTab({ windowsData }) {
 // ═══════════════════════════════════════════════════════════════
 function ElevationsTab({ windowsData }) {
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-      {windowsData.map(({ win, windowSpec, derived }) => (
-        <div key={win.id} className="card p-4">
-          <div className="text-xs font-semibold text-ink-200 mb-2">
-            {win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — {win.width}×{win.height} mm
-          </div>
-          {derived ? (
-            <FrontElevation2D windowSpec={windowSpec} derived={derived} />
-          ) : (
-            <div className="text-xs text-ink-400 py-8 text-center">Calculations not available for this window.</div>
-          )}
-        </div>
-      ))}
+    <div className="card p-8 text-center text-ink-400">
+      2D Elevations — in progress
     </div>
   );
 }
