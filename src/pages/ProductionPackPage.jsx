@@ -376,10 +376,10 @@ function ThreeDTab({ windowsData }) {
 // ═══════════════════════════════════════════════════════════════
 function ElevationsTab({ windowsData }) {
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
       {windowsData.map(({ win, windowSpec, derived }) => (
-        <div key={win.id} className="card p-4">
-          <div className="text-xs font-semibold text-ink-200 mb-2">
+        <div key={win.id} className="card p-6">
+          <div className="text-xs font-semibold text-ink-200 mb-3">
             {win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — {win.width}×{win.height} mm
           </div>
           {derived ? (
