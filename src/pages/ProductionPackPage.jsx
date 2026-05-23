@@ -375,17 +375,11 @@ function ThreeDTab({ windowsData }) {
 // ═══════════════════════════════════════════════════════════════
 function ElevationsTab({ windowsData }) {
   return (
-    <div className="space-y-6">
+    <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
       {windowsData.map(({ win, windowSpec, derived }) => (
         <div key={win.id} className="card p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-semibold text-ink-50">
-              {win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — {win.width}×{win.height} mm
-            </div>
-            <Link to={`/projects/${win._projectId}/batches/${win._batchId || win.batch_id}/windows/${win.id}`}
-              className="text-[10px] text-accent-400 hover:text-accent-300 transition-colors">
-              View Details →
-            </Link>
+          <div className="text-xs font-semibold text-ink-200 mb-2">
+            {win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — {win.width}×{win.height} mm
           </div>
           {derived ? (
             <FrontElevation2D windowSpec={windowSpec} derived={derived} />
@@ -408,19 +402,13 @@ function SectionsTab({ windowsData }) {
     return <div className="card p-8 text-center text-ink-400">No data available.</div>;
   }
   return (
-    <div className="space-y-6">
+    <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
       <div className="card p-4">
-        <div className="text-sm font-semibold text-ink-50 mb-3">Vertical Section</div>
-        <div className="text-[10px] text-ink-400 mb-2">
-          Cross-section from head to sill (shared for all windows in this batch — same profile type).
-        </div>
+        <div className="text-xs font-semibold text-ink-200 mb-2">Vertical Section</div>
         <VerticalSection2D windowSpec={first.windowSpec} derived={first.derived} />
       </div>
       <div className="card p-4">
-        <div className="text-sm font-semibold text-ink-50 mb-3">Horizontal Section</div>
-        <div className="text-[10px] text-ink-400 mb-2">
-          Cross-section at meeting rail level — exterior to interior.
-        </div>
+        <div className="text-xs font-semibold text-ink-200 mb-2">Horizontal Section</div>
         <HorizontalSection2D windowSpec={first.windowSpec} derived={first.derived} />
       </div>
     </div>
@@ -559,10 +547,10 @@ function GlassTab({ merged, windowsData, isPPMode }) {
       </div>
 
       {/* Glass drawings per window */}
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {windowsData.map(({ win, windowSpec, derived }) => (
           <div key={win.id} className="card p-4">
-            <div className="text-sm font-semibold text-ink-50 mb-2">
+            <div className="text-xs font-semibold text-ink-200 mb-2">
               {isPPMode && win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — Glass Drawing
             </div>
             {derived ? (
