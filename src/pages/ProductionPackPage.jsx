@@ -431,6 +431,8 @@ function SectionsTab({ windowsData }) {
 // TAB: 2D Elements (per window: Box + Upper Sash + Lower Sash)
 // ═══════════════════════════════════════════════════════════════
 function ElementsTab({ windowsData }) {
+  const [expandedDrawing, setExpandedDrawing] = useState(null); // { windowSpec, derived, type: 'box'|'upper'|'lower', title }
+
   return (
     <div className="space-y-8">
       {windowsData.map(({ win, windowSpec, derived }) => (
@@ -449,7 +451,8 @@ function ElementsTab({ windowsData }) {
             <div className="card p-4">
               <div className="text-xs font-semibold text-ink-200 mb-2">Box Detail</div>
               {derived ? (
-                <BoxDetail2D windowSpec={windowSpec} derived={derived} />
+                <BoxDetail2D windowSpec={windowSpec} derived={derived}
+                  onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'box', title: `${win.name} — Box Detail` })} />
               ) : (
                 <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
               )}
@@ -457,7 +460,8 @@ function ElementsTab({ windowsData }) {
             <div className="card p-4">
               <div className="text-xs font-semibold text-ink-200 mb-2">Upper Sash</div>
               {derived ? (
-                <SashDetail2D windowSpec={windowSpec} derived={derived} type="upper" />
+                <SashDetail2D windowSpec={windowSpec} derived={derived} type="upper"
+                  onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'upper', title: `${win.name} — Upper Sash` })} />
               ) : (
                 <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
               )}
@@ -465,7 +469,8 @@ function ElementsTab({ windowsData }) {
             <div className="card p-4">
               <div className="text-xs font-semibold text-ink-200 mb-2">Lower Sash</div>
               {derived ? (
-                <SashDetail2D windowSpec={windowSpec} derived={derived} type="lower" />
+                <SashDetail2D windowSpec={windowSpec} derived={derived} type="lower"
+                  onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'lower', title: `${win.name} — Lower Sash` })} />
               ) : (
                 <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
               )}
@@ -473,6 +478,31 @@ function ElementsTab({ windowsData }) {
           </div>
         </div>
       ))}
+
+      {/* Full-screen expand modal */}
+      {expandedDrawing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setExpandedDrawing(null)}>
+          <div className="absolute inset-0 bg-black/80" />
+          <div className="relative w-full max-w-5xl mx-4 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm font-semibold text-ink-50">{expandedDrawing.title}</div>
+              <button onClick={() => setExpandedDrawing(null)}
+                className="w-8 h-8 rounded-full bg-surface-700 border border-surface-500 text-ink-300 hover:text-ink-50 flex items-center justify-center text-sm">×</button>
+            </div>
+            <div className="card p-6 overflow-auto flex-1">
+              {expandedDrawing.type === 'box' && (
+                <BoxDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} />
+              )}
+              {expandedDrawing.type === 'upper' && (
+                <SashDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} type="upper" />
+              )}
+              {expandedDrawing.type === 'lower' && (
+                <SashDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} type="lower" />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

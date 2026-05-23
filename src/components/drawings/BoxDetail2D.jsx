@@ -81,8 +81,13 @@ function Ext({ x1, y1, x2, y2, sc }) {
 }
 
 // ─── Main Component ───
-export default function BoxDetail2D({ windowSpec, derived }) {
+export default function BoxDetail2D({ windowSpec, derived, onExpand }) {
   const [expanded, setExpanded] = useState(false);
+  const isExternalExpand = !!onExpand;
+  const handleExpand = (e) => {
+    e.stopPropagation();
+    if (isExternalExpand) { onExpand(); } else { setExpanded(!expanded); }
+  };
 
   const d = useMemo(() => {
     if (!windowSpec || !derived) return null;
@@ -141,13 +146,13 @@ export default function BoxDetail2D({ windowSpec, derived }) {
     <div className="w-full relative">
       {/* Expand hint */}
       <div className="absolute top-2 right-2 z-10 text-[10px] text-ink-400 bg-surface-700/80 px-2 py-1 rounded cursor-pointer hover:text-accent-400 transition-colors"
-        onClick={() => setExpanded(!expanded)}>
-        {expanded ? '⊖ Collapse' : '⊕ Expand'}
+        onClick={handleExpand}>
+        {isExternalExpand ? '⊕ Expand' : (expanded ? '⊖ Collapse' : '⊕ Expand')}
       </div>
 
-      <div onClick={() => setExpanded(!expanded)} className="cursor-pointer">
+      <div onClick={isExternalExpand ? handleExpand : () => setExpanded(!expanded)} className="cursor-pointer">
         <svg viewBox={`0 0 ${totalW} ${totalH}`} xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-auto" style={{ maxHeight: expanded ? 'none' : '65vh' }}>
+          className="w-full h-auto" style={{ maxHeight: (expanded && !isExternalExpand) ? 'none' : '65vh' }}>
 
           {/* Frame geometry */}
           <path d={rJamb} fill={COL.frameFill} stroke={COL.frame} strokeWidth={sc * 3} />

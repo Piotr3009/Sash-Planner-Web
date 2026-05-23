@@ -88,8 +88,13 @@ function computeSegments(from, to, cutPairs) {
   return segs;
 }
 
-export default function SashDetail2D({ windowSpec, derived, type = 'upper' }) {
+export default function SashDetail2D({ windowSpec, derived, type = 'upper', onExpand }) {
   const [expanded, setExpanded] = useState(false);
+  const isExternalExpand = !!onExpand;
+  const handleExpand = (e) => {
+    e.stopPropagation();
+    if (isExternalExpand) { onExpand(); } else { setExpanded(!expanded); }
+  };
 
   const geom = useMemo(() => {
     if (!windowSpec || !derived) return null;
@@ -193,17 +198,17 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper' }) {
     <div className="w-full relative">
       <div
         className="absolute top-2 right-2 z-10 text-[10px] text-ink-400 bg-surface-700/80 px-2 py-1 rounded cursor-pointer hover:text-accent-400"
-        onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+        onClick={handleExpand}
       >
-        {expanded ? '⊖ Collapse' : '⊕ Expand'}
+        {isExternalExpand ? '⊕ Expand' : (expanded ? '⊖ Collapse' : '⊕ Expand')}
       </div>
 
-      <div onClick={() => setExpanded(!expanded)} className="cursor-pointer">
+      <div onClick={isExternalExpand ? handleExpand : () => setExpanded(!expanded)} className="cursor-pointer">
         <svg
           viewBox={`0 0 ${totalW} ${totalH}`}
           xmlns="http://www.w3.org/2000/svg"
           className="w-full h-auto"
-          style={{ maxHeight: expanded ? 'none' : '65vh', background: '#1a1f2e' }}
+          style={{ maxHeight: (expanded && !isExternalExpand) ? 'none' : '65vh', background: '#1a1f2e' }}
         >
           {/* OUTER SASH */}
           <rect
