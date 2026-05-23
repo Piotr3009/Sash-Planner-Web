@@ -7,30 +7,7 @@
  */
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
-import { computeBarPositions } from './drawingUtils.jsx';
-
-// Drawing style constants
-const STROKE = {
-  frame: '#94A3B8',      // box frame outline
-  sash: '#CBD5E1',       // sash outline
-  bar: '#94A3B8',        // glazing bars
-  glass: '#0EA5E9',      // glass fill
-  glassOpacity: 0.12,
-  dim: '#00B4A0',        // dimension lines (teal accent)
-  dimText: '#E2E8F0',    // dimension text
-  horn: '#F59E0B',       // horn highlight
-  bg: 'transparent',
-};
-
-const FONT = {
-  size: 14,
-  family: 'DM Sans, system-ui, sans-serif',
-};
-
-// Dimension line offset from drawing edge (mm)
-const DIM_OFFSET = 40;
-const DIM_GAP = 35;
-const MARGIN = 80;
+import { STROKE, FONT, DIM_OFFSET, DIM_GAP, MARGIN, computeBarPositions } from './drawingUtils.jsx';
 
 export default function FrontElevation2D({ windowSpec, derived }) {
   const drawing = useMemo(() => {
@@ -304,7 +281,7 @@ function DimH({ y, x1, x2, label, small }) {
       <line x1={x2} y1={y - tick * 3} x2={x2} y2={y - tick} stroke={STROKE.dim} strokeWidth={0.3} strokeOpacity={0.4} />
       {/* Label */}
       <text x={mid} y={y - 6} fill={STROKE.dim} fontSize={fs} fontFamily={FONT.family}
-        textAnchor="middle" fontWeight="500">{label}</text>
+        textAnchor="middle" fontWeight="400">{label}</text>
     </g>
   );
 }
@@ -321,7 +298,7 @@ function DimV({ x, y1, y2, label, small }) {
       <line x1={x - tick} y1={y2} x2={x + tick} y2={y2} stroke={STROKE.dim} strokeWidth={0.5} />
       {/* Label — rotated */}
       <text x={x + 8} y={mid + 4} fill={STROKE.dim} fontSize={fs} fontFamily={FONT.family}
-        fontWeight="500"
+        fontWeight="400"
         transform={`rotate(-90, ${x + 8}, ${mid + 4})`}
         textAnchor="middle">{label}</text>
     </g>

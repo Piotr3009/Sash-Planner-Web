@@ -7,6 +7,7 @@
  */
 import { useMemo, useState } from 'react';
 import { FONT } from './drawingUtils.jsx';
+import { COLORS, FONT_FAMILY, SIZES, WEIGHTS } from './drawingTheme.js';
 
 // ─── Constants from DXF (profile geometry — fixed) ───
 const BOX = {
@@ -21,15 +22,15 @@ const BOX = {
   bulge: 0.292123,
 };
 
-// ─── Colors ───
+// Alias — wired to theme
 const COL = {
-  frame: '#CBD5E1',
-  frameFill: 'rgba(148,163,184,0.06)',
-  sillDetail: '#94A3B8',
-  dim: '#EF4444',
-  label: '#00B4A0',
-  cavity: '#00B4A0',
-  title: '#E2E8F0',
+  frame:     COLORS.frame,
+  frameFill: COLORS.frameFill,
+  sillDetail: COLORS.sillDetail,
+  dim:       COLORS.dim,
+  label:     COLORS.label,
+  cavity:    COLORS.label,
+  title:     COLORS.title,
 };
 
 // ─── Bulge → SVG arc ───

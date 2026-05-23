@@ -19,6 +19,7 @@
 import { useMemo, useState } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
 import { computeBarPositions } from './drawingUtils.jsx';
+import { COLORS, FONT_FAMILY, SIZES, WEIGHTS } from './drawingTheme.js';
 
 // BAR_PATTERNS (per-sash, matches 3D ParametricSashWindow.jsx)
 // 4x4 = 1+1 bar = 4 panes per sash, NOT 16 panes
@@ -34,28 +35,27 @@ const BAR_PATTERNS = {
 // Constants matching approved reference SVG
 const BAR_WIDTH = 22; // mm — matches 3D (hardcoded; will sync with calculations.js in Stage 3)
 
+// Alias — wired to theme
 const C = {
-  outer:     '#E2E8F0', // outer sash + glass rebate + cross + bar edges
-  rebate:    '#0EA5E9', // outer rebate (dashed)
-  glassFill: '#0EA5E9',
-  meeting:   '#64748b',
-  label:     '#00B4A0', // green labels
-  dim:       '#EF4444', // red dimensions
-  notch:     '#F59E0B', // orange V-notches
-  title:     '#E2E8F0',
-  subtitle:  '#E2E8F0',
+  outer:     COLORS.sash,
+  rebate:    COLORS.glass,
+  glassFill: COLORS.glass,
+  meeting:   COLORS.meeting,
+  label:     COLORS.label,
+  dim:       COLORS.dim,
+  notch:     COLORS.notch,
+  title:     COLORS.title,
+  subtitle:  COLORS.subtitle,
   bgFill:    'rgba(148,163,184,0.03)',
 };
 
-const FONT_FAMILY = 'DM Sans, system-ui, sans-serif';
-
-// Base font sizes (multiplied by sc factor)
-const FS_DIM_LARGE = 21;
-const FS_DIM_SMALL = 17;
-const FS_LABEL = 13;
-const FS_TITLE = 21;
-const FS_SUBTITLE = 17;
-const FS_NOTCH_NOTE = 9;
+// Font sizes from theme
+const FS_DIM_LARGE = SIZES.dimLarge;
+const FS_DIM_SMALL = SIZES.dimSmall;
+const FS_LABEL = SIZES.label;
+const FS_TITLE = SIZES.title;
+const FS_SUBTITLE = SIZES.subtitle;
+const FS_NOTCH_NOTE = SIZES.notch;
 
 // Base stroke widths (multiplied by sc factor)
 const SW_OUTER = 1;
@@ -212,7 +212,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
           viewBox={`0 0 ${totalW} ${totalH}`}
           xmlns="http://www.w3.org/2000/svg"
           className="w-full h-auto"
-          style={{ maxHeight: (expanded && !isExternalExpand) ? 'none' : '65vh', background: '#1a1f2e' }}
+          style={{ maxHeight: (expanded && !isExternalExpand) ? 'none' : '65vh', background: COLORS.bg }}
         >
           {/* OUTER SASH */}
           <rect
