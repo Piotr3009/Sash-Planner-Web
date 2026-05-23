@@ -20,7 +20,7 @@ const C = {
   rowBg:    [248, 248, 246],
   glass:    [26, 58, 92],
   glassFill:[240, 243, 247],
-  dim:      [0, 137, 123],
+  dim:      [0, 121, 107],
   link:     [0, 85, 170],
 };
 
@@ -31,10 +31,10 @@ const LW = {
   outline:  0.25,     // glass outer edge
   seal:     0.13,     // edge seal, spacer bars
   cross:    0.1,      // bar intersection crosses
-  dimLine:  0.13,     // chain dimension lines
-  dimOver:  0.15,     // overall dimension lines
-  tick:     0.13,     // tick marks
-  ext:      0.05,     // extension lines (dashed)
+  dimLine:  0.18,     // chain dimension lines
+  dimOver:  0.22,     // overall dimension lines
+  tick:     0.18,     // tick marks
+  ext:      0.06,     // extension lines (dashed)
   cell:     0.2,      // drawing cell border
   cellIn:   0.06,     // inner cell border
   sep:      0.3,      // section separators
@@ -352,7 +352,7 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
     doc.setLineDashPattern([], 0);
   });
 
-  doc.setFont('courier', 'normal');
+  doc.setFont('courier', 'bold');
   doc.setFontSize(3.5);
   tc(doc, C.dim);
   for (let i = 0; i < hCuts.length - 1; i++) {
@@ -474,7 +474,7 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
   if (!glassItems.length) return null;
 
   // Pagination: page 1 = table, page 2+ = 6 drawings each
-  const drawPages = Math.ceil(glassItems.length / 6);
+  const drawPages = Math.ceil(glassItems.length / 4);
   const totalPages = 1 + drawPages;
 
   const info = {
@@ -502,8 +502,8 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
   const drawAreaH = contentBot - contentTop;
   const drawAreaW = PG.w - 2 * PG.bx - 4;
 
-  const gap = 2.5;
-  const cellW = (drawAreaW - 2 * gap) / 3;
+  const gap = 3;
+  const cellW = (drawAreaW - gap) / 2;
   const cellH = (drawAreaH - gap) / 2;
 
   let di = 0;
@@ -513,7 +513,7 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
     drawHeader(doc, info, pg + 2, totalPages);
 
     for (let row = 0; row < 2; row++) {
-      for (let col = 0; col < 3; col++) {
+      for (let col = 0; col < 2; col++) {
         if (di >= glassItems.length) break;
         const cellX = PG.bx + 2 + col * (cellW + gap);
         const cellY = contentTop + row * (cellH + gap);
