@@ -37,12 +37,10 @@ export const MARGIN = 80;
 // ─── Horizontal dimension line ───
 export function DimH({ y, x1, x2, label, small, sc }) {
   const mid = (x1 + x2) / 2;
-  const fs = sc
-    ? sc * (small ? SIZES.dimSmall : SIZES.dimLarge)
-    : (small ? FONT.size * 0.7 : FONT.size * 0.85);
-  const tick = sc ? sc * (small ? 8 : 14) : (small ? 4 : 6);
-  const sw = sc ? sc * 1.5 : 0.5;
-  const gap = sc ? sc * 10 : 6;
+  const fs = sc * (small ? SIZES.dimSmall : SIZES.dimLarge);
+  const tick = sc * (small ? 8 : 14);
+  const sw = sc * 1.5;
+  const gap = sc * 10;
   return (
     <g>
       <line x1={x1} y1={y} x2={x2} y2={y} stroke={STROKE.dim} strokeWidth={sw} />
@@ -57,19 +55,17 @@ export function DimH({ y, x1, x2, label, small, sc }) {
 // ─── Vertical dimension line ───
 export function DimV({ x, y1, y2, label, small, sc }) {
   const mid = (y1 + y2) / 2;
-  const fs = sc
-    ? sc * (small ? SIZES.dimSmall : SIZES.dimLarge)
-    : (small ? FONT.size * 0.7 : FONT.size * 0.85);
-  const tick = sc ? sc * (small ? 8 : 14) : (small ? 4 : 6);
-  const sw = sc ? sc * 1.5 : 0.5;
-  const offset = sc ? sc * 18 : 8;
+  const fs = sc * (small ? SIZES.dimSmall : SIZES.dimLarge);
+  const tick = sc * (small ? 8 : 14);
+  const sw = sc * 1.5;
+  const offset = sc * 18;
   return (
     <g>
       <line x1={x} y1={y1} x2={x} y2={y2} stroke={STROKE.dim} strokeWidth={sw} />
       <line x1={x - tick} y1={y1} x2={x + tick} y2={y1} stroke={STROKE.dim} strokeWidth={sw} />
       <line x1={x - tick} y1={y2} x2={x + tick} y2={y2} stroke={STROKE.dim} strokeWidth={sw} />
-      <text x={x + offset} y={mid + (sc ? sc * 8 : 4)} fill={STROKE.dim} fontSize={fs} fontFamily={FONT.family}
-        fontWeight={WEIGHTS.dim} transform={`rotate(-90, ${x + offset}, ${mid + (sc ? sc * 8 : 4)})`}
+      <text x={x + offset} y={mid + sc * 8} fill={STROKE.dim} fontSize={fs} fontFamily={FONT.family}
+        fontWeight={WEIGHTS.dim} transform={`rotate(-90, ${x + offset}, ${mid + sc * 8})`}
         textAnchor="middle">{label}</text>
     </g>
   );
@@ -77,9 +73,9 @@ export function DimV({ x, y1, y2, label, small, sc }) {
 
 // ─── Title block ───
 export function TitleBlock({ x, y, title, subtitle, sc }) {
-  const titleFs = sc ? sc * SIZES.title : FONT.size * 1.1;
-  const subFs = sc ? sc * SIZES.subtitle : FONT.size * 0.75;
-  const subGap = sc ? sc * 25 : 18;
+  const titleFs = sc * SIZES.title;
+  const subFs = sc * SIZES.subtitle;
+  const subGap = sc * 25;
   return (
     <g>
       <text x={x} y={y} fill={COLORS.title} fontSize={titleFs}
@@ -98,7 +94,7 @@ export function TitleBlock({ x, y, title, subtitle, sc }) {
 
 // ─── Label helper ───
 export function Label({ x, y, text, anchor = 'middle', opacity = 0.8, sc }) {
-  const fs = sc ? sc * SIZES.label : FONT.size * 0.7;
+  const fs = sc * SIZES.label;
   return (
     <text x={x} y={y} fill={COLORS.label} fontSize={fs}
       fontFamily={FONT.family} textAnchor={anchor} fillOpacity={opacity} fontWeight={WEIGHTS.label}>
