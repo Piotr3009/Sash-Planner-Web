@@ -217,8 +217,8 @@ function drawTable(doc, items, startY) {
     doc.text(g.sash || '', x + 35, y);
 
     doc.setFont('courier', 'normal');
-    doc.text(fmt(g.width), x + 58, y);
-    doc.text(fmt(g.height), x + 88, y);
+    doc.text(fmt(g.glassW), x + 58, y);
+    doc.text(fmt(g.glassH), x + 88, y);
 
     doc.setFont('helvetica', 'normal');
     doc.text(g.type || '', x + 120, y);
