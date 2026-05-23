@@ -20,16 +20,12 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
     const sashW = derived.sashWidth;
     const topH = derived.topSashHeight;
     const botH = derived.bottomSashHeight;
-    const stile = CONSTANTS.STILE_WIDTH;
-    const topRail = CONSTANTS.TOP_RAIL_WIDTH;
-    const botRail = CONSTANTS.BOTTOM_RAIL_WIDTH;
-    const meetRail = CONSTANTS.MEETING_RAIL_WIDTH;
     const barW = CONSTANTS.GLAZING_BAR_WIDTH;
 
-    const glassW = sashW - 2 * stile;
+    const glassW = sashW - CONSTANTS.GLASS_WIDTH_DEDUCTION;
     const glassH = isUpper
-      ? topH - topRail - meetRail / 2
-      : botH - botRail - meetRail / 2;
+      ? topH - CONSTANTS.GLASS_HEIGHT_DEDUCTION
+      : botH - CONSTANTS.GLASS_HEIGHT_DEDUCTION;
 
     // Bar counts
     const gridMode = windowSpec.sash?.grid?.mode || 'none';
@@ -62,8 +58,9 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
 
   const ox = MARGIN + DIM_OFF;
   const oy = MARGIN;
+  const TITLE_SPACE = 50;
   const totalW = d.glassW + MARGIN * 2 + DIM_OFF * 2;
-  const totalH = d.glassH + MARGIN * 2 + DIM_OFF * 2;
+  const totalH = d.glassH + MARGIN * 2 + DIM_OFF * 2 + TITLE_SPACE;
 
   return (
     <div className="w-full" style={{ maxHeight: '65vh', overflow: 'auto' }}>
@@ -114,14 +111,14 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
         )}
 
         {/* Title */}
-        <text x={totalW / 2} y={totalH - 8 * totalW / VIEWBOX_REF}
+        <text x={totalW / 2} y={totalH - 30 * totalW / VIEWBOX_REF}
           fill={COLORS.title} fontSize={tfs(SIZES.title, totalW)} fontFamily={FONT.family}
           textAnchor="middle" fontWeight={WEIGHTS.title}>
           {d.isUpper ? 'UPPER' : 'LOWER'} GLASS
         </text>
 
         {/* Spec */}
-        <text x={totalW / 2} y={totalH + 6 * totalW / VIEWBOX_REF}
+        <text x={totalW / 2} y={totalH - 12 * totalW / VIEWBOX_REF}
           fill={STROKE.glass} fontSize={tfs(SIZES.subtitle, totalW)} fontFamily={FONT.family}
           textAnchor="middle" fillOpacity={0.7}>
           {d.glassType} / {d.glassFinish} · spacer: {d.spacer}
