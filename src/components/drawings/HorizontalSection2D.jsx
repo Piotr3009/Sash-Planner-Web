@@ -101,17 +101,17 @@ export default function HorizontalSection2D({ windowSpec, derived }) {
               </text>
               {/* Width dim on top */}
               {b.w > 15 && (
-                <DimH y={-DIM_OFFSET} x1={b.x} x2={b.x + b.w} label={`${b.w}`} small sc={sc} />
+                <DimH y={-DIM_OFFSET} x1={b.x} x2={b.x + b.w} extFrom={0} label={`${b.w}`} small sc={sc} />
               )}
             </g>
           );
         })}
 
         {/* Overall width */}
-        <DimH y={d.depth + DIM_OFFSET + 30} x1={0} x2={d.totalW} label={`Total: ${d.totalW} mm`} sc={sc} />
+        <DimH y={d.depth + DIM_OFFSET + 30} x1={0} x2={d.totalW} extFrom={d.depth} label={`Total: ${d.totalW} mm`} sc={sc} />
 
         {/* Depth */}
-        <DimV x={d.totalW + DIM_OFFSET} y1={0} y2={d.depth} label={`${d.depth} mm`} sc={sc} />
+        <DimV x={d.totalW + DIM_OFFSET} y1={0} y2={d.depth} extFrom={d.totalW} label={`${d.depth} mm`} sc={sc} />
 
         {/* Title */}
         <TitleBlock x={d.totalW / 2} y={d.depth + DIM_OFFSET * 2 + 50}

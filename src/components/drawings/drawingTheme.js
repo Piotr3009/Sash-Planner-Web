@@ -63,6 +63,32 @@ export const WEIGHTS = {
   subtitle: '400',
 };
 
+// ─── Stroke widths (in PIXELS, like SIZES — independent of sc) ───
+// Change values here to update line thickness across ALL drawings at once.
+export const STROKES = {
+  // Element outlines
+  outer:       1,      // outer profile contour (sash, frame, jamb)
+  rebate:      0.8,    // inner rebate line
+  bar:         1,      // glazing bars
+  notch:       1.2,    // mortise/tenon notch markings
+  notchCircle: 0.5,    // notch circle highlights
+
+  // Dimension lines (CAD-style — Sash reference)
+  dim:         0.7,    // main dimension line + ticks
+  ext:         0.3,    // extension line (dashed, from object to dim line)
+  leader:      0.3,    // leader line (for small dimensions)
+};
+
+// ─── Dimension geometry (SVG units, scaled by sc — relative to drawing size) ───
+export const DIMS = {
+  tickHalf:      5,    // tick mark half-length (each side of dim line)
+  extOvershoot:  10,   // how far ext line overshoots past dim line
+  textGap:       8,    // text-to-dim-line gap
+  leaderV:       18,   // leader vertical segment length
+  leaderHOff:    17,   // text horizontal offset after leader
+  dashPattern:   '3,2', // dash pattern for ext + leader lines (scaled by sc)
+};
+
 // ─── Scale divisor ───
 // sc = viewBoxWidth / SC_DIVISOR
 // Ensures text is always ~3% of viewBox width = identical visual size everywhere

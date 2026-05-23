@@ -205,31 +205,31 @@ export default function FrontElevation2D({ windowSpec, derived }) {
 
         {/* ── DIMENSION LINES ── */}
         {/* Frame Width — bottom */}
-        <DimH y={d.fh + DIM_OFFSET} x1={0} x2={d.fw} label={`${d.fw} mm`} sc={sc} />
+        <DimH y={d.fh + DIM_OFFSET} x1={0} x2={d.fw} extFrom={d.fh} label={`${d.fw} mm`} sc={sc} />
 
         {/* Frame Height — right */}
-        <DimV x={d.fw + DIM_OFFSET} y1={0} y2={d.fh} label={`${d.fh} mm`} sc={sc} />
+        <DimV x={d.fw + DIM_OFFSET} y1={0} y2={d.fh} extFrom={d.fw} label={`${d.fh} mm`} sc={sc} />
 
         {/* Sash Width — top */}
-        <DimH y={-DIM_OFFSET} x1={d.sashX} x2={d.sashX + d.sashW} label={`Sash: ${d.sashW} mm`} sc={sc} />
+        <DimH y={-DIM_OFFSET} x1={d.sashX} x2={d.sashX + d.sashW} extFrom={0} label={`Sash: ${d.sashW} mm`} sc={sc} />
 
         {/* Top Sash Height — left */}
-        <DimV x={-DIM_OFFSET} y1={d.sashY} y2={d.meetY} label={`${d.topH}`} sc={sc} />
+        <DimV x={-DIM_OFFSET} y1={d.sashY} y2={d.meetY} extFrom={0} label={`${d.topH}`} sc={sc} />
 
         {/* Bottom Sash Height — left */}
-        <DimV x={-DIM_OFFSET} y1={d.meetY} y2={d.sashY + d.topH + d.botH} label={`${d.botH}`} sc={sc} />
+        <DimV x={-DIM_OFFSET} y1={d.meetY} y2={d.sashY + d.topH + d.botH} extFrom={0} label={`${d.botH}`} sc={sc} />
 
         {/* Jamb width — bottom detail */}
-        <DimH y={d.fh + DIM_OFFSET + DIM_GAP} x1={0} x2={d.jw} label={`${d.jw}`} small sc={sc} />
+        <DimH y={d.fh + DIM_OFFSET + DIM_GAP} x1={0} x2={d.jw} extFrom={d.fh} label={`${d.jw}`} small sc={sc} />
 
         {/* Stile width — bottom detail */}
-        <DimH y={d.fh + DIM_OFFSET + DIM_GAP} x1={d.sashX} x2={d.sashX + d.stile} label={`${d.stile}`} small sc={sc} />
+        <DimH y={d.fh + DIM_OFFSET + DIM_GAP} x1={d.sashX} x2={d.sashX + d.stile} extFrom={d.fh} label={`${d.stile}`} small sc={sc} />
 
         {/* Head height */}
-        <DimV x={d.fw + DIM_OFFSET + DIM_GAP} y1={0} y2={d.hw} label={`${d.hw}`} small sc={sc} />
+        <DimV x={d.fw + DIM_OFFSET + DIM_GAP} y1={0} y2={d.hw} extFrom={d.fw} label={`${d.hw}`} small sc={sc} />
 
         {/* Sill height */}
-        <DimV x={d.fw + DIM_OFFSET + DIM_GAP} y1={d.fh - d.sw} y2={d.fh} label={`${d.sw}`} small sc={sc} />
+        <DimV x={d.fw + DIM_OFFSET + DIM_GAP} y1={d.fh - d.sw} y2={d.fh} extFrom={d.fw} label={`${d.sw}`} small sc={sc} />
 
         {/* Meeting rail label */}
         <text x={d.fw + DIM_OFFSET + DIM_GAP + 15} y={d.meetY + 4}

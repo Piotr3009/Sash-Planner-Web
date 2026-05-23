@@ -150,14 +150,14 @@ export default function GlassDrawing2D({ windowSpec, derived }) {
 
         {/* ── Dimensions ── */}
         {/* Upper glass zone */}
-        <DimH y={d.uGlassY - 15} x1={d.uGlassX} x2={d.uGlassX + d.uGlassW} label={`${Math.round(d.uGlassW)} mm`} small sc={sc} />
-        <DimV x={d.fw + DIM_OFFSET} y1={d.uGlassY} y2={d.uGlassY + d.uGlassH} label={`${Math.round(d.uGlassH)}`} small sc={sc} />
+        <DimH y={d.uGlassY - 15} x1={d.uGlassX} x2={d.uGlassX + d.uGlassW} extFrom={d.uGlassY} label={`${Math.round(d.uGlassW)} mm`} small sc={sc} />
+        <DimV x={d.fw + DIM_OFFSET} y1={d.uGlassY} y2={d.uGlassY + d.uGlassH} extFrom={d.fw} label={`${Math.round(d.uGlassH)}`} small sc={sc} />
 
         {/* Lower glass zone */}
-        <DimV x={d.fw + DIM_OFFSET} y1={d.lGlassY} y2={d.lGlassY + d.lGlassH} label={`${Math.round(d.lGlassH)}`} small sc={sc} />
+        <DimV x={d.fw + DIM_OFFSET} y1={d.lGlassY} y2={d.lGlassY + d.lGlassH} extFrom={d.fw} label={`${Math.round(d.lGlassH)}`} small sc={sc} />
 
         {/* Individual pane size */}
-        <DimH y={d.fh + DIM_OFFSET} x1={d.uGlassX} x2={d.uGlassX + d.uPaneW}
+        <DimH y={d.fh + DIM_OFFSET} x1={d.uGlassX} x2={d.uGlassX + d.uPaneW} extFrom={d.fh}
           label={`Pane: ${d.uPaneW}mm`} small sc={sc} />
 
         {/* Spec label */}

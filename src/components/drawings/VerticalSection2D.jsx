@@ -115,16 +115,16 @@ export default function VerticalSection2D({ windowSpec, derived }) {
             </text>
             {/* Height dimension on right side */}
             {b.h > 30 && (
-              <DimV x={d.depth + 80} y1={b.y} y2={b.y + b.h} label={`${Math.round(b.h)}`} small sc={sc} />
+              <DimV x={d.depth + 80} y1={b.y} y2={b.y + b.h} extFrom={d.depth} label={`${Math.round(b.h)}`} small sc={sc} />
             )}
           </g>
         ))}
 
         {/* Overall height — left */}
-        <DimV x={-DIM_OFFSET} y1={0} y2={d.totalStackH} label={`≈ ${d.totalStackH} mm`} sc={sc} />
+        <DimV x={-DIM_OFFSET} y1={0} y2={d.totalStackH} extFrom={0} label={`≈ ${d.totalStackH} mm`} sc={sc} />
 
         {/* Depth dimension — bottom */}
-        <DimH y={d.totalStackH + DIM_OFFSET} x1={0} x2={d.depth} label={`Depth: ${d.depth} mm`} sc={sc} />
+        <DimH y={d.totalStackH + DIM_OFFSET} x1={0} x2={d.depth} extFrom={d.totalStackH} label={`Depth: ${d.depth} mm`} sc={sc} />
 
         {/* Title */}
         <TitleBlock x={d.depth / 2} y={d.totalStackH + DIM_OFFSET * 2 + 20}

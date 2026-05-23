@@ -19,7 +19,7 @@
 import { useMemo, useState } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
 import { computeBarPositions } from './drawingUtils.jsx';
-import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, SC_DIVISOR } from './drawingTheme.js';
+import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, SC_DIVISOR } from './drawingTheme.js';
 
 // BAR_PATTERNS (per-sash, matches 3D ParametricSashWindow.jsx)
 // 4x4 = 1+1 bar = 4 panes per sash, NOT 16 panes
@@ -57,15 +57,15 @@ const FS_TITLE = SIZES.title;
 const FS_SUBTITLE = SIZES.subtitle;
 const FS_NOTCH_NOTE = SIZES.notch;
 
-// Base stroke widths (multiplied by sc factor)
-const SW_OUTER = 1;
-const SW_REBATE = 0.8;
-const SW_BAR = 1;
-const SW_NOTCH = 1.2;
-const SW_NOTCH_CIRCLE = 0.5;
-const SW_DIM = 0.7;
-const SW_EXT = 0.3;
-const SW_LEADER = 0.3;
+// Stroke widths — now sourced from theme (px values, single source of truth)
+const SW_OUTER = STROKES.outer;
+const SW_REBATE = STROKES.rebate;
+const SW_BAR = STROKES.bar;
+const SW_NOTCH = STROKES.notch;
+const SW_NOTCH_CIRCLE = STROKES.notchCircle;
+const SW_DIM = STROKES.dim;
+const SW_EXT = STROKES.ext;
+const SW_LEADER = STROKES.leader;
 
 // Helper: format dimension to 0.5mm precision (keeps half-mm values like 437.5)
 // Math.round(437.5) = 438 (loses info); fmt(437.5) = "437.5"
@@ -218,13 +218,13 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
           {/* OUTER SASH */}
           <rect
             x={X(0)} y={Y(0)} width={geom.sashW} height={geom.sashH}
-            fill={C.bgFill} stroke={C.outer} strokeWidth={sw(SW_OUTER)}
+            fill={C.bgFill} stroke={C.outer} strokeWidth={`${SW_OUTER}px`}
           />
 
           {/* OUTER REBATE — blue dashed */}
           <rect
             x={X(geom.rebateX)} y={Y(geom.rebateY)} width={geom.rebateW} height={geom.rebateH}
-            fill="none" stroke={C.rebate} strokeWidth={sw(SW_REBATE)} strokeOpacity={0.5}
+            fill="none" stroke={C.rebate} strokeWidth={`${SW_REBATE}px`} strokeOpacity={0.5}
             strokeDasharray={`${sw(4)},${sw(3)}`}
           />
 
@@ -232,7 +232,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
           <rect
             x={X(geom.glassX)} y={Y(geom.glassY)} width={geom.glassW} height={geom.glassH}
             fill={C.glassFill} fillOpacity={0.06}
-            stroke={C.outer} strokeWidth={sw(SW_OUTER)}
+            stroke={C.outer} strokeWidth={`${SW_OUTER}px`}
           />
 
           {/* HORNS (upper sash only, dashed projection) */}
@@ -241,12 +241,12 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
               <line
                 x1={X(2)} y1={Y(geom.sashH)}
                 x2={X(2)} y2={Y(geom.sashH + geom.hornExt)}
-                stroke={C.notch} strokeWidth={sw(1)} strokeDasharray={`${sw(4)},${sw(3)}`} strokeOpacity={0.7}
+                stroke={C.notch} strokeWidth={`${STROKES.notch}px`} strokeDasharray={`${sw(4)},${sw(3)}`} strokeOpacity={0.7}
               />
               <line
                 x1={X(geom.sashW - 2)} y1={Y(geom.sashH)}
                 x2={X(geom.sashW - 2)} y2={Y(geom.sashH + geom.hornExt)}
-                stroke={C.notch} strokeWidth={sw(1)} strokeDasharray={`${sw(4)},${sw(3)}`} strokeOpacity={0.7}
+                stroke={C.notch} strokeWidth={`${STROKES.notch}px`} strokeDasharray={`${sw(4)},${sw(3)}`} strokeOpacity={0.7}
               />
               <text
                 x={X(geom.sashW + 5 * sc)} y={Y(geom.sashH + geom.hornExt / 2)}
@@ -264,11 +264,11 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
                 <g key={`vb-${i}-s-${j}`}>
                   <line
                     x1={X(vb.left)} y1={Y(seg.a)} x2={X(vb.left)} y2={Y(seg.b)}
-                    stroke={C.outer} strokeWidth={sw(SW_BAR)}
+                    stroke={C.outer} strokeWidth={`${SW_BAR}px`}
                   />
                   <line
                     x1={X(vb.right)} y1={Y(seg.a)} x2={X(vb.right)} y2={Y(seg.b)}
-                    stroke={C.outer} strokeWidth={sw(SW_BAR)}
+                    stroke={C.outer} strokeWidth={`${SW_BAR}px`}
                   />
                 </g>
               ))}
@@ -282,11 +282,11 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
                 <g key={`hb-${j}-s-${i}`}>
                   <line
                     x1={X(seg.a)} y1={Y(hb.top)} x2={X(seg.b)} y2={Y(hb.top)}
-                    stroke={C.outer} strokeWidth={sw(SW_BAR)}
+                    stroke={C.outer} strokeWidth={`${SW_BAR}px`}
                   />
                   <line
                     x1={X(seg.a)} y1={Y(hb.bot)} x2={X(seg.b)} y2={Y(hb.bot)}
-                    stroke={C.outer} strokeWidth={sw(SW_BAR)}
+                    stroke={C.outer} strokeWidth={`${SW_BAR}px`}
                   />
                 </g>
               ))}
@@ -299,11 +299,11 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
               <g key={`cross-${vi}-${hi}`}>
                 <line
                   x1={X(vb.left)} y1={Y(hb.top)} x2={X(vb.right)} y2={Y(hb.bot)}
-                  stroke={C.outer} strokeWidth={sw(SW_BAR)}
+                  stroke={C.outer} strokeWidth={`${SW_BAR}px`}
                 />
                 <line
                   x1={X(vb.right)} y1={Y(hb.top)} x2={X(vb.left)} y2={Y(hb.bot)}
-                  stroke={C.outer} strokeWidth={sw(SW_BAR)}
+                  stroke={C.outer} strokeWidth={`${SW_BAR}px`}
                 />
               </g>
             ))
@@ -313,19 +313,19 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
           {geom.vBars.map((vb, i) => (
             <g key={`vn-${i}`}>
               <line x1={X(vb.cx)} y1={Y(geom.glassY - 4)} x2={X(vb.left)} y2={Y(geom.glassY)}
-                stroke={C.notch} strokeWidth={sw(SW_NOTCH)} strokeOpacity={0.8} />
+                stroke={C.notch} strokeWidth={`${SW_NOTCH}px`} strokeOpacity={0.8} />
               <line x1={X(vb.cx)} y1={Y(geom.glassY - 4)} x2={X(vb.right)} y2={Y(geom.glassY)}
-                stroke={C.notch} strokeWidth={sw(SW_NOTCH)} strokeOpacity={0.8} />
+                stroke={C.notch} strokeWidth={`${SW_NOTCH}px`} strokeOpacity={0.8} />
               <circle cx={X(vb.cx)} cy={Y(geom.glassY - 2)} r={sw(12)}
-                fill="none" stroke={C.notch} strokeWidth={sw(SW_NOTCH_CIRCLE)} strokeOpacity={0.4}
+                fill="none" stroke={C.notch} strokeWidth={`${SW_NOTCH_CIRCLE}px`} strokeOpacity={0.4}
                 strokeDasharray={`${sw(3)},${sw(2)}`} />
 
               <line x1={X(vb.cx)} y1={Y(geom.glassY + geom.glassH + 4)} x2={X(vb.left)} y2={Y(geom.glassY + geom.glassH)}
-                stroke={C.notch} strokeWidth={sw(SW_NOTCH)} strokeOpacity={0.8} />
+                stroke={C.notch} strokeWidth={`${SW_NOTCH}px`} strokeOpacity={0.8} />
               <line x1={X(vb.cx)} y1={Y(geom.glassY + geom.glassH + 4)} x2={X(vb.right)} y2={Y(geom.glassY + geom.glassH)}
-                stroke={C.notch} strokeWidth={sw(SW_NOTCH)} strokeOpacity={0.8} />
+                stroke={C.notch} strokeWidth={`${SW_NOTCH}px`} strokeOpacity={0.8} />
               <circle cx={X(vb.cx)} cy={Y(geom.glassY + geom.glassH + 2)} r={sw(12)}
-                fill="none" stroke={C.notch} strokeWidth={sw(SW_NOTCH_CIRCLE)} strokeOpacity={0.4}
+                fill="none" stroke={C.notch} strokeWidth={`${SW_NOTCH_CIRCLE}px`} strokeOpacity={0.4}
                 strokeDasharray={`${sw(3)},${sw(2)}`} />
             </g>
           ))}
@@ -334,19 +334,19 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
           {geom.hBars.map((hb, j) => (
             <g key={`hn-${j}`}>
               <line x1={X(geom.glassX - 4)} y1={Y(hb.cy)} x2={X(geom.glassX)} y2={Y(hb.top)}
-                stroke={C.notch} strokeWidth={sw(SW_NOTCH)} strokeOpacity={0.8} />
+                stroke={C.notch} strokeWidth={`${SW_NOTCH}px`} strokeOpacity={0.8} />
               <line x1={X(geom.glassX - 4)} y1={Y(hb.cy)} x2={X(geom.glassX)} y2={Y(hb.bot)}
-                stroke={C.notch} strokeWidth={sw(SW_NOTCH)} strokeOpacity={0.8} />
+                stroke={C.notch} strokeWidth={`${SW_NOTCH}px`} strokeOpacity={0.8} />
               <circle cx={X(geom.glassX - 2)} cy={Y(hb.cy)} r={sw(12)}
-                fill="none" stroke={C.notch} strokeWidth={sw(SW_NOTCH_CIRCLE)} strokeOpacity={0.4}
+                fill="none" stroke={C.notch} strokeWidth={`${SW_NOTCH_CIRCLE}px`} strokeOpacity={0.4}
                 strokeDasharray={`${sw(3)},${sw(2)}`} />
 
               <line x1={X(geom.glassX + geom.glassW + 4)} y1={Y(hb.cy)} x2={X(geom.glassX + geom.glassW)} y2={Y(hb.top)}
-                stroke={C.notch} strokeWidth={sw(SW_NOTCH)} strokeOpacity={0.8} />
+                stroke={C.notch} strokeWidth={`${SW_NOTCH}px`} strokeOpacity={0.8} />
               <line x1={X(geom.glassX + geom.glassW + 4)} y1={Y(hb.cy)} x2={X(geom.glassX + geom.glassW)} y2={Y(hb.bot)}
-                stroke={C.notch} strokeWidth={sw(SW_NOTCH)} strokeOpacity={0.8} />
+                stroke={C.notch} strokeWidth={`${SW_NOTCH}px`} strokeOpacity={0.8} />
               <circle cx={X(geom.glassX + geom.glassW + 2)} cy={Y(hb.cy)} r={sw(12)}
-                fill="none" stroke={C.notch} strokeWidth={sw(SW_NOTCH_CIRCLE)} strokeOpacity={0.4}
+                fill="none" stroke={C.notch} strokeWidth={`${SW_NOTCH_CIRCLE}px`} strokeOpacity={0.4}
                 strokeDasharray={`${sw(3)},${sw(2)}`} />
             </g>
           ))}
@@ -375,14 +375,14 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
           {topCuts.map((cx, i) => (
             <line key={`tdc-ext-${i}`}
               x1={X(cx)} y1={topExtLineEnd} x2={X(cx)} y2={topDimY - 10 * sc}
-              stroke={C.dim} strokeWidth={sw(SW_EXT)} strokeDasharray={`${sw(3)},${sw(2)}`} />
+              stroke={C.dim} strokeWidth={`${SW_EXT}px`} strokeDasharray={`${sw(3)},${sw(2)}`} />
           ))}
           <line x1={X(topCuts[0])} y1={topDimY} x2={X(topCuts[topCuts.length - 1])} y2={topDimY}
-            stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+            stroke={C.dim} strokeWidth={`${SW_DIM}px`} />
           {topCuts.map((cx, i) => (
             <line key={`tdc-tk-${i}`}
               x1={X(cx)} y1={topDimY - 5 * sc} x2={X(cx)} y2={topDimY + 5 * sc}
-              stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+              stroke={C.dim} strokeWidth={`${SW_DIM}px`} />
           ))}
           {topCuts.slice(0, -1).map((cx, i) => {
             const nx = topCuts[i + 1];
@@ -392,9 +392,9 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
               return (
                 <g key={`tdc-lbl-${i}`}>
                   <line x1={X(mid)} y1={topDimY} x2={X(mid)} y2={topDimY - 18 * sc}
-                    stroke={C.dim} strokeWidth={sw(SW_LEADER)} />
+                    stroke={C.dim} strokeWidth={`${SW_LEADER}px`} />
                   <line x1={X(mid)} y1={topDimY - 18 * sc} x2={X(mid + 15 * sc)} y2={topDimY - 18 * sc}
-                    stroke={C.dim} strokeWidth={sw(SW_LEADER)} />
+                    stroke={C.dim} strokeWidth={`${SW_LEADER}px`} />
                   <text x={X(mid + 17 * sc)} y={topDimY - 15 * sc}
                     fill={C.dim} fontSize={fs(FS_DIM_SMALL)} fontFamily={FONT_FAMILY}
                     fontWeight={WEIGHTS.dim}>{fmt(width)}</text>
@@ -412,14 +412,14 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
           {leftCuts.map((cy, i) => (
             <line key={`ldc-ext-${i}`}
               x1={leftExtLineEnd} y1={Y(cy)} x2={leftDimX - 10 * sc} y2={Y(cy)}
-              stroke={C.dim} strokeWidth={sw(SW_EXT)} strokeDasharray={`${sw(3)},${sw(2)}`} />
+              stroke={C.dim} strokeWidth={`${SW_EXT}px`} strokeDasharray={`${sw(3)},${sw(2)}`} />
           ))}
           <line x1={leftDimX} y1={Y(leftCuts[0])} x2={leftDimX} y2={Y(leftCuts[leftCuts.length - 1])}
-            stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+            stroke={C.dim} strokeWidth={`${SW_DIM}px`} />
           {leftCuts.map((cy, i) => (
             <line key={`ldc-tk-${i}`}
               x1={leftDimX - 5 * sc} y1={Y(cy)} x2={leftDimX + 5 * sc} y2={Y(cy)}
-              stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+              stroke={C.dim} strokeWidth={`${SW_DIM}px`} />
           ))}
           {leftCuts.slice(0, -1).map((cy, i) => {
             const ny = leftCuts[i + 1];
@@ -429,9 +429,9 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
               return (
                 <g key={`ldc-lbl-${i}`}>
                   <line x1={leftDimX} y1={Y(mid)} x2={leftDimX - 18 * sc} y2={Y(mid)}
-                    stroke={C.dim} strokeWidth={sw(SW_LEADER)} />
+                    stroke={C.dim} strokeWidth={`${SW_LEADER}px`} />
                   <line x1={leftDimX - 18 * sc} y1={Y(mid)} x2={leftDimX - 18 * sc} y2={Y(mid) - 15 * sc}
-                    stroke={C.dim} strokeWidth={sw(SW_LEADER)} />
+                    stroke={C.dim} strokeWidth={`${SW_LEADER}px`} />
                   <text x={leftDimX - 18 * sc} y={Y(mid) - 18 * sc}
                     fill={C.dim} fontSize={fs(FS_DIM_SMALL)} fontFamily={FONT_FAMILY}
                     textAnchor="middle" fontWeight={WEIGHTS.dim}>{fmt(height)}</text>
@@ -449,15 +449,15 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
           {/* OVERALL WIDTH (bottom) */}
           <g>
             <line x1={X(0)} y1={Y(geom.sashH) + 15 * sc} x2={X(0)} y2={Y(geom.sashH) + 35 * sc}
-              stroke={C.dim} strokeWidth={sw(SW_EXT)} strokeDasharray={`${sw(3)},${sw(2)}`} />
+              stroke={C.dim} strokeWidth={`${SW_EXT}px`} strokeDasharray={`${sw(3)},${sw(2)}`} />
             <line x1={X(geom.sashW)} y1={Y(geom.sashH) + 15 * sc} x2={X(geom.sashW)} y2={Y(geom.sashH) + 35 * sc}
-              stroke={C.dim} strokeWidth={sw(SW_EXT)} strokeDasharray={`${sw(3)},${sw(2)}`} />
+              stroke={C.dim} strokeWidth={`${SW_EXT}px`} strokeDasharray={`${sw(3)},${sw(2)}`} />
             <line x1={X(0)} y1={Y(geom.sashH) + 30 * sc} x2={X(geom.sashW)} y2={Y(geom.sashH) + 30 * sc}
-              stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+              stroke={C.dim} strokeWidth={`${SW_DIM}px`} />
             <line x1={X(0)} y1={Y(geom.sashH) + 25 * sc} x2={X(0)} y2={Y(geom.sashH) + 35 * sc}
-              stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+              stroke={C.dim} strokeWidth={`${SW_DIM}px`} />
             <line x1={X(geom.sashW)} y1={Y(geom.sashH) + 25 * sc} x2={X(geom.sashW)} y2={Y(geom.sashH) + 35 * sc}
-              stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+              stroke={C.dim} strokeWidth={`${SW_DIM}px`} />
             <text x={X(geom.sashW / 2)} y={Y(geom.sashH) + 26 * sc}
               fill={C.dim} fontSize={fs(FS_DIM_LARGE)} fontFamily={FONT_FAMILY}
               textAnchor="middle" fontWeight={WEIGHTS.dim}>{fmt(geom.sashW)}</text>
@@ -466,15 +466,15 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
           {/* OVERALL HEIGHT (right) */}
           <g>
             <line x1={X(geom.sashW) + 15 * sc} y1={Y(0)} x2={X(geom.sashW) + 35 * sc} y2={Y(0)}
-              stroke={C.dim} strokeWidth={sw(SW_EXT)} strokeDasharray={`${sw(3)},${sw(2)}`} />
+              stroke={C.dim} strokeWidth={`${SW_EXT}px`} strokeDasharray={`${sw(3)},${sw(2)}`} />
             <line x1={X(geom.sashW) + 15 * sc} y1={Y(geom.sashH)} x2={X(geom.sashW) + 35 * sc} y2={Y(geom.sashH)}
-              stroke={C.dim} strokeWidth={sw(SW_EXT)} strokeDasharray={`${sw(3)},${sw(2)}`} />
+              stroke={C.dim} strokeWidth={`${SW_EXT}px`} strokeDasharray={`${sw(3)},${sw(2)}`} />
             <line x1={X(geom.sashW) + 30 * sc} y1={Y(0)} x2={X(geom.sashW) + 30 * sc} y2={Y(geom.sashH)}
-              stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+              stroke={C.dim} strokeWidth={`${SW_DIM}px`} />
             <line x1={X(geom.sashW) + 25 * sc} y1={Y(0)} x2={X(geom.sashW) + 35 * sc} y2={Y(0)}
-              stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+              stroke={C.dim} strokeWidth={`${SW_DIM}px`} />
             <line x1={X(geom.sashW) + 25 * sc} y1={Y(geom.sashH)} x2={X(geom.sashW) + 35 * sc} y2={Y(geom.sashH)}
-              stroke={C.dim} strokeWidth={sw(SW_DIM)} />
+              stroke={C.dim} strokeWidth={`${SW_DIM}px`} />
             <text x={X(geom.sashW) + 26 * sc} y={Y(geom.sashH / 2)}
               fill={C.dim} fontSize={fs(FS_DIM_LARGE)} fontFamily={FONT_FAMILY}
               textAnchor="middle" fontWeight={WEIGHTS.dim}

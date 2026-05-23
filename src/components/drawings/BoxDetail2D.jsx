@@ -6,7 +6,7 @@
  * Click to expand 2x. Dimensions 4x bigger for readability.
  */
 import { useMemo, useState } from 'react';
-import { FONT } from './drawingUtils.jsx';
+import { FONT, DimH, DimV, DimChainH, DimChainV } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, SC_DIVISOR } from './drawingTheme.js';
 
 // ─── Constants from DXF (profile geometry — fixed) ───
@@ -43,42 +43,6 @@ function bulgeArc(x1, y1, x2, y2, bulge) {
   const la = Math.abs(bulge) > 1 ? 1 : 0;
   const sw = bulge > 0 ? 0 : 1;
   return `A ${r} ${r} 0 ${la} ${sw} ${x2} ${y2}`;
-}
-
-// ─── Dimension helpers (unified via theme) ───
-function DimH({ y, x1, x2, label, small, sc }) {
-  const fs = `${small ? SIZES.dimSmall : SIZES.dimLarge}px`;
-  const tick = sc * 14;
-  const mid = (x1 + x2) / 2;
-  return (
-    <g>
-      <line x1={x1} y1={y} x2={x2} y2={y} stroke={COL.dim} strokeWidth={sc * 2} />
-      <line x1={x1} y1={y - tick} x2={x1} y2={y + tick} stroke={COL.dim} strokeWidth={sc * 2} />
-      <line x1={x2} y1={y - tick} x2={x2} y2={y + tick} stroke={COL.dim} strokeWidth={sc * 2} />
-      <text x={mid} y={y - sc * 10} fill={COL.dim} fontSize={fs} fontFamily={FONT.family}
-        textAnchor="middle" fontWeight={WEIGHTS.dim}>{label}</text>
-    </g>
-  );
-}
-
-function DimV({ x, y1, y2, label, small, sc }) {
-  const fs = `${small ? SIZES.dimSmall : SIZES.dimLarge}px`;
-  const tick = sc * 14;
-  const mid = (y1 + y2) / 2;
-  return (
-    <g>
-      <line x1={x} y1={y1} x2={x} y2={y2} stroke={COL.dim} strokeWidth={sc * 2} />
-      <line x1={x - tick} y1={y1} x2={x + tick} y2={y1} stroke={COL.dim} strokeWidth={sc * 2} />
-      <line x1={x - tick} y1={y2} x2={x + tick} y2={y2} stroke={COL.dim} strokeWidth={sc * 2} />
-      <text x={x + sc * 18} y={mid + sc * 8} fill={COL.dim} fontSize={fs} fontFamily={FONT.family}
-        fontWeight={WEIGHTS.dim} transform={`rotate(-90, ${x + sc * 18}, ${mid + sc * 8})`}
-        textAnchor="middle">{label}</text>
-    </g>
-  );
-}
-
-function Ext({ x1, y1, x2, y2, sc }) {
-  return <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={COL.dim} strokeWidth={sc * 1} strokeDasharray={`${sc * 6},${sc * 4}`} />;
 }
 
 // ─── Main Component ───
@@ -194,41 +158,29 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
             CAVITY
           </text>
 
-          {/* ── Red dimensions ── */}
+          {/* ── Red dimensions (CAD-style with ext lines + chain) ── */}
 
-          {/* Overall width — bottom */}
-          <Ext x1={X(0)} y1={Y(0)} x2={X(0)} y2={Y(0) + DM * 1.5} sc={sc} />
-          <Ext x1={X(fw)} y1={Y(0)} x2={X(fw)} y2={Y(0) + DM * 1.5} sc={sc} />
-          <DimH y={Y(0) + DM * 1.3} x1={X(0)} x2={X(fw)} label={`${fw} mm`} sc={sc} />
-
-          {/* Overall height — right */}
-          <Ext x1={X(fw)} y1={Y(0)} x2={X(fw) + DM * 1.5} y2={Y(0)} sc={sc} />
-          <Ext x1={X(fw)} y1={Y(fh)} x2={X(fw) + DM * 1.5} y2={Y(fh)} sc={sc} />
-          <DimV x={X(fw) + DM * 1.3} y1={Y(fh)} y2={Y(0)} label={`${fh} mm`} sc={sc} />
+          {/* Overall width chain — bottom: jambW_bottom | cavity | jambW_bottom */}
+          <DimChainH y={Y(0) + DM * 1.3} extFrom={Y(0)} sc={sc}
+            cuts={[X(0), X(BOX.jambW_bottom), X(fw - BOX.jambW_bottom), X(fw)]} />
 
           {/* Inner width — top */}
-          <Ext x1={X(BOX.jambW_top)} y1={Y(fh)} x2={X(BOX.jambW_top)} y2={Y(fh) - DM * 1.5} sc={sc} />
-          <Ext x1={X(fw - BOX.jambW_top)} y1={Y(fh)} x2={X(fw - BOX.jambW_top)} y2={Y(fh) - DM * 1.5} sc={sc} />
           <DimH y={Y(fh) - DM * 1.2} x1={X(BOX.jambW_top)} x2={X(fw - BOX.jambW_top)}
-            label={`${d.innerW} (inner)`} small sc={sc} />
+            extFrom={Y(fh)} label={`${d.innerW} (inner)`} small sc={sc} />
 
-          {/* Jamb width — bottom */}
-          <Ext x1={X(0)} y1={Y(0)} x2={X(0)} y2={Y(0) + DM * 2.5} sc={sc} />
-          <Ext x1={X(BOX.jambW_bottom)} y1={Y(0)} x2={X(BOX.jambW_bottom)} y2={Y(0) + DM * 2.5} sc={sc} />
-          <DimH y={Y(0) + DM * 2.3} x1={X(0)} x2={X(BOX.jambW_bottom)} label={`${BOX.jambW_bottom}`} small sc={sc} />
+          {/* Overall height chain — right: sill | cavity | head */}
+          <DimChainV x={X(fw) + DM * 1.3} extFrom={X(fw)} sc={sc}
+            cuts={[Y(0), Y(BOX.sillTop), Y(fh - BOX.headH), Y(fh)]} />
 
           {/* Head height — left */}
-          <Ext x1={X(0)} y1={Y(fh - BOX.headH)} x2={X(0) - DM * 1.2} y2={Y(fh - BOX.headH)} sc={sc} />
-          <Ext x1={X(0)} y1={Y(fh)} x2={X(0) - DM * 1.2} y2={Y(fh)} sc={sc} />
-          <DimV x={X(0) - DM} y1={Y(fh)} y2={Y(fh - BOX.headH)} label={`${BOX.headH}`} small sc={sc} />
+          <DimV x={X(0) - DM} y1={Y(fh)} y2={Y(fh - BOX.headH)}
+            extFrom={X(0)} label={`${BOX.headH}`} small sc={sc} />
 
           {/* Sill details — far right */}
-          <Ext x1={X(fw)} y1={Y(0)} x2={X(fw) + DM * 2.8} y2={Y(0)} sc={sc} />
-          <Ext x1={X(fw)} y1={Y(BOX.sillNose)} x2={X(fw) + DM * 2.8} y2={Y(BOX.sillNose)} sc={sc} />
-          <Ext x1={X(fw)} y1={Y(BOX.sillTop)} x2={X(fw) + DM * 2.8} y2={Y(BOX.sillTop)} sc={sc} />
-          <DimV x={X(fw) + DM * 2.5} y1={Y(0)} y2={Y(BOX.sillNose)} label={`${BOX.sillNose}`} small sc={sc} />
+          <DimV x={X(fw) + DM * 2.5} y1={Y(0)} y2={Y(BOX.sillNose)}
+            extFrom={X(fw)} label={`${BOX.sillNose}`} small sc={sc} />
           <DimV x={X(fw) + DM * 2.5} y1={Y(BOX.sillNose)} y2={Y(BOX.sillTop)}
-            label={`${BOX.sillTop - BOX.sillNose}`} small sc={sc} />
+            extFrom={X(fw)} label={`${BOX.sillTop - BOX.sillNose}`} small sc={sc} />
 
           {/* Title */}
           <text x={totalW / 2} y={totalH - sc * 12} fill={COL.title} fontSize={titleFs}
