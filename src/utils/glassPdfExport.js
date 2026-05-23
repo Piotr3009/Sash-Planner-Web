@@ -259,25 +259,25 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
   doc.setLineWidth(LW.cellIn);
   doc.rect(cx + 0.3, cy + 0.3, cw - 0.6, ch - 0.6);
 
-  // Title bar
+  // Title bar — left: name, right: spec (same size)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(5);
   tc(doc, C.black);
   doc.text(`${g.index} · ${g.windowName} — ${g.sash.toUpperCase()} GLASS`, cx + 2, cy + 4);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(3.8);
-  tc(doc, C.grayL);
-  doc.text(g.projectNumber || '', cx + cw - 2, cy + 4, { align: 'right' });
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(5);
+  tc(doc, C.glass);
+  doc.text(`${g.type} / ${g.finish} · spacer: ${g.spacer}`, cx + cw - 2, cy + 4, { align: 'right' });
   dc(doc, C.black);
   doc.setLineWidth(LW.cellIn);
   doc.line(cx + 0.3, cy + 6, cx + cw - 0.3, cy + 6);
 
-  // Drawing area
-  const dMargin = { l: 10, t: 8, r: 10, b: 14 };
+  // Drawing area — no bottom text, maximized
+  const dMargin = { l: 10, t: 8, r: 10, b: 8 };
   const areaX = cx + 2;
   const areaY = cy + 8;
   const areaW = cw - 4;
-  const areaH = ch - 22;
+  const areaH = ch - 12;
 
   const availW = areaW - dMargin.l - dMargin.r;
   const availH = areaH - dMargin.t - dMargin.b;
@@ -407,16 +407,6 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
   doc.line(ohX - 1.2, gy + gh, ohX + 1.2, gy + gh);
   doc.text(`${fmt(g.glassH)} mm`, ohX + 3.5, gy + gh / 2, { angle: 90, align: 'center' });
 
-  // ── TITLE + SPEC ──
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(5.5);
-  tc(doc, C.black);
-  doc.text(`${g.sash.toUpperCase()} GLASS`, cx + cw / 2, cy + ch - 6, { align: 'center' });
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(4.5);
-  tc(doc, C.glass);
-  doc.text(`${g.type} / ${g.finish} · spacer: ${g.spacer}`, cx + cw / 2, cy + ch - 2, { align: 'center' });
 }
 
 // ─── FOOTER ───
