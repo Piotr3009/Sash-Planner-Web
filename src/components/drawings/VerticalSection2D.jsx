@@ -109,7 +109,7 @@ export default function VerticalSection2D({ windowSpec, derived }) {
             {/* Label to the right */}
             <text x={d.depth + 15} y={b.y + b.h / 2 + 4}
               fill={b.isGlass ? STROKE.glass : STROKE.label}
-              fontSize={sc * SIZES.notch} fontFamily={FONT.family}
+              fontSize={`${SIZES.notch}px`} fontFamily={FONT.family}
               fillOpacity={0.7}>
               {b.label}
             </text>

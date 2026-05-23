@@ -47,7 +47,7 @@ function bulgeArc(x1, y1, x2, y2, bulge) {
 
 // ─── Dimension helpers (unified via theme) ───
 function DimH({ y, x1, x2, label, small, sc }) {
-  const fs = small ? sc * SIZES.dimSmall : sc * SIZES.dimLarge;
+  const fs = `${small ? SIZES.dimSmall : SIZES.dimLarge}px`;
   const tick = sc * 14;
   const mid = (x1 + x2) / 2;
   return (
@@ -62,7 +62,7 @@ function DimH({ y, x1, x2, label, small, sc }) {
 }
 
 function DimV({ x, y1, y2, label, small, sc }) {
-  const fs = small ? sc * SIZES.dimSmall : sc * SIZES.dimLarge;
+  const fs = `${small ? SIZES.dimSmall : SIZES.dimLarge}px`;
   const tick = sc * 14;
   const mid = (y1 + y2) / 2;
   return (
@@ -140,10 +140,10 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
 
   const sill = `M ${X(BOX.jambW_bottom)} ${Y(0)} L ${X(fw - BOX.jambW_bottom)} ${Y(0)} L ${X(fw - BOX.jambW_bottom)} ${Y(BOX.sillNose)} L ${X(BOX.jambW_bottom)} ${Y(BOX.sillNose)} Z`;
 
-  const labelFs = sc * SIZES.label;
-  const titleFs = sc * SIZES.title;
-  const subtitleFs = sc * SIZES.subtitle;
-  const cavityFs = sc * SIZES.annotation;
+  const labelFs = `${SIZES.label}px`;
+  const titleFs = `${SIZES.title}px`;
+  const subtitleFs = `${SIZES.subtitle}px`;
+  const cavityFs = `${SIZES.annotation}px`;
   const winName = windowSpec?.name || 'Window';
   const projNum = projectNumber || '';
 

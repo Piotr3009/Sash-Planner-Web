@@ -74,12 +74,12 @@ export default function HorizontalSection2D({ windowSpec, derived }) {
       >
         {/* Exterior / Interior labels */}
         <text x={-DIM_OFFSET - 10} y={d.depth / 2 + 4}
-          fill={STROKE.dimText} fontSize={sc * SIZES.annotation} fontFamily={FONT.family}
+          fill={STROKE.dimText} fontSize={`${SIZES.annotation}px`} fontFamily={FONT.family}
           textAnchor="end" fillOpacity={0.5}>
           ← EXTERIOR
         </text>
         <text x={d.totalW + DIM_OFFSET + 10} y={d.depth / 2 + 4}
-          fill={STROKE.dimText} fontSize={sc * SIZES.annotation} fontFamily={FONT.family}
+          fill={STROKE.dimText} fontSize={`${SIZES.annotation}px`} fontFamily={FONT.family}
           textAnchor="start" fillOpacity={0.5}>
           INTERIOR →
         </text>
@@ -94,7 +94,7 @@ export default function HorizontalSection2D({ windowSpec, derived }) {
                 stroke={b.isSash ? STROKE.sash : STROKE.frame} strokeWidth={1} />
               {/* Label below */}
               <text x={b.x + b.w / 2} y={d.depth + 20}
-                fill={STROKE.label} fontSize={sc * SIZES.notch} fontFamily={FONT.family}
+                fill={STROKE.label} fontSize={`${SIZES.notch}px`} fontFamily={FONT.family}
                 textAnchor="middle" fillOpacity={0.7}
                 transform={`rotate(-45, ${b.x + b.w / 2}, ${d.depth + 20})`}>
                 {b.label}

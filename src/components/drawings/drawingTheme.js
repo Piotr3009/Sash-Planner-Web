@@ -42,15 +42,17 @@ export const COLORS = {
 // ─── Font ───
 export const FONT_FAMILY = 'DM Sans, system-ui, sans-serif';
 
-// Base sizes — multiplied by component's own scale factor (sc)
+// Base sizes — used as fixed pixel font-size in SVG text elements.
+// SVG `font-size="Npx"` renders Npx on screen regardless of viewBox / aspect ratio.
+// To change text size everywhere, change values here only.
 export const SIZES = {
-  dimLarge:    21,
-  dimSmall:    17,
-  label:       13,
-  title:       21,
-  subtitle:    17,
-  annotation:  15,  // mid-size: glass specs, section labels
-  notch:       9,
+  dimLarge:    16,
+  dimSmall:    13,
+  label:       12,
+  title:       18,
+  subtitle:    14,
+  annotation:  13,  // mid-size: glass specs, section labels
+  notch:       10,
 };
 
 // ─── Weights ───

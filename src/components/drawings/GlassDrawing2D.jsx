@@ -162,14 +162,14 @@ export default function GlassDrawing2D({ windowSpec, derived }) {
 
         {/* Spec label */}
         <text x={d.fw / 2} y={d.fh + DIM_OFFSET + 35}
-          fill={STROKE.glass} fontSize={sc * SIZES.annotation} fontFamily={FONT.family}
+          fill={STROKE.glass} fontSize={`${SIZES.annotation}px`} fontFamily={FONT.family}
           textAnchor="middle" fillOpacity={0.7}>
           {d.glassType} · {d.glassSpec} · Spacer: {d.spacer} · Finish: {d.finish}
         </text>
 
         {/* Pane count */}
         <text x={d.fw / 2} y={d.fh + DIM_OFFSET + 52}
-          fill={STROKE.dimText} fontSize={sc * SIZES.label} fontFamily={FONT.family}
+          fill={STROKE.dimText} fontSize={`${SIZES.label}px`} fontFamily={FONT.family}
           textAnchor="middle" fillOpacity={0.5}>
           Upper: {d.uPaneCols}×{d.uPaneRows} ({d.uPaneCols * d.uPaneRows} panes) · Lower: {d.lPaneCols}×{d.lPaneRows} ({d.lPaneCols * d.lPaneRows} panes)
         </text>
@@ -186,7 +186,7 @@ export default function GlassDrawing2D({ windowSpec, derived }) {
 function PaneLabel({ x, y, w, h, cols, rows, prefix, sc }) {
   return (
     <text x={x} y={y + 5}
-      fill={STROKE.glass} fontSize={sc * SIZES.label} fontFamily={FONT.family}
+      fill={STROKE.glass} fontSize={`${SIZES.label}px`} fontFamily={FONT.family}
       textAnchor="middle" fillOpacity={0.6}>
       {cols}×{rows} · {w}×{h}mm
     </text>

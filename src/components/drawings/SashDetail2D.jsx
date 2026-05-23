@@ -164,7 +164,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
   const totalW = ox + geom.sashW + MGN_RIGHT_DIM;
   const totalH = oy + geom.sashH + MGN_HORN + MGN_BOT_DIM + MGN_TITLE;
   const sc = totalW / SC_DIVISOR;
-  const fs = (n) => n * sc;
+  const fs = (n) => `${n}px`;
 
   const X = (x) => ox + x;
   const Y = (y) => oy + y;

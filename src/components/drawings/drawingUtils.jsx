@@ -37,7 +37,7 @@ export const MARGIN = 80;
 // ─── Horizontal dimension line ───
 export function DimH({ y, x1, x2, label, small, sc }) {
   const mid = (x1 + x2) / 2;
-  const fs = sc * (small ? SIZES.dimSmall : SIZES.dimLarge);
+  const fs = `${small ? SIZES.dimSmall : SIZES.dimLarge}px`;
   const tick = sc * (small ? 8 : 14);
   const sw = sc * 1.5;
   const gap = sc * 10;
@@ -55,7 +55,7 @@ export function DimH({ y, x1, x2, label, small, sc }) {
 // ─── Vertical dimension line ───
 export function DimV({ x, y1, y2, label, small, sc }) {
   const mid = (y1 + y2) / 2;
-  const fs = sc * (small ? SIZES.dimSmall : SIZES.dimLarge);
+  const fs = `${small ? SIZES.dimSmall : SIZES.dimLarge}px`;
   const tick = sc * (small ? 8 : 14);
   const sw = sc * 1.5;
   const offset = sc * 18;
@@ -73,8 +73,8 @@ export function DimV({ x, y1, y2, label, small, sc }) {
 
 // ─── Title block ───
 export function TitleBlock({ x, y, title, subtitle, sc }) {
-  const titleFs = sc * SIZES.title;
-  const subFs = sc * SIZES.subtitle;
+  const titleFs = `${SIZES.title}px`;
+  const subFs = `${SIZES.subtitle}px`;
   const subGap = sc * 25;
   return (
     <g>
@@ -94,7 +94,7 @@ export function TitleBlock({ x, y, title, subtitle, sc }) {
 
 // ─── Label helper ───
 export function Label({ x, y, text, anchor = 'middle', opacity = 0.8, sc }) {
-  const fs = sc * SIZES.label;
+  const fs = `${SIZES.label}px`;
   return (
     <text x={x} y={y} fill={COLORS.label} fontSize={fs}
       fontFamily={FONT.family} textAnchor={anchor} fillOpacity={opacity} fontWeight={WEIGHTS.label}>
