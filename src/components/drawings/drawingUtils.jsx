@@ -267,7 +267,7 @@ export function Label({ x, y, text, anchor = 'middle', opacity = 0.8, vbw }) {
   );
 }
 
-// ─── Bar positioning helper ───
+// ─── Bar positioning helper (for SASH — wood bars, equal spacing within opening) ───
 export function computeBarPositions({ glassX, glassY, glassW, glassH, vCount, hCount, barW }) {
   const paneW = vCount > 0 ? Math.max((glassW - vCount * barW) / (vCount + 1), 0) : glassW;
   const paneH = hCount > 0 ? Math.max((glassH - hCount * barW) / (hCount + 1), 0) : glassH;
@@ -282,4 +282,52 @@ export function computeBarPositions({ glassX, glassY, glassW, glassH, vCount, hC
     hBars.push({ cy: top + barW / 2, top, bot: top + barW });
   }
   return { vBars, hBars, paneW, paneH };
+}
+
+// ─── Glass spacer bar positions (derived from WOOD bar centers) ───
+// Spacer bars share the same center line as wood bars but are 18mm wide (not 22mm).
+// Positions returned in GLASS coordinate system (origin = glass top-left corner).
+export function computeGlassBarPositions({ sashW, sashH, isUpper, vCount, hCount }) {
+  const STILE = 57, TOP_RAIL = 57, MEET_RAIL = 43, BOT_RAIL = 90;
+  const REBATE = 12.5, WOOD_BAR = 22, SPACER = 18;
+
+  const topEdge = isUpper ? TOP_RAIL : MEET_RAIL;
+  const botEdge = isUpper ? MEET_RAIL : BOT_RAIL;
+
+  // Glass unit origin in sash coords
+  const glassOriginX = STILE - REBATE;
+  const glassOriginY = topEdge - REBATE;
+
+  // Wood opening dimensions
+  const woodW = sashW - 2 * STILE;
+  const woodH = sashH - topEdge - botEdge;
+
+  // Glass unit dimensions
+  const glassW = woodW + 2 * REBATE;
+  const glassH = woodH + 2 * REBATE;
+
+  // Compute wood bar centers in sash coords, convert to glass coords
+  const vBars = [];
+  if (vCount > 0) {
+    const woodPaneW = (woodW - vCount * WOOD_BAR) / (vCount + 1);
+    for (let i = 0; i < vCount; i++) {
+      const woodCenter = STILE + (i + 1) * woodPaneW + i * WOOD_BAR + WOOD_BAR / 2;
+      const cx = woodCenter - glassOriginX;
+      const left = cx - SPACER / 2;
+      vBars.push({ cx, left, right: left + SPACER });
+    }
+  }
+
+  const hBars = [];
+  if (hCount > 0) {
+    const woodPaneH = (woodH - hCount * WOOD_BAR) / (hCount + 1);
+    for (let j = 0; j < hCount; j++) {
+      const woodCenter = topEdge + (j + 1) * woodPaneH + j * WOOD_BAR + WOOD_BAR / 2;
+      const cy = woodCenter - glassOriginY;
+      const top = cy - SPACER / 2;
+      hBars.push({ cy, top, bot: top + SPACER });
+    }
+  }
+
+  return { vBars, hBars, glassW, glassH };
 }

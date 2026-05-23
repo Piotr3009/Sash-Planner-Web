@@ -8,7 +8,7 @@
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
 import { STROKE, COLORS, FONT, SIZES, WEIGHTS, STROKES, VIEWBOX_REF,
-  DimH, DimV, DimChainH, DimChainV, tfs, computeBarPositions } from './drawingUtils.jsx';
+  DimH, DimV, DimChainH, DimChainV, tfs, computeGlassBarPositions } from './drawingUtils.jsx';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
 const SPACER_BAR = 18;
@@ -54,9 +54,9 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
     const vCount = pattern.v;
     const hCount = pattern.h;
 
-    const bars = computeBarPositions({
-      glassX: 0, glassY: 0, glassW, glassH,
-      vCount, hCount, barW: SPACER_BAR,
+    const sashH = isUpper ? topH : botH;
+    const bars = computeGlassBarPositions({
+      sashW, sashH, isUpper, vCount, hCount,
     });
 
     // Chain cuts — 11 | seg | 18 | seg | 18 | seg | 11
@@ -68,13 +68,44 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
     bars.hBars.forEach(b => { vCuts.push(b.top); vCuts.push(b.bot); });
     vCuts.push(glassH - EDGE_SEAL, glassH);
 
-    // Cross-check
+    // Cross-check: verify bar centers align with wood bar centers
     let checkOk = true;
     const errs = [];
-    const sw = bars.paneW * (vCount + 1) + vCount * SPACER_BAR;
-    const sh = bars.paneH * (hCount + 1) + hCount * SPACER_BAR;
-    if (Math.abs(sw - glassW) > 0.1) { checkOk = false; errs.push(`W:${sw.toFixed(1)}≠${glassW.toFixed(1)}`); }
-    if (Math.abs(sh - glassH) > 0.1) { checkOk = false; errs.push(`H:${sh.toFixed(1)}≠${glassH.toFixed(1)}`); }
+    const STILE = 57, WOOD_BAR = 22;
+    const topEdge = isUpper ? 57 : 43;
+    const botEdge = isUpper ? 43 : 90;
+    const woodW = sashW - 2 * STILE;
+    const woodH = sashH - topEdge - botEdge;
+    const glassOriginX = STILE - REBATE;
+    const glassOriginY = topEdge - REBATE;
+
+    // Check vertical bars
+    if (vCount > 0) {
+      const woodPaneW = (woodW - vCount * WOOD_BAR) / (vCount + 1);
+      bars.vBars.forEach((vb, i) => {
+        const woodCenter = STILE + (i + 1) * woodPaneW + i * WOOD_BAR + WOOD_BAR / 2;
+        const glassCenter = glassOriginX + vb.cx;
+        if (Math.abs(woodCenter - glassCenter) > 0.1) {
+          checkOk = false;
+          errs.push(`V${i + 1}:${glassCenter.toFixed(1)}≠${woodCenter.toFixed(1)}`);
+        }
+      });
+    }
+    // Check horizontal bars
+    if (hCount > 0) {
+      const woodPaneH = (woodH - hCount * WOOD_BAR) / (hCount + 1);
+      bars.hBars.forEach((hb, j) => {
+        const woodCenter = topEdge + (j + 1) * woodPaneH + j * WOOD_BAR + WOOD_BAR / 2;
+        const glassCenter = glassOriginY + hb.cy;
+        if (Math.abs(woodCenter - glassCenter) > 0.1) {
+          checkOk = false;
+          errs.push(`H${j + 1}:${glassCenter.toFixed(1)}≠${woodCenter.toFixed(1)}`);
+        }
+      });
+    }
+    // Check glass dimensions match
+    if (Math.abs(bars.glassW - glassW) > 0.1) { checkOk = false; errs.push(`gW:${bars.glassW.toFixed(1)}≠${glassW.toFixed(1)}`); }
+    if (Math.abs(bars.glassH - glassH) > 0.1) { checkOk = false; errs.push(`gH:${bars.glassH.toFixed(1)}≠${glassH.toFixed(1)}`); }
 
     const glassType = windowSpec?.glass?.type || windowSpec?.glazing?.type || 'double';
     const glassFinish = windowSpec?.glass?.finish || windowSpec?.glazing?.finish || 'clear';

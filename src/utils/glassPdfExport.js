@@ -9,6 +9,7 @@
  */
 import { jsPDF } from 'jspdf';
 import { CONSTANTS } from '../engine/calculations.js';
+import { computeGlassBarPositions } from '../components/drawings/drawingUtils.jsx';
 
 // ─── COLORS (RGB 0-255) ───
 const C = {
@@ -58,22 +59,6 @@ const EDGE_SEAL = 11;
 function fmt(n) {
   const r = Math.round(n * 10) / 10;
   return Number.isInteger(r) ? r.toString() : r.toFixed(1);
-}
-
-function computeBarPositions(glassW, glassH, vCount, hCount) {
-  const bw = SPACER_BAR;
-  const pW = vCount > 0 ? (glassW - vCount * bw) / (vCount + 1) : glassW;
-  const pH = hCount > 0 ? (glassH - hCount * bw) / (hCount + 1) : glassH;
-  const vBars = [], hBars = [];
-  for (let i = 0; i < vCount; i++) {
-    const l = (i + 1) * pW + i * bw;
-    vBars.push({ left: l, right: l + bw, cx: l + bw / 2 });
-  }
-  for (let j = 0; j < hCount; j++) {
-    const t = (j + 1) * pH + j * bw;
-    hBars.push({ top: t, bot: t + bw, cy: t + bw / 2 });
-  }
-  return { vBars, hBars };
 }
 
 function segsBetween(from, to, cutPairs) {
@@ -301,7 +286,10 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
 
   // Bars
   const pat = BAR_PATTERNS[g.bars] || BAR_PATTERNS['none'];
-  const bars = computeBarPositions(g.glassW, g.glassH, pat.v, pat.h);
+  const bars = computeGlassBarPositions({
+    sashW: g.sashW, sashH: g.sashH, isUpper: g.sash === 'Upper',
+    vCount: pat.v, hCount: pat.h,
+  });
 
   doc.setLineWidth(LW.seal);
 
@@ -455,10 +443,10 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
     const fLoc = windowSpec?.glazing?.frostedLocation || 'bottom';
     const grid = windowSpec?.sash?.grid?.mode || 'none';
 
-    const base = { windowName: win.name, projectNumber: win._projectNumber || '', type, spec, spacer, makeup, bars: grid };
+    const base = { windowName: win.name, projectNumber: win._projectNumber || '', type, spec, spacer, makeup, bars: grid, sashW: sw };
 
-    glassItems.push({ ...base, index: idx++, sash: 'Upper', glassW, glassH: glassHupper, finish: isFrosted && fLoc === 'both' ? 'frosted' : 'clear' });
-    glassItems.push({ ...base, index: idx++, sash: 'Lower', glassW, glassH: glassHlower, finish: isFrosted ? 'frosted' : 'clear' });
+    glassItems.push({ ...base, index: idx++, sash: 'Upper', sashH: topH, glassW, glassH: glassHupper, finish: isFrosted && fLoc === 'both' ? 'frosted' : 'clear' });
+    glassItems.push({ ...base, index: idx++, sash: 'Lower', sashH: botH, glassW, glassH: glassHlower, finish: isFrosted ? 'frosted' : 'clear' });
   });
 
   if (!glassItems.length) return null;
