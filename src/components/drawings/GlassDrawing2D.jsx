@@ -20,6 +20,20 @@ function fmt(n) {
   return Number.isInteger(r) ? r.toString() : r.toFixed(1);
 }
 
+/** Break a line from→to into segments, skipping each [start,end] cut pair */
+function segmentsBetween(from, to, cutPairs) {
+  if (cutPairs.length === 0) return [{ a: from, b: to }];
+  const sorted = [...cutPairs].sort((p, q) => p[0] - q[0]);
+  const segs = [];
+  let pos = from;
+  for (const [cStart, cEnd] of sorted) {
+    if (cStart > pos) segs.push({ a: pos, b: cStart });
+    pos = Math.max(pos, cEnd);
+  }
+  if (pos < to) segs.push({ a: pos, b: to });
+  return segs;
+}
+
 export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) {
   const d = useMemo(() => {
     if (!windowSpec || !derived) return null;
@@ -98,25 +112,53 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
           width={d.glassW - 2 * EDGE_SEAL} height={d.glassH - 2 * EDGE_SEAL}
           fill="none" stroke={COLORS.glass} strokeWidth={0.5} {...NS} strokeOpacity={0.6} />
 
-        {/* Vertical spacer bars */}
-        {d.vBars.map((bar, i) => (
-          <g key={`v${i}`}>
-            <rect x={ox + bar.left} y={oy} width={SPACER_BAR} height={d.glassH}
-              fill={COLORS.bar} fillOpacity={0.2} stroke={COLORS.bar} strokeWidth={STROKES.bar} {...NS} />
-            <line x1={ox + bar.cx} y1={oy} x2={ox + bar.cx} y2={oy + d.glassH}
-              stroke={COLORS.bar} strokeWidth={0.3} {...NS} strokeOpacity={0.4} />
-          </g>
-        ))}
+        {/* Vertical spacer bars — two parallel lines, broken at h-bar intersections */}
+        {d.vBars.map((bar, i) => {
+          const hCutPairs = d.hBars.map(hb => [hb.top, hb.bot]);
+          const segs = segmentsBetween(0, d.glassH, hCutPairs);
+          return (
+            <g key={`v${i}`}>
+              {segs.map((seg, j) => (
+                <g key={`vs-${i}-${j}`}>
+                  <line x1={ox + bar.left} y1={oy + seg.a} x2={ox + bar.left} y2={oy + seg.b}
+                    stroke={COLORS.glass} strokeWidth={0.5} {...NS} strokeOpacity={0.6} />
+                  <line x1={ox + bar.right} y1={oy + seg.a} x2={ox + bar.right} y2={oy + seg.b}
+                    stroke={COLORS.glass} strokeWidth={0.5} {...NS} strokeOpacity={0.6} />
+                </g>
+              ))}
+            </g>
+          );
+        })}
 
-        {/* Horizontal spacer bars */}
-        {d.hBars.map((bar, i) => (
-          <g key={`h${i}`}>
-            <rect x={ox} y={oy + bar.top} width={d.glassW} height={SPACER_BAR}
-              fill={COLORS.bar} fillOpacity={0.2} stroke={COLORS.bar} strokeWidth={STROKES.bar} {...NS} />
-            <line x1={ox} y1={oy + bar.cy} x2={ox + d.glassW} y2={oy + bar.cy}
-              stroke={COLORS.bar} strokeWidth={0.3} {...NS} strokeOpacity={0.4} />
-          </g>
-        ))}
+        {/* Horizontal spacer bars — two parallel lines, broken at v-bar intersections */}
+        {d.hBars.map((bar, i) => {
+          const vCutPairs = d.vBars.map(vb => [vb.left, vb.right]);
+          const segs = segmentsBetween(0, d.glassW, vCutPairs);
+          return (
+            <g key={`h${i}`}>
+              {segs.map((seg, j) => (
+                <g key={`hs-${i}-${j}`}>
+                  <line x1={ox + seg.a} y1={oy + bar.top} x2={ox + seg.b} y2={oy + bar.top}
+                    stroke={COLORS.glass} strokeWidth={0.5} {...NS} strokeOpacity={0.6} />
+                  <line x1={ox + seg.a} y1={oy + bar.bot} x2={ox + seg.b} y2={oy + bar.bot}
+                    stroke={COLORS.glass} strokeWidth={0.5} {...NS} strokeOpacity={0.6} />
+                </g>
+              ))}
+            </g>
+          );
+        })}
+
+        {/* Crosses at bar intersections */}
+        {d.vBars.flatMap((vb, vi) =>
+          d.hBars.map((hb, hi) => (
+            <g key={`cross-${vi}-${hi}`}>
+              <line x1={ox + vb.left} y1={oy + hb.top} x2={ox + vb.right} y2={oy + hb.bot}
+                stroke={COLORS.glass} strokeWidth={0.5} {...NS} strokeOpacity={0.6} />
+              <line x1={ox + vb.right} y1={oy + hb.top} x2={ox + vb.left} y2={oy + hb.bot}
+                stroke={COLORS.glass} strokeWidth={0.5} {...NS} strokeOpacity={0.6} />
+            </g>
+          ))
+        )}
 
         {/* ── DIMENSIONS ── */}
 

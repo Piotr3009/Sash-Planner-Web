@@ -37,10 +37,12 @@ export const CONSTANTS = Object.freeze({
     HORN_ALLOWANCE_VERTICAL: 70,
     HORN_ALLOWANCE_HORIZONTAL: 30,
 
-    // Glass deduction from sash width (verified: glass_w = sash_w - 90)
-    GLASS_WIDTH_DEDUCTION: 90,
-    // Glass deduction from sash height (verified: glass_h = top_sash_h - 76)
-    GLASS_HEIGHT_DEDUCTION: 76,
+    // Glass deduction from sash width (verified against Excel: glass_w = sash_w - 89)
+    // = 2×stile(57) - 2×rebate(12.5) = 114 - 25 = 89
+    GLASS_WIDTH_DEDUCTION: 89,
+    // Glass deduction from sash height (verified against Excel: glass_h = top_sash_h - 75)
+    // = topRail(57) + meetRail(43) - 2×rebate(12.5) = 100 - 25 = 75
+    GLASS_HEIGHT_DEDUCTION: 75,
 
     // Tolerances
     GLASS_TOLERANCE: 3,
