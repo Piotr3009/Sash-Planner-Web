@@ -27,6 +27,9 @@ export const FONT = {
   family: FONT_FAMILY,
 };
 
+// Re-export theme values for consumers
+export { SIZES, COLORS, WEIGHTS, SC_DIVISOR } from './drawingTheme.js';
+
 export const DIM_OFFSET = 40;
 export const DIM_GAP = 35;
 export const MARGIN = 80;

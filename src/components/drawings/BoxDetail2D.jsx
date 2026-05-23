@@ -7,7 +7,7 @@
  */
 import { useMemo, useState } from 'react';
 import { FONT } from './drawingUtils.jsx';
-import { COLORS, FONT_FAMILY, SIZES, WEIGHTS } from './drawingTheme.js';
+import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, SC_DIVISOR } from './drawingTheme.js';
 
 // ─── Constants from DXF (profile geometry — fixed) ───
 const BOX = {
@@ -102,11 +102,12 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
 
   const { fw, fh } = d;
   // Scale factor for text/dims relative to frame size
-  const sc = Math.max(fw, fh) / 500;
-  const DM = 60 * sc;
-  const M = 80 * sc;
+  const layoutSc = Math.max(fw, fh) / 500;
+  const DM = 60 * layoutSc;
+  const M = 80 * layoutSc;
   const totalW = fw + M * 2 + DM * 3;
   const totalH = fh + M * 2 + DM * 3;
+  const sc = totalW / SC_DIVISOR;
 
   // Coordinate helpers (Y flipped)
   const ox = M + DM * 2;

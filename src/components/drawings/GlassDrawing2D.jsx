@@ -7,7 +7,7 @@
  */
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
-import { STROKE, FONT, DimH, DimV, TitleBlock, Label, DIM_OFFSET, MARGIN, computeBarPositions } from './drawingUtils.jsx';
+import { STROKE, FONT, SIZES, SC_DIVISOR, DimH, DimV, TitleBlock, Label, DIM_OFFSET, MARGIN, computeBarPositions } from './drawingUtils.jsx';
 
 export default function GlassDrawing2D({ windowSpec, derived }) {
   const d = useMemo(() => {
@@ -96,7 +96,7 @@ export default function GlassDrawing2D({ windowSpec, derived }) {
 
   const totalW = d.fw + MARGIN * 2 + DIM_OFFSET * 3;
   const totalH = d.fh + MARGIN * 2 + DIM_OFFSET * 4;
-  const sc = Math.max(d.fw, d.fh) / 500;
+  const sc = totalW / SC_DIVISOR;
 
   return (
     <div className="w-full">
@@ -144,9 +144,9 @@ export default function GlassDrawing2D({ windowSpec, derived }) {
 
         {/* ── Pane labels (centre of each pane) ── */}
         <PaneLabel x={d.uGlassX + d.uGlassW / 2} y={d.uGlassY + d.uGlassH / 2}
-          w={d.uPaneW} h={d.uPaneH} cols={d.uPaneCols} rows={d.uPaneRows} prefix="UP" />
+          w={d.uPaneW} h={d.uPaneH} cols={d.uPaneCols} rows={d.uPaneRows} prefix="UP" sc={sc} />
         <PaneLabel x={d.lGlassX + d.lGlassW / 2} y={d.lGlassY + d.lGlassH / 2}
-          w={d.lPaneW} h={d.lPaneH} cols={d.lPaneCols} rows={d.lPaneRows} prefix="LP" />
+          w={d.lPaneW} h={d.lPaneH} cols={d.lPaneCols} rows={d.lPaneRows} prefix="LP" sc={sc} />
 
         {/* ── Dimensions ── */}
         {/* Upper glass zone */}
@@ -158,35 +158,35 @@ export default function GlassDrawing2D({ windowSpec, derived }) {
 
         {/* Individual pane size */}
         <DimH y={d.fh + DIM_OFFSET} x1={d.uGlassX} x2={d.uGlassX + d.uPaneW}
-          label={`Pane: ${d.uPaneW}mm`} small />
+          label={`Pane: ${d.uPaneW}mm`} small sc={sc} />
 
         {/* Spec label */}
         <text x={d.fw / 2} y={d.fh + DIM_OFFSET + 35}
-          fill={STROKE.glass} fontSize={FONT.size * 0.8} fontFamily={FONT.family}
+          fill={STROKE.glass} fontSize={sc * SIZES.annotation} fontFamily={FONT.family}
           textAnchor="middle" fillOpacity={0.7}>
           {d.glassType} · {d.glassSpec} · Spacer: {d.spacer} · Finish: {d.finish}
         </text>
 
         {/* Pane count */}
         <text x={d.fw / 2} y={d.fh + DIM_OFFSET + 52}
-          fill={STROKE.dimText} fontSize={FONT.size * 0.7} fontFamily={FONT.family}
+          fill={STROKE.dimText} fontSize={sc * SIZES.label} fontFamily={FONT.family}
           textAnchor="middle" fillOpacity={0.5}>
           Upper: {d.uPaneCols}×{d.uPaneRows} ({d.uPaneCols * d.uPaneRows} panes) · Lower: {d.lPaneCols}×{d.lPaneRows} ({d.lPaneCols * d.lPaneRows} panes)
         </text>
 
         {/* Title */}
         <TitleBlock x={d.fw / 2} y={d.fh + DIM_OFFSET * 2 + 55}
-          title={`GLASS DRAWING — ${d.fw} × ${d.fh} mm`} />
+          title={`GLASS DRAWING — ${d.fw} × ${d.fh} mm`} sc={sc} />
       </svg>
     </div>
   );
 }
 
 // ─── Pane centre label ───
-function PaneLabel({ x, y, w, h, cols, rows, prefix }) {
+function PaneLabel({ x, y, w, h, cols, rows, prefix, sc }) {
   return (
     <text x={x} y={y + 5}
-      fill={STROKE.glass} fontSize={FONT.size * 0.7} fontFamily={FONT.family}
+      fill={STROKE.glass} fontSize={sc * SIZES.label} fontFamily={FONT.family}
       textAnchor="middle" fillOpacity={0.6}>
       {cols}×{rows} · {w}×{h}mm
     </text>

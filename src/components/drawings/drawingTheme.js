@@ -17,11 +17,11 @@ export const COLORS = {
   meeting:     '#64748b',
   sillDetail:  '#94A3B8',
 
-  // Dimensions (RED — consistent everywhere)
-  dim:         '#EF4444',
+  // Dimensions (teal — was red)
+  dim:         '#00B4A0',
 
-  // Labels — part names (teal)
-  label:       '#00B4A0',
+  // Labels — part names (red — was teal)
+  label:       '#EF4444',
 
   // Title / subtitle (white)
   title:       '#E2E8F0',
@@ -44,12 +44,13 @@ export const FONT_FAMILY = 'DM Sans, system-ui, sans-serif';
 
 // Base sizes — multiplied by component's own scale factor (sc)
 export const SIZES = {
-  dimLarge:  21,
-  dimSmall:  17,
-  label:     13,
-  title:     21,
-  subtitle:  17,
-  notch:     9,
+  dimLarge:    21,
+  dimSmall:    17,
+  label:       13,
+  title:       21,
+  subtitle:    17,
+  annotation:  15,  // mid-size: glass specs, section labels
+  notch:       9,
 };
 
 // ─── Weights ───
@@ -59,3 +60,8 @@ export const WEIGHTS = {
   title:    '600',
   subtitle: '400',
 };
+
+// ─── Scale divisor ───
+// sc = viewBoxWidth / SC_DIVISOR
+// Ensures text is always ~3% of viewBox width = identical visual size everywhere
+export const SC_DIVISOR = 700;

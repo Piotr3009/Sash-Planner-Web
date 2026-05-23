@@ -19,7 +19,7 @@
 import { useMemo, useState } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
 import { computeBarPositions } from './drawingUtils.jsx';
-import { COLORS, FONT_FAMILY, SIZES, WEIGHTS } from './drawingTheme.js';
+import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, SC_DIVISOR } from './drawingTheme.js';
 
 // BAR_PATTERNS (per-sash, matches 3D ParametricSashWindow.jsx)
 // 4x4 = 1+1 bar = 4 panes per sash, NOT 16 panes
@@ -149,21 +149,22 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
 
   if (!geom) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
 
-  const sc = Math.max(geom.sashW, geom.sashH) / 500;
-  const fs = (n) => n * sc;
-  const sw = (n) => n * sc;
+  const layoutSc = Math.max(geom.sashW, geom.sashH) / 500;
+  const sw = (n) => n * layoutSc;
 
-  const MGN_TOP_DIM = 80 * sc;
-  const MGN_LEFT_DIM = 80 * sc;
-  const MGN_RIGHT_DIM = 60 * sc;
-  const MGN_BOT_DIM = 60 * sc;
-  const MGN_TITLE = 40 * sc;
-  const MGN_HORN = geom.isUpper && geom.hornExt > 0 ? geom.hornExt + 20 * sc : 0;
+  const MGN_TOP_DIM = 80 * layoutSc;
+  const MGN_LEFT_DIM = 80 * layoutSc;
+  const MGN_RIGHT_DIM = 60 * layoutSc;
+  const MGN_BOT_DIM = 60 * layoutSc;
+  const MGN_TITLE = 40 * layoutSc;
+  const MGN_HORN = geom.isUpper && geom.hornExt > 0 ? geom.hornExt + 20 * layoutSc : 0;
 
   const ox = MGN_LEFT_DIM;
   const oy = MGN_TOP_DIM;
   const totalW = ox + geom.sashW + MGN_RIGHT_DIM;
   const totalH = oy + geom.sashH + MGN_HORN + MGN_BOT_DIM + MGN_TITLE;
+  const sc = totalW / SC_DIVISOR;
+  const fs = (n) => n * sc;
 
   const X = (x) => ox + x;
   const Y = (y) => oy + y;

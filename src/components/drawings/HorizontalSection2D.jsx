@@ -7,7 +7,7 @@
  */
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
-import { STROKE, FONT, DimH, DimV, TitleBlock, Label, DIM_OFFSET, MARGIN } from './drawingUtils.jsx';
+import { STROKE, FONT, SIZES, SC_DIVISOR, DimH, DimV, TitleBlock, Label, DIM_OFFSET, MARGIN } from './drawingUtils.jsx';
 
 // Approximate section widths at meeting rail level (simplified)
 const SECT = {
@@ -62,7 +62,7 @@ export default function HorizontalSection2D({ windowSpec, derived }) {
 
   const viewW = d.totalW + MARGIN * 2 + DIM_OFFSET * 3;
   const viewH = d.depth + MARGIN * 2 + DIM_OFFSET * 3;
-  const sc = Math.max(d.totalW, d.depth) / 500;
+  const sc = viewW / SC_DIVISOR;
 
   return (
     <div className="w-full">
@@ -74,12 +74,12 @@ export default function HorizontalSection2D({ windowSpec, derived }) {
       >
         {/* Exterior / Interior labels */}
         <text x={-DIM_OFFSET - 10} y={d.depth / 2 + 4}
-          fill={STROKE.dimText} fontSize={FONT.size * 0.8} fontFamily={FONT.family}
+          fill={STROKE.dimText} fontSize={sc * SIZES.annotation} fontFamily={FONT.family}
           textAnchor="end" fillOpacity={0.5}>
           ← EXTERIOR
         </text>
         <text x={d.totalW + DIM_OFFSET + 10} y={d.depth / 2 + 4}
-          fill={STROKE.dimText} fontSize={FONT.size * 0.8} fontFamily={FONT.family}
+          fill={STROKE.dimText} fontSize={sc * SIZES.annotation} fontFamily={FONT.family}
           textAnchor="start" fillOpacity={0.5}>
           INTERIOR →
         </text>
@@ -94,7 +94,7 @@ export default function HorizontalSection2D({ windowSpec, derived }) {
                 stroke={b.isSash ? STROKE.sash : STROKE.frame} strokeWidth={1} />
               {/* Label below */}
               <text x={b.x + b.w / 2} y={d.depth + 20}
-                fill={STROKE.label} fontSize={FONT.size * 0.55} fontFamily={FONT.family}
+                fill={STROKE.label} fontSize={sc * SIZES.notch} fontFamily={FONT.family}
                 textAnchor="middle" fillOpacity={0.7}
                 transform={`rotate(-45, ${b.x + b.w / 2}, ${d.depth + 20})`}>
                 {b.label}
@@ -116,7 +116,7 @@ export default function HorizontalSection2D({ windowSpec, derived }) {
         {/* Title */}
         <TitleBlock x={d.totalW / 2} y={d.depth + DIM_OFFSET * 2 + 50}
           title="HORIZONTAL SECTION"
-          subtitle="Cross-section at meeting rail level (simplified)" />
+          subtitle="Cross-section at meeting rail level (simplified)" sc={sc} />
       </svg>
     </div>
   );

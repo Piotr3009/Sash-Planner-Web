@@ -7,7 +7,7 @@
  */
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
-import { STROKE, FONT, DimH, DimV, TitleBlock, Label, DIM_OFFSET, MARGIN } from './drawingUtils.jsx';
+import { STROKE, FONT, SIZES, SC_DIVISOR, DimH, DimV, TitleBlock, Label, DIM_OFFSET, MARGIN } from './drawingUtils.jsx';
 
 // Profile depths (simplified — will be refined with real profile data)
 const PROFILE = {
@@ -80,7 +80,7 @@ export default function VerticalSection2D({ windowSpec, derived }) {
   const drawW = d.depth + 60; // extra space for labels
   const totalW = drawW + MARGIN * 2 + DIM_OFFSET * 3;
   const totalH = d.totalStackH + MARGIN * 2 + DIM_OFFSET * 3;
-  const sc = Math.max(drawW, d.totalStackH) / 500;
+  const sc = totalW / SC_DIVISOR;
 
   return (
     <div className="w-full">
@@ -109,7 +109,7 @@ export default function VerticalSection2D({ windowSpec, derived }) {
             {/* Label to the right */}
             <text x={d.depth + 15} y={b.y + b.h / 2 + 4}
               fill={b.isGlass ? STROKE.glass : STROKE.label}
-              fontSize={FONT.size * 0.65} fontFamily={FONT.family}
+              fontSize={sc * SIZES.notch} fontFamily={FONT.family}
               fillOpacity={0.7}>
               {b.label}
             </text>
@@ -129,7 +129,7 @@ export default function VerticalSection2D({ windowSpec, derived }) {
         {/* Title */}
         <TitleBlock x={d.depth / 2} y={d.totalStackH + DIM_OFFSET * 2 + 20}
           title="VERTICAL SECTION"
-          subtitle={`Frame ${d.fw}×${d.fh}mm · Top sash ${d.topH}mm · Bottom sash ${d.botH}mm`} />
+          subtitle={`Frame ${d.fw}×${d.fh}mm · Top sash ${d.topH}mm · Bottom sash ${d.botH}mm`} sc={sc} />
       </svg>
     </div>
   );

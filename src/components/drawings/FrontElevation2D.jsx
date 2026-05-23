@@ -7,7 +7,7 @@
  */
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
-import { STROKE, FONT, SIZES, DimH, DimV, TitleBlock, DIM_OFFSET, DIM_GAP, MARGIN, computeBarPositions } from './drawingUtils.jsx';
+import { STROKE, FONT, SIZES, SC_DIVISOR, DimH, DimV, TitleBlock, DIM_OFFSET, DIM_GAP, MARGIN, computeBarPositions } from './drawingUtils.jsx';
 
 export default function FrontElevation2D({ windowSpec, derived }) {
   const drawing = useMemo(() => {
@@ -97,9 +97,9 @@ export default function FrontElevation2D({ windowSpec, derived }) {
   }
 
   const d = drawing;
-  const sc = Math.max(d.fw, d.fh) / 500;
   const totalW = d.fw + MARGIN * 2 + DIM_OFFSET * 3;
   const totalH = d.fh + MARGIN * 2 + DIM_OFFSET * 3;
+  const sc = totalW / SC_DIVISOR;
 
   return (
     <div className="w-full">
