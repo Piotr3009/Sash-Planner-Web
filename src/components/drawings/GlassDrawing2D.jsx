@@ -181,13 +181,13 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
           extFrom={ox + d.glassW} label={`${fmt(d.glassH)} mm`} vbw={totalW} />
 
         {/* Title */}
-        <text x={totalW / 2} y={totalH - 18 * ts}
+        <text x={totalW / 2} y={totalH - 13.8 * ts}
           fill={COLORS.title} fontSize={tfs(SIZES.title, totalW)} fontFamily={FONT.family}
           textAnchor="middle" fontWeight={WEIGHTS.title}>
           {d.isUpper ? 'UPPER' : 'LOWER'} GLASS
         </text>
         <text x={totalW / 2} y={totalH - 4 * ts}
-          fill={STROKE.glass} fontSize={tfs(SIZES.subtitle, totalW)} fontFamily={FONT.family}
+          fill={STROKE.glass} fontSize={tfs(SIZES.subtitle * 1.25, totalW)} fontFamily={FONT.family}
           textAnchor="middle" fillOpacity={0.7}>
           {d.glassType} / {d.glassFinish} · spacer: {d.spacerColour}
         </text>
