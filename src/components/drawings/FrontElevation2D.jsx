@@ -116,11 +116,14 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
   const oy = M;               // frame top edge in SVG
 
   // ─── Sash positions (SVG coords) ───
-  // Center of box Y = meeting rail line
+  // Meeting rails overlap by meetRail (43mm). Combined visible height is
+  // topSashH + botSashH - meetRail, centered at box center Y.
+  const meetRail = geom.meetRail;
+  const combinedH = topSashH + botSashH - meetRail;
   const sashX = ox + (fw - sashW) / 2;
   const centerY = oy + fh / 2;
-  const upperSashY = centerY - topSashH;   // top edge of upper sash
-  const lowerSashY = centerY;              // top edge of lower sash
+  const upperSashY = centerY - combinedH / 2;
+  const lowerSashY = upperSashY + topSashH - meetRail;
 
   // ─── Box frame paths (SVG Y-down) ───
   // Y-flip helper: real y → SVG y  (y=0 = sill bottom, y=fh = head top)
@@ -225,8 +228,8 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
         {/* Lower bars */}
         {renderBars(geom.lBars, sashX, lowerSashY, geom.lGlassX, geom.lGlassY, geom.lGlassW, geom.lGlassH)}
 
-        {/* Meeting rail line (emphasized) */}
-        <line x1={sashX} y1={centerY} x2={sashX + sashW} y2={centerY}
+        {/* Meeting rail line (emphasized) — center of overlap zone */}
+        <line x1={sashX} y1={lowerSashY + meetRail / 2} x2={sashX + sashW} y2={lowerSashY + meetRail / 2}
           stroke={COL.meeting} strokeWidth={STROKES.meeting} {...NS} />
 
         {/* ── DIM LINES — overall only ── */}
