@@ -55,7 +55,7 @@ function DimH({ y, x1, x2, label, small, sc }) {
       <line x1={x1} y1={y - tick} x2={x1} y2={y + tick} stroke={COL.dim} strokeWidth={sc * 2} />
       <line x1={x2} y1={y - tick} x2={x2} y2={y + tick} stroke={COL.dim} strokeWidth={sc * 2} />
       <text x={mid} y={y - sc * 10} fill={COL.dim} fontSize={fs} fontFamily={FONT.family}
-        textAnchor="middle" fontWeight="500">{label}</text>
+        textAnchor="middle" fontWeight="400">{label}</text>
     </g>
   );
 }
@@ -70,7 +70,7 @@ function DimV({ x, y1, y2, label, small, sc }) {
       <line x1={x - tick} y1={y1} x2={x + tick} y2={y1} stroke={COL.dim} strokeWidth={sc * 2} />
       <line x1={x - tick} y1={y2} x2={x + tick} y2={y2} stroke={COL.dim} strokeWidth={sc * 2} />
       <text x={x + sc * 18} y={mid + sc * 8} fill={COL.dim} fontSize={fs} fontFamily={FONT.family}
-        fontWeight="500" transform={`rotate(-90, ${x + sc * 18}, ${mid + sc * 8})`}
+        fontWeight="400" transform={`rotate(-90, ${x + sc * 18}, ${mid + sc * 8})`}
         textAnchor="middle">{label}</text>
     </g>
   );
@@ -139,8 +139,8 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
   const sill = `M ${X(BOX.jambW_bottom)} ${Y(0)} L ${X(fw - BOX.jambW_bottom)} ${Y(0)} L ${X(fw - BOX.jambW_bottom)} ${Y(BOX.sillNose)} L ${X(BOX.jambW_bottom)} ${Y(BOX.sillNose)} Z`;
 
   const labelFs = sc * 24;
-  const titleFs = sc * 48;
-  const subtitleFs = sc * 29;
+  const titleFs = sc * 36;
+  const subtitleFs = sc * 24;
   const cavityFs = sc * 40;
   const winName = windowSpec?.name || 'Window';
   const projNum = projectNumber || '';
