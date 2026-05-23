@@ -43,7 +43,7 @@ const C = {
   dim:       '#EF4444', // red dimensions
   notch:     '#F59E0B', // orange V-notches
   title:     '#E2E8F0',
-  subtitle:  '#475569',
+  subtitle:  '#E2E8F0',
   bgFill:    'rgba(148,163,184,0.03)',
 };
 
@@ -88,7 +88,7 @@ function computeSegments(from, to, cutPairs) {
   return segs;
 }
 
-export default function SashDetail2D({ windowSpec, derived, type = 'upper', onExpand }) {
+export default function SashDetail2D({ windowSpec, derived, type = 'upper', onExpand, projectNumber }) {
   const [expanded, setExpanded] = useState(false);
   const isExternalExpand = !!onExpand;
   const handleExpand = (e) => {
@@ -174,9 +174,13 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
   const vCuts = geom.vBars.map(vb => [vb.left, vb.right]);
   const horizontalEdgeSegments = computeSegments(geom.glassX, geom.glassX + geom.glassW, vCuts);
 
-  const label = geom.isUpper ? 'UPPER' : 'LOWER';
-  const titleText = `${label} SASH — FRONT — ${fmt(geom.sashW)} × ${fmt(geom.sashH)} mm`;
-  const subtitleText = `${geom.gridMode} · ${geom.v} v + ${geom.h} h bar${(geom.v + geom.h) === 1 ? '' : 's'}${geom.hasHorns ? ` · horns ${geom.hornExt}mm` : ''}`;
+  const label = geom.isUpper ? 'US' : 'LS';
+  const winName = windowSpec?.name || 'Window';
+  const projNum = projectNumber || '';
+  const titleText = `${label} — Front${projNum ? ` — ${projNum}` : ''} — ${winName}`;
+  const glassType = windowSpec?.glass?.type || 'double';
+  const glassFinish = windowSpec?.glass?.finish || 'clear';
+  const subtitleText = `${geom.gridMode} · ${glassType} / ${glassFinish}`;
 
   // Top dim chain cut points
   const topCuts = [0, geom.stile];

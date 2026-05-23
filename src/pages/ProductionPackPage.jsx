@@ -460,8 +460,8 @@ function ElementsTab({ windowsData }) {
             <div className="card p-4">
               <div className="text-xs font-semibold text-ink-200 mb-2">Upper Sash</div>
               {derived ? (
-                <SashDetail2D windowSpec={windowSpec} derived={derived} type="upper"
-                  onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'upper', title: `${win.name} — Upper Sash` })} />
+                <SashDetail2D windowSpec={windowSpec} derived={derived} type="upper" projectNumber={win._projectNumber}
+                  onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'upper', title: `${win.name} — Upper Sash`, projectNumber: win._projectNumber })} />
               ) : (
                 <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
               )}
@@ -469,8 +469,8 @@ function ElementsTab({ windowsData }) {
             <div className="card p-4">
               <div className="text-xs font-semibold text-ink-200 mb-2">Lower Sash</div>
               {derived ? (
-                <SashDetail2D windowSpec={windowSpec} derived={derived} type="lower"
-                  onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'lower', title: `${win.name} — Lower Sash` })} />
+                <SashDetail2D windowSpec={windowSpec} derived={derived} type="lower" projectNumber={win._projectNumber}
+                  onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'lower', title: `${win.name} — Lower Sash`, projectNumber: win._projectNumber })} />
               ) : (
                 <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
               )}
@@ -494,10 +494,10 @@ function ElementsTab({ windowsData }) {
                 <BoxDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} />
               )}
               {expandedDrawing.type === 'upper' && (
-                <SashDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} type="upper" />
+                <SashDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} type="upper" projectNumber={expandedDrawing.projectNumber} />
               )}
               {expandedDrawing.type === 'lower' && (
-                <SashDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} type="lower" />
+                <SashDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} type="lower" projectNumber={expandedDrawing.projectNumber} />
               )}
             </div>
           </div>
