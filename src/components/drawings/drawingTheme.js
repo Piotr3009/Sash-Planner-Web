@@ -41,13 +41,13 @@ export const FONT_FAMILY = 'DM Sans, system-ui, sans-serif';
 // ─── Text sizes (approx screen px) ───
 // Change these → text changes everywhere, identically.
 export const SIZES = {
-  dimLarge:    14,
-  dimSmall:    11,
-  label:       10,
-  title:       16,
-  subtitle:    12,
-  annotation:  11,
-  notch:        9,
+  dimLarge:    21,
+  dimSmall:    17,
+  label:       15,
+  title:       24,
+  subtitle:    18,
+  annotation:  17,
+  notch:       14,
 };
 
 // ─── Font weights ───
