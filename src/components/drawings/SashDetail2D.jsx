@@ -50,8 +50,8 @@ const C = {
 const FONT_FAMILY = 'DM Sans, system-ui, sans-serif';
 
 // Base font sizes (multiplied by sc factor)
-const FS_DIM_LARGE = 14;
-const FS_DIM_SMALL = 11;
+const FS_DIM_LARGE = 21;
+const FS_DIM_SMALL = 17;
 const FS_LABEL = 10;
 const FS_TITLE = 14;
 const FS_SUBTITLE = 11;

@@ -44,9 +44,9 @@ function bulgeArc(x1, y1, x2, y2, bulge) {
   return `A ${r} ${r} 0 ${la} ${sw} ${x2} ${y2}`;
 }
 
-// ─── Red dimension helpers (4x bigger text) ───
+// ─── Red dimension helpers (unified with Sash system) ───
 function DimH({ y, x1, x2, label, small, sc }) {
-  const fs = small ? sc * 28 : sc * 36;
+  const fs = small ? sc * 17 : sc * 21;
   const tick = sc * 14;
   const mid = (x1 + x2) / 2;
   return (
@@ -61,7 +61,7 @@ function DimH({ y, x1, x2, label, small, sc }) {
 }
 
 function DimV({ x, y1, y2, label, small, sc }) {
-  const fs = small ? sc * 28 : sc * 36;
+  const fs = small ? sc * 17 : sc * 21;
   const tick = sc * 14;
   const mid = (y1 + y2) / 2;
   return (
