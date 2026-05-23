@@ -451,8 +451,8 @@ function ElementsTab({ windowsData }) {
             <div className="card p-4">
               <div className="text-xs font-semibold text-ink-200 mb-2">Box Detail</div>
               {derived ? (
-                <BoxDetail2D windowSpec={windowSpec} derived={derived}
-                  onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'box', title: `${win.name} — Box Detail` })} />
+                <BoxDetail2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber}
+                  onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'box', title: `${win.name} — Box Detail`, projectNumber: win._projectNumber })} />
               ) : (
                 <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
               )}
@@ -491,7 +491,7 @@ function ElementsTab({ windowsData }) {
             </div>
             <div className="card p-6 overflow-auto flex-1">
               {expandedDrawing.type === 'box' && (
-                <BoxDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} />
+                <BoxDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} projectNumber={expandedDrawing.projectNumber} />
               )}
               {expandedDrawing.type === 'upper' && (
                 <SashDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} type="upper" projectNumber={expandedDrawing.projectNumber} />

@@ -53,8 +53,8 @@ const FONT_FAMILY = 'DM Sans, system-ui, sans-serif';
 const FS_DIM_LARGE = 21;
 const FS_DIM_SMALL = 17;
 const FS_LABEL = 10;
-const FS_TITLE = 14;
-const FS_SUBTITLE = 11;
+const FS_TITLE = 21;
+const FS_SUBTITLE = 17;
 const FS_NOTCH_NOTE = 9;
 
 // Base stroke widths (multiplied by sc factor)
@@ -396,14 +396,14 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
                     stroke={C.dim} strokeWidth={sw(SW_LEADER)} />
                   <text x={X(mid + 17 * sc)} y={topDimY - 15 * sc}
                     fill={C.dim} fontSize={fs(FS_DIM_SMALL)} fontFamily={FONT_FAMILY}
-                    fontWeight="600">{fmt(width)}</text>
+                    fontWeight="500">{fmt(width)}</text>
                 </g>
               );
             }
             return (
               <text key={`tdc-lbl-${i}`} x={X(mid)} y={topDimY - 8 * sc}
                 fill={C.dim} fontSize={fs(FS_DIM_SMALL)} fontFamily={FONT_FAMILY}
-                textAnchor="middle" fontWeight="600">{fmt(width)}</text>
+                textAnchor="middle" fontWeight="500">{fmt(width)}</text>
             );
           })}
 
@@ -433,14 +433,14 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
                     stroke={C.dim} strokeWidth={sw(SW_LEADER)} />
                   <text x={leftDimX - 18 * sc} y={Y(mid) - 18 * sc}
                     fill={C.dim} fontSize={fs(FS_DIM_SMALL)} fontFamily={FONT_FAMILY}
-                    textAnchor="middle" fontWeight="600">{fmt(height)}</text>
+                    textAnchor="middle" fontWeight="500">{fmt(height)}</text>
                 </g>
               );
             }
             return (
               <text key={`ldc-lbl-${i}`} x={leftDimX - 8 * sc} y={Y(mid)}
                 fill={C.dim} fontSize={fs(FS_DIM_SMALL)} fontFamily={FONT_FAMILY}
-                textAnchor="middle" fontWeight="600"
+                textAnchor="middle" fontWeight="500"
                 transform={`rotate(-90, ${leftDimX - 8 * sc}, ${Y(mid)})`}>{fmt(height)}</text>
             );
           })}
@@ -459,7 +459,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
               stroke={C.dim} strokeWidth={sw(SW_DIM)} />
             <text x={X(geom.sashW / 2)} y={Y(geom.sashH) + 26 * sc}
               fill={C.dim} fontSize={fs(FS_DIM_LARGE)} fontFamily={FONT_FAMILY}
-              textAnchor="middle" fontWeight="600">{fmt(geom.sashW)}</text>
+              textAnchor="middle" fontWeight="500">{fmt(geom.sashW)}</text>
           </g>
 
           {/* OVERALL HEIGHT (right) */}
@@ -476,7 +476,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
               stroke={C.dim} strokeWidth={sw(SW_DIM)} />
             <text x={X(geom.sashW) + 26 * sc} y={Y(geom.sashH / 2)}
               fill={C.dim} fontSize={fs(FS_DIM_LARGE)} fontFamily={FONT_FAMILY}
-              textAnchor="middle" fontWeight="600"
+              textAnchor="middle" fontWeight="500"
               transform={`rotate(-90, ${X(geom.sashW) + 26 * sc}, ${Y(geom.sashH / 2)})`}>{fmt(geom.sashH)}</text>
           </g>
 
