@@ -188,7 +188,7 @@ function MaterialFormModal({ material, existingCategories, existingSubcategories
 
 // ─── Main ───
 export default function IronmongeryPage() {
-  const materials = useIronmongeryStore((s) => s.items);
+  const items = useIronmongeryStore((s) => s.items);
   const addItem = useIronmongeryStore((s) => s.addItem);
   const updateItem = useIronmongeryStore((s) => s.updateItem);
   const deleteItem = useIronmongeryStore((s) => s.deleteItem);
@@ -208,7 +208,7 @@ export default function IronmongeryPage() {
     const catSet = new Set();
     items.forEach((m) => { if (m.category) catSet.add(m.category); });
     return [...catSet].sort();
-  }, [materials]);
+  }, [items]);
 
   // Subcategories grouped by category (for form)
   const subcategoriesByCategory = useMemo(() => {
@@ -222,7 +222,7 @@ export default function IronmongeryPage() {
     const result = {};
     Object.entries(map).forEach(([cat, subs]) => { result[cat] = [...subs].sort(); });
     return result;
-  }, [materials]);
+  }, [items]);
 
   // Category counts
   const counts = useMemo(() => {
@@ -231,11 +231,11 @@ export default function IronmongeryPage() {
       c[cat] = items.filter((m) => m.category === cat).length;
     });
     return c;
-  }, [materials, categories]);
+  }, [items, categories]);
 
   // Filtered + searched + sorted materials
   const filtered = useMemo(() => {
-    let list = materials;
+    let list = items;
     if (categoryFilter) list = list.filter((m) => m.category === categoryFilter);
     if (subcategoryFilter) list = list.filter((m) => m.subcategory === subcategoryFilter);
     if (searchQuery) {
@@ -266,7 +266,7 @@ export default function IronmongeryPage() {
       return 0;
     });
     return list;
-  }, [materials, categoryFilter, subcategoryFilter, searchQuery, sortBy, sortDir]);
+  }, [items, categoryFilter, subcategoryFilter, searchQuery, sortBy, sortDir]);
 
   // ─── Selection ───
   const allSelected = filtered.length > 0 && filtered.every((m) => selected.has(m.id));
@@ -615,7 +615,7 @@ export default function IronmongeryPage() {
           {filtered.length > 0 && (
             <div className="px-4 py-2.5 border-t border-surface-500 text-[10px] text-ink-400 flex justify-between">
               <span>
-                Showing {filtered.length} of {items.length} materials
+                Showing {filtered.length} of {items.length} items
                 {categoryFilter && ` · Filtered by "${categoryFilter}"`}
                 {subcategoryFilter && ` > "${subcategoryFilter}"`}
               </span>
@@ -647,8 +647,8 @@ export default function IronmongeryPage() {
           title={confirmDelete === 'bulk' ? `Delete ${selected.size} materials?` : `Delete "${confirmDelete.name}"?`}
           message={
             confirmDelete === 'bulk'
-              ? `This will permanently remove ${selected.size} selected materials from the catalog.`
-              : `This will permanently remove ${confirmDelete.item_number} from the materials catalog.`
+              ? `This will permanently remove ${selected.size} selected items from the catalog.`
+              : `This will permanently remove ${confirmDelete.item_number} from the ironmongery catalog.`
           }
           onConfirm={confirmDeleteAction}
           onCancel={() => setConfirmDelete(null)}
