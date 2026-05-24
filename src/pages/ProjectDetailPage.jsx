@@ -20,6 +20,7 @@ export default function ProjectDetailPage() {
   const setCurrentProject = useProjectStore((s) => s.setCurrentProject);
   const createBatch = useProjectStore((s) => s.createBatch);
   const deleteBatch = useProjectStore((s) => s.deleteBatch);
+  const removeWindowFromBatch = useProjectStore((s) => s.removeWindowFromBatch);
 
   const [showAddBatch, setShowAddBatch] = useState(false);
   const [showMaterials, setShowMaterials] = useState(false);
@@ -310,15 +311,28 @@ export default function ProjectDetailPage() {
               {winCount > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                   {batch.windows.map((win) => (
-                    <Link key={win.id} to={`/projects/${projectId}/batches/${batch.id}/windows/${win.id}`}
-                      className="p-3 bg-surface-600 border border-surface-500 rounded-lg hover:border-accent-500/40 hover:shadow-glow transition-all">
-                      <div className="font-semibold text-sm text-ink-50">{win.name}</div>
-                      <div className="text-xs text-ink-400 mt-0.5">{win.width} × {win.height} mm</div>
-                      <div className="text-[10px] text-ink-400 mt-1">
-                        {win.upperBars && win.upperBars !== 'none' ? `Bars: ${win.upperBars}` : 'No bars'}
-                        {win.glassFinish === 'frosted' ? ' · Frosted' : ''}
-                      </div>
-                    </Link>
+                    <div key={win.id} className="p-3 bg-surface-600 border border-surface-500 rounded-lg hover:border-accent-500/40 hover:shadow-glow transition-all relative group">
+                      <Link to={`/projects/${projectId}/batches/${batch.id}/windows/${win.id}`} className="block">
+                        <div className="font-semibold text-sm text-ink-50">{win.name}</div>
+                        <div className="text-xs text-ink-400 mt-0.5">{win.width} × {win.height} mm</div>
+                        <div className="text-[10px] text-ink-400 mt-1">
+                          {win.upperBars && win.upperBars !== 'none' ? `Bars: ${win.upperBars}` : 'No bars'}
+                          {win.glassFinish === 'frosted' ? ' · Frosted' : ''}
+                        </div>
+                      </Link>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (window.confirm(`Delete window "${win.name}"? This cannot be undone.`)) {
+                            removeWindowFromBatch(projectId, batch.id, win.id);
+                          }
+                        }}
+                        className="absolute top-2 right-2 text-[10px] text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity font-medium"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   ))}
                 </div>
               ) : (

@@ -23,6 +23,7 @@ import {
 } from '../engine/lists.js';
 import { optimisePrecut } from '../engine/optimizer.js';
 import { exportGlassPDF } from '../utils/glassPdfExport.js';
+import { exportPreCutPDF } from '../utils/precutPdfExport.js';
 import { getPartSymbol } from '../engine/partSymbols.js';
 
 import FrontElevation2D from '../components/drawings/FrontElevation2D.jsx';
@@ -361,7 +362,7 @@ export default function ProductionPackPage() {
         {tab === 'sections'   && <SectionsTab windowsData={windowsData} />}
         {tab === 'elements'   && <ElementsTab windowsData={windowsData} />}
         {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} batch={batch} pp={pp} />}
-        {tab === 'precut'     && <PreCutTab merged={merged} settings={settings} />}
+        {tab === 'precut'     && <PreCutTab merged={merged} settings={settings} batch={batch} pp={pp} isPPMode={isPPMode} projects={projects} />}
         {tab === 'cutlist'    && <CutListTab merged={merged} isPPMode={isPPMode} />}
         {tab === 'bom'        && <BOMTab merged={merged} batch={batch} pp={pp} isPPMode={isPPMode} windowsData={windowsData} />}
       </main>
@@ -779,7 +780,7 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: Pre-Cut List — grouped by section, BLO with offcuts
 // ═══════════════════════════════════════════════════════════════
-function PreCutTab({ merged, settings }) {
+function PreCutTab({ merged, settings, batch, pp, isPPMode, projects }) {
   // Material assignment lookup
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const getMaterialById = useMaterialStore((s) => s.getMaterialById);
@@ -798,6 +799,9 @@ function PreCutTab({ merged, settings }) {
     }
     return null;
   };
+
+  // Export format state
+  const [exportFormat, setExportFormat] = useState('a3');
   // Local state for editable stock lengths and offcuts per group
   const [stockLengths, setStockLengths] = useState({});
   const [offcutsMap, setOffcutsMap] = useState({}); // key → [length, length, ...]
@@ -880,8 +884,48 @@ function PreCutTab({ merged, settings }) {
     return localOptimization.boxSapele?.find((g) => String(g.preCutWidth) === group.section);
   };
 
+  const handleExportPDF = () => {
+    const exportGroups = allGroups.map((g) => ({
+      ...g,
+      stockLength: stockLengths[g.key] || g.defaultStock,
+      materialInfo: getMaterialForGroup(g.items),
+    }));
+    const projList = isPPMode
+      ? [...new Set((pp?.assignments || []).map((a) => {
+          const proj = (projects || []).find((p) => p.id === a.projectId);
+          return { number: proj?.project_number, name: proj?.name, id: a.projectId };
+        }).filter(Boolean))]
+      : [{ number: batch?.label, name: '' }];
+
+    exportPreCutPDF({
+      groups: exportGroups,
+      optimization: localOptimization,
+      settings,
+      batch,
+      pp,
+      projects: projList,
+      isPPMode,
+      format: exportFormat,
+    });
+  };
+
   return (
     <div className="space-y-4">
+      {/* Export controls */}
+      <div className="flex items-center justify-end gap-2">
+        <select
+          className="text-[10px] bg-surface-700 border border-surface-500 rounded px-2 py-1 text-ink-200 outline-none"
+          value={exportFormat}
+          onChange={(e) => setExportFormat(e.target.value)}
+        >
+          <option value="a3">A3 Landscape</option>
+          <option value="a4">A4 Landscape</option>
+        </select>
+        <button onClick={handleExportPDF} className="btn btn-primary text-xs px-4">
+          📄 Export PDF
+        </button>
+      </div>
+
       {allGroups.map((group) => {
         const optGroup = getOptGroup(group);
         const isExpanded = expandedGroups[group.key] !== false; // default expanded
