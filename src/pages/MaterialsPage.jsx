@@ -192,7 +192,10 @@ export default function MaterialsPage() {
   const deleteMaterial = useMaterialStore((s) => s.deleteMaterial);
 
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [subcategoryFilter, setSubcategoryFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('item_number');
+  const [sortDir, setSortDir] = useState('asc');
   const [showForm, setShowForm] = useState(false);     // false | 'add' | material object (edit)
   const [confirmDelete, setConfirmDelete] = useState(null); // null | 'bulk' | material
   const [lightboxSrc, setLightboxSrc] = useState(null);
@@ -228,10 +231,11 @@ export default function MaterialsPage() {
     return c;
   }, [materials, categories]);
 
-  // Filtered + searched materials
+  // Filtered + searched + sorted materials
   const filtered = useMemo(() => {
     let list = materials;
     if (categoryFilter) list = list.filter((m) => m.category === categoryFilter);
+    if (subcategoryFilter) list = list.filter((m) => m.subcategory === subcategoryFilter);
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       list = list.filter(
@@ -244,8 +248,23 @@ export default function MaterialsPage() {
           m.notes?.toLowerCase().includes(q)
       );
     }
+    // Sort
+    list = [...list].sort((a, b) => {
+      let va = a[sortBy] ?? '';
+      let vb = b[sortBy] ?? '';
+      if (sortBy === 'cost_per_unit') {
+        va = Number(va) || 0;
+        vb = Number(vb) || 0;
+      } else {
+        va = String(va).toLowerCase();
+        vb = String(vb).toLowerCase();
+      }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
     return list;
-  }, [materials, categoryFilter, searchQuery]);
+  }, [materials, categoryFilter, subcategoryFilter, searchQuery, sortBy, sortDir]);
 
   // ─── Selection ───
   const allSelected = filtered.length > 0 && filtered.every((m) => selected.has(m.id));
@@ -380,7 +399,7 @@ export default function MaterialsPage() {
         {/* Category filter pills (dynamic) */}
         <div className="flex gap-2 mb-4 flex-wrap">
           <button
-            onClick={() => setCategoryFilter('')}
+            onClick={() => { setCategoryFilter(''); setSubcategoryFilter(''); }}
             className={`text-[11px] px-3 py-1 rounded-full transition-colors ${
               !categoryFilter ? 'bg-surface-600 text-ink-50' : 'bg-surface-700/50 text-ink-400 hover:text-ink-200'
             }`}
@@ -393,7 +412,7 @@ export default function MaterialsPage() {
             return (
               <button
                 key={cat}
-                onClick={() => setCategoryFilter(isActive ? '' : cat)}
+                onClick={() => { setCategoryFilter(isActive ? '' : cat); setSubcategoryFilter(''); }}
                 className="text-[11px] px-3 py-1 rounded-full transition-colors capitalize"
                 style={{
                   background: isActive ? cc.bg : 'transparent',
@@ -406,6 +425,34 @@ export default function MaterialsPage() {
             );
           })}
         </div>
+
+        {/* Subcategory pills — shown when category is selected */}
+        {categoryFilter && subcategoriesByCategory[categoryFilter]?.length > 0 && (
+          <div className="flex gap-2 mb-4 flex-wrap pl-4 border-l-2 border-surface-500/50">
+            <button
+              onClick={() => setSubcategoryFilter('')}
+              className={`text-[10px] px-2.5 py-0.5 rounded-full transition-colors ${
+                !subcategoryFilter ? 'bg-surface-600 text-ink-100' : 'bg-surface-700/50 text-ink-400 hover:text-ink-200'
+              }`}
+            >
+              All
+            </button>
+            {subcategoriesByCategory[categoryFilter].map((sub) => {
+              const isActive = subcategoryFilter === sub;
+              return (
+                <button
+                  key={sub}
+                  onClick={() => setSubcategoryFilter(isActive ? '' : sub)}
+                  className={`text-[10px] px-2.5 py-0.5 rounded-full transition-colors capitalize ${
+                    isActive ? 'bg-accent-500/15 text-accent-400 border border-accent-500/30' : 'bg-surface-700/50 text-ink-400 hover:text-ink-200 border border-transparent'
+                  }`}
+                >
+                  {sub}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Search */}
         <input
@@ -431,14 +478,35 @@ export default function MaterialsPage() {
                     />
                   </th>
                   <th className="px-3 py-2.5 text-left text-ink-400 font-medium uppercase text-[10px] tracking-wider">Image</th>
-                  <th className="px-3 py-2.5 text-left text-ink-400 font-medium uppercase text-[10px] tracking-wider">Item #</th>
-                  <th className="px-3 py-2.5 text-left text-ink-400 font-medium uppercase text-[10px] tracking-wider">Name</th>
-                  <th className="px-3 py-2.5 text-left text-ink-400 font-medium uppercase text-[10px] tracking-wider">Size</th>
-                  <th className="px-3 py-2.5 text-left text-ink-400 font-medium uppercase text-[10px] tracking-wider">Thickness</th>
-                  <th className="px-3 py-2.5 text-left text-ink-400 font-medium uppercase text-[10px] tracking-wider">Color</th>
-                  <th className="px-3 py-2.5 text-left text-ink-400 font-medium uppercase text-[10px] tracking-wider">Category</th>
-                  <th className="px-3 py-2.5 text-left text-ink-400 font-medium uppercase text-[10px] tracking-wider">Subcategory</th>
-                  <th className="px-3 py-2.5 text-right text-ink-400 font-medium uppercase text-[10px] tracking-wider">Cost/Unit</th>
+                  {[
+                    { key: 'item_number', label: 'Item #' },
+                    { key: 'name', label: 'Name' },
+                    { key: 'size', label: 'Size' },
+                    { key: 'thickness', label: 'Thickness' },
+                    { key: 'color', label: 'Color' },
+                    { key: 'category', label: 'Category' },
+                    { key: 'subcategory', label: 'Subcategory' },
+                  ].map((col) => (
+                    <th
+                      key={col.key}
+                      className="px-3 py-2.5 text-left text-ink-400 font-medium uppercase text-[10px] tracking-wider cursor-pointer hover:text-ink-200 transition-colors select-none"
+                      onClick={() => {
+                        if (sortBy === col.key) setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+                        else { setSortBy(col.key); setSortDir('asc'); }
+                      }}
+                    >
+                      {col.label} {sortBy === col.key ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                  ))}
+                  <th
+                    className="px-3 py-2.5 text-right text-ink-400 font-medium uppercase text-[10px] tracking-wider cursor-pointer hover:text-ink-200 transition-colors select-none"
+                    onClick={() => {
+                      if (sortBy === 'cost_per_unit') setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+                      else { setSortBy('cost_per_unit'); setSortDir('asc'); }
+                    }}
+                  >
+                    Cost/Unit {sortBy === 'cost_per_unit' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                  </th>
                   <th className="px-3 py-2.5 text-center text-ink-400 font-medium uppercase text-[10px] tracking-wider w-8"></th>
                 </tr>
               </thead>
@@ -446,7 +514,7 @@ export default function MaterialsPage() {
                 {filtered.length === 0 && (
                   <tr>
                     <td colSpan={11} className="px-4 py-12 text-center text-ink-400">
-                      {searchQuery || categoryFilter ? 'No materials match your search.' : 'No materials yet. Import from JC or add your first material.'}
+                      {searchQuery || categoryFilter || subcategoryFilter ? 'No materials match your search.' : 'No materials yet. Import from JC or add your first material.'}
                     </td>
                   </tr>
                 )}
@@ -547,6 +615,7 @@ export default function MaterialsPage() {
               <span>
                 Showing {filtered.length} of {materials.length} materials
                 {categoryFilter && ` · Filtered by "${categoryFilter}"`}
+                {subcategoryFilter && ` > "${subcategoryFilter}"`}
               </span>
               <span>
                 🔗 JC = Imported from Joinery Core
