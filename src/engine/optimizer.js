@@ -6,9 +6,9 @@
 
 function expandItems(items) {
   const expanded = [];
-  items.forEach(({ length, quantity, elementName, windowId }) => {
+  items.forEach(({ length, quantity, elementName, windowId, windowName, _projectNumber }) => {
     for (let i = 0; i < quantity; i += 1) {
-      expanded.push({ length: Number(length), elementName, windowId });
+      expanded.push({ length: Number(length), elementName, windowId, windowName: windowName || '', projectNumber: _projectNumber || '' });
     }
   });
   return expanded.filter((item) => Number.isFinite(item.length) && item.length > 0);
@@ -48,7 +48,8 @@ function bestFitDecreasing({ items, stockLength, kerf, endTrim, minimumPiece, pr
       const potentialUsed = bar.used + kerfAllowance + cut.length;
       const remainingAfterEndTrim = barStock - (potentialUsed + endTrim);
       if (remainingAfterEndTrim < 0) return;
-      if (remainingAfterEndTrim !== 0 && remainingAfterEndTrim < minimumPiece) return;
+      // Skip minimumPiece check for offcut bars — use them as much as possible
+      if (!bar.isOffcut && remainingAfterEndTrim !== 0 && remainingAfterEndTrim < minimumPiece) return;
       if (remainingAfterEndTrim < bestWaste) {
         bestWaste = remainingAfterEndTrim;
         bestBar = bar;
@@ -76,7 +77,7 @@ function bestFitDecreasing({ items, stockLength, kerf, endTrim, minimumPiece, pr
     const kerfAllowance = bestBar.cuts.length > 0 ? kerf : 0;
     bestBar.cuts.push(cut.length);
     if (!bestBar.cutDetails) bestBar.cutDetails = [];
-    bestBar.cutDetails.push({ length: cut.length, elementName: cut.elementName || '' });
+    bestBar.cutDetails.push({ length: cut.length, elementName: cut.elementName || '', windowName: cut.windowName || '', projectNumber: cut.projectNumber || '' });
     bestBar.used += kerfAllowance + cut.length;
     const remaining = barStock - (bestBar.used + endTrim);
     bestBar.waste = Math.max(remaining, 0);

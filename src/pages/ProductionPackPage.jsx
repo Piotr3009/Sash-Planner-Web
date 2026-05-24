@@ -26,8 +26,6 @@ import { getPartSymbol } from '../engine/partSymbols.js';
 import FrontElevation2D from '../components/drawings/FrontElevation2D.jsx';
 import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
 import SashDetail2D from '../components/drawings/SashDetail2D.jsx';
-import VerticalSection2D from '../components/drawings/VerticalSection2D.jsx';
-import HorizontalSection2D from '../components/drawings/HorizontalSection2D.jsx';
 import GlassDrawing2D from '../components/drawings/GlassDrawing2D.jsx';
 import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 
@@ -499,20 +497,19 @@ function ElevationsTab({ windowsData }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// TAB: 2D Sections — generated drawings + user image upload
+// TAB: 2D Sections — container-based image upload system
 // ═══════════════════════════════════════════════════════════════
 function SectionsTab({ windowsData }) {
-  const first = windowsData[0];
   const [sectionImages, setSectionImages] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('pc-section-images') || '{}'); } catch { return {}; }
+    try { return JSON.parse(localStorage.getItem('pc-section-images') || '[]'); } catch { return []; }
   });
+  const [zoomedImg, setZoomedImg] = useState(null);
 
-  const handleImageUpload = (key, e) => {
+  const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      // Resize to ~200KB via canvas
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
@@ -520,69 +517,67 @@ function SectionsTab({ windowsData }) {
         let w = img.width, h = img.height;
         if (w > maxDim || h > maxDim) {
           const ratio = Math.min(maxDim / w, maxDim / h);
-          w = Math.round(w * ratio);
-          h = Math.round(h * ratio);
+          w = Math.round(w * ratio); h = Math.round(h * ratio);
         }
-        canvas.width = w;
-        canvas.height = h;
+        canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
         const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
-        const updated = { ...sectionImages, [key]: dataUrl };
+        const updated = [...sectionImages, { id: `sec-${Date.now()}`, src: dataUrl, label: file.name.replace(/\.[^.]+$/, '') }];
         setSectionImages(updated);
         localStorage.setItem('pc-section-images', JSON.stringify(updated));
       };
       img.src = reader.result;
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
-  const handleRemoveImage = (key) => {
-    const updated = { ...sectionImages };
-    delete updated[key];
+  const handleRemoveImage = (id) => {
+    const updated = sectionImages.filter((s) => s.id !== id);
     setSectionImages(updated);
     localStorage.setItem('pc-section-images', JSON.stringify(updated));
   };
 
-  if (!first?.windowSpec || !first?.derived) {
-    return <div className="card p-8 text-center text-ink-400">No data available.</div>;
-  }
-
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div className="card p-4">
-          <div className="text-xs font-semibold text-ink-200 mb-2">Vertical Section</div>
-          <VerticalSection2D windowSpec={first.windowSpec} derived={first.derived} />
-        </div>
-        <div className="card p-4">
-          <div className="text-xs font-semibold text-ink-200 mb-2">Horizontal Section</div>
-          <HorizontalSection2D windowSpec={first.windowSpec} derived={first.derived} />
-        </div>
+      {/* Containers grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        {sectionImages.map((item) => (
+          <div key={item.id} className="card overflow-hidden relative group">
+            <div className="px-4 py-2 border-b border-surface-500 flex items-center justify-between bg-surface-800">
+              <span className="text-xs font-medium text-ink-200 truncate">{item.label || 'Section'}</span>
+              <button onClick={() => handleRemoveImage(item.id)}
+                className="w-5 h-5 rounded flex items-center justify-center text-ink-400 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all text-xs">×</button>
+            </div>
+            <div className="p-3 flex items-center justify-center cursor-zoom-in" onClick={() => setZoomedImg(item.src)}>
+              <img src={item.src} alt={item.label} className="max-w-full max-h-[400px] rounded" />
+            </div>
+          </div>
+        ))}
+
+        {/* Add container button */}
+        <label className="card flex flex-col items-center justify-center py-12 cursor-pointer hover:border-accent-500/40 transition-all">
+          <svg className="w-8 h-8 mb-2 text-ink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          <span className="text-xs text-ink-400">Add section image</span>
+          <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+        </label>
       </div>
 
-      {/* User-uploaded section images */}
-      <div className="card p-4">
-        <div className="text-xs font-semibold text-ink-200 mb-3">Custom Section Images</div>
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {Object.entries(sectionImages).map(([key, src]) => (
-            <div key={key} className="relative group">
-              <img src={src} alt={key} className="w-full rounded border border-surface-500 cursor-zoom-in" onClick={() => window.open(src, '_blank')} />
-              <button
-                onClick={() => handleRemoveImage(key)}
-                className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500/80 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              >×</button>
-              <div className="text-[10px] text-ink-400 mt-1">{key}</div>
-            </div>
-          ))}
-          <label className="flex flex-col items-center justify-center py-8 rounded-xl border border-dashed border-surface-500 text-ink-400 text-xs hover:border-accent-500 hover:text-accent-400 cursor-pointer transition-all">
-            <svg className="w-6 h-6 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            Add section image
-            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(`section-${Date.now()}`, e)} />
-          </label>
+      {sectionImages.length === 0 && (
+        <div className="text-center text-[11px] text-ink-400 py-4">
+          Upload section drawings or detail images. Each container holds one image with zoom capability.
         </div>
-      </div>
+      )}
+
+      {/* Zoom modal */}
+      {zoomedImg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setZoomedImg(null)}>
+          <img src={zoomedImg} alt="Zoomed" className="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl" />
+          <button onClick={() => setZoomedImg(null)} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-surface-700 border border-surface-500 text-ink-300 hover:text-ink-50 flex items-center justify-center text-lg">×</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -635,28 +630,6 @@ function ElementsTab({ windowsData }) {
                 <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
               )}
             </div>
-            {/* Horn Detail */}
-            {windowSpec?.sash?.horns && windowSpec.sash.horns !== 'none' && derived && (
-              <div className="card p-4">
-                <div className="text-xs font-semibold text-ink-200 mb-2">Horn Detail — Type {windowSpec.sash.horns || 'A'}</div>
-                <svg viewBox="0 0 120 200" className="w-full max-w-[120px] mx-auto" xmlns="http://www.w3.org/2000/svg">
-                  {/* Stile body */}
-                  <rect x="30" y="0" width="60" height="120" fill="none" stroke="#AFA9EC" strokeWidth="1.5" />
-                  <text x="60" y="65" textAnchor="middle" fill="#AFA9EC" fontSize="8" fontFamily="monospace">57mm</text>
-                  {/* Horn extension */}
-                  <rect x="30" y="120" width="60" height={Math.min(75, (windowSpec.sash?.hornExtension || 75) * 0.8)} fill="none" stroke="#F59E0B" strokeWidth="1.5" strokeDasharray="4 2" />
-                  <text x="60" y={130 + Math.min(75, (windowSpec.sash?.hornExtension || 75) * 0.8) / 2} textAnchor="middle" fill="#F59E0B" fontSize="7" fontFamily="monospace">
-                    {windowSpec.sash?.hornExtension || 75}mm
-                  </text>
-                  {/* Dimension arrow */}
-                  <line x1="15" y1="120" x2="15" y2={120 + Math.min(75, (windowSpec.sash?.hornExtension || 75) * 0.8)} stroke="#888" strokeWidth="0.5" />
-                  <line x1="12" y1="120" x2="18" y2="120" stroke="#888" strokeWidth="0.5" />
-                  <line x1="12" y1={120 + Math.min(75, (windowSpec.sash?.hornExtension || 75) * 0.8)} x2="18" y2={120 + Math.min(75, (windowSpec.sash?.hornExtension || 75) * 0.8)} stroke="#888" strokeWidth="0.5" />
-                  {/* Label */}
-                  <text x="60" y="195" textAnchor="middle" fill="#6B7385" fontSize="7" fontFamily="sans-serif">Horn Type {windowSpec.sash.horns || 'A'}</text>
-                </svg>
-              </div>
-            )}
           </div>
         </div>
       ))}
@@ -965,7 +938,10 @@ function PreCutTab({ merged, settings }) {
                                   {details.map((detail, idx) => {
                                     const cutLen = typeof detail === 'number' ? detail : detail.length;
                                     const elName = typeof detail === 'number' ? '' : (detail.elementName || '');
+                                    const winName = typeof detail === 'number' ? '' : (detail.windowName || '');
+                                    const projNum = typeof detail === 'number' ? '' : (detail.projectNumber || '');
                                     const sym = elName ? getPartSymbol(elName) : null;
+                                    const label = sym ? `${sym.symbol}${projNum ? '-' + projNum : ''}${winName ? '-' + winName : ''}` : '';
                                     const left = (cursor / barStock) * 100;
                                     const width = (cutLen / barStock) * 100;
                                     cursor += cutLen + (settings?.kerf || 3);
@@ -977,9 +953,9 @@ function PreCutTab({ merged, settings }) {
                                           width: `${width}%`,
                                           background: bar.isOffcut ? 'rgba(217,161,53,0.6)' : 'rgba(0,180,160,0.6)',
                                         }}
-                                        title={`${sym?.symbol || ''} ${cutLen} mm${elName ? ' — ' + elName : ''}`}>
+                                        title={`${label} ${cutLen} mm${elName ? ' — ' + elName : ''}`}>
                                         <span className="truncate">
-                                          {cutLen > barStock * 0.08 ? (sym ? `${sym.symbol} ${cutLen}` : cutLen) : (sym?.symbol || '')}
+                                          {cutLen > barStock * 0.08 ? `${label} ${cutLen}` : (label || '')}
                                         </span>
                                       </div>
                                     );
@@ -1080,6 +1056,8 @@ function CutListTab({ merged, isPPMode }) {
     setElementImages(updated);
     localStorage.setItem('pc-element-images', JSON.stringify(updated));
   };
+
+  const [zoomedElement, setZoomedElement] = useState(null);
   if (!merged?.cutList?.length) {
     return <div className="card p-8 text-center text-ink-400">No cut list data available.</div>;
   }
@@ -1130,33 +1108,42 @@ function CutListTab({ merged, isPPMode }) {
 
         return (
           <div key={group.element} className="card overflow-hidden">
-            {/* Section header: name + symbol + uploadable 2D */}
-            <div className="px-4 py-3 border-b border-surface-500 flex items-center gap-3 bg-surface-800">
-              {/* 2D miniature — upload or display */}
+            {/* Section header: name + symbol */}
+            <div className="px-4 py-3 border-b border-surface-500 bg-surface-800">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-mono font-bold text-accent-400 bg-accent-500/10 px-1.5 py-0.5 rounded">{sym.symbol}</span>
+                <span className="text-sm font-semibold text-ink-50">{group.element}</span>
+                {sym.mirror && (
+                  <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded" title="Mirror pair (L+R)">⟷ mirror</span>
+                )}
+              </div>
+              <div className="text-[10px] text-ink-400">
+                Section: {finishedSection} · {group.aggregated.reduce((s, a) => s + a.totalQty, 0)} pcs
+              </div>
+            </div>
+
+            {/* 2D image — large, centered, zoomable, row grows */}
+            <div className="border-b border-surface-500/50 bg-surface-800/30">
               {elementImages[group.element] ? (
-                <div className="relative group/img shrink-0">
-                  <img src={elementImages[group.element]} alt={group.element} className="w-10 h-10 rounded border border-surface-500 object-cover" />
+                <div className="relative group/img p-4 flex items-center justify-center">
+                  <img
+                    src={elementImages[group.element]}
+                    alt={group.element}
+                    className="max-w-full max-h-[300px] rounded border border-surface-500 cursor-zoom-in"
+                    onClick={() => setZoomedElement(elementImages[group.element])}
+                  />
                   <button onClick={() => handleRemoveImage(group.element)}
-                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500/80 text-white text-[8px] flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">×</button>
+                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500/80 text-white text-xs flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">×</button>
                 </div>
               ) : (
-                <label className="w-10 h-10 rounded bg-surface-700 border border-dashed border-surface-500 flex items-center justify-center text-ink-400 hover:text-accent-400 hover:border-accent-500 cursor-pointer transition-colors shrink-0" title="Upload 2D drawing">
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 5v14M5 12h14" /></svg>
+                <label className="flex flex-col items-center justify-center py-6 cursor-pointer text-ink-400 hover:text-accent-400 transition-colors">
+                  <svg className="w-6 h-6 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  <span className="text-[10px]">Upload 2D drawing</span>
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(group.element, e)} />
                 </label>
               )}
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-accent-400 bg-accent-500/10 px-1.5 py-0.5 rounded">{sym.symbol}</span>
-                  <span className="text-sm font-semibold text-ink-50">{group.element}</span>
-                  {sym.mirror && (
-                    <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded" title="Mirror pair (L+R)">⟷ mirror</span>
-                  )}
-                </div>
-                <div className="text-[10px] text-ink-400 mt-0.5">
-                  Section: {finishedSection} · {group.aggregated.reduce((s, a) => s + a.totalQty, 0)} pcs
-                </div>
-              </div>
             </div>
 
             {/* Items table */}
@@ -1197,6 +1184,14 @@ function CutListTab({ merged, isPPMode }) {
       <div className="card px-4 py-3 text-xs text-ink-400">
         Total element types: {byElement.length} · Total pieces: {totalPieces}
       </div>
+
+      {/* Zoom modal */}
+      {zoomedElement && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setZoomedElement(null)}>
+          <img src={zoomedElement} alt="Zoomed" className="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl" />
+          <button onClick={() => setZoomedElement(null)} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-surface-700 border border-surface-500 text-ink-300 hover:text-ink-50 flex items-center justify-center text-lg">×</button>
+        </div>
+      )}
     </div>
   );
 }
