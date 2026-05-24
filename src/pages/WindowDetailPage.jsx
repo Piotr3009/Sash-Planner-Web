@@ -273,6 +273,8 @@ function BOMPanel({ item, windowSpec, derived }) {
                 <div className="flex justify-between"><span>Glazing Packer 2mm</span><span className="text-ink-200">{c.spacer2mm.qty} pcs</span></div>
                 <div className="flex justify-between"><span>Georgian Bar/Bead Tape</span><span className="text-ink-200">{c.beadTape.meters} m</span></div>
                 <div className="flex justify-between"><span>Silicone</span><span className="text-ink-200">{c.silicone.tubes} tubes</span></div>
+                <div className="flex justify-between"><span>Sliding Sash Seal 6070</span><span className="text-ink-200">{c.seal6070.meters} m</span></div>
+                <div className="flex justify-between"><span>Bottom Seal 6009</span><span className="text-ink-200">{c.seal6009.meters} m</span></div>
               </div>
             </div>
           );

@@ -131,7 +131,7 @@ export default function ProductionPackPage() {
     const allBeading = [];
     const allWeights = [];
     let totalPaint = { areaSqm: 0, primer: 0, topcoat: 0 };
-    let totalConsumables = { glassSqm: 0, cordM: 0, clips: 0, spacer1mm: 0, spacer2mm: 0, beadTapeM: 0, siliconeTubes: 0 };
+    let totalConsumables = { glassSqm: 0, cordM: 0, clips: 0, spacer1mm: 0, spacer2mm: 0, beadTapeM: 0, siliconeTubes: 0, seal6070M: 0, seal6009M: 0 };
     let glassType = 'double';
     let clipSize = '24mm';
 
@@ -191,6 +191,8 @@ export default function ProductionPackPage() {
         totalConsumables.spacer2mm += c.spacer2mm.qty;
         totalConsumables.beadTapeM += c.beadTape.meters;
         totalConsumables.siliconeTubes += c.silicone.tubes;
+        totalConsumables.seal6070M += c.seal6070?.meters || 0;
+        totalConsumables.seal6009M += c.seal6009?.meters || 0;
         glassType = c.glass.type;
         clipSize = c.clips.size;
       }
@@ -903,6 +905,8 @@ function BOMTab({ merged, batch, pp, isPPMode, windowsData }) {
               <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Glazing Packer 2mm</span><span className="text-ink-200">{merged.consumables.spacer2mm} pcs</span></div>
               <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Georgian Bar/Bead Tape</span><span className="text-ink-200">{merged.consumables.beadTapeM.toFixed(2)} m</span></div>
               <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Silicone</span><span className="text-ink-200">{merged.consumables.siliconeTubes.toFixed(1)} tubes</span></div>
+              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Sliding Sash Seal 6070</span><span className="text-ink-200">{merged.consumables.seal6070M.toFixed(2)} m</span></div>
+              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Bottom Seal 6009</span><span className="text-ink-200">{merged.consumables.seal6009M.toFixed(2)} m</span></div>
               <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Weather stripping</span><span className="text-ink-200">{windowsData.length} sets</span></div>
               <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Screws / Fixings</span><span className="text-ink-200">As needed</span></div>
             </div>

@@ -329,7 +329,7 @@ function calculatePaint(frameWidth, frameHeight) {
     };
 }
 
-function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight) {
+function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight) {
     const glassW = sashWidth - 2 * CONSTANTS.STILE_WIDTH;
     const glassH = topSashHeight - CONSTANTS.TOP_RAIL_WIDTH - CONSTANTS.MEETING_RAIL_WIDTH;
     const glassType = windowSpec.glazing?.type || 'double';
@@ -367,6 +367,13 @@ function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, to
     // Weights — type depends on frame
     const weightType = isSlim ? 'slim' : 'normal';
 
+    // Seals — +10%
+    const SEAL_FACTOR = 1.10;
+    // Sliding Sash Seal 6070: sashW × 4 + topSashH × 4 + botSashH × 4
+    const seal6070 = round((sashWidth * 4 + topSashHeight * 4 + bottomSashHeight * 4) * SEAL_FACTOR / 1000);
+    // Bottom Seal 6009: sashW only
+    const seal6009 = round(sashWidth * SEAL_FACTOR / 1000);
+
     return {
         glass: { type: glassType, sqm: glassSqm },
         cord: { meters: cordM },
@@ -376,6 +383,8 @@ function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, to
         beadTape: { meters: beadTapeM },
         silicone: { tubes: siliconeTubes },
         weightType,
+        seal6070: { meters: seal6070 },
+        seal6009: { meters: seal6009 },
     };
 }
 
@@ -461,7 +470,7 @@ export function deriveWindowData(windowSpec, settings = {}) {
 
     const weights = calculateWeights(windowSpec, sashWidth, topSashHeight, bottomSashHeight);
     const paint = calculatePaint(frameWidth, frameHeight);
-    const consumables = calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight);
+    const consumables = calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight);
 
     return {
         sashWidth,
