@@ -9,7 +9,7 @@
  * cut lists, glass, hardware using buildProjectAggregates.
  */
 import { useState, useMemo, useEffect, Suspense } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useProjectStore, BATCH_STATUSES } from '../stores/projectStore.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
@@ -53,11 +53,15 @@ const STATUS_CONFIG = {
 // ─── Main Component ───
 export default function ProductionPackPage() {
   const { projectId, batchId, ppId } = useParams();
+  const navigate = useNavigate();
   const projects = useProjectStore((s) => s.projects);
   const productionPacks = useProjectStore((s) => s.productionPacks);
   const settings = useProjectStore((s) => s.settings);
   const updateProductionPack = useProjectStore((s) => s.updateProductionPack);
+  const updateBatchLabel = useProjectStore((s) => s.updateBatchLabel);
   const [tab, setTab] = useState('overview');
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
 
   // PP mode: cross-project merged windows
   const pp = useMemo(
@@ -228,41 +232,89 @@ export default function ProductionPackPage() {
   }
 
   const headerTitle = isPPMode
-    ? `Production Pack — ${pp.name}`
-    : `Production Pack — ${batch.label}`;
+    ? pp.name
+    : batch.label;
   const headerSub = isPPMode
     ? `${pp.type} · ${sourceWindows.length} windows · ${pp.assignments?.length || 0} batches · ${pp.status}`
     : `${project.name} · ${batch.windows?.length || 0} windows · ${batch.status}`;
+
+  const handleNameSave = () => {
+    const trimmed = nameDraft.trim();
+    if (!trimmed) { setEditingName(false); return; }
+    if (isPPMode) {
+      updateProductionPack(pp.id, { name: trimmed });
+    } else {
+      updateBatchLabel(projectId, batchId, trimmed);
+    }
+    setEditingName(false);
+  };
+
+  const handleNameKeyDown = (e) => {
+    if (e.key === 'Enter') handleNameSave();
+    if (e.key === 'Escape') setEditingName(false);
+  };
 
   return (
     <div className="min-h-full bg-surface-800">
       {/* Header */}
       <header className="border-b border-surface-500 bg-surface-900 px-6 py-4">
         <div className="max-w-[1400px] mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-ink-50">
-              {headerTitle}
-            </h1>
-            <div className="flex items-center gap-3 mt-0.5">
-              <p className="text-xs text-ink-400">
-                {headerSub}
-              </p>
-              {isPPMode && (
-                <select
-                  className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border cursor-pointer outline-none"
-                  style={{
-                    background: `${STATUS_CONFIG[pp.status]?.color || '#F59E0B'}20`,
-                    color: STATUS_CONFIG[pp.status]?.color || '#F59E0B',
-                    borderColor: `${STATUS_CONFIG[pp.status]?.color || '#F59E0B'}40`,
-                  }}
-                  value={pp.status}
-                  onChange={(e) => updateProductionPack(pp.id, { status: e.target.value })}
-                >
-                  {BATCH_STATUSES.map((s) => (
-                    <option key={s} value={s}>{STATUS_CONFIG[s]?.label || s}</option>
-                  ))}
-                </select>
-              )}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="w-8 h-8 rounded-lg bg-surface-700 hover:bg-surface-600 text-ink-300 hover:text-ink-50 flex items-center justify-center transition-colors shrink-0"
+              title="Go back"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-ink-400">Production Pack —</span>
+                {editingName ? (
+                  <input
+                    className="text-xl font-bold text-ink-50 bg-surface-700 border border-surface-500 rounded-lg px-2 py-0.5 outline-none focus:border-accent-500"
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    onBlur={handleNameSave}
+                    onKeyDown={handleNameKeyDown}
+                    autoFocus
+                  />
+                ) : (
+                  <h1
+                    className="text-xl font-bold text-ink-50 cursor-pointer hover:text-accent-400 transition-colors"
+                    onClick={() => { setNameDraft(headerTitle); setEditingName(true); }}
+                    title="Click to edit name"
+                  >
+                    {headerTitle}
+                    <svg className="inline w-3.5 h-3.5 ml-1.5 text-ink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                    </svg>
+                  </h1>
+                )}
+              </div>
+              <div className="flex items-center gap-3 mt-0.5">
+                <p className="text-xs text-ink-400">
+                  {headerSub}
+                </p>
+                {isPPMode && (
+                  <select
+                    className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border cursor-pointer outline-none"
+                    style={{
+                      background: `${STATUS_CONFIG[pp.status]?.color || '#F59E0B'}20`,
+                      color: STATUS_CONFIG[pp.status]?.color || '#F59E0B',
+                      borderColor: `${STATUS_CONFIG[pp.status]?.color || '#F59E0B'}40`,
+                    }}
+                    value={pp.status}
+                    onChange={(e) => updateProductionPack(pp.id, { status: e.target.value })}
+                  >
+                    {BATCH_STATUSES.map((s) => (
+                      <option key={s} value={s}>{STATUS_CONFIG[s]?.label || s}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex gap-2">

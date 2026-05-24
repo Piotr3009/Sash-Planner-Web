@@ -132,6 +132,35 @@ export const useMaterialStore = create(
     }
     return { added: imported.length, updated };
   },
+
+  // ─── Category management ───
+  renameCategory: (oldName, newName) => {
+    if (!oldName || !newName || oldName === newName) return;
+    set((s) => ({
+      materials: s.materials.map((m) =>
+        m.category === oldName ? { ...m, category: newName } : m
+      ),
+    }));
+  },
+
+  canDeleteCategory: (categoryName) => {
+    return !get().materials.some((m) => m.category === categoryName);
+  },
+
+  renameSubcategory: (category, oldSub, newSub) => {
+    if (!oldSub || !newSub || oldSub === newSub) return;
+    set((s) => ({
+      materials: s.materials.map((m) =>
+        m.category === category && m.subcategory === oldSub
+          ? { ...m, subcategory: newSub }
+          : m
+      ),
+    }));
+  },
+
+  canDeleteSubcategory: (category, subcategory) => {
+    return !get().materials.some((m) => m.category === category && m.subcategory === subcategory);
+  },
 }),
     {
       name: 'sp-materials',

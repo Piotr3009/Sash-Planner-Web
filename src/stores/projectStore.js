@@ -182,6 +182,18 @@ export const useProjectStore = create(
     }));
   },
 
+  updateProject: (projectId, patch) => {
+    set((s) => {
+      const updatedProjects = s.projects.map((p) =>
+        p.id === projectId ? { ...p, ...patch } : p
+      );
+      const updatedCurrent = s.currentProject?.id === projectId
+        ? { ...s.currentProject, ...patch }
+        : s.currentProject;
+      return { projects: updatedProjects, currentProject: updatedCurrent };
+    });
+  },
+
   // ─── BATCH CRUD ───
   createBatch: (projectId, windowType) => {
     const id = uid();
@@ -268,6 +280,20 @@ export const useProjectStore = create(
         ? { ...s.currentProject, batches: (s.currentProject.batches || []).map(updateBatch) }
         : s.currentProject;
       const updatedBatch = s.currentBatch?.id === batchId ? { ...s.currentBatch, status } : s.currentBatch;
+      return { projects: updatedProjects, currentProject: updatedCurrent, currentBatch: updatedBatch };
+    });
+  },
+
+  updateBatchLabel: (projectId, batchId, label) => {
+    set((s) => {
+      const updateBatch = (b) => b.id === batchId ? { ...b, label } : b;
+      const updatedProjects = s.projects.map((p) =>
+        p.id === projectId ? { ...p, batches: (p.batches || []).map(updateBatch) } : p
+      );
+      const updatedCurrent = s.currentProject?.id === projectId
+        ? { ...s.currentProject, batches: (s.currentProject.batches || []).map(updateBatch) }
+        : s.currentProject;
+      const updatedBatch = s.currentBatch?.id === batchId ? { ...s.currentBatch, label } : s.currentBatch;
       return { projects: updatedProjects, currentProject: updatedCurrent, currentBatch: updatedBatch };
     });
   },

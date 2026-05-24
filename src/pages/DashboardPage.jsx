@@ -18,6 +18,19 @@ const STATUS_CONFIG = {
   complete:        { label: 'Done',    color: '#10B981' },
 };
 
+// ─── Dynamic height per project (based on batch count) ───
+const BATCH_PILL_H = 32;
+const BATCH_PILL_GAP = 6;
+const CARD_PADDING = 24;
+const MIN_CARD_H = 130;
+const PROJECT_GAP = 12;
+
+function getProjectCardHeight(batchCount) {
+  if (batchCount <= 0) return MIN_CARD_H;
+  const batchesHeight = batchCount * BATCH_PILL_H + (batchCount - 1) * BATCH_PILL_GAP + CARD_PADDING;
+  return Math.max(MIN_CARD_H, batchesHeight);
+}
+
 // ─── Confirmation modal ───
 function ConfirmModal({ title, message, onConfirm, onCancel }) {
   return (
@@ -35,10 +48,106 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
   );
 }
 
-const PROJECT_CARD_H = 130;
-const PROJECT_GAP = 12;
+// ─── Edit Project modal ───
+function EditProjectModal({ project, onSave, onCancel }) {
+  const [name, setName] = useState(project.name || '');
+  const [number, setNumber] = useState(project.project_number || '');
+  const [client, setClient] = useState(project.client || '');
+  const [address, setAddress] = useState(project.address || '');
 
-// ─── SVG connection lines (Batch→PP and PP→Delivery) ───
+  const submit = () => {
+    if (!name.trim()) return;
+    onSave({
+      name: name.trim().slice(0, 5),
+      project_number: number.trim().slice(0, 5),
+      client: client.trim(),
+      address: address.trim(),
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onCancel}>
+      <div className="absolute inset-0 bg-black/60" />
+      <div className="relative bg-surface-800 border border-surface-500 rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="text-sm font-semibold text-ink-50 mb-3">Edit Project</div>
+        <div className="space-y-2">
+          <div>
+            <label className="text-[10px] text-ink-400 uppercase tracking-wider block mb-0.5">Project name (max 5 chars) *</label>
+            <input className="input text-xs w-full" value={name} maxLength={5} onChange={(e) => setName(e.target.value)} autoFocus />
+          </div>
+          <div>
+            <label className="text-[10px] text-ink-400 uppercase tracking-wider block mb-0.5">Project number (max 5 chars)</label>
+            <input className="input text-xs w-full" value={number} maxLength={5} onChange={(e) => setNumber(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-[10px] text-ink-400 uppercase tracking-wider block mb-0.5">Client</label>
+            <input className="input text-xs w-full" value={client} onChange={(e) => setClient(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-[10px] text-ink-400 uppercase tracking-wider block mb-0.5">Address</label>
+            <input className="input text-xs w-full" value={address} onChange={(e) => setAddress(e.target.value)} />
+          </div>
+        </div>
+        <div className="flex gap-2 justify-end mt-4">
+          <button onClick={onCancel} className="btn btn-secondary text-xs px-4">Cancel</button>
+          <button onClick={submit} className="btn btn-primary text-xs px-4">Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Custom batch-assign dropdown ───
+function BatchAssignDropdown({ batchId, projectId, productionPacks, currentPPId, onAssign }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
+  const currentPP = productionPacks.find((pp) => pp.id === currentPPId);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-surface-700/60 hover:bg-surface-600 text-ink-300 hover:text-ink-100 transition-colors"
+      >
+        <span className="truncate max-w-[60px]">{currentPP ? currentPP.name : '— assign'}</span>
+        <svg className="w-2.5 h-2.5 shrink-0 text-ink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6" /></svg>
+      </button>
+      {open && (
+        <div className="absolute z-40 top-full mt-1 left-0 min-w-[140px] bg-surface-700 border border-surface-500 rounded-lg shadow-xl py-1 max-h-[200px] overflow-y-auto">
+          <button
+            className={`w-full text-left px-3 py-1.5 text-[10px] hover:bg-surface-600 transition-colors ${!currentPPId ? 'text-accent-400 font-medium' : 'text-ink-300'}`}
+            onClick={(e) => { e.stopPropagation(); onAssign(batchId, projectId, null); setOpen(false); }}
+          >
+            — unassign
+          </button>
+          {productionPacks.map((pp) => {
+            const tc = typeColor(pp.type);
+            return (
+              <button
+                key={pp.id}
+                className={`w-full text-left px-3 py-1.5 text-[10px] hover:bg-surface-600 transition-colors flex items-center gap-2 ${pp.id === currentPPId ? 'text-accent-400 font-medium' : 'text-ink-200'}`}
+                onClick={(e) => { e.stopPropagation(); onAssign(batchId, projectId, pp.id); setOpen(false); }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: tc.dot }} />
+                <span className="truncate">{pp.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── SVG connection lines (Project→Batch, Batch→PP, PP→Delivery) ───
 function ConnectionLines({ containerRef, projects, productionPacks }) {
   const [lines, setLines] = useState([]);
 
@@ -48,6 +157,33 @@ function ConnectionLines({ containerRef, projects, productionPacks }) {
     const cRect = container.getBoundingClientRect();
     const newLines = [];
 
+    // ── Project → Batch lines ──
+    projects.forEach((project) => {
+      const projEl = container.querySelector(`[data-project-id="${project.id}"]`);
+      if (!projEl) return;
+      const pRect = projEl.getBoundingClientRect();
+      const pRightX = pRect.right - cRect.left;
+      const pCenterY = pRect.top - cRect.top + pRect.height / 2;
+
+      (project.batches || []).forEach((batch) => {
+        const batchEl = container.querySelector(`[data-batch-id="${batch.id}"]`);
+        if (!batchEl) return;
+        const bRect = batchEl.getBoundingClientRect();
+        const bLeftX = bRect.left - cRect.left;
+        const bY = bRect.top - cRect.top + bRect.height / 2;
+
+        const tc = typeColor(batch.type || 'sash');
+        newLines.push({
+          key: `p-${project.id}-${batch.id}`,
+          x1: pRightX, y1: pCenterY,
+          x2: bLeftX, y2: bY,
+          color: tc.line,
+          opacity: 0.25,
+        });
+      });
+    });
+
+    // ── Batch → PP lines ──
     productionPacks.forEach((pp) => {
       const ppEl = container.querySelector(`[data-pp-id="${pp.id}"]`);
       if (!ppEl) return;
@@ -80,6 +216,7 @@ function ConnectionLines({ containerRef, projects, productionPacks }) {
         connectedProjects.add(projectId);
       });
 
+      // ── PP → Delivery lines ──
       connectedProjects.forEach((projectId) => {
         const delEl = container.querySelector(`[data-delivery-id="${projectId}"]`);
         if (!delEl) return;
@@ -160,7 +297,7 @@ function NewPPForm({ onCreate, onCancel }) {
   );
 }
 
-// ─── New Project form ───
+// ─── New Project form (with short name enforcement) ───
 function NewProjectForm({ onCreate, onCancel }) {
   const [name, setName] = useState('');
   const [number, setNumber] = useState('');
@@ -175,8 +312,14 @@ function NewProjectForm({ onCreate, onCancel }) {
 
   return (
     <div className="card p-3 space-y-2">
-      <input className="input text-xs" placeholder="Project name *" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-      <input className="input text-xs" placeholder="Project number" value={number} onChange={(e) => setNumber(e.target.value)} />
+      <div>
+        <input className="input text-xs w-full" placeholder="Project name * (max 5)" maxLength={5} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        <div className="text-[9px] text-ink-400 mt-0.5 text-right">{name.length}/5</div>
+      </div>
+      <div>
+        <input className="input text-xs w-full" placeholder="Project number (max 5)" maxLength={5} value={number} onChange={(e) => setNumber(e.target.value)} />
+        <div className="text-[9px] text-ink-400 mt-0.5 text-right">{number.length}/5</div>
+      </div>
       <input className="input text-xs" placeholder="Client" value={client} onChange={(e) => setClient(e.target.value)} />
       <input className="input text-xs" placeholder="Address" value={address} onChange={(e) => setAddress(e.target.value)} />
       <div className="flex gap-2">
@@ -199,6 +342,7 @@ export default function DashboardPage() {
   const projects = useProjectStore((s) => s.projects);
   const productionPacks = useProjectStore((s) => s.productionPacks);
   const createProject = useProjectStore((s) => s.createProject);
+  const updateProject = useProjectStore((s) => s.updateProject);
   const createProductionPack = useProjectStore((s) => s.createProductionPack);
   const assignBatch = useProjectStore((s) => s.assignBatchToProductionPack);
   const unassignBatch = useProjectStore((s) => s.unassignBatchFromProductionPack);
@@ -210,10 +354,17 @@ export default function DashboardPage() {
 
   const [showNewPP, setShowNewPP] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
-  const [confirmAction, setConfirmAction] = useState(null); // { title, message, onConfirm }
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [editProject, setEditProject] = useState(null); // project being edited
 
-  // Total height of projects column (for PP centering)
-  const projectsBlockHeight = projects.length * PROJECT_CARD_H + Math.max(0, projects.length - 1) * PROJECT_GAP;
+  // ─── Per-project dynamic heights ───
+  const projectHeights = useMemo(() => {
+    const heights = {};
+    projects.forEach((p) => {
+      heights[p.id] = getProjectCardHeight((p.batches || []).length);
+    });
+    return heights;
+  }, [projects]);
 
   const deliveryData = useMemo(() => {
     return projects.map((project) => {
@@ -225,7 +376,6 @@ export default function DashboardPage() {
       batches.forEach((batch) => {
         const winCount = batch.windows?.length || 0;
         totalWindows += winCount;
-        // Completion is determined by Production Pack status, not batch status
         const assignedPP = productionPacks.find((pp) =>
           pp.assignments.some((a) => a.projectId === project.id && a.batchId === batch.id)
         );
@@ -261,6 +411,13 @@ export default function DashboardPage() {
     setShowNewProject(false);
   };
 
+  const handleEditProjectSave = (patch) => {
+    if (editProject) {
+      updateProject(editProject.id, patch);
+      setEditProject(null);
+    }
+  };
+
   const handleDeleteProject = (e, project) => {
     e.preventDefault();
     e.stopPropagation();
@@ -288,6 +445,9 @@ export default function DashboardPage() {
     e.stopPropagation();
     updateProductionPack(ppId, { status: e.target.value });
   };
+
+  // Total height for PP centering
+  const projectsBlockHeight = projects.reduce((sum, p) => sum + (projectHeights[p.id] || MIN_CARD_H), 0) + Math.max(0, projects.length - 1) * PROJECT_GAP;
 
   return (
     <>
@@ -317,33 +477,48 @@ export default function DashboardPage() {
 
           <div className="flex items-start">
 
-            {/* ─── Col 1: Projects (160px, fixed 130px cards) ─── */}
+            {/* ─── Col 1: Projects (160px, dynamic height cards) ─── */}
             <div style={{ width: 160 }} className="shrink-0">
               <div style={{ display: 'flex', flexDirection: 'column', gap: PROJECT_GAP }}>
-                {projects.map((project) => (
-                  <div
-                    key={project.id}
-                    className="relative group"
-                    style={{ height: PROJECT_CARD_H }}
-                  >
-                    <Link
-                      to={`/projects/${project.id}`}
-                      className="card p-3 block hover:border-accent-500/40 transition-all overflow-hidden h-full"
+                {projects.map((project) => {
+                  const h = projectHeights[project.id] || MIN_CARD_H;
+                  return (
+                    <div
+                      key={project.id}
+                      data-project-id={project.id}
+                      className="relative group"
+                      style={{ height: h }}
                     >
-                      <div className="text-xs font-semibold text-ink-50 truncate pr-5">{project.name}</div>
-                      <div className="text-[10px] text-ink-400 mt-0.5">{project.project_number}</div>
-                      <div className="text-[10px] text-ink-200 mt-1 truncate">{project.client}</div>
-                      <div className="text-[9px] text-ink-400 mt-1 truncate">{project.address}</div>
-                    </Link>
-                    <button
-                      onClick={(e) => handleDeleteProject(e, project)}
-                      className="absolute top-2 right-2 w-5 h-5 rounded flex items-center justify-center text-[10px] text-ink-400 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
-                      title="Delete project"
-                    >
-                      🗑️
-                    </button>
-                  </div>
-                ))}
+                      <Link
+                        to={`/projects/${project.id}`}
+                        className="card p-3 block hover:border-accent-500/40 transition-all overflow-hidden h-full"
+                      >
+                        <div className="text-xs font-semibold text-ink-50 truncate pr-10">{project.name}</div>
+                        <div className="text-[10px] text-ink-400 mt-0.5">{project.project_number}</div>
+                        <div className="text-[10px] text-ink-200 mt-1 truncate">{project.client}</div>
+                        <div className="text-[9px] text-ink-400 mt-1 truncate">{project.address}</div>
+                      </Link>
+                      {/* Edit button */}
+                      <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditProject(project); }}
+                        className="absolute top-2 right-8 w-5 h-5 rounded flex items-center justify-center text-ink-400 hover:text-accent-400 hover:bg-accent-500/10 opacity-0 group-hover:opacity-100 transition-all"
+                        title="Edit project"
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                        </svg>
+                      </button>
+                      {/* Delete button */}
+                      <button
+                        onClick={(e) => handleDeleteProject(e, project)}
+                        className="absolute top-2 right-2 w-5 h-5 rounded flex items-center justify-center text-[10px] text-ink-400 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
+                        title="Delete project"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
               <div className="mt-3">
                 {showNewProject ? (
@@ -359,13 +534,14 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* ─── Col 2: Batches (200px, 16px gap, centered per project) ─── */}
+            {/* ─── Col 2: Batches (200px, dynamic height, centered per project) ─── */}
             <div style={{ width: 200, marginLeft: 16 }} className="shrink-0">
               <div style={{ display: 'flex', flexDirection: 'column', gap: PROJECT_GAP }}>
                 {projects.map((project) => {
                   const batches = project.batches || [];
+                  const h = projectHeights[project.id] || MIN_CARD_H;
                   return (
-                    <div key={project.id} style={{ height: PROJECT_CARD_H }} className="flex flex-col justify-center">
+                    <div key={project.id} style={{ height: h }} className="flex flex-col justify-center">
                       <div className="space-y-1.5">
                         {batches.map((batch) => {
                           const tc = typeColor(batch.type);
@@ -383,19 +559,14 @@ export default function DashboardPage() {
                               <span className="font-medium truncate" style={{ color: tc.text }}>
                                 {typeLabel(batch.type)} ×{winCount}
                               </span>
-                              <span className="ml-auto flex items-center gap-0.5">
-                                <select
-                                  className="bg-transparent text-[9px] outline-none cursor-pointer"
-                                  style={{ color: assignedPP ? tc.text : '#6B7385', maxWidth: '68px', appearance: 'none', WebkitAppearance: 'none' }}
-                                  value={assignedPP?.id || ''}
-                                  onChange={(e) => handleAssign(batch.id, project.id, e.target.value || null)}
-                                >
-                                  <option value="">— assign</option>
-                                  {productionPacks.map((pp) => (
-                                    <option key={pp.id} value={pp.id}>{pp.name}</option>
-                                  ))}
-                                </select>
-                                <span style={{ color: '#6B7385', fontSize: '8px', pointerEvents: 'none' }}>▾</span>
+                              <span className="ml-auto">
+                                <BatchAssignDropdown
+                                  batchId={batch.id}
+                                  projectId={project.id}
+                                  productionPacks={productionPacks}
+                                  currentPPId={assignedPP?.id || ''}
+                                  onAssign={handleAssign}
+                                />
                               </span>
                             </div>
                           );
@@ -512,10 +683,11 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* ─── Col 4: Project Complete (100px gap, fixed 130px cards) ─── */}
+            {/* ─── Col 4: Project Complete (dynamic height, matching project cards) ─── */}
             <div style={{ marginLeft: 100, minWidth: 160 }} className="flex-1">
               <div style={{ display: 'flex', flexDirection: 'column', gap: PROJECT_GAP }}>
                 {deliveryData.map((d) => {
+                  const h = projectHeights[d.projectId] || MIN_CARD_H;
                   const progress = d.totalBatches > 0
                     ? Math.round((d.completedBatches / d.totalBatches) * 100)
                     : 0;
@@ -525,7 +697,7 @@ export default function DashboardPage() {
                       key={d.projectId}
                       data-delivery-id={d.projectId}
                       className="card p-3 overflow-hidden"
-                      style={{ height: PROJECT_CARD_H }}
+                      style={{ height: h }}
                     >
                       <div className="text-xs font-semibold text-ink-50 truncate">{d.projectNumber}</div>
                       <div className="text-[10px] text-ink-200 mt-0.5 truncate">{d.projectName}</div>
@@ -581,6 +753,15 @@ export default function DashboardPage() {
           message={confirmAction.message}
           onConfirm={confirmAction.onConfirm}
           onCancel={() => setConfirmAction(null)}
+        />
+      )}
+
+      {/* Edit project modal */}
+      {editProject && (
+        <EditProjectModal
+          project={editProject}
+          onSave={handleEditProjectSave}
+          onCancel={() => setEditProject(null)}
         />
       )}
     </>

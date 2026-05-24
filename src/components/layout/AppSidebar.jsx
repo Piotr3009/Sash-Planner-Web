@@ -107,7 +107,10 @@ export default function AppSidebar() {
           )}
         </NavLink>
 
-        {/* Materials (expandable) */}
+        {/* ─── Separator ─── */}
+        <div className="h-px bg-surface-500/50 my-2 mx-2" />
+
+        {/* Materials (expandable) — Production Materials + Ironmongery */}
         <button
           onClick={() => setMaterialsOpen(!materialsOpen)}
           className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] mb-0.5 transition-colors text-ink-200 hover:bg-surface-700 hover:text-ink-50 w-full text-left"
@@ -132,44 +135,8 @@ export default function AppSidebar() {
                 }`
               }
             >
-              Catalog
+              Production Materials
             </NavLink>
-            <button
-              onClick={() => setAssignmentsOpen(!assignmentsOpen)}
-              className="flex items-center gap-1 w-full px-3 py-1.5 rounded-md text-[12px] mb-0.5 transition-colors text-ink-300 hover:bg-surface-700/60 hover:text-ink-100"
-            >
-              <span className="flex-1 text-left">Assignments</span>
-              <svg className={`w-3 h-3 text-ink-400 transition-transform ${assignmentsOpen ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 18l6-6-6-6" />
-              </svg>
-            </button>
-            {assignmentsOpen && (
-              <div className="pl-3 mb-1 ml-2 border-l border-surface-500/50">
-                <NavLink to="/materials/assignments/sash"
-                  className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
-                  Sash windows
-                </NavLink>
-                <NavLink to="/materials/assignments/casement"
-                  className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
-                  Casement
-                </NavLink>
-                <NavLink to="/materials/assignments/fix-frame"
-                  className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
-                  Fix frame
-                </NavLink>
-                <NavLink to="/materials/assignments/doors"
-                  className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
-                  Doors
-                </NavLink>
-                <NavLink to="/materials/assignments/other"
-                  className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
-                  Other
-                </NavLink>
-                <div className="px-3 py-1 text-[11px] text-ink-400/50 cursor-default">
-                  + Add new
-                </div>
-              </div>
-            )}
             <NavLink
               to="/ironmongery"
               className={({ isActive }) =>
@@ -180,6 +147,62 @@ export default function AppSidebar() {
             >
               Ironmongery
             </NavLink>
+            <NavLink
+              to="/categories"
+              className={({ isActive }) =>
+                `block px-3 py-1.5 rounded-md text-[12px] mb-0.5 transition-colors ${
+                  isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'
+                }`
+              }
+            >
+              Manage Categories
+            </NavLink>
+          </div>
+        )}
+
+        {/* Assign Materials — top-level with own icon */}
+        <button
+          onClick={() => setAssignmentsOpen(!assignmentsOpen)}
+          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] mb-0.5 transition-colors text-ink-200 hover:bg-surface-700 hover:text-ink-50 w-full text-left"
+        >
+          <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+            <rect x="9" y="3" width="6" height="4" rx="1" />
+            <path d="M9 14l2 2 4-4" />
+          </svg>
+          <span className="flex-1">Assign Materials</span>
+          <svg className={`w-3.5 h-3.5 text-ink-400 transition-transform ${assignmentsOpen ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        </button>
+
+        {assignmentsOpen && (
+          <div className="pl-4 mb-1">
+            <div className="pl-3 ml-2 border-l border-surface-500/50">
+              <NavLink to="/materials/assignments/sash"
+                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                Sash windows
+              </NavLink>
+              <NavLink to="/materials/assignments/casement"
+                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                Casement
+              </NavLink>
+              <NavLink to="/materials/assignments/fix-frame"
+                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                Fix frame
+              </NavLink>
+              <NavLink to="/materials/assignments/doors"
+                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                Doors
+              </NavLink>
+              <NavLink to="/materials/assignments/other"
+                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                Other
+              </NavLink>
+              <div className="px-3 py-1 text-[11px] text-ink-400/50 cursor-default">
+                + Add new
+              </div>
+            </div>
           </div>
         )}
       </nav>
