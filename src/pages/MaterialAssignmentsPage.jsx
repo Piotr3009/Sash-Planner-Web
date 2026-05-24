@@ -12,7 +12,7 @@ const TYPE_LABELS = {
 };
 
 // ─── Part Row ───
-function PartRow({ part, assignment, materials, categories, subcategoriesByCategory, onAssign, onFilter, onYieldChange, onRemove }) {
+function PartRow({ part, assignment, materials, categories, subcategoriesByCategory, onAssign, onFilter, onYieldChange, onRemove, disabled }) {
   const selCat = assignment?.category || '';
   const selSub = assignment?.subcategory || '';
 
@@ -60,6 +60,7 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
         <select
           className="input text-[11px] w-full"
           value={selCat}
+          disabled={disabled}
           onChange={(e) => {
             onFilter(part.id, e.target.value, '');
             // Clear material if category changed
@@ -82,7 +83,7 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
             onFilter(part.id, selCat, e.target.value);
             if (assignment?.material_id) onRemove(part.id);
           }}
-          disabled={!selCat}
+          disabled={disabled || !selCat}
         >
           <option value="">All</option>
           {subcategories.map((s) => (
@@ -96,6 +97,7 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
         <select
           className="input text-xs w-full"
           value={assignment?.material_id || ''}
+          disabled={disabled}
           onChange={(e) => {
             if (e.target.value) {
               onAssign(part.id, e.target.value, assignment?.yield || 1.0, selCat, selSub);
@@ -134,7 +136,7 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
             const val = parseFloat(e.target.value);
             if (!isNaN(val) && val > 0) onYieldChange(part.id, val);
           }}
-          disabled={!assignment?.material_id}
+          disabled={disabled || !assignment?.material_id}
         />
       </td>
 
@@ -151,7 +153,7 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
 }
 
 // ─── Part Group Section ───
-function PartGroupSection({ title, subtitle, parts, assignments, materials, categories, subcategoriesByCategory, onAssign, onFilter, onYieldChange, onRemove }) {
+function PartGroupSection({ title, subtitle, parts, assignments, materials, categories, subcategoriesByCategory, onAssign, onFilter, onYieldChange, onRemove, disabled }) {
   return (
     <div className="mb-6">
       <div className="flex items-center gap-3 mb-3">
@@ -187,6 +189,7 @@ function PartGroupSection({ title, subtitle, parts, assignments, materials, cate
                   onFilter={onFilter}
                   onYieldChange={onYieldChange}
                   onRemove={onRemove}
+                  disabled={disabled}
                 />
               ))}
             </tbody>
@@ -212,6 +215,8 @@ export default function MaterialAssignmentsPage() {
   const clearAll = useMaterialAssignmentStore((s) => s.clearAll);
 
   const [confirmClear, setConfirmClear] = useState(false);
+  const [locked, setLocked] = useState(true);
+  const [confirmUnlock, setConfirmUnlock] = useState(false);
 
   // Dynamic categories from all materials
   const categories = useMemo(() => {
@@ -288,13 +293,30 @@ export default function MaterialAssignmentsPage() {
                 />
               </div>
             </div>
-            <button
-              onClick={() => setConfirmClear(true)}
-              className="text-xs px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25 transition-colors"
-              disabled={assignedCount === 0}
-            >
-              Clear all
-            </button>
+            {!locked && (
+              <button
+                onClick={() => setConfirmClear(true)}
+                className="text-xs px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25 transition-colors"
+                disabled={assignedCount === 0}
+              >
+                Clear all
+              </button>
+            )}
+            {locked ? (
+              <button
+                onClick={() => setConfirmUnlock(true)}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-surface-600 text-ink-300 border border-surface-500 hover:bg-surface-500 transition-colors"
+              >
+                🔒 Locked
+              </button>
+            ) : (
+              <button
+                onClick={() => setLocked(true)}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-colors"
+              >
+                🔓 Editing
+              </button>
+            )}
           </div>
         </div>
 
@@ -320,6 +342,7 @@ export default function MaterialAssignmentsPage() {
           onFilter={setFilter}
           onYieldChange={setYield}
           onRemove={removeAssignment}
+          disabled={locked}
         />
 
         {/* Sash */}
@@ -335,6 +358,7 @@ export default function MaterialAssignmentsPage() {
           onFilter={setFilter}
           onYieldChange={setYield}
           onRemove={removeAssignment}
+          disabled={locked}
         />
 
         {/* Beading */}
@@ -350,6 +374,7 @@ export default function MaterialAssignmentsPage() {
           onFilter={setFilter}
           onYieldChange={setYield}
           onRemove={removeAssignment}
+          disabled={locked}
         />
 
         {/* Glass */}
@@ -365,6 +390,7 @@ export default function MaterialAssignmentsPage() {
           onFilter={setFilter}
           onYieldChange={setYield}
           onRemove={removeAssignment}
+          disabled={locked}
         />
 
         {/* Paint */}
@@ -380,6 +406,7 @@ export default function MaterialAssignmentsPage() {
           onFilter={setFilter}
           onYieldChange={setYield}
           onRemove={removeAssignment}
+          disabled={locked}
         />
 
         {/* Consumables */}
@@ -395,6 +422,7 @@ export default function MaterialAssignmentsPage() {
           onFilter={setFilter}
           onYieldChange={setYield}
           onRemove={removeAssignment}
+          disabled={locked}
         />
 
         {/* Legend */}
@@ -415,6 +443,21 @@ export default function MaterialAssignmentsPage() {
             <div className="flex gap-2 justify-end">
               <button onClick={() => setConfirmClear(false)} className="btn btn-secondary text-xs px-4">Cancel</button>
               <button onClick={() => { clearAll(); setConfirmClear(false); }} className="text-xs px-4 py-1.5 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors">Clear all</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm unlock modal */}
+      {confirmUnlock && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setConfirmUnlock(false)}>
+          <div className="absolute inset-0 bg-black/60" />
+          <div className="relative bg-surface-800 border border-surface-500 rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="text-sm font-semibold text-ink-50 mb-2">Unlock material assignments?</div>
+            <div className="text-xs text-ink-300 mb-4">Changes to assignments will affect all BOM calculations across projects. Make sure you know what you are doing.</div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmUnlock(false)} className="btn btn-secondary text-xs px-4">Cancel</button>
+              <button onClick={() => { setLocked(false); setConfirmUnlock(false); }} className="text-xs px-4 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 transition-colors">Unlock</button>
             </div>
           </div>
         </div>
