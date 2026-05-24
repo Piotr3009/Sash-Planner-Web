@@ -941,7 +941,7 @@ function PreCutTab({ merged, settings }) {
                                     const winName = typeof detail === 'number' ? '' : (detail.windowName || '');
                                     const projNum = typeof detail === 'number' ? '' : (detail.projectNumber || '');
                                     const sym = elName ? getPartSymbol(elName) : null;
-                                    const label = sym ? `${sym.symbol}${projNum ? '-' + projNum : ''}${winName ? '-' + winName : ''}` : '';
+                                    const label = sym ? `${projNum ? projNum + '-' : ''}${winName ? winName + '-' : ''}${sym.symbol}` : '';
                                     const left = (cursor / barStock) * 100;
                                     const width = (cutLen / barStock) * 100;
                                     cursor += cutLen + (settings?.kerf || 3);
