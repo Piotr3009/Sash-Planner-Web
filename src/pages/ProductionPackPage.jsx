@@ -131,6 +131,9 @@ export default function ProductionPackPage() {
     const allBeading = [];
     const allWeights = [];
     let totalPaint = { areaSqm: 0, primer: 0, topcoat: 0 };
+    let totalConsumables = { glassSqm: 0, cordM: 0, clips: 0, spacer1mm: 0, spacer2mm: 0, beadTapeM: 0, siliconeTubes: 0 };
+    let glassType = 'double';
+    let clipSize = '24mm';
 
     windowsData.forEach(({ win, windowSpec, derived }) => {
       if (!derived || !windowSpec) return;
@@ -177,6 +180,20 @@ export default function ProductionPackPage() {
         totalPaint.primer += derived.paint.primer;
         totalPaint.topcoat += derived.paint.topcoat;
       }
+
+      // Consumables
+      if (derived.consumables) {
+        const c = derived.consumables;
+        totalConsumables.glassSqm += c.glass.sqm;
+        totalConsumables.cordM += c.cord.meters;
+        totalConsumables.clips += c.clips.qty;
+        totalConsumables.spacer1mm += c.spacer1mm.qty;
+        totalConsumables.spacer2mm += c.spacer2mm.qty;
+        totalConsumables.beadTapeM += c.beadTape.meters;
+        totalConsumables.siliconeTubes += c.silicone.tubes;
+        glassType = c.glass.type;
+        clipSize = c.clips.size;
+      }
     });
 
     // Optimization
@@ -187,7 +204,7 @@ export default function ProductionPackPage() {
       console.warn('Optimizer failed:', e);
     }
 
-    return { cutList: allCut, precut: allPrecut, glass: allGlass, hardware: allHardware, beading: allBeading, weights: allWeights, paint: totalPaint, optimization };
+    return { cutList: allCut, precut: allPrecut, glass: allGlass, hardware: allHardware, beading: allBeading, weights: allWeights, paint: totalPaint, consumables: { ...totalConsumables, glassType, clipSize }, optimization };
   }, [windowsData, settings]);
 
   // ─── Render ───
@@ -871,18 +888,27 @@ function BOMTab({ merged, batch, pp, isPPMode, windowsData }) {
         </div>
       )}
 
-      {/* Consumables */}
-      <div className="card p-4">
-        <div className="text-sm font-semibold text-ink-50 mb-3">Consumables (estimated)</div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-ink-400">
-          <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Glazing putty</span><span className="text-ink-200">{windowsData.length} sets</span></div>
-          <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Weather stripping</span><span className="text-ink-200">{windowsData.length} sets</span></div>
-          <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Staff beads</span><span className="text-ink-200">{windowsData.length} sets</span></div>
-          <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Parting beads</span><span className="text-ink-200">{windowsData.length} sets</span></div>
-          <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Screws / Fixings</span><span className="text-ink-200">As needed</span></div>
-          <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Adhesive / Glue</span><span className="text-ink-200">As needed</span></div>
+      {/* Glazing & Consumables */}
+      {merged.consumables && (
+        <div className="card overflow-hidden">
+          <div className="px-4 py-3 border-b border-surface-500">
+            <div className="text-sm font-semibold text-ink-50">Glazing & Consumables</div>
+          </div>
+          <div className="p-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-ink-400">
+              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Glass ({merged.consumables.glassType})</span><span className="text-ink-200">{merged.consumables.glassSqm.toFixed(2)} m²</span></div>
+              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Cord</span><span className="text-ink-200">{merged.consumables.cordM.toFixed(2)} m</span></div>
+              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Glazing Clips ({merged.consumables.clipSize})</span><span className="text-ink-200">{merged.consumables.clips} pcs</span></div>
+              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Glazing Packer 1mm</span><span className="text-ink-200">{merged.consumables.spacer1mm} pcs</span></div>
+              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Glazing Packer 2mm</span><span className="text-ink-200">{merged.consumables.spacer2mm} pcs</span></div>
+              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Georgian Bar/Bead Tape</span><span className="text-ink-200">{merged.consumables.beadTapeM.toFixed(2)} m</span></div>
+              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Silicone</span><span className="text-ink-200">{merged.consumables.siliconeTubes.toFixed(1)} tubes</span></div>
+              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Weather stripping</span><span className="text-ink-200">{windowsData.length} sets</span></div>
+              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Screws / Fixings</span><span className="text-ink-200">As needed</span></div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="p-3 bg-accent-500/10 border border-accent-500/20 rounded-lg text-xs text-accent-400">
         Full BOM with pricing — coming with Materials database integration.

@@ -329,6 +329,50 @@ function calculatePaint(frameWidth, frameHeight) {
     };
 }
 
+function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight) {
+    const glassW = sashWidth - 2 * CONSTANTS.STILE_WIDTH;
+    const glassH = topSashHeight - CONSTANTS.TOP_RAIL_WIDTH - CONSTANTS.MEETING_RAIL_WIDTH;
+    const glassType = windowSpec.glazing?.type || 'double';
+
+    const gridMode = windowSpec.sash?.grid?.mode || 'none';
+    const pattern = BEADING_BAR_PATTERNS[gridMode] || BEADING_BAR_PATTERNS['none'];
+    const barPerSash = (pattern.v * glassH) + (pattern.h * glassW);
+    const perimPerSash = 2 * (glassW + glassH);
+
+    // Glass area (m²)
+    const glassSqm = round((glassW * glassH) / 1_000_000 * 2);
+
+    // Cord — 3× frame height in meters
+    const cordM = round((3 * frameHeight) / 1000);
+
+    // Glazing clips — 20 per window (size depends on glass type)
+    const clipSize = glassType === 'triple' ? '28mm' : '24mm';
+    const clipQty = 20;
+
+    // Spacer 1mm — 20 per window
+    const spacer1mmQty = 20;
+
+    // Spacer 2mm — 4 per window
+    const spacer2mmQty = 4;
+
+    // Bead tape — (perim × 2 + bars × 4) × 2 sashes, NO off-cut
+    const beadTapeM = round(((perimPerSash * 2) + (barPerSash * 4)) * 2 / 1000);
+
+    // Silicone — 0.1 tube per meter of (perim + bars) × 2 sashes
+    const siliconeMeters = ((perimPerSash + barPerSash) * 2) / 1000;
+    const siliconeTubes = round(0.1 * siliconeMeters);
+
+    return {
+        glass: { type: glassType, sqm: glassSqm },
+        cord: { meters: cordM },
+        clips: { size: clipSize, qty: clipQty },
+        spacer1mm: { qty: spacer1mmQty },
+        spacer2mm: { qty: spacer2mmQty },
+        beadTape: { meters: beadTapeM },
+        silicone: { tubes: siliconeTubes },
+    };
+}
+
 const BEADING_BAR_PATTERNS = {
     'none': { v: 0, h: 0 }, '2x2': { v: 1, h: 0 }, '3x3': { v: 2, h: 0 },
     '4x4': { v: 1, h: 1 }, '6x6': { v: 2, h: 1 }, '9x9': { v: 2, h: 2 },
@@ -411,6 +455,7 @@ export function deriveWindowData(windowSpec, settings = {}) {
 
     const weights = calculateWeights(windowSpec, sashWidth, topSashHeight, bottomSashHeight);
     const paint = calculatePaint(frameWidth, frameHeight);
+    const consumables = calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight);
 
     return {
         sashWidth,
@@ -423,6 +468,7 @@ export function deriveWindowData(windowSpec, settings = {}) {
         barPositions,
         weights,
         paint,
+        consumables,
     };
 }
 

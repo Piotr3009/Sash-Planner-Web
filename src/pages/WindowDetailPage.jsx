@@ -258,16 +258,33 @@ function BOMPanel({ item, windowSpec, derived }) {
           </div>
         )}
 
+        {/* Glazing & Consumables */}
+        {(() => {
+          const c = derived?.consumables;
+          if (!c) return null;
+          return (
+            <div className="bg-surface-600 rounded-lg border border-surface-500 p-4">
+              <div className="text-xs font-medium text-ink-200 mb-2">Glazing & Consumables</div>
+              <div className="space-y-1 text-xs text-ink-400">
+                <div className="flex justify-between"><span>Glass ({c.glass.type})</span><span className="text-ink-200">{c.glass.sqm} m²</span></div>
+                <div className="flex justify-between"><span>Cord</span><span className="text-ink-200">{c.cord.meters} m</span></div>
+                <div className="flex justify-between"><span>Glazing Clips ({c.clips.size})</span><span className="text-ink-200">{c.clips.qty} pcs</span></div>
+                <div className="flex justify-between"><span>Glazing Packer 1mm</span><span className="text-ink-200">{c.spacer1mm.qty} pcs</span></div>
+                <div className="flex justify-between"><span>Glazing Packer 2mm</span><span className="text-ink-200">{c.spacer2mm.qty} pcs</span></div>
+                <div className="flex justify-between"><span>Georgian Bar/Bead Tape</span><span className="text-ink-200">{c.beadTape.meters} m</span></div>
+                <div className="flex justify-between"><span>Silicone</span><span className="text-ink-200">{c.silicone.tubes} tubes</span></div>
+              </div>
+            </div>
+          );
+        })()}
+
         <div className="bg-surface-600 rounded-lg border border-surface-500 p-4">
-          <div className="text-xs font-medium text-ink-200 mb-2">Hardware & Consumables</div>
+          <div className="text-xs font-medium text-ink-200 mb-2">Hardware</div>
           <div className="space-y-1 text-xs text-ink-400">
-            <div className="flex justify-between"><span>Sash weights</span><span>2 pcs</span></div>
-            <div className="flex justify-between"><span>Sash cords</span><span>2 pcs</span></div>
-            <div className="flex justify-between"><span>Pulleys</span><span>2 pcs</span></div>
             <div className="flex justify-between"><span>Sash lock ({windowSpec?.hardware.finish})</span><span>1 pc</span></div>
             <div className="flex justify-between"><span>Sash lifts ({windowSpec?.hardware.finish})</span><span>2 pcs</span></div>
+            <div className="flex justify-between"><span>Pulleys</span><span>4 pcs</span></div>
             <div className="flex justify-between"><span>Weather stripping</span><span>Set</span></div>
-            <div className="flex justify-between"><span>Glazing putty</span><span>As needed</span></div>
           </div>
         </div>
       </div>
