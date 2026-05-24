@@ -106,7 +106,7 @@ export default function BatchDefaultsPage() {
           {/* 6. IRONMONGERY (last) */}
           <Sec title="Ironmongery Finish">
             <HChips o={IRON_FINISHES} v={d.ironmongery} c={v => upd('ironmongery', v)} />
-            <button onClick={() => alert('Ironmongery database — coming soon')}
+            <button onClick={() => navigate('/ironmongery')}
               className="w-full mt-2 px-4 py-3 border-2 border-dashed border-surface-500 rounded-lg text-xs text-ink-400 hover:border-accent-500/40 hover:text-accent-400 transition-colors text-center">
               🔧 Browse ironmongery database →
             </button>
