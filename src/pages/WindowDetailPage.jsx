@@ -220,8 +220,10 @@ function GlassPanel({ windowSpec, derived }) {
   );
 }
 
-// ─── BOM Panel (placeholder) ───
+// ─── BOM Panel ───
 function BOMPanel({ item, windowSpec, derived }) {
+  const w = derived?.weights;
+  const p = derived?.paint;
   return (
     <div className="card p-5">
       <div className="text-sm font-semibold text-ink-50 mb-4">Bill of Materials</div>
@@ -229,6 +231,33 @@ function BOMPanel({ item, windowSpec, derived }) {
         <BOMGroup title="Timber" items={derived?.components?.box || []} />
         <BOMGroup title="Sash Components" items={derived?.components?.sash || []} />
         <BOMGroup title="Beading" items={derived?.components?.beading || []} unit="m" />
+
+        {/* Weights */}
+        {w && (
+          <div className="bg-surface-600 rounded-lg border border-surface-500 p-4">
+            <div className="text-xs font-medium text-ink-200 mb-2">Weights</div>
+            <div className="space-y-1 text-xs text-ink-400">
+              <div className="flex justify-between"><span>Timber (both sashes)</span><span className="text-ink-200">{w.timber} kg</span></div>
+              <div className="flex justify-between"><span>Glass ({w.glassType}, {w.kgPerSqm} kg/m²)</span><span className="text-ink-200">{w.glass} kg</span></div>
+              <div className="flex justify-between border-t border-surface-500/50 pt-1 mt-1">
+                <span className="text-ink-100 font-medium">Total (+5%)</span>
+                <span className="text-ink-100 font-semibold">{w.total} kg</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Paint */}
+        {p && (
+          <div className="bg-surface-600 rounded-lg border border-surface-500 p-4">
+            <div className="text-xs font-medium text-ink-200 mb-2">Paint — {p.areaSqm} m²</div>
+            <div className="space-y-1 text-xs text-ink-400">
+              <div className="flex justify-between"><span>Primer</span><span className="text-ink-200">{p.primer} L</span></div>
+              <div className="flex justify-between"><span>Topcoat (White 9016 or Bespoke)</span><span className="text-ink-200">{p.topcoat} L</span></div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-surface-600 rounded-lg border border-surface-500 p-4">
           <div className="text-xs font-medium text-ink-200 mb-2">Hardware & Consumables</div>
           <div className="space-y-1 text-xs text-ink-400">
@@ -237,8 +266,6 @@ function BOMPanel({ item, windowSpec, derived }) {
             <div className="flex justify-between"><span>Pulleys</span><span>2 pcs</span></div>
             <div className="flex justify-between"><span>Sash lock ({windowSpec?.hardware.finish})</span><span>1 pc</span></div>
             <div className="flex justify-between"><span>Sash lifts ({windowSpec?.hardware.finish})</span><span>2 pcs</span></div>
-            <div className="flex justify-between"><span>Staff beads</span><span>Set</span></div>
-            <div className="flex justify-between"><span>Parting beads</span><span>Set</span></div>
             <div className="flex justify-between"><span>Weather stripping</span><span>Set</span></div>
             <div className="flex justify-between"><span>Glazing putty</span><span>As needed</span></div>
           </div>

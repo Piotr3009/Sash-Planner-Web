@@ -129,6 +129,8 @@ export default function ProductionPackPage() {
     const allGlass = [];
     const allHardware = [];
     const allBeading = [];
+    const allWeights = [];
+    let totalPaint = { areaSqm: 0, primer: 0, topcoat: 0 };
 
     windowsData.forEach(({ win, windowSpec, derived }) => {
       if (!derived || !windowSpec) return;
@@ -163,6 +165,18 @@ export default function ProductionPackPage() {
       if (derived.components?.beading) {
         allBeading.push(...derived.components.beading.map((b) => ({ ...b, windowName: win.name, _projectNumber: win._projectNumber })));
       }
+
+      // Weights
+      if (derived.weights) {
+        allWeights.push({ ...derived.weights, windowName: win.name, _projectNumber: win._projectNumber });
+      }
+
+      // Paint
+      if (derived.paint) {
+        totalPaint.areaSqm += derived.paint.areaSqm;
+        totalPaint.primer += derived.paint.primer;
+        totalPaint.topcoat += derived.paint.topcoat;
+      }
     });
 
     // Optimization
@@ -173,7 +187,7 @@ export default function ProductionPackPage() {
       console.warn('Optimizer failed:', e);
     }
 
-    return { cutList: allCut, precut: allPrecut, glass: allGlass, hardware: allHardware, beading: allBeading, optimization };
+    return { cutList: allCut, precut: allPrecut, glass: allGlass, hardware: allHardware, beading: allBeading, weights: allWeights, paint: totalPaint, optimization };
   }, [windowsData, settings]);
 
   // ─── Render ───
@@ -800,6 +814,59 @@ function BOMTab({ merged, batch, pp, isPPMode, windowsData }) {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Weights */}
+      {merged.weights && merged.weights.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="px-4 py-3 border-b border-surface-500">
+            <div className="text-sm font-semibold text-ink-50">Weights — per window</div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-surface-500 bg-surface-700/50">
+                  {isPPMode && <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Project</th>}
+                  <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Window</th>
+                  <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Timber (kg)</th>
+                  <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Glass (kg)</th>
+                  <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Total +5% (kg)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {merged.weights.map((w, i) => (
+                  <tr key={i} className="border-b border-surface-500/50">
+                    {isPPMode && <td className="px-4 py-2.5 text-accent-400 text-[10px]">{w._projectNumber}</td>}
+                    <td className="px-4 py-2.5 text-ink-100">{w.windowName}</td>
+                    <td className="px-4 py-2.5 text-right text-ink-200">{w.timber}</td>
+                    <td className="px-4 py-2.5 text-right text-ink-200">{w.glass}</td>
+                    <td className="px-4 py-2.5 text-right text-ink-100 font-semibold">{w.total}</td>
+                  </tr>
+                ))}
+                <tr className="bg-surface-700/30">
+                  {isPPMode && <td />}
+                  <td className="px-4 py-2.5 text-ink-100 font-medium">Total</td>
+                  <td className="px-4 py-2.5 text-right text-ink-200">{merged.weights.reduce((s, w) => s + w.timber, 0).toFixed(2)}</td>
+                  <td className="px-4 py-2.5 text-right text-ink-200">{merged.weights.reduce((s, w) => s + w.glass, 0).toFixed(2)}</td>
+                  <td className="px-4 py-2.5 text-right text-ink-100 font-semibold">{merged.weights.reduce((s, w) => s + w.total, 0).toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Paint */}
+      {merged.paint && merged.paint.areaSqm > 0 && (
+        <div className="card overflow-hidden">
+          <div className="px-4 py-3 border-b border-surface-500">
+            <div className="text-sm font-semibold text-ink-50">Paint — {merged.paint.areaSqm.toFixed(2)} m² total</div>
+          </div>
+          <div className="p-4 space-y-1 text-xs text-ink-300">
+            <div className="flex justify-between"><span>Primer</span><span className="text-ink-100 font-semibold">{merged.paint.primer.toFixed(2)} L</span></div>
+            <div className="flex justify-between"><span>Topcoat (White 9016 or Bespoke)</span><span className="text-ink-100 font-semibold">{merged.paint.topcoat.toFixed(2)} L</span></div>
           </div>
         </div>
       )}

@@ -270,6 +270,65 @@ function calculateGlazingSummaryForWindow(windowSpec, sashWidth, sashHeight, set
 
 const OFFCUT_FACTOR = 1.15; // 15% waste for off-cuts
 
+// ─── Weight constants ───
+const KG_PER_METER = {
+    '57x57': 2.0,   // stiles, top rail
+    '57x90': 3.1,   // bottom rail
+    '57x43': 1.5,   // meeting rails
+};
+
+const GLASS_KG_PER_SQM = {
+    'double': 21,
+    'triple': 33,
+    'single': 10,    // single heritage
+    'passive': 18,   // vacuum
+};
+
+function calculateWeights(windowSpec, sashWidth, topSashHeight, bottomSashHeight) {
+    const sw = sashWidth / 1000; // to meters
+
+    // Upper sash: 2× stiles (57×57) + top rail (57×57) + meeting rail (57×43)
+    const upperTimber =
+        2 * (topSashHeight / 1000) * KG_PER_METER['57x57'] +
+        sw * KG_PER_METER['57x57'] +
+        sw * KG_PER_METER['57x43'];
+
+    // Lower sash: 2× stiles (57×57) + bottom rail (57×90) + meeting rail (57×43)
+    const lowerTimber =
+        2 * (bottomSashHeight / 1000) * KG_PER_METER['57x57'] +
+        sw * KG_PER_METER['57x90'] +
+        sw * KG_PER_METER['57x43'];
+
+    // Glass — both sashes (glassH identical for upper & lower)
+    const glassW = sashWidth - 2 * CONSTANTS.STILE_WIDTH;
+    const glassH = topSashHeight - CONSTANTS.TOP_RAIL_WIDTH - CONSTANTS.MEETING_RAIL_WIDTH;
+    const glassType = windowSpec.glazing?.type || 'double';
+    const kgPerSqm = GLASS_KG_PER_SQM[glassType] || GLASS_KG_PER_SQM['double'];
+    const glassSqmPerSash = (glassW * glassH) / 1_000_000;
+    const glassTotal = glassSqmPerSash * kgPerSqm * 2;
+
+    const subtotal = upperTimber + lowerTimber + glassTotal;
+    const total = round(subtotal * 1.05); // +5% silicone, clips, etc.
+
+    return {
+        timber: round(upperTimber + lowerTimber),
+        glass: round(glassTotal),
+        total,
+        glassType,
+        kgPerSqm,
+    };
+}
+
+function calculatePaint(frameWidth, frameHeight) {
+    const areaSqm = round((frameWidth * frameHeight) / 1_000_000);
+    // Per 1.5 m²: 2L primer + 1L topcoat
+    return {
+        areaSqm,
+        primer: round((areaSqm / 1.5) * 2),
+        topcoat: round((areaSqm / 1.5) * 1),
+    };
+}
+
 const BEADING_BAR_PATTERNS = {
     'none': { v: 0, h: 0 }, '2x2': { v: 1, h: 0 }, '3x3': { v: 2, h: 0 },
     '4x4': { v: 1, h: 1 }, '6x6': { v: 2, h: 1 }, '9x9': { v: 2, h: 2 },
@@ -350,6 +409,9 @@ export function deriveWindowData(windowSpec, settings = {}) {
         windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight
     );
 
+    const weights = calculateWeights(windowSpec, sashWidth, topSashHeight, bottomSashHeight);
+    const paint = calculatePaint(frameWidth, frameHeight);
+
     return {
         sashWidth,
         sashHeight,
@@ -359,6 +421,8 @@ export function deriveWindowData(windowSpec, settings = {}) {
         components: { sash: sashComponents, box: boxComponents, beading: beadingComponents },
         glazingItems: [glazingSummary],
         barPositions,
+        weights,
+        paint,
     };
 }
 
