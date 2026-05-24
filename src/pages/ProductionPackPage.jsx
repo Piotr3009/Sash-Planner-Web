@@ -11,6 +11,8 @@
 import { useState, useMemo, useEffect, Suspense } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useProjectStore, BATCH_STATUSES } from '../stores/projectStore.js';
+import { useMaterialAssignmentStore } from '../stores/materialAssignmentStore.js';
+import { useMaterialStore } from '../stores/materialStore.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
 import {
@@ -778,6 +780,24 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp }) {
 // TAB: Pre-Cut List — grouped by section, BLO with offcuts
 // ═══════════════════════════════════════════════════════════════
 function PreCutTab({ merged, settings }) {
+  // Material assignment lookup
+  const assignments = useMaterialAssignmentStore((s) => s.assignments);
+  const getMaterialById = useMaterialStore((s) => s.getMaterialById);
+
+  // Resolve material name for a group by checking assignments of its items
+  const getMaterialForGroup = (items) => {
+    for (const item of items) {
+      const sym = getPartSymbol(item.elementName);
+      if (sym?.partId) {
+        const assignment = assignments[sym.partId];
+        if (assignment?.material_id) {
+          const mat = getMaterialById(assignment.material_id);
+          if (mat) return mat.name;
+        }
+      }
+    }
+    return null;
+  };
   // Local state for editable stock lengths and offcuts per group
   const [stockLengths, setStockLengths] = useState({});
   const [offcutsMap, setOffcutsMap] = useState({}); // key → [length, length, ...]
@@ -882,6 +902,14 @@ function PreCutTab({ merged, settings }) {
                 <path d="M9 18l6-6-6-6" />
               </svg>
               <div className="text-sm font-semibold text-ink-50">{group.label}</div>
+              {(() => {
+                const matName = getMaterialForGroup(group.items);
+                return matName ? (
+                  <span className="text-[10px] text-accent-400 bg-accent-500/10 px-2 py-0.5 rounded">{matName}</span>
+                ) : (
+                  <span className="text-[10px] text-ink-400/50 italic">No material assigned</span>
+                );
+              })()}
               <div className="ml-auto flex items-center gap-3">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] text-ink-400">Stock:</span>
@@ -1020,6 +1048,22 @@ function PreCutTab({ merged, settings }) {
 // TAB: Cut List — grouped by element, symbols, mirror, sorted
 // ═══════════════════════════════════════════════════════════════
 function CutListTab({ merged, isPPMode }) {
+  // Material assignment lookup
+  const assignments = useMaterialAssignmentStore((s) => s.assignments);
+  const getMaterialById = useMaterialStore((s) => s.getMaterialById);
+
+  const getMaterialForElement = (elementName) => {
+    const sym = getPartSymbol(elementName);
+    if (sym?.partId) {
+      const assignment = assignments[sym.partId];
+      if (assignment?.material_id) {
+        const mat = getMaterialById(assignment.material_id);
+        if (mat) return mat.name;
+      }
+    }
+    return null;
+  };
+
   const [elementImages, setElementImages] = useState(() => {
     try { return JSON.parse(localStorage.getItem('pc-element-images') || '{}'); } catch { return {}; }
   });
@@ -1139,6 +1183,10 @@ function CutListTab({ merged, isPPMode }) {
                 </div>
                 <div className="text-[10px] text-ink-400 mt-0.5">
                   Section: {finishedSection} · {group.aggregated.reduce((s, a) => s + a.totalQty, 0)} pcs
+                  {(() => {
+                    const matName = getMaterialForElement(group.element);
+                    return matName ? <span className="ml-2 text-accent-400">· {matName}</span> : null;
+                  })()}
                 </div>
               </div>
             </div>

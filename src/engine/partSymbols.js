@@ -8,32 +8,32 @@
 
 export const PART_SYMBOLS = {
   // Box
-  head:            { symbol: 'HEAD', name: 'Head',                  group: 'box',  mirror: false },
-  jambs:           { symbol: 'JAMB', name: 'Jambs',                 group: 'box',  mirror: true  },
-  cill:            { symbol: 'CILL', name: 'Cill',                  group: 'box',  mirror: false },
-  cill_nose:       { symbol: 'CNOS', name: 'Cill Nose',             group: 'box',  mirror: false },
-  cill_extension:  { symbol: 'CEXT', name: 'Cill Extension',        group: 'box',  mirror: false },
-  ext_head_liner:  { symbol: 'EL',   name: 'External Head Liner',   group: 'box',  mirror: false },
-  int_head_liner:  { symbol: 'IL',   name: 'Internal Head Liner',   group: 'box',  mirror: false },
-  ext_jamb_liner:  { symbol: 'EL',   name: 'External Jamb Liner',   group: 'box',  mirror: true  },
-  int_jamb_liner:  { symbol: 'IL',   name: 'Internal Jamb Liner',   group: 'box',  mirror: true  },
+  head:            { partId: 'head',            symbol: 'HEAD', name: 'Head',                  group: 'box',  mirror: false },
+  jambs:           { partId: 'jambs',           symbol: 'JAMB', name: 'Jambs',                 group: 'box',  mirror: true  },
+  cill:            { partId: 'cill',            symbol: 'CILL', name: 'Cill',                  group: 'box',  mirror: false },
+  cill_nose:       { partId: 'cill_nose',       symbol: 'CNOS', name: 'Cill Nose',             group: 'box',  mirror: false },
+  cill_extension:  { partId: 'cill_extension',  symbol: 'CEXT', name: 'Cill Extension',        group: 'box',  mirror: false },
+  ext_head_liner:  { partId: 'ext_head_liner',  symbol: 'EL',   name: 'External Head Liner',   group: 'box',  mirror: false },
+  int_head_liner:  { partId: 'int_head_liner',  symbol: 'IL',   name: 'Internal Head Liner',   group: 'box',  mirror: false },
+  ext_jamb_liner:  { partId: 'ext_jamb_liner',  symbol: 'EL',   name: 'External Jamb Liner',   group: 'box',  mirror: true  },
+  int_jamb_liner:  { partId: 'int_jamb_liner',  symbol: 'IL',   name: 'Internal Jamb Liner',   group: 'box',  mirror: true  },
 
   // Sash
-  top_rail:            { symbol: 'TR',  name: 'Top Rail',             group: 'sash', mirror: false },
-  bottom_rail:         { symbol: 'BR',  name: 'Bottom Rail',          group: 'sash', mirror: false },
-  top_meet_rail:       { symbol: 'TMR', name: 'Top Meeting Rail',     group: 'sash', mirror: false },
-  bottom_meet_rail:    { symbol: 'BMR', name: 'Bottom Meeting Rail',  group: 'sash', mirror: false },
-  stiles_top_sash:     { symbol: 'STS', name: 'Stiles Top Sash',     group: 'sash', mirror: true  },
-  stiles_bottom_sash:  { symbol: 'SBS', name: 'Stiles Bottom Sash',  group: 'sash', mirror: true  },
+  top_rail:            { partId: 'top_rail',            symbol: 'TR',  name: 'Top Rail',             group: 'sash', mirror: false },
+  bottom_rail:         { partId: 'bottom_rail',         symbol: 'BR',  name: 'Bottom Rail',          group: 'sash', mirror: false },
+  top_meet_rail:       { partId: 'top_meet_rail',       symbol: 'TMR', name: 'Top Meeting Rail',     group: 'sash', mirror: false },
+  bottom_meet_rail:    { partId: 'bottom_meet_rail',    symbol: 'BMR', name: 'Bottom Meeting Rail',  group: 'sash', mirror: false },
+  stiles_top_sash:     { partId: 'stiles_top_sash',     symbol: 'STS', name: 'Stiles Top Sash',     group: 'sash', mirror: true  },
+  stiles_bottom_sash:  { partId: 'stiles_bottom_sash',  symbol: 'SBS', name: 'Stiles Bottom Sash',  group: 'sash', mirror: true  },
 
   // Beading
-  glazing_bar_beading:      { symbol: 'GBB', name: 'Glazing Bar Beading',       group: 'beading', mirror: false },
-  internal_georgian_beading:{ symbol: 'IGB', name: 'Internal Georgian Beading', group: 'beading', mirror: false },
-  triangle_beading_ext:     { symbol: 'TBE', name: 'Triangle Beading Ext',      group: 'beading', mirror: false },
-  parting_beading:           { symbol: 'PB',  name: 'Parting Beading',           group: 'beading', mirror: false },
-  staff_beading:             { symbol: 'SB',  name: 'Staff Beading',            group: 'beading', mirror: false },
-  meeting_beading_a:         { symbol: 'MBA', name: 'Meeting Beading A',        group: 'beading', mirror: false },
-  meeting_beading_b:         { symbol: 'MBB', name: 'Meeting Beading B',        group: 'beading', mirror: false },
+  glazing_bar_beading:      { partId: 'glazing_bar_beading',      symbol: 'GBB', name: 'Glazing Bar Beading',       group: 'beading', mirror: false },
+  internal_georgian_beading:{ partId: 'internal_georgian_beading', symbol: 'IGB', name: 'Internal Georgian Beading', group: 'beading', mirror: false },
+  triangle_beading_ext:     { partId: 'triangle_beading_ext',     symbol: 'TBE', name: 'Triangle Beading Ext',      group: 'beading', mirror: false },
+  parting_beading:           { partId: 'parting_beading',           symbol: 'PB',  name: 'Parting Beading',           group: 'beading', mirror: false },
+  staff_beading:             { partId: 'staff_beading',             symbol: 'SB',  name: 'Staff Beading',            group: 'beading', mirror: false },
+  meeting_beading_a:         { partId: 'meeting_beading_a',         symbol: 'MBA', name: 'Meeting Beading A',        group: 'beading', mirror: false },
+  meeting_beading_b:         { partId: 'meeting_beading_b',         symbol: 'MBB', name: 'Meeting Beading B',        group: 'beading', mirror: false },
 };
 
 /**
