@@ -1,6 +1,15 @@
 import { useState, useMemo } from 'react';
+import { useParams } from 'react-router-dom';
 import { useMaterialStore } from '../stores/materialStore.js';
 import { useMaterialAssignmentStore, SASH_WINDOW_PARTS, ALL_PARTS } from '../stores/materialAssignmentStore.js';
+
+const TYPE_LABELS = {
+  sash: 'Sash Windows',
+  casement: 'Casement',
+  'fix-frame': 'Fix Frame',
+  doors: 'Doors',
+  other: 'Other',
+};
 
 // ─── Part Row ───
 function PartRow({ part, assignment, materials, categories, subcategoriesByCategory, onAssign, onFilter, onYieldChange, onRemove }) {
@@ -190,6 +199,10 @@ function PartGroupSection({ title, subtitle, parts, assignments, materials, cate
 
 // ─── Main ───
 export default function MaterialAssignmentsPage() {
+  const { typeId = 'sash' } = useParams();
+  const typeName = TYPE_LABELS[typeId] || typeId;
+  const isSash = typeId === 'sash';
+
   const materials = useMaterialStore((s) => s.materials);
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const setAssignment = useMaterialAssignmentStore((s) => s.setAssignment);
@@ -221,11 +234,31 @@ export default function MaterialAssignmentsPage() {
     return result;
   }, [materials]);
 
-  // Stats
-  const totalParts = ALL_PARTS.length;
-  const assignedCount = ALL_PARTS.filter((p) => assignments[p.id]?.material_id).length;
-  const requiredParts = ALL_PARTS.filter((p) => !p.optional);
+  // Stats — only for current type
+  const typeParts = isSash ? ALL_PARTS : [];
+  const totalParts = typeParts.length;
+  const assignedCount = typeParts.filter((p) => assignments[p.id]?.material_id).length;
+  const requiredParts = typeParts.filter((p) => !p.optional);
   const requiredAssigned = requiredParts.filter((p) => assignments[p.id]?.material_id).length;
+
+  // Coming soon for non-sash types
+  if (!isSash) {
+    return (
+      <div className="p-6">
+        <div className="mb-5">
+          <h1 className="text-lg font-semibold text-ink-50">Material Assignments — {typeName}</h1>
+          <p className="text-[10px] text-ink-400 mt-0.5">Assign materials for {typeName} parts</p>
+        </div>
+        <div className="card p-12 text-center">
+          <div className="text-3xl mb-4">🚧</div>
+          <div className="text-lg font-semibold text-ink-200 mb-2">{typeName} — coming soon</div>
+          <div className="text-sm text-ink-400 max-w-md mx-auto">
+            Parts list for {typeName} is being built. Sash Windows assignments are available now.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -233,9 +266,9 @@ export default function MaterialAssignmentsPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="text-lg font-semibold text-ink-50">Material Assignments</h1>
+            <h1 className="text-lg font-semibold text-ink-50">Material Assignments — {typeName}</h1>
             <p className="text-[10px] text-ink-400 mt-0.5">
-              Assign materials from catalog to each window part · Sash window template
+              Assign materials from catalog to each part · {typeName}
             </p>
           </div>
           <div className="flex items-center gap-3">

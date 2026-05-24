@@ -65,7 +65,8 @@ export default function App() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="materials" element={<MaterialsPage />} />
-        <Route path="materials/assignments" element={<MaterialAssignmentsPage />} />
+        <Route path="materials/assignments" element={<Navigate to="/materials/assignments/sash" replace />} />
+        <Route path="materials/assignments/:typeId" element={<MaterialAssignmentsPage />} />
         <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="projects/:projectId/batches/:batchId/windows/:windowId" element={
           <Suspense fallback={<PageLoading />}><WindowDetailPage /></Suspense>

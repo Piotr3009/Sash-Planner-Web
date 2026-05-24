@@ -11,6 +11,7 @@ export default function AppSidebar() {
   const signOut = useAuthStore((s) => s.signOut);
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
+  const [assignmentsOpen, setAssignmentsOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -137,16 +138,42 @@ export default function AppSidebar() {
             >
               Catalog
             </NavLink>
-            <NavLink
-              to="/materials/assignments"
-              className={({ isActive }) =>
-                `block px-3 py-1.5 rounded-md text-[12px] mb-0.5 transition-colors ${
-                  isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'
-                }`
-              }
+            <button
+              onClick={() => setAssignmentsOpen(!assignmentsOpen)}
+              className="flex items-center gap-1 w-full px-3 py-1.5 rounded-md text-[12px] mb-0.5 transition-colors text-ink-300 hover:bg-surface-700/60 hover:text-ink-100"
             >
-              Assignments
-            </NavLink>
+              <span className="flex-1 text-left">Assignments</span>
+              <svg className={`w-3 h-3 text-ink-400 transition-transform ${assignmentsOpen ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </button>
+            {assignmentsOpen && (
+              <div className="pl-3 mb-1 ml-2 border-l border-surface-500/50">
+                <NavLink to="/materials/assignments/sash"
+                  className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                  Sash windows
+                </NavLink>
+                <NavLink to="/materials/assignments/casement"
+                  className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                  Casement
+                </NavLink>
+                <NavLink to="/materials/assignments/fix-frame"
+                  className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                  Fix frame
+                </NavLink>
+                <NavLink to="/materials/assignments/doors"
+                  className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                  Doors
+                </NavLink>
+                <NavLink to="/materials/assignments/other"
+                  className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                  Other
+                </NavLink>
+                <div className="px-3 py-1 text-[11px] text-ink-400/50 cursor-default">
+                  + Add new
+                </div>
+              </div>
+            )}
           </div>
         )}
       </nav>
