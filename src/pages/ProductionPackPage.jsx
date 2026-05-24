@@ -21,6 +21,7 @@ import {
 } from '../engine/lists.js';
 import { optimisePrecut } from '../engine/optimizer.js';
 import { exportGlassPDF } from '../utils/glassPdfExport.js';
+import { getPartSymbol } from '../engine/partSymbols.js';
 
 import FrontElevation2D from '../components/drawings/FrontElevation2D.jsx';
 import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
@@ -700,117 +701,343 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// TAB: Pre-Cut List (per element, grouped by identical dimensions)
+// TAB: Pre-Cut List — grouped by section, BLO with offcuts
 // ═══════════════════════════════════════════════════════════════
 function PreCutTab({ merged, settings }) {
+  // Local state for editable stock lengths and offcuts per group
+  const [stockLengths, setStockLengths] = useState({});
+  const [offcutsMap, setOffcutsMap] = useState({}); // key → [length, length, ...]
+  const [offcutInput, setOffcutInput] = useState({}); // key → current input string
+  const [expandedGroups, setExpandedGroups] = useState({});
+
   if (!merged?.precut) {
     return <div className="card p-8 text-center text-ink-400">No pre-cut data available.</div>;
   }
 
+  // Build unified groups: sash (by section) + box (by preCutWidth)
+  const allGroups = [];
+
+  (merged.precut.sashEngineering || []).forEach((g) => {
+    allGroups.push({
+      key: `sash-${g.section}`,
+      label: `Engineering Wood — ${g.section}`,
+      section: g.section,
+      type: 'sash',
+      items: g.items,
+      defaultStock: settings?.stockLengthSash || 5900,
+    });
+  });
+
+  (merged.precut.boxSapele || []).forEach((g) => {
+    allGroups.push({
+      key: `box-${g.preCutWidth}`,
+      label: `Box Timber — ${g.preCutWidth} mm width`,
+      section: `${g.preCutWidth}`,
+      type: 'box',
+      items: g.items,
+      defaultStock: settings?.stockLengthBox || 2400,
+    });
+  });
+
+  // Re-run optimizer with custom stock lengths + offcuts
+  const localOptimization = useMemo(() => {
+    const precutWithStock = {
+      sashEngineering: (merged.precut.sashEngineering || []).map((g) => ({
+        ...g,
+        stockLength: stockLengths[`sash-${g.section}`] || settings?.stockLengthSash || 5900,
+      })),
+      boxSapele: (merged.precut.boxSapele || []).map((g) => ({
+        ...g,
+        stockLength: stockLengths[`box-${g.preCutWidth}`] || settings?.stockLengthBox || 2400,
+      })),
+    };
+    try {
+      return optimisePrecut(precutWithStock, settings, offcutsMap);
+    } catch (e) {
+      console.warn('Optimizer with offcuts failed:', e);
+      return null;
+    }
+  }, [merged.precut, settings, stockLengths, offcutsMap]);
+
+  const toggleExpand = (key) => setExpandedGroups((p) => ({ ...p, [key]: !p[key] }));
+
+  const handleAddOffcut = (groupKey) => {
+    const val = parseFloat(offcutInput[groupKey]);
+    if (!val || val <= 0) return;
+    setOffcutsMap((p) => ({
+      ...p,
+      [groupKey]: [...(p[groupKey] || []), Math.round(val)],
+    }));
+    setOffcutInput((p) => ({ ...p, [groupKey]: '' }));
+  };
+
+  const handleRemoveOffcut = (groupKey, idx) => {
+    setOffcutsMap((p) => ({
+      ...p,
+      [groupKey]: (p[groupKey] || []).filter((_, i) => i !== idx),
+    }));
+  };
+
+  const getOptGroup = (group) => {
+    if (!localOptimization) return null;
+    if (group.type === 'sash') {
+      return localOptimization.sashEngineering?.find((g) => g.section === group.section);
+    }
+    return localOptimization.boxSapele?.find((g) => String(g.preCutWidth) === group.section);
+  };
+
   return (
     <div className="space-y-4">
-      {/* Sash Engineering */}
-      {merged.precut.sashEngineering.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="px-4 py-3 border-b border-surface-500">
-            <div className="text-sm font-semibold text-ink-50">Sash Engineering — Pre-Cut</div>
-          </div>
-          {merged.precut.sashEngineering.map((group) => (
-            <div key={group.section}>
-              <div className="px-4 py-2 bg-surface-700/50 border-b border-surface-500 text-xs font-medium text-ink-200">
-                Section: {group.section}
-              </div>
-              <GroupedElementTable items={group.items} />
-            </div>
-          ))}
-        </div>
-      )}
+      {allGroups.map((group) => {
+        const optGroup = getOptGroup(group);
+        const isExpanded = expandedGroups[group.key] !== false; // default expanded
+        const stock = stockLengths[group.key] || group.defaultStock;
+        const groupOffcuts = offcutsMap[group.key] || [];
+        // Visual width scale: wider sections get wider bars
+        const sectionNum = parseInt(group.section) || 63;
+        const barHeight = Math.max(20, Math.min(36, Math.round(sectionNum / 4)));
 
-      {/* Box Sapele */}
-      {merged.precut.boxSapele.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="px-4 py-3 border-b border-surface-500">
-            <div className="text-sm font-semibold text-ink-50">Box Sapele — Pre-Cut</div>
-          </div>
-          {merged.precut.boxSapele.map((group) => (
-            <div key={group.preCutWidth}>
-              <div className="px-4 py-2 bg-surface-700/50 border-b border-surface-500 text-xs font-medium text-ink-200">
-                Pre-cut width: {group.preCutWidth} mm
-              </div>
-              <GroupedElementTable items={group.items} />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Optimizer */}
-      {merged.optimization?.sashEngineering?.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="px-4 py-3 border-b border-surface-500">
-            <div className="text-sm font-semibold text-ink-50">Bar Layout Optimizer</div>
-          </div>
-          <div className="p-4 space-y-4">
-            {merged.optimization.sashEngineering.map((g) => (
-              <div key={g.section}>
-                <div className="text-xs font-medium text-ink-200 mb-2">Section: {g.section}</div>
-                <BarVis bars={g.bars} stockLength={settings?.stockLengthSash || 5900} endTrim={settings?.endTrim || 10} />
-                <div className="text-[10px] text-ink-400 mt-1">
-                  Bars: {g.summary.totalBars} · Waste: {g.summary.wasteTotal} mm · Utilisation: {(g.summary.utilAvg * 100).toFixed(1)}%
+        return (
+          <div key={group.key} className="card overflow-hidden">
+            {/* Group header */}
+            <div
+              className="px-4 py-3 border-b border-surface-500 flex items-center gap-3 cursor-pointer hover:bg-surface-700/30 transition-colors"
+              onClick={() => toggleExpand(group.key)}
+            >
+              <svg className={`w-3.5 h-3.5 text-ink-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+              <div className="text-sm font-semibold text-ink-50">{group.label}</div>
+              <div className="ml-auto flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-ink-400">Stock:</span>
+                  <input
+                    className="w-16 text-[11px] text-ink-100 bg-surface-700 border border-surface-500 rounded px-1.5 py-0.5 text-center outline-none focus:border-accent-500"
+                    value={stock}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value) || 0;
+                      setStockLengths((p) => ({ ...p, [group.key]: v }));
+                    }}
+                  />
+                  <span className="text-[10px] text-ink-400">mm</span>
                 </div>
+                <span className="text-[10px] text-ink-400">
+                  {group.items.length} elements · {group.items.reduce((s, it) => s + (it.quantity || 1), 0)} pcs
+                </span>
               </div>
-            ))}
+            </div>
+
+            {isExpanded && (
+              <div>
+                {/* BLO visualization */}
+                {optGroup?.bars?.length > 0 && (
+                  <div className="p-4 border-b border-surface-500/50 bg-surface-800/50">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs font-medium text-ink-200">Bar Layout Optimizer</div>
+                      <div className="text-[10px] text-ink-400">
+                        Bars: {optGroup.summary.totalBars} · Waste: {optGroup.summary.wasteTotal} mm · Util: {(optGroup.summary.utilAvg * 100).toFixed(1)}%
+                      </div>
+                    </div>
+                    {/* Bars */}
+                    <div className="space-y-1">
+                      {optGroup.bars.map((bar) => {
+                        const barStock = bar.stockLength || stock;
+                        let cursor = settings?.endTrim || 10;
+                        return (
+                          <div key={bar.barId} className="flex items-center gap-2">
+                            <div className="w-20 text-[10px] text-ink-400 font-mono flex items-center gap-1">
+                              {bar.isOffcut && <span className="text-amber-400" title="Offcut">◆</span>}
+                              {bar.barId}
+                            </div>
+                            <div
+                              className="flex-1 bg-surface-600 rounded relative overflow-hidden border border-surface-500"
+                              style={{ height: barHeight }}
+                            >
+                              <div className="absolute inset-y-0 bg-surface-500"
+                                style={{ left: 0, width: `${((settings?.endTrim || 10) / barStock) * 100}%` }} />
+                              {bar.cuts.map((cut, idx) => {
+                                const left = (cursor / barStock) * 100;
+                                const width = (cut / barStock) * 100;
+                                cursor += cut + (settings?.kerf || 3);
+                                return (
+                                  <div key={idx}
+                                    className="absolute inset-y-0 border-r border-surface-800 text-[9px] text-white grid place-items-center"
+                                    style={{
+                                      left: `${left}%`,
+                                      width: `${width}%`,
+                                      background: bar.isOffcut ? 'rgba(217,161,53,0.6)' : 'rgba(0,180,160,0.6)',
+                                    }}
+                                    title={`${cut} mm`}>
+                                    {cut > barStock * 0.06 ? cut : ''}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="w-20 text-[10px] text-ink-400 text-right font-mono">
+                              {(bar.utilization * 100).toFixed(0)}% {bar.isOffcut ? `(${barStock})` : ''}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Offcuts input */}
+                    <div className="mt-3 pt-3 border-t border-surface-500/50">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] text-ink-400">Offcuts:</span>
+                        {groupOffcuts.map((oc, idx) => (
+                          <span key={idx} className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                            {oc} mm
+                            <button onClick={() => handleRemoveOffcut(group.key, idx)} className="text-amber-400 hover:text-amber-200">×</button>
+                          </span>
+                        ))}
+                        <div className="flex items-center gap-1">
+                          <input
+                            className="w-16 text-[10px] bg-surface-700 border border-surface-500 rounded px-1.5 py-0.5 text-ink-200 outline-none focus:border-accent-500"
+                            placeholder="mm"
+                            value={offcutInput[group.key] || ''}
+                            onChange={(e) => setOffcutInput((p) => ({ ...p, [group.key]: e.target.value }))}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleAddOffcut(group.key); }}
+                          />
+                          <button
+                            onClick={() => handleAddOffcut(group.key)}
+                            className="text-[10px] px-2 py-0.5 rounded bg-surface-700 text-ink-300 hover:text-accent-400 hover:bg-surface-600 border border-surface-500 transition-colors"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Elements table (sorted as BLO) */}
+                <GroupedElementTable items={group.items} />
+              </div>
+            )}
           </div>
-        </div>
+        );
+      })}
+
+      {allGroups.length === 0 && (
+        <div className="card p-8 text-center text-ink-400">No pre-cut groups available.</div>
       )}
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════
-// TAB: Cut List (final, per element, grouped)
+// TAB: Cut List — grouped by element, symbols, mirror, sorted
 // ═══════════════════════════════════════════════════════════════
 function CutListTab({ merged, isPPMode }) {
   if (!merged?.cutList?.length) {
     return <div className="card p-8 text-center text-ink-400">No cut list data available.</div>;
   }
 
-  const grouped = groupCutListItems(merged.cutList);
+  // Group by element name
+  const byElement = useMemo(() => {
+    const map = new Map();
+    merged.cutList.forEach((c) => {
+      const key = c.element;
+      if (!map.has(key)) {
+        map.set(key, {
+          element: c.element,
+          section: c.section,
+          symbolInfo: getPartSymbol(c.element),
+          items: [],
+        });
+      }
+      map.get(key).items.push(c);
+    });
+
+    // Sort items within each group by length (shortest first)
+    const groups = Array.from(map.values());
+    groups.forEach((g) => {
+      g.items.sort((a, b) => a.length - b.length);
+      // Aggregate: group identical lengths within element
+      const agg = new Map();
+      g.items.forEach((it) => {
+        const k = `${it.length}|${it.windowName || ''}|${it._projectNumber || ''}`;
+        if (!agg.has(k)) {
+          agg.set(k, { ...it, totalQty: 0 });
+        }
+        agg.get(k).totalQty += (it.quantity || 1);
+      });
+      g.aggregated = Array.from(agg.values()).sort((a, b) => a.length - b.length);
+    });
+
+    return groups;
+  }, [merged.cutList]);
+
+  const totalPieces = merged.cutList.reduce((s, c) => s + (c.quantity || 1), 0);
 
   return (
-    <div className="card overflow-hidden">
-      <div className="px-4 py-3 border-b border-surface-500">
-        <div className="text-sm font-semibold text-ink-50">Cut List — All Windows (grouped by element)</div>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b border-surface-500 bg-surface-700/50">
-              {isPPMode && <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Projects</th>}
-              <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Element</th>
-              <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Section</th>
-              <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Length</th>
-              <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Total Qty</th>
-              <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Material</th>
-              <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Windows</th>
-            </tr>
-          </thead>
-          <tbody>
-            {grouped.map((g, i) => (
-              <tr key={i} className="border-b border-surface-500/50">
-                {isPPMode && <td className="px-4 py-2.5 text-accent-400 text-[10px]">{g.projects.join(', ')}</td>}
-                <td className="px-4 py-2.5 text-ink-100 font-medium">{g.element}</td>
-                <td className="px-4 py-2.5 text-ink-300">{g.section}</td>
-                <td className="px-4 py-2.5 text-right text-ink-100 font-mono">{g.length} mm</td>
-                <td className="px-4 py-2.5 text-right text-ink-100 font-semibold">{g.totalQty}</td>
-                <td className="px-4 py-2.5 text-ink-300">{g.material}</td>
-                <td className="px-4 py-2.5 text-ink-400">{g.windows.join(', ')}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="px-4 py-3 border-t border-surface-500 text-xs text-ink-400">
-        Total unique elements: {grouped.length} · Total pieces: {grouped.reduce((s, g) => s + g.totalQty, 0)}
+    <div className="space-y-4">
+      {byElement.map((group) => {
+        const sym = group.symbolInfo;
+        // Find finished section from SASH_WINDOW_PARTS if available
+        const finishedSection = group.items[0]?.section || '—';
+
+        return (
+          <div key={group.element} className="card overflow-hidden">
+            {/* Section header: name + symbol + placeholder 2D */}
+            <div className="px-4 py-3 border-b border-surface-500 flex items-center gap-3 bg-surface-800">
+              {/* Placeholder 2D miniature */}
+              <div className="w-10 h-10 rounded bg-surface-700 border border-surface-500 flex items-center justify-center text-[9px] text-ink-400 shrink-0" title="2D drawing — coming soon">
+                2D
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold text-accent-400 bg-accent-500/10 px-1.5 py-0.5 rounded">{sym.symbol}</span>
+                  <span className="text-sm font-semibold text-ink-50">{group.element}</span>
+                  {sym.mirror && (
+                    <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded" title="Mirror pair (L+R)">⟷ mirror</span>
+                  )}
+                </div>
+                <div className="text-[10px] text-ink-400 mt-0.5">
+                  Section: {finishedSection} · {group.aggregated.reduce((s, a) => s + a.totalQty, 0)} pcs
+                </div>
+              </div>
+            </div>
+
+            {/* Items table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-surface-500 bg-surface-700/30">
+                    <th className="px-4 py-2 text-left text-ink-400 font-medium w-16">Symbol</th>
+                    {isPPMode && <th className="px-4 py-2 text-left text-ink-400 font-medium">Project</th>}
+                    <th className="px-4 py-2 text-left text-ink-400 font-medium">Window</th>
+                    <th className="px-4 py-2 text-right text-ink-400 font-medium">Length</th>
+                    <th className="px-4 py-2 text-right text-ink-400 font-medium">Qty</th>
+                    <th className="px-4 py-2 text-left text-ink-400 font-medium">Finished</th>
+                    <th className="px-4 py-2 text-center text-ink-400 font-medium w-16">Mirror</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {group.aggregated.map((item, idx) => (
+                    <tr key={idx} className="border-b border-surface-500/30 hover:bg-surface-700/20">
+                      <td className="px-4 py-2 font-mono font-bold text-accent-400">{sym.symbol}</td>
+                      {isPPMode && <td className="px-4 py-2 text-ink-300 text-[10px]">{item._projectNumber || '—'}</td>}
+                      <td className="px-4 py-2 text-ink-200">{item.windowName || '—'}</td>
+                      <td className="px-4 py-2 text-right text-ink-100 font-mono">{item.length} mm</td>
+                      <td className="px-4 py-2 text-right text-ink-100 font-semibold">{item.totalQty}</td>
+                      <td className="px-4 py-2 text-ink-300">{finishedSection}</td>
+                      <td className="px-4 py-2 text-center">
+                        {sym.mirror ? <span className="text-purple-400">⟷</span> : <span className="text-ink-400/30">—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })}
+
+      <div className="card px-4 py-3 text-xs text-ink-400">
+        Total element types: {byElement.length} · Total pieces: {totalPieces}
       </div>
     </div>
   );

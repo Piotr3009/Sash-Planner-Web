@@ -25,11 +25,8 @@ export default function ManageCategoriesPage() {
   const renameSubcategory = useMaterialStore((s) => s.renameSubcategory);
   const canDeleteSubcategory = useMaterialStore((s) => s.canDeleteSubcategory);
 
-  const [newCategory, setNewCategory] = useState('');
   const [editingCat, setEditingCat] = useState(null); // { name, draft }
   const [editingSub, setEditingSub] = useState(null); // { category, name, draft }
-  const [newSubFor, setNewSubFor] = useState(null); // category name
-  const [newSubName, setNewSubName] = useState('');
   const [confirmAction, setConfirmAction] = useState(null);
   const [expandedCats, setExpandedCats] = useState({});
 
@@ -54,19 +51,6 @@ export default function ManageCategoriesPage() {
 
   const toggleExpand = (cat) => {
     setExpandedCats((prev) => ({ ...prev, [cat]: !prev[cat] }));
-  };
-
-  // ─── Add category ───
-  const handleAddCategory = () => {
-    const trimmed = newCategory.trim();
-    if (!trimmed) return;
-    if (categoryMap[trimmed]) return; // already exists
-    // Adding a category without materials: we just create a placeholder material
-    // Actually: categories are derived from materials, so we can't add an empty one
-    // The user should add materials to a category via the catalog
-    // But for UX, let's allow adding — we'll just note it
-    // For now, inform user
-    setNewCategory('');
   };
 
   // ─── Rename category ───
@@ -265,40 +249,10 @@ export default function ManageCategoriesPage() {
                     );
                   })}
 
-                  {/* Add subcategory */}
-                  {newSubFor === catName ? (
-                    <div className="flex items-center gap-2 px-4 py-2 pl-10">
-                      <input
-                        className="flex-1 text-xs bg-surface-700 border border-surface-500 rounded px-2 py-1 outline-none focus:border-accent-500 text-ink-200"
-                        placeholder="Subcategory name"
-                        value={newSubName}
-                        onChange={(e) => setNewSubName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && newSubName.trim()) {
-                            // Adding subcategory: note that subcategories are derived from materials
-                            // User needs to assign a material to this subcategory via catalog
-                            setNewSubFor(null);
-                            setNewSubName('');
-                          }
-                          if (e.key === 'Escape') { setNewSubFor(null); setNewSubName(''); }
-                        }}
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => { setNewSubFor(null); setNewSubName(''); }}
-                        className="text-ink-400 hover:text-ink-200 text-xs"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setNewSubFor(catName)}
-                      className="w-full text-left px-4 py-2 pl-10 text-[11px] text-ink-400 hover:text-accent-400 hover:bg-surface-700/30 transition-colors"
-                    >
-                      + Add subcategory
-                    </button>
-                  )}
+                  {/* Add subcategory — info */}
+                  <div className="px-4 py-2 pl-10 text-[10px] text-ink-400/60 italic">
+                    Add subcategories via Production Materials catalog
+                  </div>
                 </div>
               )}
             </div>

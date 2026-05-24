@@ -58,8 +58,8 @@ function EditProjectModal({ project, onSave, onCancel }) {
   const submit = () => {
     if (!name.trim()) return;
     onSave({
-      name: name.trim().slice(0, 5),
-      project_number: number.trim().slice(0, 5),
+      name: name.trim(),
+      project_number: number.trim(),
       client: client.trim(),
       address: address.trim(),
     });
