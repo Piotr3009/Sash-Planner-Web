@@ -1108,42 +1108,39 @@ function CutListTab({ merged, isPPMode }) {
 
         return (
           <div key={group.element} className="card overflow-hidden">
-            {/* Section header: name + symbol */}
-            <div className="px-4 py-3 border-b border-surface-500 bg-surface-800">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-mono font-bold text-accent-400 bg-accent-500/10 px-1.5 py-0.5 rounded">{sym.symbol}</span>
-                <span className="text-sm font-semibold text-ink-50">{group.element}</span>
-                {sym.mirror && (
-                  <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded" title="Mirror pair (L+R)">⟷ mirror</span>
-                )}
-              </div>
-              <div className="text-[10px] text-ink-400">
-                Section: {finishedSection} · {group.aggregated.reduce((s, a) => s + a.totalQty, 0)} pcs
-              </div>
-            </div>
-
-            {/* 2D image — large, centered, zoomable, row grows */}
-            <div className="border-b border-surface-500/50 bg-surface-800/30">
+            {/* Section header: image + name + symbol — single row */}
+            <div className="px-4 py-3 border-b border-surface-500 flex items-center gap-3 bg-surface-800">
+              {/* 2D image — in-row, ~80x80, zoomable */}
               {elementImages[group.element] ? (
-                <div className="relative group/img p-4 flex items-center justify-center">
+                <div className="relative group/img shrink-0">
                   <img
                     src={elementImages[group.element]}
                     alt={group.element}
-                    className="max-w-full max-h-[300px] rounded border border-surface-500 cursor-zoom-in"
+                    className="w-20 h-20 rounded border border-surface-500 object-cover cursor-zoom-in"
                     onClick={() => setZoomedElement(elementImages[group.element])}
                   />
                   <button onClick={() => handleRemoveImage(group.element)}
-                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500/80 text-white text-xs flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">×</button>
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500/80 text-white text-[9px] flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">×</button>
                 </div>
               ) : (
-                <label className="flex flex-col items-center justify-center py-6 cursor-pointer text-ink-400 hover:text-accent-400 transition-colors">
-                  <svg className="w-6 h-6 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                  <span className="text-[10px]">Upload 2D drawing</span>
+                <label className="w-20 h-20 rounded bg-surface-700 border border-dashed border-surface-500 flex flex-col items-center justify-center text-ink-400 hover:text-accent-400 hover:border-accent-500 cursor-pointer transition-colors shrink-0" title="Upload 2D drawing">
+                  <svg className="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 5v14M5 12h14" /></svg>
+                  <span className="text-[8px]">2D</span>
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(group.element, e)} />
                 </label>
               )}
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold text-accent-400 bg-accent-500/10 px-1.5 py-0.5 rounded">{sym.symbol}</span>
+                  <span className="text-sm font-semibold text-ink-50">{group.element}</span>
+                  {sym.mirror && (
+                    <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded" title="Mirror pair (L+R)">⟷ mirror</span>
+                  )}
+                </div>
+                <div className="text-[10px] text-ink-400 mt-0.5">
+                  Section: {finishedSection} · {group.aggregated.reduce((s, a) => s + a.totalQty, 0)} pcs
+                </div>
+              </div>
             </div>
 
             {/* Items table */}
