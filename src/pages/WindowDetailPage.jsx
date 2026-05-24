@@ -228,7 +228,7 @@ function BOMPanel({ item, windowSpec, derived }) {
       <div className="space-y-3">
         <BOMGroup title="Timber" items={derived?.components?.box || []} />
         <BOMGroup title="Sash Components" items={derived?.components?.sash || []} />
-        <BOMGroup title="Beading" items={derived?.components?.beading || []} />
+        <BOMGroup title="Beading" items={derived?.components?.beading || []} unit="m" />
         <div className="bg-surface-600 rounded-lg border border-surface-500 p-4">
           <div className="text-xs font-medium text-ink-200 mb-2">Hardware & Consumables</div>
           <div className="space-y-1 text-xs text-ink-400">
@@ -251,8 +251,9 @@ function BOMPanel({ item, windowSpec, derived }) {
   );
 }
 
-function BOMGroup({ title, items }) {
+function BOMGroup({ title, items, unit = 'mm' }) {
   if (!items.length) return null;
+  const isMeters = unit === 'm';
   return (
     <div className="bg-surface-600 rounded-lg border border-surface-500 overflow-hidden">
       <div className="px-4 py-2 border-b border-surface-500 text-xs font-medium text-ink-200">{title}</div>
@@ -270,7 +271,7 @@ function BOMGroup({ title, items }) {
             <tr key={i} className="border-b border-surface-500/30">
               <td className="px-4 py-1.5 text-ink-100">{c.elementName}</td>
               <td className="px-4 py-1.5 text-ink-300">{c.section}</td>
-              <td className="px-4 py-1.5 text-right text-ink-200">{c.length} mm</td>
+              <td className="px-4 py-1.5 text-right text-ink-200">{isMeters ? (c.length / 1000).toFixed(2) : c.length} {unit}</td>
               <td className="px-4 py-1.5 text-right text-ink-200">{c.quantity}</td>
             </tr>
           ))}

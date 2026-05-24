@@ -784,7 +784,7 @@ function BOMTab({ merged, batch, pp, isPPMode, windowsData }) {
                   {isPPMode && <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Project</th>}
                   <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Window</th>
                   <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Type</th>
-                  <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Length (mm)</th>
+                  <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Length (m)</th>
                   <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Notes</th>
                 </tr>
               </thead>
@@ -794,7 +794,7 @@ function BOMTab({ merged, batch, pp, isPPMode, windowsData }) {
                     {isPPMode && <td className="px-4 py-2.5 text-accent-400 text-[10px]">{b._projectNumber}</td>}
                     <td className="px-4 py-2.5 text-ink-100">{b.windowName}</td>
                     <td className="px-4 py-2.5 text-ink-200 font-medium">{b.elementName}</td>
-                    <td className="px-4 py-2.5 text-right text-ink-100 font-semibold">{Math.round(b.length)}</td>
+                    <td className="px-4 py-2.5 text-right text-ink-100 font-semibold">{(b.length / 1000).toFixed(2)}</td>
                     <td className="px-4 py-2.5 text-ink-400 text-[10px]">{b.notes}</td>
                   </tr>
                 ))}

@@ -270,38 +270,52 @@ function calculateGlazingSummaryForWindow(windowSpec, sashWidth, sashHeight, set
 
 const OFFCUT_FACTOR = 1.15; // 15% waste for off-cuts
 
-function calculateBeadingComponents(windowSpec, sashWidth, topSashHeight, bottomSashHeight, glazingBars) {
-    const stile = CONSTANTS.STILE_WIDTH;
-    const topRail = CONSTANTS.TOP_RAIL_WIDTH;
-    const meetRail = CONSTANTS.MEETING_RAIL_WIDTH;
+const BEADING_BAR_PATTERNS = {
+    'none': { v: 0, h: 0 }, '2x2': { v: 1, h: 0 }, '3x3': { v: 2, h: 0 },
+    '4x4': { v: 1, h: 1 }, '6x6': { v: 2, h: 1 }, '9x9': { v: 2, h: 2 },
+};
 
-    const glassW = sashWidth - 2 * stile;
-    // Upper & lower glass heights are identical (rail diff = sash height diff = 33mm)
-    const glassH = topSashHeight - topRail - meetRail;
+function calculateBeadingComponents(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight) {
+    const F = OFFCUT_FACTOR;
+    const glassW = sashWidth - 2 * CONSTANTS.STILE_WIDTH;
+    const glassH = topSashHeight - CONSTANTS.TOP_RAIL_WIDTH - CONSTANTS.MEETING_RAIL_WIDTH;
 
-    // 1. Glazing bar beading — perimeter of glass area × 2 sashes
-    const perimeterPerSash = 2 * (glassW + glassH);
-    const glazingTotal = round(perimeterPerSash * 2 * OFFCUT_FACTOR);
+    const gridMode = windowSpec.sash?.grid?.mode || 'none';
+    const pattern = BEADING_BAR_PATTERNS[gridMode] || BEADING_BAR_PATTERNS['none'];
+    const barPerSash = (pattern.v * glassH) + (pattern.h * glassW);
 
-    // 2 & 3. Georgian + Triangle — same lengths as wood bars × 2 sashes
-    const vLen = glazingBars.vertical.length;
-    const vQty = glazingBars.vertical.quantity;
-    const hLen = glazingBars.horizontal.length;
-    const hQty = glazingBars.horizontal.quantity;
-    const barTotalPerSash = (vLen * vQty) + (hLen * hQty);
-    const barTotal = round(barTotalPerSash * 2 * OFFCUT_FACTOR);
+    const rec = (name, lengthMm, notes) =>
+        createComponentRecord(windowSpec, 'beading', name, 'profile', lengthMm, 1, notes);
 
     const beading = [];
 
-    beading.push(createComponentRecord(windowSpec, 'beading', 'GLAZING BAR BEADING', 'profile',
-        glazingTotal, 1, `Perimeter ${round(perimeterPerSash)} × 2 sashes + 15%`));
+    // 1. Glazing bar beading — perimeter of glass area × 2 sashes
+    const perimPerSash = 2 * (glassW + glassH);
+    beading.push(rec('GLAZING BAR BEADING', round(perimPerSash * 2 * F),
+        `Perim ${round(perimPerSash)} × 2 + 15%`));
 
-    if (barTotal > 0) {
-        beading.push(createComponentRecord(windowSpec, 'beading', 'INTERNAL GEORGIAN BEADING', 'profile',
-            barTotal, 1, `GB lengths ${round(barTotalPerSash)} × 2 sashes + 15%`));
-        beading.push(createComponentRecord(windowSpec, 'beading', 'TRIANGLE BEADING (EXT)', 'profile',
-            barTotal, 1, `GB lengths ${round(barTotalPerSash)} × 2 sashes + 15%`));
+    // 2 & 3. Georgian + Triangle (only if bars exist)
+    if (barPerSash > 0) {
+        const barTotal = round(barPerSash * 2 * F);
+        beading.push(rec('INTERNAL GEORGIAN BEADING', barTotal,
+            `Bars ${round(barPerSash)} × 2 + 15%`));
+        beading.push(rec('TRIANGLE BEADING (EXT)', barTotal,
+            `Bars ${round(barPerSash)} × 2 + 15%`));
     }
+
+    // 4. Parting beading — 2× frame height + frame width
+    beading.push(rec('PARTING BEADING', round((frameHeight * 2 + frameWidth) * F),
+        `2×H(${frameHeight}) + W(${frameWidth}) + 15%`));
+
+    // 5. Staff beading — full frame perimeter
+    beading.push(rec('STAFF BEADING', round((frameWidth * 2 + frameHeight * 2) * F),
+        `2×(W+H) = ${2 * (frameWidth + frameHeight)} + 15%`));
+
+    // 6 & 7. Meeting beading A & B — sash width each (at end)
+    beading.push(rec('MEETING BEADING A', round(sashWidth * F),
+        `sashW(${sashWidth}) + 15%`));
+    beading.push(rec('MEETING BEADING B', round(sashWidth * F),
+        `sashW(${sashWidth}) + 15%`));
 
     return beading;
 }
@@ -333,8 +347,7 @@ export function deriveWindowData(windowSpec, settings = {}) {
     };
 
     const beadingComponents = calculateBeadingComponents(
-        windowSpec, sashWidth, topSashHeight, bottomSashHeight,
-        result.components.sash.glazingBars
+        windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight
     );
 
     return {

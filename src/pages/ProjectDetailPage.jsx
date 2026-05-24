@@ -57,7 +57,8 @@ export default function ProjectDetailPage() {
 
     // Beading calculations
     const glassW = sashW - 2 * 57;
-    const glassH = halfSash - 57 - 43;
+    const topSashH = (sashH - 33) / 2;  // SASH_HEIGHT_DIFFERENCE = 33
+    const glassH = topSashH - 57 - 43;  // topRail - meetRail (same for both sashes)
     const perimeterPerSash = 2 * (glassW + glassH);
     const gridMode = win.upperBars || 'none';
     const pattern = BAR_PATTERNS[gridMode] || BAR_PATTERNS['none'];
@@ -82,6 +83,10 @@ export default function ProjectDetailPage() {
       glazing_bar_beading: perimeterPerSash * 2 * OFFCUT,
       internal_georgian_beading: barTotalPerSash * 2 * OFFCUT,
       triangle_beading_ext: barTotalPerSash * 2 * OFFCUT,
+      parting_beading: (H * 2 + W) * OFFCUT,
+      staff_beading: (W * 2 + H * 2) * OFFCUT,
+      meeting_beading_a: sashW * OFFCUT,
+      meeting_beading_b: sashW * OFFCUT,
     };
     return lengths[partId] || 0;
   };
