@@ -306,6 +306,7 @@ export const useProjectStore = create(
       name: name || `#${get().productionPacks.length + 1} ${type || 'Sash'}`,
       type: type || 'sash',
       deadline: deadline || '',
+      responsible: '',
       status: 'preparation',
       assignments: [],
       created_at: new Date().toISOString(),

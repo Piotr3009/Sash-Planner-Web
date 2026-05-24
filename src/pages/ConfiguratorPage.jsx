@@ -160,7 +160,7 @@ export default function ConfiguratorPage() {
           <h1 className="text-lg font-semibold text-ink-50">{batch.label} — {isEditMode ? `Edit ${editingWindow?.name || 'Window'}` : 'Add Window'}</h1>
         </div>
         <div className="flex items-center gap-3">
-          <input type="text" placeholder="Window name (max 6)" maxLength={6} value={winName} onChange={e => setWinName(e.target.value)}
+          <input type="text" placeholder="Window name (max 7)" maxLength={7} value={winName} onChange={e => setWinName(e.target.value)}
             className={`px-3 py-2 border-2 rounded-lg text-sm w-56 bg-surface-800 ${winName.trim() ? 'border-accent-500 text-ink-50' : 'border-status-danger/50 text-ink-200'}`} />
           <button onClick={save} className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'}`}>
             {isEditMode ? '✓ Update Window' : '✓ Save to Batch'}

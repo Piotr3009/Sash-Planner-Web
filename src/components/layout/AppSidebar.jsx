@@ -27,7 +27,7 @@ export default function AppSidebar() {
 
       {/* ─── Logo ─── */}
       <div className="px-3 py-3 border-b border-surface-500">
-        <img src="/logo-full.png" alt="Production Core" className="h-8 w-auto" />
+        <img src="/logo-full.png" alt="Production Core" className="h-12 w-auto" />
       </div>
 
       {/* ─── Main nav ─── */}

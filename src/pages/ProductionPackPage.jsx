@@ -315,6 +315,19 @@ export default function ProductionPackPage() {
                     ))}
                   </select>
                 )}
+                {isPPMode && (
+                  <span className="flex items-center gap-1 text-[10px] text-ink-400">
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" /><circle cx="12" cy="7" r="4" />
+                    </svg>
+                    <input
+                      className="bg-transparent border-b border-surface-500 text-[10px] text-ink-200 outline-none focus:border-accent-500 w-24 placeholder:text-ink-400/50"
+                      placeholder="Responsible"
+                      value={pp.responsible || ''}
+                      onChange={(e) => updateProductionPack(pp.id, { responsible: e.target.value })}
+                    />
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -486,23 +499,89 @@ function ElevationsTab({ windowsData }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// TAB: 2D Sections (shared for batch — V-Section + H-Section)
+// TAB: 2D Sections — generated drawings + user image upload
 // ═══════════════════════════════════════════════════════════════
 function SectionsTab({ windowsData }) {
-  // Use first window's data — sections are shared (same profiles for entire batch)
   const first = windowsData[0];
+  const [sectionImages, setSectionImages] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pc-section-images') || '{}'); } catch { return {}; }
+  });
+
+  const handleImageUpload = (key, e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      // Resize to ~200KB via canvas
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 800;
+        let w = img.width, h = img.height;
+        if (w > maxDim || h > maxDim) {
+          const ratio = Math.min(maxDim / w, maxDim / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        const updated = { ...sectionImages, [key]: dataUrl };
+        setSectionImages(updated);
+        localStorage.setItem('pc-section-images', JSON.stringify(updated));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = (key) => {
+    const updated = { ...sectionImages };
+    delete updated[key];
+    setSectionImages(updated);
+    localStorage.setItem('pc-section-images', JSON.stringify(updated));
+  };
+
   if (!first?.windowSpec || !first?.derived) {
     return <div className="card p-8 text-center text-ink-400">No data available.</div>;
   }
+
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-      <div className="card p-4">
-        <div className="text-xs font-semibold text-ink-200 mb-2">Vertical Section</div>
-        <VerticalSection2D windowSpec={first.windowSpec} derived={first.derived} />
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="card p-4">
+          <div className="text-xs font-semibold text-ink-200 mb-2">Vertical Section</div>
+          <VerticalSection2D windowSpec={first.windowSpec} derived={first.derived} />
+        </div>
+        <div className="card p-4">
+          <div className="text-xs font-semibold text-ink-200 mb-2">Horizontal Section</div>
+          <HorizontalSection2D windowSpec={first.windowSpec} derived={first.derived} />
+        </div>
       </div>
+
+      {/* User-uploaded section images */}
       <div className="card p-4">
-        <div className="text-xs font-semibold text-ink-200 mb-2">Horizontal Section</div>
-        <HorizontalSection2D windowSpec={first.windowSpec} derived={first.derived} />
+        <div className="text-xs font-semibold text-ink-200 mb-3">Custom Section Images</div>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {Object.entries(sectionImages).map(([key, src]) => (
+            <div key={key} className="relative group">
+              <img src={src} alt={key} className="w-full rounded border border-surface-500 cursor-zoom-in" onClick={() => window.open(src, '_blank')} />
+              <button
+                onClick={() => handleRemoveImage(key)}
+                className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500/80 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              >×</button>
+              <div className="text-[10px] text-ink-400 mt-1">{key}</div>
+            </div>
+          ))}
+          <label className="flex flex-col items-center justify-center py-8 rounded-xl border border-dashed border-surface-500 text-ink-400 text-xs hover:border-accent-500 hover:text-accent-400 cursor-pointer transition-all">
+            <svg className="w-6 h-6 mb-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Add section image
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(`section-${Date.now()}`, e)} />
+          </label>
+        </div>
       </div>
     </div>
   );
@@ -556,6 +635,28 @@ function ElementsTab({ windowsData }) {
                 <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
               )}
             </div>
+            {/* Horn Detail */}
+            {windowSpec?.sash?.horns && windowSpec.sash.horns !== 'none' && derived && (
+              <div className="card p-4">
+                <div className="text-xs font-semibold text-ink-200 mb-2">Horn Detail — Type {windowSpec.sash.horns || 'A'}</div>
+                <svg viewBox="0 0 120 200" className="w-full max-w-[120px] mx-auto" xmlns="http://www.w3.org/2000/svg">
+                  {/* Stile body */}
+                  <rect x="30" y="0" width="60" height="120" fill="none" stroke="#AFA9EC" strokeWidth="1.5" />
+                  <text x="60" y="65" textAnchor="middle" fill="#AFA9EC" fontSize="8" fontFamily="monospace">57mm</text>
+                  {/* Horn extension */}
+                  <rect x="30" y="120" width="60" height={Math.min(75, (windowSpec.sash?.hornExtension || 75) * 0.8)} fill="none" stroke="#F59E0B" strokeWidth="1.5" strokeDasharray="4 2" />
+                  <text x="60" y={130 + Math.min(75, (windowSpec.sash?.hornExtension || 75) * 0.8) / 2} textAnchor="middle" fill="#F59E0B" fontSize="7" fontFamily="monospace">
+                    {windowSpec.sash?.hornExtension || 75}mm
+                  </text>
+                  {/* Dimension arrow */}
+                  <line x1="15" y1="120" x2="15" y2={120 + Math.min(75, (windowSpec.sash?.hornExtension || 75) * 0.8)} stroke="#888" strokeWidth="0.5" />
+                  <line x1="12" y1="120" x2="18" y2="120" stroke="#888" strokeWidth="0.5" />
+                  <line x1="12" y1={120 + Math.min(75, (windowSpec.sash?.hornExtension || 75) * 0.8)} x2="18" y2={120 + Math.min(75, (windowSpec.sash?.hornExtension || 75) * 0.8)} stroke="#888" strokeWidth="0.5" />
+                  {/* Label */}
+                  <text x="60" y="195" textAnchor="middle" fill="#6B7385" fontSize="7" fontFamily="sans-serif">Horn Type {windowSpec.sash.horns || 'A'}</text>
+                </svg>
+              </div>
+            )}
           </div>
         </div>
       ))}
@@ -839,47 +940,59 @@ function PreCutTab({ merged, settings }) {
                         Bars: {optGroup.summary.totalBars} · Waste: {optGroup.summary.wasteTotal} mm · Util: {(optGroup.summary.utilAvg * 100).toFixed(1)}%
                       </div>
                     </div>
-                    {/* Bars */}
+                    {/* Bars — scaled proportionally to longest bar */}
                     <div className="space-y-1">
-                      {optGroup.bars.map((bar) => {
-                        const barStock = bar.stockLength || stock;
-                        let cursor = settings?.endTrim || 10;
-                        return (
-                          <div key={bar.barId} className="flex items-center gap-2">
-                            <div className="w-20 text-[10px] text-ink-400 font-mono flex items-center gap-1">
-                              {bar.isOffcut && <span className="text-amber-400" title="Offcut">◆</span>}
-                              {bar.barId}
+                      {(() => {
+                        const maxStock = Math.max(...optGroup.bars.map((b) => b.stockLength || stock));
+                        return optGroup.bars.map((bar) => {
+                          const barStock = bar.stockLength || stock;
+                          const barWidthPct = (barStock / maxStock) * 100;
+                          let cursor = settings?.endTrim || 10;
+                          const details = bar.cutDetails || bar.cuts.map((c) => ({ length: c, elementName: '' }));
+                          return (
+                            <div key={bar.barId} className="flex items-center gap-2">
+                              <div className="w-20 text-[10px] text-ink-400 font-mono flex items-center gap-1">
+                                {bar.isOffcut && <span className="text-amber-400" title="Offcut">◆</span>}
+                                {bar.barId}
+                              </div>
+                              <div className="flex-1 relative" style={{ height: barHeight }}>
+                                <div
+                                  className="bg-surface-600 rounded relative overflow-hidden border border-surface-500 h-full"
+                                  style={{ width: `${barWidthPct}%` }}
+                                >
+                                  <div className="absolute inset-y-0 bg-surface-500"
+                                    style={{ left: 0, width: `${((settings?.endTrim || 10) / barStock) * 100}%` }} />
+                                  {details.map((detail, idx) => {
+                                    const cutLen = typeof detail === 'number' ? detail : detail.length;
+                                    const elName = typeof detail === 'number' ? '' : (detail.elementName || '');
+                                    const sym = elName ? getPartSymbol(elName) : null;
+                                    const left = (cursor / barStock) * 100;
+                                    const width = (cutLen / barStock) * 100;
+                                    cursor += cutLen + (settings?.kerf || 3);
+                                    return (
+                                      <div key={idx}
+                                        className="absolute inset-y-0 border-r border-surface-800 text-[8px] text-white flex items-center justify-center overflow-hidden px-0.5"
+                                        style={{
+                                          left: `${left}%`,
+                                          width: `${width}%`,
+                                          background: bar.isOffcut ? 'rgba(217,161,53,0.6)' : 'rgba(0,180,160,0.6)',
+                                        }}
+                                        title={`${sym?.symbol || ''} ${cutLen} mm${elName ? ' — ' + elName : ''}`}>
+                                        <span className="truncate">
+                                          {cutLen > barStock * 0.08 ? (sym ? `${sym.symbol} ${cutLen}` : cutLen) : (sym?.symbol || '')}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                              <div className="w-20 text-[10px] text-ink-400 text-right font-mono">
+                                {(bar.utilization * 100).toFixed(0)}% {bar.isOffcut ? `(${barStock})` : ''}
+                              </div>
                             </div>
-                            <div
-                              className="flex-1 bg-surface-600 rounded relative overflow-hidden border border-surface-500"
-                              style={{ height: barHeight }}
-                            >
-                              <div className="absolute inset-y-0 bg-surface-500"
-                                style={{ left: 0, width: `${((settings?.endTrim || 10) / barStock) * 100}%` }} />
-                              {bar.cuts.map((cut, idx) => {
-                                const left = (cursor / barStock) * 100;
-                                const width = (cut / barStock) * 100;
-                                cursor += cut + (settings?.kerf || 3);
-                                return (
-                                  <div key={idx}
-                                    className="absolute inset-y-0 border-r border-surface-800 text-[9px] text-white grid place-items-center"
-                                    style={{
-                                      left: `${left}%`,
-                                      width: `${width}%`,
-                                      background: bar.isOffcut ? 'rgba(217,161,53,0.6)' : 'rgba(0,180,160,0.6)',
-                                    }}
-                                    title={`${cut} mm`}>
-                                    {cut > barStock * 0.06 ? cut : ''}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            <div className="w-20 text-[10px] text-ink-400 text-right font-mono">
-                              {(bar.utilization * 100).toFixed(0)}% {bar.isOffcut ? `(${barStock})` : ''}
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        });
+                      })()}
                     </div>
 
                     {/* Offcuts input */}
@@ -931,6 +1044,42 @@ function PreCutTab({ merged, settings }) {
 // TAB: Cut List — grouped by element, symbols, mirror, sorted
 // ═══════════════════════════════════════════════════════════════
 function CutListTab({ merged, isPPMode }) {
+  const [elementImages, setElementImages] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('pc-element-images') || '{}'); } catch { return {}; }
+  });
+
+  const handleImageUpload = (elementKey, e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 400;
+        let w = img.width, h = img.height;
+        if (w > maxDim || h > maxDim) {
+          const ratio = Math.min(maxDim / w, maxDim / h);
+          w = Math.round(w * ratio); h = Math.round(h * ratio);
+        }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+        const updated = { ...elementImages, [elementKey]: dataUrl };
+        setElementImages(updated);
+        localStorage.setItem('pc-element-images', JSON.stringify(updated));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = (elementKey) => {
+    const updated = { ...elementImages };
+    delete updated[elementKey];
+    setElementImages(updated);
+    localStorage.setItem('pc-element-images', JSON.stringify(updated));
+  };
   if (!merged?.cutList?.length) {
     return <div className="card p-8 text-center text-ink-400">No cut list data available.</div>;
   }
@@ -981,12 +1130,21 @@ function CutListTab({ merged, isPPMode }) {
 
         return (
           <div key={group.element} className="card overflow-hidden">
-            {/* Section header: name + symbol + placeholder 2D */}
+            {/* Section header: name + symbol + uploadable 2D */}
             <div className="px-4 py-3 border-b border-surface-500 flex items-center gap-3 bg-surface-800">
-              {/* Placeholder 2D miniature */}
-              <div className="w-10 h-10 rounded bg-surface-700 border border-surface-500 flex items-center justify-center text-[9px] text-ink-400 shrink-0" title="2D drawing — coming soon">
-                2D
-              </div>
+              {/* 2D miniature — upload or display */}
+              {elementImages[group.element] ? (
+                <div className="relative group/img shrink-0">
+                  <img src={elementImages[group.element]} alt={group.element} className="w-10 h-10 rounded border border-surface-500 object-cover" />
+                  <button onClick={() => handleRemoveImage(group.element)}
+                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500/80 text-white text-[8px] flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">×</button>
+                </div>
+              ) : (
+                <label className="w-10 h-10 rounded bg-surface-700 border border-dashed border-surface-500 flex items-center justify-center text-ink-400 hover:text-accent-400 hover:border-accent-500 cursor-pointer transition-colors shrink-0" title="Upload 2D drawing">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 5v14M5 12h14" /></svg>
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(group.element, e)} />
+                </label>
+              )}
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono font-bold text-accent-400 bg-accent-500/10 px-1.5 py-0.5 rounded">{sym.symbol}</span>
@@ -1272,15 +1430,18 @@ function GroupedElementTable({ items, isPPMode }) {
           </tr>
         </thead>
         <tbody>
-          {grouped.map((g, i) => (
+          {grouped.map((g, i) => {
+            const sym = getPartSymbol(g.element);
+            return (
             <tr key={i} className="border-b border-surface-500/30">
               {isPPMode && <td className="px-4 py-2 text-accent-400 text-[10px]">{g.projects.join(', ')}</td>}
-              <td className="px-4 py-2 text-ink-100">{g.element}</td>
+              <td className="px-4 py-2 text-ink-100">{g.element} <span className="text-accent-400 font-mono text-[10px]">({sym.symbol})</span>{sym.mirror ? <span className="text-purple-400 text-[9px] ml-1">⟷</span> : ''}</td>
               <td className="px-4 py-2 text-right text-ink-100 font-mono">{g.length} mm</td>
               <td className="px-4 py-2 text-right text-ink-100 font-semibold">{g.totalQty}</td>
               <td className="px-4 py-2 text-ink-400">{g.windows.join(', ')}</td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

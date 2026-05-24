@@ -67,6 +67,15 @@ export const CONSTANTS = Object.freeze({
 });
 
 export const CONFIGURATIONS = Object.freeze({
+    'none': {
+        key: 'none',
+        rows: 1,
+        cols: 1,
+        totalPanes: 1,
+        verticalBars: 0,
+        horizontalBars: 0,
+        description: 'No bars'
+    },
     '2x2': {
         key: '2x2',
         rows: 2,

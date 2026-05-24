@@ -113,11 +113,11 @@ function drawHeader(doc, info, pageNum, totalPages) {
 
   // Company
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
+  doc.setFontSize(10);
   tc(doc, C.black);
   doc.text(info.companyName || 'COMPANY', x + 2, y + 7);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(5);
+  doc.setFontSize(6);
   tc(doc, C.gray);
   doc.text('GLASS ORDER — SEALED UNITS', x + 2, y + 13);
 
@@ -189,8 +189,8 @@ function drawTable(doc, items, startY) {
   ];
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(5);
-  tc(doc, C.grayL);
+  doc.setFontSize(5.5);
+  tc(doc, C.dark);
   cols.forEach(c => doc.text(c.l, x + c.dx, y));
 
   dc(doc, C.grayXL);
@@ -207,12 +207,12 @@ function drawTable(doc, items, startY) {
 
     const clr = i % 2 === 0 ? C.black : C.dark;
     tc(doc, clr);
-    doc.setFont('courier', 'normal');
-    doc.setFontSize(5);
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(5.5);
     doc.text(String(i + 1), x + 0, y);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(5);
+    doc.setFontSize(5.5);
     doc.text(g.windowName || '', x + 10, y);
     doc.text(g.sash || '', x + 35, y);
 
@@ -341,7 +341,7 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
   });
 
   doc.setFont('courier', 'bold');
-  doc.setFontSize(3.5);
+  doc.setFontSize(4);
   tc(doc, C.dim);
   for (let i = 0; i < hCuts.length - 1; i++) {
     const segW = hCuts[i + 1] - hCuts[i];

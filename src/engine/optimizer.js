@@ -25,6 +25,7 @@ function bestFitDecreasing({ items, stockLength, kerf, endTrim, minimumPiece, pr
         bars.push({
           barId: `${prefix}-OC${idx + 1}`,
           cuts: [],
+          cutDetails: [],
           used: endTrim,
           waste: 0,
           utilization: 0,
@@ -59,6 +60,7 @@ function bestFitDecreasing({ items, stockLength, kerf, endTrim, minimumPiece, pr
       const newBar = {
         barId: `${prefix}-${bars.length + 1}`,
         cuts: [],
+        cutDetails: [],
         used: endTrim,
         waste: 0,
         utilization: 0,
@@ -73,6 +75,8 @@ function bestFitDecreasing({ items, stockLength, kerf, endTrim, minimumPiece, pr
     const barStock = bestBar.stockLength || stockLength;
     const kerfAllowance = bestBar.cuts.length > 0 ? kerf : 0;
     bestBar.cuts.push(cut.length);
+    if (!bestBar.cutDetails) bestBar.cutDetails = [];
+    bestBar.cutDetails.push({ length: cut.length, elementName: cut.elementName || '' });
     bestBar.used += kerfAllowance + cut.length;
     const remaining = barStock - (bestBar.used + endTrim);
     bestBar.waste = Math.max(remaining, 0);
