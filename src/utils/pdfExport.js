@@ -32,7 +32,7 @@ export async function exportWindowToPDF({ item, windowSpec, settings, derived })
   // Header
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
-  doc.text(`Sash Planner — ${item.window_number || 'Window'}`, margin, y);
+  doc.text(`Production Core — ${item.window_number || 'Window'}`, margin, y);
   y += 6;
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');

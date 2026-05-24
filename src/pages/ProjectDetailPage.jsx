@@ -379,7 +379,7 @@ export default function ProjectDetailPage() {
                               <span>{material.item_number}</span>
                               <span>{material.size || '—'}</span>
                               {material.cost_per_unit > 0 && <span>£{Number(material.cost_per_unit).toFixed(2)}/{material.unit}</span>}
-                              {material.jc_uuid && <span className="text-[8px] px-1 py-0.5 rounded bg-green-500/15 text-green-400 border border-green-500/25">JC</span>}
+                              {material.jc_uuid && <span className="text-[8px] px-1 py-0.5 rounded bg-amber-600/15 text-amber-500 border border-amber-500/25">JC</span>}
                             </div>
                           </div>
                         </div>
@@ -429,7 +429,7 @@ export default function ProjectDetailPage() {
                       📄 Export PDF
                     </button>
                     <button onClick={handleExportJC} className="btn btn-secondary text-xs">
-                      ↑ Export to JC
+                      <svg className="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none"><path d="M12 2L3 7v10l9 5 9-5V7l-9-5z" stroke="#D4A030" strokeWidth="1.5" fill="#D4A030" fillOpacity="0.15"/></svg> Export to JC
                     </button>
                   </>
                 )}

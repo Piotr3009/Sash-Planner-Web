@@ -362,7 +362,7 @@ export default function MaterialsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'sash-planner-materials.csv';
+    a.download = 'production-core-materials.csv';
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -385,7 +385,7 @@ export default function MaterialsPage() {
               </button>
             )}
             <button onClick={handleImportCSV} className="btn btn-secondary text-xs">
-              ↑ Import from JC
+              <svg className="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none"><path d="M12 2L3 7v10l9 5 9-5V7l-9-5z" stroke="#D4A030" strokeWidth="1.5" fill="#D4A030" fillOpacity="0.15"/></svg> Import from JC
             </button>
             <button onClick={handleExportCSV} className="btn btn-secondary text-xs">
               ↓ Export CSV
@@ -558,7 +558,7 @@ export default function MaterialsPage() {
                         <div className="text-ink-100 font-medium flex items-center gap-1.5">
                           {m.name}
                           {isJC && (
-                            <span className="text-[8px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 border border-green-500/25 font-normal uppercase tracking-wider" title={`JC: ${m.jc_uuid}`}>
+                            <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-600/15 text-amber-500 border border-amber-500/25 font-normal uppercase tracking-wider" title={`JC: ${m.jc_uuid}`}>
                               JC
                             </span>
                           )}

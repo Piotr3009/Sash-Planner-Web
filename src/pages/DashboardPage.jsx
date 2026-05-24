@@ -187,7 +187,7 @@ function NewProjectForm({ onCreate, onCancel }) {
         className="w-full py-2 rounded-lg border border-surface-500 text-accent-400 text-[10px] hover:bg-surface-700 transition-all"
         onClick={() => { /* Future: Joinery Core import */ }}
       >
-        Upload from Joinery Core
+        Upload from <svg className="inline w-3.5 h-3.5 -mt-0.5 mx-0.5" viewBox="0 0 24 24" fill="none"><path d="M12 2L3 7v10l9 5 9-5V7l-9-5z" stroke="#D4A030" strokeWidth="1.5" fill="#D4A030" fillOpacity="0.15"/></svg> Joinery Core
       </button>
     </div>
   );

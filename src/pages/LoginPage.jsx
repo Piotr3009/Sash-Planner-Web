@@ -34,10 +34,10 @@ export default function LoginPage() {
     <div className="min-h-screen grid place-items-center bg-gradient-to-br from-ink-100 to-ink-200 p-6">
       <div className="card w-full max-w-md p-8">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-lg bg-accent-500 text-white grid place-items-center font-bold">S</div>
+          <div className="w-10 h-10 rounded-lg bg-[#1e3a5f] text-[#c0cde0] grid place-items-center font-bold text-sm">PC</div>
           <div>
-            <h1 className="text-xl font-semibold">Sash Planner</h1>
-            <p className="text-xs text-ink-400">Production planning for sash window manufacturers</p>
+            <h1 className="text-xl font-semibold">Production Core</h1>
+            <p className="text-xs text-ink-400">Windows & Doors Timber Production</p>
           </div>
         </div>
 

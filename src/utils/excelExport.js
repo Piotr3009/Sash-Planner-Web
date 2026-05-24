@@ -12,7 +12,7 @@ export async function exportWindowToExcel({ item, windowSpec, settings, derived 
 
   // Summary sheet
   const summary = [
-    ['Sash Planner — Production export'],
+    ['Production Core — Production export'],
     [],
     ['Window number', item.window_number || ''],
     ['Type', item.window_type || 'sash'],

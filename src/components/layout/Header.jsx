@@ -17,7 +17,7 @@ export default function Header() {
       <Link to="/dashboard" className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-accent-500 text-white grid place-items-center font-bold text-sm">S</div>
         <div>
-          <div className="font-semibold text-ink-50 leading-none text-sm">Sash Planner</div>
+          <div className="font-semibold text-ink-50 leading-none text-sm">Production Core</div>
           <div className="text-[10px] uppercase tracking-widest text-accent-500 font-medium">Production</div>
         </div>
       </Link>

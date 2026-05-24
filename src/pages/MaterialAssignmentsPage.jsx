@@ -117,7 +117,7 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
           <div className="text-[10px] text-ink-400 mt-0.5 flex items-center gap-2">
             <span>{assignedMat.size || '—'}</span>
             {assignedMat.jc_uuid && (
-              <span className="text-[8px] px-1 py-0.5 rounded bg-green-500/15 text-green-400 border border-green-500/25">JC</span>
+              <span className="text-[8px] px-1 py-0.5 rounded bg-amber-600/15 text-amber-500 border border-amber-500/25">JC</span>
             )}
           </div>
         )}
