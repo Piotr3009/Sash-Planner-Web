@@ -48,8 +48,7 @@ function bestFitDecreasing({ items, stockLength, kerf, endTrim, minimumPiece, pr
       const potentialUsed = bar.used + kerfAllowance + cut.length;
       const remainingAfterEndTrim = barStock - (potentialUsed + endTrim);
       if (remainingAfterEndTrim < 0) return;
-      // Skip minimumPiece check for offcut bars — use them as much as possible
-      if (!bar.isOffcut && remainingAfterEndTrim !== 0 && remainingAfterEndTrim < minimumPiece) return;
+      // Piece fits — any remaining is acceptable waste
       if (remainingAfterEndTrim < bestWaste) {
         bestWaste = remainingAfterEndTrim;
         bestBar = bar;

@@ -784,7 +784,7 @@ function PreCutTab({ merged, settings }) {
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const getMaterialById = useMaterialStore((s) => s.getMaterialById);
 
-  // Resolve material name for a group by checking assignments of its items
+  // Resolve full material info for a group by checking assignments of its items
   const getMaterialForGroup = (items) => {
     for (const item of items) {
       const sym = getPartSymbol(item.elementName);
@@ -792,7 +792,7 @@ function PreCutTab({ merged, settings }) {
         const assignment = assignments[sym.partId];
         if (assignment?.material_id) {
           const mat = getMaterialById(assignment.material_id);
-          if (mat) return mat.name;
+          if (mat) return mat;
         }
       }
     }
@@ -903,9 +903,15 @@ function PreCutTab({ merged, settings }) {
               </svg>
               <div className="text-sm font-semibold text-ink-50">{group.label}</div>
               {(() => {
-                const matName = getMaterialForGroup(group.items);
-                return matName ? (
-                  <span className="text-[10px] text-accent-400 bg-accent-500/10 px-2 py-0.5 rounded">{matName}</span>
+                const mat = getMaterialForGroup(group.items);
+                return mat ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] text-accent-400 bg-accent-500/10 px-2 py-0.5 rounded font-mono">{mat.item_number}</span>
+                    <span className="text-[10px] text-ink-100 font-medium">{mat.name}</span>
+                    {mat.size && <span className="text-[9px] text-ink-300">Size: {mat.size}</span>}
+                    {mat.thickness && <span className="text-[9px] text-ink-300">Thick: {mat.thickness}</span>}
+                    {mat.category && <span className="text-[9px] text-ink-400">{mat.category}{mat.subcategory ? ` / ${mat.subcategory}` : ''}</span>}
+                  </div>
                 ) : (
                   <span className="text-[10px] text-ink-400/50 italic">No material assigned</span>
                 );
@@ -1058,7 +1064,7 @@ function CutListTab({ merged, isPPMode }) {
       const assignment = assignments[sym.partId];
       if (assignment?.material_id) {
         const mat = getMaterialById(assignment.material_id);
-        if (mat) return mat.name;
+        if (mat) return mat;
       }
     }
     return null;
@@ -1184,8 +1190,15 @@ function CutListTab({ merged, isPPMode }) {
                 <div className="text-[10px] text-ink-400 mt-0.5">
                   Section: {finishedSection} · {group.aggregated.reduce((s, a) => s + a.totalQty, 0)} pcs
                   {(() => {
-                    const matName = getMaterialForElement(group.element);
-                    return matName ? <span className="ml-2 text-accent-400">· {matName}</span> : null;
+                    const mat = getMaterialForElement(group.element);
+                    return mat ? (
+                      <span className="ml-2">
+                        <span className="text-accent-400 font-mono">{mat.item_number}</span>
+                        <span className="text-ink-200 ml-1">{mat.name}</span>
+                        {mat.size && <span className="text-ink-400 ml-1">· {mat.size}</span>}
+                        {mat.thickness && <span className="text-ink-400 ml-1">· t:{mat.thickness}</span>}
+                      </span>
+                    ) : null;
                   })()}
                 </div>
               </div>
@@ -1447,7 +1460,7 @@ function GroupedElementTable({ items, isPPMode }) {
     items.forEach((it) => {
       const key = `${it.elementName}|${it.length}`;
       if (!map.has(key)) {
-        map.set(key, { element: it.elementName, length: it.length, totalQty: 0, windows: [], projects: [] });
+        map.set(key, { element: it.elementName, length: it.length, finishedLength: it.finishedLength || it.length, section: it.section || '', totalQty: 0, windows: [], projects: [] });
       }
       const g = map.get(key);
       g.totalQty += it.quantity;
@@ -1464,7 +1477,9 @@ function GroupedElementTable({ items, isPPMode }) {
           <tr className="border-b border-surface-500/50 bg-surface-700/30">
             {isPPMode && <th className="px-4 py-2 text-left text-ink-400 font-medium">Projects</th>}
             <th className="px-4 py-2 text-left text-ink-400 font-medium">Element</th>
-            <th className="px-4 py-2 text-right text-ink-400 font-medium">Length</th>
+            <th className="px-4 py-2 text-right text-ink-400 font-medium">Pre-Cut</th>
+            <th className="px-4 py-2 text-right text-ink-400 font-medium">Finished</th>
+            <th className="px-4 py-2 text-left text-ink-400 font-medium">Section</th>
             <th className="px-4 py-2 text-right text-ink-400 font-medium">Total Qty</th>
             <th className="px-4 py-2 text-left text-ink-400 font-medium">Windows</th>
           </tr>
@@ -1477,6 +1492,8 @@ function GroupedElementTable({ items, isPPMode }) {
               {isPPMode && <td className="px-4 py-2 text-accent-400 text-[10px]">{g.projects.join(', ')}</td>}
               <td className="px-4 py-2 text-ink-100">{g.element} <span className="text-accent-400 font-mono text-[10px]">({sym.symbol})</span>{sym.mirror ? <span className="text-purple-400 text-[9px] ml-1">⟷</span> : ''}</td>
               <td className="px-4 py-2 text-right text-ink-100 font-mono">{g.length} mm</td>
+              <td className="px-4 py-2 text-right text-ink-300 font-mono">{g.finishedLength} mm</td>
+              <td className="px-4 py-2 text-ink-300">{g.section}</td>
               <td className="px-4 py-2 text-right text-ink-100 font-semibold">{g.totalQty}</td>
               <td className="px-4 py-2 text-ink-400">{g.windows.join(', ')}</td>
             </tr>

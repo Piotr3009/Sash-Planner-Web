@@ -102,6 +102,8 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg) {
   const settings = settingsWithDefaults(settingsArg);
   if (!derived) return { sashEngineering: [], boxSapele: [] };
 
+  const MACHINING_ALLOWANCE = 20; // mm added to finished length for pre-cut
+
   // Sash precut groups by section (mapped via settings.sectionMap to raw)
   const bySection = new Map();
   derived.components.sash.forEach((c) => {
@@ -110,7 +112,10 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg) {
     if (!bySection.has(raw)) bySection.set(raw, []);
     bySection.get(raw).push({
       elementName: c.elementName,
-      length: c.length,
+      length: Math.round(c.length + MACHINING_ALLOWANCE),
+      finishedLength: Math.round(c.length),
+      section: raw,
+      finishedSection: c.section,
       quantity: c.quantity,
       windowId: c.windowId,
       windowName: c.windowName
@@ -126,7 +131,10 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg) {
     if (!byWidth.has(widthWithAllowance)) byWidth.set(widthWithAllowance, []);
     byWidth.get(widthWithAllowance).push({
       elementName: c.elementName,
-      length: c.length,
+      length: Math.round(c.length + MACHINING_ALLOWANCE),
+      finishedLength: Math.round(c.length),
+      section: c.section,
+      finishedSection: c.section,
       quantity: c.quantity,
       windowId: c.windowId,
       windowName: c.windowName
