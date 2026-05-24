@@ -26,12 +26,8 @@ export default function AppSidebar() {
     <aside className="w-[220px] shrink-0 bg-surface-900 border-r border-surface-500 flex flex-col h-full">
 
       {/* ─── Logo ─── */}
-      <div className="px-4 py-3.5 flex items-center gap-2.5 border-b border-surface-500">
-        <div className="w-8 h-8 rounded-lg bg-[#1e3a5f] text-[#c0cde0] grid place-items-center font-bold text-sm shrink-0">PC</div>
-        <div className="min-w-0">
-          <div className="text-[13px] font-semibold text-ink-50 leading-tight">Production Core</div>
-          <div className="text-[9px] uppercase tracking-[0.1em] text-ink-400 font-medium">Windows & Doors</div>
-        </div>
+      <div className="px-3 py-3 border-b border-surface-500">
+        <img src="/logo-full.png" alt="Production Core" className="h-8 w-auto" />
       </div>
 
       {/* ─── Main nav ─── */}

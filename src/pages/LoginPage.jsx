@@ -33,12 +33,9 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen grid place-items-center bg-gradient-to-br from-ink-100 to-ink-200 p-6">
       <div className="card w-full max-w-md p-8">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-lg bg-[#1e3a5f] text-[#c0cde0] grid place-items-center font-bold text-sm">PC</div>
-          <div>
-            <h1 className="text-xl font-semibold">Production Core</h1>
-            <p className="text-xs text-ink-400">Windows & Doors Timber Production</p>
-          </div>
+        <div className="mb-6 text-center">
+          <img src="/logo-full.png" alt="Production Core" className="h-12 w-auto mx-auto mb-2" />
+          <p className="text-xs text-ink-400">Windows & Doors Timber Production</p>
         </div>
 
         {!hasSupabaseConfig && (
