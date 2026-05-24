@@ -24,18 +24,45 @@ export const SASH_WINDOW_PARTS = {
     { id: 'bottom_meet_rail',     name: 'Bottom Meeting Rail',    section: '63×63',  finishedSection: '57×43',  pcs: 1, materialType: 'hardwood' },
   ],
   beading: [
-    { id: 'glazing_bar_beading',      name: 'Glazing Bar Beading',        section: 'profile',  pcs: 1, materialType: 'beading' },
-    { id: 'internal_georgian_beading', name: 'Internal Georgian Beading',  section: 'profile',  pcs: 1, materialType: 'beading' },
-    { id: 'triangle_beading_ext',      name: 'Triangle Beading (Ext)',     section: 'profile',  pcs: 1, materialType: 'beading' },
-    { id: 'parting_beading',           name: 'Parting Beading',            section: 'profile',  pcs: 1, materialType: 'beading' },
-    { id: 'staff_beading',            name: 'Staff Beading',              section: 'profile',  pcs: 1, materialType: 'beading' },
-    { id: 'meeting_beading_a',         name: 'Meeting Beading A',          section: 'profile',  pcs: 1, materialType: 'beading' },
-    { id: 'meeting_beading_b',         name: 'Meeting Beading B',          section: 'profile',  pcs: 1, materialType: 'beading' },
+    { id: 'glazing_bar_beading',      name: 'Glazing Bar Beading',        section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },
+    { id: 'internal_georgian_beading', name: 'Internal Georgian Beading',  section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },
+    { id: 'triangle_beading_ext',      name: 'Triangle Beading (Ext)',     section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },
+    { id: 'parting_beading',           name: 'Parting Beading',            section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },
+    { id: 'staff_beading',            name: 'Staff Beading',              section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },
+    { id: 'meeting_beading_a',         name: 'Meeting Beading A',          section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },
+    { id: 'meeting_beading_b',         name: 'Meeting Beading B',          section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },
+  ],
+  glass: [
+    { id: 'glass_double',     name: 'Double Glazing',       section: '4-16-4',   pcs: 2, materialType: 'glass', unit: 'm²' },
+    { id: 'glass_triple',     name: 'Triple Glazing',       section: '4-12-4-12-4', pcs: 2, materialType: 'glass', unit: 'm²' },
+    { id: 'glass_single',     name: 'Single Heritage',      section: '6mm',      pcs: 2, materialType: 'glass', unit: 'm²' },
+    { id: 'glass_passive',    name: 'Passive (Vacuum)',     section: 'vacuum',   pcs: 2, materialType: 'glass', unit: 'm²' },
+  ],
+  paint: [
+    { id: 'paint_primer',     name: 'Primer',               section: '—',  pcs: 1, materialType: 'paint', unit: 'L' },
+    { id: 'paint_white_9016', name: 'White Standard 9016',  section: '—',  pcs: 1, materialType: 'paint', unit: 'L' },
+    { id: 'paint_bespoke',    name: 'Bespoke Colour',       section: '—',  pcs: 1, materialType: 'paint', unit: 'L', optional: true },
+  ],
+  consumables: [
+    { id: 'cord',             name: 'Cord / Rope',          section: '—',  pcs: 1, materialType: 'consumable', unit: 'm' },
+    { id: 'glazing_clips',    name: 'Glazing Clips',        section: '—',  pcs: 20, materialType: 'consumable', unit: 'pcs' },
+    { id: 'spacer_1mm',       name: 'Glazing Packer 1mm',   section: '—',  pcs: 20, materialType: 'consumable', unit: 'pcs' },
+    { id: 'spacer_2mm',       name: 'Glazing Packer 2mm',   section: '—',  pcs: 4, materialType: 'consumable', unit: 'pcs' },
+    { id: 'bead_tape',        name: 'Georgian Bar/Bead Tape', section: '—', pcs: 1, materialType: 'consumable', unit: 'm' },
+    { id: 'silicone',         name: 'Silicone',             section: '—',  pcs: 1, materialType: 'consumable', unit: 'tubes' },
+    { id: 'weights',          name: 'Weights (Lead)',        section: '—',  pcs: 1, materialType: 'consumable', unit: 'kg' },
   ],
 };
 
 // Flat list for lookups
-export const ALL_PARTS = [...SASH_WINDOW_PARTS.box, ...SASH_WINDOW_PARTS.sash, ...SASH_WINDOW_PARTS.beading];
+export const ALL_PARTS = [
+  ...SASH_WINDOW_PARTS.box,
+  ...SASH_WINDOW_PARTS.sash,
+  ...SASH_WINDOW_PARTS.beading,
+  ...SASH_WINDOW_PARTS.glass,
+  ...SASH_WINDOW_PARTS.paint,
+  ...SASH_WINDOW_PARTS.consumables,
+];
 
 // ─── Store ───
 export const useMaterialAssignmentStore = create(

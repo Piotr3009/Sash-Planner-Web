@@ -340,8 +340,53 @@ export default function MaterialAssignmentsPage() {
         {/* Beading */}
         <PartGroupSection
           title="Beading"
-          subtitle={`${SASH_WINDOW_PARTS.beading.length} parts · glazing, georgian, triangle`}
+          subtitle={`${SASH_WINDOW_PARTS.beading.length} parts · glazing, georgian, triangle, parting, staff, meeting`}
           parts={SASH_WINDOW_PARTS.beading}
+          assignments={assignments}
+          materials={materials}
+          categories={categories}
+          subcategoriesByCategory={subcategoriesByCategory}
+          onAssign={setAssignment}
+          onFilter={setFilter}
+          onYieldChange={setYield}
+          onRemove={removeAssignment}
+        />
+
+        {/* Glass */}
+        <PartGroupSection
+          title="Glass"
+          subtitle={`${SASH_WINDOW_PARTS.glass.length} types · double, triple, single, passive`}
+          parts={SASH_WINDOW_PARTS.glass}
+          assignments={assignments}
+          materials={materials}
+          categories={categories}
+          subcategoriesByCategory={subcategoriesByCategory}
+          onAssign={setAssignment}
+          onFilter={setFilter}
+          onYieldChange={setYield}
+          onRemove={removeAssignment}
+        />
+
+        {/* Paint */}
+        <PartGroupSection
+          title="Paint"
+          subtitle={`${SASH_WINDOW_PARTS.paint.length} types · primer, white 9016, bespoke`}
+          parts={SASH_WINDOW_PARTS.paint}
+          assignments={assignments}
+          materials={materials}
+          categories={categories}
+          subcategoriesByCategory={subcategoriesByCategory}
+          onAssign={setAssignment}
+          onFilter={setFilter}
+          onYieldChange={setYield}
+          onRemove={removeAssignment}
+        />
+
+        {/* Consumables */}
+        <PartGroupSection
+          title="Consumables"
+          subtitle={`${SASH_WINDOW_PARTS.consumables.length} items · cord, clips, spacers, tape, silicone, weights`}
+          parts={SASH_WINDOW_PARTS.consumables}
           assignments={assignments}
           materials={materials}
           categories={categories}
