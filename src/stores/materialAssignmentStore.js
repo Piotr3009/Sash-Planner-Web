@@ -44,13 +44,16 @@ export const SASH_WINDOW_PARTS = {
     { id: 'paint_bespoke',    name: 'Bespoke Colour',       section: '—',  pcs: 1, materialType: 'paint', unit: 'L', optional: true },
   ],
   consumables: [
-    { id: 'cord',             name: 'Cord / Rope',          section: '—',  pcs: 1, materialType: 'consumable', unit: 'm' },
-    { id: 'glazing_clips',    name: 'Glazing Clips',        section: '—',  pcs: 20, materialType: 'consumable', unit: 'pcs' },
-    { id: 'spacer_1mm',       name: 'Glazing Packer 1mm',   section: '—',  pcs: 20, materialType: 'consumable', unit: 'pcs' },
-    { id: 'spacer_2mm',       name: 'Glazing Packer 2mm',   section: '—',  pcs: 4, materialType: 'consumable', unit: 'pcs' },
-    { id: 'bead_tape',        name: 'Georgian Bar/Bead Tape', section: '—', pcs: 1, materialType: 'consumable', unit: 'm' },
-    { id: 'silicone',         name: 'Silicone',             section: '—',  pcs: 1, materialType: 'consumable', unit: 'tubes' },
-    { id: 'weights',          name: 'Weights (Lead)',        section: '—',  pcs: 1, materialType: 'consumable', unit: 'kg' },
+    { id: 'cord',               name: 'Cord / Rope',              section: '—',  pcs: 1, materialType: 'consumable', unit: 'm' },
+    { id: 'glazing_clips_24mm', name: 'Glazing Clips 24mm',       section: '24mm', pcs: 20, materialType: 'consumable', unit: 'pcs', note: 'double glazing' },
+    { id: 'glazing_clips_28mm', name: 'Glazing Clips 28mm',       section: '28mm', pcs: 20, materialType: 'consumable', unit: 'pcs', note: 'triple glazing' },
+    { id: 'glazing_clips_14mm', name: 'Glazing Clips 14mm',       section: '14mm', pcs: 20, materialType: 'consumable', unit: 'pcs', note: 'slim frame' },
+    { id: 'spacer_1mm',         name: 'Glazing Packer 1mm',       section: '—',  pcs: 20, materialType: 'consumable', unit: 'pcs' },
+    { id: 'spacer_2mm',         name: 'Glazing Packer 2mm',       section: '—',  pcs: 4, materialType: 'consumable', unit: 'pcs' },
+    { id: 'bead_tape',          name: 'Georgian Bar/Bead Tape',   section: '—',  pcs: 1, materialType: 'consumable', unit: 'm' },
+    { id: 'silicone',           name: 'Silicone',                 section: '—',  pcs: 1, materialType: 'consumable', unit: 'tubes' },
+    { id: 'weights_normal',     name: 'Weights Normal',           section: '—',  pcs: 1, materialType: 'consumable', unit: 'kg', note: 'standard frame' },
+    { id: 'weights_slim',       name: 'Weights Slim',             section: '—',  pcs: 1, materialType: 'consumable', unit: 'kg', note: 'slim frame' },
   ],
 };
 

@@ -345,8 +345,10 @@ function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, to
     // Cord — 3× frame height in meters
     const cordM = round((3 * frameHeight) / 1000);
 
-    // Glazing clips — 20 per window (size depends on glass type)
-    const clipSize = glassType === 'triple' ? '28mm' : '24mm';
+    // Glazing clips — 20 per window, size depends on glass type + frame type
+    // double/single/passive → 24mm, triple → 28mm, slim frame → 14mm
+    const isSlim = windowSpec.frame?.type === 'slim';
+    const clipSize = isSlim ? '14mm' : (glassType === 'triple' ? '28mm' : '24mm');
     const clipQty = 20;
 
     // Spacer 1mm — 20 per window
@@ -362,6 +364,9 @@ function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, to
     const siliconeMeters = ((perimPerSash + barPerSash) * 2) / 1000;
     const siliconeTubes = round(0.1 * siliconeMeters);
 
+    // Weights — type depends on frame
+    const weightType = isSlim ? 'slim' : 'normal';
+
     return {
         glass: { type: glassType, sqm: glassSqm },
         cord: { meters: cordM },
@@ -370,6 +375,7 @@ function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, to
         spacer2mm: { qty: spacer2mmQty },
         beadTape: { meters: beadTapeM },
         silicone: { tubes: siliconeTubes },
+        weightType,
     };
 }
 
