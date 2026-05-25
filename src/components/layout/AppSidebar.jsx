@@ -147,16 +147,6 @@ export default function AppSidebar() {
             >
               Ironmongery
             </NavLink>
-            <NavLink
-              to="/categories"
-              className={({ isActive }) =>
-                `block px-3 py-1.5 rounded-md text-[12px] mb-0.5 transition-colors ${
-                  isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'
-                }`
-              }
-            >
-              Manage Categories
-            </NavLink>
           </div>
         )}
 

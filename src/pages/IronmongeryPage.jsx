@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useIronmongeryStore, IRONMONGERY_FINISHES } from '../stores/ironmongeryStore.js';
+import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 
 const IRONMONGERY_UNITS = ['pcs', 'pair', 'set', 'unit'];
 
@@ -201,6 +202,7 @@ export default function IronmongeryPage() {
   const [showForm, setShowForm] = useState(false);     // false | 'add' | material object (edit)
   const [confirmDelete, setConfirmDelete] = useState(null); // null | 'bulk' | material
   const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [showCategories, setShowCategories] = useState(false);
   const [selected, setSelected] = useState(new Set());
 
   // ─── Dynamic categories from data ───
@@ -380,20 +382,28 @@ export default function IronmongeryPage() {
               {items.length} items across {categories.length} categories
             </p>
           </div>
-          <div className="flex gap-2 items-center">
-            {someSelected && (
-              <button onClick={handleBulkDelete} className="text-xs px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25 transition-colors">
-                Delete selected ({selected.size})
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex gap-2 items-center">
+              {someSelected && (
+                <button onClick={handleBulkDelete} className="text-xs px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 border border-red-500/30 hover:bg-red-500/25 transition-colors">
+                  Delete selected ({selected.size})
+                </button>
+              )}
+              <button onClick={handleImportCSV} className="btn btn-secondary text-xs">
+                <svg className="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none"><path d="M12 2L3 7v10l9 5 9-5V7l-9-5z" stroke="#D4A030" strokeWidth="1.5" fill="#D4A030" fillOpacity="0.15"/></svg> Import from JC
               </button>
-            )}
-            <button onClick={handleImportCSV} className="btn btn-secondary text-xs">
-              <svg className="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none"><path d="M12 2L3 7v10l9 5 9-5V7l-9-5z" stroke="#D4A030" strokeWidth="1.5" fill="#D4A030" fillOpacity="0.15"/></svg> Import from JC
-            </button>
-            <button onClick={handleExportCSV} className="btn btn-secondary text-xs">
-              ↓ Export CSV
-            </button>
-            <button onClick={() => setShowForm('add')} className="btn btn-primary text-xs">
-              + Add material
+              <button onClick={handleExportCSV} className="btn btn-secondary text-xs">
+                ↓ Export CSV
+              </button>
+              <button onClick={() => setShowForm('add')} className="btn btn-primary text-xs">
+                + Add material
+              </button>
+            </div>
+            <button onClick={() => setShowCategories(true)} className="text-[11px] text-ink-400 hover:text-accent-400 transition-colors flex items-center gap-1">
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+              </svg>
+              Manage Categories
             </button>
           </div>
         </div>
@@ -653,6 +663,10 @@ export default function IronmongeryPage() {
           onConfirm={confirmDeleteAction}
           onCancel={() => setConfirmDelete(null)}
         />
+      )}
+      {/* Manage Categories modal */}
+      {showCategories && (
+        <ManageCategoriesModal onClose={() => setShowCategories(false)} />
       )}
     </>
   );
