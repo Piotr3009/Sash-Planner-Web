@@ -153,17 +153,15 @@ function drawSummaryTable(doc, PG, groups, startY) {
   doc.text('PRE-CUT SUMMARY', x, y);
   y += 10;
 
-  // Header
+  // Header — spread across full width, no Waste/Util
   const cols = [
     { l: '#', dx: 0 },
-    { l: 'Section', dx: 10 },
-    { l: 'Material', dx: 55 },
-    { l: 'Stock', dx: 155 },
-    { l: 'Elem', dx: 185 },
-    { l: 'Pcs', dx: 210 },
-    { l: 'Bars', dx: 232 },
-    { l: 'Waste', dx: 255 },
-    { l: 'Util', dx: 290 },
+    { l: 'Section', dx: 12 },
+    { l: 'Material', dx: 135 },
+    { l: 'Stock (mm)', dx: 225 },
+    { l: 'Elements', dx: 270 },
+    { l: 'Pieces', dx: 310 },
+    { l: 'Bars', dx: 345 },
   ];
 
   doc.setFont('helvetica', 'bold');
@@ -172,33 +170,30 @@ function drawSummaryTable(doc, PG, groups, startY) {
   cols.forEach((c) => doc.text(c.l, x + c.dx, y));
   dc(doc, C.grayXL);
   doc.setLineWidth(LW.tableLine);
-  doc.line(x, y + 3, x + 320, y + 3);
+  doc.line(x, y + 3, x + 380, y + 3);
   y += 11;
 
   // Rows
   groups.forEach((g, i) => {
     if (i % 2 === 0) {
       fc(doc, C.rowBg);
-      doc.rect(x - 1, y - 5, 322, 10, 'F');
+      doc.rect(x - 1, y - 5, 382, 10, 'F');
     }
     tc(doc, C.black);
     doc.setFont('courier', 'normal');
     doc.setFontSize(11);
     doc.text(String(i + 1), x + 0, y);
     doc.setFont('helvetica', 'bold');
-    doc.text(g.label, x + 10, y);
+    doc.text(g.label, x + 12, y);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.text((g.materialName || 'Not assigned').substring(0, 30), x + 55, y);
+    doc.text((g.materialName || 'Not assigned').substring(0, 35), x + 135, y);
     doc.setFont('courier', 'normal');
     doc.setFontSize(11);
-    doc.text(String(g.stockLength), x + 155, y);
-    doc.text(String(g.elementCount), x + 185, y);
-    doc.text(String(g.pieceCount), x + 210, y);
-    doc.text(String(g.barCount), x + 232, y);
-    doc.text(String(g.waste), x + 255, y);
-    const util = g.utilization > 0 ? `${(g.utilization * 100).toFixed(1)}%` : '—';
-    doc.text(util, x + 290, y);
+    doc.text(String(g.stockLength), x + 225, y);
+    doc.text(String(g.elementCount), x + 270, y);
+    doc.text(String(g.pieceCount), x + 310, y);
+    doc.text(String(g.barCount), x + 345, y);
     y += 10;
   });
 
@@ -206,7 +201,7 @@ function drawSummaryTable(doc, PG, groups, startY) {
 }
 
 // ─── BLO VISUALIZATION (per section page) ───
-function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf, sectionWidth) {
+function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf) {
   const x = PG.bx + 4;
   const areaW = PG.w - 2 * PG.bx - 8;
   let y = startY;
@@ -214,9 +209,8 @@ function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf, sectionW
   if (!optGroup?.bars?.length) return y;
 
   const maxStock = Math.max(...optGroup.bars.map((b) => b.stockLength || stockLength));
-  // Proportional bar height: base 14mm, 1.5x if section width > 100mm
-  const barH = (sectionWidth && sectionWidth > 100) ? 21 : 14;
-  const barGap = 3;
+  const barH = 7;
+  const barGap = 2;
 
   optGroup.bars.forEach((bar) => {
     const barStock = bar.stockLength || stockLength;
@@ -257,7 +251,7 @@ function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf, sectionW
       doc.setFontSize(7.5);
       tc(doc, C.black);
       if (cutW > 20) {
-        doc.text(label, cutX + cutW / 2, y + barH / 2 + 2, { align: 'center' });
+        doc.text(label, cutX + cutW / 2, y + barH / 2 + 1.5, { align: 'center' });
       }
 
       cursor += cutLen + kerf;
@@ -267,13 +261,13 @@ function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf, sectionW
     doc.setFont('courier', 'normal');
     doc.setFontSize(8);
     tc(doc, C.gray);
-    doc.text(bar.barId, x + barW + 3, y + barH / 2 + 2);
-    doc.text(`${(bar.utilization * 100).toFixed(0)}%`, x + barW + 30, y + barH / 2 + 2);
+    doc.text(bar.barId, x + barW + 3, y + barH / 2 + 1.5);
+    doc.text(`${(bar.utilization * 100).toFixed(0)}%`, x + barW + 30, y + barH / 2 + 1.5);
     if (bar.isOffcut) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
       tc(doc, C.amber);
-      doc.text(`(offcut ${barStock})`, x + barW + 48, y + barH / 2 + 2);
+      doc.text(`(offcut ${barStock})`, x + barW + 48, y + barH / 2 + 1.5);
     }
 
     y += barH + barGap;
@@ -499,10 +493,7 @@ export function exportPreCutPDF({
     doc.text('BAR LAYOUT OPTIMIZER', PG.bx + 4, y);
     y += 8;
 
-    // Determine section width for proportional bar height
-    const sectionWidth = parseInt(sg.section, 10) || 0;
-
-    y = drawBLO(doc, PG, sg.optGroup, sg.stockLength, y, endTrim, kerf, sectionWidth);
+    y = drawBLO(doc, PG, sg.optGroup, sg.stockLength, y, endTrim, kerf);
     y += 4;
 
     // Element table
