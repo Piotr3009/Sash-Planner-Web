@@ -46,7 +46,7 @@ const LW = {
 const PG = { w: 297, h: 210, bx: 8, by: 8 };
 const HEADER_H = 20;
 const FOOTER_H = 8;
-const TABLE_ROW_H = 5;
+const TABLE_ROW_H = 6;
 
 // ─── GLASS CONSTANTS ───
 const BAR_PATTERNS = {
@@ -189,7 +189,7 @@ function drawTable(doc, items, startY) {
   ];
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(5.5);
+  doc.setFontSize(7);
   tc(doc, C.dark);
   cols.forEach(c => doc.text(c.l, x + c.dx, y));
 
@@ -208,11 +208,11 @@ function drawTable(doc, items, startY) {
     const clr = i % 2 === 0 ? C.black : C.dark;
     tc(doc, clr);
     doc.setFont('courier', 'bold');
-    doc.setFontSize(5.5);
+    doc.setFontSize(6);
     doc.text(String(i + 1), x + 0, y);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(5.5);
+    doc.setFontSize(6);
     doc.text(g.windowName || '', x + 10, y);
     doc.text(g.sash || '', x + 35, y);
 
@@ -341,7 +341,7 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
   });
 
   doc.setFont('courier', 'bold');
-  doc.setFontSize(4);
+  doc.setFontSize(6);
   tc(doc, C.dim);
   for (let i = 0; i < hCuts.length - 1; i++) {
     const segW = hCuts[i + 1] - hCuts[i];
@@ -383,7 +383,7 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
   doc.line(gx, owY - 1.2, gx, owY + 1.2);
   doc.line(gx + gw, owY - 1.2, gx + gw, owY + 1.2);
   doc.setFont('courier', 'bold');
-  doc.setFontSize(4.5);
+  doc.setFontSize(6);
   tc(doc, C.dim);
   doc.text(`${fmt(g.glassW)} mm`, gx + gw / 2, owY + 3.5, { align: 'center' });
 

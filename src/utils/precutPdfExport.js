@@ -43,8 +43,8 @@ function getPageDims(format) {
     : { w: 297, h: 210, bx: 8, by: 8 };
 }
 
-const HEADER_H = 22;
-const FOOTER_H = 8;
+const HEADER_H = 40;
+const FOOTER_H = 10;
 
 // ─── PAGE BORDER ───
 function drawPageBorder(doc, PG) {
@@ -64,7 +64,7 @@ function drawHeader(doc, PG, info, pageNum, totalPages) {
   doc.setLineWidth(LW.sep);
   doc.line(x, y + HEADER_H, x + w, y + HEADER_H);
 
-  const col1 = 60, col2 = w - 55, col3 = w - 28;
+  const col1 = 80, col2 = w - 70, col3 = w - 35;
   doc.setLineWidth(LW.borderIn);
   doc.line(x + col1, y, x + col1, y + HEADER_H);
   doc.line(x + col2, y, x + col2, y + HEADER_H);
@@ -73,140 +73,140 @@ function drawHeader(doc, PG, info, pageNum, totalPages) {
 
   // Company
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
+  doc.setFontSize(20);
   tc(doc, C.black);
-  doc.text(info.companyName || 'COMPANY', x + 2, y + 8);
+  doc.text(info.companyName || 'COMPANY', x + 3, y + 15);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6);
+  doc.setFontSize(12);
   tc(doc, C.gray);
-  doc.text('PRE-CUT LIST — PRODUCTION', x + 2, y + 14);
+  doc.text('PRE-CUT LIST — PRODUCTION', x + 3, y + 25);
   if (info.responsible) {
-    doc.setFontSize(5);
+    doc.setFontSize(10);
     tc(doc, C.grayL);
-    doc.text(`Responsible: ${info.responsible}`, x + 2, y + 19);
+    doc.text(`Responsible: ${info.responsible}`, x + 3, y + 34);
   }
 
   // Batch info
-  doc.setFontSize(5);
+  doc.setFontSize(10);
   tc(doc, C.grayL);
-  doc.text('Batch:', x + col1 + 3, y + 8);
-  doc.text('Projects:', x + col1 + 3, y + HEADER_H / 2 + 8);
+  doc.text('Batch:', x + col1 + 3, y + 14);
+  doc.text('Projects:', x + col1 + 3, y + HEADER_H / 2 + 14);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6);
+  doc.setFontSize(12);
   tc(doc, C.black);
-  doc.text(String(info.batchName || '—'), x + col1 + 18, y + 8);
+  doc.text(String(info.batchName || '—'), x + col1 + 22, y + 14);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(5.5);
+  doc.setFontSize(11);
   tc(doc, C.dark);
-  doc.text((info.projects || []).join(' · ').substring(0, 100), x + col1 + 24, y + HEADER_H / 2 + 8);
+  doc.text((info.projects || []).join(' · ').substring(0, 60), x + col1 + 30, y + HEADER_H / 2 + 14);
 
   // Date / Sections
-  doc.setFontSize(5);
+  doc.setFontSize(10);
   tc(doc, C.grayL);
-  doc.text('Date:', x + col2 + 3, y + 8);
-  doc.text('Sections:', x + col2 + 3, y + HEADER_H / 2 + 8);
+  doc.text('Date:', x + col2 + 3, y + 14);
+  doc.text('Sections:', x + col2 + 3, y + HEADER_H / 2 + 14);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6);
+  doc.setFontSize(12);
   tc(doc, C.black);
-  doc.text(info.date, x + col2 + 16, y + 8);
-  doc.text(String(info.totalSections), x + col2 + 22, y + HEADER_H / 2 + 8);
+  doc.text(info.date, x + col2 + 20, y + 14);
+  doc.text(String(info.totalSections), x + col2 + 28, y + HEADER_H / 2 + 14);
 
   // Rev / Page
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(5);
+  doc.setFontSize(10);
   tc(doc, C.grayL);
-  doc.text('Rev:', x + col3 + 3, y + 8);
-  doc.text('Page:', x + col3 + 3, y + HEADER_H / 2 + 8);
+  doc.text('Rev:', x + col3 + 3, y + 14);
+  doc.text('Page:', x + col3 + 3, y + HEADER_H / 2 + 14);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6);
+  doc.setFontSize(12);
   tc(doc, C.black);
-  doc.text('A', x + col3 + 13, y + 8);
-  doc.text(`${pageNum} / ${totalPages}`, x + col3 + 14, y + HEADER_H / 2 + 8);
+  doc.text('A', x + col3 + 16, y + 14);
+  doc.text(`${pageNum} / ${totalPages}`, x + col3 + 18, y + HEADER_H / 2 + 14);
 }
 
 // ─── FOOTER ───
 function drawFooter(doc, PG, info, pageNum, totalPages) {
-  const y = PG.h - PG.by - 3;
+  const y = PG.h - PG.by - 4;
   dc(doc, C.black);
   doc.setLineWidth(LW.borderIn);
   doc.line(PG.bx + 0.7, y - 1, PG.w - PG.bx - 0.7, y - 1);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(4);
+  doc.setFontSize(8);
   tc(doc, C.grayL);
-  doc.text([info.companyName, info.companyAddress].filter(Boolean).join(' · '), PG.bx + 4, y + 1.5);
+  doc.text([info.companyName, info.companyAddress].filter(Boolean).join(' · '), PG.bx + 4, y + 2.5);
 
   doc.setFont('courier', 'bold');
-  doc.setFontSize(5);
+  doc.setFontSize(10);
   tc(doc, C.black);
-  doc.text(`${pageNum} / ${totalPages}`, PG.w - PG.bx - 4, y + 1.5, { align: 'right' });
+  doc.text(`${pageNum} / ${totalPages}`, PG.w - PG.bx - 4, y + 2.5, { align: 'right' });
 }
 
 // ─── SUMMARY TABLE (page 1) ───
 function drawSummaryTable(doc, PG, groups, startY) {
   const x = PG.bx + 3;
-  let y = startY + 5;
+  let y = startY + 8;
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(5);
+  doc.setFontSize(10);
   tc(doc, C.grayL);
   doc.text('PRE-CUT SUMMARY', x, y);
-  y += 6;
+  y += 10;
 
   // Header
   const cols = [
     { l: '#', dx: 0 },
-    { l: 'Section', dx: 8 },
-    { l: 'Material', dx: 45 },
-    { l: 'Stock (mm)', dx: 140 },
-    { l: 'Elements', dx: 175 },
-    { l: 'Pieces', dx: 205 },
-    { l: 'Bars', dx: 230 },
-    { l: 'Waste (mm)', dx: 255 },
-    { l: 'Utilization', dx: 290 },
+    { l: 'Section', dx: 10 },
+    { l: 'Material', dx: 55 },
+    { l: 'Stock', dx: 155 },
+    { l: 'Elem', dx: 185 },
+    { l: 'Pcs', dx: 210 },
+    { l: 'Bars', dx: 232 },
+    { l: 'Waste', dx: 255 },
+    { l: 'Util', dx: 290 },
   ];
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(5.5);
+  doc.setFontSize(11);
   tc(doc, C.dark);
   cols.forEach((c) => doc.text(c.l, x + c.dx, y));
   dc(doc, C.grayXL);
   doc.setLineWidth(LW.tableLine);
-  doc.line(x, y + 2, x + 320, y + 2);
-  y += 6;
+  doc.line(x, y + 3, x + 320, y + 3);
+  y += 11;
 
   // Rows
   groups.forEach((g, i) => {
     if (i % 2 === 0) {
       fc(doc, C.rowBg);
-      doc.rect(x - 1, y - 3.5, 322, 5.5, 'F');
+      doc.rect(x - 1, y - 5, 322, 10, 'F');
     }
     tc(doc, C.black);
     doc.setFont('courier', 'normal');
-    doc.setFontSize(5.5);
+    doc.setFontSize(11);
     doc.text(String(i + 1), x + 0, y);
     doc.setFont('helvetica', 'bold');
-    doc.text(g.label, x + 8, y);
+    doc.text(g.label, x + 10, y);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(5);
-    doc.text((g.materialName || 'Not assigned').substring(0, 40), x + 45, y);
+    doc.setFontSize(10);
+    doc.text((g.materialName || 'Not assigned').substring(0, 30), x + 55, y);
     doc.setFont('courier', 'normal');
-    doc.setFontSize(5.5);
-    doc.text(String(g.stockLength), x + 140, y);
-    doc.text(String(g.elementCount), x + 175, y);
-    doc.text(String(g.pieceCount), x + 205, y);
-    doc.text(String(g.barCount), x + 230, y);
+    doc.setFontSize(11);
+    doc.text(String(g.stockLength), x + 155, y);
+    doc.text(String(g.elementCount), x + 185, y);
+    doc.text(String(g.pieceCount), x + 210, y);
+    doc.text(String(g.barCount), x + 232, y);
     doc.text(String(g.waste), x + 255, y);
     const util = g.utilization > 0 ? `${(g.utilization * 100).toFixed(1)}%` : '—';
     doc.text(util, x + 290, y);
-    y += 5.5;
+    y += 10;
   });
 
   return y;
 }
 
 // ─── BLO VISUALIZATION (per section page) ───
-function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf) {
+function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf, sectionWidth) {
   const x = PG.bx + 4;
   const areaW = PG.w - 2 * PG.bx - 8;
   let y = startY;
@@ -214,8 +214,9 @@ function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf) {
   if (!optGroup?.bars?.length) return y;
 
   const maxStock = Math.max(...optGroup.bars.map((b) => b.stockLength || stockLength));
-  const barH = 7;
-  const barGap = 2;
+  // Proportional bar height: base 14mm, 1.5x if section width > 100mm
+  const barH = (sectionWidth && sectionWidth > 100) ? 21 : 14;
+  const barGap = 3;
 
   optGroup.bars.forEach((bar) => {
     const barStock = bar.stockLength || stockLength;
@@ -250,13 +251,13 @@ function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf) {
       doc.setLineWidth(LW.barCut);
       doc.rect(cutX, y, cutW, barH, 'FD');
 
-      // Label
+      // Label — BLACK text (was white)
       const label = `${projNum ? projNum + '-' : ''}${winName ? winName + '-' : ''}${sym?.symbol || ''} ${cutLen}`;
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(3.8);
-      tc(doc, [255, 255, 255]);
-      if (cutW > 15) {
-        doc.text(label, cutX + cutW / 2, y + barH / 2 + 1.2, { align: 'center' });
+      doc.setFontSize(7.5);
+      tc(doc, C.black);
+      if (cutW > 20) {
+        doc.text(label, cutX + cutW / 2, y + barH / 2 + 2, { align: 'center' });
       }
 
       cursor += cutLen + kerf;
@@ -264,27 +265,27 @@ function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf) {
 
     // Bar ID + utilization
     doc.setFont('courier', 'normal');
-    doc.setFontSize(4);
+    doc.setFontSize(8);
     tc(doc, C.gray);
-    doc.text(bar.barId, x + barW + 3, y + barH / 2 + 1.2);
-    doc.text(`${(bar.utilization * 100).toFixed(0)}%`, x + barW + 30, y + barH / 2 + 1.2);
+    doc.text(bar.barId, x + barW + 3, y + barH / 2 + 2);
+    doc.text(`${(bar.utilization * 100).toFixed(0)}%`, x + barW + 30, y + barH / 2 + 2);
     if (bar.isOffcut) {
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(3.5);
+      doc.setFontSize(7);
       tc(doc, C.amber);
-      doc.text(`(offcut ${barStock})`, x + barW + 42, y + barH / 2 + 1.2);
+      doc.text(`(offcut ${barStock})`, x + barW + 48, y + barH / 2 + 2);
     }
 
     y += barH + barGap;
   });
 
   // Stats
-  y += 2;
+  y += 3;
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(5);
+  doc.setFontSize(10);
   tc(doc, C.gray);
   doc.text(`Bars: ${optGroup.summary.totalBars}  ·  Waste: ${optGroup.summary.wasteTotal} mm  ·  Utilization: ${(optGroup.summary.utilAvg * 100).toFixed(1)}%`, x, y);
-  y += 5;
+  y += 8;
 
   return y;
 }
@@ -292,44 +293,44 @@ function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf) {
 // ─── ELEMENT TABLE (per section page) ───
 function drawElementTable(doc, PG, items, startY, isPPMode) {
   const x = PG.bx + 4;
-  let y = startY + 3;
+  let y = startY + 5;
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(4.5);
+  doc.setFontSize(9);
   tc(doc, C.grayL);
   doc.text('ELEMENT LIST', x, y);
-  y += 5;
+  y += 8;
 
-  // Header
+  // Header — tighter columns
   const cols = isPPMode
     ? [
         { l: 'Symbol', dx: 0 },
-        { l: 'Project', dx: 22 },
-        { l: 'Window', dx: 55 },
-        { l: 'Element', dx: 90 },
-        { l: 'Pre-Cut (mm)', dx: 175 },
-        { l: 'Finished (mm)', dx: 210 },
-        { l: 'Section', dx: 250 },
+        { l: 'Project', dx: 28 },
+        { l: 'Window', dx: 60 },
+        { l: 'Element', dx: 100 },
+        { l: 'Pre-Cut', dx: 175 },
+        { l: 'Finished', dx: 210 },
+        { l: 'Section', dx: 248 },
         { l: 'Qty', dx: 285 },
       ]
     : [
         { l: 'Symbol', dx: 0 },
-        { l: 'Window', dx: 22 },
-        { l: 'Element', dx: 60 },
-        { l: 'Pre-Cut (mm)', dx: 155 },
-        { l: 'Finished (mm)', dx: 195 },
+        { l: 'Window', dx: 28 },
+        { l: 'Element', dx: 68 },
+        { l: 'Pre-Cut', dx: 160 },
+        { l: 'Finished', dx: 198 },
         { l: 'Section', dx: 240 },
         { l: 'Qty', dx: 275 },
       ];
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(5);
+  doc.setFontSize(10);
   tc(doc, C.dark);
   cols.forEach((c) => doc.text(c.l, x + c.dx, y));
   dc(doc, C.grayXL);
   doc.setLineWidth(LW.tableLine);
-  doc.line(x, y + 2, x + 310, y + 2);
-  y += 5.5;
+  doc.line(x, y + 3, x + 310, y + 3);
+  y += 10;
 
   // Group items by elementName + length
   const grouped = new Map();
@@ -344,41 +345,41 @@ function drawElementTable(doc, PG, items, startY, isPPMode) {
   const rows = Array.from(grouped.values()).sort((a, b) => a.elementName.localeCompare(b.elementName) || a.length - b.length);
 
   rows.forEach((item, i) => {
-    if (y > PG.h - PG.by - FOOTER_H - 5) return; // overflow guard
+    if (y > PG.h - PG.by - FOOTER_H - 8) return; // overflow guard
 
     if (i % 2 === 0) {
       fc(doc, C.rowBg);
-      doc.rect(x - 1, y - 3.5, 312, 5, 'F');
+      doc.rect(x - 1, y - 5, 312, 9, 'F');
     }
 
     const sym = getPartSymbol(item.elementName);
 
     doc.setFont('courier', 'bold');
-    doc.setFontSize(5);
+    doc.setFontSize(10);
     tc(doc, C.tealDark);
     doc.text(sym.symbol, x + (isPPMode ? 0 : 0), y);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(5);
+    doc.setFontSize(10);
     tc(doc, C.black);
 
     if (isPPMode) {
-      doc.text(item._projectNumber || '—', x + 22, y);
-      doc.text(item.windowName || '—', x + 55, y);
-      doc.text(item.elementName, x + 90, y);
+      doc.text(item._projectNumber || '—', x + 28, y);
+      doc.text(item.windowName || '—', x + 60, y);
+      doc.text(item.elementName, x + 100, y);
       doc.setFont('courier', 'normal');
       doc.text(String(item.length), x + 175, y);
       doc.text(String(item.finishedLength || item.length), x + 210, y);
       doc.setFont('helvetica', 'normal');
-      doc.text(item.section || '—', x + 250, y);
+      doc.text(item.section || '—', x + 248, y);
       doc.setFont('courier', 'bold');
       doc.text(String(item.totalQty), x + 285, y);
     } else {
-      doc.text(item.windowName || '—', x + 22, y);
-      doc.text(item.elementName, x + 60, y);
+      doc.text(item.windowName || '—', x + 28, y);
+      doc.text(item.elementName, x + 68, y);
       doc.setFont('courier', 'normal');
-      doc.text(String(item.length), x + 155, y);
-      doc.text(String(item.finishedLength || item.length), x + 195, y);
+      doc.text(String(item.length), x + 160, y);
+      doc.text(String(item.finishedLength || item.length), x + 198, y);
       doc.setFont('helvetica', 'normal');
       doc.text(item.section || '—', x + 240, y);
       doc.setFont('courier', 'bold');
@@ -387,12 +388,12 @@ function drawElementTable(doc, PG, items, startY, isPPMode) {
 
     if (sym.mirror) {
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(4);
+      doc.setFontSize(8);
       tc(doc, [150, 100, 200]);
       doc.text('⟷', x + (isPPMode ? 300 : 290), y);
     }
 
-    y += 5;
+    y += 9;
   });
 
   return y;
@@ -467,39 +468,42 @@ export function exportPreCutPDF({
     drawPageBorder(doc, PG);
     drawHeader(doc, PG, info, idx + 2, totalPages);
 
-    let y = PG.by + HEADER_H + 4;
+    let y = PG.by + HEADER_H + 6;
 
     // Section title + material info
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
+    doc.setFontSize(16);
     tc(doc, C.black);
     doc.text(sg.label, PG.bx + 4, y);
 
     if (sg.materialInfo) {
       const mi = sg.materialInfo;
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(5.5);
+      doc.setFontSize(11);
       tc(doc, C.tealDark);
       const matLine = [mi.item_number, mi.name, mi.size ? `Size: ${mi.size}` : '', mi.thickness ? `Thickness: ${mi.thickness}` : '', mi.category, mi.subcategory].filter(Boolean).join(' · ');
-      doc.text(matLine, PG.bx + 4, y + 5);
+      doc.text(matLine, PG.bx + 4, y + 8);
     }
 
     doc.setFont('courier', 'normal');
-    doc.setFontSize(5);
+    doc.setFontSize(10);
     tc(doc, C.gray);
     doc.text(`Stock: ${sg.stockLength} mm`, PG.w - PG.bx - 4, y, { align: 'right' });
 
-    y += sg.materialInfo ? 12 : 7;
+    y += sg.materialInfo ? 18 : 12;
 
     // BLO
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(5.5);
+    doc.setFontSize(11);
     tc(doc, C.dark);
     doc.text('BAR LAYOUT OPTIMIZER', PG.bx + 4, y);
-    y += 5;
+    y += 8;
 
-    y = drawBLO(doc, PG, sg.optGroup, sg.stockLength, y, endTrim, kerf);
-    y += 3;
+    // Determine section width for proportional bar height
+    const sectionWidth = parseInt(sg.section, 10) || 0;
+
+    y = drawBLO(doc, PG, sg.optGroup, sg.stockLength, y, endTrim, kerf, sectionWidth);
+    y += 4;
 
     // Element table
     y = drawElementTable(doc, PG, sg.items, y, isPPMode);

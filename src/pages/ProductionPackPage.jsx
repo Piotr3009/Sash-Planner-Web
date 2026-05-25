@@ -827,9 +827,23 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects }) {
   });
 
   (merged.precut.boxSapele || []).forEach((g) => {
+    // Derive descriptive label from element names in group
+    const names = g.items.map(i => (i.elementName || '').toUpperCase());
+    const sec = g.items[0]?.section || `${g.preCutWidth}`;
+    const secDisplay = sec.replace('x', ' x ');
+    let boxLabel;
+    if (names.some(n => n.includes('CILL NOSE') || n.includes('CILL_NOSE'))) {
+      boxLabel = `Cill Nose — ${secDisplay}`;
+    } else if (names.some(n => n === 'CILL')) {
+      boxLabel = `Sill Timber — ${secDisplay}`;
+    } else if (names.some(n => n.includes('LINER'))) {
+      boxLabel = `Liner — ${secDisplay}`;
+    } else {
+      boxLabel = `Box — ${secDisplay}`;
+    }
     allGroups.push({
       key: `box-${g.preCutWidth}`,
-      label: `Box Timber — ${g.preCutWidth} mm width`,
+      label: boxLabel,
       section: `${g.preCutWidth}`,
       type: 'box',
       items: g.items,
@@ -1204,25 +1218,27 @@ function CutListTab({ merged, isPPMode }) {
           <div key={group.element} className="card overflow-hidden">
             {/* Section header: image + name + symbol — single row */}
             <div className="px-4 py-3 border-b border-surface-500 flex items-center gap-3 bg-surface-800">
-              {/* 2D image — in-row, ~80x80, zoomable */}
-              {elementImages[group.element] ? (
-                <div className="relative group/img shrink-0">
-                  <img
-                    src={elementImages[group.element]}
-                    alt={group.element}
-                    className="w-20 h-20 rounded border border-surface-500 object-cover cursor-zoom-in"
-                    onClick={() => setZoomedElement(elementImages[group.element])}
-                  />
-                  <button onClick={() => handleRemoveImage(group.element)}
-                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500/80 text-white text-[9px] flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">×</button>
-                </div>
-              ) : (
-                <label className="w-20 h-20 rounded bg-surface-700 border border-dashed border-surface-500 flex flex-col items-center justify-center text-ink-400 hover:text-accent-400 hover:border-accent-500 cursor-pointer transition-colors shrink-0" title="Upload 2D drawing">
-                  <svg className="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 5v14M5 12h14" /></svg>
-                  <span className="text-[8px]">2D</span>
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(group.element, e)} />
-                </label>
-              )}
+              {/* 2D images — two slots side by side, ~80x80, zoomable */}
+              {[group.element, `${group.element}:2`].map((imgKey, slotIdx) => (
+                elementImages[imgKey] ? (
+                  <div key={slotIdx} className="relative group/img shrink-0">
+                    <img
+                      src={elementImages[imgKey]}
+                      alt={group.element}
+                      className="w-20 h-20 rounded border border-surface-500 object-cover cursor-zoom-in"
+                      onClick={() => setZoomedElement(elementImages[imgKey])}
+                    />
+                    <button onClick={() => handleRemoveImage(imgKey)}
+                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500/80 text-white text-[9px] flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">×</button>
+                  </div>
+                ) : (
+                  <label key={slotIdx} className="w-20 h-20 rounded bg-surface-700 border border-dashed border-surface-500 flex flex-col items-center justify-center text-ink-400 hover:text-accent-400 hover:border-accent-500 cursor-pointer transition-colors shrink-0" title="Upload 2D drawing">
+                    <svg className="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 5v14M5 12h14" /></svg>
+                    <span className="text-[8px]">2D</span>
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(imgKey, e)} />
+                  </label>
+                )
+              ))}
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono font-bold text-accent-400 bg-accent-500/10 px-1.5 py-0.5 rounded">{sym.symbol}</span>

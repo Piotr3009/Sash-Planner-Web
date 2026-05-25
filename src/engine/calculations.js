@@ -234,7 +234,7 @@ function calculateBoxComponentSet(windowSpec, frameWidth, frameHeight) {
     const boxComponents = [];
     boxComponents.push(createComponentRecord(windowSpec, 'box', 'HEAD', '28x141', headLength, 1));
     boxComponents.push(createComponentRecord(windowSpec, 'box', 'CILL', '69x46', headLength + cillExtension, 1, `Extension ${cillExtension}mm`));
-    boxComponents.push(createComponentRecord(windowSpec, 'box', 'CILL NOSE', '28x141', headLength + cillExtension, 1));
+    boxComponents.push(createComponentRecord(windowSpec, 'box', 'CILL NOSE', '64x128', headLength + cillExtension, 1));
     boxComponents.push(createComponentRecord(windowSpec, 'box', 'JAMB LEFT', '28x141', jambLength, 1));
     boxComponents.push(createComponentRecord(windowSpec, 'box', 'JAMB RIGHT', '28x141', jambLength, 1));
     boxComponents.push(createComponentRecord(windowSpec, 'box', 'INTERNAL HEAD LINER', '17x86', headLength, 1));
