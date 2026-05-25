@@ -504,7 +504,7 @@ function ElevationsTab({ windowsData }) {
 // ═══════════════════════════════════════════════════════════════
 function SectionsTab({ windowsData }) {
   const [sectionImages, setSectionImages] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('pc-section-images') || '[]'); } catch { return []; }
+    try { const d = JSON.parse(localStorage.getItem('pc-section-images') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
   });
   const [zoomedImg, setZoomedImg] = useState(null);
 
@@ -1115,7 +1115,7 @@ function CutListTab({ merged, isPPMode }) {
   };
 
   const [elementImages, setElementImages] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('pc-element-images') || '{}'); } catch { return {}; }
+    try { const d = JSON.parse(localStorage.getItem('pc-element-images') || '{}'); return (d && typeof d === 'object' && !Array.isArray(d)) ? d : {}; } catch { return {}; }
   });
 
   const handleImageUpload = (elementKey, e) => {
