@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProjectStore, BATCH_DEFAULTS } from '../stores/projectStore.js';
-import { GLASS_TYPES, GLASS_SPECS, SPACERS, RAL_GROUPS as RAL } from '../config.js';
+import { GLASS_TYPES, GLASS_SPECS, SPACERS, RAL_GROUPS as RAL, FB_GROUPS as FB } from '../config.js';
 
 
 const HORN_OPTIONS = [{ value: 'none', label: 'No Horns' }, { value: 'A', label: 'Richmond' }, { value: 'D', label: 'Type D' }];
@@ -9,13 +9,6 @@ const FRAME_TYPES = [{ value: 'standard', label: 'Standard (164mm)' }, { value: 
 const IRON_FINISHES = [
   { value: 'brass', label: 'Brass' }, { value: 'chrome', label: 'Chrome' }, { value: 'stainless', label: 'Stainless' },
   { value: 'antique_brass', label: 'Antique Brass' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' },
-];
-const FB = [
-  { g: 'Whites', o: [['#fdfbfc','All White 2005'],['#f2f0e8','Strong White 2001'],['#ede8dc','Great White 2006'],['#f0ece0','Wimborne White 239'],['#fdfeec','Pointing 2003'],['#ede6d5','White Tie 2002'],['#ede3ce','Slipper Satin 2004']] },
-  { g: 'Neutrals & Stones', o: [['#ccbfb3',"Elephant's Breath 229"],['#d0ccc4','Ammonite 274'],['#c8c4b8','Cornforth White 228'],['#c0b8a8','Purbeck Stone 275'],['#9d9088',"Mole's Breath 276"],['#8c7c68',"Mouse's Back 40"]] },
-  { g: 'Greys', o: [['#b9beaa','Pigeon 25'],['#a8a8a0','Pavilion Gray 242'],['#9c9c98','Lamp Room Gray 88'],['#787470','Plummett 272'],['#3c3d42','Down Pipe 26'],['#45484b','Railings 31'],['#313639','Off-Black 57']] },
-  { g: 'Greens', o: [['#5a6850','Calke Green 34'],['#485840','Viridian 214'],['#636f65','Green Smoke 47'],['#73806e','Card Room Green 79'],['#708068','Chappell Green 83']] },
-  { g: 'Blues', o: [['#2c3437','Hague Blue 30'],['#2c3a48','Stiffkey Blue 281'],['#586768','Inchyra Blue 289'],['#759194','Stone Blue 86']] },
 ];
 
 export default function BatchDefaultsPage() {

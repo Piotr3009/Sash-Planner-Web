@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
-import { GLASS_TYPES, GLASS_FINISHES, FROSTED_LOCATIONS, SPACERS } from '../config.js';
+import { GLASS_TYPES, GLASS_FINISHES, FROSTED_LOCATIONS, SPACERS, SWATCHES, RAL_GROUPS, FB_GROUPS } from '../config.js';
 
 const Viewer3D = lazy(() => import('../3d/App.jsx'));
 
@@ -307,9 +307,30 @@ export default function ConfiguratorPage() {
                 <HChips o={SPACERS} v={ovSpacerColor || spacer} c={setOvSpacerColor} />
               </OverrideRow>
               <OverrideRow label="Wood colour" active={ovWoodColor !== null} onToggle={() => setOvWoodColor(ovWoodColor !== null ? null : (def.woodColor || '#F6F6F6'))}>
-                <div className="flex items-center gap-2">
-                  <input type="color" value={ovWoodColor || wc} onChange={e => setOvWoodColor(e.target.value)} className="w-8 h-8 rounded border border-surface-500 cursor-pointer" />
-                  <span className="text-[10px] text-ink-300 font-mono">{ovWoodColor || wc}</span>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded border border-surface-400 shrink-0" style={{ backgroundColor: ovWoodColor || wc }} />
+                    <span className="text-[10px] text-ink-300 font-mono">{(ovWoodColor || wc).toUpperCase()}</span>
+                  </div>
+                  <div className="grid grid-cols-5 gap-1">
+                    {SWATCHES.map(s => (
+                      <div key={s.hex} onClick={() => setOvWoodColor(s.hex)} title={s.name}
+                        className={`aspect-square rounded cursor-pointer border ${(ovWoodColor || wc) === s.hex ? 'border-accent-500 border-2' : 'border-surface-500'}`}
+                        style={{ backgroundColor: s.hex }} />
+                    ))}
+                    <label className="aspect-square rounded border border-dashed border-surface-400 flex items-center justify-center cursor-pointer text-ink-400 hover:text-ink-200 text-sm" title="Custom colour">
+                      +
+                      <input type="color" value={ovWoodColor || wc} onChange={e => setOvWoodColor(e.target.value)} className="absolute opacity-0 w-0 h-0" />
+                    </label>
+                  </div>
+                  <select value="" onChange={e => e.target.value && setOvWoodColor(e.target.value)} className="w-full px-2 py-1 bg-surface-700 border border-surface-500 rounded text-[10px] text-ink-200">
+                    <option value="">— RAL —</option>
+                    {RAL_GROUPS.map(g => <optgroup key={g.g} label={g.g}>{g.o.map(([hex, lab]) => <option key={hex} value={hex}>{lab}</option>)}</optgroup>)}
+                  </select>
+                  <select value="" onChange={e => e.target.value && setOvWoodColor(e.target.value)} className="w-full px-2 py-1 bg-surface-700 border border-surface-500 rounded text-[10px] text-ink-200">
+                    <option value="">— Farrow & Ball —</option>
+                    {FB_GROUPS.map(g => <optgroup key={g.g} label={g.g}>{g.o.map(([hex, lab]) => <option key={hex} value={hex}>{lab}</option>)}</optgroup>)}
+                  </select>
                 </div>
               </OverrideRow>
             </div>

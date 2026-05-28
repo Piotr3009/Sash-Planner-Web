@@ -3,7 +3,7 @@ import { Canvas, useThree } from '@react-three/fiber';
 import { Bounds, ContactShadows, Html, OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { useMemo, useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
-import { RAL_LOOKUP as RAL_COLORS, SWATCHES } from '../config.js';
+import { RAL_LOOKUP as RAL_COLORS, RAL_GROUPS, FB_GROUPS, SWATCHES } from '../config.js';
 import ParametricSashWindow from './components/ParametricSashWindow';
 import CasementWindow from './components/casement/CasementWindow';
 import ArchedCasementWindow from './components/casement/ArchedCasementWindow';
@@ -138,139 +138,14 @@ function ColorPicker({ label, value, onChange, inputId }) {
         <span>RAL</span>
         <select value="" onChange={(e) => e.target.value && onChange(e.target.value)}>
           <option value="">— RAL —</option>
-          <optgroup label="Whites &amp; Creams">
-            <option value="#FFFFFF">9010 Pure White</option><option value="#F6F6F6">9016 Traffic White</option>
-            <option value="#F4F4F4">9003 Signal White</option><option value="#FDF4E3">9001 Cream White</option>
-            <option value="#E7EBDA">9002 Grey White</option><option value="#E6D690">1015 Light Ivory</option>
-            <option value="#C2B078">1001 Beige</option><option value="#C6A664">1002 Sand Yellow</option>
-          </optgroup>
-          <optgroup label="Greys">
-            <option value="#D7D7D7">7035 Light Grey</option><option value="#B5B8B1">7038 Agate Grey</option>
-            <option value="#8D948D">7042 Traffic Grey A</option><option value="#7D7F7D">7037 Dusty Grey</option>
-            <option value="#78858B">7000 Squirrel Grey</option><option value="#9EA0A1">7004 Signal Grey</option>
-            <option value="#6C7059">7005 Mouse Grey</option><option value="#474A51">7024 Graphite Grey</option>
-            <option value="#293133">7016 Anthracite Grey</option><option value="#23282B">7021 Black Grey</option>
-            <option value="#434750">7015 Slate Grey</option><option value="#4E5754">7012 Basalt Grey</option>
-          </optgroup>
-          <optgroup label="Blacks">
-            <option value="#0A0A0A">9005 Jet Black</option><option value="#1C2023">9011 Graphite Black</option>
-            <option value="#1E1E1E">9017 Traffic Black</option><option value="#282828">9004 Signal Black</option>
-          </optgroup>
-          <optgroup label="Greens">
-            <option value="#31372B">6009 Fir Green</option><option value="#2F4538">6005 Moss Green</option>
-            <option value="#343B29">6007 Bottle Green</option><option value="#1F3A3D">6004 Blue Green</option>
-            <option value="#4A4F3B">6003 Olive Green</option><option value="#587246">6011 Reseda Green</option>
-            <option value="#35682D">6010 Grass Green</option><option value="#1E5945">6016 Turquoise Green</option>
-          </optgroup>
-          <optgroup label="Blues">
-            <option value="#1E2460">5002 Ultramarine Blue</option><option value="#1D1E33">5004 Black Blue</option>
-            <option value="#1B2A4A">5011 Steel Blue</option><option value="#2271B3">5015 Sky Blue</option>
-            <option value="#063971">5017 Traffic Blue</option><option value="#3B83BD">5012 Light Blue</option>
-            <option value="#354D73">5000 Violet Blue</option><option value="#49678D">5023 Distant Blue</option>
-          </optgroup>
-          <optgroup label="Reds">
-            <option value="#AF2B1E">3000 Flame Red</option><option value="#9B111E">3003 Ruby Red</option>
-            <option value="#75151E">3004 Purple Red</option><option value="#5E2129">3005 Wine Red</option>
-            <option value="#D53032">3018 Strawberry Red</option><option value="#CC0605">3020 Traffic Red</option>
-          </optgroup>
-          <optgroup label="Browns">
-            <option value="#955F20">8001 Ochre Brown</option><option value="#6F4F28">8008 Olive Brown</option>
-            <option value="#6F3B2A">8011 Nut Brown</option><option value="#4E3B31">8028 Terra Brown</option>
-            <option value="#45322E">8017 Chocolate Brown</option><option value="#382C1E">8014 Sepia Brown</option>
-          </optgroup>
-          <optgroup label="Yellows &amp; Oranges">
-            <option value="#E5BE01">1003 Signal Yellow</option><option value="#F4A900">1028 Melon Yellow</option>
-            <option value="#ED760E">2000 Yellow Orange</option><option value="#FF7514">2003 Pastel Orange</option>
-          </optgroup>
+          {RAL_GROUPS.map(g => <optgroup key={g.g} label={g.g}>{g.o.map(([hex, lab]) => <option key={hex} value={hex}>{lab}</option>)}</optgroup>)}
         </select>
       </label>
       <label className="select-wrap">
         <span>Farrow &amp; Ball</span>
         <select value="" onChange={(e) => e.target.value && onChange(e.target.value)}>
           <option value="">— F&amp;B —</option>
-          <optgroup label="Whites">
-            <option value="#fdfbfc">All White 2005</option>
-            <option value="#f2f0e8">Strong White 2001</option>
-            <option value="#ede8dc">Great White 2006</option>
-            <option value="#f0ece0">Wimborne White 239</option>
-            <option value="#fdfeec">Pointing 2003</option>
-            <option value="#f3f0e1">James White 2010</option>
-            <option value="#ede6d5">White Tie 2002</option>
-            <option value="#ede3ce">Slipper Satin 2004</option>
-            <option value="#e8e2d0">Skimming Stone 241</option>
-            <option value="#eee8d8">New White 59</option>
-            <option value="#e8e0cc">String 8</option>
-            <option value="#eae0d0">Dimity 2008</option>
-          </optgroup>
-          <optgroup label="Neutrals &amp; Stones">
-            <option value="#ccbfb3">Elephant's Breath 229</option>
-            <option value="#d0ccc4">Ammonite 274</option>
-            <option value="#c8c4b8">Cornforth White 228</option>
-            <option value="#c0b8a8">Purbeck Stone 275</option>
-            <option value="#9d9088">Mole's Breath 276</option>
-            <option value="#b8b0a0">Joa's White 226</option>
-            <option value="#b0a898">Drop Cloth 283</option>
-            <option value="#c4977a">Dead Salmon 28</option>
-            <option value="#b8a890">Oxford Stone 264</option>
-            <option value="#a89880">Savage Ground 213</option>
-            <option value="#8c7c68">Mouse's Back 40</option>
-            <option value="#c8b898">Stony Ground 211</option>
-            <option value="#d8c8b0">Matchstick 2013</option>
-          </optgroup>
-          <optgroup label="Greys">
-            <option value="#b9beaa">Pigeon 25</option>
-            <option value="#c8c8c0">Ammonite 274</option>
-            <option value="#a8a8a0">Pavilion Gray 242</option>
-            <option value="#9c9c98">Lamp Room Gray 88</option>
-            <option value="#b0b0a8">Mizzle 266</option>
-            <option value="#8c8880">Worsted 284</option>
-            <option value="#949088">Manor House Gray 265</option>
-            <option value="#787470">Plummett 272</option>
-            <option value="#3c3d42">Down Pipe 26</option>
-            <option value="#45484b">Railings 31</option>
-            <option value="#313639">Off-Black 57</option>
-            <option value="#292820">Pitch Black 256</option>
-          </optgroup>
-          <optgroup label="Blues">
-            <option value="#2c3437">Hague Blue 30</option>
-            <option value="#2c3a48">Stiffkey Blue 281</option>
-            <option value="#586768">Inchyra Blue 289</option>
-            <option value="#759194">Stone Blue 86</option>
-            <option value="#6888a0">Lulworth Blue 89</option>
-            <option value="#8898a8">Parma Gray 27</option>
-            <option value="#aac0b3">Dix Blue 82</option>
-            <option value="#c8d4d8">Borrowed Light 235</option>
-            <option value="#cfd7cc">Light Blue 22</option>
-          </optgroup>
-          <optgroup label="Greens">
-            <option value="#5a6850">Calke Green 34</option>
-            <option value="#485840">Viridian 214</option>
-            <option value="#636f65">Green Smoke 47</option>
-            <option value="#73806e">Card Room Green 79</option>
-            <option value="#7a8868">Saxon Green 80</option>
-            <option value="#5a7048">Pea Green 33</option>
-            <option value="#bbbe9f">Vert de Terre 234</option>
-            <option value="#a0a88c">Lichen 19</option>
-            <option value="#708068">Chappell Green 83</option>
-          </optgroup>
-          <optgroup label="Reds &amp; Pinks">
-            <option value="#8c182b">Rectory Red 217</option>
-            <option value="#6a1820">Incarnadine 248</option>
-            <option value="#8a2030">Blazer 212</option>
-            <option value="#d08880">Cinder Rose 246</option>
-            <option value="#d4a0a0">Calamine 230</option>
-            <option value="#e8a898">Pink Ground 202</option>
-            <option value="#c09090">Sulking Room Pink 295</option>
-            <option value="#d8b0a8">Peignoir 286</option>
-          </optgroup>
-          <optgroup label="Yellows &amp; Oranges">
-            <option value="#ce923c">India Yellow 66</option>
-            <option value="#dac586">Hay 37</option>
-            <option value="#c89830">Sudbury Yellow 51</option>
-            <option value="#d09878">Setting Plaster 231</option>
-            <option value="#c07030">Charlotte's Locks 268</option>
-            <option value="#d4a860">Babouche 223</option>
-          </optgroup>
+          {FB_GROUPS.map(g => <optgroup key={g.g} label={g.g}>{g.o.map(([hex, lab]) => <option key={hex} value={hex}>{lab}</option>)}</optgroup>)}
         </select>
       </label>
       <label className="control">
