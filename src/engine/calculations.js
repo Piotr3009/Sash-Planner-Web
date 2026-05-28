@@ -78,48 +78,48 @@ export const CONFIGURATIONS = Object.freeze({
     },
     '2x2': {
         key: '2x2',
+        rows: 1,
+        cols: 2,
+        totalPanes: 2,
+        verticalBars: 1,
+        horizontalBars: 0,
+        description: '2 over 2'
+    },
+    '3x3': {
+        key: '3x3',
+        rows: 1,
+        cols: 3,
+        totalPanes: 3,
+        verticalBars: 2,
+        horizontalBars: 0,
+        description: '3 over 3'
+    },
+    '4x4': {
+        key: '4x4',
         rows: 2,
         cols: 2,
         totalPanes: 4,
         verticalBars: 1,
         horizontalBars: 1,
-        description: '2×2 Traditional'
+        description: '4 over 4'
     },
-    '3x3': {
-        key: '3x3',
+    '6x6': {
+        key: '6x6',
+        rows: 2,
+        cols: 3,
+        totalPanes: 6,
+        verticalBars: 2,
+        horizontalBars: 1,
+        description: '6 over 6'
+    },
+    '9x9': {
+        key: '9x9',
         rows: 3,
         cols: 3,
         totalPanes: 9,
         verticalBars: 2,
         horizontalBars: 2,
-        description: '3×3 Georgian'
-    },
-    '4x4': {
-        key: '4x4',
-        rows: 4,
-        cols: 4,
-        totalPanes: 16,
-        verticalBars: 3,
-        horizontalBars: 3,
-        description: '4×4 Fine Georgian'
-    },
-    '6x6': {
-        key: '6x6',
-        rows: 6,
-        cols: 6,
-        totalPanes: 36,
-        verticalBars: 5,
-        horizontalBars: 5,
-        description: '6×6 Extra Fine'
-    },
-    '9x9': {
-        key: '9x9',
-        rows: 9,
-        cols: 9,
-        totalPanes: 81,
-        verticalBars: 8,
-        horizontalBars: 8,
-        description: '9×9 Ultra Fine'
+        description: '9 over 9'
     },
     custom: {
         key: 'custom',
