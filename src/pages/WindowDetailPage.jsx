@@ -3,9 +3,10 @@ import { Link, useParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
-import { buildHardwareList } from '../engine/lists.js';
+import { buildHardwareList, buildGlassListForWindow } from '../engine/lists.js';
 import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 import DrawingsPanel from '../components/drawings/DrawingsPanel.jsx';
+import GlassDrawing2D from '../components/drawings/GlassDrawing2D.jsx';
 import CutListPanel from '../components/dashboard/CutListPanel.jsx';
 import ExportControls from '../components/export/ExportControls.jsx';
 
@@ -177,45 +178,64 @@ export default function WindowDetailPage() {
   );
 }
 
-// ─── Glass Panel (placeholder with schedule) ───
+// ─── Glass Panel — same source as Production Pack ───
 function GlassPanel({ windowSpec, derived }) {
-  if (!derived?.glazingItems?.length) {
+  const glassList = useMemo(
+    () => (derived && windowSpec ? buildGlassListForWindow(derived, windowSpec) : []),
+    [derived, windowSpec]
+  );
+
+  if (!glassList.length) {
     return <div className="card p-8 text-center text-ink-400">No glass data.</div>;
   }
-  const g = derived.glazingItems[0];
+
   return (
-    <div className="card p-5">
-      <div className="text-sm font-semibold text-ink-50 mb-4">Glass Schedule</div>
-      <div className="bg-surface-600 rounded-lg border border-surface-500 overflow-hidden">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b border-surface-500">
-              <th className="px-4 py-2 text-left text-ink-400 font-medium">Pane</th>
-              <th className="px-4 py-2 text-right text-ink-400 font-medium">Width</th>
-              <th className="px-4 py-2 text-right text-ink-400 font-medium">Height</th>
-              <th className="px-4 py-2 text-right text-ink-400 font-medium">Qty</th>
-              <th className="px-4 py-2 text-left text-ink-400 font-medium">Type</th>
-            </tr>
-          </thead>
-          <tbody>
-            {g.panes?.map((p, i) => (
-              <tr key={i} className="border-b border-surface-500/50">
-                <td className="px-4 py-2 text-ink-100">{p.label || `Pane ${i + 1}`}</td>
-                <td className="px-4 py-2 text-right text-ink-200">{p.width} mm</td>
-                <td className="px-4 py-2 text-right text-ink-200">{p.height} mm</td>
-                <td className="px-4 py-2 text-right text-ink-200">{p.quantity || 1}</td>
-                <td className="px-4 py-2 text-ink-400">{windowSpec?.glazing.type} / {windowSpec?.glazing.spec}</td>
+    <div className="space-y-4">
+      {/* Glass schedule table */}
+      <div className="card p-5">
+        <div className="text-sm font-semibold text-ink-50 mb-4">Glass Schedule</div>
+        <div className="bg-surface-600 rounded-lg border border-surface-500 overflow-hidden">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-surface-500">
+                <th className="px-4 py-2 text-left text-ink-400 font-medium">Pane</th>
+                <th className="px-4 py-2 text-right text-ink-400 font-medium">Width</th>
+                <th className="px-4 py-2 text-right text-ink-400 font-medium">Height</th>
+                <th className="px-4 py-2 text-right text-ink-400 font-medium">Qty</th>
+                <th className="px-4 py-2 text-left text-ink-400 font-medium">Type</th>
+                <th className="px-4 py-2 text-left text-ink-400 font-medium">Makeup</th>
+                <th className="px-4 py-2 text-left text-ink-400 font-medium">Finish</th>
+                <th className="px-4 py-2 text-left text-ink-400 font-medium">Spacer</th>
               </tr>
-            )) || (
-              <tr>
-                <td colSpan={5} className="px-4 py-4 text-center text-ink-400">Glass data format not yet supported for detailed schedule. Check Export tab.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {glassList.map((g, i) => (
+                <tr key={i} className="border-b border-surface-500/50">
+                  <td className="px-4 py-2 text-ink-100">{g.label}</td>
+                  <td className="px-4 py-2 text-right text-ink-200 font-mono">{g.width} mm</td>
+                  <td className="px-4 py-2 text-right text-ink-200 font-mono">{g.height} mm</td>
+                  <td className="px-4 py-2 text-right text-ink-200">{g.quantity}</td>
+                  <td className="px-4 py-2 text-ink-300">{g.type} / {g.spec}</td>
+                  <td className="px-4 py-2 text-ink-300">{g.makeup || '—'}</td>
+                  <td className="px-4 py-2 text-ink-300">{g.finish}</td>
+                  <td className="px-4 py-2 text-ink-300">{g.spacer}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-      <div className="mt-3 text-[10px] text-ink-400">
-        Glass drawing with pane positions coming soon.
+
+      {/* Glass drawings — upper + lower */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="card p-4">
+          <div className="text-xs font-semibold text-ink-200 mb-2">Upper Glass</div>
+          <GlassDrawing2D windowSpec={windowSpec} derived={derived} type="upper" />
+        </div>
+        <div className="card p-4">
+          <div className="text-xs font-semibold text-ink-200 mb-2">Lower Glass</div>
+          <GlassDrawing2D windowSpec={windowSpec} derived={derived} type="lower" />
+        </div>
       </div>
     </div>
   );
