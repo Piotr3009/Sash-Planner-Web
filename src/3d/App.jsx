@@ -1090,6 +1090,8 @@ export default function App() {
       if (cfg.trafficDoor !== undefined) setTrafficDoor(cfg.trafficDoor);
       if (cfg.bifoldOpenDirection !== undefined) setBifoldOpenDirection(cfg.bifoldOpenDirection);
     };
+    // B4: Signal that 3D viewer is ready — ConfiguratorPage listens for this
+    window.dispatchEvent(new Event('3d-ready'));
     return () => { delete window.update3D; };
   }, []);
 
