@@ -205,23 +205,19 @@ function createComponentRecord(windowSpec, group, elementName, section, length, 
     };
 }
 
-function calculateSashComponentSet(windowSpec, settings, sashWidth, sashHeight) {
-    const halfHeight = sashHeight / 2;
+function calculateSashComponentSet(windowSpec, settings, sashWidth, topSashHeight, bottomSashHeight) {
     const hornExtra = windowSpec.sash?.horns ? Number(windowSpec.sash?.hornExtension ?? settings.hornExtensionDefault) : 0;
-    const meetingLength = sashWidth;
-
-    const topSashHeight = halfHeight;
-    const bottomSashHeight = halfHeight;
+    const railLength = sashWidth;
 
     const sashComponents = [];
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'TOP RAIL', '57x57', meetingLength, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'TOP RAIL', '57x57', railLength, 1));
     sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES TOP SASH (L)', '57x57', topSashHeight + hornExtra, 1));
     sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES TOP SASH (R)', '57x57', topSashHeight + hornExtra, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'TOP MEET RAIL', '57x43', meetingLength, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'BOTTOM MEET RAIL', '57x43', meetingLength, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES BOTTOM SASH (L)', '57x57', bottomSashHeight + hornExtra, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES BOTTOM SASH (R)', '57x57', bottomSashHeight + hornExtra, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'BOTTOM RAIL', '57x90', meetingLength, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'TOP MEET RAIL', '57x43', railLength, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'BOTTOM MEET RAIL', '57x43', railLength, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES BOTTOM SASH (L)', '57x57', bottomSashHeight, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES BOTTOM SASH (R)', '57x57', bottomSashHeight, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'BOTTOM RAIL', '57x90', railLength, 1));
 
     return sashComponents;
 }
@@ -461,7 +457,7 @@ export function deriveWindowData(windowSpec, settings = {}) {
     const bottomSashHeight = topSashHeight + CONSTANTS.SASH_HEIGHT_DIFFERENCE;
     const sashHeight = totalSashHeight;
 
-    const sashComponents = calculateSashComponentSet(windowSpec, settings, sashWidth, sashHeight);
+    const sashComponents = calculateSashComponentSet(windowSpec, settings, sashWidth, topSashHeight, bottomSashHeight);
     const boxComponents = calculateBoxComponentSet(windowSpec, frameWidth, frameHeight);
     const glazingSummary = calculateGlazingSummaryForWindow(windowSpec, sashWidth, sashHeight, settings);
 
