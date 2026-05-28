@@ -20,9 +20,9 @@ const GLASS_FINISHES = [{ value: 'clear', label: 'Clear' }, { value: 'frosted', 
 const FROSTED_LOCS = [{ value: 'bottom', label: 'Bottom Only' }, { value: 'both', label: 'Both' }];
 const OPENINGS = [{ value: 'both', label: 'Both Open' }, { value: 'bottom', label: 'Bottom Only' }, { value: 'fixed', label: 'Fixed' }];
 const GLASS_TYPES = [{ value: 'double', label: 'Double' }, { value: 'triple', label: 'Triple' }, { value: 'single', label: 'Single Heritage' }];
-const IRON_OPTIONS = [{ value: 'brass', label: 'Brass' }, { value: 'chrome', label: 'Chrome' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' }, { value: 'satin-nickel', label: 'Satin Nickel' }];
-const HORN_OPTIONS = [{ value: 'none', label: 'None' }, { value: 'A', label: 'Type A' }, { value: 'B', label: 'Type B' }, { value: 'C', label: 'Type C' }];
-const SPACER_OPTIONS = [{ value: 'silver', label: 'Silver' }, { value: 'black', label: 'Black' }, { value: 'gold', label: 'Gold' }, { value: 'white', label: 'White' }];
+const IRON_OPTIONS = [{ value: 'brass', label: 'Brass' }, { value: 'chrome', label: 'Chrome' }, { value: 'stainless', label: 'Stainless' }, { value: 'antique_brass', label: 'Antique Brass' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' }];
+const HORN_OPTIONS = [{ value: 'none', label: 'No Horns' }, { value: 'A', label: 'Richmond' }, { value: 'D', label: 'Type D' }];
+const SPACER_OPTIONS = [{ value: 'white', label: 'White' }, { value: 'silver', label: 'Silver' }, { value: 'black', label: 'Black' }];
 
 // ─── Triple sash dimension constraints (matching PSW) ───
 const TRIPLE_CONSTRAINTS = { minW: 1400, maxW: 3000, defaultW: 2000, minH: 1200, maxH: 2500 };
@@ -141,7 +141,7 @@ export default function ConfiguratorPage() {
   const isSingle = colType === 'single';
   const gType = ovGlassType ?? def.glassType ?? 'double';
   const gSpec = def.glassSpec || 'toughened';
-  const spacer = ovSpacerColor ?? def.spacerColor ?? 'silver';
+  const spacer = ovSpacerColor ?? def.spacerColor ?? 'white';
   const pas24 = def.pas24 || false;
   const iron = ovIronmongery ?? def.ironmongery ?? 'brass';
   const frameDepth = gType === 'triple' ? 172 : (boxType === 'standard' ? 164 : 144);
@@ -306,7 +306,7 @@ export default function ConfiguratorPage() {
               <OverrideRow label="Horns" active={ovHornType !== null} onToggle={() => setOvHornType(ovHornType !== null ? null : (def.hornType || 'A'))}>
                 <HChips o={HORN_OPTIONS} v={ovHornType || horn} c={setOvHornType} />
               </OverrideRow>
-              <OverrideRow label="Spacer colour" active={ovSpacerColor !== null} onToggle={() => setOvSpacerColor(ovSpacerColor !== null ? null : (def.spacerColor || 'silver'))}>
+              <OverrideRow label="Spacer colour" active={ovSpacerColor !== null} onToggle={() => setOvSpacerColor(ovSpacerColor !== null ? null : (def.spacerColor || 'white'))}>
                 <HChips o={SPACER_OPTIONS} v={ovSpacerColor || spacer} c={setOvSpacerColor} />
               </OverrideRow>
               <OverrideRow label="Wood colour" active={ovWoodColor !== null} onToggle={() => setOvWoodColor(ovWoodColor !== null ? null : (def.woodColor || '#F6F6F6'))}>

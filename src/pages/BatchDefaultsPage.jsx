@@ -7,7 +7,7 @@ const HORN_OPTIONS = [{ value: 'none', label: 'No Horns' }, { value: 'A', label:
 const FRAME_TYPES = [{ value: 'standard', label: 'Standard (164mm)' }, { value: 'slim', label: 'Slim (144mm)' }];
 const GLASS_TYPES = [{ value: 'double', label: 'Double (U: 1.4)' }, { value: 'triple', label: 'Triple (U: 1.2)' }, { value: 'passive', label: 'Passive (U: 0.8)' }];
 const GLASS_SPECS = [{ value: 'toughened', label: 'Toughened' }, { value: 'laminated', label: 'Laminated' }];
-const SPACERS = [{ value: 'silver', label: 'Silver' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' }];
+const SPACERS = [{ value: 'white', label: 'White' }, { value: 'silver', label: 'Silver' }, { value: 'black', label: 'Black' }];
 const IRON_FINISHES = [
   { value: 'brass', label: 'Brass' }, { value: 'chrome', label: 'Chrome' }, { value: 'stainless', label: 'Stainless' },
   { value: 'antique_brass', label: 'Antique Brass' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' },
