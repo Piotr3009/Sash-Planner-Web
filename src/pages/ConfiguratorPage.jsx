@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
 
@@ -60,6 +60,7 @@ export default function ConfiguratorPage() {
   const [headType, setHeadType] = useState('flat');
   const [inW, setInW] = useState(1000);
   const [inH, setInH] = useState(1500);
+  const preTripleWRef = useRef(null); // remembers width before triple switch
   const [uBars, setUBars] = useState('none');
   const [lBars, setLBars] = useState('none');
   const [sameBars, setSameBars] = useState(true);
@@ -104,9 +105,11 @@ export default function ConfiguratorPage() {
     }
   }, [editingWindow, prefilled]);
 
-  // ─── B1: Triple sash dimension clamp ───
+  // ─── B1: Triple sash dimension clamp + restore on double ───
   useEffect(() => {
     if (sashType === 'triple') {
+      // Save current width before clamping
+      preTripleWRef.current = inW;
       setInW(prev => {
         const v = Number(prev);
         if (isNaN(v) || v < TRIPLE_CONSTRAINTS.minW) return TRIPLE_CONSTRAINTS.defaultW;
@@ -117,6 +120,12 @@ export default function ConfiguratorPage() {
         if (isNaN(v) || v < TRIPLE_CONSTRAINTS.minH) return Math.max(v, TRIPLE_CONSTRAINTS.minH);
         return v;
       });
+    } else {
+      // Restore pre-triple width if we had one
+      if (preTripleWRef.current !== null) {
+        setInW(preTripleWRef.current);
+        preTripleWRef.current = null;
+      }
     }
   }, [sashType]);
 
@@ -202,8 +211,15 @@ export default function ConfiguratorPage() {
   };
   const updateBarMm = (setter, list, idx, val) => {
     const next = [...list];
-    next[idx] = { ...next[idx], mm: Math.max(10, Math.round(Number(val) || 10)) };
-    setter(next.sort((a, b) => a.mm - b.mm));
+    // Allow empty string during typing — store raw value
+    next[idx] = { ...next[idx], mm: val === '' ? '' : Number(val) };
+    setter(next); // NO sort during editing
+  };
+  const finalizeBarMm = (setter, list, idx) => {
+    const next = [...list];
+    const v = Number(next[idx].mm);
+    next[idx] = { ...next[idx], mm: (isNaN(v) || v < 10) ? 10 : Math.round(v) };
+    setter(next);
   };
   const removeBar = (setter, list, idx) => setter(list.filter((_, i) => i !== idx));
 
@@ -266,9 +282,9 @@ export default function ConfiguratorPage() {
 
           {isSash && <Sec t="Georgian Bars">
             <Lbl>Upper</Lbl><GChips o={BAR_OPTIONS} v={uBars} c={v => { setUBars(v); if (sameBars) setLBars(v); }} />
-            {uBars === 'custom' && <CBarEd bars={uCustom} maxVal={extW} onAdd={type => addBar(setUCustom, uCustom, type)} onChange={(i, v) => updateBarMm(setUCustom, uCustom, i, v)} onRemove={i => removeBar(setUCustom, uCustom, i)} />}
+            {uBars === 'custom' && <CBarEd bars={uCustom} maxVal={extW} onAdd={type => addBar(setUCustom, uCustom, type)} onChange={(i, v) => updateBarMm(setUCustom, uCustom, i, v)} onFinalize={i => finalizeBarMm(setUCustom, uCustom, i)} onRemove={i => removeBar(setUCustom, uCustom, i)} />}
             <label className="flex items-center gap-2 text-xs text-ink-400 mb-2 cursor-pointer"><input type="checkbox" checked={sameBars} onChange={e => setSameBars(e.target.checked)} className="accent-accent-500" />Same upper & lower</label>
-            {!sameBars && <><Lbl>Lower</Lbl><GChips o={BAR_OPTIONS} v={lBars} c={setLBars} />{lBars === 'custom' && <CBarEd bars={lCustom} maxVal={extW} onAdd={type => addBar(setLCustom, lCustom, type)} onChange={(i, v) => updateBarMm(setLCustom, lCustom, i, v)} onRemove={i => removeBar(setLCustom, lCustom, i)} />}</>}
+            {!sameBars && <><Lbl>Lower</Lbl><GChips o={BAR_OPTIONS} v={lBars} c={setLBars} />{lBars === 'custom' && <CBarEd bars={lCustom} maxVal={extW} onAdd={type => addBar(setLCustom, lCustom, type)} onChange={(i, v) => updateBarMm(setLCustom, lCustom, i, v)} onFinalize={i => finalizeBarMm(setLCustom, lCustom, i)} onRemove={i => removeBar(setLCustom, lCustom, i)} />}</>}
           </Sec>}
 
           <Sec t="Opening"><HChips o={OPENINGS} v={opening} c={setOpening} /></Sec>
@@ -377,7 +393,7 @@ function OverrideRow({ label, active, onToggle, children }) {
 }
 
 // ─── B2+B3: Custom bar editor with inline inputs ───
-function CBarEd({ bars, maxVal, onAdd, onChange, onRemove }) {
+function CBarEd({ bars, maxVal, onAdd, onChange, onFinalize, onRemove }) {
   return (
     <div className="bg-surface-600 rounded-lg p-2 mb-2 text-xs border border-surface-500">
       <div className="flex gap-2 mb-2">
@@ -387,11 +403,12 @@ function CBarEd({ bars, maxVal, onAdd, onChange, onRemove }) {
       {bars.map((b, i) => (
         <div key={i} className="flex items-center gap-2 mb-1">
           <span className={`text-[9px] font-bold w-4 ${b.type === 'v' ? 'text-teal-400' : 'text-purple-400'}`}>{b.type.toUpperCase()}</span>
-          <input type="range" min={10} max={maxVal || 1500} step={1} value={b.mm}
+          <input type="range" min={10} max={maxVal || 1500} step={1} value={b.mm === '' ? 10 : b.mm}
             onChange={e => onChange(i, e.target.value)}
             className="flex-1 accent-accent-500 h-1.5" />
           <input type="number" min={10} max={maxVal || 1500} value={b.mm}
             onChange={e => onChange(i, e.target.value)}
+            onBlur={() => onFinalize(i)}
             className="w-16 px-1.5 py-0.5 bg-surface-700 border border-surface-500 rounded text-[10px] text-ink-100 text-center" />
           <span className="text-[9px] text-ink-400">mm</span>
           <button onClick={() => onRemove(i)} className="text-red-400 hover:text-red-300 text-sm leading-none">×</button>
