@@ -13,7 +13,11 @@ const nextItemNumber = (items) => {
 };
 
 export const IRONMONGERY_CATEGORIES = [
-  'locks', 'handles', 'pulleys', 'hinges', 'fasteners', 'vents', 'restrictors', 'other',
+  { key: 'fingerLifts', label: 'Finger Lifts', windowType: 'sash' },
+  { key: 'locks', label: 'Sash Locks', windowType: 'sash' },
+  { key: 'pullHandles', label: 'Pull Handles', windowType: 'sash' },
+  { key: 'stoppers', label: 'Stoppers', windowType: 'sash' },
+  { key: 'trickleVents', label: 'Trickle Vents', windowType: 'sash' },
 ];
 
 export const IRONMONGERY_FINISHES = [
