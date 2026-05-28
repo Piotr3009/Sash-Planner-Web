@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
+import { buildHardwareList } from '../engine/lists.js';
 import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 import DrawingsPanel from '../components/drawings/DrawingsPanel.jsx';
 import CutListPanel from '../components/dashboard/CutListPanel.jsx';
@@ -283,10 +284,12 @@ function BOMPanel({ item, windowSpec, derived }) {
         <div className="bg-surface-600 rounded-lg border border-surface-500 p-4">
           <div className="text-xs font-medium text-ink-200 mb-2">Hardware</div>
           <div className="space-y-1 text-xs text-ink-400">
-            <div className="flex justify-between"><span>Sash lock ({windowSpec?.hardware.finish})</span><span>1 pc</span></div>
-            <div className="flex justify-between"><span>Sash lifts ({windowSpec?.hardware.finish})</span><span>2 pcs</span></div>
-            <div className="flex justify-between"><span>Pulleys</span><span>4 pcs</span></div>
-            <div className="flex justify-between"><span>Weather stripping</span><span>Set</span></div>
+            {windowSpec && buildHardwareList(windowSpec).map((h, i) => (
+              <div key={i} className="flex justify-between"><span>{h.item} ({h.detail})</span><span>{h.quantity} pcs</span></div>
+            ))}
+            {windowSpec && buildHardwareList(windowSpec).length === 0 && (
+              <div className="text-ink-500 italic">Fixed window — no hardware</div>
+            )}
           </div>
         </div>
       </div>

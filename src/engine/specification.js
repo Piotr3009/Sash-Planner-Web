@@ -89,6 +89,9 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
   // Frame depth — new: item.frameDepth
   const frameDepth = item?.frameDepth || (glassType === 'triple' ? 172 : 164);
 
+  // Opening type — new: item.openingType
+  const openingType = item?.openingType || item?.opening_type || fc.openingType || 'both';
+
   return {
     id: item?.id || `mock_${Math.random().toString(36).slice(2, 8)}`,
     name: item?.name || item?.window_number || spec.windowName || 'Window',
@@ -96,6 +99,7 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
     quantity: Number(item?.quantity || 1),
     frame: { width, height, depth: frameDepth },
     sash: {
+      openingType,
       horns: hasHorns,
       hornType: hornsVal,
       hornExtension: 75,

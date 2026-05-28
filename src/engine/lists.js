@@ -213,17 +213,40 @@ export function buildGlassListForWindow(derived, windowSpec) {
 export function buildHardwareList(windowSpec) {
   const finish = windowSpec?.hardware?.finish || 'brass';
   const isPas24 = windowSpec?.hardware?.catches === 'PAS24';
-  const list = [
-    { item: 'Sash lock', detail: `${finish} finish`, quantity: 1 },
-    { item: 'Finger pull (lower sash)', detail: finish, quantity: 1 },
-    { item: 'Sash lift / cup handles', detail: finish, quantity: 2 },
-    { item: 'Pulley wheels', detail: 'Spring balance / cord', quantity: 4 },
-    { item: 'Trickle vent', detail: 'Concealed head vent', quantity: 1 },
-    { item: 'Weather seal', detail: 'Brush pile', quantity: 1 }
-  ];
+  const openingType = windowSpec?.sash?.openingType || 'both';
+  const isFixed = openingType === 'fixed';
+  const isBottomOnly = openingType === 'bottom';
+  const frameWidth = windowSpec?.frame?.width || 1000;
+  const hasBars = windowSpec?.sash?.grid?.mode && windowSpec.sash.grid.mode !== 'none';
+
+  // Fixed windows = no hardware
+  if (isFixed) return [];
+
+  const list = [];
+
+  // Locks: 1 normally, 2 if width > 1200mm OR has Georgian bars (PSW rule)
+  const lockQty = (frameWidth > 1200 || hasBars) ? 2 : 1;
+  list.push({ item: 'Sash lock', detail: `${finish} finish${isPas24 ? ' (PAS24)' : ''}`, quantity: lockQty });
+
+  // Finger lifts: always 2 per opening window
+  list.push({ item: 'Finger lift', detail: finish, quantity: 2 });
+
+  // Pull handles: user-selected, default 0 (manual quantity in PSW)
+  // For now: include 2 as default
+  list.push({ item: 'Sash pull handle', detail: finish, quantity: 2 });
+
+  // Pulleys: 4 for both, 2 for bottom-only
+  const pulleyQty = isBottomOnly ? 2 : 4;
+  list.push({ item: 'Pulley wheels', detail: 'Spring balance', quantity: pulleyQty });
+
+  // Stoppers: always 2 per opening window
+  list.push({ item: 'Window stopper', detail: finish, quantity: 2 });
+
+  // PAS24 restrictor
   if (isPas24) {
-    list.push({ item: 'Restrictor (PAS24)', detail: `${finish}`, quantity: 1 });
+    list.push({ item: 'Restrictor (PAS24)', detail: finish, quantity: 1 });
   }
+
   return list;
 }
 
