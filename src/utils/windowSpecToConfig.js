@@ -45,13 +45,7 @@ const COLOR_MAP = {
   'unpainted':    '#DEC89A',
 };
 
-// RAL code → hex (subset — full table is in 3d/App.jsx RAL_COLORS)
-const RAL_COLORS = {
-  '9010': '#FFFFFF', '9016': '#F6F6F6', '9001': '#FDF4E3',
-  '9005': '#0A0A0A', '7016': '#293133', '7021': '#23282B',
-  '7035': '#D7D7D7', '6005': '#2F4538', '6009': '#31372B',
-  '3005': '#5E2129', '5011': '#1B2A4A',
-};
+import { RAL_LOOKUP as RAL_COLORS } from '../config.js';
 
 function resolveColor(name, ral) {
   if (!name && !ral) return '#F4F4F2'; // default white

@@ -1,26 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProjectStore, BATCH_DEFAULTS } from '../stores/projectStore.js';
+import { GLASS_TYPES, GLASS_SPECS, SPACERS, RAL_GROUPS as RAL } from '../config.js';
 
 
 const HORN_OPTIONS = [{ value: 'none', label: 'No Horns' }, { value: 'A', label: 'Richmond' }, { value: 'D', label: 'Type D' }];
 const FRAME_TYPES = [{ value: 'standard', label: 'Standard (164mm)' }, { value: 'slim', label: 'Slim (144mm)' }];
-const GLASS_TYPES = [{ value: 'double', label: 'Double (U: 1.4)' }, { value: 'triple', label: 'Triple (U: 1.2)' }, { value: 'passive', label: 'Passive (U: 0.8)' }];
-const GLASS_SPECS = [{ value: 'toughened', label: 'Toughened' }, { value: 'laminated', label: 'Laminated' }];
-const SPACERS = [{ value: 'white', label: 'White' }, { value: 'silver', label: 'Silver' }, { value: 'black', label: 'Black' }];
 const IRON_FINISHES = [
   { value: 'brass', label: 'Brass' }, { value: 'chrome', label: 'Chrome' }, { value: 'stainless', label: 'Stainless' },
   { value: 'antique_brass', label: 'Antique Brass' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' },
-];
-
-const RAL = [
-  { g: 'Whites & Creams', o: [['#FFFFFF','9010 Pure White'],['#F6F6F6','9016 Traffic White'],['#F4F4F4','9003 Signal White'],['#FDF4E3','9001 Cream White'],['#E7EBDA','9002 Grey White'],['#E6D690','1015 Light Ivory'],['#C2B078','1001 Beige']] },
-  { g: 'Greys', o: [['#D7D7D7','7035 Light Grey'],['#B5B8B1','7038 Agate Grey'],['#8D948D','7042 Traffic Grey A'],['#78858B','7000 Squirrel Grey'],['#474A51','7024 Graphite Grey'],['#293133','7016 Anthracite'],['#23282B','7021 Black Grey'],['#434750','7015 Slate Grey']] },
-  { g: 'Blacks', o: [['#0A0A0A','9005 Jet Black'],['#1C2023','9011 Graphite Black'],['#1E1E1E','9017 Traffic Black'],['#282828','9004 Signal Black']] },
-  { g: 'Greens', o: [['#31372B','6009 Fir Green'],['#2F4538','6005 Moss Green'],['#343B29','6007 Bottle Green'],['#4A4F3B','6003 Olive Green'],['#587246','6011 Reseda Green'],['#35682D','6010 Grass Green']] },
-  { g: 'Blues', o: [['#1E2460','5002 Ultramarine'],['#1B2A4A','5011 Steel Blue'],['#2271B3','5015 Sky Blue'],['#063971','5017 Traffic Blue']] },
-  { g: 'Reds', o: [['#AF2B1E','3000 Flame Red'],['#9B111E','3003 Ruby Red'],['#75151E','3004 Purple Red'],['#5E2129','3005 Wine Red']] },
-  { g: 'Browns', o: [['#955F20','8001 Ochre Brown'],['#6F4F28','8008 Olive Brown'],['#6F3B2A','8011 Nut Brown'],['#4E3B31','8028 Terra Brown'],['#45322E','8017 Chocolate Brown']] },
 ];
 const FB = [
   { g: 'Whites', o: [['#fdfbfc','All White 2005'],['#f2f0e8','Strong White 2001'],['#ede8dc','Great White 2006'],['#f0ece0','Wimborne White 239'],['#fdfeec','Pointing 2003'],['#ede6d5','White Tie 2002'],['#ede3ce','Slipper Satin 2004']] },

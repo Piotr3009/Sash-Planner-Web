@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
+import { GLASS_TYPES, GLASS_FINISHES, FROSTED_LOCATIONS, SPACERS } from '../config.js';
 
 const Viewer3D = lazy(() => import('../3d/App.jsx'));
 
@@ -16,13 +17,9 @@ const SPLIT_RATIOS = [
   { value: '1/5-3/5-1/5', label: '1/5 – 3/5 – 1/5' },
 ];
 const HEAD_TYPES = [{ value: 'flat', label: 'Flat' }, { value: 'arch', label: 'Arch' }];
-const GLASS_FINISHES = [{ value: 'clear', label: 'Clear' }, { value: 'frosted', label: 'Frosted' }];
-const FROSTED_LOCS = [{ value: 'bottom', label: 'Bottom Only' }, { value: 'both', label: 'Both' }];
 const OPENINGS = [{ value: 'both', label: 'Both Open' }, { value: 'bottom', label: 'Bottom Only' }, { value: 'fixed', label: 'Fixed' }];
-const GLASS_TYPES = [{ value: 'double', label: 'Double' }, { value: 'triple', label: 'Triple' }, { value: 'single', label: 'Single Heritage' }];
 const IRON_OPTIONS = [{ value: 'brass', label: 'Brass' }, { value: 'chrome', label: 'Chrome' }, { value: 'stainless', label: 'Stainless' }, { value: 'antique_brass', label: 'Antique Brass' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' }];
 const HORN_OPTIONS = [{ value: 'none', label: 'No Horns' }, { value: 'A', label: 'Richmond' }, { value: 'D', label: 'Type D' }];
-const SPACER_OPTIONS = [{ value: 'white', label: 'White' }, { value: 'silver', label: 'Silver' }, { value: 'black', label: 'Black' }];
 
 // ─── Triple sash dimension constraints (matching PSW) ───
 const TRIPLE_CONSTRAINTS = { minW: 1400, maxW: 3000, defaultW: 2000, minH: 1200, maxH: 2500 };
@@ -291,7 +288,7 @@ export default function ConfiguratorPage() {
 
           <Sec t="Glass Finish">
             <HChips o={GLASS_FINISHES} v={gFin} c={setGFin} />
-            {gFin === 'frosted' && <><Lbl>Location</Lbl><HChips o={FROSTED_LOCS} v={frostLoc} c={setFrostLoc} /></>}
+            {gFin === 'frosted' && <><Lbl>Location</Lbl><HChips o={FROSTED_LOCATIONS} v={frostLoc} c={setFrostLoc} /></>}
           </Sec>
 
           {/* ─── B6: Per-window overrides ─── */}
@@ -307,7 +304,7 @@ export default function ConfiguratorPage() {
                 <HChips o={HORN_OPTIONS} v={ovHornType || horn} c={setOvHornType} />
               </OverrideRow>
               <OverrideRow label="Spacer colour" active={ovSpacerColor !== null} onToggle={() => setOvSpacerColor(ovSpacerColor !== null ? null : (def.spacerColor || 'white'))}>
-                <HChips o={SPACER_OPTIONS} v={ovSpacerColor || spacer} c={setOvSpacerColor} />
+                <HChips o={SPACERS} v={ovSpacerColor || spacer} c={setOvSpacerColor} />
               </OverrideRow>
               <OverrideRow label="Wood colour" active={ovWoodColor !== null} onToggle={() => setOvWoodColor(ovWoodColor !== null ? null : (def.woodColor || '#F6F6F6'))}>
                 <div className="flex items-center gap-2">
