@@ -8,6 +8,7 @@ import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 import DrawingsPanel from '../components/drawings/DrawingsPanel.jsx';
 import GlassDrawing2D from '../components/drawings/GlassDrawing2D.jsx';
 import CutListPanel from '../components/dashboard/CutListPanel.jsx';
+import PreCutPanel from '../components/dashboard/PreCutPanel.jsx';
 import ExportControls from '../components/export/ExportControls.jsx';
 
 
@@ -15,6 +16,7 @@ const TABS = [
   { id: '3d', label: '3D Preview', icon: '🧊' },
   { id: '2d', label: '2D Drawings', icon: '📐' },
   { id: 'cutlist', label: 'Cut List', icon: '🪚' },
+  { id: 'precut', label: 'Pre-Cut', icon: '📏' },
   { id: 'glass', label: 'Glass', icon: '🪟' },
   { id: 'bom', label: 'BOM', icon: '📋' },
 ];
@@ -120,9 +122,11 @@ export default function WindowDetailPage() {
           )}
 
           {tab === 'cutlist' && (
-            <div>
-              <CutListPanel item={item} windowSpec={windowSpec} settings={settings} derived={derived} />
-            </div>
+            <CutListPanel item={item} windowSpec={windowSpec} settings={settings} derived={derived} />
+          )}
+
+          {tab === 'precut' && (
+            <PreCutPanel windowSpec={windowSpec} settings={settings} derived={derived} />
           )}
 
           {tab === 'glass' && (
