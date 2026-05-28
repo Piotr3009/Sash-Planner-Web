@@ -24,6 +24,7 @@ const defaultSettings = {
 const BATCH_DEFAULTS = {
   sash: {
     ironmongery: 'brass',
+    ironmongerySlots: {},
     colourMode: 'single',
     woodColor: '#F6F6F6',
     woodColorExt: '#F6F6F6',

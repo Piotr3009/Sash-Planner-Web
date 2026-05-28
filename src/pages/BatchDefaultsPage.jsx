@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProjectStore, BATCH_DEFAULTS } from '../stores/projectStore.js';
 import { GLASS_TYPES, GLASS_SPECS, SPACERS, RAL_GROUPS as RAL, FB_GROUPS as FB } from '../config.js';
+import { useIronmongeryStore, IRONMONGERY_CATEGORIES } from '../stores/ironmongeryStore.js';
+import IronmongeryPickerModal from '../components/IronmongeryPickerModal.jsx';
 
 
 const HORN_OPTIONS = [{ value: 'none', label: 'No Horns' }, { value: 'A', label: 'Richmond' }, { value: 'D', label: 'Type D' }];
@@ -28,6 +30,13 @@ export default function BatchDefaultsPage() {
 
   const isSash = batch.type === 'sash';
   const upd = (key, val) => setD(prev => ({ ...prev, [key]: val }));
+  const [pickerSlot, setPickerSlot] = useState(null);
+
+  // Ironmongery slot helpers
+  const slots = d.ironmongerySlots || {};
+  const ironItems = useIronmongeryStore((s) => s.items);
+  const getSlotItem = (key) => ironItems.find(m => m.id === slots[key]) || null;
+  const assignSlot = (key, itemId) => upd('ironmongerySlots', { ...slots, [key]: itemId });
 
   const handleSave = () => {
     updateBatchDefaults(projectId, batchId, d);
@@ -84,13 +93,47 @@ export default function BatchDefaultsPage() {
             </Sec>
           )}
 
-          {/* 6. IRONMONGERY (last) */}
+          {/* 6. IRONMONGERY FINISH */}
           <Sec title="Ironmongery Finish">
             <HChips o={IRON_FINISHES} v={d.ironmongery} c={v => upd('ironmongery', v)} />
-            <button onClick={() => navigate('/ironmongery')}
-              className="w-full mt-2 px-4 py-3 border-2 border-dashed border-surface-500 rounded-lg text-xs text-ink-400 hover:border-accent-500/40 hover:text-accent-400 transition-colors text-center">
-              🔧 Browse ironmongery database →
-            </button>
+          </Sec>
+
+          {/* 7. IRONMONGERY SLOTS */}
+          <Sec title="Ironmongery — Assign Products">
+            <div className="space-y-2">
+              {IRONMONGERY_CATEGORIES.filter(c => c.windowType === (batch.type || 'sash')).map(cat => {
+                const item = getSlotItem(cat.key);
+                return (
+                  <div key={cat.key}
+                    onClick={() => setPickerSlot(cat.key)}
+                    className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                      item
+                        ? 'border-accent-500/30 bg-accent-500/5 hover:bg-accent-500/10'
+                        : 'border-surface-500 bg-surface-700/20 hover:bg-surface-700/40 border-dashed'
+                    }`}
+                  >
+                    <div className="w-12 h-12 rounded bg-surface-600 shrink-0 overflow-hidden">
+                      {item?.image_url ? (
+                        <img src={item.image_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-ink-500 text-[10px]">+</div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] text-ink-400 uppercase tracking-wider">{cat.label}</div>
+                      {item ? (
+                        <div className="text-xs text-ink-100 font-medium truncate">{item.name} {item.color && `(${item.color})`}</div>
+                      ) : (
+                        <div className="text-xs text-ink-500 italic">Click to assign...</div>
+                      )}
+                    </div>
+                    {item && item.cost_per_unit > 0 && (
+                      <div className="text-xs font-mono text-accent-400 shrink-0">£{Number(item.cost_per_unit).toFixed(2)}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </Sec>
 
           {/* SUMMARY */}
@@ -108,6 +151,16 @@ export default function BatchDefaultsPage() {
           <button onClick={handleSave} className="w-full btn btn-primary py-3 text-sm">✓ Save Defaults & Continue</button>
         </div>
       </div>
+
+      {/* Ironmongery Picker Modal */}
+      {pickerSlot && (
+        <IronmongeryPickerModal
+          categoryKey={pickerSlot}
+          currentItemId={slots[pickerSlot] || null}
+          onSelect={(itemId) => assignSlot(pickerSlot, itemId)}
+          onClose={() => setPickerSlot(null)}
+        />
+      )}
     </div>
   );
 }
