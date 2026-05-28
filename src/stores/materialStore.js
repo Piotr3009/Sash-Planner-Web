@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { mockMaterials } from '../mocks/mockMaterials.js';
 
 const uid = () => `mat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -166,7 +165,7 @@ export const useMaterialStore = create(
       name: 'sp-materials',
       merge: (persisted, current) => {
         if (!persisted || !persisted.materials) {
-          return { ...current, materials: mockMaterials, materialsLoaded: true };
+          return { ...current, materials: [], materialsLoaded: true };
         }
         return { ...current, ...persisted, materialsLoaded: true };
       },
