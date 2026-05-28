@@ -13,6 +13,7 @@ const nextItemNumber = (items) => {
 };
 
 export const IRONMONGERY_CATEGORIES = [
+  { key: 'pulleys', label: 'Pulleys', windowType: 'sash' },
   { key: 'fingerLifts', label: 'Finger Lifts', windowType: 'sash' },
   { key: 'locks', label: 'Sash Locks', windowType: 'sash' },
   { key: 'pullHandles', label: 'Pull Handles', windowType: 'sash' },
