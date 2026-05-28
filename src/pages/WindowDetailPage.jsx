@@ -15,8 +15,8 @@ import ExportControls from '../components/export/ExportControls.jsx';
 const TABS = [
   { id: '3d', label: '3D Preview', icon: '🧊' },
   { id: '2d', label: '2D Drawings', icon: '📐' },
-  { id: 'cutlist', label: 'Cut List', icon: '🪚' },
   { id: 'precut', label: 'Pre-Cut', icon: '📏' },
+  { id: 'cutlist', label: 'Cut List', icon: '🪚' },
   { id: 'glass', label: 'Glass', icon: '🪟' },
   { id: 'bom', label: 'BOM', icon: '📋' },
 ];

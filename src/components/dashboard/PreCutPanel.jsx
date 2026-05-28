@@ -27,9 +27,11 @@ export default function PreCutPanel({ windowSpec, settings, derived }) {
   const allGroups = [];
 
   (precut.sashEngineering || []).forEach((g) => {
+    const finished = g.items[0]?.finishedSection || g.section;
     allGroups.push({
       key: `sash-${g.section}`,
-      label: `Engineering Wood — ${g.section}`,
+      label: `Sash Timber — ${finished}`,
+      precutSection: g.section,
       section: g.section,
       type: 'sash',
       items: g.items,
@@ -39,21 +41,22 @@ export default function PreCutPanel({ windowSpec, settings, derived }) {
 
   (precut.boxSapele || []).forEach((g) => {
     const names = g.items.map(i => (i.elementName || '').toUpperCase());
-    const sec = g.items[0]?.section || `${g.preCutWidth}`;
-    const secDisplay = sec.replace('x', ' x ');
+    const finished = g.items[0]?.finishedSection || g.items[0]?.section || `${g.preCutWidth}`;
+    const finDisplay = finished.replace('x', ' x ');
     let boxLabel;
     if (names.some(n => n.includes('CILL NOSE') || n.includes('CILL_NOSE'))) {
-      boxLabel = `Cill Nose — ${secDisplay}`;
+      boxLabel = `Cill Nose — ${finDisplay}`;
     } else if (names.some(n => n === 'CILL')) {
-      boxLabel = `Sill Timber — ${secDisplay}`;
+      boxLabel = `Sill Timber — ${finDisplay}`;
     } else if (names.some(n => n.includes('LINER'))) {
-      boxLabel = `Liner — ${secDisplay}`;
+      boxLabel = `Liner — ${finDisplay}`;
     } else {
-      boxLabel = `Box — ${secDisplay}`;
+      boxLabel = `Box — ${finDisplay}`;
     }
     allGroups.push({
       key: `box-${g.preCutWidth}`,
       label: boxLabel,
+      precutSection: `${g.preCutWidth}`,
       section: `${g.preCutWidth}`,
       type: 'box',
       items: g.items,
@@ -133,7 +136,10 @@ export default function PreCutPanel({ windowSpec, settings, derived }) {
               <svg className={`w-3.5 h-3.5 text-ink-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 18l6-6-6-6" />
               </svg>
-              <div className="text-sm font-semibold text-ink-50">{group.label}</div>
+              <div>
+                <div className="text-sm font-semibold text-ink-50">{group.label}</div>
+                <div className="text-[10px] text-ink-400">pre-cut: {group.precutSection}</div>
+              </div>
               <div className="ml-auto flex items-center gap-3">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] text-ink-400">Stock:</span>
