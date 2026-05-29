@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
+import { useMaterialStore } from '../stores/materialStore.js';
+import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignmentStore.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
 import { buildHardwareList, buildGlassListForWindow, buildPrecutForWindow } from '../engine/lists.js';
@@ -245,117 +247,162 @@ function GlassPanel({ windowSpec, derived }) {
   );
 }
 
-// ─── BOM Panel — Purchase list view ───
+// ─── BOM Panel — Purchase list matching Project Materials layout ───
+const ELEMENT_TO_PART_ID = {
+  'HEAD': 'head', 'CILL': 'cill', 'CILL NOSE': 'cill_nose', 'CILL EXTENSION': 'cill_extension',
+  'JAMB LEFT': 'jambs', 'JAMB RIGHT': 'jambs',
+  'INTERNAL HEAD LINER': 'int_head_liner', 'EXTERNAL HEAD LINER': 'ext_head_liner',
+  'INTERNAL JAMB LINER (L)': 'int_jamb_liner', 'INTERNAL JAMB LINER (R)': 'int_jamb_liner',
+  'EXTERNAL JAMB LINER (L)': 'ext_jamb_liner', 'EXTERNAL JAMB LINER (R)': 'ext_jamb_liner',
+  'TOP RAIL': 'top_rail', 'BOTTOM RAIL': 'bottom_rail',
+  'STILES TOP SASH (L)': 'stiles_top_sash', 'STILES TOP SASH (R)': 'stiles_top_sash',
+  'STILES BOTTOM SASH (L)': 'stiles_bottom_sash', 'STILES BOTTOM SASH (R)': 'stiles_bottom_sash',
+  'TOP MEET RAIL': 'top_meet_rail', 'BOTTOM MEET RAIL': 'bottom_meet_rail',
+  'GLAZING BEADING': 'glazing_beading', 'TRIANGLE BEADING (EXT)': 'triangle_beading_ext',
+  'PARTING BEADING': 'parting_beading', 'STAFF BEADING': 'staff_beading',
+  'MEETING BEADING A': 'meeting_beading_a', 'MEETING BEADING B': 'meeting_beading_b',
+};
+
 function BOMPanel({ item, windowSpec, settings, derived }) {
+  const materials = useMaterialStore((s) => s.materials);
+  const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const w = derived?.weights;
   const p = derived?.paint;
+
   const glassList = useMemo(
     () => (derived && windowSpec ? buildGlassListForWindow(derived, windowSpec) : []),
     [derived, windowSpec]
   );
 
-  // Build timber summary from pre-cut (has machining allowance)
-  const timberLines = useMemo(() => {
-    if (!derived || !windowSpec) return [];
+  // Build length map from pre-cut (timber) + derived (beading)
+  const partLengths = useMemo(() => {
+    if (!derived || !windowSpec) return {};
+    const map = {}; // partId → totalMm
+
+    // Timber from pre-cut (has machining allowance)
     const precut = buildPrecutForWindow(derived, windowSpec, settings);
-    if (!precut) return [];
-
-    const categorizeName = (name) => {
-      const n = (name || '').toUpperCase();
-      if (n.includes('STILE') || n.includes('RAIL')) return 'Sash Timber';
-      if (n.includes('JAMB') && !n.includes('LINER')) return 'Jamb Timber';
-      if (n.includes('CILL NOSE') || n.includes('CILL_NOSE')) return 'Cill Nose';
-      if (n.includes('CILL')) return 'Cill Timber';
-      if (n === 'HEAD') return 'Head Timber';
-      if (n.includes('LINER')) return 'Liner';
-      return 'Timber';
-    };
-
-    const map = new Map();
-    const addItems = (items) => {
-      items.forEach((it) => {
-        const cat = categorizeName(it.elementName);
-        const fin = it.finishedSection || it.section;
-        const key = `${cat}|${fin}`;
-        if (!map.has(key)) map.set(key, { category: cat, section: fin, totalLm: 0 });
-        map.get(key).totalLm += (it.length * (it.quantity || 1));
+    if (precut) {
+      const addItems = (items) => items.forEach((it) => {
+        const pid = ELEMENT_TO_PART_ID[it.elementName];
+        if (!pid) return;
+        map[pid] = (map[pid] || 0) + it.length * (it.quantity || 1);
       });
-    };
+      (precut.sashEngineering || []).forEach((g) => addItems(g.items));
+      (precut.boxSapele || []).forEach((g) => addItems(g.items));
+    }
 
-    (precut.sashEngineering || []).forEach((g) => addItems(g.items));
-    (precut.boxSapele || []).forEach((g) => addItems(g.items));
+    // Beading from derived (already in mm totals)
+    (derived.components?.beading || []).forEach((b) => {
+      const pid = ELEMENT_TO_PART_ID[b.elementName];
+      if (!pid) return;
+      map[pid] = (map[pid] || 0) + b.length * (b.quantity || 1);
+    });
 
-    return Array.from(map.values())
-      .map((r) => ({ ...r, totalLm: Math.round(r.totalLm) }))
-      .sort((a, b) => a.category.localeCompare(b.category) || a.section.localeCompare(b.section));
+    return map;
   }, [derived, windowSpec, settings]);
 
-  // Beading summary — sum by name
-  const beadingLines = useMemo(() => {
-    const items = derived?.components?.beading || [];
-    return items.map((b) => ({
-      name: b.elementName,
-      meters: (b.length / 1000).toFixed(2),
-    }));
-  }, [derived]);
+  // Group by material (same structure as Project Materials)
+  const bomGroups = useMemo(() => {
+    const matMap = {};
+    const unassigned = { material: null, parts: [], totalMeters: 0 };
+
+    ALL_PARTS.forEach((part) => {
+      const totalMm = partLengths[part.id];
+      if (!totalMm) return;
+
+      const assignment = assignments[part.id];
+      const yieldCoeff = assignment?.yield || 1.0;
+      const totalMeters = (totalMm / 1000) * yieldCoeff;
+      const pcsTotal = part.pcs;
+      const partData = { ...part, pcsTotal, totalMeters, yield: yieldCoeff };
+
+      if (assignment?.material_id) {
+        const matId = assignment.material_id;
+        const mat = materials.find((m) => m.id === matId);
+        if (mat) {
+          if (!matMap[matId]) matMap[matId] = { material: mat, parts: [], totalMeters: 0 };
+          matMap[matId].parts.push(partData);
+          matMap[matId].totalMeters += totalMeters;
+          return;
+        }
+      }
+      unassigned.parts.push(partData);
+      unassigned.totalMeters += totalMeters;
+    });
+
+    const groups = Object.values(matMap);
+    if (unassigned.parts.length > 0) groups.push(unassigned);
+    return groups;
+  }, [partLengths, assignments, materials]);
 
   return (
     <div className="space-y-4">
-      {/* Timber */}
-      {timberLines.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="px-4 py-3 border-b border-surface-500 bg-surface-800">
-            <div className="text-sm font-semibold text-ink-50">Timber</div>
-            <div className="text-[10px] text-ink-400">Pre-cut lengths (with machining allowance)</div>
-          </div>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-surface-500 bg-surface-700/30">
-                <th className="px-4 py-2 text-left text-ink-400 font-medium">Part</th>
-                <th className="px-4 py-2 text-left text-ink-400 font-medium">Section</th>
-                <th className="px-4 py-2 text-left text-ink-400 font-medium">Material</th>
-                <th className="px-4 py-2 text-right text-ink-400 font-medium">Total (lm)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {timberLines.map((t, i) => (
-                <tr key={i} className="border-b border-surface-500/30">
-                  <td className="px-4 py-2 text-ink-100">{t.category}</td>
-                  <td className="px-4 py-2 text-ink-200 font-mono">{t.section}</td>
-                  <td className="px-4 py-2 text-ink-400 italic">—</td>
-                  <td className="px-4 py-2 text-right text-ink-100 font-mono">{(t.totalLm / 1000).toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Material groups — identical to Project Materials */}
+      {bomGroups.length === 0 ? (
+        <div className="card p-8 text-center">
+          <div className="text-3xl mb-3">📋</div>
+          <div className="text-sm text-ink-300">No material data available.</div>
         </div>
-      )}
+      ) : (
+        bomGroups.map((group, gi) => (
+          <div key={gi} className="card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                {group.material?.image_url ? (
+                  <img src={group.material.image_url} alt="" className="w-10 h-10 rounded object-cover border border-surface-500" />
+                ) : (
+                  <div className="w-10 h-10 rounded bg-surface-600 border border-surface-500 grid place-items-center text-ink-500 text-xs">
+                    {group.material ? '—' : '?'}
+                  </div>
+                )}
+                <div>
+                  <div className="text-sm font-semibold text-ink-50">
+                    {group.material ? group.material.name : 'Unassigned'}
+                  </div>
+                  <div className="text-[10px] text-ink-400 flex items-center gap-2">
+                    {group.material ? (
+                      <>
+                        <span>{group.material.item_number}</span>
+                        <span>{group.material.size || '—'}</span>
+                        {group.material.cost_per_unit > 0 && <span>£{Number(group.material.cost_per_unit).toFixed(2)}/{group.material.unit}</span>}
+                        {group.material.jc_uuid && <span className="text-[8px] px-1 py-0.5 rounded bg-amber-600/15 text-amber-500 border border-amber-500/25">JC</span>}
+                      </>
+                    ) : (
+                      <span>Go to Materials → Assignments to assign</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-semibold text-ink-100">{group.totalMeters.toFixed(2)} m</div>
+                <div className="text-[10px] text-ink-400">pre-cut lengths</div>
+              </div>
+            </div>
 
-      {/* Beading */}
-      {beadingLines.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="px-4 py-3 border-b border-surface-500 bg-surface-800">
-            <div className="text-sm font-semibold text-ink-50">Beading</div>
-          </div>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-surface-500 bg-surface-700/30">
-                <th className="px-4 py-2 text-left text-ink-400 font-medium">Type</th>
-                <th className="px-4 py-2 text-left text-ink-400 font-medium">Material</th>
-                <th className="px-4 py-2 text-right text-ink-400 font-medium">Total (lm)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {beadingLines.map((b, i) => (
-                <tr key={i} className="border-b border-surface-500/30">
-                  <td className="px-4 py-2 text-ink-100">{b.name}</td>
-                  <td className="px-4 py-2 text-ink-400 italic">—</td>
-                  <td className="px-4 py-2 text-right text-ink-100 font-mono">{b.meters}</td>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-surface-500/50">
+                  <th className="py-1.5 text-left text-ink-400 font-medium">Part</th>
+                  <th className="py-1.5 text-center text-ink-400 font-medium">Section</th>
+                  <th className="py-1.5 text-center text-ink-400 font-medium">Pcs</th>
+                  <th className="py-1.5 text-center text-ink-400 font-medium">Yield</th>
+                  <th className="py-1.5 text-right text-ink-400 font-medium">Meters</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {group.parts.map((gp, pi) => (
+                  <tr key={pi} className="border-b border-surface-500/30">
+                    <td className="py-1.5 text-ink-200">{gp.name}</td>
+                    <td className="py-1.5 text-center text-ink-300 font-mono">{gp.section}</td>
+                    <td className="py-1.5 text-center text-ink-300">{gp.pcsTotal}</td>
+                    <td className="py-1.5 text-center text-ink-300">{gp.yield}</td>
+                    <td className="py-1.5 text-right text-ink-100 font-mono font-medium">{gp.totalMeters.toFixed(2)} m</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))
       )}
 
       {/* Glass */}
