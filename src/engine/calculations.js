@@ -414,16 +414,14 @@ function calculateBeadingComponents(windowSpec, frameWidth, frameHeight, sashWid
 
     const beading = [];
 
-    // 1. Glazing bar beading — perimeter of glass area × 2 sashes
+    // 1. Glazing beading — perimeter of glass area × 2 sashes
     const perimPerSash = 2 * (glassW + glassH);
-    beading.push(rec('GLAZING BAR BEADING', round(perimPerSash * 2 * F),
+    beading.push(rec('GLAZING BEADING', round(perimPerSash * 2 * F),
         `Perim ${round(perimPerSash)} × 2 + 15%`));
 
-    // 2 & 3. Georgian + Triangle (only if bars exist)
+    // 2. Triangle beading ext (only if bars exist)
     if (barPerSash > 0) {
         const barTotal = round(barPerSash * 2 * F);
-        beading.push(rec('INTERNAL GEORGIAN BEADING', barTotal,
-            `Bars ${round(barPerSash)} × 2 + 15%`));
         beading.push(rec('TRIANGLE BEADING (EXT)', barTotal,
             `Bars ${round(barPerSash)} × 2 + 15%`));
     }

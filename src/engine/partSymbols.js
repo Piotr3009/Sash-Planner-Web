@@ -32,13 +32,12 @@ export const PART_SYMBOLS = {
   stile_bottom_right:  { partId: 'stile_bottom_right',  symbol: 'SBS-R', name: 'Stile Bottom Sash Right', group: 'sash', mirror: true  },
 
   // Beading
-  glazing_bar_beading:      { partId: 'glazing_bar_beading',      symbol: 'GBB', name: 'Glazing Bar Beading',       group: 'beading', mirror: false },
-  internal_georgian_beading:{ partId: 'internal_georgian_beading', symbol: 'IGB', name: 'Internal Georgian Beading', group: 'beading', mirror: false },
-  triangle_beading_ext:     { partId: 'triangle_beading_ext',     symbol: 'TBE', name: 'Triangle Beading Ext',      group: 'beading', mirror: false },
-  parting_beading:           { partId: 'parting_beading',           symbol: 'PB',  name: 'Parting Beading',           group: 'beading', mirror: false },
-  staff_beading:             { partId: 'staff_beading',             symbol: 'SB',  name: 'Staff Beading',            group: 'beading', mirror: false },
-  meeting_beading_a:         { partId: 'meeting_beading_a',         symbol: 'MBA', name: 'Meeting Beading A',        group: 'beading', mirror: false },
-  meeting_beading_b:         { partId: 'meeting_beading_b',         symbol: 'MBB', name: 'Meeting Beading B',        group: 'beading', mirror: false },
+  glazing_beading:            { partId: 'glazing_beading',            symbol: 'GB',  name: 'Glazing Beading',          group: 'beading', mirror: false },
+  triangle_beading_ext:       { partId: 'triangle_beading_ext',       symbol: 'TBE', name: 'Triangle Beading Ext',     group: 'beading', mirror: false },
+  parting_beading:             { partId: 'parting_beading',             symbol: 'PB',  name: 'Parting Beading',           group: 'beading', mirror: false },
+  staff_beading:               { partId: 'staff_beading',               symbol: 'SB',  name: 'Staff Beading',            group: 'beading', mirror: false },
+  meeting_beading_a:           { partId: 'meeting_beading_a',           symbol: 'MBA', name: 'Meeting Beading A',        group: 'beading', mirror: false },
+  meeting_beading_b:           { partId: 'meeting_beading_b',           symbol: 'MBB', name: 'Meeting Beading B',        group: 'beading', mirror: false },
 };
 
 /**
@@ -65,8 +64,7 @@ const _ILL  = PART_SYMBOLS.int_liner_left;
 const _ILR  = PART_SYMBOLS.int_liner_right;
 const _ELL  = PART_SYMBOLS.ext_liner_left;
 const _ELR  = PART_SYMBOLS.ext_liner_right;
-const _GBB  = PART_SYMBOLS.glazing_bar_beading;
-const _IGB  = PART_SYMBOLS.internal_georgian_beading;
+const _GB   = PART_SYMBOLS.glazing_beading;
 const _TBE  = PART_SYMBOLS.triangle_beading_ext;
 const _PB   = PART_SYMBOLS.parting_beading;
 const _SB   = PART_SYMBOLS.staff_beading;
@@ -112,8 +110,8 @@ const ENGINE_NAME_MAP = {
   'external jamb liner (l)': _ELL,
   'external jamb liner (r)': _ELR,
   // Beading
-  'glazing bar beading':         _GBB,
-  'internal georgian beading':   _IGB,
+  'glazing beading':              _GB,
+  'glazing bar beading':          _GB,
   'triangle beading (ext)':      _TBE,
   'parting beading':             _PB,
   'staff beading':               _SB,

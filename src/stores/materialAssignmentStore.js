@@ -24,8 +24,7 @@ export const SASH_WINDOW_PARTS = {
     { id: 'bottom_meet_rail',     name: 'Bottom Meeting Rail',    section: '63×63',  finishedSection: '57×43',  pcs: 1, materialType: 'hardwood' },
   ],
   beading: [
-    { id: 'glazing_bar_beading',      name: 'Glazing Bar Beading',        section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },
-    { id: 'internal_georgian_beading', name: 'Internal Georgian Beading',  section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },
+    { id: 'glazing_beading',           name: 'Glazing Beading',            section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },
     { id: 'triangle_beading_ext',      name: 'Triangle Beading (Ext)',     section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },
     { id: 'parting_beading',           name: 'Parting Beading',            section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },
     { id: 'staff_beading',            name: 'Staff Beading',              section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },

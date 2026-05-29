@@ -364,7 +364,7 @@ export default function MaterialAssignmentsPage() {
         {/* Beading */}
         <PartGroupSection
           title="Beading"
-          subtitle={`${SASH_WINDOW_PARTS.beading.length} parts · glazing, georgian, triangle, parting, staff, meeting`}
+          subtitle={`${SASH_WINDOW_PARTS.beading.length} parts · glazing, triangle, parting, staff, meeting`}
           parts={SASH_WINDOW_PARTS.beading}
           assignments={assignments}
           materials={materials}
