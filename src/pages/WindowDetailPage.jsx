@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
-import { buildHardwareList, buildGlassListForWindow } from '../engine/lists.js';
+import { buildHardwareList, buildGlassListForWindow, buildPrecutForWindow } from '../engine/lists.js';
 import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 import DrawingsPanel from '../components/drawings/DrawingsPanel.jsx';
 import GlassDrawing2D from '../components/drawings/GlassDrawing2D.jsx';
@@ -134,7 +134,7 @@ export default function WindowDetailPage() {
           )}
 
           {tab === 'bom' && (
-            <BOMPanel item={item} windowSpec={windowSpec} derived={derived} />
+            <BOMPanel item={item} windowSpec={windowSpec} settings={settings} derived={derived} />
           )}
         </div>
 
@@ -245,25 +245,205 @@ function GlassPanel({ windowSpec, derived }) {
   );
 }
 
-// ─── BOM Panel ───
-function BOMPanel({ item, windowSpec, derived }) {
+// ─── BOM Panel — Purchase list view ───
+function BOMPanel({ item, windowSpec, settings, derived }) {
   const w = derived?.weights;
   const p = derived?.paint;
-  return (
-    <div className="card p-5">
-      <div className="text-sm font-semibold text-ink-50 mb-4">Bill of Materials</div>
-      <div className="space-y-3">
-        <BOMGroup title="Timber" items={derived?.components?.box || []} />
-        <BOMGroup title="Sash Components" items={derived?.components?.sash || []} />
-        <BOMGroup title="Beading" items={derived?.components?.beading || []} unit="m" />
+  const glassList = useMemo(
+    () => (derived && windowSpec ? buildGlassListForWindow(derived, windowSpec) : []),
+    [derived, windowSpec]
+  );
 
-        {/* Weights */}
-        {w && (
-          <div className="bg-surface-600 rounded-lg border border-surface-500 p-4">
-            <div className="text-xs font-medium text-ink-200 mb-2">Weights</div>
+  // Build timber summary from pre-cut (has machining allowance)
+  const timberLines = useMemo(() => {
+    if (!derived || !windowSpec) return [];
+    const precut = buildPrecutForWindow(derived, windowSpec, settings);
+    if (!precut) return [];
+
+    const categorizeName = (name) => {
+      const n = (name || '').toUpperCase();
+      if (n.includes('STILE') || n.includes('RAIL')) return 'Sash Timber';
+      if (n.includes('JAMB') && !n.includes('LINER')) return 'Jamb Timber';
+      if (n.includes('CILL NOSE') || n.includes('CILL_NOSE')) return 'Cill Nose';
+      if (n.includes('CILL')) return 'Cill Timber';
+      if (n === 'HEAD') return 'Head Timber';
+      if (n.includes('LINER')) return 'Liner';
+      return 'Timber';
+    };
+
+    const map = new Map();
+    const addItems = (items) => {
+      items.forEach((it) => {
+        const cat = categorizeName(it.elementName);
+        const fin = it.finishedSection || it.section;
+        const key = `${cat}|${fin}`;
+        if (!map.has(key)) map.set(key, { category: cat, section: fin, totalLm: 0 });
+        map.get(key).totalLm += (it.length * (it.quantity || 1));
+      });
+    };
+
+    (precut.sashEngineering || []).forEach((g) => addItems(g.items));
+    (precut.boxSapele || []).forEach((g) => addItems(g.items));
+
+    return Array.from(map.values())
+      .map((r) => ({ ...r, totalLm: Math.round(r.totalLm) }))
+      .sort((a, b) => a.category.localeCompare(b.category) || a.section.localeCompare(b.section));
+  }, [derived, windowSpec, settings]);
+
+  // Beading summary — sum by name
+  const beadingLines = useMemo(() => {
+    const items = derived?.components?.beading || [];
+    return items.map((b) => ({
+      name: b.elementName,
+      meters: (b.length / 1000).toFixed(2),
+    }));
+  }, [derived]);
+
+  return (
+    <div className="space-y-4">
+      {/* Timber */}
+      {timberLines.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="px-4 py-3 border-b border-surface-500 bg-surface-800">
+            <div className="text-sm font-semibold text-ink-50">Timber</div>
+            <div className="text-[10px] text-ink-400">Pre-cut lengths (with machining allowance)</div>
+          </div>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-surface-500 bg-surface-700/30">
+                <th className="px-4 py-2 text-left text-ink-400 font-medium">Part</th>
+                <th className="px-4 py-2 text-left text-ink-400 font-medium">Section</th>
+                <th className="px-4 py-2 text-left text-ink-400 font-medium">Material</th>
+                <th className="px-4 py-2 text-right text-ink-400 font-medium">Total (lm)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {timberLines.map((t, i) => (
+                <tr key={i} className="border-b border-surface-500/30">
+                  <td className="px-4 py-2 text-ink-100">{t.category}</td>
+                  <td className="px-4 py-2 text-ink-200 font-mono">{t.section}</td>
+                  <td className="px-4 py-2 text-ink-400 italic">—</td>
+                  <td className="px-4 py-2 text-right text-ink-100 font-mono">{(t.totalLm / 1000).toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Beading */}
+      {beadingLines.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="px-4 py-3 border-b border-surface-500 bg-surface-800">
+            <div className="text-sm font-semibold text-ink-50">Beading</div>
+          </div>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-surface-500 bg-surface-700/30">
+                <th className="px-4 py-2 text-left text-ink-400 font-medium">Type</th>
+                <th className="px-4 py-2 text-left text-ink-400 font-medium">Material</th>
+                <th className="px-4 py-2 text-right text-ink-400 font-medium">Total (lm)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {beadingLines.map((b, i) => (
+                <tr key={i} className="border-b border-surface-500/30">
+                  <td className="px-4 py-2 text-ink-100">{b.name}</td>
+                  <td className="px-4 py-2 text-ink-400 italic">—</td>
+                  <td className="px-4 py-2 text-right text-ink-100 font-mono">{b.meters}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Glass */}
+      {glassList.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="px-4 py-3 border-b border-surface-500 bg-surface-800">
+            <div className="text-sm font-semibold text-ink-50">Glass</div>
+          </div>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-surface-500 bg-surface-700/30">
+                <th className="px-4 py-2 text-left text-ink-400 font-medium">Pane</th>
+                <th className="px-4 py-2 text-right text-ink-400 font-medium">Width</th>
+                <th className="px-4 py-2 text-right text-ink-400 font-medium">Height</th>
+                <th className="px-4 py-2 text-right text-ink-400 font-medium">Qty</th>
+                <th className="px-4 py-2 text-left text-ink-400 font-medium">Spec</th>
+              </tr>
+            </thead>
+            <tbody>
+              {glassList.map((g, i) => (
+                <tr key={i} className="border-b border-surface-500/30">
+                  <td className="px-4 py-2 text-ink-100">{g.label}</td>
+                  <td className="px-4 py-2 text-right text-ink-200 font-mono">{g.width} mm</td>
+                  <td className="px-4 py-2 text-right text-ink-200 font-mono">{g.height} mm</td>
+                  <td className="px-4 py-2 text-right text-ink-200">{g.quantity}</td>
+                  <td className="px-4 py-2 text-ink-300">{g.type} / {g.spec} / {g.finish}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Consumables */}
+      {(() => {
+        const c = derived?.consumables;
+        if (!c) return null;
+        return (
+          <div className="card overflow-hidden">
+            <div className="px-4 py-3 border-b border-surface-500 bg-surface-800">
+              <div className="text-sm font-semibold text-ink-50">Consumables</div>
+            </div>
+            <div className="p-4 space-y-1 text-xs text-ink-400">
+              <div className="flex justify-between"><span>Cord</span><span className="text-ink-200">{c.cord.meters} m</span></div>
+              <div className="flex justify-between"><span>Glazing Clips ({c.clips.size})</span><span className="text-ink-200">{c.clips.qty} pcs</span></div>
+              <div className="flex justify-between"><span>Glazing Packer 1mm</span><span className="text-ink-200">{c.spacer1mm.qty} pcs</span></div>
+              <div className="flex justify-between"><span>Glazing Packer 2mm</span><span className="text-ink-200">{c.spacer2mm.qty} pcs</span></div>
+              <div className="flex justify-between"><span>Bead Tape</span><span className="text-ink-200">{c.beadTape.meters} m</span></div>
+              <div className="flex justify-between"><span>Silicone</span><span className="text-ink-200">{c.silicone.tubes} tubes</span></div>
+              <div className="flex justify-between"><span>Sliding Sash Seal 6070</span><span className="text-ink-200">{c.seal6070.meters} m</span></div>
+              <div className="flex justify-between"><span>Bottom Seal 6009</span><span className="text-ink-200">{c.seal6009.meters} m</span></div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Hardware */}
+      <div className="card overflow-hidden">
+        <div className="px-4 py-3 border-b border-surface-500 bg-surface-800">
+          <div className="text-sm font-semibold text-ink-50">Hardware</div>
+        </div>
+        <div className="p-4 space-y-1 text-xs text-ink-400">
+          {windowSpec && buildHardwareList(windowSpec).map((h, i) => (
+            <div key={i} className="flex justify-between"><span>{h.item} ({h.detail})</span><span className="text-ink-200">{h.quantity} pcs</span></div>
+          ))}
+          {windowSpec && buildHardwareList(windowSpec).length === 0 && (
+            <div className="text-ink-500 italic">Fixed window — no hardware</div>
+          )}
+        </div>
+      </div>
+
+      {/* Paint & Weights */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        {p && (
+          <div className="card p-4">
+            <div className="text-xs font-semibold text-ink-200 mb-2">Paint — {p.areaSqm} m²</div>
             <div className="space-y-1 text-xs text-ink-400">
-              <div className="flex justify-between"><span>Timber (both sashes)</span><span className="text-ink-200">{w.timber} kg</span></div>
-              <div className="flex justify-between"><span>Glass ({w.glassType}, {w.kgPerSqm} kg/m²)</span><span className="text-ink-200">{w.glass} kg</span></div>
+              <div className="flex justify-between"><span>Primer</span><span className="text-ink-200">{p.primer} L</span></div>
+              <div className="flex justify-between"><span>Topcoat</span><span className="text-ink-200">{p.topcoat} L</span></div>
+            </div>
+          </div>
+        )}
+        {w && (
+          <div className="card p-4">
+            <div className="text-xs font-semibold text-ink-200 mb-2">Weights</div>
+            <div className="space-y-1 text-xs text-ink-400">
+              <div className="flex justify-between"><span>Timber</span><span className="text-ink-200">{w.timber} kg</span></div>
+              <div className="flex justify-between"><span>Glass ({w.glassType})</span><span className="text-ink-200">{w.glass} kg</span></div>
               <div className="flex justify-between border-t border-surface-500/50 pt-1 mt-1">
                 <span className="text-ink-100 font-medium">Total (+5%)</span>
                 <span className="text-ink-100 font-semibold">{w.total} kg</span>
@@ -271,85 +451,7 @@ function BOMPanel({ item, windowSpec, derived }) {
             </div>
           </div>
         )}
-
-        {/* Paint */}
-        {p && (
-          <div className="bg-surface-600 rounded-lg border border-surface-500 p-4">
-            <div className="text-xs font-medium text-ink-200 mb-2">Paint — {p.areaSqm} m²</div>
-            <div className="space-y-1 text-xs text-ink-400">
-              <div className="flex justify-between"><span>Primer</span><span className="text-ink-200">{p.primer} L</span></div>
-              <div className="flex justify-between"><span>Topcoat (White 9016 or Bespoke)</span><span className="text-ink-200">{p.topcoat} L</span></div>
-            </div>
-          </div>
-        )}
-
-        {/* Glazing & Consumables */}
-        {(() => {
-          const c = derived?.consumables;
-          if (!c) return null;
-          return (
-            <div className="bg-surface-600 rounded-lg border border-surface-500 p-4">
-              <div className="text-xs font-medium text-ink-200 mb-2">Glazing & Consumables</div>
-              <div className="space-y-1 text-xs text-ink-400">
-                <div className="flex justify-between"><span>Glass ({c.glass.type})</span><span className="text-ink-200">{c.glass.sqm} m²</span></div>
-                <div className="flex justify-between"><span>Cord</span><span className="text-ink-200">{c.cord.meters} m</span></div>
-                <div className="flex justify-between"><span>Glazing Clips ({c.clips.size})</span><span className="text-ink-200">{c.clips.qty} pcs</span></div>
-                <div className="flex justify-between"><span>Glazing Packer 1mm</span><span className="text-ink-200">{c.spacer1mm.qty} pcs</span></div>
-                <div className="flex justify-between"><span>Glazing Packer 2mm</span><span className="text-ink-200">{c.spacer2mm.qty} pcs</span></div>
-                <div className="flex justify-between"><span>Georgian Bar/Bead Tape</span><span className="text-ink-200">{c.beadTape.meters} m</span></div>
-                <div className="flex justify-between"><span>Silicone</span><span className="text-ink-200">{c.silicone.tubes} tubes</span></div>
-                <div className="flex justify-between"><span>Sliding Sash Seal 6070</span><span className="text-ink-200">{c.seal6070.meters} m</span></div>
-                <div className="flex justify-between"><span>Bottom Seal 6009</span><span className="text-ink-200">{c.seal6009.meters} m</span></div>
-              </div>
-            </div>
-          );
-        })()}
-
-        <div className="bg-surface-600 rounded-lg border border-surface-500 p-4">
-          <div className="text-xs font-medium text-ink-200 mb-2">Hardware</div>
-          <div className="space-y-1 text-xs text-ink-400">
-            {windowSpec && buildHardwareList(windowSpec).map((h, i) => (
-              <div key={i} className="flex justify-between"><span>{h.item} ({h.detail})</span><span>{h.quantity} pcs</span></div>
-            ))}
-            {windowSpec && buildHardwareList(windowSpec).length === 0 && (
-              <div className="text-ink-500 italic">Fixed window — no hardware</div>
-            )}
-          </div>
-        </div>
       </div>
-      <div className="mt-4 p-3 bg-accent-500/10 border border-accent-500/20 rounded-lg text-xs text-accent-400">
-        Full BOM with quantities and pricing — coming with Materials database integration.
-      </div>
-    </div>
-  );
-}
-
-function BOMGroup({ title, items, unit = 'mm' }) {
-  if (!items.length) return null;
-  const isMeters = unit === 'm';
-  return (
-    <div className="bg-surface-600 rounded-lg border border-surface-500 overflow-hidden">
-      <div className="px-4 py-2 border-b border-surface-500 text-xs font-medium text-ink-200">{title}</div>
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-surface-500/50">
-            <th className="px-4 py-1.5 text-left text-ink-400">Element</th>
-            <th className="px-4 py-1.5 text-left text-ink-400">Section</th>
-            <th className="px-4 py-1.5 text-right text-ink-400">Length</th>
-            <th className="px-4 py-1.5 text-right text-ink-400">Qty</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((c, i) => (
-            <tr key={i} className="border-b border-surface-500/30">
-              <td className="px-4 py-1.5 text-ink-100">{c.elementName}</td>
-              <td className="px-4 py-1.5 text-ink-300">{c.section}</td>
-              <td className="px-4 py-1.5 text-right text-ink-200">{isMeters ? (c.length / 1000).toFixed(2) : c.length} {unit}</td>
-              <td className="px-4 py-1.5 text-right text-ink-200">{c.quantity}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
