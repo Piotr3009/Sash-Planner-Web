@@ -122,10 +122,15 @@ export function buildWindowPartQtys(derived, windowSpec, settings) {
   }
 
   // ── Paint (litres) ──
+  // Topcoat material depends on colour: 9016 (default white) → white paint;
+  // any other colour → bespoke. Quantity (litres) is the same either way.
   const p = derived.paint;
   if (p) {
     setQty('paint_primer', p.primer, 'L');
-    setQty('paint_white_9016', p.topcoat, 'L');
+    const hex = (windowSpec.color?.single || '').toUpperCase();
+    const ral = String(windowSpec.color?.ral || '').replace(/[^0-9]/g, '');
+    const isWhite9016 = ral === '9016' || hex === '#F6F6F6' || (!hex && !ral);
+    setQty(isWhite9016 ? 'paint_white_9016' : 'paint_bespoke', p.topcoat, 'L');
   }
 
   return map;

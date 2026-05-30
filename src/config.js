@@ -114,7 +114,6 @@ export const GLASS_TYPES = [
   { value: 'double', label: 'Double (U: 1.4)' },
   { value: 'triple', label: 'Triple (U: 1.2)' },
   { value: 'passive', label: 'Passive (U: 0.8)' },
-  { value: 'single', label: 'Single Heritage (10mm)' },
 ];
 
 export const GLASS_SPECS = [
