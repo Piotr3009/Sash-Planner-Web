@@ -38,6 +38,14 @@ function textOn(rgb) {
   return lum > 150 ? C.black : C.white;
 }
 
+function drawLogoBox(doc, x, y, w, h) {
+  doc.setDrawColor(150, 175, 200);
+  doc.setLineWidth(0.25);
+  doc.setLineDashPattern([1.2, 1], 0);
+  doc.rect(x, y, w, h);
+  doc.setLineDashPattern([], 0);
+}
+
 // ─── PAGE BORDER + HEADER (redrawn on every page via didDrawPage) ───
 function drawFrame(doc, info) {
   // double border
@@ -54,13 +62,25 @@ function drawFrame(doc, info) {
   doc.setFillColor(...C.navy);
   doc.rect(x, y, w, HEADER_H, 'F');
 
-  // left: company + title
+  // left: logo placeholder (auto-filled from company settings) + company name
+  const lw = 40, lh = 14, lx = x + 4, ly = y + (HEADER_H - lh) / 2;
+  if (info.logo) {
+    try {
+      const fmt = /jpe?g/i.test(info.logo.slice(0, 30)) ? 'JPEG' : 'PNG';
+      doc.addImage(info.logo, fmt, lx, ly, lw, lh, undefined, 'FAST');
+    } catch (e) {
+      drawLogoBox(doc, lx, ly, lw, lh);
+    }
+  } else {
+    drawLogoBox(doc, lx, ly, lw, lh);
+  }
+  const tX = lx + lw + 5;
   doc.setTextColor(...C.white);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
-  doc.text(info.companyName || 'COMPANY', x + 4, y + 8.5);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+  doc.text(info.companyName || 'COMPANY', tX, y + 8.5);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
   doc.setTextColor(190, 210, 228);
-  doc.text('SPRAYING SCHEDULE', x + 4, y + 14.5);
+  doc.text('SPRAYING SCHEDULE', tX, y + 14.5);
 
   // divider
   const colX = x + w - 110;

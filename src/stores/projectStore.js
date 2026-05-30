@@ -17,6 +17,13 @@ const defaultSettings = {
     '57x57': '63x63',
     '57x90': '63x95',
     '57x43': '63x63'
+  },
+  company: {
+    companyName: 'PRIME SASH WINDOWS',
+    companyAddress: 'London, UK',
+    companyPhone: '',
+    companyEmail: '',
+    logo: '',   // base64 data URL — auto-inserted into PDF headers when set
   }
 };
 
@@ -616,8 +623,18 @@ export const useProjectStore = create(
           // First visit — no saved data at all, use mocks
           return { ...current, projects: mockProjects, productionPacks: mockProductionPacks, projectsLoaded: true };
         }
-        // Saved data exists — always restore it
-        return { ...current, ...persisted, projectsLoaded: true };
+        // Saved data exists — always restore it.
+        // Deep-merge settings so newly-added defaults (e.g. company) survive old saves.
+        return {
+          ...current,
+          ...persisted,
+          settings: {
+            ...current.settings,
+            ...(persisted.settings || {}),
+            company: { ...current.settings.company, ...((persisted.settings || {}).company || {}) },
+          },
+          projectsLoaded: true,
+        };
       },
     }
   )

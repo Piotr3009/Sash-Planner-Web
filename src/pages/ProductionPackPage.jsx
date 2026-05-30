@@ -689,12 +689,7 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp }) {
       batch: batch || pp,
       windowsData,
       projects,
-      companySettings: {
-        companyName: 'PRIME SASH WINDOWS',
-        companyAddress: 'London, UK',
-        companyPhone: '',
-        companyEmail: '',
-      },
+      companySettings: useProjectStore.getState().settings.company || {},
     });
   };
 
@@ -1440,7 +1435,9 @@ function SprayingTab({ windowsData, batch, pp }) {
   }, [windowsData]);
 
   const handleExport = () => {
-    const notes = useProjectStore.getState().sprayNotes;
+    const st = useProjectStore.getState();
+    const notes = st.sprayNotes;
+    const company = st.settings.company || {};
     const sections = data.sections.map((s) => ({
       name: s.name, hex: s.hex,
       rows: s.rows.map((r) => ({
@@ -1456,7 +1453,8 @@ function SprayingTab({ windowsData, batch, pp }) {
       colours: data.colourChips.map((c) => c.name),
       sections,
       beadGroups: data.beadGroups,
-      companyName: 'PRIME SASH WINDOWS',
+      companyName: company.companyName || 'COMPANY',
+      logo: company.logo || '',
     });
   };
 
