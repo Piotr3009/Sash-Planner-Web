@@ -25,6 +25,8 @@ import { optimisePrecut } from '../engine/optimizer.js';
 import { exportGlassPDF } from '../utils/glassPdfExport.js';
 import { exportPreCutPDF } from '../utils/precutPdfExport.js';
 import { exportSprayingPDF } from '../utils/sprayingPdfExport.js';
+import { exportCutListPDF } from '../utils/cutListPdfExport.js';
+import { exportOverviewPDF } from '../utils/overviewPdfExport.js';
 import { getColorName } from '../config.js';
 import { getPartSymbol } from '../engine/partSymbols.js';
 
@@ -49,7 +51,7 @@ const TABS = [
 ];
 
 // Tabs that currently have a PDF export implemented
-const EXPORTABLE_TABS = ['glass', 'precut', 'spraying'];
+const EXPORTABLE_TABS = ['overview', 'glass', 'precut', 'cutlist', 'spraying'];
 
 // ─── Status config ───
 const STATUS_CONFIG = {
@@ -386,14 +388,14 @@ export default function ProductionPackPage() {
 
       {/* Content */}
       <main className="max-w-[1400px] mx-auto p-6">
-        {tab === 'overview'   && <OverviewTab batch={batch} pp={pp} isPPMode={isPPMode} windowsData={windowsData} />}
+        {tab === 'overview'   && <OverviewTab batch={batch} pp={pp} isPPMode={isPPMode} windowsData={windowsData} registerExport={registerExport} />}
         {tab === '3d'         && <ThreeDTab windowsData={windowsData} />}
         {tab === 'elevations' && <ElevationsTab windowsData={windowsData} />}
         {tab === 'sections'   && <SectionsTab windowsData={windowsData} />}
         {tab === 'elements'   && <ElementsTab windowsData={windowsData} />}
         {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} batch={batch} pp={pp} registerExport={registerExport} />}
         {tab === 'precut'     && <PreCutTab merged={merged} settings={settings} batch={batch} pp={pp} isPPMode={isPPMode} projects={projects} registerExport={registerExport} exportFormat={exportFormat} />}
-        {tab === 'cutlist'    && <CutListTab merged={merged} isPPMode={isPPMode} />}
+        {tab === 'cutlist'    && <CutListTab merged={merged} isPPMode={isPPMode} pp={pp} batch={batch} registerExport={registerExport} />}
         {tab === 'spraying'   && <SprayingTab windowsData={windowsData} batch={batch} pp={pp} registerExport={registerExport} />}
         {tab === 'bom'        && <BOMTab merged={merged} batch={batch} pp={pp} isPPMode={isPPMode} windowsData={windowsData} />}
       </main>
@@ -404,7 +406,26 @@ export default function ProductionPackPage() {
 // ═══════════════════════════════════════════════════════════════
 // TAB: Overview
 // ═══════════════════════════════════════════════════════════════
-function OverviewTab({ batch, pp, isPPMode, windowsData }) {
+function OverviewTab({ batch, pp, isPPMode, windowsData, registerExport }) {
+  const handleExport = () => {
+    const company = useProjectStore.getState().settings.company || {};
+    const projects = [...new Set(windowsData.map(({ win }) => win._projectNumber).filter(Boolean))];
+    const windows = windowsData.map(({ win }) => ({
+      projectNum: win._projectNumber, name: win.name, type: win.sashType || 'double',
+      width: win.width, height: win.height, bars: win.upperBars || 'none',
+      head: win.headType || 'flat', glass: win.glassFinish || 'clear', opening: win.openingType || 'both',
+    }));
+    exportOverviewPDF({
+      companyName: company.companyName || 'COMPANY NAME',
+      companyAddress: company.companyAddress || '',
+      logo: company.logo || '',
+      title: pp?.name || batch?.name || 'Pack',
+      projects, date: new Date().toLocaleDateString('en-GB'),
+      isPPMode, windows,
+    });
+  };
+  registerExport('overview', handleExport);
+
   return (
     <div className="space-y-4">
       {/* Batch/PP info summary */}
@@ -1118,7 +1139,7 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
 // ═══════════════════════════════════════════════════════════════
 // TAB: Cut List — grouped by element, symbols, mirror, sorted
 // ═══════════════════════════════════════════════════════════════
-function CutListTab({ merged, isPPMode }) {
+function CutListTab({ merged, isPPMode, pp, batch, registerExport }) {
   // Material assignment lookup
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const getMaterialById = useMaterialStore((s) => s.getMaterialById);
@@ -1213,6 +1234,33 @@ function CutListTab({ merged, isPPMode }) {
   }, [merged.cutList]);
 
   const totalPieces = merged.cutList.reduce((s, c) => s + (c.quantity || 1), 0);
+
+  const handleExport = () => {
+    const company = useProjectStore.getState().settings.company || {};
+    const projects = [...new Set(merged.cutList.map((c) => c._projectNumber).filter(Boolean))];
+    const groups = byElement.map((g) => {
+      const m = getMaterialForElement(g.element);
+      return {
+        symbol: g.symbolInfo?.symbol || '',
+        element: g.element,
+        mirror: g.symbolInfo?.mirror,
+        section: g.items[0]?.section || '',
+        material: m ? `${m.item_number || ''} ${m.name || ''}`.trim() : '',
+        rows: g.aggregated.map((it) => ({
+          projectNum: it._projectNumber, window: it.windowName, length: it.length, qty: it.totalQty,
+        })),
+      };
+    });
+    exportCutListPDF({
+      companyName: company.companyName || 'COMPANY NAME',
+      companyAddress: company.companyAddress || '',
+      logo: company.logo || '',
+      title: pp?.name || batch?.name || 'Pack',
+      projects, date: new Date().toLocaleDateString('en-GB'),
+      isPPMode, totalPieces, groups,
+    });
+  };
+  registerExport('cutlist', handleExport);
 
   return (
     <div className="space-y-4">

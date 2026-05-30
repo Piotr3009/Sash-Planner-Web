@@ -36,12 +36,13 @@ export function exportSprayingPDF(info) {
 
   // ── PART A — Elements ──
   const colsA = [
-    { label: 'Project №', dx: 0, mono: true },
-    { label: 'Window', dx: 24 },
-    { label: 'Element', dx: 56 },
-    { label: 'Colour', dx: 92 },
-    { label: 'Size (mm)', dx: 180, align: 'right', mono: true },
-    { label: 'Additional info', dx: 188 },
+    { label: 'No.', dx: 0, auto: true, mono: true },
+    { label: 'Project №', dx: 12, mono: true },
+    { label: 'Window', dx: 34 },
+    { label: 'Element', dx: 64 },
+    { label: 'Colour', dx: 100 },
+    { label: 'Size (mm)', dx: 186, align: 'right', mono: true },
+    { label: 'Additional info', dx: 194 },
   ];
   const rowsA = [{ section: { label: 'PART A — ELEMENTS' } }];
   (info.sections || []).forEach((sec) => {
@@ -58,9 +59,10 @@ export function exportSprayingPDF(info) {
 
   // ── PART B — Beadings ──
   const colsB = [
-    { label: 'Beading type', dx: 0 },
-    { label: 'Linear m', dx: 80, align: 'right', mono: true },
-    { label: 'Bars (pcs)', dx: 130, align: 'right', mono: true },
+    { label: 'No.', dx: 0, auto: true, mono: true },
+    { label: 'Beading type', dx: 12 },
+    { label: 'Linear m', dx: 92, align: 'right', mono: true },
+    { label: 'Bars (pcs)', dx: 142, align: 'right', mono: true },
   ];
   const rowsB = [{ section: { label: 'PART B — BEADINGS (painted first)' } }];
   (info.beadGroups || []).forEach((g) => {

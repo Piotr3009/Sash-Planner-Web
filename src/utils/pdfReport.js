@@ -163,6 +163,7 @@ export function drawReportTable(doc, PG, { info, startY, title, columns, rows, t
   colHeader();
 
   let zebra = 0;
+  let lp = 0;
   rows.forEach((row) => {
     if (y + rowH > bottom) {
       newReportPage(doc, PG, info);
@@ -183,11 +184,13 @@ export function drawReportTable(doc, PG, { info, startY, title, columns, rows, t
     }
     if (zebra % 2 === 0) { fc(doc, RC.rowBg); doc.rect(x - 1, y - 5, tableWidth + 1, rowH, 'F'); }
     tc(doc, RC.black);
-    row.cells.forEach((cell, ci) => {
-      const c = columns[ci]; if (!c) return;
+    lp += 1;
+    let k = 0;
+    columns.forEach((c) => {
+      const val = c.auto ? lp : row.cells[k++];
       doc.setFont(c.mono ? 'courier' : 'helvetica', c.bold ? 'bold' : 'normal');
       doc.setFontSize(c.mono ? 10 : 9.5);
-      doc.text(String(cell ?? ''), x + c.dx, y, c.align === 'right' ? { align: 'right' } : undefined);
+      doc.text(String(val ?? ''), x + c.dx, y, c.align === 'right' ? { align: 'right' } : undefined);
     });
     y += rowH; zebra++;
   });
