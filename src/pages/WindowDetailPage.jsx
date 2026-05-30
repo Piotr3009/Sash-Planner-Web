@@ -263,40 +263,98 @@ const ELEMENT_TO_PART_ID = {
   'MEETING BEADING A': 'meeting_beading_a', 'MEETING BEADING B': 'meeting_beading_b',
 };
 
+// Glazing clip size → assignment part id (size depends on glass/frame type)
+const CLIP_SIZE_TO_PART_ID = {
+  '24mm': 'glazing_clips_24mm',
+  '28mm': 'glazing_clips_28mm',
+  '14mm': 'glazing_clips_14mm',
+};
+
+// Glass type → assignment part id
+const GLASS_TYPE_TO_PART_ID = {
+  double: 'glass_double',
+  triple: 'glass_triple',
+  single: 'glass_single',
+  passive: 'glass_passive',
+};
+
+// Format a quantity for display by unit (pcs/tubes are whole, others 2dp)
+function formatQty(value, unit) {
+  const n = Number(value) || 0;
+  const whole = unit === 'pcs' || unit === 'tubes';
+  return `${whole ? Math.round(n) : n.toFixed(2)} ${unit}`;
+}
+
 function BOMPanel({ item, windowSpec, settings, derived }) {
   const materials = useMaterialStore((s) => s.materials);
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
-  const w = derived?.weights;
-  const p = derived?.paint;
 
   const glassList = useMemo(
     () => (derived && windowSpec ? buildGlassListForWindow(derived, windowSpec) : []),
     [derived, windowSpec]
   );
 
-  // Build length map from pre-cut (timber) + derived (beading)
-  const partLengths = useMemo(() => {
+  // Build qty map per part: partId → { qty, unit }
+  // Timber/beading = meters (from pre-cut + derived); other parts = native unit.
+  const partQtys = useMemo(() => {
     if (!derived || !windowSpec) return {};
-    const map = {}; // partId → totalMm
+    const map = {}; // partId → { mm?, qty, unit }
+    const addMm = (pid, mm) => {
+      if (!pid || !mm) return;
+      if (!map[pid]) map[pid] = { mm: 0, unit: 'm' };
+      map[pid].mm += mm;
+    };
+    const setQty = (pid, qty, unit) => {
+      if (!pid || !qty) return;
+      map[pid] = { qty: (map[pid]?.qty || 0) + qty, unit };
+    };
 
-    // Timber from pre-cut (has machining allowance)
+    // ── Timber from pre-cut (has machining allowance) — totals in mm ──
     const precut = buildPrecutForWindow(derived, windowSpec, settings);
     if (precut) {
       const addItems = (items) => items.forEach((it) => {
-        const pid = ELEMENT_TO_PART_ID[it.elementName];
-        if (!pid) return;
-        map[pid] = (map[pid] || 0) + it.length * (it.quantity || 1);
+        addMm(ELEMENT_TO_PART_ID[it.elementName], it.length * (it.quantity || 1));
       });
       (precut.sashEngineering || []).forEach((g) => addItems(g.items));
       (precut.boxSapele || []).forEach((g) => addItems(g.items));
     }
 
-    // Beading from derived (already in mm totals)
+    // ── Beading from derived (already in mm totals) ──
     (derived.components?.beading || []).forEach((b) => {
-      const pid = ELEMENT_TO_PART_ID[b.elementName];
-      if (!pid) return;
-      map[pid] = (map[pid] || 0) + b.length * (b.quantity || 1);
+      addMm(ELEMENT_TO_PART_ID[b.elementName], b.length * (b.quantity || 1));
     });
+
+    // ── Consumables (native units) ──
+    const c = derived.consumables;
+    if (c) {
+      setQty('cord', c.cord?.meters, 'm');
+      setQty(CLIP_SIZE_TO_PART_ID[c.clips?.size], c.clips?.qty, 'pcs');
+      setQty('spacer_1mm', c.spacer1mm?.qty, 'pcs');
+      setQty('spacer_2mm', c.spacer2mm?.qty, 'pcs');
+      setQty('bead_tape', c.beadTape?.meters, 'm');
+      setQty('silicone', c.silicone?.tubes, 'tubes');
+      setQty('seal_sliding_6070', c.seal6070?.meters, 'm');
+      setQty('seal_bottom_6009', c.seal6009?.meters, 'm');
+    }
+
+    // ── Glass (sqm to purchase) ──
+    const g = derived.consumables?.glass;
+    if (g?.sqm) {
+      setQty(GLASS_TYPE_TO_PART_ID[g.type] || 'glass_double', g.sqm, 'm²');
+    }
+
+    // ── Weights (total window mass +5% = counterbalance to buy) ──
+    if (derived.weights?.total) {
+      const wPid = (c?.weightType === 'slim') ? 'weights_slim' : 'weights_normal';
+      setQty(wPid, derived.weights.total, 'kg');
+    }
+
+    // ── Paint (litres) ──
+    const p = derived.paint;
+    if (p) {
+      setQty('paint_primer', p.primer, 'L');
+      setQty('paint_white_9016', p.topcoat, 'L');
+    }
 
     return map;
   }, [derived, windowSpec, settings]);
@@ -304,36 +362,40 @@ function BOMPanel({ item, windowSpec, settings, derived }) {
   // Group by material (same structure as Project Materials)
   const bomGroups = useMemo(() => {
     const matMap = {};
-    const unassigned = { material: null, parts: [], totalMeters: 0 };
+    const unassigned = { material: null, parts: [], total: 0, unit: 'm' };
 
     ALL_PARTS.forEach((part) => {
-      const totalMm = partLengths[part.id];
-      if (!totalMm) return;
+      const entry = partQtys[part.id];
+      if (!entry) return;
 
       const assignment = assignments[part.id];
       const yieldCoeff = assignment?.yield || 1.0;
-      const totalMeters = (totalMm / 1000) * yieldCoeff;
+      // mm-based parts (timber/beading) convert to meters × yield; native-unit parts use qty as-is
+      const unit = entry.unit;
+      const total = entry.mm != null ? (entry.mm / 1000) * yieldCoeff : entry.qty;
       const pcsTotal = part.pcs;
-      const partData = { ...part, pcsTotal, totalMeters, yield: yieldCoeff };
+      const partData = { ...part, pcsTotal, total, unit, yield: yieldCoeff };
 
       if (assignment?.material_id) {
         const matId = assignment.material_id;
         const mat = materials.find((m) => m.id === matId);
         if (mat) {
-          if (!matMap[matId]) matMap[matId] = { material: mat, parts: [], totalMeters: 0 };
+          if (!matMap[matId]) matMap[matId] = { material: mat, parts: [], total: 0, unit };
           matMap[matId].parts.push(partData);
-          matMap[matId].totalMeters += totalMeters;
+          matMap[matId].total += total;
+          matMap[matId].unit = unit;
           return;
         }
       }
       unassigned.parts.push(partData);
-      unassigned.totalMeters += totalMeters;
+      unassigned.total += total;
+      unassigned.unit = unit;
     });
 
     const groups = Object.values(matMap);
     if (unassigned.parts.length > 0) groups.push(unassigned);
     return groups;
-  }, [partLengths, assignments, materials]);
+  }, [partQtys, assignments, materials]);
 
   return (
     <div className="space-y-4">
@@ -374,8 +436,8 @@ function BOMPanel({ item, windowSpec, settings, derived }) {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-sm font-semibold text-ink-100">{group.totalMeters.toFixed(2)} m</div>
-                <div className="text-[10px] text-ink-400">pre-cut lengths</div>
+                <div className="text-sm font-semibold text-ink-100">{formatQty(group.total, group.unit)}</div>
+                <div className="text-[10px] text-ink-400">total</div>
               </div>
             </div>
 
@@ -386,7 +448,7 @@ function BOMPanel({ item, windowSpec, settings, derived }) {
                   <th className="py-1.5 text-center text-ink-400 font-medium">Section</th>
                   <th className="py-1.5 text-center text-ink-400 font-medium">Pcs</th>
                   <th className="py-1.5 text-center text-ink-400 font-medium">Yield</th>
-                  <th className="py-1.5 text-right text-ink-400 font-medium">Meters</th>
+                  <th className="py-1.5 text-right text-ink-400 font-medium">Qty</th>
                 </tr>
               </thead>
               <tbody>
@@ -396,7 +458,7 @@ function BOMPanel({ item, windowSpec, settings, derived }) {
                     <td className="py-1.5 text-center text-ink-300 font-mono">{gp.section}</td>
                     <td className="py-1.5 text-center text-ink-300">{gp.pcsTotal}</td>
                     <td className="py-1.5 text-center text-ink-300">{gp.yield}</td>
-                    <td className="py-1.5 text-right text-ink-100 font-mono font-medium">{gp.totalMeters.toFixed(2)} m</td>
+                    <td className="py-1.5 text-right text-ink-100 font-mono font-medium">{formatQty(gp.total, gp.unit)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -436,28 +498,7 @@ function BOMPanel({ item, windowSpec, settings, derived }) {
         </div>
       )}
 
-      {/* Consumables */}
-      {(() => {
-        const c = derived?.consumables;
-        if (!c) return null;
-        return (
-          <div className="card overflow-hidden">
-            <div className="px-4 py-3 border-b border-surface-500 bg-surface-800">
-              <div className="text-sm font-semibold text-ink-50">Consumables</div>
-            </div>
-            <div className="p-4 space-y-1 text-xs text-ink-400">
-              <div className="flex justify-between"><span>Cord</span><span className="text-ink-200">{c.cord.meters} m</span></div>
-              <div className="flex justify-between"><span>Glazing Clips ({c.clips.size})</span><span className="text-ink-200">{c.clips.qty} pcs</span></div>
-              <div className="flex justify-between"><span>Glazing Packer 1mm</span><span className="text-ink-200">{c.spacer1mm.qty} pcs</span></div>
-              <div className="flex justify-between"><span>Glazing Packer 2mm</span><span className="text-ink-200">{c.spacer2mm.qty} pcs</span></div>
-              <div className="flex justify-between"><span>Bead Tape</span><span className="text-ink-200">{c.beadTape.meters} m</span></div>
-              <div className="flex justify-between"><span>Silicone</span><span className="text-ink-200">{c.silicone.tubes} tubes</span></div>
-              <div className="flex justify-between"><span>Sliding Sash Seal 6070</span><span className="text-ink-200">{c.seal6070.meters} m</span></div>
-              <div className="flex justify-between"><span>Bottom Seal 6009</span><span className="text-ink-200">{c.seal6009.meters} m</span></div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* Consumables, Paint, Weights now render as material cards above (block A style) */}
 
       {/* Hardware */}
       <div className="card overflow-hidden">
@@ -474,31 +515,7 @@ function BOMPanel({ item, windowSpec, settings, derived }) {
         </div>
       </div>
 
-      {/* Paint & Weights */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        {p && (
-          <div className="card p-4">
-            <div className="text-xs font-semibold text-ink-200 mb-2">Paint — {p.areaSqm} m²</div>
-            <div className="space-y-1 text-xs text-ink-400">
-              <div className="flex justify-between"><span>Primer</span><span className="text-ink-200">{p.primer} L</span></div>
-              <div className="flex justify-between"><span>Topcoat</span><span className="text-ink-200">{p.topcoat} L</span></div>
-            </div>
-          </div>
-        )}
-        {w && (
-          <div className="card p-4">
-            <div className="text-xs font-semibold text-ink-200 mb-2">Weights</div>
-            <div className="space-y-1 text-xs text-ink-400">
-              <div className="flex justify-between"><span>Timber</span><span className="text-ink-200">{w.timber} kg</span></div>
-              <div className="flex justify-between"><span>Glass ({w.glassType})</span><span className="text-ink-200">{w.glass} kg</span></div>
-              <div className="flex justify-between border-t border-surface-500/50 pt-1 mt-1">
-                <span className="text-ink-100 font-medium">Total (+5%)</span>
-                <span className="text-ink-100 font-semibold">{w.total} kg</span>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Paint & Weights now render as material cards above (block A style) */}
     </div>
   );
 }
