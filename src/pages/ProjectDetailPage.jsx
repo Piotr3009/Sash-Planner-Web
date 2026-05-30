@@ -7,6 +7,7 @@ import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
 import { mergeWindowMaterials, formatQty } from '../engine/bom.js';
+import ImageLightbox from '../components/ImageLightbox.jsx';
 
 
 const TYPE_LABELS = { sash: 'Sash Windows', casement: 'Casement Windows', 'fix-frame': 'Fix Frame', doors: 'Doors', special: 'Special / Other' };
@@ -18,6 +19,7 @@ const STATUS_STYLES = {
 
 export default function ProjectDetailPage() {
   const { projectId } = useParams();
+  const [zoomMatSrc, setZoomMatSrc] = useState(null);
   const navigate = useNavigate();
   const projects = useProjectStore((s) => s.projects);
   const currentProject = useProjectStore((s) => s.currentProject);
@@ -315,7 +317,9 @@ export default function ProjectDetailPage() {
                           <td className="px-4 py-2.5">
                             <div className="flex items-center gap-2">
                               {(row.material?.image_url || row.product?.image_url) ? (
-                                <img src={row.material?.image_url || row.product?.image_url} alt="" className="w-7 h-7 rounded object-cover border border-surface-500" />
+                                <img src={row.material?.image_url || row.product?.image_url} alt=""
+                                  onClick={() => setZoomMatSrc(row.material?.image_url || row.product?.image_url)}
+                                  className="w-7 h-7 rounded object-cover border border-surface-500 cursor-zoom-in hover:opacity-80 transition-opacity" />
                               ) : (
                                 <div className="w-7 h-7 rounded bg-surface-600 border border-surface-500 grid place-items-center text-ink-500 text-[10px]">{row._assigned ? '—' : '?'}</div>
                               )}
@@ -362,6 +366,7 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       )}
+      {zoomMatSrc && <ImageLightbox src={zoomMatSrc} onClose={() => setZoomMatSrc(null)} />}
     </div>
   );
 }

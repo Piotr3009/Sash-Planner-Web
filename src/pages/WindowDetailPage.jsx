@@ -8,6 +8,7 @@ import { parseSpecification, normaliseToWindowSpec } from '../engine/specificati
 import { deriveWindowData } from '../engine/calculations.js';
 import { buildGlassListForWindow } from '../engine/lists.js';
 import { buildWindowPartQtys, buildWindowHardware, resolvePartTotal, formatQty } from '../engine/bom.js';
+import ImageLightbox from '../components/ImageLightbox.jsx';
 import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 import DrawingsPanel from '../components/drawings/DrawingsPanel.jsx';
 import GlassDrawing2D from '../components/drawings/GlassDrawing2D.jsx';
@@ -254,6 +255,7 @@ function BOMPanel({ item, windowSpec, settings, derived, batch }) {
   const materials = useMaterialStore((s) => s.materials);
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const ironmongeryItems = useIronmongeryStore((s) => s.items);
+  const [zoomSrc, setZoomSrc] = useState(null);
 
   // Build qty map per part — shared single source (bom.js)
   const partQtys = useMemo(
@@ -317,7 +319,9 @@ function BOMPanel({ item, windowSpec, settings, derived, batch }) {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 {group.material?.image_url ? (
-                  <img src={group.material.image_url} alt="" className="w-10 h-10 rounded object-cover border border-surface-500" />
+                  <img src={group.material.image_url} alt=""
+                    onClick={() => setZoomSrc(group.material.image_url)}
+                    className="w-10 h-10 rounded object-cover border border-surface-500 cursor-zoom-in hover:opacity-80 transition-opacity" />
                 ) : (
                   <div className="w-10 h-10 rounded bg-surface-600 border border-surface-500 grid place-items-center text-ink-500 text-xs">
                     {group.material ? '—' : '?'}
@@ -386,7 +390,9 @@ function BOMPanel({ item, windowSpec, settings, derived, batch }) {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 {g.product?.image_url ? (
-                  <img src={g.product.image_url} alt="" className="w-10 h-10 rounded object-cover border border-surface-500" />
+                  <img src={g.product.image_url} alt=""
+                    onClick={() => setZoomSrc(g.product.image_url)}
+                    className="w-10 h-10 rounded object-cover border border-surface-500 cursor-zoom-in hover:opacity-80 transition-opacity" />
                 ) : (
                   <div className="w-10 h-10 rounded bg-surface-600 border border-surface-500 grid place-items-center text-ink-500 text-xs">
                     {g.product ? '—' : '?'}
@@ -437,6 +443,7 @@ function BOMPanel({ item, windowSpec, settings, derived, batch }) {
       )}
 
       {/* Paint & Weights now render as material cards above (block A style) */}
+      {zoomSrc && <ImageLightbox src={zoomSrc} onClose={() => setZoomSrc(null)} />}
     </div>
   );
 }

@@ -30,6 +30,7 @@ import { exportSprayingPDF } from '../utils/sprayingPdfExport.js';
 import { exportCutListPDF } from '../utils/cutListPdfExport.js';
 import { exportOverviewPDF } from '../utils/overviewPdfExport.js';
 import { exportThreeDPDF } from '../utils/threeDPdfExport.js';
+import { exportBomPDF } from '../utils/bomPdfExport.js';
 import { getColorName } from '../config.js';
 import { getPartSymbol } from '../engine/partSymbols.js';
 
@@ -39,6 +40,7 @@ import SashDetail2D from '../components/drawings/SashDetail2D.jsx';
 import GlassDrawing2D from '../components/drawings/GlassDrawing2D.jsx';
 import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 import Window3DCaptureRig from '../components/viewer/Window3DCaptureRig.jsx';
+import ImageLightbox from '../components/ImageLightbox.jsx';
 
 // ─── Tab config ───
 const TABS = [
@@ -55,7 +57,7 @@ const TABS = [
 ];
 
 // Tabs that currently have a PDF export implemented
-const EXPORTABLE_TABS = ['overview', '3d', 'glass', 'precut', 'cutlist', 'spraying'];
+const EXPORTABLE_TABS = ['overview', '3d', 'glass', 'precut', 'cutlist', 'spraying', 'bom'];
 
 // ─── Status config ───
 const STATUS_CONFIG = {
@@ -403,7 +405,7 @@ export default function ProductionPackPage() {
         {tab === 'precut'     && <PreCutTab merged={merged} settings={settings} batch={batch} pp={pp} isPPMode={isPPMode} projects={projects} registerExport={registerExport} exportFormat={exportFormat} />}
         {tab === 'cutlist'    && <CutListTab merged={merged} isPPMode={isPPMode} pp={pp} batch={batch} registerExport={registerExport} />}
         {tab === 'spraying'   && <SprayingTab windowsData={windowsData} batch={batch} pp={pp} registerExport={registerExport} />}
-        {tab === 'bom'        && <BOMTab merged={merged} batch={batch} pp={pp} isPPMode={isPPMode} windowsData={windowsData} />}
+        {tab === 'bom'        && <BOMTab merged={merged} batch={batch} pp={pp} isPPMode={isPPMode} windowsData={windowsData} registerExport={registerExport} />}
       </main>
     </div>
   );
@@ -1680,11 +1682,12 @@ function SprayingTab({ windowsData, batch, pp, registerExport }) {
   );
 }
 
-function BOMTab({ batch, pp, isPPMode, windowsData }) {
+function BOMTab({ batch, pp, isPPMode, windowsData, registerExport }) {
   const materials = useMaterialStore((s) => s.materials);
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const ironmongeryItems = useIronmongeryStore((s) => s.items);
   const settings = useProjectStore((s) => s.settings);
+  const [zoomSrc, setZoomSrc] = useState(null);
 
   // Same engine as Single Window BOM / Project Materials, merged over THIS pack's
   // windows (which may span multiple projects). Source of truth: deriveWindowData per window.
@@ -1696,11 +1699,38 @@ function BOMTab({ batch, pp, isPPMode, windowsData }) {
     return mergeWindowMaterials(windows, { assignments, materials, ALL_PARTS, ironmongeryItems, settings });
   }, [windowsData, assignments, materials, ironmongeryItems, settings]);
 
+  const totalCost = rows.reduce((s, r) => s + (r.costPerUnit > 0 ? r.qty * r.costPerUnit : 0), 0);
+
+  // Header "Export PDF" → flat purchase list (same data as the table below).
+  const handleExport = () => {
+    if (!rows.length) return;
+    const company = useProjectStore.getState().settings.company || {};
+    const projects = [...new Set((windowsData || []).map((d) => d.win?._projectNumber).filter(Boolean))];
+    exportBomPDF({
+      title: pp?.name || batch?.name || 'Pack',
+      projects,
+      date: new Date().toLocaleDateString('en-GB'),
+      deadline: pp?.deadline || '',
+      companyName: company.companyName || 'COMPANY NAME',
+      companyAddress: company.companyAddress || '',
+      logo: company.logo || '',
+      rows: rows.map((r) => ({
+        name: r.name,
+        itemNumber: r.material?.item_number || r.product?.item_number || '',
+        qty: formatQty(r.qty, r.unit),
+        unitCost: r.costPerUnit > 0 ? `£${r.costPerUnit.toFixed(2)}` : '—',
+        estCost: r.costPerUnit > 0 ? `£${(r.qty * r.costPerUnit).toFixed(2)}` : '—',
+        ironmongery: r.source === 'ironmongery',
+        assigned: r._assigned,
+      })),
+      total: `£${totalCost.toFixed(2)}`,
+    });
+  };
+  registerExport && registerExport('bom', handleExport);
+
   if (!rows.length) {
     return <div className="card p-8 text-center text-ink-400">No materials — add windows and assign materials in Materials → Assignments.</div>;
   }
-
-  const totalCost = rows.reduce((s, r) => s + (r.costPerUnit > 0 ? r.qty * r.costPerUnit : 0), 0);
 
   return (
     <div className="space-y-4">
@@ -1724,7 +1754,9 @@ function BOMTab({ batch, pp, isPPMode, windowsData }) {
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2">
                       {(row.material?.image_url || row.product?.image_url) ? (
-                        <img src={row.material?.image_url || row.product?.image_url} alt="" className="w-7 h-7 rounded object-cover border border-surface-500" />
+                        <img src={row.material?.image_url || row.product?.image_url} alt=""
+                          onClick={() => setZoomSrc(row.material?.image_url || row.product?.image_url)}
+                          className="w-7 h-7 rounded object-cover border border-surface-500 cursor-zoom-in hover:opacity-80 transition-opacity" />
                       ) : (
                         <div className="w-7 h-7 rounded bg-surface-600 border border-surface-500 grid place-items-center text-ink-500 text-[10px]">{row._assigned ? '—' : '?'}</div>
                       )}
@@ -1750,6 +1782,7 @@ function BOMTab({ batch, pp, isPPMode, windowsData }) {
           <div className="text-xs text-ink-300">Est. total: <strong className="text-ink-100 font-mono">£{totalCost.toFixed(2)}</strong></div>
         </div>
       </div>
+      {zoomSrc && <ImageLightbox src={zoomSrc} onClose={() => setZoomSrc(null)} />}
     </div>
   );
 }
