@@ -610,7 +610,7 @@ function ElevationsTab({ windowsData, pp, batch, registerExport }) {
       for (const d of windowsData) {
         no += 1;
         const svg = refs.current[d.win.id]?.querySelector('svg');
-        const png = svg ? await svgNodeToPng(svg, { scale: 2 }) : null;
+        const png = svg ? await svgNodeToPng(svg, { scale: 3, printMode: true }) : null;
         items.push({
           image: png?.url || null, w: png?.w, h: png?.h,
           no, projectNum: d.win._projectNumber || '', name: d.win.name || '',
@@ -782,7 +782,7 @@ function ElementsTab({ windowsData, pp, batch, registerExport }) {
         const drawings = [];
         for (const [t, label] of types) {
           const svg = refs.current[`${d.win.id}-${t}`]?.querySelector('svg');
-          const png = svg ? await svgNodeToPng(svg, { scale: 2 }) : null;
+          const png = svg ? await svgNodeToPng(svg, { scale: 3, printMode: true }) : null;
           drawings.push({ image: png?.url || null, w: png?.w, h: png?.h, label });
         }
         windows.push({
