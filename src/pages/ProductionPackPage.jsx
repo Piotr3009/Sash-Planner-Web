@@ -1341,12 +1341,18 @@ function ColorChip({ hex, name }) {
   );
 }
 
+const SPRAY_ELEM_ORDER = { 'Box': 0, 'Upper Sash': 1, 'Lower Sash': 2 };
+
 function SprayingTab({ windowsData, batch, pp }) {
   const data = useMemo(() => {
     const wins = (windowsData || []).filter((wd) => wd.derived);
-    const singleGroups = {};   // hex → { hex, name, rows:[{win, element, dim}] }
-    const dualWindows = [];    // [{ name, outside, inside, elements:[{element,dim}] }]
+    const colorSections = {};  // hex → { hex, name, rows:[{projectNum, window, element, colour, size, sort}] }
     const beadByColor = {};    // interior hex → { hex, name, beads:{label: mm} }
+
+    const addRow = (hex, row) => {
+      if (!colorSections[hex]) colorSections[hex] = { hex, name: getColorName(hex), rows: [] };
+      colorSections[hex].rows.push(row);
+    };
 
     wins.forEach(({ win, windowSpec, derived }) => {
       const c = windowSpec.color || {};
@@ -1355,29 +1361,29 @@ function SprayingTab({ windowsData, batch, pp }) {
       const inside = c.inside || single;
       const isDual = (c.type && c.type !== 'single') && (outside !== inside);
 
+      const projectNum = win._projectNumber || '';
       const fw = Math.round(windowSpec.frame?.width || 0);
       const fh = Math.round(windowSpec.frame?.height || 0);
       const sW = Math.round(derived.sashWidth || 0);
       const tH = Math.round(derived.topSashHeight || 0);
       const bH = Math.round(derived.bottomSashHeight || 0);
       const elements = [
-        { element: 'Box', dim: `${fw} × ${fh}` },
-        { element: 'Upper Sash', dim: `${sW} × ${tH}` },
-        { element: 'Lower Sash', dim: `${sW} × ${bH}` },
+        { element: 'Box', size: `${fw} × ${fh}` },
+        { element: 'Upper Sash', size: `${sW} × ${tH}` },
+        { element: 'Lower Sash', size: `${sW} × ${bH}` },
       ];
 
-      // PART A
-      if (isDual) {
-        dualWindows.push({
-          name: win.name,
-          outside: { hex: outside, name: getColorName(outside) },
-          inside: { hex: inside, name: getColorName(inside) },
-          elements,
-        });
-      } else {
-        if (!singleGroups[single]) singleGroups[single] = { hex: single, name: getColorName(single), rows: [] };
-        elements.forEach((el) => singleGroups[single].rows.push({ win: win.name, ...el }));
-      }
+      // PART A — each element row goes into its colour section.
+      // Dual: row appears in BOTH the outside and inside colour sections (face labelled).
+      elements.forEach((el) => {
+        const base = { projectNum, window: win.name, element: el.element, size: el.size, sort: SPRAY_ELEM_ORDER[el.element] ?? 9 };
+        if (isDual) {
+          addRow(outside, { ...base, colour: `${getColorName(outside)} (out)` });
+          addRow(inside,  { ...base, colour: `${getColorName(inside)} (in)` });
+        } else {
+          addRow(single, { ...base, colour: getColorName(single) });
+        }
+      });
 
       // PART B — beadings always under interior colour
       if (!beadByColor[inside]) beadByColor[inside] = { hex: inside, name: getColorName(inside), beads: {} };
@@ -1389,6 +1395,12 @@ function SprayingTab({ windowsData, batch, pp }) {
       });
     });
 
+    // Sort each section's rows: by element (Box → Upper → Lower), then window
+    const sections = Object.values(colorSections).map((s) => ({
+      hex: s.hex, name: s.name,
+      rows: s.rows.slice().sort((a, b) => a.sort - b.sort || String(a.window).localeCompare(String(b.window))),
+    }));
+
     const beadGroups = Object.values(beadByColor).map((g) => ({
       hex: g.hex, name: g.name,
       rows: ['Staff', 'Parting', 'Glazing', 'Georgian']
@@ -1397,21 +1409,16 @@ function SprayingTab({ windowsData, batch, pp }) {
         .map((r) => { const lm = r.mm / 1000; return { label: r.label, lm, pcs: ceilHalf(lm / SPRAY_BAR_LEN_M) }; }),
     })).filter((g) => g.rows.length > 0);
 
-    return { singleGroups: Object.values(singleGroups), dualWindows, beadGroups };
+    return { sections, beadGroups };
   }, [windowsData]);
 
   const handleExport = () => {
     const title = pp?.name || batch?.name || 'Spraying';
-    const sg = data.singleGroups.map((g) => `
+    const sa = data.sections.map((g) => `
       <h3>${g.name}</h3>
-      <table><thead><tr><th>Window</th><th>Element</th><th style="text-align:right;">Size (mm)</th></tr></thead><tbody>
-      ${g.rows.map((r) => `<tr><td>${r.win}</td><td>${r.element}</td><td style="text-align:right;">${r.dim}</td></tr>`).join('')}
+      <table><thead><tr><th>Project №</th><th>Window</th><th>Element</th><th>Colour</th><th style="text-align:right;">Size (mm)</th><th style="width:22%;">Additional info</th></tr></thead><tbody>
+      ${g.rows.map((r) => `<tr><td>${r.projectNum}</td><td>${r.window}</td><td>${r.element}</td><td>${r.colour}</td><td style="text-align:right;">${r.size}</td><td></td></tr>`).join('')}
       </tbody></table>`).join('');
-    const dg = data.dualWindows.length ? `
-      <h3>Dual colour — Outside / Inside</h3>
-      <table><thead><tr><th>Window</th><th>Element</th><th style="text-align:right;">Size (mm)</th><th>Outside</th><th>Inside</th></tr></thead><tbody>
-      ${data.dualWindows.map((w) => w.elements.map((el) => `<tr><td>${w.name}</td><td>${el.element}</td><td style="text-align:right;">${el.dim}</td><td>${w.outside.name}</td><td>${w.inside.name}</td></tr>`).join('')).join('')}
-      </tbody></table>` : '';
     const bg = data.beadGroups.map((g) => `
       <h3>${g.name} — beadings</h3>
       <table><thead><tr><th>Type</th><th style="text-align:right;">Linear m</th><th style="text-align:right;">Bars (pcs)</th></tr></thead><tbody>
@@ -1427,15 +1434,15 @@ function SprayingTab({ windowsData, batch, pp }) {
       .sec{font-size:14px;font-weight:bold;margin:22px 0 4px;border-bottom:2px solid #333;padding-bottom:3px;}</style></head>
       <body>
       <h1>Spraying — ${title}</h1>
-      <h2>Beadings painted first · elements grouped by colour</h2>
-      <div class="sec">Part A — Elements</div>${sg}${dg}
+      <h2>Beadings painted first · elements grouped by colour, sorted by element</h2>
+      <div class="sec">Part A — Elements</div>${sa}
       <div class="sec">Part B — Beadings (painted first)</div>${bg}
       <script>window.onload=()=>window.print()</script></body></html>`;
     const w = window.open('', '_blank');
     w.document.write(html); w.document.close();
   };
 
-  if (!data.singleGroups.length && !data.dualWindows.length && !data.beadGroups.length) {
+  if (!data.sections.length && !data.beadGroups.length) {
     return <div className="card p-8 text-center text-ink-400">No data available.</div>;
   }
 
@@ -1448,11 +1455,10 @@ function SprayingTab({ windowsData, batch, pp }) {
         <button onClick={handleExport} className="btn btn-secondary text-xs">📄 Export PDF</button>
       </div>
 
-      {/* PART A — Elements */}
+      {/* PART A — Elements: colour sections, sorted by element */}
       <div>
-        <div className="text-sm font-semibold text-ink-50 mb-3">Part A — Elements <span className="text-ink-400 font-normal">· box + sashes by colour</span></div>
-
-        {data.singleGroups.map((g) => (
+        <div className="text-sm font-semibold text-ink-50 mb-3">Part A — Elements <span className="text-ink-400 font-normal">· by colour, sorted by element</span></div>
+        {data.sections.map((g) => (
           <div key={g.hex} className="card overflow-hidden mb-4">
             <div className="px-4 py-3 border-b border-surface-500 flex items-center justify-between">
               <ColorChip hex={g.hex} name={g.name} />
@@ -1461,51 +1467,29 @@ function SprayingTab({ windowsData, batch, pp }) {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-surface-500/50 bg-surface-800">
-                  <th className="px-4 py-2 text-left text-ink-400 font-medium">Window</th>
-                  <th className="px-4 py-2 text-left text-ink-400 font-medium">Element</th>
-                  <th className="px-4 py-2 text-right text-ink-400 font-medium">Size (mm)</th>
+                  <th className="px-3 py-2 text-left text-ink-400 font-medium">Project №</th>
+                  <th className="px-3 py-2 text-left text-ink-400 font-medium">Window</th>
+                  <th className="px-3 py-2 text-left text-ink-400 font-medium">Element</th>
+                  <th className="px-3 py-2 text-left text-ink-400 font-medium">Colour</th>
+                  <th className="px-3 py-2 text-right text-ink-400 font-medium">Size (mm)</th>
+                  <th className="px-3 py-2 text-left text-ink-400 font-medium">Additional info</th>
                 </tr>
               </thead>
               <tbody>
                 {g.rows.map((r, i) => (
                   <tr key={i} className="border-b border-surface-500/30">
-                    <td className="px-4 py-1.5 text-ink-200">{r.win}</td>
-                    <td className="px-4 py-1.5 text-ink-300">{r.element}</td>
-                    <td className="px-4 py-1.5 text-right text-ink-100 font-mono">{r.dim}</td>
+                    <td className="px-3 py-1.5 text-ink-300 font-mono">{r.projectNum || '—'}</td>
+                    <td className="px-3 py-1.5 text-ink-200">{r.window}</td>
+                    <td className="px-3 py-1.5 text-ink-300">{r.element}</td>
+                    <td className="px-3 py-1.5 text-ink-300">{r.colour}</td>
+                    <td className="px-3 py-1.5 text-right text-ink-100 font-mono">{r.size}</td>
+                    <td className="px-3 py-1.5 text-ink-500"></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         ))}
-
-        {data.dualWindows.length > 0 && (
-          <div className="card overflow-hidden mb-4">
-            <div className="px-4 py-3 border-b border-surface-500 text-sm font-semibold text-ink-50">Dual colour</div>
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-surface-500/50 bg-surface-800">
-                  <th className="px-4 py-2 text-left text-ink-400 font-medium">Window</th>
-                  <th className="px-4 py-2 text-left text-ink-400 font-medium">Element</th>
-                  <th className="px-4 py-2 text-right text-ink-400 font-medium">Size (mm)</th>
-                  <th className="px-4 py-2 text-left text-ink-400 font-medium">Outside</th>
-                  <th className="px-4 py-2 text-left text-ink-400 font-medium">Inside</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.dualWindows.map((w, wi) => w.elements.map((el, ei) => (
-                  <tr key={`${wi}-${ei}`} className="border-b border-surface-500/30">
-                    <td className="px-4 py-1.5 text-ink-200">{ei === 0 ? w.name : ''}</td>
-                    <td className="px-4 py-1.5 text-ink-300">{el.element}</td>
-                    <td className="px-4 py-1.5 text-right text-ink-100 font-mono">{el.dim}</td>
-                    <td className="px-4 py-1.5"><ColorChip hex={w.outside.hex} name={w.outside.name} /></td>
-                    <td className="px-4 py-1.5"><ColorChip hex={w.inside.hex} name={w.inside.name} /></td>
-                  </tr>
-                )))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
       {/* PART B — Beadings */}
