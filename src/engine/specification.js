@@ -22,10 +22,10 @@ function detectGridMode(spec, item) {
   const upper = (item?.upperBars || item?.upper_bars || spec?.upperBars || '').toLowerCase();
   const lower = (item?.lowerBars || item?.lower_bars || spec?.lowerBars || '').toLowerCase();
   const candidate = lower && lower !== 'none' ? lower : upper;
-  if (!candidate || candidate === 'none') return '2x2';
+  if (!candidate || candidate === 'none') return 'none';
   if (/^\d+x\d+$/.test(candidate)) return candidate;
   if (candidate === 'custom') return 'custom';
-  return '2x2';
+  return 'none';
 }
 
 function customBarsFromSpec(spec, item) {
