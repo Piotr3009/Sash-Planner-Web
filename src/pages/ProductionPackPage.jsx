@@ -31,6 +31,8 @@ import { exportCutListPDF } from '../utils/cutListPdfExport.js';
 import { exportOverviewPDF } from '../utils/overviewPdfExport.js';
 import { exportThreeDPDF } from '../utils/threeDPdfExport.js';
 import { exportBomPDF } from '../utils/bomPdfExport.js';
+import { exportElevationsPDF, exportElementsPDF, exportSectionsPDF } from '../utils/drawingsPdfExport.js';
+import { svgNodeToPng, loadImageSize } from '../utils/svgRaster.js';
 import { getColorName } from '../config.js';
 import { getPartSymbol } from '../engine/partSymbols.js';
 
@@ -57,7 +59,7 @@ const TABS = [
 ];
 
 // Tabs that currently have a PDF export implemented
-const EXPORTABLE_TABS = ['overview', '3d', 'glass', 'precut', 'cutlist', 'spraying', 'bom'];
+const EXPORTABLE_TABS = ['overview', '3d', 'elevations', 'sections', 'elements', 'glass', 'precut', 'cutlist', 'spraying', 'bom'];
 
 // ─── Status config ───
 const STATUS_CONFIG = {
@@ -398,9 +400,9 @@ export default function ProductionPackPage() {
       <main className="max-w-[1400px] mx-auto p-6">
         {tab === 'overview'   && <OverviewTab batch={batch} pp={pp} isPPMode={isPPMode} windowsData={windowsData} registerExport={registerExport} />}
         {tab === '3d'         && <ThreeDTab windowsData={windowsData} pp={pp} batch={batch} registerExport={registerExport} />}
-        {tab === 'elevations' && <ElevationsTab windowsData={windowsData} />}
-        {tab === 'sections'   && <SectionsTab windowsData={windowsData} />}
-        {tab === 'elements'   && <ElementsTab windowsData={windowsData} />}
+        {tab === 'elevations' && <ElevationsTab windowsData={windowsData} pp={pp} batch={batch} registerExport={registerExport} />}
+        {tab === 'sections'   && <SectionsTab windowsData={windowsData} pp={pp} batch={batch} registerExport={registerExport} />}
+        {tab === 'elements'   && <ElementsTab windowsData={windowsData} pp={pp} batch={batch} registerExport={registerExport} />}
         {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} batch={batch} pp={pp} registerExport={registerExport} />}
         {tab === 'precut'     && <PreCutTab merged={merged} settings={settings} batch={batch} pp={pp} isPPMode={isPPMode} projects={projects} registerExport={registerExport} exportFormat={exportFormat} />}
         {tab === 'cutlist'    && <CutListTab merged={merged} isPPMode={isPPMode} pp={pp} batch={batch} registerExport={registerExport} />}
@@ -595,29 +597,69 @@ function ThreeDTab({ windowsData, pp, batch, registerExport }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: 2D Elevations
 // ═══════════════════════════════════════════════════════════════
-function ElevationsTab({ windowsData }) {
+function ElevationsTab({ windowsData, pp, batch, registerExport }) {
+  const [busy, setBusy] = useState(false);
+  const refs = useRef({});
+
+  const handleExport = async () => {
+    if (busy || !windowsData.length) return;
+    setBusy(true);
+    try {
+      const items = [];
+      let no = 0;
+      for (const d of windowsData) {
+        no += 1;
+        const svg = refs.current[d.win.id]?.querySelector('svg');
+        const png = svg ? await svgNodeToPng(svg, { scale: 2 }) : null;
+        items.push({
+          image: png?.url || null, w: png?.w, h: png?.h,
+          no, projectNum: d.win._projectNumber || '', name: d.win.name || '',
+          dims: `${d.win.width}×${d.win.height} mm`,
+        });
+      }
+      const company = useProjectStore.getState().settings.company || {};
+      const projects = [...new Set(windowsData.map((d) => d.win._projectNumber).filter(Boolean))];
+      exportElevationsPDF({
+        title: pp?.name || batch?.name || 'Pack', projects,
+        date: new Date().toLocaleDateString('en-GB'), deadline: pp?.deadline || '',
+        companyName: company.companyName || 'COMPANY NAME', companyAddress: company.companyAddress || '',
+        logo: company.logo || '', items,
+      });
+    } finally { setBusy(false); }
+  };
+  registerExport && registerExport('elevations', handleExport);
+
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-      {windowsData.map(({ win, windowSpec, derived }) => (
-        <div key={win.id} className="card p-4">
-          <div className="text-xs font-semibold text-ink-200 mb-2">
-            {win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — {win.width}×{win.height} mm
+    <>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        {windowsData.map(({ win, windowSpec, derived }) => (
+          <div key={win.id} className="card p-4">
+            <div className="text-xs font-semibold text-ink-200 mb-2">
+              {win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — {win.width}×{win.height} mm
+            </div>
+            {derived ? (
+              <div ref={(el) => { refs.current[win.id] = el; }}>
+                <FrontElevation2D windowSpec={windowSpec} derived={derived} />
+              </div>
+            ) : (
+              <div className="text-xs text-ink-400 py-8 text-center">Calculations not available for this window.</div>
+            )}
           </div>
-          {derived ? (
-            <FrontElevation2D windowSpec={windowSpec} derived={derived} />
-          ) : (
-            <div className="text-xs text-ink-400 py-8 text-center">Calculations not available for this window.</div>
-          )}
+        ))}
+      </div>
+      {busy && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
+          <div className="card px-6 py-4 text-sm text-ink-100">Generating PDF…</div>
         </div>
-      ))}
-    </div>
+      )}
+    </>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════
 // TAB: 2D Sections — container-based image upload system
 // ═══════════════════════════════════════════════════════════════
-function SectionsTab({ windowsData }) {
+function SectionsTab({ windowsData, pp, batch, registerExport }) {
   const [sectionImages, setSectionImages] = useState(() => {
     try { const d = JSON.parse(localStorage.getItem('pc-section-images') || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
   });
@@ -655,6 +697,26 @@ function SectionsTab({ windowsData }) {
     setSectionImages(updated);
     localStorage.setItem('pc-section-images', JSON.stringify(updated));
   };
+
+  const handleExport = async () => {
+    if (!sectionImages.length) return;
+    const items = [];
+    let no = 0;
+    for (const s of sectionImages) {
+      no += 1;
+      const size = await loadImageSize(s.src);
+      items.push({ image: s.src, w: size?.w, h: size?.h, no, label: s.label || 'Section' });
+    }
+    const company = useProjectStore.getState().settings.company || {};
+    const projects = [...new Set((windowsData || []).map((d) => d.win?._projectNumber).filter(Boolean))];
+    exportSectionsPDF({
+      title: pp?.name || batch?.name || 'Pack', projects,
+      date: new Date().toLocaleDateString('en-GB'), deadline: pp?.deadline || '',
+      companyName: company.companyName || 'COMPANY NAME', companyAddress: company.companyAddress || '',
+      logo: company.logo || '', items,
+    });
+  };
+  registerExport && registerExport('sections', handleExport);
 
   return (
     <div className="space-y-4">
@@ -703,8 +765,43 @@ function SectionsTab({ windowsData }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: 2D Elements (per window: Box + Upper Sash + Lower Sash)
 // ═══════════════════════════════════════════════════════════════
-function ElementsTab({ windowsData }) {
+function ElementsTab({ windowsData, pp, batch, registerExport }) {
   const [expandedDrawing, setExpandedDrawing] = useState(null); // { windowSpec, derived, type: 'box'|'upper'|'lower', title }
+  const [busy, setBusy] = useState(false);
+  const refs = useRef({});
+
+  const handleExport = async () => {
+    if (busy || !windowsData.length) return;
+    setBusy(true);
+    try {
+      const windows = [];
+      let no = 0;
+      for (const d of windowsData) {
+        no += 1;
+        const types = [['box', 'Box Detail'], ['upper', 'Upper Sash'], ['lower', 'Lower Sash']];
+        const drawings = [];
+        for (const [t, label] of types) {
+          const svg = refs.current[`${d.win.id}-${t}`]?.querySelector('svg');
+          const png = svg ? await svgNodeToPng(svg, { scale: 2 }) : null;
+          drawings.push({ image: png?.url || null, w: png?.w, h: png?.h, label });
+        }
+        windows.push({
+          no,
+          caption: `${d.win._projectNumber ? `${d.win._projectNumber} · ` : ''}${d.win.name} — ${d.win.width}×${d.win.height} mm`,
+          drawings,
+        });
+      }
+      const company = useProjectStore.getState().settings.company || {};
+      const projects = [...new Set(windowsData.map((d) => d.win._projectNumber).filter(Boolean))];
+      exportElementsPDF({
+        title: pp?.name || batch?.name || 'Pack', projects,
+        date: new Date().toLocaleDateString('en-GB'), deadline: pp?.deadline || '',
+        companyName: company.companyName || 'COMPANY NAME', companyAddress: company.companyAddress || '',
+        logo: company.logo || '', windows,
+      });
+    } finally { setBusy(false); }
+  };
+  registerExport && registerExport('elements', handleExport);
 
   return (
     <div className="space-y-8">
@@ -724,8 +821,10 @@ function ElementsTab({ windowsData }) {
             <div className="card p-4">
               <div className="text-xs font-semibold text-ink-200 mb-2">Box Detail</div>
               {derived ? (
-                <BoxDetail2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber}
-                  onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'box', title: `${win.name} — Box Detail`, projectNumber: win._projectNumber })} />
+                <div ref={(el) => { refs.current[`${win.id}-box`] = el; }}>
+                  <BoxDetail2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber}
+                    onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'box', title: `${win.name} — Box Detail`, projectNumber: win._projectNumber })} />
+                </div>
               ) : (
                 <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
               )}
@@ -733,8 +832,10 @@ function ElementsTab({ windowsData }) {
             <div className="card p-4">
               <div className="text-xs font-semibold text-ink-200 mb-2">Upper Sash</div>
               {derived ? (
-                <SashDetail2D windowSpec={windowSpec} derived={derived} type="upper" projectNumber={win._projectNumber}
-                  onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'upper', title: `${win.name} — Upper Sash`, projectNumber: win._projectNumber })} />
+                <div ref={(el) => { refs.current[`${win.id}-upper`] = el; }}>
+                  <SashDetail2D windowSpec={windowSpec} derived={derived} type="upper" projectNumber={win._projectNumber}
+                    onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'upper', title: `${win.name} — Upper Sash`, projectNumber: win._projectNumber })} />
+                </div>
               ) : (
                 <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
               )}
@@ -742,8 +843,10 @@ function ElementsTab({ windowsData }) {
             <div className="card p-4">
               <div className="text-xs font-semibold text-ink-200 mb-2">Lower Sash</div>
               {derived ? (
-                <SashDetail2D windowSpec={windowSpec} derived={derived} type="lower" projectNumber={win._projectNumber}
-                  onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'lower', title: `${win.name} — Lower Sash`, projectNumber: win._projectNumber })} />
+                <div ref={(el) => { refs.current[`${win.id}-lower`] = el; }}>
+                  <SashDetail2D windowSpec={windowSpec} derived={derived} type="lower" projectNumber={win._projectNumber}
+                    onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'lower', title: `${win.name} — Lower Sash`, projectNumber: win._projectNumber })} />
+                </div>
               ) : (
                 <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
               )}
@@ -751,6 +854,12 @@ function ElementsTab({ windowsData }) {
           </div>
         </div>
       ))}
+
+      {busy && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
+          <div className="card px-6 py-4 text-sm text-ink-100">Generating PDF…</div>
+        </div>
+      )}
 
       {/* Full-screen expand modal */}
       {expandedDrawing && (
