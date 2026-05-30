@@ -59,7 +59,12 @@ export function svgNodeToPng(svgEl, { scale = 3, bg = '#ffffff', printMode = fal
       clone.setAttribute('width', w);
       clone.setAttribute('height', h);
       let xml = new XMLSerializer().serializeToString(clone);
-      if (printMode) xml = applyPrintPalette(xml);
+      if (printMode) {
+        xml = applyPrintPalette(xml); // darken light lines (hex attributes)
+        // The SVG background is set via inline style (serialized as rgb(...)),
+        // which the hex palette map cannot catch — force it white in any form.
+        xml = xml.replace(/background\s*:\s*[^;"']+/gi, 'background:#ffffff');
+      }
       const svg64 = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
 
       const img = new Image();
