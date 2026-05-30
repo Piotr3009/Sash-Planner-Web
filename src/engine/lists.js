@@ -231,9 +231,8 @@ export function buildHardwareList(windowSpec) {
   // Finger lifts: always 2 per opening window
   list.push({ item: 'Finger lift', detail: finish, quantity: 2 });
 
-  // Pull handles: user-selected, default 0 (manual quantity in PSW)
-  // For now: include 2 as default
-  list.push({ item: 'Sash pull handle', detail: finish, quantity: 2 });
+  // Pull handles: 1 per window
+  list.push({ item: 'Sash pull handle', detail: finish, quantity: 1 });
 
   // Pulleys: 4 for both, 2 for bottom-only
   const pulleyQty = isBottomOnly ? 2 : 4;

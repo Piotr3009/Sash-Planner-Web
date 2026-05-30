@@ -446,7 +446,7 @@ function calculateBeadingComponents(windowSpec, frameWidth, frameHeight, sashWid
 export function deriveWindowData(windowSpec, settings = {}) {
     const frameWidth = Number(windowSpec.frame?.width ?? 0);
     const frameHeight = Number(windowSpec.frame?.height ?? 0);
-    const gridMode = windowSpec.sash?.grid?.mode ?? '2x2';
+    const gridMode = windowSpec.sash?.grid?.mode ?? 'none';
 
     const config = resolveConfiguration(gridMode, windowSpec.sash?.grid ?? {});
     const sashWidth = frameWidth - CONSTANTS.SASH_WIDTH_DEDUCTION;

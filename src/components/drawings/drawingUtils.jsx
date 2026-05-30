@@ -353,12 +353,13 @@ export const HORN_DEF = {
 // Build an SVG path for a horn at one stile (SVG y-down).
 //   sashX = sash left edge; sashW = sash width; topY = sash bottom (where horn joins)
 //   side 'L' = left stile (straight back at sashX, curve inward); 'R' = right (mirrored)
-export function buildHornPath(type, sashX, sashW, topY, side) {
+//   inset = shift horn inward from the sash edge (mm). Default 0 (back flush with edge).
+export function buildHornPath(type, sashX, sashW, topY, side, inset = 0) {
   const def = HORN_DEF[type];
   if (!def) return '';
   const sX = HORN_W / HORN_BBOX_W;     // 30/40
   const sY = HORN_H / def.dropRaw;     // 70 / (80 − minY) → tip lands at topY+70
-  const X = (x) => (side === 'L' ? sashX + x * sX : (sashX + sashW) - x * sX);
+  const X = (x) => (side === 'L' ? sashX + inset + x * sX : (sashX + sashW - inset) - x * sX);
   const Y = (y) => topY + (80 - y) * sY;
   return def.segs.map((s) => {
     switch (s[0]) {

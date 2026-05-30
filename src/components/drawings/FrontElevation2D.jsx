@@ -7,7 +7,7 @@
  */
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
-import { computeBarPositions, DimH, DimV, TitleBlock, tfs, HORN_DEF, buildHornPath } from './drawingUtils.jsx';
+import { computeBarPositions, DimH, DimV, TitleBlock, tfs, HORN_DEF, HORN_W, buildHornPath } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
@@ -255,12 +255,13 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
         {windowSpec?.sash?.horns && HORN_DEF[windowSpec.sash.hornType] && (() => {
           const type = windowSpec.sash.hornType;
           const hornTopY = upperSashY + topSashH;   // upper-sash bottom edge
+          const inset = (geom.stile - HORN_W) / 2;  // centre horn on the stile (elevation only)
           return (
             <g>
-              <path d={buildHornPath(type, sashX, sashW, hornTopY, 'L')}
-                fill={COL.frameFill} stroke={COL.sash} strokeWidth={STROKES.sash} {...NS} />
-              <path d={buildHornPath(type, sashX, sashW, hornTopY, 'R')}
-                fill={COL.frameFill} stroke={COL.sash} strokeWidth={STROKES.sash} {...NS} />
+              <path d={buildHornPath(type, sashX, sashW, hornTopY, 'L', inset)}
+                fill={COL.frameFill} stroke={COL.meeting} strokeWidth={STROKES.sash} {...NS} />
+              <path d={buildHornPath(type, sashX, sashW, hornTopY, 'R', inset)}
+                fill={COL.frameFill} stroke={COL.meeting} strokeWidth={STROKES.sash} {...NS} />
             </g>
           );
         })()}
