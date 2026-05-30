@@ -24,6 +24,7 @@ import {
 import { optimisePrecut } from '../engine/optimizer.js';
 import { exportGlassPDF } from '../utils/glassPdfExport.js';
 import { exportPreCutPDF } from '../utils/precutPdfExport.js';
+import { exportSprayingPDF } from '../utils/sprayingPdfExport.js';
 import { getColorName } from '../config.js';
 import { getPartSymbol } from '../engine/partSymbols.js';
 
@@ -1341,6 +1342,29 @@ function ColorChip({ hex, name }) {
   );
 }
 
+function SprayNoteInput({ noteKey }) {
+  const value = useProjectStore((s) => s.sprayNotes[noteKey] || '');
+  const setSprayNote = useProjectStore((s) => s.setSprayNote);
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => setSprayNote(noteKey, e.target.value)}
+      placeholder="add note…"
+      className="w-full bg-surface-800 border border-surface-500 rounded px-2 py-1 text-xs text-ink-100 focus:border-ink-300 focus:outline-none"
+    />
+  );
+}
+
+function SprayMeta({ label, value }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-wide text-ink-500">{label}</div>
+      <div className="text-ink-100 font-medium">{value || '—'}</div>
+    </div>
+  );
+}
+
 const SPRAY_ELEM_ORDER = { 'Box': 0, 'Upper Sash': 1, 'Lower Sash': 2 };
 
 function SprayingTab({ windowsData, batch, pp }) {
@@ -1378,10 +1402,10 @@ function SprayingTab({ windowsData, batch, pp }) {
       elements.forEach((el) => {
         const base = { projectNum, window: win.name, element: el.element, size: el.size, sort: SPRAY_ELEM_ORDER[el.element] ?? 9 };
         if (isDual) {
-          addRow(outside, { ...base, colour: `${getColorName(outside)} (out)` });
-          addRow(inside,  { ...base, colour: `${getColorName(inside)} (in)` });
+          addRow(outside, { ...base, colour: `${getColorName(outside)} (out)`, noteKey: `${win.id}_${el.element}_out` });
+          addRow(inside,  { ...base, colour: `${getColorName(inside)} (in)`,  noteKey: `${win.id}_${el.element}_in` });
         } else {
-          addRow(single, { ...base, colour: getColorName(single) });
+          addRow(single, { ...base, colour: getColorName(single), noteKey: `${win.id}_${el.element}_single` });
         }
       });
 
@@ -1409,37 +1433,31 @@ function SprayingTab({ windowsData, batch, pp }) {
         .map((r) => { const lm = r.mm / 1000; return { label: r.label, lm, pcs: ceilHalf(lm / SPRAY_BAR_LEN_M) }; }),
     })).filter((g) => g.rows.length > 0);
 
-    return { sections, beadGroups };
+    const projects = [...new Set(wins.map((w) => w.win._projectNumber).filter(Boolean))];
+    const colourChips = sections.map((s) => ({ hex: s.hex, name: s.name }));
+
+    return { sections, beadGroups, projects, colourChips };
   }, [windowsData]);
 
   const handleExport = () => {
-    const title = pp?.name || batch?.name || 'Spraying';
-    const sa = data.sections.map((g) => `
-      <h3>${g.name}</h3>
-      <table><thead><tr><th>Project №</th><th>Window</th><th>Element</th><th>Colour</th><th style="text-align:right;">Size (mm)</th><th style="width:22%;">Additional info</th></tr></thead><tbody>
-      ${g.rows.map((r) => `<tr><td>${r.projectNum}</td><td>${r.window}</td><td>${r.element}</td><td>${r.colour}</td><td style="text-align:right;">${r.size}</td><td></td></tr>`).join('')}
-      </tbody></table>`).join('');
-    const bg = data.beadGroups.map((g) => `
-      <h3>${g.name} — beadings</h3>
-      <table><thead><tr><th>Type</th><th style="text-align:right;">Linear m</th><th style="text-align:right;">Bars (pcs)</th></tr></thead><tbody>
-      ${g.rows.map((r) => `<tr><td>${r.label}</td><td style="text-align:right;">${r.lm.toFixed(2)}</td><td style="text-align:right;">${r.pcs.toFixed(1)}</td></tr>`).join('')}
-      </tbody></table>`).join('');
-    const html = `<!DOCTYPE html><html><head><title>Spraying — ${title}</title>
-      <style>body{font-family:Arial,sans-serif;padding:30px;color:#222;}
-      h1{font-size:18px;margin:0 0 4px;}h2{font-size:13px;color:#666;margin:0 0 18px;font-weight:normal;}
-      h3{font-size:12px;margin:18px 0 6px;text-transform:uppercase;color:#444;}
-      table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px;}
-      th{background:#f5f5f5;padding:6px 8px;text-align:left;border-bottom:2px solid #ccc;font-size:10px;text-transform:uppercase;color:#555;}
-      td{padding:5px 8px;border-bottom:1px solid #ddd;}
-      .sec{font-size:14px;font-weight:bold;margin:22px 0 4px;border-bottom:2px solid #333;padding-bottom:3px;}</style></head>
-      <body>
-      <h1>Spraying — ${title}</h1>
-      <h2>Beadings painted first · elements grouped by colour, sorted by element</h2>
-      <div class="sec">Part A — Elements</div>${sa}
-      <div class="sec">Part B — Beadings (painted first)</div>${bg}
-      <script>window.onload=()=>window.print()</script></body></html>`;
-    const w = window.open('', '_blank');
-    w.document.write(html); w.document.close();
+    const notes = useProjectStore.getState().sprayNotes;
+    const sections = data.sections.map((s) => ({
+      name: s.name, hex: s.hex,
+      rows: s.rows.map((r) => ({
+        projectNum: r.projectNum, window: r.window, element: r.element,
+        colour: r.colour, size: r.size, additional: notes[r.noteKey] || '',
+      })),
+    }));
+    exportSprayingPDF({
+      title: pp?.name || batch?.name || 'Pack',
+      projects: data.projects,
+      date: new Date().toLocaleDateString('en-GB'),
+      deadline: pp?.deadline || '',
+      colours: data.colourChips.map((c) => c.name),
+      sections,
+      beadGroups: data.beadGroups,
+      companyName: 'PRIME SASH WINDOWS',
+    });
   };
 
   if (!data.sections.length && !data.beadGroups.length) {
@@ -1448,11 +1466,32 @@ function SprayingTab({ windowsData, batch, pp }) {
 
   const countBoxes = (rows) => rows.filter((r) => r.element === 'Box').length;
   const countSashes = (rows) => rows.filter((r) => r.element !== 'Box').length;
+  const packName = pp?.name || batch?.name || 'Pack';
+  const packType = pp?.type || batch?.type || 'sash';
+  const deadline = pp?.deadline || '';
+  const today = new Date().toLocaleDateString('en-GB');
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <button onClick={handleExport} className="btn btn-secondary text-xs">📄 Export PDF</button>
+      {/* Header — Spraying Information */}
+      <div className="card p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-sm font-semibold text-ink-50">Spraying Information</div>
+          <button onClick={handleExport} className="btn btn-secondary text-xs">📄 Export PDF</button>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+          <SprayMeta label="Pack" value={packName} />
+          <SprayMeta label="Type" value={packType} />
+          <SprayMeta label="Deadline" value={deadline} />
+          <SprayMeta label="Date" value={today} />
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
+          <span className="text-ink-500">Colours:</span>
+          {data.colourChips.map((c) => <ColorChip key={c.hex} hex={c.hex} name={c.name} />)}
+        </div>
+        {data.projects.length > 0 && (
+          <div className="mt-1.5 text-xs"><span className="text-ink-500">Projects: </span><span className="text-ink-200">{data.projects.join(' · ')}</span></div>
+        )}
       </div>
 
       {/* PART A — Elements: colour sections, sorted by element */}
@@ -1483,7 +1522,7 @@ function SprayingTab({ windowsData, batch, pp }) {
                     <td className="px-3 py-1.5 text-ink-300">{r.element}</td>
                     <td className="px-3 py-1.5 text-ink-300">{r.colour}</td>
                     <td className="px-3 py-1.5 text-right text-ink-100 font-mono">{r.size}</td>
-                    <td className="px-3 py-1.5 text-ink-500"></td>
+                    <td className="px-3 py-1 w-[28%]"><SprayNoteInput noteKey={r.noteKey} /></td>
                   </tr>
                 ))}
               </tbody>

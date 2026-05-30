@@ -108,6 +108,8 @@ export const useProjectStore = create(
 
   productionPacks: [],
 
+  sprayNotes: {},   // key: `${windowId}_${element}_${face}` → text (spraying additional info)
+
   currentProject: null,
   currentBatch: null,
   currentWindows: [],    // windows in current batch
@@ -141,6 +143,14 @@ export const useProjectStore = create(
         sectionMap: { ...s.settings.sectionMap, ...(patch.sectionMap || {}) }
       }
     })),
+
+  setSprayNote: (key, value) =>
+    set((s) => {
+      const next = { ...s.sprayNotes };
+      if (value && value.trim()) next[key] = value;
+      else delete next[key];
+      return { sprayNotes: next };
+    }),
 
   // ─── Getters ───
   getProjectById: (id) => get().projects.find((p) => p.id === id) || null,
@@ -598,6 +608,7 @@ export const useProjectStore = create(
         projects: state.projects,
         productionPacks: state.productionPacks,
         settings: state.settings,
+        sprayNotes: state.sprayNotes,
         projectsLoaded: state.projectsLoaded,
       }),
       merge: (persisted, current) => {
