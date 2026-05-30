@@ -29,6 +29,7 @@ import { exportPreCutPDF } from '../utils/precutPdfExport.js';
 import { exportSprayingPDF } from '../utils/sprayingPdfExport.js';
 import { exportCutListPDF } from '../utils/cutListPdfExport.js';
 import { exportOverviewPDF } from '../utils/overviewPdfExport.js';
+import { exportThreeDPDF } from '../utils/threeDPdfExport.js';
 import { getColorName } from '../config.js';
 import { getPartSymbol } from '../engine/partSymbols.js';
 
@@ -37,6 +38,7 @@ import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
 import SashDetail2D from '../components/drawings/SashDetail2D.jsx';
 import GlassDrawing2D from '../components/drawings/GlassDrawing2D.jsx';
 import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
+import Window3DCaptureRig from '../components/viewer/Window3DCaptureRig.jsx';
 
 // ─── Tab config ───
 const TABS = [
@@ -53,7 +55,7 @@ const TABS = [
 ];
 
 // Tabs that currently have a PDF export implemented
-const EXPORTABLE_TABS = ['overview', 'glass', 'precut', 'cutlist', 'spraying'];
+const EXPORTABLE_TABS = ['overview', '3d', 'glass', 'precut', 'cutlist', 'spraying'];
 
 // ─── Status config ───
 const STATUS_CONFIG = {
@@ -393,7 +395,7 @@ export default function ProductionPackPage() {
       {/* Content */}
       <main className="max-w-[1400px] mx-auto p-6">
         {tab === 'overview'   && <OverviewTab batch={batch} pp={pp} isPPMode={isPPMode} windowsData={windowsData} registerExport={registerExport} />}
-        {tab === '3d'         && <ThreeDTab windowsData={windowsData} />}
+        {tab === '3d'         && <ThreeDTab windowsData={windowsData} pp={pp} batch={batch} registerExport={registerExport} />}
         {tab === 'elevations' && <ElevationsTab windowsData={windowsData} />}
         {tab === 'sections'   && <SectionsTab windowsData={windowsData} />}
         {tab === 'elements'   && <ElementsTab windowsData={windowsData} />}
@@ -510,26 +512,81 @@ function OverviewTab({ batch, pp, isPPMode, windowsData, registerExport }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: 3D Views
 // ═══════════════════════════════════════════════════════════════
-function ThreeDTab({ windowsData }) {
+function ThreeDTab({ windowsData, pp, batch, registerExport }) {
+  const [capturing, setCapturing] = useState(false);
+
+  // Stable list for the capture rig (id + spec), aligned to windowsData order.
+  const captureList = useMemo(
+    () => windowsData.map((d) => ({ id: d.win.id, windowSpec: d.windowSpec })),
+    [windowsData]
+  );
+
+  // Header "Export PDF" triggers an off-screen, fixed-angle capture run.
+  const handleExport = useCallback(() => {
+    if (capturing || !captureList.length) return;
+    setCapturing(true);
+  }, [capturing, captureList]);
+  registerExport && registerExport('3d', handleExport);
+
+  // When all windows are captured: build the PDF, then unmount the rig.
+  const handleComplete = useCallback((results) => {
+    const byId = {};
+    results.forEach((r) => { byId[r.id] = r.url; });
+    const st = useProjectStore.getState();
+    const company = st.settings.company || {};
+    const items = windowsData.map((d, i) => ({
+      image: byId[d.win.id] || null,
+      no: i + 1,
+      projectNum: d.win._projectNumber || '',
+      name: d.win.name || '',
+      dims: `${d.win.width}×${d.win.height} mm`,
+    }));
+    const projects = [...new Set(windowsData.map((d) => d.win._projectNumber).filter(Boolean))];
+    setCapturing(false);
+    exportThreeDPDF({
+      title: pp?.name || batch?.name || 'Pack',
+      projects,
+      date: new Date().toLocaleDateString('en-GB'),
+      deadline: pp?.deadline || '',
+      companyName: company.companyName || 'COMPANY NAME',
+      companyAddress: company.companyAddress || '',
+      logo: company.logo || '',
+      items,
+    });
+  }, [windowsData, pp, batch]);
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-      {windowsData.map(({ win, windowSpec }) => (
-        <div key={win.id} className="card overflow-hidden">
-          <div className="px-4 py-2 border-b border-surface-500 flex items-center justify-between">
-            <span className="text-sm font-medium text-ink-50">
-              {win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — {win.width}×{win.height} mm
-            </span>
-            <Link to={`/projects/${win._projectId}/batches/${win._batchId || win.batch_id}/windows/${win.id}`}
-              className="text-[10px] text-accent-400 hover:text-accent-300 transition-colors">
-              View Details →
-            </Link>
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {windowsData.map(({ win, windowSpec }) => (
+          <div key={win.id} className="card overflow-hidden">
+            <div className="px-4 py-2 border-b border-surface-500 flex items-center justify-between">
+              <span className="text-sm font-medium text-ink-50">
+                {win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — {win.width}×{win.height} mm
+              </span>
+              <Link to={`/projects/${win._projectId}/batches/${win._batchId || win.batch_id}/windows/${win.id}`}
+                className="text-[10px] text-accent-400 hover:text-accent-300 transition-colors">
+                View Details →
+              </Link>
+            </div>
+            <div className="aspect-[4/3] bg-gradient-to-br from-surface-600 to-surface-700">
+              <WindowPreview3D windowSpec={windowSpec} side="exterior" />
+            </div>
           </div>
-          <div className="aspect-[4/3] bg-gradient-to-br from-surface-600 to-surface-700">
-            <WindowPreview3D windowSpec={windowSpec} side="exterior" />
+        ))}
+      </div>
+
+      {capturing && (
+        <>
+          <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
+            <div className="card px-6 py-4 text-sm text-ink-100">
+              Generating 3D PDF…
+            </div>
           </div>
-        </div>
-      ))}
-    </div>
+          <Window3DCaptureRig windows={captureList} side="exterior" onComplete={handleComplete} />
+        </>
+      )}
+    </>
   );
 }
 
