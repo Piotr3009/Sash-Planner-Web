@@ -288,10 +288,10 @@ const HARDWARE_TO_SLOT_KEY = {
   'Window stopper': 'stoppers',
 };
 
-// Format a quantity for display by unit (pcs/tubes are whole, others 2dp)
+// Format a quantity for display by unit (pcs are whole; tubes/m/L/etc. keep 2dp)
 function formatQty(value, unit) {
   const n = Number(value) || 0;
-  const whole = unit === 'pcs' || unit === 'tubes';
+  const whole = unit === 'pcs';
   return `${whole ? Math.round(n) : n.toFixed(2)} ${unit}`;
 }
 
