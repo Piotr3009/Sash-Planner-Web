@@ -6,7 +6,8 @@ import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignm
 import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
-import { buildHardwareList, buildGlassListForWindow, buildPrecutForWindow } from '../engine/lists.js';
+import { buildGlassListForWindow } from '../engine/lists.js';
+import { buildWindowPartQtys, buildWindowHardware, resolvePartTotal, formatQty } from '../engine/bom.js';
 import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 import DrawingsPanel from '../components/drawings/DrawingsPanel.jsx';
 import GlassDrawing2D from '../components/drawings/GlassDrawing2D.jsx';
@@ -249,121 +250,16 @@ function GlassPanel({ windowSpec, derived }) {
 }
 
 // ─── BOM Panel — Purchase list matching Project Materials layout ───
-const ELEMENT_TO_PART_ID = {
-  'HEAD': 'head', 'CILL': 'cill', 'CILL NOSE': 'cill_nose', 'CILL EXTENSION': 'cill_extension',
-  'JAMB LEFT': 'jambs', 'JAMB RIGHT': 'jambs',
-  'INTERNAL HEAD LINER': 'int_head_liner', 'EXTERNAL HEAD LINER': 'ext_head_liner',
-  'INTERNAL JAMB LINER (L)': 'int_jamb_liner', 'INTERNAL JAMB LINER (R)': 'int_jamb_liner',
-  'EXTERNAL JAMB LINER (L)': 'ext_jamb_liner', 'EXTERNAL JAMB LINER (R)': 'ext_jamb_liner',
-  'TOP RAIL': 'top_rail', 'BOTTOM RAIL': 'bottom_rail',
-  'STILES TOP SASH (L)': 'stiles_top_sash', 'STILES TOP SASH (R)': 'stiles_top_sash',
-  'STILES BOTTOM SASH (L)': 'stiles_bottom_sash', 'STILES BOTTOM SASH (R)': 'stiles_bottom_sash',
-  'TOP MEET RAIL': 'top_meet_rail', 'BOTTOM MEET RAIL': 'bottom_meet_rail',
-  'GLAZING BEADING': 'glazing_beading', 'TRIANGLE BEADING (EXT)': 'triangle_beading_ext',
-  'PARTING BEADING': 'parting_beading', 'STAFF BEADING': 'staff_beading',
-  'MEETING BEADING A': 'meeting_beading_a', 'MEETING BEADING B': 'meeting_beading_b',
-};
-
-// Glazing clip size → assignment part id (size depends on glass/frame type)
-const CLIP_SIZE_TO_PART_ID = {
-  '24mm': 'glazing_clips_24mm',
-  '28mm': 'glazing_clips_28mm',
-  '14mm': 'glazing_clips_14mm',
-};
-
-// Glass type → assignment part id
-const GLASS_TYPE_TO_PART_ID = {
-  double: 'glass_double',
-  triple: 'glass_triple',
-  single: 'glass_single',
-  passive: 'glass_passive',
-};
-
-// Hardware line (buildHardwareList item name) → ironmongery slot category key
-const HARDWARE_TO_SLOT_KEY = {
-  'Sash lock': 'locks',
-  'Finger lift': 'fingerLifts',
-  'Sash pull handle': 'pullHandles',
-  'Pulley wheels': 'pulleys',
-  'Window stopper': 'stoppers',
-};
-
-// Format a quantity for display by unit (pcs are whole; tubes/m/L/etc. keep 2dp)
-function formatQty(value, unit) {
-  const n = Number(value) || 0;
-  const whole = unit === 'pcs';
-  return `${whole ? Math.round(n) : n.toFixed(2)} ${unit}`;
-}
-
 function BOMPanel({ item, windowSpec, settings, derived, batch }) {
   const materials = useMaterialStore((s) => s.materials);
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const ironmongeryItems = useIronmongeryStore((s) => s.items);
 
-  // Build qty map per part: partId → { qty, unit }
-  // Timber/beading = meters (from pre-cut + derived); other parts = native unit.
-  const partQtys = useMemo(() => {
-    if (!derived || !windowSpec) return {};
-    const map = {}; // partId → { mm?, qty, unit }
-    const addMm = (pid, mm) => {
-      if (!pid || !mm) return;
-      if (!map[pid]) map[pid] = { mm: 0, unit: 'm' };
-      map[pid].mm += mm;
-    };
-    const setQty = (pid, qty, unit) => {
-      if (!pid || !qty) return;
-      map[pid] = { qty: (map[pid]?.qty || 0) + qty, unit };
-    };
-
-    // ── Timber from pre-cut (has machining allowance) — totals in mm ──
-    const precut = buildPrecutForWindow(derived, windowSpec, settings);
-    if (precut) {
-      const addItems = (items) => items.forEach((it) => {
-        addMm(ELEMENT_TO_PART_ID[it.elementName], it.length * (it.quantity || 1));
-      });
-      (precut.sashEngineering || []).forEach((g) => addItems(g.items));
-      (precut.boxSapele || []).forEach((g) => addItems(g.items));
-    }
-
-    // ── Beading from derived (already in mm totals) ──
-    (derived.components?.beading || []).forEach((b) => {
-      addMm(ELEMENT_TO_PART_ID[b.elementName], b.length * (b.quantity || 1));
-    });
-
-    // ── Consumables (native units) ──
-    const c = derived.consumables;
-    if (c) {
-      setQty('cord', c.cord?.meters, 'm');
-      setQty(CLIP_SIZE_TO_PART_ID[c.clips?.size], c.clips?.qty, 'pcs');
-      setQty('spacer_1mm', c.spacer1mm?.qty, 'pcs');
-      setQty('spacer_2mm', c.spacer2mm?.qty, 'pcs');
-      setQty('bead_tape', c.beadTape?.meters, 'm');
-      setQty('silicone', c.silicone?.tubes, 'tubes');
-      setQty('seal_sliding_6070', c.seal6070?.meters, 'm');
-      setQty('seal_bottom_6009', c.seal6009?.meters, 'm');
-    }
-
-    // ── Glass (sqm to purchase) ──
-    const g = derived.consumables?.glass;
-    if (g?.sqm) {
-      setQty(GLASS_TYPE_TO_PART_ID[g.type] || 'glass_double', g.sqm, 'm²');
-    }
-
-    // ── Weights (total window mass +5% = counterbalance to buy) ──
-    if (derived.weights?.total) {
-      const wPid = (c?.weightType === 'slim') ? 'weights_slim' : 'weights_normal';
-      setQty(wPid, derived.weights.total, 'kg');
-    }
-
-    // ── Paint (litres) ──
-    const p = derived.paint;
-    if (p) {
-      setQty('paint_primer', p.primer, 'L');
-      setQty('paint_white_9016', p.topcoat, 'L');
-    }
-
-    return map;
-  }, [derived, windowSpec, settings]);
+  // Build qty map per part — shared single source (bom.js)
+  const partQtys = useMemo(
+    () => buildWindowPartQtys(derived, windowSpec, settings),
+    [derived, windowSpec, settings]
+  );
 
   // Group by material (same structure as Project Materials)
   const bomGroups = useMemo(() => {
@@ -376,9 +272,7 @@ function BOMPanel({ item, windowSpec, settings, derived, batch }) {
 
       const assignment = assignments[part.id];
       const yieldCoeff = assignment?.yield || 1.0;
-      // mm-based parts (timber/beading) convert to meters × yield; native-unit parts use qty as-is
-      const unit = entry.unit;
-      const total = entry.mm != null ? (entry.mm / 1000) * yieldCoeff : entry.qty;
+      const { total, unit } = resolvePartTotal(entry, yieldCoeff);
       const pcsTotal = part.pcs;
       const partData = { ...part, pcsTotal, total, unit, yield: yieldCoeff };
 
@@ -403,19 +297,11 @@ function BOMPanel({ item, windowSpec, settings, derived, batch }) {
     return groups;
   }, [partQtys, assignments, materials]);
 
-  // Ironmongery (hardware) as card-A groups: qty from buildHardwareList,
-  // product from batch.defaults.ironmongerySlots[categoryKey] → ironmongeryStore item.
-  const hardwareGroups = useMemo(() => {
-    if (!windowSpec) return [];
-    const lines = buildHardwareList(windowSpec);
-    const slots = batch?.defaults?.ironmongerySlots || {};
-    return lines.map((h) => {
-      const slotKey = HARDWARE_TO_SLOT_KEY[h.item];
-      const itemId = slotKey ? slots[slotKey] : null;
-      const product = itemId ? ironmongeryItems.find((m) => m.id === itemId) : null;
-      return { line: h, product };
-    });
-  }, [windowSpec, batch, ironmongeryItems]);
+  // Ironmongery (hardware) as card-A groups — shared single source (bom.js)
+  const hardwareGroups = useMemo(
+    () => buildWindowHardware(windowSpec, batch, ironmongeryItems),
+    [windowSpec, batch, ironmongeryItems]
+  );
 
   return (
     <div className="space-y-4">
