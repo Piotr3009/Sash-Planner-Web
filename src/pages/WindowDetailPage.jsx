@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
 import { useMaterialStore } from '../stores/materialStore.js';
 import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignmentStore.js';
+import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
 import { buildHardwareList, buildGlassListForWindow, buildPrecutForWindow } from '../engine/lists.js';
@@ -136,7 +137,7 @@ export default function WindowDetailPage() {
           )}
 
           {tab === 'bom' && (
-            <BOMPanel item={item} windowSpec={windowSpec} settings={settings} derived={derived} />
+            <BOMPanel item={item} windowSpec={windowSpec} settings={settings} derived={derived} batch={currentBatch} />
           )}
         </div>
 
@@ -278,6 +279,15 @@ const GLASS_TYPE_TO_PART_ID = {
   passive: 'glass_passive',
 };
 
+// Hardware line (buildHardwareList item name) → ironmongery slot category key
+const HARDWARE_TO_SLOT_KEY = {
+  'Sash lock': 'locks',
+  'Finger lift': 'fingerLifts',
+  'Sash pull handle': 'pullHandles',
+  'Pulley wheels': 'pulleys',
+  'Window stopper': 'stoppers',
+};
+
 // Format a quantity for display by unit (pcs/tubes are whole, others 2dp)
 function formatQty(value, unit) {
   const n = Number(value) || 0;
@@ -285,9 +295,10 @@ function formatQty(value, unit) {
   return `${whole ? Math.round(n) : n.toFixed(2)} ${unit}`;
 }
 
-function BOMPanel({ item, windowSpec, settings, derived }) {
+function BOMPanel({ item, windowSpec, settings, derived, batch }) {
   const materials = useMaterialStore((s) => s.materials);
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
+  const ironmongeryItems = useIronmongeryStore((s) => s.items);
 
   // Build qty map per part: partId → { qty, unit }
   // Timber/beading = meters (from pre-cut + derived); other parts = native unit.
@@ -392,6 +403,20 @@ function BOMPanel({ item, windowSpec, settings, derived }) {
     return groups;
   }, [partQtys, assignments, materials]);
 
+  // Ironmongery (hardware) as card-A groups: qty from buildHardwareList,
+  // product from batch.defaults.ironmongerySlots[categoryKey] → ironmongeryStore item.
+  const hardwareGroups = useMemo(() => {
+    if (!windowSpec) return [];
+    const lines = buildHardwareList(windowSpec);
+    const slots = batch?.defaults?.ironmongerySlots || {};
+    return lines.map((h) => {
+      const slotKey = HARDWARE_TO_SLOT_KEY[h.item];
+      const itemId = slotKey ? slots[slotKey] : null;
+      const product = itemId ? ironmongeryItems.find((m) => m.id === itemId) : null;
+      return { line: h, product };
+    });
+  }, [windowSpec, batch, ironmongeryItems]);
+
   return (
     <div className="space-y-4">
       {/* Material groups — identical to Project Materials */}
@@ -466,20 +491,64 @@ function BOMPanel({ item, windowSpec, settings, derived }) {
 
       {/* Consumables, Paint, Weights now render as material cards above (block A style) */}
 
-      {/* Hardware */}
-      <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-surface-500 bg-surface-800">
-          <div className="text-sm font-semibold text-ink-50">Hardware</div>
-        </div>
-        <div className="p-4 space-y-1 text-xs text-ink-400">
-          {windowSpec && buildHardwareList(windowSpec).map((h, i) => (
-            <div key={i} className="flex justify-between"><span>{h.item} ({h.detail})</span><span className="text-ink-200">{h.quantity} pcs</span></div>
-          ))}
-          {windowSpec && buildHardwareList(windowSpec).length === 0 && (
-            <div className="text-ink-500 italic">Fixed window — no hardware</div>
-          )}
-        </div>
-      </div>
+      {/* Ironmongery — same card layout as block A; product from batch slots, qty from rules */}
+      {hardwareGroups.length === 0 ? (
+        <div className="card p-4 text-xs text-ink-500 italic">Fixed window — no hardware</div>
+      ) : (
+        hardwareGroups.map((g, gi) => (
+          <div key={gi} className="card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                {g.product?.image_url ? (
+                  <img src={g.product.image_url} alt="" className="w-10 h-10 rounded object-cover border border-surface-500" />
+                ) : (
+                  <div className="w-10 h-10 rounded bg-surface-600 border border-surface-500 grid place-items-center text-ink-500 text-xs">
+                    {g.product ? '—' : '?'}
+                  </div>
+                )}
+                <div>
+                  <div className="text-sm font-semibold text-ink-50">
+                    {g.product ? g.product.name : 'Unassigned'}
+                  </div>
+                  <div className="text-[10px] text-ink-400 flex items-center gap-2">
+                    {g.product ? (
+                      <>
+                        <span>{g.product.item_number}</span>
+                        {g.product.finish && <span>{g.product.finish}</span>}
+                        {g.product.cost_per_unit > 0 && <span>£{Number(g.product.cost_per_unit).toFixed(2)}/{g.product.unit || 'pcs'}</span>}
+                        {g.product.jc_uuid && <span className="text-[8px] px-1 py-0.5 rounded bg-amber-600/15 text-amber-500 border border-amber-500/25">JC</span>}
+                      </>
+                    ) : (
+                      <span>{g.line.item} — go to Batch Defaults to assign</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-semibold text-ink-100">{g.line.quantity} pcs</div>
+                <div className="text-[10px] text-ink-400">{g.line.item}</div>
+              </div>
+            </div>
+
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-surface-500/50">
+                  <th className="py-1.5 text-left text-ink-400 font-medium">Type</th>
+                  <th className="py-1.5 text-center text-ink-400 font-medium">Detail</th>
+                  <th className="py-1.5 text-right text-ink-400 font-medium">Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-surface-500/30">
+                  <td className="py-1.5 text-ink-200">{g.line.item}</td>
+                  <td className="py-1.5 text-center text-ink-300">{g.line.detail}</td>
+                  <td className="py-1.5 text-right text-ink-100 font-mono font-medium">{g.line.quantity} pcs</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        ))
+      )}
 
       {/* Paint & Weights now render as material cards above (block A style) */}
     </div>
