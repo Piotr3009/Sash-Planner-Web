@@ -8,7 +8,7 @@
  * Computes derived data for ALL windows in the batch and merges
  * cut lists, glass, hardware using buildProjectAggregates.
  */
-import { useState, useMemo, useEffect, Suspense } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback, Suspense } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useProjectStore, BATCH_STATUSES } from '../stores/projectStore.js';
 import { useMaterialAssignmentStore } from '../stores/materialAssignmentStore.js';
@@ -48,6 +48,9 @@ const TABS = [
   { id: 'bom',          label: 'BOM',             icon: '📦' },
 ];
 
+// Tabs that currently have a PDF export implemented
+const EXPORTABLE_TABS = ['glass', 'precut', 'spraying'];
+
 // ─── Status config ───
 const STATUS_CONFIG = {
   preparation:    { label: 'Preparation',    color: '#F59E0B' },
@@ -65,6 +68,13 @@ export default function ProductionPackPage() {
   const updateProductionPack = useProjectStore((s) => s.updateProductionPack);
   const updateBatchLabel = useProjectStore((s) => s.updateBatchLabel);
   const [tab, setTab] = useState('overview');
+
+  // Header export: each tab registers its export handler; the header button fires the active tab's.
+  const [exportFormat, setExportFormat] = useState('a3');
+  const exportHandlersRef = useRef({});
+  const registerExport = useCallback((id, fn) => { exportHandlersRef.current[id] = fn; }, []);
+  const canExport = EXPORTABLE_TABS.includes(tab);
+  const handleHeaderExport = () => exportHandlersRef.current[tab]?.();
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
 
@@ -335,8 +345,25 @@ export default function ProductionPackPage() {
               </div>
             </div>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => window.print()} className="btn btn-secondary text-xs">🖨️ Print</button>
+          <div className="flex items-center gap-2">
+            {tab === 'precut' && (
+              <select
+                value={exportFormat}
+                onChange={(e) => setExportFormat(e.target.value)}
+                className="text-[10px] bg-surface-700 border border-surface-500 rounded px-2 py-1 text-ink-200 outline-none"
+              >
+                <option value="a3">A3 Landscape</option>
+                <option value="a4">A4 Landscape</option>
+              </select>
+            )}
+            <button
+              onClick={handleHeaderExport}
+              disabled={!canExport}
+              title={canExport ? 'Export this tab to PDF' : 'No PDF export for this tab yet'}
+              className={`btn btn-primary text-xs px-4 ${!canExport ? 'opacity-40 cursor-not-allowed' : ''}`}
+            >
+              📄 Export PDF
+            </button>
           </div>
         </div>
       </header>
@@ -364,10 +391,10 @@ export default function ProductionPackPage() {
         {tab === 'elevations' && <ElevationsTab windowsData={windowsData} />}
         {tab === 'sections'   && <SectionsTab windowsData={windowsData} />}
         {tab === 'elements'   && <ElementsTab windowsData={windowsData} />}
-        {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} batch={batch} pp={pp} />}
-        {tab === 'precut'     && <PreCutTab merged={merged} settings={settings} batch={batch} pp={pp} isPPMode={isPPMode} projects={projects} />}
+        {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} batch={batch} pp={pp} registerExport={registerExport} />}
+        {tab === 'precut'     && <PreCutTab merged={merged} settings={settings} batch={batch} pp={pp} isPPMode={isPPMode} projects={projects} registerExport={registerExport} exportFormat={exportFormat} />}
         {tab === 'cutlist'    && <CutListTab merged={merged} isPPMode={isPPMode} />}
-        {tab === 'spraying'   && <SprayingTab windowsData={windowsData} batch={batch} pp={pp} />}
+        {tab === 'spraying'   && <SprayingTab windowsData={windowsData} batch={batch} pp={pp} registerExport={registerExport} />}
         {tab === 'bom'        && <BOMTab merged={merged} batch={batch} pp={pp} isPPMode={isPPMode} windowsData={windowsData} />}
       </main>
     </div>
@@ -672,7 +699,7 @@ function ElementsTab({ windowsData }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: Glass Schedule
 // ═══════════════════════════════════════════════════════════════
-function GlassTab({ merged, windowsData, isPPMode, batch, pp }) {
+function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) {
   if (!merged?.glass?.length) {
     return <div className="card p-8 text-center text-ink-400">No glass data available.</div>;
   }
@@ -692,16 +719,13 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp }) {
       companySettings: useProjectStore.getState().settings.company || {},
     });
   };
+  registerExport('glass', handleExportPDF);
 
   return (
     <div className="space-y-4">
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-surface-500 flex items-center justify-between">
           <div className="text-sm font-semibold text-ink-50">Glass Order — All Windows</div>
-          <button onClick={handleExportPDF}
-            className="px-3 py-1.5 text-xs font-medium bg-accent-600 hover:bg-accent-500 text-white rounded transition-colors">
-            Export PDF
-          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -779,7 +803,7 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: Pre-Cut List — grouped by section, BLO with offcuts
 // ═══════════════════════════════════════════════════════════════
-function PreCutTab({ merged, settings, batch, pp, isPPMode, projects }) {
+function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerExport, exportFormat }) {
   // Material assignment lookup
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const getMaterialById = useMaterialStore((s) => s.getMaterialById);
@@ -799,8 +823,6 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects }) {
     return null;
   };
 
-  // Export format state
-  const [exportFormat, setExportFormat] = useState('a3');
   // Local state for editable stock lengths and offcuts per group
   const [stockLengths, setStockLengths] = useState({});
   const [offcutsMap, setOffcutsMap] = useState({}); // key → [length, length, ...]
@@ -921,24 +943,10 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects }) {
       format: exportFormat,
     });
   };
+  registerExport('precut', handleExportPDF);
 
   return (
     <div className="space-y-4">
-      {/* Export controls */}
-      <div className="flex items-center justify-end gap-2">
-        <select
-          className="text-[10px] bg-surface-700 border border-surface-500 rounded px-2 py-1 text-ink-200 outline-none"
-          value={exportFormat}
-          onChange={(e) => setExportFormat(e.target.value)}
-        >
-          <option value="a3">A3 Landscape</option>
-          <option value="a4">A4 Landscape</option>
-        </select>
-        <button onClick={handleExportPDF} className="btn btn-primary text-xs px-4">
-          📄 Export PDF
-        </button>
-      </div>
-
       {allGroups.map((group) => {
         const optGroup = getOptGroup(group);
         const isExpanded = expandedGroups[group.key] !== false; // default expanded
@@ -1362,7 +1370,7 @@ function SprayMeta({ label, value }) {
 
 const SPRAY_ELEM_ORDER = { 'Box': 0, 'Upper Sash': 1, 'Lower Sash': 2 };
 
-function SprayingTab({ windowsData, batch, pp }) {
+function SprayingTab({ windowsData, batch, pp, registerExport }) {
   const data = useMemo(() => {
     const wins = (windowsData || []).filter((wd) => wd.derived);
     const colorSections = {};  // hex → { hex, name, rows:[{projectNum, window, element, colour, size, sort}] }
@@ -1457,6 +1465,7 @@ function SprayingTab({ windowsData, batch, pp }) {
       logo: company.logo || '',
     });
   };
+  registerExport('spraying', handleExport);
 
   if (!data.sections.length && !data.beadGroups.length) {
     return <div className="card p-8 text-center text-ink-400">No data available.</div>;
@@ -1475,7 +1484,6 @@ function SprayingTab({ windowsData, batch, pp }) {
       <div className="card p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="text-sm font-semibold text-ink-50">Spraying Information</div>
-          <button onClick={handleExport} className="btn btn-secondary text-xs">📄 Export PDF</button>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
           <SprayMeta label="Pack" value={packName} />

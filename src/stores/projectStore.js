@@ -19,8 +19,8 @@ const defaultSettings = {
     '57x43': '63x63'
   },
   company: {
-    companyName: 'PRIME SASH WINDOWS',
-    companyAddress: 'London, UK',
+    companyName: '',
+    companyAddress: '',
     companyPhone: '',
     companyEmail: '',
     logo: '',   // base64 data URL — auto-inserted into PDF headers when set
