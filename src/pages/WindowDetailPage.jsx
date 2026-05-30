@@ -289,11 +289,6 @@ function BOMPanel({ item, windowSpec, settings, derived }) {
   const materials = useMaterialStore((s) => s.materials);
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
 
-  const glassList = useMemo(
-    () => (derived && windowSpec ? buildGlassListForWindow(derived, windowSpec) : []),
-    [derived, windowSpec]
-  );
-
   // Build qty map per part: partId → { qty, unit }
   // Timber/beading = meters (from pre-cut + derived); other parts = native unit.
   const partQtys = useMemo(() => {
@@ -467,36 +462,7 @@ function BOMPanel({ item, windowSpec, settings, derived }) {
         ))
       )}
 
-      {/* Glass */}
-      {glassList.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="px-4 py-3 border-b border-surface-500 bg-surface-800">
-            <div className="text-sm font-semibold text-ink-50">Glass</div>
-          </div>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-surface-500 bg-surface-700/30">
-                <th className="px-4 py-2 text-left text-ink-400 font-medium">Pane</th>
-                <th className="px-4 py-2 text-right text-ink-400 font-medium">Width</th>
-                <th className="px-4 py-2 text-right text-ink-400 font-medium">Height</th>
-                <th className="px-4 py-2 text-right text-ink-400 font-medium">Qty</th>
-                <th className="px-4 py-2 text-left text-ink-400 font-medium">Spec</th>
-              </tr>
-            </thead>
-            <tbody>
-              {glassList.map((g, i) => (
-                <tr key={i} className="border-b border-surface-500/30">
-                  <td className="px-4 py-2 text-ink-100">{g.label}</td>
-                  <td className="px-4 py-2 text-right text-ink-200 font-mono">{g.width} mm</td>
-                  <td className="px-4 py-2 text-right text-ink-200 font-mono">{g.height} mm</td>
-                  <td className="px-4 py-2 text-right text-ink-200">{g.quantity}</td>
-                  <td className="px-4 py-2 text-ink-300">{g.type} / {g.spec} / {g.finish}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* Glass now renders as a material card above (block A style); dimensions live in the Glass tab */}
 
       {/* Consumables, Paint, Weights now render as material cards above (block A style) */}
 
