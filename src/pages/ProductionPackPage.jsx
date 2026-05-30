@@ -11,8 +11,10 @@
 import { useState, useMemo, useEffect, useRef, useCallback, Suspense } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useProjectStore, BATCH_STATUSES } from '../stores/projectStore.js';
-import { useMaterialAssignmentStore } from '../stores/materialAssignmentStore.js';
+import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignmentStore.js';
 import { useMaterialStore } from '../stores/materialStore.js';
+import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
+import { mergeWindowMaterials, formatQty } from '../engine/bom.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
 import {
@@ -110,6 +112,7 @@ export default function ProductionPackPage() {
             _projectId: pId,
             _projectNumber: proj?.project_number || proj?.name || pId,
             _batchId: bId,
+            _batch: b,
           })));
         }
       });
@@ -121,6 +124,7 @@ export default function ProductionPackPage() {
         _projectId: projectId,
         _projectNumber: project?.project_number || project?.name || '',
         _batchId: batchId,
+        _batch: batch,
       }));
     }
     return [];
@@ -1619,178 +1623,75 @@ function SprayingTab({ windowsData, batch, pp, registerExport }) {
   );
 }
 
-function BOMTab({ merged, batch, pp, isPPMode, windowsData }) {
-  if (!merged) {
-    return <div className="card p-8 text-center text-ink-400">No data available.</div>;
+function BOMTab({ batch, pp, isPPMode, windowsData }) {
+  const materials = useMaterialStore((s) => s.materials);
+  const assignments = useMaterialAssignmentStore((s) => s.assignments);
+  const ironmongeryItems = useIronmongeryStore((s) => s.items);
+  const settings = useProjectStore((s) => s.settings);
+
+  // Same engine as Single Window BOM / Project Materials, merged over THIS pack's
+  // windows (which may span multiple projects). Source of truth: deriveWindowData per window.
+  const rows = useMemo(() => {
+    const windows = (windowsData || [])
+      .filter((wd) => wd.derived && wd.windowSpec)
+      .map((wd) => ({ derived: wd.derived, windowSpec: wd.windowSpec, batch: wd.win?._batch }));
+    if (!windows.length) return [];
+    return mergeWindowMaterials(windows, { assignments, materials, ALL_PARTS, ironmongeryItems, settings });
+  }, [windowsData, assignments, materials, ironmongeryItems, settings]);
+
+  if (!rows.length) {
+    return <div className="card p-8 text-center text-ink-400">No materials — add windows and assign materials in Materials → Assignments.</div>;
   }
 
-  // Group hardware by item name
-  const hardwareGrouped = groupHardwareItems(merged.hardware);
+  const totalCost = rows.reduce((s, r) => s + (r.costPerUnit > 0 ? r.qty * r.costPerUnit : 0), 0);
 
   return (
     <div className="space-y-4">
-      {/* Timber summary from cut list */}
       <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-surface-500">
-          <div className="text-sm font-semibold text-ink-50">Timber — Summary</div>
-        </div>
-        <TimberSummaryTable cutList={merged.cutList} isPPMode={isPPMode} />
-      </div>
-
-      {/* Hardware / Ironmongery */}
-      <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-surface-500">
-          <div className="text-sm font-semibold text-ink-50">Hardware & Ironmongery</div>
+        <div className="px-4 py-3 border-b border-surface-500 flex items-center justify-between">
+          <div className="text-sm font-semibold text-ink-50">Production Pack Materials</div>
+          <div className="text-[10px] text-ink-400">{rows.length} material{rows.length !== 1 ? 's' : ''} · Purchase list · Yield applied</div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-surface-500 bg-surface-700/50">
-                {isPPMode && <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Projects</th>}
-                <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Item</th>
-                <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Detail</th>
-                <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Total Qty</th>
+              <tr className="border-b border-surface-500 bg-surface-800">
+                <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Material</th>
+                <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Qty</th>
+                <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Est. cost</th>
               </tr>
             </thead>
             <tbody>
-              {hardwareGrouped.map((h, i) => (
-                <tr key={i} className="border-b border-surface-500/50">
-                  {isPPMode && <td className="px-4 py-2.5 text-accent-400 text-[10px]">{h.projects.join(', ')}</td>}
-                  <td className="px-4 py-2.5 text-ink-100 font-medium">{h.item}</td>
-                  <td className="px-4 py-2.5 text-ink-300">{h.detail}</td>
-                  <td className="px-4 py-2.5 text-right text-ink-100 font-semibold">{h.totalQty}</td>
+              {rows.map((row) => (
+                <tr key={row.key} className="border-b border-surface-500/30">
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-2">
+                      {(row.material?.image_url || row.product?.image_url) ? (
+                        <img src={row.material?.image_url || row.product?.image_url} alt="" className="w-7 h-7 rounded object-cover border border-surface-500" />
+                      ) : (
+                        <div className="w-7 h-7 rounded bg-surface-600 border border-surface-500 grid place-items-center text-ink-500 text-[10px]">{row._assigned ? '—' : '?'}</div>
+                      )}
+                      <div>
+                        <div className={`font-medium ${row._assigned ? 'text-ink-100' : 'text-ink-300 italic'}`}>{row.name}</div>
+                        <div className="text-[10px] text-ink-400 flex items-center gap-2">
+                          {(row.material?.item_number || row.product?.item_number) && <span>{row.material?.item_number || row.product?.item_number}</span>}
+                          {row.source === 'ironmongery' && <span className="text-[8px] px-1 py-0.5 rounded bg-surface-600 text-ink-400 border border-surface-500">ironmongery</span>}
+                          {(row.material?.jc_uuid || row.product?.jc_uuid) && <span className="text-[8px] px-1 py-0.5 rounded bg-amber-600/15 text-amber-500 border border-amber-500/25">JC</span>}
+                          {!row._assigned && <span>unassigned</span>}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-ink-100 font-mono font-medium whitespace-nowrap">{formatQty(row.qty, row.unit)}</td>
+                  <td className="px-4 py-2.5 text-right text-ink-300 font-mono whitespace-nowrap">{row.costPerUnit > 0 ? `£${(row.qty * row.costPerUnit).toFixed(2)}` : '—'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* Glass total */}
-      <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-surface-500">
-          <div className="text-sm font-semibold text-ink-50">Glass — Summary</div>
+        <div className="px-4 py-3 border-t border-surface-500 flex justify-end">
+          <div className="text-xs text-ink-300">Est. total: <strong className="text-ink-100 font-mono">£{totalCost.toFixed(2)}</strong></div>
         </div>
-        <div className="p-4 text-xs text-ink-300">
-          Total units: <strong className="text-ink-100">{merged.glass.reduce((s, g) => s + (g.quantity || 1), 0)}</strong> ·
-          Type: <strong className="text-ink-100">{batch?.defaults?.glassType || pp?.type || 'double'}</strong> ·
-          Spacer: <strong className="text-ink-100">{batch?.defaults?.spacerColor || 'black'}</strong>
-          <span className="ml-4 text-ink-400">(See Glass Schedule tab for full breakdown)</span>
-        </div>
-      </div>
-
-      {/* Beading */}
-      {merged.beading && merged.beading.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="px-4 py-3 border-b border-surface-500">
-            <div className="text-sm font-semibold text-ink-50">Beading</div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-surface-500 bg-surface-700/50">
-                  {isPPMode && <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Project</th>}
-                  <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Window</th>
-                  <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Type</th>
-                  <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Length (m)</th>
-                  <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {merged.beading.map((b, i) => (
-                  <tr key={i} className="border-b border-surface-500/50">
-                    {isPPMode && <td className="px-4 py-2.5 text-accent-400 text-[10px]">{b._projectNumber}</td>}
-                    <td className="px-4 py-2.5 text-ink-100">{b.windowName}</td>
-                    <td className="px-4 py-2.5 text-ink-200 font-medium">{b.elementName}</td>
-                    <td className="px-4 py-2.5 text-right text-ink-100 font-semibold">{(b.length / 1000).toFixed(2)}</td>
-                    <td className="px-4 py-2.5 text-ink-400 text-[10px]">{b.notes}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Weights */}
-      {merged.weights && merged.weights.length > 0 && (
-        <div className="card overflow-hidden">
-          <div className="px-4 py-3 border-b border-surface-500">
-            <div className="text-sm font-semibold text-ink-50">Weights — per window</div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-surface-500 bg-surface-700/50">
-                  {isPPMode && <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Project</th>}
-                  <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Window</th>
-                  <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Timber (kg)</th>
-                  <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Glass (kg)</th>
-                  <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Total +5% (kg)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {merged.weights.map((w, i) => (
-                  <tr key={i} className="border-b border-surface-500/50">
-                    {isPPMode && <td className="px-4 py-2.5 text-accent-400 text-[10px]">{w._projectNumber}</td>}
-                    <td className="px-4 py-2.5 text-ink-100">{w.windowName}</td>
-                    <td className="px-4 py-2.5 text-right text-ink-200">{w.timber}</td>
-                    <td className="px-4 py-2.5 text-right text-ink-200">{w.glass}</td>
-                    <td className="px-4 py-2.5 text-right text-ink-100 font-semibold">{w.total}</td>
-                  </tr>
-                ))}
-                <tr className="bg-surface-700/30">
-                  {isPPMode && <td />}
-                  <td className="px-4 py-2.5 text-ink-100 font-medium">Total</td>
-                  <td className="px-4 py-2.5 text-right text-ink-200">{merged.weights.reduce((s, w) => s + w.timber, 0).toFixed(2)}</td>
-                  <td className="px-4 py-2.5 text-right text-ink-200">{merged.weights.reduce((s, w) => s + w.glass, 0).toFixed(2)}</td>
-                  <td className="px-4 py-2.5 text-right text-ink-100 font-semibold">{merged.weights.reduce((s, w) => s + w.total, 0).toFixed(2)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Paint */}
-      {merged.paint && merged.paint.areaSqm > 0 && (
-        <div className="card overflow-hidden">
-          <div className="px-4 py-3 border-b border-surface-500">
-            <div className="text-sm font-semibold text-ink-50">Paint — {merged.paint.areaSqm.toFixed(2)} m² total</div>
-          </div>
-          <div className="p-4 space-y-1 text-xs text-ink-300">
-            <div className="flex justify-between"><span>Primer</span><span className="text-ink-100 font-semibold">{merged.paint.primer.toFixed(2)} L</span></div>
-            <div className="flex justify-between"><span>Topcoat (White 9016 or Bespoke)</span><span className="text-ink-100 font-semibold">{merged.paint.topcoat.toFixed(2)} L</span></div>
-          </div>
-        </div>
-      )}
-
-      {/* Glazing & Consumables */}
-      {merged.consumables && (
-        <div className="card overflow-hidden">
-          <div className="px-4 py-3 border-b border-surface-500">
-            <div className="text-sm font-semibold text-ink-50">Glazing & Consumables</div>
-          </div>
-          <div className="p-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-ink-400">
-              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Glass ({merged.consumables.glassType})</span><span className="text-ink-200">{merged.consumables.glassSqm.toFixed(2)} m²</span></div>
-              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Cord</span><span className="text-ink-200">{merged.consumables.cordM.toFixed(2)} m</span></div>
-              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Glazing Clips ({merged.consumables.clipSize})</span><span className="text-ink-200">{merged.consumables.clips} pcs</span></div>
-              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Glazing Packer 1mm</span><span className="text-ink-200">{merged.consumables.spacer1mm} pcs</span></div>
-              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Glazing Packer 2mm</span><span className="text-ink-200">{merged.consumables.spacer2mm} pcs</span></div>
-              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Georgian Bar/Bead Tape</span><span className="text-ink-200">{merged.consumables.beadTapeM.toFixed(2)} m</span></div>
-              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Silicone</span><span className="text-ink-200">{merged.consumables.siliconeTubes.toFixed(1)} tubes</span></div>
-              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Sliding Sash Seal 6070</span><span className="text-ink-200">{merged.consumables.seal6070M.toFixed(2)} m</span></div>
-              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Bottom Seal 6009</span><span className="text-ink-200">{merged.consumables.seal6009M.toFixed(2)} m</span></div>
-              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Weather stripping</span><span className="text-ink-200">{windowsData.length} sets</span></div>
-              <div className="flex justify-between p-2 bg-surface-600 rounded"><span>Screws / Fixings</span><span className="text-ink-200">As needed</span></div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="p-3 bg-accent-500/10 border border-accent-500/20 rounded-lg text-xs text-accent-400">
-        Full BOM with pricing — coming with Materials database integration.
       </div>
     </div>
   );
