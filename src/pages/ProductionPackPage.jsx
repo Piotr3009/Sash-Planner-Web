@@ -1461,7 +1461,8 @@ function SprayingTab({ windowsData, batch, pp, registerExport }) {
       colours: data.colourChips.map((c) => c.name),
       sections,
       beadGroups: data.beadGroups,
-      companyName: company.companyName || 'COMPANY',
+      companyName: company.companyName || 'COMPANY NAME',
+      companyAddress: company.companyAddress || '',
       logo: company.logo || '',
     });
   };
