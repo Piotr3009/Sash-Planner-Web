@@ -24,6 +24,7 @@ import {
 import { optimisePrecut } from '../engine/optimizer.js';
 import { exportGlassPDF } from '../utils/glassPdfExport.js';
 import { exportPreCutPDF } from '../utils/precutPdfExport.js';
+import { getColorName } from '../config.js';
 import { getPartSymbol } from '../engine/partSymbols.js';
 
 import FrontElevation2D from '../components/drawings/FrontElevation2D.jsx';
@@ -42,6 +43,7 @@ const TABS = [
   { id: 'glass',        label: 'Glass Schedule',  icon: '💎' },
   { id: 'precut',       label: 'Pre-Cut List',    icon: '📏' },
   { id: 'cutlist',      label: 'Cut List',        icon: '🪚' },
+  { id: 'spraying',     label: 'Spraying',        icon: '🎨' },
   { id: 'bom',          label: 'BOM',             icon: '📦' },
 ];
 
@@ -364,6 +366,7 @@ export default function ProductionPackPage() {
         {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} batch={batch} pp={pp} />}
         {tab === 'precut'     && <PreCutTab merged={merged} settings={settings} batch={batch} pp={pp} isPPMode={isPPMode} projects={projects} />}
         {tab === 'cutlist'    && <CutListTab merged={merged} isPPMode={isPPMode} />}
+        {tab === 'spraying'   && <SprayingTab windowsData={windowsData} batch={batch} pp={pp} />}
         {tab === 'bom'        && <BOMTab merged={merged} batch={batch} pp={pp} isPPMode={isPPMode} windowsData={windowsData} />}
       </main>
     </div>
@@ -1317,6 +1320,227 @@ function CutListTab({ merged, isPPMode }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: BOM
 // ═══════════════════════════════════════════════════════════════
+// ─── TAB: Spraying ───
+// Structure 2: Part A = elements (box + sashes) by colour (single grouped, dual separate);
+// Part B = beadings (staff/parting/glazing/georgian) by INTERIOR colour, as lm + pcs.
+const SPRAY_BEADINGS = {
+  'STAFF BEADING': 'Staff',
+  'PARTING BEADING': 'Parting',
+  'GLAZING BEADING': 'Glazing',
+  'GEORGIAN MIDDLE BEADING': 'Georgian',
+};
+const SPRAY_BAR_LEN_M = 3;            // beading supplied in 3 m bars
+const ceilHalf = (x) => Math.ceil(x * 2) / 2;   // round up to nearest 0.5
+
+function ColorChip({ hex, name }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="inline-block w-3.5 h-3.5 rounded border border-surface-400" style={{ background: hex }} />
+      <span className="text-ink-100">{name}</span>
+    </span>
+  );
+}
+
+function SprayingTab({ windowsData, batch, pp }) {
+  const data = useMemo(() => {
+    const wins = (windowsData || []).filter((wd) => wd.derived);
+    const singleGroups = {};   // hex → { hex, name, rows:[{win, element, dim}] }
+    const dualWindows = [];    // [{ name, outside, inside, elements:[{element,dim}] }]
+    const beadByColor = {};    // interior hex → { hex, name, beads:{label: mm} }
+
+    wins.forEach(({ win, windowSpec, derived }) => {
+      const c = windowSpec.color || {};
+      const single = c.single || '#F6F6F6';
+      const outside = c.outside || single;
+      const inside = c.inside || single;
+      const isDual = (c.type && c.type !== 'single') && (outside !== inside);
+
+      const fw = Math.round(windowSpec.frame?.width || 0);
+      const fh = Math.round(windowSpec.frame?.height || 0);
+      const sW = Math.round(derived.sashWidth || 0);
+      const tH = Math.round(derived.topSashHeight || 0);
+      const bH = Math.round(derived.bottomSashHeight || 0);
+      const elements = [
+        { element: 'Box', dim: `${fw} × ${fh}` },
+        { element: 'Upper Sash', dim: `${sW} × ${tH}` },
+        { element: 'Lower Sash', dim: `${sW} × ${bH}` },
+      ];
+
+      // PART A
+      if (isDual) {
+        dualWindows.push({
+          name: win.name,
+          outside: { hex: outside, name: getColorName(outside) },
+          inside: { hex: inside, name: getColorName(inside) },
+          elements,
+        });
+      } else {
+        if (!singleGroups[single]) singleGroups[single] = { hex: single, name: getColorName(single), rows: [] };
+        elements.forEach((el) => singleGroups[single].rows.push({ win: win.name, ...el }));
+      }
+
+      // PART B — beadings always under interior colour
+      if (!beadByColor[inside]) beadByColor[inside] = { hex: inside, name: getColorName(inside), beads: {} };
+      (derived.components?.beading || []).forEach((b) => {
+        const label = SPRAY_BEADINGS[b.elementName];
+        if (!label) return; // exclude triangle + meeting (attached to sash)
+        const mm = (b.length || 0) * (b.quantity || 1);
+        beadByColor[inside].beads[label] = (beadByColor[inside].beads[label] || 0) + mm;
+      });
+    });
+
+    const beadGroups = Object.values(beadByColor).map((g) => ({
+      hex: g.hex, name: g.name,
+      rows: ['Staff', 'Parting', 'Glazing', 'Georgian']
+        .map((label) => ({ label, mm: g.beads[label] || 0 }))
+        .filter((r) => r.mm > 0)
+        .map((r) => { const lm = r.mm / 1000; return { label: r.label, lm, pcs: ceilHalf(lm / SPRAY_BAR_LEN_M) }; }),
+    })).filter((g) => g.rows.length > 0);
+
+    return { singleGroups: Object.values(singleGroups), dualWindows, beadGroups };
+  }, [windowsData]);
+
+  const handleExport = () => {
+    const title = pp?.name || batch?.name || 'Spraying';
+    const sg = data.singleGroups.map((g) => `
+      <h3>${g.name}</h3>
+      <table><thead><tr><th>Window</th><th>Element</th><th style="text-align:right;">Size (mm)</th></tr></thead><tbody>
+      ${g.rows.map((r) => `<tr><td>${r.win}</td><td>${r.element}</td><td style="text-align:right;">${r.dim}</td></tr>`).join('')}
+      </tbody></table>`).join('');
+    const dg = data.dualWindows.length ? `
+      <h3>Dual colour — Outside / Inside</h3>
+      <table><thead><tr><th>Window</th><th>Element</th><th style="text-align:right;">Size (mm)</th><th>Outside</th><th>Inside</th></tr></thead><tbody>
+      ${data.dualWindows.map((w) => w.elements.map((el) => `<tr><td>${w.name}</td><td>${el.element}</td><td style="text-align:right;">${el.dim}</td><td>${w.outside.name}</td><td>${w.inside.name}</td></tr>`).join('')).join('')}
+      </tbody></table>` : '';
+    const bg = data.beadGroups.map((g) => `
+      <h3>${g.name} — beadings</h3>
+      <table><thead><tr><th>Type</th><th style="text-align:right;">Linear m</th><th style="text-align:right;">Bars (pcs)</th></tr></thead><tbody>
+      ${g.rows.map((r) => `<tr><td>${r.label}</td><td style="text-align:right;">${r.lm.toFixed(2)}</td><td style="text-align:right;">${r.pcs.toFixed(1)}</td></tr>`).join('')}
+      </tbody></table>`).join('');
+    const html = `<!DOCTYPE html><html><head><title>Spraying — ${title}</title>
+      <style>body{font-family:Arial,sans-serif;padding:30px;color:#222;}
+      h1{font-size:18px;margin:0 0 4px;}h2{font-size:13px;color:#666;margin:0 0 18px;font-weight:normal;}
+      h3{font-size:12px;margin:18px 0 6px;text-transform:uppercase;color:#444;}
+      table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px;}
+      th{background:#f5f5f5;padding:6px 8px;text-align:left;border-bottom:2px solid #ccc;font-size:10px;text-transform:uppercase;color:#555;}
+      td{padding:5px 8px;border-bottom:1px solid #ddd;}
+      .sec{font-size:14px;font-weight:bold;margin:22px 0 4px;border-bottom:2px solid #333;padding-bottom:3px;}</style></head>
+      <body>
+      <h1>Spraying — ${title}</h1>
+      <h2>Beadings painted first · elements grouped by colour</h2>
+      <div class="sec">Part A — Elements</div>${sg}${dg}
+      <div class="sec">Part B — Beadings (painted first)</div>${bg}
+      <script>window.onload=()=>window.print()</script></body></html>`;
+    const w = window.open('', '_blank');
+    w.document.write(html); w.document.close();
+  };
+
+  if (!data.singleGroups.length && !data.dualWindows.length && !data.beadGroups.length) {
+    return <div className="card p-8 text-center text-ink-400">No data available.</div>;
+  }
+
+  const countBoxes = (rows) => rows.filter((r) => r.element === 'Box').length;
+  const countSashes = (rows) => rows.filter((r) => r.element !== 'Box').length;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-end">
+        <button onClick={handleExport} className="btn btn-secondary text-xs">📄 Export PDF</button>
+      </div>
+
+      {/* PART A — Elements */}
+      <div>
+        <div className="text-sm font-semibold text-ink-50 mb-3">Part A — Elements <span className="text-ink-400 font-normal">· box + sashes by colour</span></div>
+
+        {data.singleGroups.map((g) => (
+          <div key={g.hex} className="card overflow-hidden mb-4">
+            <div className="px-4 py-3 border-b border-surface-500 flex items-center justify-between">
+              <ColorChip hex={g.hex} name={g.name} />
+              <span className="text-[10px] text-ink-400">{countBoxes(g.rows)} box{countBoxes(g.rows) !== 1 ? 'es' : ''} · {countSashes(g.rows)} sash{countSashes(g.rows) !== 1 ? 'es' : ''}</span>
+            </div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-surface-500/50 bg-surface-800">
+                  <th className="px-4 py-2 text-left text-ink-400 font-medium">Window</th>
+                  <th className="px-4 py-2 text-left text-ink-400 font-medium">Element</th>
+                  <th className="px-4 py-2 text-right text-ink-400 font-medium">Size (mm)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {g.rows.map((r, i) => (
+                  <tr key={i} className="border-b border-surface-500/30">
+                    <td className="px-4 py-1.5 text-ink-200">{r.win}</td>
+                    <td className="px-4 py-1.5 text-ink-300">{r.element}</td>
+                    <td className="px-4 py-1.5 text-right text-ink-100 font-mono">{r.dim}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+
+        {data.dualWindows.length > 0 && (
+          <div className="card overflow-hidden mb-4">
+            <div className="px-4 py-3 border-b border-surface-500 text-sm font-semibold text-ink-50">Dual colour</div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-surface-500/50 bg-surface-800">
+                  <th className="px-4 py-2 text-left text-ink-400 font-medium">Window</th>
+                  <th className="px-4 py-2 text-left text-ink-400 font-medium">Element</th>
+                  <th className="px-4 py-2 text-right text-ink-400 font-medium">Size (mm)</th>
+                  <th className="px-4 py-2 text-left text-ink-400 font-medium">Outside</th>
+                  <th className="px-4 py-2 text-left text-ink-400 font-medium">Inside</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.dualWindows.map((w, wi) => w.elements.map((el, ei) => (
+                  <tr key={`${wi}-${ei}`} className="border-b border-surface-500/30">
+                    <td className="px-4 py-1.5 text-ink-200">{ei === 0 ? w.name : ''}</td>
+                    <td className="px-4 py-1.5 text-ink-300">{el.element}</td>
+                    <td className="px-4 py-1.5 text-right text-ink-100 font-mono">{el.dim}</td>
+                    <td className="px-4 py-1.5"><ColorChip hex={w.outside.hex} name={w.outside.name} /></td>
+                    <td className="px-4 py-1.5"><ColorChip hex={w.inside.hex} name={w.inside.name} /></td>
+                  </tr>
+                )))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* PART B — Beadings */}
+      <div>
+        <div className="text-sm font-semibold text-ink-50 mb-3">Part B — Beadings <span className="text-ink-400 font-normal">· painted first · by interior colour</span></div>
+        {data.beadGroups.map((g) => (
+          <div key={g.hex} className="card overflow-hidden mb-4">
+            <div className="px-4 py-3 border-b border-surface-500">
+              <ColorChip hex={g.hex} name={g.name} />
+            </div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-surface-500/50 bg-surface-800">
+                  <th className="px-4 py-2 text-left text-ink-400 font-medium">Type</th>
+                  <th className="px-4 py-2 text-right text-ink-400 font-medium">Linear m</th>
+                  <th className="px-4 py-2 text-right text-ink-400 font-medium">Bars (pcs)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {g.rows.map((r, i) => (
+                  <tr key={i} className="border-b border-surface-500/30">
+                    <td className="px-4 py-1.5 text-ink-200">{r.label}</td>
+                    <td className="px-4 py-1.5 text-right text-ink-100 font-mono">{r.lm.toFixed(2)}</td>
+                    <td className="px-4 py-1.5 text-right text-ink-100 font-mono font-medium">{r.pcs.toFixed(1)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function BOMTab({ merged, batch, pp, isPPMode, windowsData }) {
   if (!merged) {
     return <div className="card p-8 text-center text-ink-400">No data available.</div>;

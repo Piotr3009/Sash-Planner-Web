@@ -107,6 +107,24 @@ export const SWATCHES = [
   { name: 'Oak', hex: '#C8853A' },
 ];
 
+// Reverse lookup: hex → human colour name (RAL + Farrow&Ball + swatches). Case-insensitive.
+const COLOR_NAME_MAP = (() => {
+  const m = {};
+  [...RAL_GROUPS, ...FB_GROUPS].forEach((grp) => {
+    (grp.o || []).forEach(([hex, label]) => { m[String(hex).toLowerCase()] = label; });
+  });
+  SWATCHES.forEach(({ hex, name }) => {
+    const k = String(hex).toLowerCase();
+    if (!m[k]) m[k] = name;
+  });
+  return m;
+})();
+
+export function getColorName(hex) {
+  if (!hex) return '—';
+  return COLOR_NAME_MAP[String(hex).toLowerCase()] || hex;
+}
+
 // ═══════════════════════════════════════════════════════════════
 // GLASS OPTIONS
 // ═══════════════════════════════════════════════════════════════
