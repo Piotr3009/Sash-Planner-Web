@@ -78,7 +78,7 @@ export function windowSpecToConfig(windowSpec) {
   const h = windowSpec.frame?.height || 1800;
 
   // Bars — windowSpec stores grid mode like '6x6', '3x3', 'none', 'custom'
-  const gridMode = windowSpec.sash?.grid?.mode || '2x2';
+  const gridMode = windowSpec.sash?.grid?.mode || 'none';
   const barsValue = gridMode === 'custom' ? 'custom' : gridMode;
 
   // Custom bars
