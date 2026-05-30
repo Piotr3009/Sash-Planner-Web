@@ -424,6 +424,9 @@ function calculateBeadingComponents(windowSpec, frameWidth, frameHeight, sashWid
         const barTotal = round(barPerSash * 2 * F);
         beading.push(rec('TRIANGLE BEADING (EXT)', barTotal,
             `Bars ${round(barPerSash)} × 2 + 15%`));
+        // 3. Georgian middle beading (internal) — same length, glued other side of glass
+        beading.push(rec('GEORGIAN MIDDLE BEADING', barTotal,
+            `Bars ${round(barPerSash)} × 2 + 15%`));
     }
 
     // 4. Parting beading — 2× frame height + frame width

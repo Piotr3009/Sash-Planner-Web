@@ -28,6 +28,7 @@ export const ELEMENT_TO_PART_ID = {
   'STILES BOTTOM SASH (L)': 'stiles_bottom_sash', 'STILES BOTTOM SASH (R)': 'stiles_bottom_sash',
   'TOP MEET RAIL': 'top_meet_rail', 'BOTTOM MEET RAIL': 'bottom_meet_rail',
   'GLAZING BEADING': 'glazing_beading', 'TRIANGLE BEADING (EXT)': 'triangle_beading_ext',
+  'GEORGIAN MIDDLE BEADING': 'georgian_middle_beading',
   'PARTING BEADING': 'parting_beading', 'STAFF BEADING': 'staff_beading',
   'MEETING BEADING A': 'meeting_beading_a', 'MEETING BEADING B': 'meeting_beading_b',
 };

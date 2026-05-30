@@ -26,6 +26,7 @@ export const SASH_WINDOW_PARTS = {
   beading: [
     { id: 'glazing_beading',           name: 'Glazing Beading',            section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },
     { id: 'triangle_beading_ext',      name: 'Triangle Beading (Ext)',     section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },
+    { id: 'georgian_middle_beading',   name: 'Georgian Middle Beading',    section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },
     { id: 'parting_beading',           name: 'Parting Beading',            section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },
     { id: 'staff_beading',            name: 'Staff Beading',              section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },
     { id: 'meeting_beading_a',         name: 'Meeting Beading A',          section: 'profile',  pcs: 1, materialType: 'beading', unit: 'm' },
