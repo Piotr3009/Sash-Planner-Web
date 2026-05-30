@@ -92,48 +92,55 @@ export function exportElevationsPDF(info) {
   doc.save(`Elevations_${String(info.title || 'pack').replace(/[^a-z0-9]+/gi, '_')}.pdf`);
 }
 
-// ─── ELEMENTS: grouped per window (header + Box / Upper / Lower) ───
+// Compact header strip (~15mm) for one-window-per-page Elements sheets.
+function compactHeader(doc, PG, hdr, caption, pageNum, total) {
+  const x = PG.bx + 0.7, y = PG.by + 0.7, w = PG.w - 2 * PG.bx - 1.4, h = 15;
+  doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.3);
+  doc.line(x, y + h, x + w, y + h);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(26, 26, 26);
+  doc.text(hdr.companyName || 'COMPANY NAME', x + 2, y + 7);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 120, 120);
+  doc.text('2D ELEMENTS', x + 2, y + 12);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(26, 26, 26);
+  doc.text(String(caption || '').substring(0, 70), x + 70, y + 9);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 120, 120);
+  doc.text(`${hdr.mid?.botValue ? `Projects ${hdr.mid.botValue}   ` : ''}${hdr.c2?.topValue || ''}`, x + w - 70, y + 7);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(26, 26, 26);
+  doc.text(`${pageNum} / ${total}`, x + w - 2, y + 12, { align: 'right' });
+  return h;
+}
+
+// ─── ELEMENTS: ONE window per page — Box / Upper / Lower large, in a row ───
 export function exportElementsPDF(info) {
   const PG = getReportPage('a4');
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const hdr = mkHeader(info, '2D ELEMENTS');
-  chrome(doc, PG, hdr);
 
   const windows = info.windows || [];
-  const gap = 6;
+  const total = Math.max(1, windows.length);
+  const COLS = 3, gap = 6, labelH = 6;
+  const HDR_H = 15;
   const x0 = PG.bx + 4;
-  const top = PG.by + REPORT_HEADER_H + 8;
-  const bottom = PG.h - PG.by - 12;
   const contentW = PG.w - 2 * PG.bx - 8;
-  const COLS = 3;
   const cellW = (contentW - gap * (COLS - 1)) / COLS;
-  const headerH = 7;
-  const rowImgH = 50;
-  const labelH = 5;
-  const blockH = headerH + rowImgH + labelH + 8;
-
-  let y = top;
+  const top = PG.by + 0.7 + HDR_H + 5;
+  const bottom = PG.h - PG.by - 10;       // above footer
+  const imgH = bottom - top - labelH;
 
   windows.forEach((win, wi) => {
-    if (y + blockH > bottom && wi > 0) { doc.addPage(); chrome(doc, PG, hdr); y = top; }
-    // window header
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(26, 26, 26);
-    doc.text(`${win.no}. ${win.caption || ''}`.substring(0, 90), x0, y + 4);
-    doc.setDrawColor(220, 220, 220); doc.setLineWidth(0.2);
-    doc.line(x0, y + 6, x0 + contentW, y + 6);
+    if (wi > 0) doc.addPage();
+    drawReportBorder(doc, PG);
+    compactHeader(doc, PG, hdr, `${win.no}. ${win.caption || ''}`, wi + 1, total);
+    drawReportFooter(doc, PG, hdr);
 
-    const rowY = y + headerH;
     (win.drawings || []).slice(0, COLS).forEach((d, di) => {
       const cx = x0 + di * (cellW + gap);
-      placeImg(doc, d, cx, rowY, cellW, rowImgH);
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(136, 136, 136);
-      doc.text(String(d.label || ''), cx, rowY + rowImgH + 4);
+      placeImg(doc, d, cx, top, cellW, imgH);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(26, 26, 26);
+      doc.text(String(d.label || ''), cx + cellW / 2, top + imgH + 4.5, { align: 'center' });
     });
-
-    y += blockH;
   });
 
-  stampReportPages(doc, PG);
   doc.save(`Elements_${String(info.title || 'pack').replace(/[^a-z0-9]+/gi, '_')}.pdf`);
 }
 

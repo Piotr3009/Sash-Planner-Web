@@ -29,6 +29,7 @@ const PRINT_MAP = {
   [COLORS.sash]:    '#475569', // light sash (also title/subtitle) → dark
   [COLORS.bar]:     '#475569', // mid (also sillDetail/sectionFill) → darker
   [COLORS.section]: '#475569',
+  [COLORS.dim]:     '#0F766E', // dimension teal → darker teal (readable on white)
 };
 
 function applyPrintPalette(xml) {
