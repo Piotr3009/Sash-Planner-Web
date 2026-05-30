@@ -3,7 +3,7 @@
  */
 import { useMemo, useState } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
-import { computeBarPositions, DimChainH, DimChainV, DimH, DimV, tfs } from './drawingUtils.jsx';
+import { computeBarPositions, DimChainH, DimChainV, DimH, DimV, tfs, HORN_DEF, buildHornPath } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
@@ -154,17 +154,13 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
             fill={C.glassFill} fillOpacity={0.06}
             stroke={C.outer} strokeWidth={STROKES.outer} {...NS} />
 
-          {/* Horns */}
-          {geom.isUpper && geom.hasHorns && (
+          {/* Horns — real profile from 3D HornMesh (upper sash only; none → nothing) */}
+          {geom.isUpper && geom.hasHorns && HORN_DEF[windowSpec.sash?.hornType] && (
             <g>
-              <line x1={X(2)} y1={Y(geom.sashH)} x2={X(2)} y2={Y(geom.sashH + geom.hornExt)}
-                stroke={C.notch} strokeWidth={STROKES.notch} {...NS} strokeDasharray={`${sw(4)},${sw(3)}`} strokeOpacity={0.7} />
-              <line x1={X(geom.sashW - 2)} y1={Y(geom.sashH)} x2={X(geom.sashW - 2)} y2={Y(geom.sashH + geom.hornExt)}
-                stroke={C.notch} strokeWidth={STROKES.notch} {...NS} strokeDasharray={`${sw(4)},${sw(3)}`} strokeOpacity={0.7} />
-              <text x={X(geom.sashW + 4 * ts)} y={Y(geom.sashH + geom.hornExt / 2)}
-                fill={C.notch} fontSize={tfs(SIZES.notch, totalW)} fontFamily={FONT_FAMILY} fillOpacity={0.7}>
-                Horn {geom.hornExt}mm
-              </text>
+              <path d={buildHornPath(windowSpec.sash.hornType, X(0), geom.sashW, Y(geom.sashH), 'L')}
+                fill={C.bgFill} stroke={C.outer} strokeWidth={STROKES.outer} {...NS} />
+              <path d={buildHornPath(windowSpec.sash.hornType, X(0), geom.sashW, Y(geom.sashH), 'R')}
+                fill={C.bgFill} stroke={C.outer} strokeWidth={STROKES.outer} {...NS} />
             </g>
           )}
 

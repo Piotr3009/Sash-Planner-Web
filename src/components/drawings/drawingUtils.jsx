@@ -331,3 +331,42 @@ export function computeGlassBarPositions({ sashW, sashH, isUpper, vCount, hCount
 
   return { vBars, hBars, glassW, glassH };
 }
+
+// ─── Horns — profile paths copied verbatim from 3D HornMesh (ParametricSashWindow) ───
+// Segment: ['M'|'L', x, y] | ['C', cp1x,cp1y, cp2x,cp2y, x,y] | ['Z']
+// Shape bbox: width 40; height = 80 − minY (A: 84, D: 80). Top (y=80) joins sash; tip at minY.
+export const HORN_BBOX_W = 40;   // raw widest (mm)
+export const HORN_W = 30;        // target widest after scaling (mm)
+export const HORN_H = 70;        // target drop below sash bottom (mm) — fixed spec
+export const HORN_DEF = {
+  A: { dropRaw: 84, segs: [
+    ['M', 0, 80], ['L', 40, 80], ['L', 40, 68], ['L', 33, 62],
+    ['C', 44, 52, 43, 34, 28, 22], ['C', 16, 12, 15, 6, 27, 0],
+    ['L', 22, -4], ['L', 0, -4], ['Z'],
+  ] },
+  D: { dropRaw: 80, segs: [
+    ['M', 0, 80], ['L', 40, 80], ['L', 40, 64], ['L', 34, 64], ['L', 34, 56],
+    ['C', 34, 42, 30, 16, 18, 0], ['L', 0, 0], ['Z'],
+  ] },
+};
+
+// Build an SVG path for a horn at one stile (SVG y-down).
+//   sashX = sash left edge; sashW = sash width; topY = sash bottom (where horn joins)
+//   side 'L' = left stile (straight back at sashX, curve inward); 'R' = right (mirrored)
+export function buildHornPath(type, sashX, sashW, topY, side) {
+  const def = HORN_DEF[type];
+  if (!def) return '';
+  const sX = HORN_W / HORN_BBOX_W;     // 30/40
+  const sY = HORN_H / def.dropRaw;     // 70 / (80 − minY) → tip lands at topY+70
+  const X = (x) => (side === 'L' ? sashX + x * sX : (sashX + sashW) - x * sX);
+  const Y = (y) => topY + (80 - y) * sY;
+  return def.segs.map((s) => {
+    switch (s[0]) {
+      case 'M': return `M ${X(s[1])} ${Y(s[2])}`;
+      case 'L': return `L ${X(s[1])} ${Y(s[2])}`;
+      case 'C': return `C ${X(s[1])} ${Y(s[2])} ${X(s[3])} ${Y(s[4])} ${X(s[5])} ${Y(s[6])}`;
+      case 'Z': return 'Z';
+      default: return '';
+    }
+  }).join(' ');
+}
