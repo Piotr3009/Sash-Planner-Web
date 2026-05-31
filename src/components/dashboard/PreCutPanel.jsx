@@ -7,8 +7,13 @@ import { useState, useMemo } from 'react';
 import { buildPrecutForWindow } from '../../engine/lists.js';
 import { optimisePrecut } from '../../engine/optimizer.js';
 import { getPartSymbol } from '../../engine/partSymbols.js';
+import { useMaterialAssignmentStore } from '../../stores/materialAssignmentStore.js';
+import { useMaterialStore } from '../../stores/materialStore.js';
+import { exportPreCutPDF } from '../../utils/precutPdfExport.js';
 
-export default function PreCutPanel({ windowSpec, settings, derived }) {
+export default function PreCutPanel({ item, windowSpec, settings, derived, batch }) {
+  const assignments = useMaterialAssignmentStore((s) => s.assignments);
+  const materials = useMaterialStore((s) => s.materials);
   const [stockLengths, setStockLengths] = useState({});
   const [offcutsMap, setOffcutsMap] = useState({});
   const [offcutInput, setOffcutInput] = useState({});
@@ -112,12 +117,52 @@ export default function PreCutPanel({ windowSpec, settings, derived }) {
     return localOptimization.boxSapele?.find((g) => String(g.preCutWidth) === group.section);
   };
 
+  const getMaterialForGroup = (items) => {
+    const el = items?.[0]?.elementName;
+    if (!el) return null;
+    const sym = getPartSymbol(el);
+    if (sym?.partId) {
+      const a = assignments[sym.partId];
+      if (a?.material_id) return materials.find((m) => m.id === a.material_id) || null;
+    }
+    return null;
+  };
+
+  const handleExport = () => {
+    if (!localOptimization || !allGroups.length) return;
+    const company = settings?.company || {};
+    const exportGroups = allGroups.map((g) => ({
+      ...g,
+      stockLength: stockLengths[g.key] || g.defaultStock,
+      materialInfo: getMaterialForGroup(g.items),
+    }));
+    const projList = batch
+      ? [{ number: batch.projectNumber || batch.label || '', name: batch.projectName || '' }]
+      : [];
+    exportPreCutPDF({
+      groups: exportGroups,
+      optimization: localOptimization,
+      settings,
+      batch,
+      projects: projList,
+      isPPMode: false,
+      format: 'a4',
+      companySettings: company,
+    });
+  };
+
   if (allGroups.length === 0) {
     return <div className="card p-8 text-center text-ink-400">No pre-cut groups available.</div>;
   }
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold text-ink-50">Pre-Cut List</div>
+        <button onClick={handleExport} className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors">
+          📄 Export PDF
+        </button>
+      </div>
       {allGroups.map((group) => {
         const optGroup = getOptGroup(group);
         const isExpanded = expandedGroups[group.key] !== false;

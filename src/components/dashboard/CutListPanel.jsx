@@ -6,8 +6,13 @@
 import { useMemo } from 'react';
 import { buildCutListForWindow } from '../../engine/lists.js';
 import { getPartSymbol } from '../../engine/partSymbols.js';
+import { useMaterialAssignmentStore } from '../../stores/materialAssignmentStore.js';
+import { useMaterialStore } from '../../stores/materialStore.js';
+import { exportCutListPDF } from '../../utils/cutListPdfExport.js';
 
-export default function CutListPanel({ item, windowSpec, settings, derived }) {
+export default function CutListPanel({ item, windowSpec, settings, derived, batch }) {
+  const assignments = useMaterialAssignmentStore((s) => s.assignments);
+  const materials = useMaterialStore((s) => s.materials);
   const cutList = useMemo(() => {
     if (!derived || !windowSpec) return [];
     return buildCutListForWindow(derived, windowSpec);
@@ -45,12 +50,59 @@ export default function CutListPanel({ item, windowSpec, settings, derived }) {
 
   const totalPieces = cutList.reduce((s, c) => s + (c.quantity || 1), 0);
 
+  const getMaterialForElement = (elementName) => {
+    const sym = getPartSymbol(elementName);
+    if (sym?.partId) {
+      const a = assignments[sym.partId];
+      if (a?.material_id) return materials.find((m) => m.id === a.material_id) || null;
+    }
+    return null;
+  };
+
+  const handleExport = () => {
+    if (!byElement.length) return;
+    const company = settings?.company || {};
+    const groups = byElement.map((g) => {
+      const m = getMaterialForElement(g.element);
+      return {
+        symbol: g.symbolInfo?.symbol || '',
+        element: g.element,
+        mirror: g.symbolInfo?.mirror,
+        section: g.items[0]?.section || '',
+        material: m ? `${m.item_number || ''} ${m.name || ''}`.trim() : '',
+        rows: g.aggregated.map((it) => ({
+          projectNum: batch?.projectNumber || '',
+          window: item?.name || item?.window_number || '',
+          length: it.length,
+          qty: it.totalQty,
+        })),
+      };
+    });
+    exportCutListPDF({
+      companyName: company.companyName || 'COMPANY NAME',
+      companyAddress: company.companyAddress || '',
+      logo: company.logo || '',
+      title: item?.name || item?.window_number || 'Window',
+      projects: batch?.projectNumber ? [batch.projectNumber] : [],
+      date: new Date().toLocaleDateString('en-GB'),
+      isPPMode: false,
+      totalPieces,
+      groups,
+    });
+  };
+
   if (!cutList.length) {
     return <div className="card p-8 text-center text-ink-400">No cut list data available.</div>;
   }
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold text-ink-50">Cut List <span className="text-ink-400 font-normal">· {totalPieces} pcs</span></div>
+        <button onClick={handleExport} className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors">
+          📄 Export PDF
+        </button>
+      </div>
       {byElement.map((group) => {
         const sym = group.symbolInfo;
         const finishedSection = group.items[0]?.section || '—';

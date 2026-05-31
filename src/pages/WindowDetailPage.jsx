@@ -129,11 +129,11 @@ export default function WindowDetailPage() {
           )}
 
           {tab === 'cutlist' && (
-            <CutListPanel item={item} windowSpec={windowSpec} settings={settings} derived={derived} />
+            <CutListPanel item={item} windowSpec={windowSpec} settings={settings} derived={derived} batch={currentBatch} />
           )}
 
           {tab === 'precut' && (
-            <PreCutPanel windowSpec={windowSpec} settings={settings} derived={derived} />
+            <PreCutPanel item={item} windowSpec={windowSpec} settings={settings} derived={derived} batch={currentBatch} />
           )}
 
           {tab === 'glass' && (
