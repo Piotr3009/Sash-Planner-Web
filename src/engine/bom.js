@@ -105,7 +105,9 @@ export function buildWindowPartQtys(derived, windowSpec, settings) {
     setQty(CLIP_SIZE_TO_PART_ID[c.clips?.size], c.clips?.qty, 'pcs');
     setQty('spacer_1mm', c.spacer1mm?.qty, 'pcs');
     setQty('spacer_2mm', c.spacer2mm?.qty, 'pcs');
-    setQty('bead_tape', c.beadTape?.meters, 'm');
+    const beadTapeM = c.beadTape?.meters || 0;
+    setQty('bead_tape', beadTapeM / 2, 'm');       // 1mm (one side)
+    setQty('bead_tape_2mm', beadTapeM / 2, 'm');   // 2mm (other side)
     setQty('silicone', c.silicone?.tubes, 'tubes');
     setQty('seal_sliding_6070', c.seal6070?.meters, 'm');
     setQty('seal_bottom_6009', c.seal6009?.meters, 'm');
