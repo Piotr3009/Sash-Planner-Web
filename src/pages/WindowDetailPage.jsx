@@ -9,11 +9,11 @@ import { deriveWindowData } from '../engine/calculations.js';
 import { buildGlassListForWindow, buildVentGrilles } from '../engine/lists.js';
 import { buildWindowPartQtys, buildWindowHardware, resolvePartTotal, formatQty, mergeWindowMaterials } from '../engine/bom.js';
 import ImageLightbox from '../components/ImageLightbox.jsx';
-import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 import DrawingsPanel from '../components/drawings/DrawingsPanel.jsx';
 import GlassDrawing2D from '../components/drawings/GlassDrawing2D.jsx';
 import CutListPanel from '../components/dashboard/CutListPanel.jsx';
 import PreCutPanel from '../components/dashboard/PreCutPanel.jsx';
+import ThreeDPanel from '../components/dashboard/ThreeDPanel.jsx';
 import ExportControls from '../components/export/ExportControls.jsx';
 import { exportGlassPDF } from '../utils/glassPdfExport.js';
 import { exportBomPDF } from '../utils/bomPdfExport.js';
@@ -111,17 +111,7 @@ export default function WindowDetailPage() {
         {/* Main content area */}
         <div className="xl:col-span-2">
           {tab === '3d' && (
-            <div className="card p-2">
-              <div className="flex items-center justify-between p-2">
-                <div className="text-sm font-medium text-ink-50">3D Preview</div>
-                <Link to={editUrl} className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors">
-                  ✏️ Edit
-                </Link>
-              </div>
-              <div className="aspect-[4/3] bg-gradient-to-br from-surface-600 to-surface-700 rounded-lg overflow-hidden">
-                <WindowPreview3D windowSpec={windowSpec} side="exterior" />
-              </div>
-            </div>
+            <ThreeDPanel item={item} windowSpec={windowSpec} batch={currentBatch} editUrl={editUrl} />
           )}
 
           {tab === '2d' && (
