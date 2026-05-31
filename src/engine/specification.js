@@ -92,6 +92,14 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
   // Opening type — new: item.openingType
   const openingType = item?.openingType || item?.opening_type || fc.openingType || 'both';
 
+  // Trickle vent — room type drives grille count (Approved Document F, Vol 1).
+  // Defaults are deliberately the safest (most ventilation): habitable + sole window.
+  const ventRoomType = item?.ventRoomType || spec.ventRoomType || fc.ventRoomType || 'habitable';
+  const ventSoleWindow = item?.ventSoleWindow !== undefined ? !!item.ventSoleWindow
+    : spec.ventSoleWindow !== undefined ? !!spec.ventSoleWindow
+    : fc.ventSoleWindow !== undefined ? !!fc.ventSoleWindow
+    : true;
+
   return {
     id: item?.id || `mock_${Math.random().toString(36).slice(2, 8)}`,
     name: item?.name || item?.window_number || spec.windowName || 'Window',
@@ -120,6 +128,10 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
     hardware: {
       finish: ironFinish,
       catches: pas24 ? 'PAS24' : 'NON PAS24'
+    },
+    vent: {
+      roomType: ventRoomType,   // 'habitable' | 'kitchen' | 'bathroom' | 'other'
+      soleWindow: ventSoleWindow
     },
     cill: { extension: Number(spec.sillExtension || item?.sill_extension || 0) },
     glazing: {

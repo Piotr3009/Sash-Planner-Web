@@ -210,6 +210,30 @@ export function buildGlassListForWindow(derived, windowSpec) {
   ];
 }
 
+/**
+ * Trickle vent grille count per window (Approved Document F, Vol 1, Table 1.7,
+ * multi-storey dwellings; grille equivalent area ≈ 4300mm²).
+ *   habitable / kitchen : requires 8000mm² → 2 grilles when this is the room's
+ *                         sole window, else 1 (the 8000mm² is shared across the
+ *                         room's windows).
+ *   bathroom            : requires 4000mm² → 1 grille.
+ *   other (utility / WC / non-habitable) : no minimum → 0.
+ * Single-storey dwellings (10,000mm²) are intentionally out of scope.
+ */
+export function buildVentGrilles(windowSpec) {
+  const roomType = windowSpec?.vent?.roomType || 'habitable';
+  const sole = windowSpec?.vent?.soleWindow !== false; // default true
+  switch (roomType) {
+    case 'habitable':
+    case 'kitchen':
+      return sole ? 2 : 1;
+    case 'bathroom':
+      return 1;
+    default:
+      return 0;
+  }
+}
+
 export function buildHardwareList(windowSpec) {
   const finish = windowSpec?.hardware?.finish || 'brass';
   const isPas24 = windowSpec?.hardware?.catches === 'PAS24';
@@ -219,10 +243,17 @@ export function buildHardwareList(windowSpec) {
   const frameWidth = windowSpec?.frame?.width || 1000;
   const hasBars = windowSpec?.sash?.grid?.mode && windowSpec.sash.grid.mode !== 'none';
 
-  // Fixed windows = no hardware
-  if (isFixed) return [];
-
   const list = [];
+
+  // Trickle vent — room ventilation, independent of opening type (a fixed window
+  // still ventilates its room). Count from the Approved Document F room-type rule.
+  const ventQty = buildVentGrilles(windowSpec);
+  if (ventQty > 0) {
+    list.push({ item: 'Trickle vent', detail: 'Concealed', quantity: ventQty });
+  }
+
+  // Fixed windows = no sash hardware (the trickle vent above still applies)
+  if (isFixed) return list;
 
   // Locks: 1 normally, 2 if width > 1200mm OR has Georgian bars (PSW rule)
   const lockQty = (frameWidth > 1200 || hasBars) ? 2 : 1;

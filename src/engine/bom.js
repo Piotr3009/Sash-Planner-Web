@@ -55,6 +55,7 @@ export const HARDWARE_TO_SLOT_KEY = {
   'Sash pull handle': 'pullHandles',
   'Pulley wheels': 'pulleys',
   'Window stopper': 'stoppers',
+  'Trickle vent': 'trickleVents',
 };
 
 // Format a quantity for display by unit (pcs are whole; tubes/m/L/etc. keep 2dp)
