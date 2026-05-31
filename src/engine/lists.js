@@ -239,6 +239,7 @@ export function buildHardwareList(windowSpec) {
   const isPas24 = windowSpec?.hardware?.catches === 'PAS24';
   const openingType = windowSpec?.sash?.openingType || 'both';
   const isFixed = openingType === 'fixed';
+  const isBottomOnly = openingType === 'bottom';
   const frameWidth = windowSpec?.frame?.width || 1000;
   const hasBars = windowSpec?.sash?.grid?.mode && windowSpec.sash.grid.mode !== 'none';
 
@@ -258,14 +259,15 @@ export function buildHardwareList(windowSpec) {
   const lockQty = (frameWidth > 1200 || hasBars) ? 2 : 1;
   list.push({ item: 'Sash lock', detail: `${finish} finish${isPas24 ? ' (PAS24)' : ''}`, quantity: lockQty });
 
-  // Finger lifts: 1 set per opening window (set already contains the pair)
-  list.push({ item: 'Finger lift', detail: finish, quantity: 1 });
+  // Finger lifts: always 2 per opening window
+  list.push({ item: 'Finger lift', detail: finish, quantity: 2 });
 
   // Pull handles: 1 per window
   list.push({ item: 'Sash pull handle', detail: finish, quantity: 1 });
 
-  // Pulleys: 1 set per window (set already contains the pair)
-  list.push({ item: 'Pulley wheels', detail: 'Spring balance', quantity: 1 });
+  // Pulleys: 4 for both, 2 for bottom-only
+  const pulleyQty = isBottomOnly ? 2 : 4;
+  list.push({ item: 'Pulley wheels', detail: 'Spring balance', quantity: pulleyQty });
 
   // Stoppers: 1 set per opening window (set already contains the pair)
   list.push({ item: 'Window stopper', detail: finish, quantity: 1 });
