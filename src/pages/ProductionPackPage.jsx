@@ -22,6 +22,7 @@ import {
   buildPrecutForWindow,
   buildGlassListForWindow,
   buildHardwareList,
+  buildVentGrilles,
 } from '../engine/lists.js';
 import { optimisePrecut } from '../engine/optimizer.js';
 import { exportGlassPDF } from '../utils/glassPdfExport.js';
@@ -484,11 +485,12 @@ function OverviewTab({ batch, pp, isPPMode, windowsData, registerExport }) {
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Head</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Glass</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Opening</th>
+                <th className="px-4 py-2.5 text-center text-ink-400 font-medium">Vent</th>
                 <th className="px-4 py-2.5 text-center text-ink-400 font-medium">Detail</th>
               </tr>
             </thead>
             <tbody>
-              {windowsData.map(({ win }) => (
+              {windowsData.map(({ win, windowSpec }) => (
                 <tr key={win.id} className="border-b border-surface-500/50 hover:bg-surface-700/30">
                   {isPPMode && <td className="px-4 py-2.5 text-accent-400 font-medium">{win._projectNumber}</td>}
                   <td className="px-4 py-2.5 text-ink-100 font-medium">{win.name}</td>
@@ -499,6 +501,7 @@ function OverviewTab({ batch, pp, isPPMode, windowsData, registerExport }) {
                   <td className="px-4 py-2.5 text-ink-300">{win.headType || 'flat'}</td>
                   <td className="px-4 py-2.5 text-ink-300">{win.glassFinish || 'clear'}</td>
                   <td className="px-4 py-2.5 text-ink-300">{win.openingType || 'both'}</td>
+                  <td className="px-4 py-2.5 text-center text-ink-200">{buildVentGrilles(windowSpec)}</td>
                   <td className="px-4 py-2.5 text-center">
                     <Link to={`/projects/${win._projectId}/batches/${win._batchId || win.batch_id}/windows/${win.id}`}
                       className="text-accent-400 hover:text-accent-300 transition-colors">View →</Link>

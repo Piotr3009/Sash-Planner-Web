@@ -6,7 +6,7 @@ import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignm
 import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
-import { buildGlassListForWindow } from '../engine/lists.js';
+import { buildGlassListForWindow, buildVentGrilles } from '../engine/lists.js';
 import { buildWindowPartQtys, buildWindowHardware, resolvePartTotal, formatQty } from '../engine/bom.js';
 import ImageLightbox from '../components/ImageLightbox.jsx';
 import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
@@ -173,6 +173,7 @@ export default function WindowDetailPage() {
           <SpecSection title="Hardware">
             <SpecRow label="Finish" value={windowSpec?.hardware.finish} />
             <SpecRow label="Security" value={windowSpec?.hardware.catches} />
+            <SpecRow label="Trickle vent" value={`${buildVentGrilles(windowSpec)} · ${windowSpec?.vent?.roomType || 'habitable'}`} />
           </SpecSection>
           {derived && (
             <SpecSection title="Calculated">

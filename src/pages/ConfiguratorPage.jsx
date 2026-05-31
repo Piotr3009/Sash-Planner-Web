@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } fro
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
 import { GLASS_TYPES, GLASS_FINISHES, FROSTED_LOCATIONS, SPACERS, SWATCHES, RAL_GROUPS, FB_GROUPS } from '../config.js';
+import { buildVentGrilles } from '../engine/lists.js';
 
 const Viewer3D = lazy(() => import('../3d/App.jsx'));
 
@@ -18,6 +19,8 @@ const SPLIT_RATIOS = [
 ];
 const HEAD_TYPES = [{ value: 'flat', label: 'Flat' }, { value: 'arch', label: 'Arch' }];
 const OPENINGS = [{ value: 'both', label: 'Both Open' }, { value: 'bottom', label: 'Bottom Only' }, { value: 'fixed', label: 'Fixed' }];
+const ROOM_TYPES = [{ value: 'habitable', label: 'Habitable' }, { value: 'kitchen', label: 'Kitchen' }, { value: 'bathroom', label: 'Bathroom' }, { value: 'other', label: 'Other' }];
+const SOLE_OPTIONS = [{ value: true, label: 'Only window' }, { value: false, label: 'More than one' }];
 const IRON_OPTIONS = [{ value: 'brass', label: 'Brass' }, { value: 'chrome', label: 'Chrome' }, { value: 'stainless', label: 'Stainless' }, { value: 'antique_brass', label: 'Antique Brass' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' }];
 const HORN_OPTIONS = [{ value: 'none', label: 'No Horns' }, { value: 'A', label: 'Richmond' }, { value: 'D', label: 'Type D' }];
 
@@ -64,6 +67,8 @@ export default function ConfiguratorPage() {
   const [uCustom, setUCustom] = useState([]);
   const [lCustom, setLCustom] = useState([]);
   const [opening, setOpening] = useState('both');
+  const [ventRoomType, setVentRoomType] = useState('habitable');
+  const [ventSoleWindow, setVentSoleWindow] = useState(true);
   const [gFin, setGFin] = useState('clear');
   const [frostLoc, setFrostLoc] = useState('bottom');
   const [prefilled, setPrefilled] = useState(false);
@@ -90,6 +95,8 @@ export default function ConfiguratorPage() {
       setUCustom(migrateBars(editingWindow.upperCustomBars));
       setLCustom(migrateBars(editingWindow.lowerCustomBars));
       setOpening(editingWindow.openingType || 'both');
+      setVentRoomType(editingWindow.ventRoomType || 'habitable');
+      setVentSoleWindow(editingWindow.ventSoleWindow !== undefined ? editingWindow.ventSoleWindow : true);
       setGFin(editingWindow.glassFinish || 'clear');
       setFrostLoc(editingWindow.frostedLocation || 'bottom');
       // B6: restore overrides
@@ -188,6 +195,7 @@ export default function ConfiguratorPage() {
       lowerGlass: gFin === 'frosted' ? 'frosted' : 'clear',
       glassType: gType, glassSpec: gSpec, glassFinish: gFin, frostedLocation: frostLoc,
       spacerColor: spacer, sashType, splitRatio, headType, openingType: opening,
+      ventRoomType, ventSoleWindow,
       frameType: gType === 'triple' ? 'standard' : boxType, frameDepth, pas24,
       // B6: persist overrides (null = no override)
       ovGlassType, ovIronmongery, ovHornType, ovSpacerColor, ovWoodColor,
@@ -285,6 +293,15 @@ export default function ConfiguratorPage() {
           </Sec>}
 
           <Sec t="Opening"><HChips o={OPENINGS} v={opening} c={setOpening} /></Sec>
+
+          <Sec t="Ventilation">
+            <Lbl>Room type</Lbl>
+            <HChips o={ROOM_TYPES} v={ventRoomType} c={setVentRoomType} />
+            {(ventRoomType === 'habitable' || ventRoomType === 'kitchen') && (
+              <><Lbl>Only window in this room?</Lbl><HChips o={SOLE_OPTIONS} v={ventSoleWindow} c={setVentSoleWindow} /></>
+            )}
+            <div className="text-[11px] text-ink-300 mt-1.5">Trickle vents: <span className="text-accent-400 font-medium">{buildVentGrilles({ vent: { roomType: ventRoomType, soleWindow: ventSoleWindow } })}</span></div>
+          </Sec>
 
           <Sec t="Glass Finish">
             <HChips o={GLASS_FINISHES} v={gFin} c={setGFin} />
