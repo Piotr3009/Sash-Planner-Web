@@ -6,19 +6,17 @@ import { useState } from 'react';
 import FrontElevation2D from './FrontElevation2D.jsx';
 import BoxDetail2D from './BoxDetail2D.jsx';
 import SashDetail2D from './SashDetail2D.jsx';
-import VerticalSection2D from './VerticalSection2D.jsx';
-import HorizontalSection2D from './HorizontalSection2D.jsx';
+import SectionsUpload from './SectionsUpload.jsx';
 
 const SUB_TABS = [
   { id: 'elevation', label: 'Front Elevation' },
   { id: 'box', label: 'Box Detail' },
   { id: 'upper', label: 'Upper Sash' },
   { id: 'lower', label: 'Lower Sash' },
-  { id: 'vsection', label: 'V-Section' },
-  { id: 'hsection', label: 'H-Section' },
+  { id: 'vsection', label: '2D Sections' },
 ];
 
-export default function DrawingsPanel({ windowSpec, settings, derived }) {
+export default function DrawingsPanel({ item, windowSpec, settings, derived, batch }) {
   const [subTab, setSubTab] = useState('elevation');
 
   return (
@@ -38,26 +36,24 @@ export default function DrawingsPanel({ windowSpec, settings, derived }) {
       </div>
 
       {/* Drawing area */}
-      <div className="card p-4 min-h-[400px]">
-        {subTab === 'elevation' && (
-          <FrontElevation2D windowSpec={windowSpec} derived={derived} />
-        )}
-        {subTab === 'box' && (
-          <BoxDetail2D windowSpec={windowSpec} derived={derived} />
-        )}
-        {subTab === 'upper' && (
-          <SashDetail2D windowSpec={windowSpec} derived={derived} type="upper" />
-        )}
-        {subTab === 'lower' && (
-          <SashDetail2D windowSpec={windowSpec} derived={derived} type="lower" />
-        )}
-        {subTab === 'vsection' && (
-          <VerticalSection2D windowSpec={windowSpec} derived={derived} />
-        )}
-        {subTab === 'hsection' && (
-          <HorizontalSection2D windowSpec={windowSpec} derived={derived} />
-        )}
-      </div>
+      {subTab === 'vsection' ? (
+        <SectionsUpload item={item} batch={batch} />
+      ) : (
+        <div className="card p-4 min-h-[400px]">
+          {subTab === 'elevation' && (
+            <FrontElevation2D windowSpec={windowSpec} derived={derived} />
+          )}
+          {subTab === 'box' && (
+            <BoxDetail2D windowSpec={windowSpec} derived={derived} />
+          )}
+          {subTab === 'upper' && (
+            <SashDetail2D windowSpec={windowSpec} derived={derived} type="upper" />
+          )}
+          {subTab === 'lower' && (
+            <SashDetail2D windowSpec={windowSpec} derived={derived} type="lower" />
+          )}
+        </div>
+      )}
     </div>
   );
 }

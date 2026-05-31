@@ -125,7 +125,7 @@ export default function WindowDetailPage() {
           )}
 
           {tab === '2d' && (
-            <DrawingsPanel windowSpec={windowSpec} settings={settings} derived={derived} />
+            <DrawingsPanel item={item} windowSpec={windowSpec} settings={settings} derived={derived} batch={currentBatch} />
           )}
 
           {tab === 'cutlist' && (
