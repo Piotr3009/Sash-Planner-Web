@@ -15,6 +15,8 @@ import GlassDrawing2D from '../components/drawings/GlassDrawing2D.jsx';
 import CutListPanel from '../components/dashboard/CutListPanel.jsx';
 import PreCutPanel from '../components/dashboard/PreCutPanel.jsx';
 import ExportControls from '../components/export/ExportControls.jsx';
+import { exportGlassPDF } from '../utils/glassPdfExport.js';
+import { exportBomPDF } from '../utils/bomPdfExport.js';
 
 
 const TABS = [
@@ -135,7 +137,7 @@ export default function WindowDetailPage() {
           )}
 
           {tab === 'glass' && (
-            <GlassPanel windowSpec={windowSpec} derived={derived} />
+            <GlassPanel item={item} windowSpec={windowSpec} derived={derived} batch={currentBatch} settings={settings} />
           )}
 
           {tab === 'bom' && (
@@ -189,11 +191,23 @@ export default function WindowDetailPage() {
 }
 
 // ─── Glass Panel — same source as Production Pack ───
-function GlassPanel({ windowSpec, derived }) {
+function GlassPanel({ item, windowSpec, derived, batch, settings }) {
   const glassList = useMemo(
     () => (derived && windowSpec ? buildGlassListForWindow(derived, windowSpec) : []),
     [derived, windowSpec]
   );
+
+  const handleExport = () => {
+    if (!derived || !windowSpec) return;
+    const company = settings?.company || {};
+    const projects = batch ? [{ number: batch.projectNumber || '', name: batch.projectName || '', id: batch.id }] : [];
+    exportGlassPDF({
+      batch,
+      windowsData: [{ win: { ...item, _projectNumber: batch?.projectNumber || '' }, windowSpec, derived }],
+      projects,
+      companySettings: company,
+    });
+  };
 
   if (!glassList.length) {
     return <div className="card p-8 text-center text-ink-400">No glass data.</div>;
@@ -203,7 +217,12 @@ function GlassPanel({ windowSpec, derived }) {
     <div className="space-y-4">
       {/* Glass schedule table */}
       <div className="card p-5">
-        <div className="text-sm font-semibold text-ink-50 mb-4">Glass Schedule</div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-sm font-semibold text-ink-50">Glass Schedule</div>
+          <button onClick={handleExport} className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors">
+            📄 Export PDF
+          </button>
+        </div>
         <div className="bg-surface-600 rounded-lg border border-surface-500 overflow-hidden">
           <table className="w-full text-xs">
             <thead>
@@ -306,19 +325,54 @@ function BOMPanel({ item, windowSpec, settings, derived, batch }) {
     [windowSpec, batch, ironmongeryItems]
   );
 
-  // Total material + ironmongery cost for this one window — same source as
-  // Project Materials / BOM export (mergeWindowMaterials), so figures match.
-  const windowCost = useMemo(() => {
-    if (!derived || !windowSpec) return 0;
-    const rows = mergeWindowMaterials(
+  // Total material + ironmongery for this one window — same source as Project
+  // Materials / BOM export (mergeWindowMaterials), so figures match everywhere.
+  const bomRows = useMemo(() => {
+    if (!derived || !windowSpec) return [];
+    return mergeWindowMaterials(
       [{ derived, windowSpec, batch }],
       { assignments, materials, ALL_PARTS, ironmongeryItems, settings }
     );
-    return rows.reduce((s, r) => s + (r.costPerUnit > 0 ? r.qty * r.costPerUnit : 0), 0);
   }, [derived, windowSpec, batch, assignments, materials, ironmongeryItems, settings]);
+
+  const windowCost = useMemo(
+    () => bomRows.reduce((s, r) => s + (r.costPerUnit > 0 ? r.qty * r.costPerUnit : 0), 0),
+    [bomRows]
+  );
+
+  const handleExport = () => {
+    if (!bomRows.length) return;
+    const company = settings?.company || {};
+    exportBomPDF({
+      title: item?.name || item?.window_number || 'Window',
+      projects: batch?.projectNumber ? [batch.projectNumber] : [],
+      date: new Date().toLocaleDateString('en-GB'),
+      companyName: company.companyName || 'COMPANY NAME',
+      companyAddress: company.companyAddress || '',
+      logo: company.logo || '',
+      subtitle: 'BILL OF MATERIALS — WINDOW',
+      scopeLabel: 'Window',
+      rows: bomRows.map((r) => ({
+        name: r.name,
+        itemNumber: r.material?.item_number || r.product?.item_number || '',
+        qty: formatQty(r.qty, r.unit),
+        unitCost: r.costPerUnit > 0 ? `£${r.costPerUnit.toFixed(2)}` : '—',
+        estCost: r.costPerUnit > 0 ? `£${(r.qty * r.costPerUnit).toFixed(2)}` : '—',
+        ironmongery: r.source === 'ironmongery',
+        assigned: r._assigned,
+      })),
+      total: `£${windowCost.toFixed(2)}`,
+    });
+  };
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold text-ink-50">Bill of Materials</div>
+        <button onClick={handleExport} className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors">
+          📄 Export PDF
+        </button>
+      </div>
       {/* Material groups — identical to Project Materials */}
       {bomGroups.length === 0 ? (
         <div className="card p-8 text-center">
