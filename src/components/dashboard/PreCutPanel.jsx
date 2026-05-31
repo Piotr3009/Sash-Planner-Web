@@ -14,6 +14,7 @@ import { exportPreCutPDF } from '../../utils/precutPdfExport.js';
 export default function PreCutPanel({ item, windowSpec, settings, derived, batch }) {
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const materials = useMaterialStore((s) => s.materials);
+  const [exportFormat, setExportFormat] = useState('a3');
   const [stockLengths, setStockLengths] = useState({});
   const [offcutsMap, setOffcutsMap] = useState({});
   const [offcutInput, setOffcutInput] = useState({});
@@ -146,7 +147,7 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
       batch,
       projects: projList,
       isPPMode: false,
-      format: 'a4',
+      format: exportFormat,
       companySettings: company,
     });
   };
@@ -159,9 +160,19 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="text-sm font-semibold text-ink-50">Pre-Cut List</div>
-        <button onClick={handleExport} className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors">
-          📄 Export PDF
-        </button>
+        <div className="flex items-center gap-2">
+          <select
+            value={exportFormat}
+            onChange={(e) => setExportFormat(e.target.value)}
+            className="text-[10px] bg-surface-700 border border-surface-500 rounded px-2 py-1 text-ink-200 outline-none"
+          >
+            <option value="a3">A3 Landscape</option>
+            <option value="a4">A4 Landscape</option>
+          </select>
+          <button onClick={handleExport} className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors">
+            📄 Export PDF
+          </button>
+        </div>
       </div>
       {allGroups.map((group) => {
         const optGroup = getOptGroup(group);
