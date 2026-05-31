@@ -7,7 +7,7 @@ import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
 import { buildGlassListForWindow, buildVentGrilles } from '../engine/lists.js';
-import { buildWindowPartQtys, buildWindowHardware, resolvePartTotal, formatQty } from '../engine/bom.js';
+import { buildWindowPartQtys, buildWindowHardware, resolvePartTotal, formatQty, mergeWindowMaterials } from '../engine/bom.js';
 import ImageLightbox from '../components/ImageLightbox.jsx';
 import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 import DrawingsPanel from '../components/drawings/DrawingsPanel.jsx';
@@ -306,6 +306,17 @@ function BOMPanel({ item, windowSpec, settings, derived, batch }) {
     [windowSpec, batch, ironmongeryItems]
   );
 
+  // Total material + ironmongery cost for this one window — same source as
+  // Project Materials / BOM export (mergeWindowMaterials), so figures match.
+  const windowCost = useMemo(() => {
+    if (!derived || !windowSpec) return 0;
+    const rows = mergeWindowMaterials(
+      [{ derived, windowSpec, batch }],
+      { assignments, materials, ALL_PARTS, ironmongeryItems, settings }
+    );
+    return rows.reduce((s, r) => s + (r.costPerUnit > 0 ? r.qty * r.costPerUnit : 0), 0);
+  }, [derived, windowSpec, batch, assignments, materials, ironmongeryItems, settings]);
+
   return (
     <div className="space-y-4">
       {/* Material groups — identical to Project Materials */}
@@ -444,6 +455,16 @@ function BOMPanel({ item, windowSpec, settings, derived, batch }) {
       )}
 
       {/* Paint & Weights now render as material cards above (block A style) */}
+
+      {/* Total material + ironmongery cost for this window */}
+      <div className="card p-4 flex items-center justify-between border border-accent-500/20">
+        <div>
+          <div className="text-sm font-semibold text-ink-50">Material cost per window</div>
+          <div className="text-[10px] text-ink-400">Estimate · assigned items only · yield applied</div>
+        </div>
+        <div className="text-lg font-bold text-accent-400 font-mono">£{windowCost.toFixed(2)}</div>
+      </div>
+
       {zoomSrc && <ImageLightbox src={zoomSrc} onClose={() => setZoomSrc(null)} />}
     </div>
   );
