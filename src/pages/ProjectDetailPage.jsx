@@ -7,6 +7,7 @@ import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
 import { mergeWindowMaterials, formatQty } from '../engine/bom.js';
+import { exportBomPDF } from '../utils/bomPdfExport.js';
 import ImageLightbox from '../components/ImageLightbox.jsx';
 
 
@@ -76,42 +77,33 @@ export default function ProjectDetailPage() {
     if (window.confirm('Delete this batch and all its windows?')) deleteBatch(projectId, batchId);
   };
 
-  // ─── Export to PDF (print-friendly window) ───
+  // ─── Export to PDF (professional, same style as Production Pack BOM) ───
   const handleExportPDF = () => {
-    const totalWindows = batches.reduce((s, b) => s + (b.windows?.length || 0), 0);
-    const rows = projectMaterials.map((r) => `
-        <tr>
-          <td style="padding:6px 8px;border-bottom:1px solid #ddd;">${(r.material?.item_number || r.product?.item_number) || '—'}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid #ddd;">${r.name}${r._assigned ? '' : ' (unassigned)'}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right;font-weight:bold;">${formatQty(r.qty, r.unit)}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right;">${r.costPerUnit > 0 ? '£' + (r.qty * r.costPerUnit).toFixed(2) : '—'}</td>
-        </tr>
-      `).join('');
-
+    if (!projectMaterials.length) return;
     const totalCost = projectMaterials.reduce((sum, r) =>
       sum + (r.costPerUnit > 0 ? r.qty * r.costPerUnit : 0), 0);
-
-    const html = `<!DOCTYPE html><html><head><title>Materials — ${currentProject.name}</title>
-      <style>body{font-family:Arial,sans-serif;padding:30px;color:#222;}
-      h1{font-size:18px;margin:0 0 4px;}h2{font-size:13px;color:#666;margin:0 0 20px;font-weight:normal;}
-      table{width:100%;border-collapse:collapse;font-size:12px;}
-      th{background:#f5f5f5;padding:8px;text-align:left;border-bottom:2px solid #ccc;font-size:11px;text-transform:uppercase;color:#555;}
-      .footer{margin-top:20px;font-size:11px;color:#888;}
-      .total{margin-top:10px;text-align:right;font-size:14px;font-weight:bold;}</style></head>
-      <body>
-      <h1>Project Materials — ${currentProject.name}</h1>
-      <h2>${currentProject.project_number} · ${batches.length} batches · ${totalWindows} windows</h2>
-      <table><thead><tr>
-        <th>Item #</th><th>Material</th>
-        <th style="text-align:right;">Qty</th><th style="text-align:right;">Est. Cost</th>
-      </tr></thead><tbody>${rows}</tbody></table>
-      <div class="total">Estimated Total: £${totalCost.toFixed(2)}</div>
-      <div class="footer">Generated ${new Date().toLocaleDateString('en-GB')} · Purchase list · Yield applied</div>
-      <script>window.onload=()=>window.print()</script></body></html>`;
-
-    const w = window.open('', '_blank');
-    w.document.write(html);
-    w.document.close();
+    const company = settings.company || {};
+    exportBomPDF({
+      title: currentProject.name || 'Project',
+      projects: currentProject.project_number ? [currentProject.project_number] : [],
+      date: new Date().toLocaleDateString('en-GB'),
+      deadline: currentProject.deadline || '',
+      companyName: company.companyName || 'COMPANY NAME',
+      companyAddress: company.companyAddress || '',
+      logo: company.logo || '',
+      subtitle: 'PROJECT MATERIALS',
+      scopeLabel: 'Project',
+      rows: projectMaterials.map((r) => ({
+        name: r.name,
+        itemNumber: r.material?.item_number || r.product?.item_number || '',
+        qty: formatQty(r.qty, r.unit),
+        unitCost: r.costPerUnit > 0 ? `£${r.costPerUnit.toFixed(2)}` : '—',
+        estCost: r.costPerUnit > 0 ? `£${(r.qty * r.costPerUnit).toFixed(2)}` : '—',
+        ironmongery: r.source === 'ironmongery',
+        assigned: r._assigned,
+      })),
+      total: `£${totalCost.toFixed(2)}`,
+    });
   };
 
   // ─── Export CSV for Joinery Core ───

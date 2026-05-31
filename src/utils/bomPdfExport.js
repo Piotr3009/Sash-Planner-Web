@@ -26,10 +26,10 @@ export function exportBomPDF(info) {
 
   const hdr = {
     companyName: info.companyName || 'COMPANY NAME',
-    subtitle: 'BILL OF MATERIALS',
+    subtitle: info.subtitle || 'BILL OF MATERIALS',
     companyAddress: info.companyAddress || '',
     logo: info.logo || '',
-    mid: { topLabel: 'Pack', topValue: info.title || '—', botLabel: 'Projects', botValue: (info.projects || []).join(' · ') || '—' },
+    mid: { topLabel: info.scopeLabel || 'Pack', topValue: info.title || '—', botLabel: 'Projects', botValue: (info.projects || []).join(' · ') || '—' },
     c2:  { topLabel: 'Date', topValue: info.date || '—', botLabel: 'Items', botValue: String(info.rows?.length ?? 0) },
     c3:  { topLabel: 'Rev', topValue: 'A' },
   };
