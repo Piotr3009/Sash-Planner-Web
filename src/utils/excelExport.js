@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import {
   buildCutListForWindow,
+  buildGroupedCutList,
   buildPrecutForWindow,
   buildGlassListForWindow,
   buildHardwareList
@@ -28,11 +29,11 @@ export async function exportWindowToExcel({ item, windowSpec, settings, derived 
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Summary');
 
-  // Cut list
-  const cutList = buildCutListForWindow(derived, windowSpec);
+  // Cut list — merged mirror pairs + longest-first (single source: buildGroupedCutList)
+  const cutList = buildGroupedCutList(buildCutListForWindow(derived, windowSpec));
   const cutSheet = [
     ['Element', 'Section', 'Length (mm)', 'Qty', 'Material', 'Notes'],
-    ...cutList.map((c) => [c.element, c.section || '', c.length, c.quantity, c.material || '', c.notes || ''])
+    ...cutList.map((c) => [c.mergedLabel || c.element, c.section || '', c.length, c.quantity, c.material || '', c.notes || ''])
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cutSheet), 'Cut list');
 

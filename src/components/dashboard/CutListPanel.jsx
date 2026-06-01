@@ -4,7 +4,7 @@
  * Grouped by element with part symbols, mirror indicators, dark theme.
  */
 import { useMemo } from 'react';
-import { buildCutListForWindow } from '../../engine/lists.js';
+import { buildCutListForWindow, buildGroupedCutList } from '../../engine/lists.js';
 import { getPartSymbol } from '../../engine/partSymbols.js';
 import { useMaterialAssignmentStore } from '../../stores/materialAssignmentStore.js';
 import { useMaterialStore } from '../../stores/materialStore.js';
@@ -19,14 +19,21 @@ export default function CutListPanel({ item, windowSpec, settings, derived, batc
   }, [derived, windowSpec]);
 
   const byElement = useMemo(() => {
+    // Merge mirror L/R pairs + sort longest-first (single source: buildGroupedCutList).
+    const grouped = buildGroupedCutList(cutList);
+    // Group by display element name, preserving the render structure
+    // ({ element, section, symbolInfo, aggregated[] }) the UI already expects.
     const map = new Map();
-    cutList.forEach((c) => {
+    grouped.forEach((c) => {
       const key = c.element;
       if (!map.has(key)) {
         map.set(key, {
           element: c.element,
           section: c.section,
-          symbolInfo: getPartSymbol(c.element),
+          // Merged rows carry mergedSymbol; otherwise look up by element name.
+          symbolInfo: c.mergedSymbol
+            ? { symbol: c.mergedSymbol, name: c.mergedLabel, mirror: true }
+            : getPartSymbol(c.element),
           items: [],
         });
       }
@@ -35,14 +42,15 @@ export default function CutListPanel({ item, windowSpec, settings, derived, batc
 
     const groups = Array.from(map.values());
     groups.forEach((g) => {
-      // Aggregate identical lengths
+      // Aggregate identical lengths within the (already merged) element group.
       const agg = new Map();
       g.items.forEach((it) => {
         const k = `${it.length}`;
         if (!agg.has(k)) agg.set(k, { ...it, totalQty: 0 });
         agg.get(k).totalQty += (it.quantity || 1);
       });
-      g.aggregated = Array.from(agg.values()).sort((a, b) => a.length - b.length);
+      // Keep longest-first inside the group too.
+      g.aggregated = Array.from(agg.values()).sort((a, b) => b.length - a.length);
     });
 
     return groups;
