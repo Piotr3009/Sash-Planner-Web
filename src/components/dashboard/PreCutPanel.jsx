@@ -66,7 +66,7 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
       section: `${g.preCutWidth}`,
       type: 'box',
       items: g.items,
-      defaultStock: settings?.stockLengthBox || 2400,
+      defaultStock: settings?.stockLengthBox || 3700,
     });
   });
 
@@ -80,7 +80,7 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
       })),
       boxSapele: (precut.boxSapele || []).map((g) => ({
         ...g,
-        stockLength: stockLengths[`box-${g.preCutWidth}`] || settings?.stockLengthBox || 2400,
+        stockLength: stockLengths[`box-${g.preCutWidth}`] || settings?.stockLengthBox || 3700,
       })),
     };
     try {
@@ -92,6 +92,14 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
   }, [precut, settings, stockLengths, offcutsMap]);
 
   const toggleExpand = (key) => setExpandedGroups((p) => ({ ...p, [key]: !p[key] }));
+
+  // 3c: step stock length by ±100mm. Lower bound = longest required piece in the
+  // group (a stock shorter than the longest piece can't fit it).
+  const stepStock = (group, current, delta) => {
+    const minStock = Math.max(...group.items.map((it) => it.length || 0), 0);
+    const next = Math.max(minStock, (current || 0) + delta);
+    setStockLengths((p) => ({ ...p, [group.key]: next }));
+  };
 
   const handleAddOffcut = (groupKey) => {
     const val = parseFloat(offcutInput[groupKey]);
@@ -186,12 +194,18 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
           <div key={group.key} className="card overflow-hidden">
             {/* Group header */}
             <div
-              className="px-4 py-3 border-b border-surface-500 flex items-center gap-3 cursor-pointer hover:bg-surface-700/30 transition-colors"
-              onClick={() => toggleExpand(group.key)}
+              className="px-4 py-3 border-b border-surface-500 flex items-center gap-3"
             >
-              <svg className={`w-3.5 h-3.5 text-ink-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 18l6-6-6-6" />
-              </svg>
+              <button
+                type="button"
+                onClick={() => toggleExpand(group.key)}
+                className="shrink-0 cursor-pointer text-ink-400 hover:text-ink-200 transition-colors"
+                aria-label={isExpanded ? 'Collapse' : 'Expand'}
+              >
+                <svg className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </button>
               <div>
                 <div className="text-sm font-semibold text-ink-50">{group.label}</div>
                 <div className="text-[10px] text-ink-400">pre-cut: {group.precutSection}</div>
@@ -199,10 +213,23 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
               <div className="ml-auto flex items-center gap-3">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] text-ink-400">Stock:</span>
+                  <div className="flex flex-col">
+                    <button
+                      type="button"
+                      onClick={() => stepStock(group, stock, 100)}
+                      className="text-ink-400 hover:text-accent-400 leading-none text-[8px] px-0.5"
+                      aria-label="Increase stock by 100mm"
+                    >▲</button>
+                    <button
+                      type="button"
+                      onClick={() => stepStock(group, stock, -100)}
+                      className="text-ink-400 hover:text-accent-400 leading-none text-[8px] px-0.5"
+                      aria-label="Decrease stock by 100mm"
+                    >▼</button>
+                  </div>
                   <input
                     className="w-16 text-[11px] text-ink-100 bg-surface-700 border border-surface-500 rounded px-1.5 py-0.5 text-center outline-none focus:border-accent-500"
                     value={stock}
-                    onClick={(e) => e.stopPropagation()}
                     onChange={(e) => {
                       const v = parseInt(e.target.value) || 0;
                       setStockLengths((p) => ({ ...p, [group.key]: v }));
