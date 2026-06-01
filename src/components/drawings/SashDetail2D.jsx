@@ -63,9 +63,9 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
     const glassW = sashW - 2 * stile;
     const glassH = sashH - topEdge - botEdge;
     const REBATE_OFFSET = 9;
-    const rebateX = REBATE_OFFSET, rebateY = REBATE_OFFSET;
-    const rebateW = sashW - 2 * REBATE_OFFSET;
-    const rebateH = sashH - 2 * REBATE_OFFSET;
+    const rebateX = glassX + REBATE_OFFSET, rebateY = glassY + REBATE_OFFSET;
+    const rebateW = glassW - 2 * REBATE_OFFSET;
+    const rebateH = glassH - 2 * REBATE_OFFSET;
     const gridMode = windowSpec.sash?.grid?.mode || 'none';
     const pattern = BAR_PATTERNS[gridMode] || BAR_PATTERNS['none'];
     const v = pattern.v, h = pattern.h;
@@ -85,7 +85,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
   const sw = (n) => n * layoutSc;
   const MGN_TOP_DIM = 80 * layoutSc;
   const MGN_LEFT_DIM = 80 * layoutSc;
-  const MGN_RIGHT_DIM = 60 * layoutSc;
+  const MGN_RIGHT_DIM = (geom.isUpper && geom.hasHorns && geom.hornExt > 0 ? 110 : 60) * layoutSc;
   const MGN_BOT_DIM = 60 * layoutSc;
   const MGN_TITLE = 40 * layoutSc;
   const MGN_HORN = geom.isUpper && geom.hornExt > 0 ? geom.hornExt + 20 * layoutSc : 0;
@@ -281,6 +281,12 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
             y1={Y(0)} y2={Y(geom.sashH)}
             extFrom={X(geom.sashW) + 12 * ts}
             label={fmt(geom.sashH)} vbw={totalW} />
+          {geom.isUpper && geom.hasHorns && geom.hornExt > 0 && (
+            <DimV x={X(geom.sashW) + 44 * ts}
+              y1={Y(0)} y2={Y(geom.sashH + geom.hornExt)}
+              extFrom={X(geom.sashW) + 12 * ts}
+              label={fmt(geom.sashH + geom.hornExt)} vbw={totalW} />
+          )}
 
           {/* Title */}
           <text x={totalW / 2} y={totalH - 16 * ts}
