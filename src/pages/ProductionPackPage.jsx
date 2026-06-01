@@ -407,7 +407,7 @@ export default function ProductionPackPage() {
         {tab === 'elements'   && <ElementsTab windowsData={windowsData} pp={pp} batch={batch} registerExport={registerExport} />}
         {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} batch={batch} pp={pp} registerExport={registerExport} />}
         {tab === 'precut'     && <PreCutTab merged={merged} settings={settings} batch={batch} pp={pp} isPPMode={isPPMode} projects={projects} registerExport={registerExport} exportFormat={exportFormat} />}
-        {tab === 'cutlist'    && <CutListTab merged={merged} isPPMode={isPPMode} pp={pp} batch={batch} registerExport={registerExport} />}
+        {tab === 'cutlist'    && <CutListTab merged={merged} isPPMode={isPPMode} pp={pp} batch={batch} registerExport={registerExport} exportFormat={exportFormat} />}
         {tab === 'spraying'   && <SprayingTab windowsData={windowsData} batch={batch} pp={pp} registerExport={registerExport} />}
         {tab === 'bom'        && <BOMTab merged={merged} batch={batch} pp={pp} isPPMode={isPPMode} windowsData={windowsData} registerExport={registerExport} />}
       </main>
@@ -1343,7 +1343,7 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
 // ═══════════════════════════════════════════════════════════════
 // TAB: Cut List — grouped by element, symbols, mirror, sorted
 // ═══════════════════════════════════════════════════════════════
-function CutListTab({ merged, isPPMode, pp, batch, registerExport }) {
+function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat }) {
   // Material assignment lookup
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const getMaterialById = useMaterialStore((s) => s.getMaterialById);
@@ -1466,6 +1466,7 @@ function CutListTab({ merged, isPPMode, pp, batch, registerExport }) {
       title: pp?.name || batch?.name || 'Pack',
       projects, date: new Date().toLocaleDateString('en-GB'),
       isPPMode, totalPieces, groups,
+      format: exportFormat,
     });
   };
   registerExport('cutlist', handleExport);

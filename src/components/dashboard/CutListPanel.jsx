@@ -96,6 +96,7 @@ export default function CutListPanel({ item, windowSpec, settings, derived, batc
       isPPMode: false,
       totalPieces,
       groups,
+      format: 'a4',
     });
   };
 
