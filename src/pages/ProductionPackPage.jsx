@@ -19,7 +19,6 @@ import { parseSpecification, normaliseToWindowSpec } from '../engine/specificati
 import { deriveWindowData } from '../engine/calculations.js';
 import {
   buildCutListForWindow,
-  buildGroupedCutList,
   buildPrecutForWindow,
   buildGlassListForWindow,
   buildHardwareList,
@@ -407,7 +406,7 @@ export default function ProductionPackPage() {
         {tab === 'elements'   && <ElementsTab windowsData={windowsData} pp={pp} batch={batch} registerExport={registerExport} />}
         {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} batch={batch} pp={pp} registerExport={registerExport} />}
         {tab === 'precut'     && <PreCutTab merged={merged} settings={settings} batch={batch} pp={pp} isPPMode={isPPMode} projects={projects} registerExport={registerExport} exportFormat={exportFormat} />}
-        {tab === 'cutlist'    && <CutListTab merged={merged} isPPMode={isPPMode} pp={pp} batch={batch} registerExport={registerExport} exportFormat={exportFormat} />}
+        {tab === 'cutlist'    && <CutListTab merged={merged} isPPMode={isPPMode} pp={pp} batch={batch} registerExport={registerExport} />}
         {tab === 'spraying'   && <SprayingTab windowsData={windowsData} batch={batch} pp={pp} registerExport={registerExport} />}
         {tab === 'bom'        && <BOMTab merged={merged} batch={batch} pp={pp} isPPMode={isPPMode} windowsData={windowsData} registerExport={registerExport} />}
       </main>
@@ -1067,7 +1066,7 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
       section: `${g.preCutWidth}`,
       type: 'box',
       items: g.items,
-      defaultStock: settings?.stockLengthBox || 3700,
+      defaultStock: settings?.stockLengthBox || 2400,
     });
   });
 
@@ -1080,7 +1079,7 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
       })),
       boxSapele: (merged.precut.boxSapele || []).map((g) => ({
         ...g,
-        stockLength: stockLengths[`box-${g.preCutWidth}`] || settings?.stockLengthBox || 3700,
+        stockLength: stockLengths[`box-${g.preCutWidth}`] || settings?.stockLengthBox || 2400,
       })),
     };
     try {
@@ -1092,13 +1091,6 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
   }, [merged.precut, settings, stockLengths, offcutsMap]);
 
   const toggleExpand = (key) => setExpandedGroups((p) => ({ ...p, [key]: !p[key] }));
-
-  // 3c: step stock length by ±100mm. Lower bound = longest required piece in group.
-  const stepStock = (group, current, delta) => {
-    const minStock = Math.max(...group.items.map((it) => it.length || 0), 0);
-    const next = Math.max(minStock, (current || 0) + delta);
-    setStockLengths((p) => ({ ...p, [group.key]: next }));
-  };
 
   const handleAddOffcut = (groupKey) => {
     const val = parseFloat(offcutInput[groupKey]);
@@ -1166,18 +1158,12 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
           <div key={group.key} className="card overflow-hidden">
             {/* Group header */}
             <div
-              className="px-4 py-3 border-b border-surface-500 flex items-center gap-3"
+              className="px-4 py-3 border-b border-surface-500 flex items-center gap-3 cursor-pointer hover:bg-surface-700/30 transition-colors"
+              onClick={() => toggleExpand(group.key)}
             >
-              <button
-                type="button"
-                onClick={() => toggleExpand(group.key)}
-                className="shrink-0 cursor-pointer text-ink-400 hover:text-ink-200 transition-colors"
-                aria-label={isExpanded ? 'Collapse' : 'Expand'}
-              >
-                <svg className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
-              </button>
+              <svg className={`w-3.5 h-3.5 text-ink-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
               <div className="text-sm font-semibold text-ink-50">{group.label}</div>
               {(() => {
                 const mat = getMaterialForGroup(group.items);
@@ -1196,23 +1182,10 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
               <div className="ml-auto flex items-center gap-3">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] text-ink-400">Stock:</span>
-                  <div className="flex flex-col">
-                    <button
-                      type="button"
-                      onClick={() => stepStock(group, stock, 100)}
-                      className="text-ink-400 hover:text-accent-400 leading-none text-[8px] px-0.5"
-                      aria-label="Increase stock by 100mm"
-                    >▲</button>
-                    <button
-                      type="button"
-                      onClick={() => stepStock(group, stock, -100)}
-                      className="text-ink-400 hover:text-accent-400 leading-none text-[8px] px-0.5"
-                      aria-label="Decrease stock by 100mm"
-                    >▼</button>
-                  </div>
                   <input
                     className="w-16 text-[11px] text-ink-100 bg-surface-700 border border-surface-500 rounded px-1.5 py-0.5 text-center outline-none focus:border-accent-500"
                     value={stock}
+                    onClick={(e) => e.stopPropagation()}
                     onChange={(e) => {
                       const v = parseInt(e.target.value) || 0;
                       setStockLengths((p) => ({ ...p, [group.key]: v }));
@@ -1343,7 +1316,7 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
 // ═══════════════════════════════════════════════════════════════
 // TAB: Cut List — grouped by element, symbols, mirror, sorted
 // ═══════════════════════════════════════════════════════════════
-function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat }) {
+function CutListTab({ merged, isPPMode, pp, batch, registerExport }) {
   // Material assignment lookup
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const getMaterialById = useMaterialStore((s) => s.getMaterialById);
@@ -1404,28 +1377,24 @@ function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat 
 
   // Group by element name
   const byElement = useMemo(() => {
-    // Merge mirror L/R pairs + sort longest-first (single source: buildGroupedCutList).
-    const grouped = buildGroupedCutList(merged.cutList);
     const map = new Map();
-    grouped.forEach((c) => {
+    merged.cutList.forEach((c) => {
       const key = c.element;
       if (!map.has(key)) {
         map.set(key, {
           element: c.element,
           section: c.section,
-          symbolInfo: c.mergedSymbol
-            ? { symbol: c.mergedSymbol, name: c.mergedLabel, mirror: true }
-            : getPartSymbol(c.element),
+          symbolInfo: getPartSymbol(c.element),
           items: [],
         });
       }
       map.get(key).items.push(c);
     });
 
-    // Sort items within each group by length (longest first)
+    // Sort items within each group by length (shortest first)
     const groups = Array.from(map.values());
     groups.forEach((g) => {
-      g.items.sort((a, b) => b.length - a.length);
+      g.items.sort((a, b) => a.length - b.length);
       // Aggregate: group identical lengths within element
       const agg = new Map();
       g.items.forEach((it) => {
@@ -1435,7 +1404,7 @@ function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat 
         }
         agg.get(k).totalQty += (it.quantity || 1);
       });
-      g.aggregated = Array.from(agg.values()).sort((a, b) => b.length - a.length);
+      g.aggregated = Array.from(agg.values()).sort((a, b) => a.length - b.length);
     });
 
     return groups;
@@ -1466,7 +1435,6 @@ function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat 
       title: pp?.name || batch?.name || 'Pack',
       projects, date: new Date().toLocaleDateString('en-GB'),
       isPPMode, totalPieces, groups,
-      format: exportFormat,
     });
   };
   registerExport('cutlist', handleExport);

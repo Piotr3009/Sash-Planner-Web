@@ -58,11 +58,43 @@ export function buildCutListForWindow(derived, windowSpec) {
       notes: c.notes || ''
     });
   });
-  // NOTE: Glazing bars (VGB/HGB) and beading are intentionally NOT listed here.
-  // - Beading is cut on the fly; it remains in the engine (derived.components.beading),
-  //   BOM and material list (bom.js reads it directly from derived.components.beading).
-  // - Glazing bars between panes are not used in current (non-heritage) windows.
-  // Cut list shows only timber that is actually cut to length: frame (box) + sash.
+  // Glazing bars
+  const bars = derived.barPositions;
+  const sashH2 = (derived.topSashHeight || derived.sashHeight / 2) - CONSTANTS.TOP_RAIL_WIDTH - CONSTANTS.MEETING_RAIL_WIDTH;
+  const sashW = derived.sashWidth - 2 * CONSTANTS.STILE_WIDTH;
+  if (bars?.vertical?.length) {
+    out.push({
+      element: 'Vertical glazing bar',
+      section: `${CONSTANTS.GLAZING_BAR_WIDTH}x${CONSTANTS.GLAZING_BAR_DEPTH}`,
+      length: Math.round(sashH2),
+      quantity: bars.vertical.length * 2,
+      material: 'Hardwood (bar stock)',
+      notes: 'Per sash × 2'
+    });
+  }
+  if (bars?.horizontal?.length) {
+    out.push({
+      element: 'Horizontal glazing bar',
+      section: `${CONSTANTS.GLAZING_BAR_WIDTH}x${CONSTANTS.GLAZING_BAR_DEPTH}`,
+      length: Math.round(sashW),
+      quantity: bars.horizontal.length * 2,
+      material: 'Hardwood (bar stock)',
+      notes: 'Per sash × 2'
+    });
+  }
+  // Beading
+  if (derived.components.beading) {
+    derived.components.beading.forEach((c) => {
+      out.push({
+        element: c.elementName,
+        section: c.section,
+        length: c.length,
+        quantity: c.quantity,
+        material: 'Beading',
+        notes: c.notes || ''
+      });
+    });
+  }
   return out.map((row) => ({ ...row, length: Math.round(row.length) }));
 }
 
@@ -283,82 +315,4 @@ export function buildProjectAggregates(items, windowSpecs, settingsArg) {
   });
 
   return { cutList: allCut, precut: allPrecut, glass: allGlass, hardware: allHardware, beading: allBeading };
-}
-
-/**
- * MIRROR_PAIRS — left element name → { right element name, merged symbol, merged label }.
- * Used by buildGroupedCutList to merge mirror L/R pairs into a single row (qty ×2),
- * since both sides are identical (mirror). Single source of cut-list grouping logic,
- * consumed by single-window panel, Production Pack tab, PDF and Excel export.
- */
-export const MIRROR_PAIRS = {
-  'JAMB LEFT':                { right: 'JAMB RIGHT',                symbol: 'JB-L/R',  label: 'Jambs (L/R)' },
-  'INTERNAL JAMB LINER (L)':  { right: 'INTERNAL JAMB LINER (R)',  symbol: 'IL-L/R',  label: 'Internal Jamb Liner (L/R)' },
-  'EXTERNAL JAMB LINER (L)':  { right: 'EXTERNAL JAMB LINER (R)',  symbol: 'EL-L/R',  label: 'External Jamb Liner (L/R)' },
-  'STILES TOP SASH (L)':      { right: 'STILES TOP SASH (R)',      symbol: 'STS-L/R', label: 'Stiles Top Sash (L/R)' },
-  'STILES BOTTOM SASH (L)':   { right: 'STILES BOTTOM SASH (R)',   symbol: 'SBS-L/R', label: 'Stiles Bottom Sash (L/R)' },
-};
-
-/**
- * buildGroupedCutList — single source of cut-list presentation logic.
- * Takes a raw cut list (array of rows from buildCutListForWindow) and:
- *   1. Merges mirror L/R pairs into one row (qty doubled), using MIRROR_PAIRS.
- *      If a pair has UNEQUAL lengths, it is NOT merged (kept separate + flagged
- *      with mismatch:true) — unequal mirror parts signal a calculation error.
- *   2. Sorts the resulting rows by length DESCENDING (longest first) — the correct
- *      cutting order so the longest pieces are cut before short offcuts remain.
- *
- * Returns array of rows. Merged rows carry { mergedSymbol, mergedLabel, mirror:true };
- * unmerged rows are passed through unchanged.
- */
-export function buildGroupedCutList(rawCutList) {
-  if (!Array.isArray(rawCutList) || rawCutList.length === 0) return [];
-
-  // Index rows by element name for pair lookup.
-  const byElement = new Map();
-  rawCutList.forEach((row) => {
-    if (!byElement.has(row.element)) byElement.set(row.element, []);
-    byElement.get(row.element).push(row);
-  });
-
-  const out = [];
-  const consumed = new Set(); // element names already merged as a right-side partner
-
-  rawCutList.forEach((row) => {
-    if (consumed.has(`${row.element}|${row.length}`)) return;
-
-    const pair = MIRROR_PAIRS[row.element];
-    if (pair) {
-      // Find a right-side row of the SAME length (mirror parts must be equal).
-      const rights = byElement.get(pair.right) || [];
-      const match = rights.find(
-        (r) => r.length === row.length && !consumed.has(`${pair.right}|${r.length}`)
-      );
-      if (match) {
-        consumed.add(`${pair.right}|${match.length}`);
-        out.push({
-          ...row,
-          element: pair.label,
-          mergedSymbol: pair.symbol,
-          mergedLabel: pair.label,
-          mirror: true,
-          quantity: (row.quantity || 1) + (match.quantity || 1),
-        });
-        return;
-      }
-      // No equal-length partner → keep separate, flag mismatch (calculation error signal).
-      out.push({ ...row, mismatch: true });
-      return;
-    }
-
-    // Right-side element handled only if its left partner already merged it.
-    const isRightSide = Object.values(MIRROR_PAIRS).some((p) => p.right === row.element);
-    if (isRightSide && consumed.has(`${row.element}|${row.length}`)) return;
-
-    out.push({ ...row });
-  });
-
-  // Sort by length DESCENDING (longest first = correct cutting order).
-  out.sort((a, b) => (b.length || 0) - (a.length || 0));
-  return out;
 }
