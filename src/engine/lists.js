@@ -58,43 +58,11 @@ export function buildCutListForWindow(derived, windowSpec) {
       notes: c.notes || ''
     });
   });
-  // Glazing bars
-  const bars = derived.barPositions;
-  const sashH2 = (derived.topSashHeight || derived.sashHeight / 2) - CONSTANTS.TOP_RAIL_WIDTH - CONSTANTS.MEETING_RAIL_WIDTH;
-  const sashW = derived.sashWidth - 2 * CONSTANTS.STILE_WIDTH;
-  if (bars?.vertical?.length) {
-    out.push({
-      element: 'Vertical glazing bar',
-      section: `${CONSTANTS.GLAZING_BAR_WIDTH}x${CONSTANTS.GLAZING_BAR_DEPTH}`,
-      length: Math.round(sashH2),
-      quantity: bars.vertical.length * 2,
-      material: 'Hardwood (bar stock)',
-      notes: 'Per sash × 2'
-    });
-  }
-  if (bars?.horizontal?.length) {
-    out.push({
-      element: 'Horizontal glazing bar',
-      section: `${CONSTANTS.GLAZING_BAR_WIDTH}x${CONSTANTS.GLAZING_BAR_DEPTH}`,
-      length: Math.round(sashW),
-      quantity: bars.horizontal.length * 2,
-      material: 'Hardwood (bar stock)',
-      notes: 'Per sash × 2'
-    });
-  }
-  // Beading
-  if (derived.components.beading) {
-    derived.components.beading.forEach((c) => {
-      out.push({
-        element: c.elementName,
-        section: c.section,
-        length: c.length,
-        quantity: c.quantity,
-        material: 'Beading',
-        notes: c.notes || ''
-      });
-    });
-  }
+  // NOTE: Glazing bars (VGB/HGB) and beading are intentionally NOT listed here.
+  // - Beading is cut on the fly; it remains in the engine (derived.components.beading),
+  //   BOM and material list (bom.js reads it directly from derived.components.beading).
+  // - Glazing bars between panes are not used in current (non-heritage) windows.
+  // Cut list shows only timber that is actually cut to length: frame (box) + sash.
   return out.map((row) => ({ ...row, length: Math.round(row.length) }));
 }
 
