@@ -19,8 +19,6 @@ const C = {
   rowBg:  [247, 247, 245],
   cardHead:[238, 238, 235],
   cardBorder:[154, 154, 150],
-  accentBlue:[58, 110, 165],
-  accentGray:[150, 150, 146],
   pillBlue:[220, 232, 244],
   pillBlueT:[44, 93, 143],
   pillGray:[228, 228, 226],
@@ -159,23 +157,32 @@ export function exportCutListPDF(info) {
   // Draw the column-header row inside a card; returns new y.
   const drawCardCols = (cy) => {
     doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5 * S); tc(doc, C.gray);
-    cols.forEach((c) => doc.text(c.label, x + 8 * S + c.dx * S, cy, c.align === 'right' ? { align: 'right' } : undefined));
+    cols.forEach((c) => doc.text(c.label, x + 4 * S + c.dx * S, cy, c.align === 'right' ? { align: 'right' } : undefined));
     return cy + colHeadH;
   };
+
+  const pageUsableH = bottom - topStart; // full height available for a card on a fresh page
 
   (info.groups || []).forEach((g) => {
     const dataRows = g.rows || [];
     const cardH = headBandH + colHeadH + dataRows.length * rowH + 3 * S;
 
-    // Keep the card header with at least one row on the same page.
-    const minNeeded = headBandH + colHeadH + rowH + 3 * S;
-    if (y + minNeeded > bottom) newPage();
+    // Option A: keep the whole card together.
+    // If it doesn't fit in the remaining space here BUT fits on a fresh page,
+    // move the entire card to the next page. Only allow splitting when the card
+    // is taller than a whole page (no other choice).
+    const fitsOnFreshPage = cardH <= pageUsableH;
+    if (y + cardH > bottom && fitsOnFreshPage) {
+      newPage();
+    } else if (y + cardH > bottom && !fitsOnFreshPage) {
+      // Card taller than a page: start it on a fresh page if we're not already at top.
+      if (y > topStart + 0.5) newPage();
+    }
 
     const cardTop = y;
     let cy = y + headBandH - 4 * S; // baseline for title text
 
     // ── Title band ──
-    const accentW = 5 * S; // left colour accent stripe width
     fc(doc, C.cardHead); doc.rect(x, cardTop, cardW, headBandH, 'F');
     // symbol pill
     const sym = safe(g.symbol || '');
@@ -184,7 +191,7 @@ export function exportCutListPDF(info) {
     const pillPad = 2.4 * S;
     const pillW = pillTextW + pillPad * 2;
     const pillH = 8 * S;
-    const pillX = x + accentW + 3 * S;
+    const pillX = x + 3 * S;
     const pillY = cardTop + (headBandH - pillH) / 2;
     const pillFill = g.mirror ? C.pillBlue : C.pillGray;
     const pillText = g.mirror ? C.pillBlueT : C.pillGrayT;
@@ -223,7 +230,7 @@ export function exportCutListPDF(info) {
         y = drawCardCols(y + 4.5 * S);
         zebra = 0;
       }
-      if (zebra % 2 === 1) { fc(doc, C.rowBg); doc.rect(x + 6 * S, y - 4 * S, cardW - 6.5 * S, rowH, 'F'); }
+      if (zebra % 2 === 1) { fc(doc, C.rowBg); doc.rect(x + 0.5 * S, y - 4 * S, cardW - 1 * S, rowH, 'F'); }
       lineNo += 1;
       const cells = isPP
         ? [lineNo, r.projectNum || '-', r.window || '-', r.length, r.qty]
@@ -232,19 +239,14 @@ export function exportCutListPDF(info) {
         doc.setFont(c.mono ? 'courier' : 'helvetica', 'normal');
         doc.setFontSize(8 * S);
         tc(doc, C.dark);
-        doc.text(safe(String(cells[ci] ?? '')), x + 8 * S + c.dx * S, y, c.align === 'right' ? { align: 'right' } : undefined);
+        doc.text(safe(String(cells[ci] ?? '')), x + 4 * S + c.dx * S, y, c.align === 'right' ? { align: 'right' } : undefined);
       });
       y += rowH; zebra++;
     });
 
     // ── Card border around the whole card ──
     y += 3 * S;
-    // ── Left colour accent stripe (full card height) ──
     const cardFullH = y - cardTop;
-    const accent = g.mirror ? C.accentBlue : C.accentGray;
-    fc(doc, accent);
-    doc.rect(x, cardTop, 5 * S, cardFullH, 'F');
-    // ── Card border around the whole card ──
     doc.setDrawColor(...C.cardBorder); doc.setLineWidth(0.6);
     if (doc.roundedRect) doc.roundedRect(x, cardTop, cardW, cardFullH, 1.5 * S, 1.5 * S, 'S');
     else doc.rect(x, cardTop, cardW, cardFullH, 'S');
