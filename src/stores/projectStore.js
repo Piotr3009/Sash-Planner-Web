@@ -39,6 +39,7 @@ const BATCH_DEFAULTS = {
     glassType: 'double',
     glassSpec: 'toughened',
     spacerColor: 'white',
+    spacerType: 'warm',
     pas24: false,
     frameType: 'standard',
     hornType: 'A',
@@ -52,6 +53,7 @@ const BATCH_DEFAULTS = {
     glassType: 'double',
     glassSpec: 'toughened',
     spacerColor: 'white',
+    spacerType: 'warm',
     pas24: false,
     frameType: 'standard',
     hornType: 'none',
@@ -65,6 +67,7 @@ const BATCH_DEFAULTS = {
     glassType: 'double',
     glassSpec: 'toughened',
     spacerColor: 'white',
+    spacerType: 'warm',
     pas24: false,
     frameType: 'standard',
     hornType: 'none',
@@ -78,6 +81,7 @@ const BATCH_DEFAULTS = {
     glassType: 'double',
     glassSpec: 'toughened',
     spacerColor: 'white',
+    spacerType: 'warm',
     pas24: true,
     frameType: 'standard',
     hornType: 'none',
@@ -91,6 +95,7 @@ const BATCH_DEFAULTS = {
     glassType: 'double',
     glassSpec: 'toughened',
     spacerColor: 'white',
+    spacerType: 'warm',
     pas24: false,
     frameType: 'standard',
     hornType: 'none',
@@ -444,6 +449,7 @@ export const useProjectStore = create(
       glassType: windowConfig.glassType || defaults.glassType || 'double',
       glassSpec: windowConfig.glassSpec || defaults.glassSpec || 'toughened',
       spacerColor: windowConfig.spacerColor || defaults.spacerColor || 'silver',
+      spacerType: windowConfig.spacerType || defaults.spacerType || 'warm',
       pas24: windowConfig.pas24 !== undefined ? windowConfig.pas24 : (defaults.pas24 || false),
       // Full specification JSON for calculations engine
       specification: JSON.stringify({
@@ -463,6 +469,7 @@ export const useProjectStore = create(
           exteriorColor: windowConfig.woodColorExt || defaults.woodColorExt || '#F6F6F6',
           ironmongeryFinish: windowConfig.ironmongery || defaults.ironmongery || 'brass',
           spacerColor: windowConfig.spacerColor || defaults.spacerColor || 'silver',
+      spacerType: windowConfig.spacerType || defaults.spacerType || 'warm',
         }
       }),
     };
@@ -532,6 +539,7 @@ export const useProjectStore = create(
       glassType: windowConfig.glassType || defaults.glassType || 'double',
       glassSpec: windowConfig.glassSpec || defaults.glassSpec || 'toughened',
       spacerColor: windowConfig.spacerColor || defaults.spacerColor || 'silver',
+      spacerType: windowConfig.spacerType || defaults.spacerType || 'warm',
       pas24: windowConfig.pas24 !== undefined ? windowConfig.pas24 : (defaults.pas24 || false),
       specification: JSON.stringify({
         windowType: batch.type,
@@ -550,6 +558,7 @@ export const useProjectStore = create(
           exteriorColor: windowConfig.woodColorExt || defaults.woodColorExt || '#F6F6F6',
           ironmongeryFinish: windowConfig.ironmongery || defaults.ironmongery || 'brass',
           spacerColor: windowConfig.spacerColor || defaults.spacerColor || 'silver',
+      spacerType: windowConfig.spacerType || defaults.spacerType || 'warm',
         }
       }),
     };

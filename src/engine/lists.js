@@ -165,7 +165,8 @@ export function buildGlassListForWindow(derived, windowSpec) {
   const glassType = windowSpec?.glazing?.type || 'double';
   const glassSpec = windowSpec?.glazing?.spec || 'toughened';
   const spacer = windowSpec?.glazing?.spacerColour || 'silver';
-  const makeup = windowSpec?.glazing?.makeup || (glassType === 'triple' ? '4x12x4x12x4' : '4x16x4');
+  const spacerType = windowSpec?.glazing?.spacerType || 'warm';
+  const makeup = windowSpec?.glazing?.makeup || (glassType === 'triple' ? '4x8x4x8x4' : '4x16x4');
   const isFrosted = windowSpec?.glazing?.finish === 'frosted';
   const frostedLoc = windowSpec?.glazing?.frostedLocation || 'bottom';
 
@@ -190,6 +191,7 @@ export function buildGlassListForWindow(derived, windowSpec) {
       type: glassType,
       spec: glassSpec,
       spacer,
+      spacerType,
       finish: upperFinish,
       makeup,
       bars: gridMode,
@@ -203,6 +205,7 @@ export function buildGlassListForWindow(derived, windowSpec) {
       type: glassType,
       spec: glassSpec,
       spacer,
+      spacerType,
       finish: lowerFinish,
       makeup,
       bars: gridMode,

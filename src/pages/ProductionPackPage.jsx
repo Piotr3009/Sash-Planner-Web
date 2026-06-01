@@ -936,6 +936,7 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) 
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Spec</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Finish</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Spacer</th>
+                <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Spacer Type</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Windows</th>
               </tr>
             </thead>
@@ -951,6 +952,7 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) 
                   <td className="px-4 py-2.5 text-ink-300">{g.spec || '—'}</td>
                   <td className="px-4 py-2.5 text-ink-300">{g.finish}</td>
                   <td className="px-4 py-2.5 text-ink-300">{g.spacer}</td>
+                  <td className="px-4 py-2.5 text-ink-300">{g.spacerType === 'alu' ? 'Aluminium' : 'Warm Edge'}</td>
                   <td className="px-4 py-2.5 text-ink-400">{g.windows.join(', ')}</td>
                 </tr>
               ))}
@@ -2084,12 +2086,12 @@ function groupCutListItems(cutList) {
 function groupGlassItems(glassList) {
   const map = new Map();
   glassList.forEach((g) => {
-    const key = `${g.width}|${g.height}|${g.type}|${g.spec}|${g.spacer}|${g.finish}`;
+    const key = `${g.width}|${g.height}|${g.type}|${g.spec}|${g.spacer}|${g.spacerType || 'warm'}|${g.finish}`;
     if (!map.has(key)) {
       map.set(key, {
         width: g.width, height: g.height,
         type: g.type, spec: g.spec || 'toughened',
-        spacer: g.spacer, finish: g.finish,
+        spacer: g.spacer, spacerType: g.spacerType || 'warm', finish: g.finish,
         makeup: g.makeup,
         totalQty: 0, windows: [], projects: [],
       });

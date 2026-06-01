@@ -80,6 +80,7 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
   const glassSpec = item?.glassSpec || item?.glass_spec || spec.glassSpec || fc.glassSpec || 'toughened';
   const glassFinish = item?.glassFinish || item?.glass_finish || spec.glassFinish || fc.glassFinish || 'clear';
   const spacerColor = item?.spacerColor || item?.spacer_color || fc.spacerColor || 'silver';
+  const spacerType = item?.spacerType || item?.spacer_type || fc.spacerType || 'warm';
   const frostedLocation = item?.frostedLocation || item?.frosted_location || fc.frostedLocation || 'bottom';
 
   // Hardware — new: item.ironmongery, old: item.ironmongery_finish
@@ -139,11 +140,12 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       spec: glassSpec,
       finish: glassFinish,
       frostedLocation,
-      thickness: glassType === 'triple' ? 36 : 24,
-      makeup: glassType === 'triple' ? '4x12x4x12x4' : '4x16x4',
+      thickness: glassType === 'triple' ? 28 : 24,
+      makeup: glassType === 'triple' ? '4x8x4x8x4' : '4x16x4',
       toughened: glassSpec === 'toughened',
       frosted: glassFinish === 'frosted',
-      spacerColour: spacerColor
+      spacerColour: spacerColor,
+      spacerType
     },
     materials: {
       sashRaw: [

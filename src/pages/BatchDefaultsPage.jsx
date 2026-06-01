@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProjectStore, BATCH_DEFAULTS } from '../stores/projectStore.js';
-import { GLASS_TYPES, GLASS_SPECS, SPACERS, RAL_GROUPS as RAL, FB_GROUPS as FB } from '../config.js';
+import { GLASS_TYPES, GLASS_SPECS, SPACERS, SPACER_TYPES, RAL_GROUPS as RAL, FB_GROUPS as FB } from '../config.js';
 import { useIronmongeryStore, IRONMONGERY_CATEGORIES } from '../stores/ironmongeryStore.js';
 import IronmongeryPickerModal from '../components/IronmongeryPickerModal.jsx';
 
@@ -70,6 +70,7 @@ export default function BatchDefaultsPage() {
             <Lbl>Type</Lbl><HChips o={GLASS_TYPES} v={d.glassType} c={v => upd('glassType', v)} />
             <Lbl>Specification</Lbl><HChips o={GLASS_SPECS} v={d.glassSpec} c={v => upd('glassSpec', v)} />
             <Lbl>Spacer</Lbl><HChips o={SPACERS} v={d.spacerColor} c={v => upd('spacerColor', v)} />
+            <Lbl>Spacer Type</Lbl><HChips o={SPACER_TYPES} v={d.spacerType || 'warm'} c={v => upd('spacerType', v)} />
           </Sec>
 
           {/* 3. SECURITY */}
@@ -142,6 +143,7 @@ export default function BatchDefaultsPage() {
             <SR l="Colour" v={d.colourMode === 'single' ? 'Single' : 'Dual (+15%)'} />
             <SR l="Glass" v={`${d.glassType} / ${d.glassSpec}`} />
             <SR l="Spacer" v={d.spacerColor} />
+            <SR l="Spacer Type" v={(SPACER_TYPES.find(t => t.value === (d.spacerType || 'warm')) || {}).label || 'Warm Edge'} />
             <SR l="PAS24" v={d.pas24 ? 'Yes' : 'No'} />
             <SR l="Frame" v={d.glassType === 'triple' ? '172mm (triple)' : (d.frameType === 'standard' ? '164mm' : '144mm')} />
             {isSash && <SR l="Horns" v={d.hornType === 'none' ? 'None' : d.hornType} />}

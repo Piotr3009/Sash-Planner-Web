@@ -158,6 +158,12 @@ export const SPACERS = [
   { value: 'black', label: 'Black' },
 ];
 
+// Spacer bar TYPE (separate from colour above). Default: warm edge.
+export const SPACER_TYPES = [
+  { value: 'warm', label: 'Warm Edge' },
+  { value: 'alu', label: 'Aluminium' },
+];
+
 // ═══════════════════════════════════════════════════════════════
 // PAS24
 // ═══════════════════════════════════════════════════════════════

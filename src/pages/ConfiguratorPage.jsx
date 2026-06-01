@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
-import { GLASS_TYPES, GLASS_FINISHES, FROSTED_LOCATIONS, SPACERS, SWATCHES, RAL_GROUPS, FB_GROUPS } from '../config.js';
+import { GLASS_TYPES, GLASS_FINISHES, FROSTED_LOCATIONS, SPACERS, SPACER_TYPES, SWATCHES, RAL_GROUPS, FB_GROUPS } from '../config.js';
 import { buildVentGrilles } from '../engine/lists.js';
 
 const Viewer3D = lazy(() => import('../3d/App.jsx'));
@@ -78,6 +78,7 @@ export default function ConfiguratorPage() {
   const [ovIronmongery, setOvIronmongery] = useState(null);
   const [ovHornType, setOvHornType] = useState(null);
   const [ovSpacerColor, setOvSpacerColor] = useState(null);
+  const [ovSpacerType, setOvSpacerType] = useState(null);
   const [ovWoodColor, setOvWoodColor] = useState(null);
 
   // Prefill form when editing
@@ -104,6 +105,7 @@ export default function ConfiguratorPage() {
       setOvIronmongery(editingWindow.ovIronmongery ?? null);
       setOvHornType(editingWindow.ovHornType ?? null);
       setOvSpacerColor(editingWindow.ovSpacerColor ?? null);
+      setOvSpacerType(editingWindow.ovSpacerType ?? null);
       setOvWoodColor(editingWindow.ovWoodColor ?? null);
       setPrefilled(true);
     }
@@ -146,6 +148,7 @@ export default function ConfiguratorPage() {
   const gType = ovGlassType ?? def.glassType ?? 'double';
   const gSpec = def.glassSpec || 'toughened';
   const spacer = ovSpacerColor ?? def.spacerColor ?? 'white';
+  const spacerType = ovSpacerType ?? def.spacerType ?? 'warm';
   const pas24 = def.pas24 || false;
   const iron = ovIronmongery ?? def.ironmongery ?? 'brass';
   const frameDepth = gType === 'triple' ? 172 : (boxType === 'standard' ? 164 : 144);
@@ -194,11 +197,11 @@ export default function ConfiguratorPage() {
       upperGlass: gFin === 'frosted' && frostLoc === 'both' ? 'frosted' : 'clear',
       lowerGlass: gFin === 'frosted' ? 'frosted' : 'clear',
       glassType: gType, glassSpec: gSpec, glassFinish: gFin, frostedLocation: frostLoc,
-      spacerColor: spacer, sashType, splitRatio, headType, openingType: opening,
+      spacerColor: spacer, spacerType, sashType, splitRatio, headType, openingType: opening,
       ventRoomType, ventSoleWindow,
       frameType: gType === 'triple' ? 'standard' : boxType, frameDepth, pas24,
       // B6: persist overrides (null = no override)
-      ovGlassType, ovIronmongery, ovHornType, ovSpacerColor, ovWoodColor,
+      ovGlassType, ovIronmongery, ovHornType, ovSpacerColor, ovSpacerType, ovWoodColor,
     };
 
     if (isEditMode) {
@@ -323,6 +326,9 @@ export default function ConfiguratorPage() {
               <OverrideRow label="Spacer colour" active={ovSpacerColor !== null} onToggle={() => setOvSpacerColor(ovSpacerColor !== null ? null : (def.spacerColor || 'white'))}>
                 <HChips o={SPACERS} v={ovSpacerColor || spacer} c={setOvSpacerColor} />
               </OverrideRow>
+              <OverrideRow label="Spacer type" active={ovSpacerType !== null} onToggle={() => setOvSpacerType(ovSpacerType !== null ? null : (def.spacerType || 'warm'))}>
+                <HChips o={SPACER_TYPES} v={ovSpacerType || spacerType} c={setOvSpacerType} />
+              </OverrideRow>
               <OverrideRow label="Wood colour" active={ovWoodColor !== null} onToggle={() => setOvWoodColor(ovWoodColor !== null ? null : (def.woodColor || '#F6F6F6'))}>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -395,6 +401,8 @@ export default function ConfiguratorPage() {
             <SR l="Spec" v={gSpec} /><SR l="Finish" v={gFin} />
             <SR l="Spacer" v={spacer} />
             {ovSpacerColor !== null && <div className="px-4 py-0.5 text-[9px] text-amber-400">overridden</div>}
+            <SR l="Spacer Type" v={(SPACER_TYPES.find(t => t.value === spacerType) || {}).label || 'Warm Edge'} />
+            {ovSpacerType !== null && <div className="px-4 py-0.5 text-[9px] text-amber-400">overridden</div>}
           </SG>
           <SG t="Opening"><SR l="Type" v={opening} /></SG>
           <SG t="Hardware">

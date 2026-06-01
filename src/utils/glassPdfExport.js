@@ -225,7 +225,9 @@ function drawTable(doc, items, startY) {
     doc.text(g.makeup || '', x + 148, y);
     doc.text(g.spec || '', x + 178, y);
     doc.text(g.finish || '', x + 210, y);
-    doc.text(g.spacer || '', x + 238, y);
+    doc.setFontSize(5.5);
+    doc.text(`${g.spacer || ''} · ${g.spacerType === 'alu' ? 'alu' : 'warm'}`, x + 238, y);
+    doc.setFontSize(6);
     doc.text(g.bars || '', x + 262, y);
 
     y += TABLE_ROW_H;
@@ -252,7 +254,7 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(5);
   tc(doc, C.glass);
-  doc.text(`${g.type} / ${g.finish} · spacer: ${g.spacer}`, cx + cw - 2, cy + 4, { align: 'right' });
+  doc.text(`${g.type} / ${g.finish} · spacer: ${g.spacer} (${g.spacerType === 'alu' ? 'aluminium' : 'warm edge'})`, cx + cw - 2, cy + 4, { align: 'right' });
   dc(doc, C.black);
   doc.setLineWidth(LW.cellIn);
   doc.line(cx + 0.3, cy + 6, cx + cw - 0.3, cy + 6);
@@ -283,6 +285,35 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
   const es = EDGE_SEAL * sc;
   doc.setLineWidth(LW.seal);
   doc.rect(gx + es, gy + es, gw - 2 * es, gh - 2 * es);
+
+  // Frosted hatch — fine 45° diagonal lines inside edge seal (subtle)
+  if (g.finish === 'frosted') {
+    const fx = gx + es, fy = gy + es;
+    const fw = gw - 2 * es, fh = gh - 2 * es;
+    const step = 4;
+    dc(doc, C.glass);
+    doc.setLineWidth(LW.seal * 0.6);
+    const hasGS = doc.saveGraphicsState && doc.GState;
+    if (hasGS) {
+      doc.saveGraphicsState();
+      doc.setGState(new doc.GState({ opacity: 0.35 }));
+    }
+    // 45° lines: y = x + c. Clip each line to the [fx, fx+fw] x [fy, fy+fh] box.
+    for (let c = fy - (fx + fw); c <= fy + fh - fx; c += step) {
+      // line: y = (x - fx) + (fx + c)  →  points where it enters/exits the box
+      let xA = fx, yA = (xA - fx) + (fx + c);
+      let xB = fx + fw, yB = (xB - fx) + (fx + c);
+      // clamp to vertical bounds
+      if (yA < fy) { yA = fy; xA = fx + (yA - (fx + c)); }
+      if (yA > fy + fh) { yA = fy + fh; xA = fx + (yA - (fx + c)); }
+      if (yB < fy) { yB = fy; xB = fx + (yB - (fx + c)); }
+      if (yB > fy + fh) { yB = fy + fh; xB = fx + (yB - (fx + c)); }
+      if (xA >= fx && xA <= fx + fw && xB >= fx && xB <= fx + fw && xB > xA) {
+        doc.line(xA, yA, xB, yB);
+      }
+    }
+    if (hasGS) doc.restoreGraphicsState();
+  }
 
   // Bars
   const pat = BAR_PATTERNS[g.bars] || BAR_PATTERNS['none'];
@@ -438,12 +469,13 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
     const type = windowSpec?.glazing?.type || 'double';
     const spec = windowSpec?.glazing?.spec || 'toughened';
     const spacer = windowSpec?.glazing?.spacerColour || 'silver';
+    const spacerType = windowSpec?.glazing?.spacerType || 'warm';
     const makeup = windowSpec?.glazing?.makeup || '4x16x4';
     const isFrosted = windowSpec?.glazing?.finish === 'frosted';
     const fLoc = windowSpec?.glazing?.frostedLocation || 'bottom';
     const grid = windowSpec?.sash?.grid?.mode || 'none';
 
-    const base = { windowName: win.name, projectNumber: win._projectNumber || '', type, spec, spacer, makeup, bars: grid, sashW: sw };
+    const base = { windowName: win.name, projectNumber: win._projectNumber || '', type, spec, spacer, spacerType, makeup, bars: grid, sashW: sw };
 
     glassItems.push({ ...base, index: idx++, sash: 'Upper', sashH: topH, glassW, glassH: glassHupper, finish: isFrosted && fLoc === 'both' ? 'frosted' : 'clear' });
     glassItems.push({ ...base, index: idx++, sash: 'Lower', sashH: botH, glassW, glassH: glassHlower, finish: isFrosted ? 'frosted' : 'clear' });

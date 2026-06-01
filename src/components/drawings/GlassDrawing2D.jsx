@@ -109,11 +109,17 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
 
     const glassType = windowSpec?.glass?.type || windowSpec?.glazing?.type || 'double';
     const glassFinish = windowSpec?.glass?.finish || windowSpec?.glazing?.finish || 'clear';
+    const frostedLocation = windowSpec?.glazing?.frostedLocation || windowSpec?.glass?.frostedLocation || 'bottom';
     const spacerColour = windowSpec?.glazing?.spacerColour || 'black';
+    const spacerType = windowSpec?.glazing?.spacerType || 'warm';
+
+    // Frosted applies to THIS panel when finish is frosted AND
+    // (this is the lower sash, OR frosting covers both sashes).
+    const isFrosted = glassFinish === 'frosted' && (!isUpper || frostedLocation === 'both');
 
     return { glassW, glassH, vBars: bars.vBars, hBars: bars.hBars,
       vCount, hCount, hCuts, vCuts, checkOk, errs,
-      glassType, glassFinish, spacerColour, isUpper };
+      glassType, glassFinish, spacerColour, spacerType, isFrosted, isUpper };
   }, [windowSpec, derived, type]);
 
   if (!d) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
@@ -133,6 +139,15 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
       <svg viewBox={`0 0 ${totalW} ${totalH}`} xmlns="http://www.w3.org/2000/svg"
         className="w-full h-auto" style={{ background: COLORS.bg }}>
 
+        {/* Frosted hatch pattern — fine diagonal lines, subtle */}
+        <defs>
+          <pattern id={`frost-${d.isUpper ? 'u' : 'l'}`} width={14 * layoutSc} height={14 * layoutSc}
+            patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2={14 * layoutSc}
+              stroke={COLORS.glass} strokeWidth={0.5} {...NS} strokeOpacity={0.45} />
+          </pattern>
+        </defs>
+
         {/* Glass unit — outer edge */}
         <rect x={ox} y={oy} width={d.glassW} height={d.glassH}
           fill={COLORS.glass} fillOpacity={0.08}
@@ -142,6 +157,13 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
         <rect x={ox + EDGE_SEAL} y={oy + EDGE_SEAL}
           width={d.glassW - 2 * EDGE_SEAL} height={d.glassH - 2 * EDGE_SEAL}
           fill="none" stroke={COLORS.glass} strokeWidth={0.5} {...NS} strokeOpacity={0.6} />
+
+        {/* Frosted hatch overlay — inside edge seal, drawn under bars */}
+        {d.isFrosted && (
+          <rect x={ox + EDGE_SEAL} y={oy + EDGE_SEAL}
+            width={d.glassW - 2 * EDGE_SEAL} height={d.glassH - 2 * EDGE_SEAL}
+            fill={`url(#frost-${d.isUpper ? 'u' : 'l'})`} stroke="none" />
+        )}
 
         {/* Vertical spacer bars — two parallel lines, broken at h-bar intersections */}
         {d.vBars.map((bar, i) => {
@@ -220,7 +242,7 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
         <text x={totalW / 2} y={totalH - 4 * ts}
           fill={STROKE.glass} fontSize={tfs(SIZES.subtitle * 1.25, totalW)} fontFamily={FONT.family}
           textAnchor="middle" fillOpacity={0.7}>
-          {d.glassType} / {d.glassFinish} · spacer: {d.spacerColour}
+          {d.glassType} / {d.glassFinish} · spacer: {d.spacerColour} ({d.spacerType === 'alu' ? 'aluminium' : 'warm edge'})
         </text>
 
         {/* Alarm */}

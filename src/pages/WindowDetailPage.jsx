@@ -225,6 +225,7 @@ function GlassPanel({ item, windowSpec, derived, batch, settings }) {
                 <th className="px-4 py-2 text-left text-ink-400 font-medium">Makeup</th>
                 <th className="px-4 py-2 text-left text-ink-400 font-medium">Finish</th>
                 <th className="px-4 py-2 text-left text-ink-400 font-medium">Spacer</th>
+                <th className="px-4 py-2 text-left text-ink-400 font-medium">Spacer Type</th>
               </tr>
             </thead>
             <tbody>
@@ -238,6 +239,7 @@ function GlassPanel({ item, windowSpec, derived, batch, settings }) {
                   <td className="px-4 py-2 text-ink-300">{g.makeup || '—'}</td>
                   <td className="px-4 py-2 text-ink-300">{g.finish}</td>
                   <td className="px-4 py-2 text-ink-300">{g.spacer}</td>
+                  <td className="px-4 py-2 text-ink-300">{g.spacerType === 'alu' ? 'Aluminium' : 'Warm Edge'}</td>
                 </tr>
               ))}
             </tbody>
