@@ -102,7 +102,12 @@ export function windowSpecToConfig(windowSpec) {
 
   // Glass
   const glassFinish = windowSpec.glazing?.finish || 'clear';
+  const frostedLocation = windowSpec.glazing?.frostedLocation || windowSpec.glazing?.frosted_location || 'bottom';
   const isDouble = (windowSpec.glazing?.type || 'double') !== 'single';
+
+  // Frosted applies per-sash: lower when frosted; upper only when location = both.
+  const upperFrosted = glassFinish === 'frosted' && frostedLocation === 'both' ? 'frosted' : 'clear';
+  const lowerFrosted = glassFinish === 'frosted' ? 'frosted' : 'clear';
 
   // Ironmongery
   const ironmongery = windowSpec.hardware?.finish || 'brass';
@@ -123,8 +128,8 @@ export function windowSpecToConfig(windowSpec) {
     woodColorExt: isSameColor ? null : woodColorExt,
     woodColorInt: isSameColor ? null : woodColorInt,
     sameColor: isSameColor,
-    upperGlass: glassFinish,
-    lowerGlass: glassFinish,
+    upperGlass: upperFrosted,
+    lowerGlass: lowerFrosted,
     doubleGlazing: isDouble,
     spacerColor,
     ironmongery,
