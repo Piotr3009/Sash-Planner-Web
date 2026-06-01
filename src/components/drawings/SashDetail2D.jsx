@@ -63,9 +63,9 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
     const glassW = sashW - 2 * stile;
     const glassH = sashH - topEdge - botEdge;
     const REBATE_OFFSET = 9;
-    const rebateX = glassX + REBATE_OFFSET, rebateY = glassY + REBATE_OFFSET;
-    const rebateW = glassW - 2 * REBATE_OFFSET;
-    const rebateH = glassH - 2 * REBATE_OFFSET;
+    const rebateX = glassX - REBATE_OFFSET, rebateY = glassY - REBATE_OFFSET;
+    const rebateW = glassW + 2 * REBATE_OFFSET;
+    const rebateH = glassH + 2 * REBATE_OFFSET;
     const gridMode = windowSpec.sash?.grid?.mode || 'none';
     const pattern = BAR_PATTERNS[gridMode] || BAR_PATTERNS['none'];
     const v = pattern.v, h = pattern.h;
