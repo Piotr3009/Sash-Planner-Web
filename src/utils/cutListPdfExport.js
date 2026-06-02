@@ -122,13 +122,13 @@ export function exportCutListPDF(info) {
     ? [
         { label: 'No.', dx: 0, mono: true },
         { label: 'Project', dx: 14 },
-        { label: 'Window', dx: 42 },
+        { label: 'Windows', dx: 42 },
         { label: 'Length (mm)', dx: 150, align: 'right', mono: true },
         { label: 'Qty', dx: 180, align: 'right', mono: true },
       ]
     : [
         { label: 'No.', dx: 0, mono: true },
-        { label: 'Window', dx: 14 },
+        { label: 'Windows', dx: 14 },
         { label: 'Length (mm)', dx: 130, align: 'right', mono: true },
         { label: 'Qty', dx: 165, align: 'right', mono: true },
       ];

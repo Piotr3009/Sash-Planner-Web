@@ -343,6 +343,31 @@ export function buildGroupedCutList(rawCutList) {
   const win = (r) => r.windowName || r.window || '';
   const proj = (r) => r._projectNumber || r.projectNum || '';
 
+  // Consolidate rows of the SAME length within a group into one row:
+  // sum the quantities and collect the contributing window names.
+  // Rows flagged mismatch are never merged (kept separate as error signals).
+  const consolidate = (rows) => {
+    const byLen = new Map();
+    const passthrough = [];
+    rows.forEach((r) => {
+      if (r.mismatch) { passthrough.push(r); return; }
+      const k = r.length;
+      if (!byLen.has(k)) {
+        byLen.set(k, { length: r.length, qty: 0, windows: [], projectNum: r.projectNum, section: r.section });
+      }
+      const agg = byLen.get(k);
+      agg.qty += r.qty;
+      if (r.window && !agg.windows.includes(r.window)) agg.windows.push(r.window);
+    });
+    const merged = Array.from(byLen.values()).map((a) => ({
+      length: a.length, qty: a.qty,
+      window: a.windows.join(', '),   // listed windows, e.g. "W2, r5, w4"
+      windowCount: a.windows.length,
+      projectNum: a.projectNum, section: a.section,
+    }));
+    return [...merged, ...passthrough];
+  };
+
   // Bucket rows by engine element name.
   const byElement = new Map();
   rawCutList.forEach((row) => {
@@ -386,16 +411,18 @@ export function buildGroupedCutList(rawCutList) {
         });
       });
       if (rows.length) {
-        rows.sort((a, b) => (b.length - a.length) || a.window.localeCompare(b.window));
-        groups.push({ symbol: def.symbol, label: def.label, mirror: true, section: rows[0].section || '', rows });
+        const consolidated = consolidate(rows);
+        consolidated.sort((a, b) => (b.length - a.length) || (a.window || '').localeCompare(b.window || ''));
+        groups.push({ symbol: def.symbol, label: def.label, mirror: true, section: consolidated[0].section || '', rows: consolidated });
       }
     } else {
       if (leftRows.length) {
         const rows = leftRows.map((r) => ({
           window: win(r), projectNum: proj(r), length: r.length, qty: r.quantity || 1, section: r.section,
         }));
-        rows.sort((a, b) => (b.length - a.length) || a.window.localeCompare(b.window));
-        groups.push({ symbol: def.symbol, label: def.label, mirror: false, section: rows[0].section || '', rows });
+        const consolidated = consolidate(rows);
+        consolidated.sort((a, b) => (b.length - a.length) || (a.window || '').localeCompare(b.window || ''));
+        groups.push({ symbol: def.symbol, label: def.label, mirror: false, section: consolidated[0].section || '', rows: consolidated });
       }
     }
   });

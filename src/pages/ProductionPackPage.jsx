@@ -1588,7 +1588,7 @@ function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat 
                   <tr className="border-b border-surface-500 bg-surface-700/30">
                     <th className="px-4 py-2 text-left text-ink-400 font-medium w-16">Symbol</th>
                     {isPPMode && <th className="px-4 py-2 text-left text-ink-400 font-medium">Project</th>}
-                    <th className="px-4 py-2 text-left text-ink-400 font-medium">Window</th>
+                    <th className="px-4 py-2 text-left text-ink-400 font-medium">Windows</th>
                     <th className="px-4 py-2 text-right text-ink-400 font-medium">Length</th>
                     <th className="px-4 py-2 text-right text-ink-400 font-medium">Qty</th>
                     <th className="px-4 py-2 text-left text-ink-400 font-medium">Finished</th>
