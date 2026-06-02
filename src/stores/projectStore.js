@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { mockProjects, mockProductionPacks } from '../mocks/mockProjects.js';
 
 // ─── Production settings (preserved from original — used by calculations engine) ───
 const defaultSettings = {
@@ -654,8 +653,8 @@ export const useProjectStore = create(
       }),
       merge: (persisted, current) => {
         if (!persisted || !persisted.projects) {
-          // First visit — no saved data at all, use mocks
-          return { ...current, projects: mockProjects, productionPacks: mockProductionPacks, projectsLoaded: true };
+          // First visit — start empty (no mock data).
+          return { ...current, projects: [], productionPacks: [], projectsLoaded: true };
         }
         // Saved data exists — always restore it.
         // Deep-merge settings so newly-added defaults (e.g. company) survive old saves.

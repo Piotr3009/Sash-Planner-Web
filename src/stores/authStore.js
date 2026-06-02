@@ -2,11 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase, hasSupabaseConfig } from '../services/supabase.js';
 
-const MOCK_SESSION = {
-  user: { id: 'mock-user', email: 'demo@sashplanner.local' },
-  mock: true
-};
-
 export const useAuthStore = create(
   persist(
     (set, get) => ({
@@ -15,11 +10,6 @@ export const useAuthStore = create(
   error: null,
 
   init: async () => {
-    // Don't wipe an existing session (e.g. mock session already set or restored from persist)
-    if (get().session) {
-      set({ loading: false });
-      return;
-    }
     if (!hasSupabaseConfig) {
       set({ session: null, loading: false });
       return;
@@ -32,8 +22,9 @@ export const useAuthStore = create(
   signIn: async (email, password) => {
     set({ error: null });
     if (!hasSupabaseConfig) {
-      set({ session: MOCK_SESSION });
-      return { ok: true, mock: true };
+      const msg = 'Supabase not configured.';
+      set({ error: msg });
+      return { ok: false, error: msg };
     }
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
@@ -44,12 +35,8 @@ export const useAuthStore = create(
     return { ok: true };
   },
 
-  signInWithMockData: () => {
-    set({ session: MOCK_SESSION, error: null });
-  },
-
   signOut: async () => {
-    if (hasSupabaseConfig && !get().session?.mock) {
+    if (hasSupabaseConfig) {
       await supabase.auth.signOut();
     }
     set({ session: null });

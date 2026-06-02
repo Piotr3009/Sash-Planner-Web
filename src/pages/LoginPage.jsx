@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore.js';
-import { hasSupabaseConfig } from '../services/supabase.js';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const session = useAuthStore((s) => s.session);
   const signIn = useAuthStore((s) => s.signIn);
-  const signInWithMockData = useAuthStore((s) => s.signInWithMockData);
   const error = useAuthStore((s) => s.error);
 
   const [email, setEmail] = useState('');
@@ -37,12 +35,6 @@ export default function LoginPage() {
           <img src="/logo-full.png" alt="Production Core" className="h-12 w-auto mx-auto mb-2" />
           <p className="text-xs text-ink-400">Windows & Doors Timber Production</p>
         </div>
-
-        {!hasSupabaseConfig && (
-          <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
-            Supabase not configured. You can sign in with mock data to explore the app, or copy <code>.env.example</code> to <code>.env</code> and add real keys.
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -75,20 +67,6 @@ export default function LoginPage() {
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
-
-        <div className="mt-4 pt-4 border-t border-ink-200">
-          <button
-            type="button"
-            onClick={() => {
-              console.log('[LoginPage] mock button clicked');
-              signInWithMockData();
-              console.log('[LoginPage] session after mock:', useAuthStore.getState().session);
-            }}
-            className="btn btn-secondary w-full"
-          >
-            Continue with mock data
-          </button>
-        </div>
       </div>
     </div>
   );
