@@ -8,7 +8,7 @@ const defaultSettings = {
   endTrim: 10,
   minimumPiece: 200,
   stockLengthSash: 5900,
-  stockLengthBox: 2500,
+  stockLengthBox: 3700,
   boxWidthAllowance: 20,
   hornExtensionDefault: 75,
   glazingAllowanceWidth: 4,
@@ -348,6 +348,31 @@ export const useProjectStore = create(
         pp.id === ppId ? { ...pp, ...patch } : pp
       ),
     }));
+  },
+
+  // Persist pre-cut editable settings (stock lengths + offcuts) to the active
+  // container: a production pack (isPP=true) or a batch's defaults (isPP=false).
+  setPrecutSettings: (id, isPP, precutSettings) => {
+    if (isPP) {
+      set((s) => ({
+        productionPacks: s.productionPacks.map((pp) =>
+          pp.id === id ? { ...pp, precutSettings } : pp
+        ),
+      }));
+      return;
+    }
+    set((s) => {
+      const patchBatch = (b) =>
+        b.id === id
+          ? { ...b, defaults: { ...(b.defaults || {}), precutSettings } }
+          : b;
+      return {
+        projects: s.projects.map((p) => ({ ...p, batches: (p.batches || []).map(patchBatch) })),
+        currentProject: s.currentProject
+          ? { ...s.currentProject, batches: (s.currentProject.batches || []).map(patchBatch) }
+          : s.currentProject,
+      };
+    });
   },
 
   assignBatchToProductionPack: (ppId, projectId, batchId) => {

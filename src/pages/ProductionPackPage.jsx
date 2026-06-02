@@ -1112,11 +1112,24 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
     return null;
   };
 
-  // Local state for editable stock lengths and offcuts per group
-  const [stockLengths, setStockLengths] = useState({});
-  const [offcutsMap, setOffcutsMap] = useState({}); // key → [length, length, ...]
-  const [offcutInput, setOffcutInput] = useState({}); // key → current input string
+  // Editable stock lengths and offcuts per group — persisted to the active
+  // container (production pack or batch) so they survive tab switches & reloads.
+  const savedPrecut = isPPMode ? (pp?.precutSettings) : (batch?.defaults?.precutSettings);
+  const [stockLengths, setStockLengths] = useState(savedPrecut?.stockLengths || {});
+  const [offcutsMap, setOffcutsMap] = useState(savedPrecut?.offcuts || {}); // key → [length, ...]
+  const [offcutInput, setOffcutInput] = useState({}); // key → current input string (not persisted)
   const [expandedGroups, setExpandedGroups] = useState({});
+
+  // Persist stock/offcut changes back to the store (debounced via effect).
+  const persistPrecut = useProjectStore((s) => s.setPrecutSettings);
+  const didMountPrecut = useRef(false);
+  useEffect(() => {
+    // Skip the very first run (initial load) to avoid a redundant write.
+    if (!didMountPrecut.current) { didMountPrecut.current = true; return; }
+    const targetId = isPPMode ? pp?.id : batch?.id;
+    if (!targetId) return;
+    persistPrecut(targetId, isPPMode, { stockLengths, offcuts: offcutsMap });
+  }, [stockLengths, offcutsMap]);
 
   if (!merged?.precut) {
     return <div className="card p-8 text-center text-ink-400">No pre-cut data available.</div>;
