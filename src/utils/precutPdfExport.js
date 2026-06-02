@@ -404,6 +404,7 @@ export function exportPreCutPDF({
   isPPMode = false,
   format = 'a3',    // 'a3' or 'a4'
   companySettings = {},
+  returnDoc = false,
 }) {
   const PG = getPageDims(format);
   const endTrim = settings?.endTrim || 10;
@@ -503,6 +504,7 @@ export function exportPreCutPDF({
   });
 
   const filename = `PreCut_${(info.batchName || 'batch').replace(/[^a-zA-Z0-9-]/g, '_')}_${info.date.replace(/\//g, '-')}.pdf`;
+  if (returnDoc) return doc.output('arraybuffer');
   doc.save(filename);
   return filename;
 }

@@ -68,5 +68,6 @@ export function exportOverviewPDF(info) {
   });
 
   stampReportPages(doc, PG);
+  if (info.returnDoc) return doc.output('arraybuffer');
   doc.save(`Overview_${(info.title || 'pack').replace(/[^a-z0-9]+/gi, '_')}.pdf`);
 }

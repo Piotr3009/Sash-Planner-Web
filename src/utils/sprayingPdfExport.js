@@ -77,5 +77,6 @@ export function exportSprayingPDF(info) {
   stampReportPages(doc, PG);
 
   const fname = `Spraying_${(info.title || 'pack').replace(/[^a-z0-9]+/gi, '_')}.pdf`;
+  if (info.returnDoc) return doc.output('arraybuffer');
   doc.save(fname);
 }

@@ -269,5 +269,6 @@ export function exportCutListPDF(info) {
     doc.text(`${p} / ${total}`, PG.w - PG.bx - 3 * S, fy + 2 * S, { align: 'right' });
   }
 
+  if (info.returnDoc) return doc.output('arraybuffer');
   doc.save(`CutList_${(info.title || 'pack').replace(/[^a-z0-9]+/gi, '_')}.pdf`);
 }

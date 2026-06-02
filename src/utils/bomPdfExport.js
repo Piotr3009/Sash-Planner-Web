@@ -38,23 +38,37 @@ export function exportBomPDF(info) {
   drawReportHeader(doc, PG, hdr);
   drawReportFooter(doc, PG, hdr);
 
-  const columns = [
-    { label: 'No.',      dx: 0,   auto: true, mono: true },
-    { label: 'Material', dx: 10 },
-    { label: 'Item №',   dx: 150, mono: true },
-    { label: 'Qty',      dx: 198, align: 'right', mono: true },
-    { label: 'Unit £',   dx: 233, align: 'right', mono: true },
-    { label: 'Est. £',   dx: 273, align: 'right', mono: true, bold: true },
-  ];
+  const hidePrices = !!info.hidePrices;
+  const columns = hidePrices
+    ? [
+        { label: 'No.',      dx: 0,   auto: true, mono: true },
+        { label: 'Material', dx: 10 },
+        { label: 'Item №',   dx: 180, mono: true },
+        { label: 'Qty',      dx: 250, align: 'right', mono: true },
+      ]
+    : [
+        { label: 'No.',      dx: 0,   auto: true, mono: true },
+        { label: 'Material', dx: 10 },
+        { label: 'Item №',   dx: 150, mono: true },
+        { label: 'Qty',      dx: 198, align: 'right', mono: true },
+        { label: 'Unit £',   dx: 233, align: 'right', mono: true },
+        { label: 'Est. £',   dx: 273, align: 'right', mono: true, bold: true },
+      ];
 
   const rows = (info.rows || []).map((r) => ({
-    cells: [
-      `${r.name}${r.ironmongery ? ' (irn)' : ''}${r.assigned === false ? ' — unassigned' : ''}`,
-      r.itemNumber || '—',
-      r.qty,
-      r.unitCost,
-      r.estCost,
-    ],
+    cells: hidePrices
+      ? [
+          `${r.name}${r.ironmongery ? ' (irn)' : ''}${r.assigned === false ? ' — unassigned' : ''}`,
+          r.itemNumber || '—',
+          r.qty,
+        ]
+      : [
+          `${r.name}${r.ironmongery ? ' (irn)' : ''}${r.assigned === false ? ' — unassigned' : ''}`,
+          r.itemNumber || '—',
+          r.qty,
+          r.unitCost,
+          r.estCost,
+        ],
   }));
 
   let y = drawReportTable(doc, PG, {
@@ -62,17 +76,20 @@ export function exportBomPDF(info) {
     title: 'MATERIALS', columns, rows, tableWidth,
   });
 
-  // Est. total line (own page if it would overflow)
-  const x = PG.bx + 3;
-  const bottom = PG.h - PG.by - 12;
-  if (y + 8 > bottom) { newReportPage(doc, PG, hdr); y = PG.by + REPORT_HEADER_H + 12; }
-  doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.3);
-  doc.line(x, y - 1, x + tableWidth, y - 1);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(26, 26, 26);
-  doc.text('EST. TOTAL', x + columns[1].dx, y + 5);
-  doc.setFont('courier', 'bold');
-  doc.text(String(info.total || '—'), x + columns[5].dx, y + 5, { align: 'right' });
+  // Est. total line — only when prices are shown
+  if (!hidePrices) {
+    const x = PG.bx + 3;
+    const bottom = PG.h - PG.by - 12;
+    if (y + 8 > bottom) { newReportPage(doc, PG, hdr); y = PG.by + REPORT_HEADER_H + 12; }
+    doc.setDrawColor(180, 180, 180); doc.setLineWidth(0.3);
+    doc.line(x, y - 1, x + tableWidth, y - 1);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(26, 26, 26);
+    doc.text('EST. TOTAL', x + columns[1].dx, y + 5);
+    doc.setFont('courier', 'bold');
+    doc.text(String(info.total || '—'), x + columns[5].dx, y + 5, { align: 'right' });
+  }
 
   stampReportPages(doc, PG);
+  if (info.returnDoc) return doc.output('arraybuffer');
   doc.save(`BOM_${String(info.title || 'pack').replace(/[^a-z0-9]+/gi, '_')}.pdf`);
 }

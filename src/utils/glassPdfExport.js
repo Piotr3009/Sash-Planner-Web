@@ -450,7 +450,7 @@ function drawFooter(doc, info, pageNum, totalPages) {
 
 // ─── MAIN EXPORT ───
 
-export function exportGlassPDF({ batch, windowsData, projects = [], companySettings = {} }) {
+export function exportGlassPDF({ batch, windowsData, projects = [], companySettings = {}, returnDoc = false }) {
   const glassItems = [];
   let idx = 1;
 
@@ -536,6 +536,7 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
   }
 
   const filename = `Glass_Order_${(info.batchName || 'batch').replace(/[^a-zA-Z0-9-]/g, '_')}_${info.date.replace(/\//g, '-')}.pdf`;
+  if (returnDoc) return doc.output('arraybuffer');
   doc.save(filename);
   return filename;
 }

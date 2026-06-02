@@ -34,6 +34,7 @@ import { exportOverviewPDF } from '../utils/overviewPdfExport.js';
 import { exportThreeDPDF } from '../utils/threeDPdfExport.js';
 import { exportBomPDF } from '../utils/bomPdfExport.js';
 import { exportElevationsPDF, exportElementsPDF, exportSectionsPDF } from '../utils/drawingsPdfExport.js';
+import { buildProductionBook } from '../utils/productionBookExport.js';
 import { svgNodeToPng, loadImageSize } from '../utils/svgRaster.js';
 import { getColorName } from '../config.js';
 import { getPartSymbol } from '../engine/partSymbols.js';
@@ -63,6 +64,54 @@ const TABS = [
 // Tabs that currently have a PDF export implemented
 const EXPORTABLE_TABS = ['overview', '3d', 'elevations', 'sections', 'elements', 'glass', 'precut', 'cutlist', 'spraying', 'bom'];
 
+/**
+ * Build Cut List section bytes for the Production Book, independent of the
+ * CutListTab component (which is only mounted when its tab is active).
+ * Mirrors the grouping/sorting the tab uses (buildGroupedCutList).
+ */
+function buildCutListBookBytes({ merged, isPPMode, baseInfo }) {
+  if (!merged?.cutList?.length) return null;
+  const grouped = buildGroupedCutList(merged.cutList);
+  const map = new Map();
+  grouped.forEach((c) => {
+    const key = c.element;
+    if (!map.has(key)) {
+      map.set(key, {
+        element: c.element,
+        section: c.section,
+        symbolInfo: c.mergedSymbol
+          ? { symbol: c.mergedSymbol, name: c.mergedLabel, mirror: true }
+          : getPartSymbol(c.element),
+        items: [],
+      });
+    }
+    map.get(key).items.push(c);
+  });
+  const groups = Array.from(map.values()).map((g) => {
+    const agg = new Map();
+    g.items.sort((a, b) => b.length - a.length);
+    g.items.forEach((it) => {
+      const k = `${it.length}|${it.windowName || ''}|${it._projectNumber || ''}`;
+      if (!agg.has(k)) agg.set(k, { ...it, totalQty: 0 });
+      agg.get(k).totalQty += (it.quantity || 1);
+    });
+    const aggregated = Array.from(agg.values()).sort((a, b) => b.length - a.length);
+    return {
+      symbol: g.symbolInfo?.symbol || '',
+      element: g.element,
+      mirror: g.symbolInfo?.mirror,
+      section: g.items[0]?.section || '',
+      rows: aggregated.map((it) => ({
+        projectNum: it._projectNumber, window: it.windowName, length: it.length, qty: it.totalQty,
+      })),
+    };
+  });
+  const totalPieces = merged.cutList.reduce((s, c) => s + (c.quantity || 1), 0);
+  return exportCutListPDF({
+    ...baseInfo, isPPMode, totalPieces, groups, format: 'a3', returnDoc: true,
+  });
+}
+
 // ─── Status config ───
 const STATUS_CONFIG = {
   preparation:    { label: 'Preparation',    color: '#F59E0B' },
@@ -87,6 +136,40 @@ export default function ProductionPackPage() {
   const registerExport = useCallback((id, fn) => { exportHandlersRef.current[id] = fn; }, []);
   const canExport = EXPORTABLE_TABS.includes(tab);
   const handleHeaderExport = () => exportHandlersRef.current[tab]?.();
+
+  // Production Pack Book — combine sections into one A3 PDF (Etap 1: overview + cut list).
+  const handleExportBook = async () => {
+    const company = useProjectStore.getState().settings.company || {};
+    const projs = [...new Set(windowsData.map(({ win }) => win._projectNumber).filter(Boolean))];
+    const baseInfo = {
+      companyName: company.companyName || 'COMPANY NAME',
+      companyAddress: company.companyAddress || '',
+      logo: company.logo || '',
+      title: pp?.name || batch?.name || 'Pack',
+      projects: projs,
+      date: new Date().toLocaleDateString('en-GB'),
+      rev: 'A',
+    };
+
+    // Overview section bytes
+    const ovWindows = windowsData.map(({ win }) => ({
+      projectNum: win._projectNumber, name: win.name, type: win.sashType || 'double',
+      width: win.width, height: win.height, bars: win.upperBars || 'none',
+      head: win.headType || 'flat', glass: win.glassFinish || 'clear', opening: win.openingType || 'both',
+    }));
+    const overviewBytes = exportOverviewPDF({ ...baseInfo, isPPMode, windows: ovWindows, returnDoc: true });
+
+    // Cut List section bytes (reuse the same grouping the tab uses)
+    const cutListBytes = buildCutListBookBytes({ merged, isPPMode, settings, baseInfo });
+
+    await buildProductionBook({
+      info: baseInfo,
+      sections: [
+        { name: 'Overview', bytes: overviewBytes },
+        { name: 'Cut List', bytes: cutListBytes },
+      ],
+    });
+  };
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
 
@@ -377,6 +460,13 @@ export default function ProductionPackPage() {
               className={`btn btn-primary text-xs px-4 ${!canExport ? 'opacity-40 cursor-not-allowed' : ''}`}
             >
               📄 Export PDF
+            </button>
+            <button
+              onClick={handleExportBook}
+              title="Export the full Production Pack as one A3 book (Overview + Cut List)"
+              className="btn btn-secondary text-xs px-4"
+            >
+              📖 Export Book
             </button>
           </div>
         </div>
