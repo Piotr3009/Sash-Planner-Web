@@ -287,78 +287,118 @@ export function buildProjectAggregates(items, windowSpecs, settingsArg) {
 
 /**
  * MIRROR_PAIRS — left element name → { right element name, merged symbol, merged label }.
- * Used by buildGroupedCutList to merge mirror L/R pairs into a single row (qty ×2),
- * since both sides are identical (mirror). Single source of cut-list grouping logic,
- * consumed by single-window panel, Production Pack tab, PDF and Excel export.
+ * Pairs are merged per window into a single row (qty ×2) since L/R are identical.
  */
 export const MIRROR_PAIRS = {
-  'JAMB LEFT':                { right: 'JAMB RIGHT',                symbol: 'JB-L/R',  label: 'Jambs (L/R)' },
-  'INTERNAL JAMB LINER (L)':  { right: 'INTERNAL JAMB LINER (R)',  symbol: 'IL-L/R',  label: 'Internal Jamb Liner (L/R)' },
-  'EXTERNAL JAMB LINER (L)':  { right: 'EXTERNAL JAMB LINER (R)',  symbol: 'EL-L/R',  label: 'External Jamb Liner (L/R)' },
-  'STILES TOP SASH (L)':      { right: 'STILES TOP SASH (R)',      symbol: 'STS-L/R', label: 'Stiles Top Sash (L/R)' },
-  'STILES BOTTOM SASH (L)':   { right: 'STILES BOTTOM SASH (R)',   symbol: 'SBS-L/R', label: 'Stiles Bottom Sash (L/R)' },
+  'JAMB LEFT':                { right: 'JAMB RIGHT',                symbol: 'JB-L/R',  label: 'Jambs (pair)' },
+  'INTERNAL JAMB LINER (L)':  { right: 'INTERNAL JAMB LINER (R)',  symbol: 'IL-L/R',  label: 'Internal Jamb Liner (pair)' },
+  'EXTERNAL JAMB LINER (L)':  { right: 'EXTERNAL JAMB LINER (R)',  symbol: 'EL-L/R',  label: 'External Jamb Liner (pair)' },
+  'STILES TOP SASH (L)':      { right: 'STILES TOP SASH (R)',      symbol: 'STS-L/R', label: 'Stiles Top Sash (pair)' },
+  'STILES BOTTOM SASH (L)':   { right: 'STILES BOTTOM SASH (R)',   symbol: 'SBS-L/R', label: 'Stiles Bottom Sash (pair)' },
 };
 
 /**
- * buildGroupedCutList — single source of cut-list presentation logic.
- * Takes a raw cut list (array of rows from buildCutListForWindow) and:
- *   1. Merges mirror L/R pairs into one row (qty doubled), using MIRROR_PAIRS.
- *      If a pair has UNEQUAL lengths, it is NOT merged (kept separate + flagged
- *      with mismatch:true) — unequal mirror parts signal a calculation error.
- *   2. Sorts the resulting rows by length DESCENDING (longest first) — the correct
- *      cutting order so the longest pieces are cut before short offcuts remain.
- *
- * Returns array of rows. Merged rows carry { mergedSymbol, mergedLabel, mirror:true };
- * unmerged rows are passed through unchanged.
+ * CUT_LIST_ORDER — the fixed display order of element TYPES in the cut list.
+ * Each entry maps an engine element name to its symbol/label. Pair entries
+ * (isPair) merge the L element with its MIRROR_PAIRS right partner per window.
+ * The cut list groups ALL windows under each type (no per-window sections),
+ * never sums across windows, and sorts pieces longest-first within each group.
+ */
+export const CUT_LIST_ORDER = [
+  // ── BOX ──
+  { match: 'HEAD',                      symbol: 'HEAD',    label: 'Head' },
+  { match: 'JAMB LEFT',                 symbol: 'JB-L/R',  label: 'Jambs (pair)',                isPair: true },
+  { match: 'INTERNAL JAMB LINER (L)',   symbol: 'IL-L/R',  label: 'Internal Jamb Liner (pair)',  isPair: true },
+  { match: 'EXTERNAL JAMB LINER (L)',   symbol: 'EL-L/R',  label: 'External Jamb Liner (pair)',  isPair: true },
+  { match: 'INTERNAL HEAD LINER',       symbol: 'IHL',     label: 'Internal Head Liner' },
+  { match: 'EXTERNAL HEAD LINER',       symbol: 'EHL',     label: 'External Head Liner' },
+  { match: 'CILL',                      symbol: 'SILL',    label: 'Cill' },
+  { match: 'CILL NOSE',                 symbol: 'CNOS',    label: 'Cill Nose' },
+  // ── SASH ──
+  { match: 'STILES TOP SASH (L)',       symbol: 'STS-L/R', label: 'Stiles Top Sash (pair)',      isPair: true },
+  { match: 'STILES BOTTOM SASH (L)',    symbol: 'SBS-L/R', label: 'Stiles Bottom Sash (pair)',   isPair: true },
+  { match: 'TOP RAIL',                  symbol: 'TR',      label: 'Top Rail' },
+  { match: 'TOP MEET RAIL',             symbol: 'TMR',     label: 'Top Meet Rail' },
+  { match: 'BOTTOM MEET RAIL',          symbol: 'BMR',     label: 'Bottom Meet Rail' },
+  { match: 'BOTTOM RAIL',               symbol: 'BR',      label: 'Bottom Rail' },
+];
+
+/**
+ * buildGroupedCutList — single source of cut-list grouping.
+ * Returns an ORDERED array of groups (one per element TYPE present), following
+ * CUT_LIST_ORDER. Each group:
+ *   { symbol, label, mirror, section, rows: [{ window, projectNum, length, qty, mismatch? }] }
+ * Rules:
+ *   - Group by TYPE across ALL windows (no per-window sections).
+ *   - Pair types merge L+R of the SAME window & SAME length into one row qty×2.
+ *     A pair whose L/R differ in length is NOT merged (kept as two rows, flagged
+ *     mismatch:true) — that signals a calculation error.
+ *   - Never sum across windows: each window's piece is its own row.
+ *   - Sort rows longest-first; ties broken by window name (asc).
+ *   - Groups with no rows are omitted.
  */
 export function buildGroupedCutList(rawCutList) {
   if (!Array.isArray(rawCutList) || rawCutList.length === 0) return [];
 
-  // Index rows by element name for pair lookup.
+  const win = (r) => r.windowName || r.window || '';
+  const proj = (r) => r._projectNumber || r.projectNum || '';
+
+  // Bucket rows by engine element name.
   const byElement = new Map();
   rawCutList.forEach((row) => {
-    if (!byElement.has(row.element)) byElement.set(row.element, []);
-    byElement.get(row.element).push(row);
+    const k = row.element;
+    if (!byElement.has(k)) byElement.set(k, []);
+    byElement.get(k).push(row);
   });
 
-  const out = [];
-  const consumed = new Set(); // element names already merged as a right-side partner
+  const groups = [];
 
-  rawCutList.forEach((row) => {
-    if (consumed.has(`${row.element}|${row.length}`)) return;
-
-    const pair = MIRROR_PAIRS[row.element];
-    if (pair) {
-      // Find a right-side row of the SAME length (mirror parts must be equal).
-      const rights = byElement.get(pair.right) || [];
-      const match = rights.find(
-        (r) => r.length === row.length && !consumed.has(`${pair.right}|${r.length}`)
-      );
-      if (match) {
-        consumed.add(`${pair.right}|${match.length}`);
-        out.push({
-          ...row,
-          element: pair.label,
-          mergedSymbol: pair.symbol,
-          mergedLabel: pair.label,
-          mirror: true,
-          quantity: (row.quantity || 1) + (match.quantity || 1),
+  CUT_LIST_ORDER.forEach((def) => {
+    const leftRows = byElement.get(def.match) || [];
+    if (def.isPair) {
+      const pair = MIRROR_PAIRS[def.match];
+      const rightRows = [...(byElement.get(pair.right) || [])];
+      const rows = [];
+      leftRows.forEach((L) => {
+        // Find the right partner from the SAME window with the SAME length.
+        const idx = rightRows.findIndex(
+          (R) => win(R) === win(L) && R.length === L.length
+        );
+        if (idx >= 0) {
+          const R = rightRows.splice(idx, 1)[0];
+          rows.push({
+            window: win(L), projectNum: proj(L), length: L.length,
+            qty: (L.quantity || 1) + (R.quantity || 1), section: L.section,
+          });
+        } else {
+          // No equal-length partner in same window → keep L alone, flag mismatch.
+          rows.push({
+            window: win(L), projectNum: proj(L), length: L.length,
+            qty: L.quantity || 1, section: L.section, mismatch: true,
+          });
+        }
+      });
+      // Any leftover right rows had no left partner → also mismatch.
+      rightRows.forEach((R) => {
+        rows.push({
+          window: win(R), projectNum: proj(R), length: R.length,
+          qty: R.quantity || 1, section: R.section, mismatch: true,
         });
-        return;
+      });
+      if (rows.length) {
+        rows.sort((a, b) => (b.length - a.length) || a.window.localeCompare(b.window));
+        groups.push({ symbol: def.symbol, label: def.label, mirror: true, section: rows[0].section || '', rows });
       }
-      // No equal-length partner → keep separate, flag mismatch (calculation error signal).
-      out.push({ ...row, mismatch: true });
-      return;
+    } else {
+      if (leftRows.length) {
+        const rows = leftRows.map((r) => ({
+          window: win(r), projectNum: proj(r), length: r.length, qty: r.quantity || 1, section: r.section,
+        }));
+        rows.sort((a, b) => (b.length - a.length) || a.window.localeCompare(b.window));
+        groups.push({ symbol: def.symbol, label: def.label, mirror: false, section: rows[0].section || '', rows });
+      }
     }
-
-    // Right-side element handled only if its left partner already merged it.
-    const isRightSide = Object.values(MIRROR_PAIRS).some((p) => p.right === row.element);
-    if (isRightSide && consumed.has(`${row.element}|${row.length}`)) return;
-
-    out.push({ ...row });
   });
 
-  // Sort by length DESCENDING (longest first = correct cutting order).
-  out.sort((a, b) => (b.length || 0) - (a.length || 0));
-  return out;
+  return groups;
 }

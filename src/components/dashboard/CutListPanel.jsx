@@ -19,41 +19,16 @@ export default function CutListPanel({ item, windowSpec, settings, derived, batc
   }, [derived, windowSpec]);
 
   const byElement = useMemo(() => {
-    // Merge mirror L/R pairs + sort longest-first (single source: buildGroupedCutList).
-    const grouped = buildGroupedCutList(cutList);
-    // Group by display element name, preserving the render structure
-    // ({ element, section, symbolInfo, aggregated[] }) the UI already expects.
-    const map = new Map();
-    grouped.forEach((c) => {
-      const key = c.element;
-      if (!map.has(key)) {
-        map.set(key, {
-          element: c.element,
-          section: c.section,
-          // Merged rows carry mergedSymbol; otherwise look up by element name.
-          symbolInfo: c.mergedSymbol
-            ? { symbol: c.mergedSymbol, name: c.mergedLabel, mirror: true }
-            : getPartSymbol(c.element),
-          items: [],
-        });
-      }
-      map.get(key).items.push(c);
-    });
-
-    const groups = Array.from(map.values());
-    groups.forEach((g) => {
-      // Aggregate identical lengths within the (already merged) element group.
-      const agg = new Map();
-      g.items.forEach((it) => {
-        const k = `${it.length}`;
-        if (!agg.has(k)) agg.set(k, { ...it, totalQty: 0 });
-        agg.get(k).totalQty += (it.quantity || 1);
-      });
-      // Keep longest-first inside the group too.
-      g.aggregated = Array.from(agg.values()).sort((a, b) => b.length - a.length);
-    });
-
-    return groups;
+    // Ordered groups (per element TYPE, all windows inside, pairs ×2, longest-first)
+    // from the single source buildGroupedCutList; adapt to the render shape.
+    const groups = buildGroupedCutList(cutList);
+    return groups.map((g) => ({
+      element: g.label,
+      section: g.section,
+      symbolInfo: { symbol: g.symbol, name: g.label, mirror: g.mirror },
+      aggregated: g.rows.map((r) => ({ length: r.length, windowName: r.window, _projectNumber: r.projectNum, totalQty: r.qty, mismatch: r.mismatch })),
+      _rows: g.rows,
+    }));
   }, [cutList]);
 
   const totalPieces = cutList.reduce((s, c) => s + (c.quantity || 1), 0);
@@ -76,13 +51,13 @@ export default function CutListPanel({ item, windowSpec, settings, derived, batc
         symbol: g.symbolInfo?.symbol || '',
         element: g.element,
         mirror: g.symbolInfo?.mirror,
-        section: g.items[0]?.section || '',
+        section: g.section || '',
         material: m ? `${m.item_number || ''} ${m.name || ''}`.trim() : '',
-        rows: g.aggregated.map((it) => ({
-          projectNum: batch?.projectNumber || '',
-          window: item?.name || item?.window_number || '',
-          length: it.length,
-          qty: it.totalQty,
+        rows: g._rows.map((r) => ({
+          projectNum: r.projectNum || batch?.projectNumber || '',
+          window: r.window || item?.name || '',
+          length: r.length,
+          qty: r.qty,
         })),
       };
     });
@@ -114,7 +89,7 @@ export default function CutListPanel({ item, windowSpec, settings, derived, batc
       </div>
       {byElement.map((group) => {
         const sym = group.symbolInfo;
-        const finishedSection = group.items[0]?.section || '—';
+        const finishedSection = group.section || '—';
 
         return (
           <div key={group.element} className="card overflow-hidden">

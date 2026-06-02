@@ -29,12 +29,16 @@ export async function exportWindowToExcel({ item, windowSpec, settings, derived 
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Summary');
 
-  // Cut list — merged mirror pairs + longest-first (single source: buildGroupedCutList)
-  const cutList = buildGroupedCutList(buildCutListForWindow(derived, windowSpec));
+  // Cut list — grouped by element type (all windows inside, pairs ×2, longest-first)
+  const cutGroups = buildGroupedCutList(buildCutListForWindow(derived, windowSpec));
   const cutSheet = [
-    ['Element', 'Section', 'Length (mm)', 'Qty', 'Material', 'Notes'],
-    ...cutList.map((c) => [c.mergedLabel || c.element, c.section || '', c.length, c.quantity, c.material || '', c.notes || ''])
+    ['Symbol', 'Element', 'Section', 'Window', 'Length (mm)', 'Qty'],
   ];
+  cutGroups.forEach((g) => {
+    g.rows.forEach((r) => {
+      cutSheet.push([g.symbol, g.label, g.section || '', r.window || '', r.length, r.qty]);
+    });
+  });
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cutSheet), 'Cut list');
 
   // Precut groups + optimisation

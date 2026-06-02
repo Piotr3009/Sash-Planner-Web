@@ -71,41 +71,15 @@ const EXPORTABLE_TABS = ['overview', '3d', 'elevations', 'sections', 'elements',
  */
 function buildCutListBookBytes({ merged, isPPMode, baseInfo }) {
   if (!merged?.cutList?.length) return null;
-  const grouped = buildGroupedCutList(merged.cutList);
-  const map = new Map();
-  grouped.forEach((c) => {
-    const key = c.element;
-    if (!map.has(key)) {
-      map.set(key, {
-        element: c.element,
-        section: c.section,
-        symbolInfo: c.mergedSymbol
-          ? { symbol: c.mergedSymbol, name: c.mergedLabel, mirror: true }
-          : getPartSymbol(c.element),
-        items: [],
-      });
-    }
-    map.get(key).items.push(c);
-  });
-  const groups = Array.from(map.values()).map((g) => {
-    const agg = new Map();
-    g.items.sort((a, b) => b.length - a.length);
-    g.items.forEach((it) => {
-      const k = `${it.length}|${it.windowName || ''}|${it._projectNumber || ''}`;
-      if (!agg.has(k)) agg.set(k, { ...it, totalQty: 0 });
-      agg.get(k).totalQty += (it.quantity || 1);
-    });
-    const aggregated = Array.from(agg.values()).sort((a, b) => b.length - a.length);
-    return {
-      symbol: g.symbolInfo?.symbol || '',
-      element: g.element,
-      mirror: g.symbolInfo?.mirror,
-      section: g.items[0]?.section || '',
-      rows: aggregated.map((it) => ({
-        projectNum: it._projectNumber, window: it.windowName, length: it.length, qty: it.totalQty,
-      })),
-    };
-  });
+  const groups = buildGroupedCutList(merged.cutList).map((g) => ({
+    symbol: g.symbol,
+    element: g.label,
+    mirror: g.mirror,
+    section: g.section,
+    rows: g.rows.map((r) => ({
+      projectNum: r.projectNum, window: r.window, length: r.length, qty: r.qty,
+    })),
+  }));
   const totalPieces = merged.cutList.reduce((s, c) => s + (c.quantity || 1), 0);
   return exportCutListPDF({
     ...baseInfo, isPPMode, totalPieces, groups, format: 'a3', returnDoc: true,
@@ -1505,43 +1479,19 @@ function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat 
     return <div className="card p-8 text-center text-ink-400">No cut list data available.</div>;
   }
 
-  // Group by element name
+  // Build ordered groups (one per element TYPE, all windows inside, pairs ×2,
+  // longest-first) from the single source buildGroupedCutList, then adapt to the
+  // shape this tab's render expects ({ element, symbolInfo, items, aggregated }).
   const byElement = useMemo(() => {
-    // Merge mirror L/R pairs + sort longest-first (single source: buildGroupedCutList).
-    const grouped = buildGroupedCutList(merged.cutList);
-    const map = new Map();
-    grouped.forEach((c) => {
-      const key = c.element;
-      if (!map.has(key)) {
-        map.set(key, {
-          element: c.element,
-          section: c.section,
-          symbolInfo: c.mergedSymbol
-            ? { symbol: c.mergedSymbol, name: c.mergedLabel, mirror: true }
-            : getPartSymbol(c.element),
-          items: [],
-        });
-      }
-      map.get(key).items.push(c);
-    });
-
-    // Sort items within each group by length (longest first)
-    const groups = Array.from(map.values());
-    groups.forEach((g) => {
-      g.items.sort((a, b) => b.length - a.length);
-      // Aggregate: group identical lengths within element
-      const agg = new Map();
-      g.items.forEach((it) => {
-        const k = `${it.length}|${it.windowName || ''}|${it._projectNumber || ''}`;
-        if (!agg.has(k)) {
-          agg.set(k, { ...it, totalQty: 0 });
-        }
-        agg.get(k).totalQty += (it.quantity || 1);
-      });
-      g.aggregated = Array.from(agg.values()).sort((a, b) => b.length - a.length);
-    });
-
-    return groups;
+    const groups = buildGroupedCutList(merged.cutList);
+    return groups.map((g) => ({
+      element: g.label,
+      section: g.section,
+      symbolInfo: { symbol: g.symbol, name: g.label, mirror: g.mirror },
+      items: g.rows.map((r) => ({ length: r.length, windowName: r.window, _projectNumber: r.projectNum, quantity: r.qty, section: g.section, mismatch: r.mismatch })),
+      aggregated: g.rows.map((r) => ({ length: r.length, windowName: r.window, _projectNumber: r.projectNum, totalQty: r.qty, mismatch: r.mismatch })),
+      _rows: g.rows,
+    }));
   }, [merged.cutList]);
 
   const totalPieces = merged.cutList.reduce((s, c) => s + (c.quantity || 1), 0);
@@ -1555,10 +1505,10 @@ function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat 
         symbol: g.symbolInfo?.symbol || '',
         element: g.element,
         mirror: g.symbolInfo?.mirror,
-        section: g.items[0]?.section || '',
+        section: g.section || '',
         material: m ? `${m.item_number || ''} ${m.name || ''}`.trim() : '',
-        rows: g.aggregated.map((it) => ({
-          projectNum: it._projectNumber, window: it.windowName, length: it.length, qty: it.totalQty,
+        rows: g._rows.map((r) => ({
+          projectNum: r.projectNum, window: r.window, length: r.length, qty: r.qty,
         })),
       };
     });
@@ -1579,7 +1529,7 @@ function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat 
       {byElement.map((group) => {
         const sym = group.symbolInfo;
         // Find finished section from SASH_WINDOW_PARTS if available
-        const finishedSection = group.items[0]?.section || '—';
+        const finishedSection = group.section || group.items[0]?.section || '—';
 
         return (
           <div key={group.element} className="card overflow-hidden">
