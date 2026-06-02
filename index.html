@@ -1,0 +1,3144 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+<!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-S88RZLHQL2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-S88RZLHQL2');
+      gtag('config', 'AW-18153525896');
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Joinery Core | Workshop Management Software for Joiners</title>
+    <meta name="description" content="Workshop management software built by a joiner. Plan production, track stock, manage your team and finances — all in one screen. 14-day free trial.">
+    <meta name="keywords" content="joinery software, workshop management, production planning, joinery ERP, carpentry software, stock control, gantt chart joinery, joinery business software, timber management, bespoke joinery">
+    <meta name="author" content="Joinery Core">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://joinerycore.com/">
+
+    <!-- Open Graph (Facebook, LinkedIn) -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://joinerycore.com/">
+    <meta property="og:title" content="Joinery Core | Workshop Management Software for Joiners">
+    <meta property="og:description" content="Plan production, track stock, manage your team and control finances — all in one screen. Built by a joiner, for joiners. Start free today.">
+    <meta property="og:image" content="https://joinerycore.com/landingimg/before-after.webp">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:site_name" content="Joinery Core">
+    <meta property="og:locale" content="en_GB">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Joinery Core | Workshop Management for Joiners">
+    <meta name="twitter:description" content="All-in-one production planning, stock control, team management and finances. Built by a joiner. Free trial.">
+    <meta name="twitter:image" content="https://joinerycore.com/landingimg/before-after.webp">
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Joinery Core",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "url": "https://joinerycore.com",
+        "description": "All-in-one workshop management software for joinery and carpentry companies. Production planning, stock control, team management and financial tracking.",
+        "offers": {
+            "@type": "AggregateOffer",
+            "priceCurrency": "GBP",
+            "lowPrice": "149",
+            "highPrice": "249",
+            "offerCount": "2"
+        },
+        "featureList": [
+            "Production Gantt Chart",
+            "Stock & Inventory Control",
+            "Team & Worker Management",
+            "Financial Tracking & Accounting",
+            "Client Management",
+            "Supplier Management",
+            "Timesheet Tracking"
+        ],
+        "screenshot": "https://joinerycore.com/landingimg/screenshot-gantt.webp",
+        "softwareHelp": {
+            "@type": "WebPage",
+            "url": "https://joinerycore.com/help.html"
+        }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Joinery Core",
+        "url": "https://joinerycore.com",
+        "logo": "https://joinerycore.com/landingimg/logo.webp",
+        "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "customer support",
+            "email": "piotr@joinerycore.com"
+        },
+        "sameAs": []
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "VideoObject",
+        "name": "JoineryCore — Production Control System Demo",
+        "description": "See how JoineryCore controls your joinery workshop from enquiry to delivery — production planning, stock control, team management and finances in one platform.",
+        "thumbnailUrl": "https://joinerycore.com/landingimg/screenshot-gantt.webp",
+        "uploadDate": "2026-05-31",
+        "duration": "PT3M25S",
+        "contentUrl": "https://joinerycore.com/help/video/JC-01.mp4",
+        "publisher": {
+            "@type": "Organization",
+            "name": "Joinery Core",
+            "logo": {
+                "@type": "ImageObject",
+                "url": "https://joinerycore.com/landingimg/logo.webp"
+            }
+        }
+    }
+    </script>
+    <link rel="icon" type="image/jpeg" href="landingimg/logo black tlo.jpeg">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            /* Tło z logo */
+            --base: #171719;
+            --card: #232226;
+            --border: #3a3a3e;
+            
+            /* Złoto z logo - gradient */
+            --gold-darkest: #5D4C37;
+            --gold-dark: #6D5D4A;
+            --gold-mid: #8F7654;
+            --gold: #AA8E68;
+            --gold-light: #C8A678;
+            --gold-lightest: #CDB28C;
+            
+            /* Primary = gold */
+            --primary: #AA8E68;
+            --primary-hover: #C8A678;
+            --primary-dark: #8F7654;
+            
+            --accent-green: #22c55e;
+            --accent-orange: #f59e0b;
+            --text: #fafafa;
+            --text-muted: #a1a1aa;
+            --text-dim: #71717a;
+        }
+        
+        html { scroll-behavior: smooth; }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--base);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        a { text-decoration: none; color: inherit; }
+        button { font-family: inherit; cursor: pointer; }
+        
+        /* Brushed metal background - like logo reference */
+        .noise-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 1;
+            /* Warstwy: winieta + smugi + bazowy gradient */
+            background:
+                /* 1) winieta */
+                radial-gradient(120% 90% at 50% 50%,
+                    rgba(0,0,0,0) 38%,
+                    rgba(0,0,0,0.55) 100%),
+                /* 2) smugi szczotkowania - delikatniejsze */
+                repeating-linear-gradient(100deg,
+                    rgba(255,255,255,0.02) 0px,
+                    rgba(255,255,255,0.008) 2px,
+                    rgba(0,0,0,0.015) 6px,
+                    rgba(0,0,0,0.000) 10px),
+                /* 3) bazowy gradient */
+                linear-gradient(180deg,
+                    #0a0a0b 0%,
+                    #151517 20%,
+                    #232328 40%,
+                    #2d2d33 55%,
+                    #232328 70%,
+                    #151517 85%,
+                    #0a0a0b 100%);
+            background-blend-mode: multiply, overlay, normal;
+            filter: contrast(1.08) brightness(0.97);
+        }
+        /*
+        TUNING:
+        - moc smug: 0.02 -> 0.03 mocniej, 0.01 słabiej
+        - winieta: 0.55 -> 0.70 mocniej, 0.40 słabiej
+        */
+        
+        .content-wrapper {
+            position: relative;
+            z-index: 10;
+            min-height: 100vh;
+            /* Transparent at top to show brushed texture, gradient to light at bottom */
+            background: linear-gradient(
+                180deg,
+                transparent 0%,
+                transparent 45%,
+                rgba(35,34,38,0.3) 50%,
+                rgba(42,42,46,0.6) 55%,
+                #404045 62%,
+                #606068 70%,
+                #909098 78%,
+                #b8b8c0 85%,
+                #e0e0e4 92%,
+                #f4f4f6 96%,
+                #ffffff 100%
+            );
+        }
+        
+        /* Container */
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 0 16px;
+        }
+        @media (min-width: 640px) { .container { padding: 0 24px; } }
+        @media (min-width: 1024px) { .container { padding: 0 32px; } }
+        
+        /* Glass Card */
+        .glass-card {
+            background: rgba(24, 24, 27, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover {
+            border-color: #3f3f46;
+            transform: translateY(-4px);
+        }
+        
+        /* Animations */
+        @keyframes pulse-badge {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .badge-pulse { animation: pulse-badge 2s ease-in-out infinite; }
+        
+        /* ========== NAVBAR ========== */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+        .navbar.scrolled {
+            background: rgba(10, 10, 11, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+        }
+        .navbar.menu-open {
+            background: rgba(10, 10, 11, 0.95);
+            backdrop-filter: blur(12px);
+        }
+        .navbar-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .logo-icon {
+            width: 160px;
+            height: 38px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .logo-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .logo-text {
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            background: linear-gradient(
+                135deg, 
+                var(--gold-lightest) 0%, 
+                var(--gold-light) 25%,
+                var(--gold) 50%,
+                var(--gold-mid) 75%,
+                var(--gold-dark) 100%
+            );
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3));
+        }
+        
+        .nav-links {
+            display: none;
+            align-items: center;
+            gap: 24px;
+        }
+        @media (min-width: 768px) { .nav-links { display: flex; } }
+        
+        .nav-link {
+            font-size: 14px;
+            color: var(--text-muted);
+            transition: color 0.2s;
+        }
+        .nav-link:hover { color: white; }
+        
+        .nav-cta {
+            display: none;
+            align-items: center;
+            gap: 12px;
+        }
+        @media (min-width: 768px) { .nav-cta { display: flex; } }
+        
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 8px;
+            border: none;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .btn:active { transform: scale(0.95); }
+        
+        .btn-sm { height: 36px; padding: 0 16px; }
+        .btn-md { height: 44px; padding: 0 24px; }
+        .btn-lg { height: 48px; padding: 0 32px; font-size: 16px; }
+        
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-muted);
+        }
+        .btn-ghost:hover { color: white; background: rgba(255,255,255,0.05); }
+        
+        .btn-primary {
+            background: linear-gradient(
+                135deg, 
+                var(--gold-lightest) 0%, 
+                var(--gold-light) 20%,
+                var(--gold) 40%,
+                var(--gold-mid) 60%,
+                var(--gold-dark) 80%,
+                var(--gold-darkest) 100%
+            );
+            color: var(--base);
+            font-weight: 600;
+            box-shadow: 
+                0 4px 14px rgba(170, 142, 104, 0.3),
+                inset 0 1px 0 rgba(205, 178, 140, 0.4),
+                inset 0 -1px 0 rgba(93, 76, 55, 0.3);
+            text-shadow: 0 1px 0 rgba(205, 178, 140, 0.3);
+            border: 1px solid var(--gold-dark);
+        }
+        .btn-primary:hover { 
+            background: linear-gradient(
+                135deg, 
+                var(--gold-lightest) 0%, 
+                var(--gold-light) 30%,
+                var(--gold-light) 50%,
+                var(--gold) 70%,
+                var(--gold-mid) 100%
+            );
+            box-shadow: 
+                0 6px 20px rgba(170, 142, 104, 0.4),
+                inset 0 1px 0 rgba(205, 178, 140, 0.5),
+                inset 0 -1px 0 rgba(93, 76, 55, 0.2);
+        }
+        
+        .btn-secondary {
+            background: var(--card);
+            color: white;
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover { background: #27272a; }
+        
+        .btn-full { width: 100%; }
+        
+        /* Mobile menu button */
+        .mobile-menu-btn {
+            display: flex;
+            padding: 8px;
+            color: var(--text-muted);
+            background: none;
+            border: none;
+        }
+        .mobile-menu-btn:hover { color: white; }
+        @media (min-width: 768px) { .mobile-menu-btn { display: none; } }
+        
+        /* Mobile menu dropdown */
+        .mobile-menu {
+            display: none;
+            padding: 16px 0;
+            border-top: 1px solid var(--border);
+            margin-top: 8px;
+            background: rgba(10, 10, 11, 0.95);
+            backdrop-filter: blur(12px);
+        }
+        .mobile-menu.open { display: block; }
+        @media (min-width: 768px) { .mobile-menu { display: none !important; } }
+        
+        .mobile-menu-links {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 16px;
+        }
+        .mobile-menu-link {
+            display: block;
+            padding: 12px 0;
+            font-size: 14px;
+            color: var(--text-muted);
+            transition: color 0.2s;
+        }
+        .mobile-menu-link:hover { color: white; }
+        
+        .mobile-menu-cta {
+            display: flex;
+            gap: 12px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+        .mobile-menu-cta .btn { flex: 1; }
+        
+        /* Social proof section */
+        .social-proof {
+            padding: 48px 0;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            background: rgba(10, 10, 11, 0.5);
+        }
+        .social-proof-inner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 32px;
+            text-align: center;
+        }
+        @media (min-width: 768px) {
+            .social-proof-inner {
+                flex-direction: row;
+                justify-content: center;
+                gap: 64px;
+            }
+        }
+        .social-proof-text {
+            font-size: 14px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .social-proof-stats {
+            display: flex;
+            gap: 48px;
+        }
+        @media (max-width: 640px) {
+            .social-proof-stats { gap: 32px; }
+        }
+        .social-proof-stat {
+            text-align: center;
+        }
+        .social-proof-stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: white;
+            line-height: 1;
+        }
+        .social-proof-stat-value.green { color: var(--accent-green); }
+        .social-proof-stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        
+        /* ========== HERO ========== */
+        .hero {
+            padding: 96px 0 80px;
+        }
+        @media (min-width: 1024px) { .hero { padding: 128px 0 112px; } }
+        
+        .hero-grid {
+            display: grid;
+            gap: 48px;
+            align-items: center;
+        }
+        @media (min-width: 1024px) {
+            .hero-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 64px;
+            }
+        }
+        
+        .hero-content {
+            text-align: center;
+        }
+        @media (min-width: 1024px) { .hero-content { text-align: left; } }
+        
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            font-size: 12px;
+            font-weight: 500;
+            border-radius: 9999px;
+            background: rgba(170, 142, 104, 0.1);
+            color: var(--primary);
+            border: 1px solid rgba(170, 142, 104, 0.3);
+            margin-bottom: 24px;
+        }
+        
+        .hero h1 {
+            font-size: 36px;
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 24px;
+            color: white;
+        }
+        @media (min-width: 640px) { .hero h1 { font-size: 48px; } }
+        @media (min-width: 1024px) { .hero h1 { font-size: 60px; } }
+        
+        .hero-desc {
+            font-size: 18px;
+            color: var(--text-muted);
+            margin-bottom: 32px;
+            max-width: 560px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        @media (min-width: 640px) { .hero-desc { font-size: 20px; } }
+        @media (min-width: 1024px) { .hero-desc { margin-left: 0; } }
+        
+        .hero-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        @media (min-width: 640px) {
+            .hero-buttons {
+                flex-direction: row;
+                justify-content: center;
+            }
+        }
+        @media (min-width: 1024px) { .hero-buttons { justify-content: flex-start; } }
+        
+        .hero-note {
+            font-size: 14px;
+            color: var(--text-dim);
+        }
+        .hero-note .check { color: var(--accent-green); }
+        
+        /* Hero Mockup */
+        .hero-visual {
+            position: relative;
+            height: 500px;
+        }
+        @media (min-width: 1024px) { .hero-visual { height: 576px; } }
+        
+        /* Screenshot Gantt */
+        .screenshot-gantt-wrapper {
+            position: absolute;
+            top: 90px;
+            left: 0;
+            right: -20%;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+        }
+        .screenshot-gantt-img {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 12px;
+        }
+
+        /* Hero video facade */
+        .hero-video-wrapper {
+            position: absolute;
+            top: 90px;
+            left: 0;
+            right: -20%;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            cursor: pointer;
+            aspect-ratio: 16 / 9;
+            background: #252526;
+        }
+        .hero-video-poster {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .hero-video-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.30);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        .hero-video-wrapper:hover .hero-video-overlay { background: rgba(0,0,0,0.45); }
+        .hero-video-play {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: #AA8E68;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            transition: transform 0.2s;
+        }
+        .hero-video-wrapper:hover .hero-video-play { transform: scale(1.08); }
+        .hero-video-label {
+            position: absolute;
+            bottom: 14px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            pointer-events: none;
+            color: #e8e2d5;
+            font-size: 13px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+        }
+        .hero-video-wrapper video {
+            width: 100%;
+            height: 100%;
+            display: block;
+            border-radius: 12px;
+        }
+        
+        /* Stock Alerts card */
+        .mock-alerts-card {
+            position: absolute;
+            bottom: -30px;
+            right: -10px;
+            width: 210px;
+            padding: 10px;
+            box-shadow: 0 20px 40px -12px rgba(0,0,0,0.5);
+        }
+        @media (max-width: 640px) {
+            .mock-alerts-card {
+                width: 170px;
+                right: 5px;
+                bottom: -20px;
+            }
+        }
+        .alerts-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+            color: #f59e0b;
+        }
+        .alerts-header span {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .alerts-count {
+            margin-left: auto;
+            background: #f59e0b;
+            color: #0a0a0b;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
+        .alerts-warning {
+            background: rgba(127, 29, 29, 0.8);
+            border-radius: 6px;
+            padding: 8px 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .alerts-dot {
+            width: 8px;
+            height: 8px;
+            background: #ef4444;
+            border-radius: 50%;
+            animation: pulse-badge 1.5s ease-in-out infinite;
+        }
+        .alerts-warning span {
+            font-size: 10px;
+            font-weight: 600;
+            color: #fca5a5;
+        }
+        .alerts-list {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .alerts-item {
+            font-size: 9px;
+            color: var(--text-muted);
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .alerts-item:last-child { border-bottom: none; }
+        
+        .mock-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .mock-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        .mock-dot.red { background: #ef4444; }
+        .mock-dot.yellow { background: #eab308; }
+        .mock-dot.green { background: #22c55e; }
+        
+        .mock-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .mock-stat {
+            background: rgba(10, 10, 11, 0.5);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .mock-stat-label {
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-bottom: 4px;
+        }
+        .mock-stat-value {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        .mock-stat-value.green { color: var(--accent-green); }
+        .mock-stat-value.orange { color: var(--accent-orange); }
+        
+        .mock-chart {
+            background: rgba(10, 10, 11, 0.5);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            height: 120px;
+        }
+        .mock-chart-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+        .mock-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            height: 70px;
+        }
+        .mock-bar {
+            flex: 1;
+            background: rgba(170, 142, 104, 0.3);
+            border-radius: 4px 4px 0 0;
+        }
+        
+        /* Gantt in mock-front */
+        .gantt-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .gantt-header svg { color: var(--primary); }
+        .gantt-header span { font-size: 14px; font-weight: 500; }
+        .gantt-badge {
+            margin-left: auto;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            background: rgba(34, 197, 94, 0.1);
+            color: var(--accent-green);
+            border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+        
+        .gantt-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .gantt-label {
+            width: 80px;
+            font-size: 10px;
+            color: var(--text-dim);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .gantt-track {
+            flex: 1;
+            height: 24px;
+            background: rgba(10, 10, 11, 0.5);
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+        .gantt-bar {
+            position: absolute;
+            height: 100%;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            padding: 0 8px;
+            font-size: 9px;
+            color: white;
+        }
+        .gantt-bar.blue { background: var(--primary); }
+        .gantt-bar.green { background: var(--accent-green); }
+        .gantt-bar.orange { background: var(--accent-orange); }
+        
+        /* Alert card */
+        .alert-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        .alert-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(170, 142, 104, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .alert-icon svg { width: 16px; height: 16px; color: var(--primary); }
+        .alert-content { flex: 1; min-width: 0; }
+        .alert-title { font-size: 12px; font-weight: 500; margin-bottom: 2px; }
+        .alert-text { font-size: 10px; color: var(--text-muted); }
+        .alert-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-orange);
+            flex-shrink: 0;
+            margin-top: 4px;
+        }
+        
+        /* ========== FEATURES ========== */
+        .features {
+            padding: 80px 0;
+        }
+        
+        .section-header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+        .section-header h2 {
+            font-size: 30px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+        @media (min-width: 640px) { .section-header h2 { font-size: 36px; } }
+        .section-header p {
+            font-size: 18px;
+            color: var(--text-muted);
+            max-width: 640px;
+            margin: 0 auto;
+        }
+        
+        .features-grid {
+            display: grid;
+            gap: 24px;
+        }
+        @media (min-width: 768px) {
+            .features-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (min-width: 1024px) {
+            .features-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        
+        .feature-card {
+            padding: 24px;
+        }
+        .feature-card.tall {
+            grid-row: span 2;
+        }
+        .feature-card.wide {
+            grid-column: span 1;
+        }
+        @media (min-width: 768px) {
+            .feature-card.wide { grid-column: span 2; }
+        }
+        
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+        .feature-icon svg { width: 24px; height: 24px; }
+        .feature-icon.blue { background: rgba(170, 142, 104, 0.1); color: var(--primary); }
+        .feature-icon.green { background: rgba(34, 197, 94, 0.1); color: var(--accent-green); }
+        .feature-icon.orange { background: rgba(245, 158, 11, 0.1); color: var(--accent-orange); }
+        
+        .feature-card h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .feature-card p {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+        
+        /* Feature visuals */
+        .feature-gantt {
+            background: rgba(10, 10, 11, 0.5);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .feature-gantt-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .feature-gantt-row:last-child { margin-bottom: 0; }
+        .feature-gantt-label {
+            width: 32px;
+            font-size: 9px;
+            color: var(--text-dim);
+        }
+        .feature-gantt-track {
+            flex: 1;
+            height: 16px;
+            background: var(--card);
+            border-radius: 4px;
+            position: relative;
+        }
+        .feature-gantt-bar {
+            position: absolute;
+            height: 100%;
+            border-radius: 4px;
+        }
+        
+        /* Pipeline */
+        .pipeline {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            flex: 1;
+        }
+        .pipeline-step {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .pipeline-num {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .pipeline-num.done { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); }
+        .pipeline-num.active { background: rgba(170, 142, 104, 0.2); color: var(--primary); }
+        .pipeline-num.pending { background: #27272a; color: var(--text-dim); }
+        .pipeline-content { flex: 1; }
+        .pipeline-title { font-size: 14px; font-weight: 500; }
+        .pipeline-desc { font-size: 12px; color: var(--text-dim); }
+        .pipeline-badge {
+            font-size: 9px;
+            padding: 2px 8px;
+            border-radius: 9999px;
+        }
+        .pipeline-badge.done { background: rgba(34, 197, 94, 0.1); color: var(--accent-green); border: 1px solid rgba(34, 197, 94, 0.2); }
+        .pipeline-badge.active { background: rgba(170, 142, 104, 0.1); color: var(--primary); border: 1px solid rgba(170, 142, 104, 0.2); }
+        .pipeline-badge.pending { background: #27272a; color: var(--text-muted); border: 1px solid var(--border); }
+        .pipeline-line {
+            width: 1px;
+            height: 32px;
+            background: var(--border);
+            margin-left: 20px;
+        }
+        
+        /* Stock bars */
+        .stock-bars { display: flex; flex-direction: column; gap: 12px; }
+        .stock-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 4px;
+        }
+        .stock-label { color: var(--text-muted); }
+        .stock-value.green { color: var(--accent-green); }
+        .stock-value.blue { color: var(--primary); }
+        .stock-value.orange { color: var(--accent-orange); }
+        .stock-track {
+            height: 8px;
+            background: var(--base);
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+        .stock-fill {
+            height: 100%;
+            border-radius: 9999px;
+            transition: width 1s ease-out;
+        }
+        .stock-fill.green { background: var(--accent-green); }
+        .stock-fill.blue { background: var(--primary); }
+        .stock-fill.orange { background: var(--accent-orange); }
+        
+        /* Team avatars */
+        .team-avatars {
+            display: flex;
+            margin-bottom: 12px;
+        }
+        .team-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 500;
+            color: white;
+            border: 2px solid var(--card);
+            margin-left: -8px;
+        }
+        .team-avatar:first-child { margin-left: 0; }
+        .team-avatar.blue { background: var(--primary); }
+        .team-avatar.green { background: var(--accent-green); }
+        .team-avatar.orange { background: var(--accent-orange); }
+        .team-avatar.gray { background: #52525b; }
+        
+        .team-stats {
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+        
+        /* Profit card */
+        .profit-visual {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .profit-content { flex: 1; min-width: 200px; }
+        .profit-box {
+            flex: 1;
+            min-width: 200px;
+            background: rgba(10, 10, 11, 0.5);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .profit-label {
+            font-size: 12px;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+        }
+        .profit-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            text-align: center;
+        }
+        .profit-stat-value {
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .profit-stat-value.green { color: var(--accent-green); }
+        .profit-stat-value.muted { color: var(--text-muted); }
+        .profit-stat-label {
+            font-size: 9px;
+            color: var(--text-dim);
+        }
+        
+        /* ========== PRICING ========== */
+        .pricing {
+            padding: 80px 0;
+        }
+        
+        .pricing-grid {
+            display: grid;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        @media (min-width: 768px) {
+            .pricing-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (min-width: 1024px) {
+            .pricing-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+        
+        .pricing-card {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .pricing-card.featured {
+            border-color: var(--primary);
+            box-shadow: 0 0 30px rgba(170, 142, 104, 0.2);
+        }
+        
+        .pricing-badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 11px;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            background: rgba(34, 197, 94, 0.1);
+            color: var(--accent-green);
+            border: 1px solid rgba(34, 197, 94, 0.2);
+            white-space: nowrap;
+        }
+        
+        .pricing-card h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .pricing-desc {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+        .pricing-price {
+            margin-bottom: 4px;
+        }
+        .pricing-price .amount {
+            font-size: 30px;
+            font-weight: 700;
+        }
+        .pricing-price .period {
+            color: var(--text-dim);
+        }
+        .pricing-users {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        
+        .pricing-features {
+            list-style: none;
+            flex: 1;
+            margin-bottom: 24px;
+        }
+        .pricing-features li {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+        .pricing-features li:last-child { margin-bottom: 0; }
+        .pricing-features svg {
+            width: 16px;
+            height: 16px;
+            color: var(--accent-green);
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        
+        .pricing-note {
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-dim);
+        }
+        .pricing-note strong {
+            color: white;
+            font-weight: 500;
+        }
+        
+        /* ========== ROI CALCULATOR ========== */
+        .roi-section {
+            padding: 80px 0;
+        }
+        
+        .roi-card {
+            padding: 24px;
+        }
+        
+        .roi-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+        .roi-header svg { color: var(--primary); }
+        .roi-header h3 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+        
+        .roi-grid {
+            display: grid;
+            gap: 32px;
+        }
+        @media (min-width: 1024px) {
+            .roi-grid { grid-template-columns: 1fr 1fr; }
+        }
+        
+        .roi-inputs { display: flex; flex-direction: column; gap: 24px; }
+        
+        .roi-input label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+        .roi-input label span {
+            color: white;
+            font-weight: 700;
+        }
+        
+        .roi-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        .roi-btn {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--text-muted);
+            transition: all 0.2s;
+        }
+        .roi-btn:hover { color: white; border-color: #3f3f46; }
+        .roi-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        
+        .roi-slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: var(--card);
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .roi-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+        }
+        .roi-slider-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-dim);
+            margin-top: 4px;
+        }
+        
+        .roi-tabs {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+            padding: 4px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .roi-tab {
+            padding: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            transition: all 0.2s;
+        }
+        .roi-tab:hover { color: white; }
+        .roi-tab.active {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .roi-results {
+            background: rgba(10, 10, 11, 0.5);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+        }
+        .roi-results h4 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+        
+        .roi-result-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+        .roi-result-item:last-of-type { margin-bottom: 0; }
+        .roi-result-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .roi-result-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .roi-result-icon svg { width: 20px; height: 20px; }
+        .roi-result-icon.green { background: rgba(34, 197, 94, 0.1); color: var(--accent-green); }
+        .roi-result-icon.orange { background: rgba(245, 158, 11, 0.1); color: var(--accent-orange); }
+        .roi-result-icon.blue { background: rgba(170, 142, 104, 0.1); color: var(--primary); }
+        .roi-result-label {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+        .roi-result-value {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        .roi-result-value.green { color: var(--accent-green); }
+        .roi-result-value.muted { color: var(--text-muted); }
+        
+        .roi-total {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+        .roi-total-main {
+            margin-bottom: 12px;
+        }
+        .roi-total-label {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+        .roi-total-value {
+            font-size: 40px;
+            font-weight: 700;
+            color: var(--accent-green);
+        }
+        .roi-total-secondary {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+        .roi-secondary-label {
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+        .roi-secondary-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        /* ========== FAQ ========== */
+        .faq {
+            padding: 80px 0;
+        }
+        
+        .faq-list {
+            max-width: 768px;
+            margin: 0 auto;
+        }
+        
+        .faq-item {
+            border-bottom: 1px solid var(--border);
+        }
+        .faq-question {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 0;
+            font-size: 16px;
+            font-weight: 500;
+            text-align: left;
+            color: white;
+            background: none;
+            border: none;
+            transition: color 0.2s;
+        }
+        .faq-question:hover { color: var(--text-muted); }
+        .faq-question svg {
+            width: 20px;
+            height: 20px;
+            color: var(--text-muted);
+            transition: transform 0.3s;
+        }
+        .faq-item.open .faq-question svg { transform: rotate(180deg); }
+        
+        .faq-answer {
+            display: none;
+            padding-bottom: 20px;
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.7;
+        }
+        .faq-item.open .faq-answer { display: block; }
+        
+        /* ========== CONTACT ========== */
+        .contact {
+            padding: 80px 0;
+        }
+        
+        .contact-card {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        
+        .contact-header {
+            margin-bottom: 24px;
+        }
+        .contact-header h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .contact-header p {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+        
+        .form-row {
+            display: grid;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        @media (min-width: 640px) {
+            .form-row { grid-template-columns: 1fr 1fr; }
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 14px;
+            font-family: inherit;
+            color: white;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(170, 142, 104, 0.1);
+        }
+        .form-group input::placeholder,
+        .form-group textarea::placeholder {
+            color: var(--text-dim);
+        }
+        .form-group textarea {
+            resize: none;
+            min-height: 120px;
+        }
+        
+        /* ========== FOOTER ========== */
+        .footer {
+            padding: 32px 0;
+            border-top: 1px solid var(--border);
+        }
+        .footer-inner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            text-align: center;
+        }
+        @media (min-width: 640px) {
+            .footer-inner {
+                flex-direction: row;
+                justify-content: space-between;
+            }
+        }
+        .footer-brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .footer-brand .logo-icon {
+            width: 24px;
+            height: 24px;
+        }
+        .logo-icon-sm {
+            width: 120px !important;
+            height: 28px !important;
+        }
+        .footer-brand span {
+            font-size: 14px;
+            color: var(--text-dim);
+        }
+        .footer-text {
+            font-size: 14px;
+            color: var(--text-dim);
+        }
+        
+        /* Icons */
+        .icon { display: inline-block; width: 24px; height: 24px; }
+        
+        /* ========== LIGHT SECTIONS (dark-to-light transition) ========== */
+        .section-light {
+            color: #0a0a0b;
+        }
+        .section-light h2,
+        .section-light h3,
+        .section-light h4 {
+            color: #0a0a0b;
+        }
+        .section-light .section-header p,
+        .section-light .pricing-desc,
+        .section-light .pricing-users,
+        .section-light .pricing-features li,
+        .section-light .pricing-note,
+        .section-light .pricing-note p,
+        .section-light .faq-answer,
+        .section-light .roi-input label,
+        .section-light .roi-result-label,
+        .section-light .roi-total-label,
+        .section-light .roi-secondary-label,
+        .section-light .contact-header p,
+        .section-light .form-group label {
+            color: #52525b;
+        }
+        .section-light .pricing-price .period {
+            color: #71717a;
+        }
+        
+        /* Glass cards on light background */
+        .section-light .glass-card {
+            background: rgba(255, 255, 255, 0.75);
+            border-color: rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+        .section-light .glass-card:hover {
+            border-color: rgba(170, 142, 104, 0.4);
+            transform: translateY(-4px);
+        }
+        
+        /* Pricing cards gradient: dark → light (left to right) */
+        /* (1) Solo - darkest */
+        .section-light .pricing-grid .pricing-card:nth-child(1) {
+            background: rgba(25, 25, 30, 0.95);
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+        .section-light .pricing-grid .pricing-card:nth-child(1) h3,
+        .section-light .pricing-grid .pricing-card:nth-child(1) .pricing-price .amount {
+            color: #ffffff;
+        }
+        .section-light .pricing-grid .pricing-card:nth-child(1) .pricing-desc,
+        .section-light .pricing-grid .pricing-card:nth-child(1) .pricing-users,
+        .section-light .pricing-grid .pricing-card:nth-child(1) .pricing-features li {
+            color: #a1a1aa;
+        }
+        .section-light .pricing-grid .pricing-card:nth-child(1) .pricing-price .period {
+            color: #71717a;
+        }
+        
+        /* (2) Small */
+        .section-light .pricing-grid .pricing-card:nth-child(2) {
+            background: rgba(35, 35, 40, 0.9);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+        .section-light .pricing-grid .pricing-card:nth-child(2) h3,
+        .section-light .pricing-grid .pricing-card:nth-child(2) .pricing-price .amount {
+            color: #ffffff;
+        }
+        .section-light .pricing-grid .pricing-card:nth-child(2) .pricing-desc,
+        .section-light .pricing-grid .pricing-card:nth-child(2) .pricing-users,
+        .section-light .pricing-grid .pricing-card:nth-child(2) .pricing-features li {
+            color: #a1a1aa;
+        }
+        .section-light .pricing-grid .pricing-card:nth-child(2) .pricing-price .period {
+            color: #71717a;
+        }
+        
+        /* (3) Basic - featured with gold glow */
+        .section-light .pricing-grid .pricing-card:nth-child(3) {
+            background: rgba(55, 55, 62, 0.85);
+            border-color: var(--primary);
+            box-shadow: 0 0 30px rgba(170, 142, 104, 0.2);
+        }
+        .section-light .pricing-grid .pricing-card:nth-child(3) h3,
+        .section-light .pricing-grid .pricing-card:nth-child(3) .pricing-price .amount {
+            color: #ffffff;
+        }
+        .section-light .pricing-grid .pricing-card:nth-child(3) .pricing-desc,
+        .section-light .pricing-grid .pricing-card:nth-child(3) .pricing-users,
+        .section-light .pricing-grid .pricing-card:nth-child(3) .pricing-features li {
+            color: #a1a1aa;
+        }
+        .section-light .pricing-grid .pricing-card:nth-child(3) .pricing-price .period {
+            color: #71717a;
+        }
+        
+        /* (4) Pro - lighter */
+        .section-light .pricing-grid .pricing-card:nth-child(4) {
+            background: rgba(120, 120, 130, 0.75);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+        .section-light .pricing-grid .pricing-card:nth-child(4) h3,
+        .section-light .pricing-grid .pricing-card:nth-child(4) .pricing-price .amount {
+            color: #ffffff;
+        }
+        .section-light .pricing-grid .pricing-card:nth-child(4) .pricing-desc,
+        .section-light .pricing-grid .pricing-card:nth-child(4) .pricing-users,
+        .section-light .pricing-grid .pricing-card:nth-child(4) .pricing-features li {
+            color: #e4e4e7;
+        }
+        .section-light .pricing-grid .pricing-card:nth-child(4) .pricing-price .period {
+            color: #a1a1aa;
+        }
+        
+        /* Pricing card hover states */
+        .section-light .pricing-grid .pricing-card:nth-child(1):hover,
+        .section-light .pricing-grid .pricing-card:nth-child(2):hover,
+        .section-light .pricing-grid .pricing-card:nth-child(3):hover,
+        .section-light .pricing-grid .pricing-card:nth-child(4):hover {
+            border-color: rgba(170, 142, 104, 0.5);
+        }
+        
+        /* Buttons in light sections */
+        .section-light .btn-secondary {
+            background: rgba(255, 255, 255, 0.9);
+            color: #0a0a0b;
+            border-color: rgba(0, 0, 0, 0.15);
+        }
+        .section-light .btn-secondary:hover {
+            background: rgba(255, 255, 255, 1);
+            border-color: rgba(0, 0, 0, 0.25);
+        }
+        
+        /* ROI specific */
+        .section-light .roi-btn {
+            background: rgba(255, 255, 255, 0.8);
+            border-color: rgba(0, 0, 0, 0.1);
+            color: #52525b;
+        }
+        .section-light .roi-btn:hover {
+            color: #0a0a0b;
+            border-color: rgba(0, 0, 0, 0.2);
+        }
+        .section-light .roi-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        .section-light .roi-tab {
+            color: #52525b;
+        }
+        .section-light .roi-tab:hover {
+            color: #0a0a0b;
+        }
+        .section-light .roi-tabs {
+            background: rgba(255, 255, 255, 0.8);
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+        .section-light .roi-results {
+            background: rgba(255, 255, 255, 0.5);
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+        .section-light .roi-result-item {
+            background: rgba(255, 255, 255, 0.8);
+            border-color: rgba(0, 0, 0, 0.08);
+        }
+        .section-light .roi-result-value.muted {
+            color: #52525b;
+        }
+        .section-light .roi-slider {
+            background: rgba(0, 0, 0, 0.1);
+        }
+        .section-light .roi-slider-labels span {
+            color: #71717a;
+        }
+        
+        /* FAQ on light */
+        .section-light .faq-item {
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+        .section-light .faq-question {
+            color: #0a0a0b;
+        }
+        .section-light .faq-question:hover {
+            color: #3f3f46;
+        }
+        .section-light .faq-question svg {
+            color: #71717a;
+        }
+        
+        /* Form inputs on light */
+        .section-light .form-group input,
+        .section-light .form-group textarea {
+            background: rgba(255, 255, 255, 0.9);
+            border-color: rgba(0, 0, 0, 0.15);
+            color: #0a0a0b;
+        }
+        .section-light .form-group input::placeholder,
+        .section-light .form-group textarea::placeholder {
+            color: #a1a1aa;
+        }
+        .section-light .form-group input:focus,
+        .section-light .form-group textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(170, 142, 104, 0.15);
+        }
+        
+        /* Footer on light */
+        .footer-light {
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+        .footer-light .footer-brand span,
+        .footer-light .footer-text {
+            color: #71717a;
+        }
+        
+        /* Navbar light mode (when scrolled into light section) */
+        .navbar.light {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        /* ========== EVOLUTION SECTION ========== */
+        .evolution-section {
+            padding: 80px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .evolution-image-wrapper {
+            position: relative;
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 48px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+        }
+        .evolution-image {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .evolution-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                90deg,
+                rgba(0, 0, 0, 0.4) 0%,
+                rgba(0, 0, 0, 0.1) 30%,
+                rgba(0, 0, 0, 0) 50%,
+                rgba(170, 142, 104, 0.1) 70%,
+                rgba(170, 142, 104, 0.2) 100%
+            );
+            display: flex;
+            align-items: flex-end;
+            padding: 32px;
+        }
+        .evolution-labels {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+        .evolution-label {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .evolution-label.past {
+            background: linear-gradient(135deg, rgba(60,60,65,0.9) 0%, rgba(40,40,45,0.9) 100%);
+            color: #888;
+            border: 1px solid rgba(100,100,105,0.3);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .evolution-center {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 16px;
+            background: linear-gradient(135deg, var(--gold-dark) 0%, var(--gold) 50%, var(--gold-light) 100%);
+            border-radius: 25px;
+            box-shadow: 0 4px 15px rgba(170, 142, 104, 0.4);
+        }
+        .evolution-center-arrow {
+            color: var(--gold-darkest);
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .evolution-center-text {
+            color: var(--gold-darkest);
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .evolution-label.future {
+            background: linear-gradient(135deg, var(--gold-light) 0%, var(--gold) 50%, var(--gold-mid) 100%);
+            color: var(--gold-darkest);
+            border: 1px solid var(--gold);
+            box-shadow: 0 4px 15px rgba(170, 142, 104, 0.4);
+        }
+        @media (max-width: 640px) {
+            .evolution-center {
+                display: none;
+            }
+            .evolution-label {
+                padding: 8px 12px;
+                font-size: 11px;
+            }
+        }
+        .evolution-content {
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .evolution-content h2 {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #18181b;
+        }
+        @media (min-width: 640px) {
+            .evolution-content h2 { font-size: 40px; }
+        }
+        .evolution-content p {
+            font-size: 18px;
+            color: #52525b;
+            line-height: 1.7;
+            margin-bottom: 32px;
+        }
+        .evolution-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .navbar.light .logo-text {
+            background: linear-gradient(
+                135deg, 
+                var(--gold-mid) 0%, 
+                var(--gold-dark) 50%, 
+                var(--gold-darkest) 100%
+            );
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .navbar.light .nav-link {
+            color: #52525b;
+        }
+        .navbar.light .nav-link:hover {
+            color: #0a0a0b;
+        }
+        .navbar.light .btn-ghost {
+            color: #52525b;
+        }
+        .navbar.light .btn-ghost:hover {
+            color: #0a0a0b;
+            background: rgba(0, 0, 0, 0.05);
+        }
+        .navbar.light .mobile-menu-btn {
+            color: #52525b;
+        }
+        .navbar.light .mobile-menu-btn:hover {
+            color: #0a0a0b;
+        }
+        
+        /* Mobile menu light */
+        .navbar.light .mobile-menu {
+            background: rgba(255, 255, 255, 0.95);
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+        .navbar.light .mobile-menu-link {
+            color: #52525b;
+        }
+        .navbar.light .mobile-menu-link:hover {
+            color: #0a0a0b;
+        }
+        .navbar.light .mobile-menu-cta {
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+        .navbar.light .mobile-menu-cta .btn-secondary {
+            background: rgba(255, 255, 255, 0.9);
+            color: #0a0a0b;
+            border-color: rgba(0, 0, 0, 0.15);
+        }
+        /* Hero clickable keywords */
+        .hero-keyword {
+            color: var(--gold-light);
+            cursor: pointer;
+            text-decoration: underline;
+            text-decoration-color: rgba(200, 166, 120, 0.4);
+            text-underline-offset: 4px;
+            text-decoration-thickness: 2px;
+            transition: all 0.2s ease;
+        }
+        .hero-keyword:hover {
+            color: var(--gold-lightest);
+            text-decoration-color: var(--gold-lightest);
+            text-shadow: 0 0 20px rgba(200, 166, 120, 0.3);
+        }
+        
+        /* No credit card - prominent */
+        .hero-no-card {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--accent-green);
+            margin-top: 16px;
+            letter-spacing: 0.3px;
+        }
+        
+        /* Hero Thumbnails */
+        .hero-thumbs-section {
+            padding: 32px 0 0;
+        }
+        .hero-thumbs-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+        @media (max-width: 640px) {
+            .hero-thumbs-row { grid-template-columns: 1fr; gap: 12px; }
+        }
+        .hero-thumb {
+            cursor: pointer;
+            text-align: center;
+        }
+        .hero-thumb-img-wrap {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            transition: border-color 0.3s, transform 0.3s;
+        }
+        .hero-thumb:hover .hero-thumb-img-wrap {
+            border-color: var(--accent);
+            transform: translateY(-4px);
+        }
+        .hero-thumb-img-wrap img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .hero-thumb-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+            color: white;
+        }
+        .hero-thumb:hover .hero-thumb-overlay {
+            opacity: 1;
+        }
+        .hero-thumb-label {
+            display: block;
+            margin-top: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .hero-thumbs-cta {
+            text-align: center;
+            margin-top: 28px;
+            padding-bottom: 8px;
+        }
+        .hero-thumbs-cta p {
+            color: var(--text-dim);
+            font-size: 15px;
+            margin-bottom: 16px;
+        }
+
+        /* Screenshot Modal */
+        .screenshot-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 200;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .screenshot-modal-overlay.open {
+            display: flex;
+        }
+        .screenshot-modal {
+            position: relative;
+            max-width: 1350px;
+            width: 100%;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+        }
+        .screenshot-modal-close {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 28px;
+            cursor: pointer;
+            z-index: 5;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s;
+        }
+        .screenshot-modal-close:hover {
+            color: white;
+            background: rgba(255,255,255,0.1);
+        }
+        .screenshot-modal-title {
+            padding: 20px 24px 12px;
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+        }
+        .screenshot-modal-img-wrap {
+            padding: 0 24px;
+        }
+        .screenshot-modal-img-wrap img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            display: block;
+        }
+        .screenshot-modal-img-wrap img[src=""] {
+            display: none;
+        }
+        .screenshot-placeholder {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            height: 320px;
+            background: rgba(10, 10, 11, 0.5);
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+            color: var(--text-dim);
+            font-size: 14px;
+        }
+        .screenshot-placeholder.visible {
+            display: flex;
+        }
+        .screenshot-modal-desc {
+            padding: 12px 24px 20px;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <div class="noise-overlay" aria-hidden="true"></div>
+    
+    <div class="content-wrapper">
+        <!-- NAVBAR -->
+        <header class="navbar" id="navbar">
+            <div class="container">
+                <div class="navbar-inner">
+                    <a href="#" class="logo">
+                        <div class="logo-icon"><img src="landingimg/logo.webp" alt="Joinery Core" width="160" height="38"></div>
+                    </a>
+                    
+                    <nav class="nav-links">
+                        <a href="#features" class="nav-link">Features</a>
+                        <a href="#pricing" class="nav-link">Pricing</a>
+                        <a href="#faq" class="nav-link">FAQ</a>
+                        <a href="#contact" class="nav-link">Contact</a>
+                        <a href="help.html" class="nav-link" target="_blank">Help</a>
+                        <a href="blog/" class="nav-link">Blog</a>
+                    </nav>
+                    
+                    <div class="nav-cta">
+                        <a href="login.html" class="btn btn-ghost btn-sm">Log In</a>
+                        <a href="register.html" class="btn btn-primary btn-sm">Get Started</a>
+                    </div>
+                    
+                    <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu" aria-expanded="false">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="menu-icon">
+                            <line x1="4" y1="5" x2="20" y2="5"></line>
+                            <line x1="4" y1="12" x2="20" y2="12"></line>
+                            <line x1="4" y1="19" x2="20" y2="19"></line>
+                        </svg>
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="close-icon" style="display:none">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                
+                <!-- Mobile Menu Dropdown -->
+                <div class="mobile-menu" id="mobileMenu">
+                    <div class="mobile-menu-links">
+                        <a href="#features" class="mobile-menu-link">Features</a>
+                        <a href="#pricing" class="mobile-menu-link">Pricing</a>
+                        <a href="#faq" class="mobile-menu-link">FAQ</a>
+                        <a href="#contact" class="mobile-menu-link">Contact</a>
+                        <a href="help.html" class="mobile-menu-link" target="_blank">Help</a>
+                        <a href="blog/" class="mobile-menu-link">Blog</a>
+                    </div>
+                    <div class="mobile-menu-cta">
+                        <a href="login.html" class="btn btn-secondary btn-md">Log In</a>
+                        <a href="register.html" class="btn btn-primary btn-md">Get Started</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- HERO -->
+        <section class="hero">
+            <div class="container">
+                <div class="hero-grid">
+                    <div class="hero-content">
+                        <div class="badge badge-pulse">Ready for 2026 & Beyond</div>
+                        
+                        <h1>Plan your <span class="hero-keyword" data-modal="modal-plan">production</span>, manage your <span class="hero-keyword" data-modal="modal-joiner">team</span>, and control your <span class="hero-keyword" data-modal="modal-sheet">stock</span> — all in one screen.</h1>
+                        
+                        <p class="hero-desc">Built by a joiner, for joiners. Production, stock, team and finances — finally in one place.</p>
+                        
+                        <a href="#features" style="display:inline-block;margin-top:8px;margin-bottom:8px;color:#AA8E68;font-size:15px;text-decoration:none;transition:opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">↓ See how it works on real joinery production</a>
+                        
+                        <div class="hero-buttons">
+                            <a href="register.html" class="btn btn-primary btn-lg">
+                                Start Free Trial
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                            </a>
+                            <a href="#features" class="btn btn-secondary btn-lg">
+                                Explore Features
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                            </a>
+                        </div>
+                        
+                        <p class="hero-no-card">✓ 14-day free trial — no credit card — start in minutes</p>
+                    </div>
+                    
+                    <div class="hero-visual">
+                        <!-- Video facade - lazy loads on click (SEO-safe) -->
+                        <div class="hero-video-wrapper" id="heroVideoWrapper" onclick="loadHeroVideo()">
+                            <img src="landingimg/screenshot-gantt.webp" alt="JoineryCore production demo" class="hero-video-poster">
+                            <div class="hero-video-overlay">
+                                <div class="hero-video-play">
+                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="#1e1e1e"><path d="M8 5v14l11-7z"/></svg>
+                                </div>
+                            </div>
+                            <div class="hero-video-label">▶ Watch the 3-minute demo</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- HERO THUMBNAILS -->
+        <section class="hero-thumbs-section">
+            <div class="container">
+                <div class="hero-thumbs-row">
+                    <div class="hero-thumb" data-modal="modal-plan">
+                        <div class="hero-thumb-img-wrap">
+                            <img src="landingimg/modal-plan.webp" alt="Production Planning" loading="lazy">
+                            <div class="hero-thumb-overlay">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v6M8 11h6"/></svg>
+                            </div>
+                        </div>
+                        <span class="hero-thumb-label">Production Planning</span>
+                    </div>
+                    <div class="hero-thumb" data-modal="modal-joiner">
+                        <div class="hero-thumb-img-wrap">
+                            <img src="landingimg/modal-joiner.webp" alt="Worker View" loading="lazy">
+                            <div class="hero-thumb-overlay">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v6M8 11h6"/></svg>
+                            </div>
+                        </div>
+                        <span class="hero-thumb-label">Worker Schedule</span>
+                    </div>
+                    <div class="hero-thumb" data-modal="modal-sheet">
+                        <div class="hero-thumb-img-wrap">
+                            <img src="landingimg/modal-sheet.webp" alt="Stock Control" loading="lazy">
+                            <div class="hero-thumb-overlay">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v6M8 11h6"/></svg>
+                            </div>
+                        </div>
+                        <span class="hero-thumb-label">Stock Control</span>
+                    </div>
+                </div>
+                <div class="hero-thumbs-cta">
+                    <p>See the full system in action — 14 days free, no credit card</p>
+                    <a href="register.html" class="btn btn-primary btn-md">Start Free Trial →</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- FOUNDER STORY -->
+        <section class="social-proof">
+            <div class="container">
+                <div style="max-width: 780px; margin: 0 auto;">
+                    <div class="social-proof-text" style="text-align: center; margin-bottom: 28px;">Why we built this</div>
+                    <h3 style="font-size: 26px; color: white; margin: 0 0 28px; line-height: 1.3; text-align: center; font-weight: 700;">
+                        Built by a joinery business owner — and his 16-year-old son.
+                    </h3>
+                    <div style="font-size: 16px; color: var(--text-dim); line-height: 1.75;">
+                        <p style="margin: 0 0 16px;">For the past 6 years, I've been running a joinery business. The biggest problem I kept seeing wasn't the work itself — it was <strong style="color: white;">miscommunication between people and departments</strong>. Lost orders, forgotten deadlines, and materials running out mid-project.</p>
+                        <p style="margin: 0 0 16px;">I realised everything needed to live in one place — simple, clear, and accessible for everyone. That's why Joinery Core was designed around one simple idea: <strong style="color: white;">one project = one row across the entire system</strong>.</p>
+                        <p style="margin: 0 0 16px;">Over time, we added more tools, including stock management and low-stock alerts, because material shortages were constantly affecting production and deadlines.</p>
+                        <p style="margin: 0 0 16px;">I designed the workflow based on real workshop experience. My 16-year-old son, who's passionate about programming, helped turn it into a real platform.</p>
+                        <p style="margin: 0 0 28px;">Today, we use Joinery Core <strong style="color: white;">daily in our own workshop</strong>, and the whole team relies on it.</p>
+                    </div>
+                    <div style="text-align: center; font-size: 14px; color: var(--text-muted); font-style: italic;">
+                        — Piotr, founder · Skylon Joinery
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- BEFORE/AFTER ILLUSTRATION -->
+        <section style="padding: 60px 0 20px;">
+            <div class="container">
+                <div style="max-width:960px;margin:0 auto;border-radius:16px;overflow:hidden;">
+                    <img src="landingimg/before-after.webp" alt="From workshop chaos to organised production planning" style="width:100%;height:auto;border-radius:16px;display:block;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                    <div style="display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;height:340px;background:#1a1410;border:1px dashed #3a3a3e;border-radius:16px;color:#71717a;font-size:14px;">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:#555"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                        <span>Before / After — illustration placeholder</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- WHO IS IT FOR -->
+        <section style="padding: 60px 0 20px;">
+            <div class="container">
+                <div style="max-width: 780px; margin: 0 auto; text-align: center;">
+                    <h2 style="font-size: 28px; color: white; margin: 0 0 16px; font-weight: 700;">One system for every type of woodworking business</h2>
+                    <p style="font-size: 16px; color: var(--text-dim); margin: 0 0 28px; line-height: 1.6;">Joinery Core works for any workshop where projects move through production stages, materials need tracking, and teams need to stay aligned.</p>
+                    <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;">
+                        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); padding: 8px 18px; border-radius: 24px; font-size: 14px; color: #c4bdb0;">Joinery workshops</span>
+                        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); padding: 8px 18px; border-radius: 24px; font-size: 14px; color: #c4bdb0;">Cabinet makers</span>
+                        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); padding: 8px 18px; border-radius: 24px; font-size: 14px; color: #c4bdb0;">Furniture manufacturers</span>
+                        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); padding: 8px 18px; border-radius: 24px; font-size: 14px; color: #c4bdb0;">Kitchen manufacturers</span>
+                        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); padding: 8px 18px; border-radius: 24px; font-size: 14px; color: #c4bdb0;">Window &amp; door manufacturers</span>
+                        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); padding: 8px 18px; border-radius: 24px; font-size: 14px; color: #c4bdb0;">Sash window specialists</span>
+                        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); padding: 8px 18px; border-radius: 24px; font-size: 14px; color: #c4bdb0;">Bespoke woodworkers</span>
+                        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); padding: 8px 18px; border-radius: 24px; font-size: 14px; color: #c4bdb0;">Spray shops</span>
+                        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); padding: 8px 18px; border-radius: 24px; font-size: 14px; color: #c4bdb0;">Fit-out companies</span>
+                        <span style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); padding: 8px 18px; border-radius: 24px; font-size: 14px; color: #c4bdb0;">Timber frame builders</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- FEATURES -->
+        <section id="features" class="features">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Everything you need to run your workshop</h2>
+                    <p>Purpose-built tools for joinery businesses, from quote to delivery.</p>
+                </div>
+                
+                <div class="features-grid">
+                    <!-- Visual Production Scheduling -->
+                    <div class="glass-card feature-card">
+                        <div class="feature-icon blue">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
+                        </div>
+                        <h3>Visual Production Scheduling</h3>
+                        <p>Drag-and-drop Gantt charts for production planning. See your workshop capacity at a glance.</p>
+                        <div class="feature-gantt">
+                            <div class="feature-gantt-row">
+                                <span class="feature-gantt-label">Mon</span>
+                                <div class="feature-gantt-track">
+                                    <div class="feature-gantt-bar" style="left:5%;width:40%;background:var(--primary)"></div>
+                                </div>
+                            </div>
+                            <div class="feature-gantt-row">
+                                <span class="feature-gantt-label">Tue</span>
+                                <div class="feature-gantt-track">
+                                    <div class="feature-gantt-bar" style="left:20%;width:50%;background:var(--accent-green)"></div>
+                                </div>
+                            </div>
+                            <div class="feature-gantt-row">
+                                <span class="feature-gantt-label">Wed</span>
+                                <div class="feature-gantt-track">
+                                    <div class="feature-gantt-bar" style="left:10%;width:30%;background:var(--accent-orange)"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Sales to Production Pipeline - TALL -->
+                    <div class="glass-card feature-card tall">
+                        <div class="feature-icon green">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="8" height="8" x="3" y="3" rx="2"/><path d="M7 11v4a2 2 0 0 0 2 2h4"/><rect width="8" height="8" x="13" y="13" rx="2"/></svg>
+                        </div>
+                        <h3>Sales to Production Pipeline</h3>
+                        <p>Track every project from initial quote through design, production, and delivery.</p>
+                        <div class="pipeline">
+                            <div class="pipeline-step">
+                                <div class="pipeline-num done">1</div>
+                                <div class="pipeline-content">
+                                    <div class="pipeline-title">Quote Accepted</div>
+                                    <div class="pipeline-desc">Kitchen refit — £8,500</div>
+                                </div>
+                                <span class="pipeline-badge done">Done</span>
+                            </div>
+                            <div class="pipeline-line"></div>
+                            <div class="pipeline-step">
+                                <div class="pipeline-num active">2</div>
+                                <div class="pipeline-content">
+                                    <div class="pipeline-title">In Production</div>
+                                    <div class="pipeline-desc">Week 2 of 3</div>
+                                </div>
+                                <span class="pipeline-badge active">Active</span>
+                            </div>
+                            <div class="pipeline-line"></div>
+                            <div class="pipeline-step">
+                                <div class="pipeline-num pending">3</div>
+                                <div class="pipeline-content">
+                                    <div class="pipeline-title" style="color:var(--text-dim)">Ready for Delivery</div>
+                                    <div class="pipeline-desc">Scheduled: 15 Jan</div>
+                                </div>
+                                <span class="pipeline-badge pending">Pending</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Smart Inventory -->
+                    <div class="glass-card feature-card">
+                        <div class="feature-icon orange">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="m7.5 4.27 9 5.15"/></svg>
+                        </div>
+                        <h3>Smart Inventory</h3>
+                        <p>Track materials and get low-stock alerts before you run out.</p>
+                        <div class="stock-bars">
+                            <div class="stock-item">
+                                <div class="stock-header">
+                                    <span class="stock-label">Oak Panels</span>
+                                    <span class="stock-value green">85%</span>
+                                </div>
+                                <div class="stock-track">
+                                    <div class="stock-fill green" style="width:85%"></div>
+                                </div>
+                            </div>
+                            <div class="stock-item">
+                                <div class="stock-header">
+                                    <span class="stock-label">MDF Sheets</span>
+                                    <span class="stock-value blue">60%</span>
+                                </div>
+                                <div class="stock-track">
+                                    <div class="stock-fill blue" style="width:60%"></div>
+                                </div>
+                            </div>
+                            <div class="stock-item">
+                                <div class="stock-header">
+                                    <span class="stock-label">Hardware Kits</span>
+                                    <span class="stock-value orange">25%</span>
+                                </div>
+                                <div class="stock-track">
+                                    <div class="stock-fill orange" style="width:25%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Team & Capacity -->
+                    <div class="glass-card feature-card">
+                        <div class="feature-icon blue">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        </div>
+                        <h3>Team & Capacity</h3>
+                        <p>Manage your team workload and allocate resources efficiently.</p>
+                        <div class="team-avatars">
+                            <div class="team-avatar blue">JD</div>
+                            <div class="team-avatar green">MK</div>
+                            <div class="team-avatar orange">TB</div>
+                            <div class="team-avatar gray">+3</div>
+                        </div>
+                        <div class="team-stats">6 team members • 87% utilization</div>
+                    </div>
+                    
+                    <!-- Project Profitability - WIDE -->
+                    <div class="glass-card feature-card wide">
+                        <div class="profit-visual">
+                            <div class="profit-content">
+                                <div class="feature-icon green">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></svg>
+                                </div>
+                                <h3>Project Profitability Tracking</h3>
+                                <p>Know exactly what each job costs and earns. Track materials, labor, and overheads in real-time.</p>
+                            </div>
+                            <div class="profit-box">
+                                <div class="profit-label">Kitchen Refit Project</div>
+                                <div class="profit-stats">
+                                    <div>
+                                        <div class="profit-stat-value">£8,500</div>
+                                        <div class="profit-stat-label">Revenue</div>
+                                    </div>
+                                    <div>
+                                        <div class="profit-stat-value muted">£5,200</div>
+                                        <div class="profit-stat-label">Costs</div>
+                                    </div>
+                                    <div>
+                                        <div class="profit-stat-value green">39%</div>
+                                        <div class="profit-stat-label">Margin</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- PRICING -->
+        <section id="pricing" class="pricing section-light">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Simple, transparent pricing</h2>
+                    <p>From solo joiner to growing workshop — pay only for the size of your team.</p>
+                </div>
+                
+                <div class="pricing-grid">
+                    <!-- Solo -->
+                    <div class="glass-card pricing-card">
+                        <h3>Solo</h3>
+                        <p class="pricing-desc">For solo joiners & freelancers</p>
+                        <div class="pricing-price">
+                            <span class="amount">£19</span><span class="period">/mo</span>
+                        </div>
+                        <p class="pricing-users"><strong>1 user</strong></p>
+                        <ul class="pricing-features">
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> All core features</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Production & Gantt</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Stock & low-stock alerts</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Timesheets</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Accounting</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> File storage 1GB</li>
+                        </ul>
+                        <a href="register.html" class="btn btn-secondary btn-full">Start Your Free Trial</a>
+                    </div>
+                    
+                    <!-- Small -->
+                    <div class="glass-card pricing-card">
+                        <h3>Small</h3>
+                        <p class="pricing-desc">Perfect for small workshops</p>
+                        <div class="pricing-price">
+                            <span class="amount">£49</span><span class="period">/mo</span>
+                        </div>
+                        <p class="pricing-users">Up to <strong>5 registered users</strong></p>
+                        <ul class="pricing-features">
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Full system access</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Production & Gantt</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Stock & Materials</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Team & Timesheets</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Accounting</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> File storage 2GB</li>
+                        </ul>
+                        <a href="register.html" class="btn btn-secondary btn-full">Try Small Plan Free</a>
+                    </div>
+                    
+                    <!-- Basic - Featured -->
+                    <div class="glass-card pricing-card featured">
+                        <div class="pricing-badge">Most Popular</div>
+                        <h3>Basic</h3>
+                        <p class="pricing-desc">For growing joinery businesses</p>
+                        <div class="pricing-price">
+                            <span class="amount">£149</span><span class="period">/mo</span>
+                        </div>
+                        <p class="pricing-users">Up to <strong>15 registered users</strong></p>
+                        <ul class="pricing-features">
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Everything in Small</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Production & Gantt</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Stock & Materials</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Team & Timesheets</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Accounting</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> File storage 5GB</li>
+                        </ul>
+                        <a href="register.html" class="btn btn-primary btn-full">Start 14-Day Free Trial</a>
+                    </div>
+                    
+                    <!-- Pro -->
+                    <div class="glass-card pricing-card">
+                        <h3>Pro</h3>
+                        <p class="pricing-desc">For established workshops</p>
+                        <div class="pricing-price">
+                            <span class="amount">£249</span><span class="period">/mo</span>
+                        </div>
+                        <p class="pricing-users">Up to <strong>30 registered users</strong></p>
+                        <ul class="pricing-features">
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Everything in Basic</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Production & Gantt</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Stock & Materials</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Team & Timesheets</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> Accounting</li>
+                            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg> File storage 20GB</li>
+                        </ul>
+                        <a href="register.html" class="btn btn-secondary btn-full">Try Pro Plan Free</a>
+                    </div>
+                </div>
+                
+                <div class="pricing-note">
+                    <p>All plans include a 14-day free trial. <strong>Registered users</strong> = active accounts in your system (archived employees don't count).</p>
+                    <p style="margin-top:8px; color:#888; font-size:13px;">All prices + VAT where applicable.</p>
+                    <p style="margin-top:8px">Need more than 30 users? <a href="#contact" style="color:#AA8E68;">Contact us</a> for an Enterprise quote.</p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- ROI CALCULATOR -->
+        <section class="roi-section section-light">
+            <div class="container">
+                <div class="section-header">
+                    <h2>See your potential savings</h2>
+                    <p>Calculate how much time and money Joinery Core could save your workshop.</p>
+                </div>
+                
+                <div class="glass-card roi-card">
+                    <div class="roi-header">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01"/></svg>
+                        <h3>Calculate Your ROI</h3>
+                    </div>
+                    
+                    <div class="roi-grid">
+                        <div class="roi-inputs">
+                            <div class="roi-input">
+                                <label>FTE time saved per month</label>
+                                <div class="roi-buttons">
+                                    <button class="roi-btn" data-fte="0.5">0.5</button>
+                                    <button class="roi-btn active" data-fte="1">1</button>
+                                    <button class="roi-btn" data-fte="1.5">1.5</button>
+                                    <button class="roi-btn" data-fte="2">2</button>
+                                </div>
+                            </div>
+                            
+                            <div class="roi-input">
+                                <label>Monthly cost per FTE: <span id="fteCostValue">£3,200</span></label>
+                                <input type="range" class="roi-slider" id="fteCostSlider" min="2800" max="3500" step="100" value="3200">
+                                <div class="roi-slider-labels">
+                                    <span>£2,800</span>
+                                    <span>£3,500</span>
+                                </div>
+                            </div>
+                            
+                            <div class="roi-input">
+                                <label>Monthly savings from avoided mistakes: <span id="mistakesValue">£1,000</span></label>
+                                <input type="range" class="roi-slider" id="mistakesSlider" min="0" max="4000" step="250" value="1000">
+                                <div class="roi-slider-labels">
+                                    <span>£0</span>
+                                    <span>£4,000</span>
+                                </div>
+                            </div>
+                            
+                            <div class="roi-input">
+                                <label>Selected plan</label>
+                                <div class="roi-tabs">
+                                    <button class="roi-tab" data-plan="49">Small</button>
+                                    <button class="roi-tab active" data-plan="149">Basic</button>
+                                    <button class="roi-tab" data-plan="249">Pro</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="roi-results">
+                            <h4>Your Estimated Returns</h4>
+                            
+                            <div class="roi-result-item">
+                                <div class="roi-result-left">
+                                    <div class="roi-result-icon green">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z"/><path d="M2 9v1c0 1.1.9 2 2 2h1"/><path d="M16 11h.01"/></svg>
+                                    </div>
+                                    <span class="roi-result-label">Monthly Savings</span>
+                                </div>
+                                <span class="roi-result-value green" id="monthlySavings">£4,200</span>
+                            </div>
+                            
+                            <div class="roi-result-item">
+                                <div class="roi-result-left">
+                                    <div class="roi-result-icon orange">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
+                                    </div>
+                                    <span class="roi-result-label">Subscription Cost</span>
+                                </div>
+                                <span class="roi-result-value muted" id="subscriptionCost">TBC</span>
+                            </div>
+                            
+                            <div class="roi-result-item">
+                                <div class="roi-result-left">
+                                    <div class="roi-result-icon blue">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></svg>
+                                    </div>
+                                    <span class="roi-result-label">Net Monthly Gain</span>
+                                </div>
+                                <span class="roi-result-value green" id="netGain">TBC</span>
+                            </div>
+                            
+                            <div class="roi-total">
+                                <div class="roi-total-main">
+                                    <div class="roi-total-label">Payback Time</div>
+                                    <div class="roi-total-value" id="paybackDays">TBC</div>
+                                </div>
+                                <div class="roi-total-secondary">
+                                    <span class="roi-secondary-label">ROI:</span>
+                                    <span class="roi-secondary-value" id="roiPercent">TBC</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- EVOLUTION / TRANSFORMATION -->
+        <section class="evolution-section section-light">
+            <div class="container">
+                <div class="evolution-image-wrapper">
+                    <img src="landingimg/workshop-evolution.webp" alt="Workshop evolution from traditional to modern" class="evolution-image">
+                    <div class="evolution-overlay">
+                        <div class="evolution-labels">
+                            <span class="evolution-label past">Yesterday</span>
+                            <div class="evolution-center">
+                                <span class="evolution-center-arrow">→</span>
+                                <span class="evolution-center-text">Joinery Core</span>
+                                <span class="evolution-center-arrow">→</span>
+                            </div>
+                            <span class="evolution-label future">Tomorrow</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="evolution-content">
+                    <h2>Your craft deserves modern tools.</h2>
+                    <p>
+                        The best joiners have always adapted. From hand tools to CNC machines, 
+                        from paper schedules to digital workflows. Joinery Core is the next step — 
+                        helping you spend less time on admin and more time doing what you love: 
+                        building beautiful things.
+                    </p>
+                    <a href="register.html" class="btn btn-primary btn-lg evolution-cta">
+                        Start Your Transformation
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </a>
+                </div>
+            </div>
+        </section>
+        
+        <!-- FAQ -->
+        <section id="faq" class="faq section-light">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Frequently asked questions</h2>
+                    <p>Got questions? We've got answers.</p>
+                </div>
+                
+                <div class="faq-list">
+                    <div class="faq-item">
+                        <button class="faq-question">
+                            How does onboarding work?
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                        </button>
+                        <div class="faq-answer">We offer optional onboarding sessions where we help you import your existing data, configure your production stages, and train your team. Most workshops are fully operational within a day.</div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <button class="faq-question">
+                            Can we add more users later?
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                        </button>
+                        <div class="faq-answer">Absolutely. You can upgrade your plan at any time. Your data and settings are preserved, and you'll only pay the difference for the remaining billing period.</div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <button class="faq-question">
+                            How is our data secured and who can access it?
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                        </button>
+                        <div class="faq-answer">Your data is encrypted at rest and in transit. We use enterprise-grade cloud infrastructure with daily backups. Only your authorized team members can access your workspace.</div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <button class="faq-question">
+                            Do you support files and drawings?
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                        </button>
+                        <div class="faq-answer">Yes. You can attach PDFs, images, CAD files, and other documents to any project. Files are stored securely and accessible to your team from anywhere.</div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <button class="faq-question">
+                            What's included in support?
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                        </button>
+                        <div class="faq-answer">All plans include email support. Growth plans get priority response times. Pro and Enterprise customers get dedicated support channels and optional video calls.</div>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <button class="faq-question">
+                            Can you build custom integrations?
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                        </button>
+                        <div class="faq-answer">Pro and Enterprise plans include API access for custom integrations. We can also build bespoke integrations with your existing tools as part of an Enterprise agreement.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- CONTACT -->
+        <section id="contact" class="contact section-light">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Ready to transform your workshop?</h2>
+                    <p>Book a demo and see how Joinery Core works for your business.</p>
+                </div>
+                
+                <div class="glass-card contact-card">
+                    <div class="contact-header">
+                        <h3>Book a Demo</h3>
+                        <p>See how Joinery Core can transform your workshop operations</p>
+                    </div>
+                    
+                    <form id="contactForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="name">Name *</label>
+                                <input type="text" id="name" placeholder="Your name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="company">Company *</label>
+                                <input type="text" id="company" placeholder="Company name" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="email">Email *</label>
+                                <input type="email" id="email" placeholder="you@company.com" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="phone">Phone</label>
+                                <input type="tel" id="phone" placeholder="+44 (0) 000 000 0000">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="message">Message</label>
+                            <textarea id="message" placeholder="Tell us about your workshop and what you're looking for..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-full btn-lg">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></svg>
+                            Send Message
+                        </button>
+                    </form>
+                    
+                    <div style="text-align:center; margin-top:24px; padding-top:20px; border-top:1px solid rgba(170,142,104,0.2);">
+                        <p style="color:#666; font-size:14px; margin:0;">Or email us directly: <a href="mailto:piotr@joinerycore.com" style="color:#AA8E68; text-decoration:none; font-weight:600;">piotr@joinerycore.com</a></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- FOOTER -->
+        <footer class="footer footer-light">
+            <div class="container">
+                <div class="footer-inner">
+                    <div class="footer-brand">
+                        <div class="logo-icon logo-icon-sm"><img src="landingimg/logo.webp" alt="Joinery Core" width="120" height="28"></div>
+                        <span>© 2026 Skylon Development LTD</span>
+                    </div>
+                    <div class="footer-links" style="display:flex;gap:24px;flex-wrap:wrap;margin:12px 0;font-size:14px;">
+                        <a href="privacy.html" style="color:#888;text-decoration:none;">Privacy Policy</a>
+                        <a href="terms.html" style="color:#888;text-decoration:none;">Terms of Service</a>
+                        <a href="blog/" style="color:#888;text-decoration:none;">Blog</a>
+                        <a href="help.html" style="color:#888;text-decoration:none;">Help Centre</a>
+                        <a href="https://www.bwf.org.uk/" target="_blank" rel="noopener" style="color:#888;text-decoration:none;">British Woodworking Federation ↗</a>
+                        <a href="https://www.facebook.com/profile.php?id=61589174870484" target="_blank" rel="noopener" style="color:#888;text-decoration:none;">Facebook ↗</a>
+                        <a href="https://www.instagram.com/joinerycore/" target="_blank" rel="noopener" style="color:#888;text-decoration:none;">Instagram ↗</a>
+                        <a href="https://www.linkedin.com/company/joinery-core/" target="_blank" rel="noopener" style="color:#888;text-decoration:none;">LinkedIn ↗</a>
+                    </div>
+                    <p class="footer-text">Joinery Core is ready for the future.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- Screenshot Modals -->
+    <div class="screenshot-modal-overlay" id="screenshotModalOverlay">
+        <div class="screenshot-modal">
+            <button class="screenshot-modal-close" id="screenshotModalClose">&times;</button>
+            <div class="screenshot-modal-title" id="screenshotModalTitle"></div>
+            <div class="screenshot-modal-img-wrap">
+                <img id="screenshotModalImg" src="" alt="Feature screenshot preview">
+                <!-- Placeholder shown when no screenshot yet -->
+                <div class="screenshot-placeholder" id="screenshotPlaceholder">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:#555"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                    <span>Screenshot coming soon</span>
+                </div>
+            </div>
+            <div class="screenshot-modal-desc" id="screenshotModalDesc"></div>
+        </div>
+    </div>
+
+    <script>
+        // Hero video facade — lazy load on click (SEO-safe, no autoplay)
+        function loadHeroVideo() {
+            const wrapper = document.getElementById('heroVideoWrapper');
+            if (!wrapper || wrapper.dataset.loaded === 'true') return;
+            wrapper.dataset.loaded = 'true';
+            wrapper.innerHTML = '<video controls autoplay playsinline preload="none" poster="landingimg/screenshot-gantt.webp"><source src="help/video/JC-01.mp4" type="video/mp4">Your browser does not support video.</video>';
+        }
+
+        // Navbar scroll effect + light mode detection
+        const pricingSection = document.getElementById('pricing');
+        window.addEventListener('scroll', () => {
+            const nav = document.getElementById('navbar');
+            nav.classList.toggle('scrolled', window.scrollY > 20);
+            
+            // Switch to light navbar when entering light sections
+            if (pricingSection) {
+                const pricingTop = pricingSection.getBoundingClientRect().top;
+                nav.classList.toggle('light', pricingTop <= 80);
+            }
+        });
+        
+        // Mobile menu toggle
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const mobileMenu = document.getElementById('mobileMenu');
+        const navbar = document.getElementById('navbar');
+        const menuIcon = mobileMenuBtn.querySelector('.menu-icon');
+        const closeIcon = mobileMenuBtn.querySelector('.close-icon');
+        
+        mobileMenuBtn.addEventListener('click', () => {
+            const isOpen = mobileMenu.classList.toggle('open');
+            navbar.classList.toggle('menu-open', isOpen);
+            menuIcon.style.display = isOpen ? 'none' : 'block';
+            closeIcon.style.display = isOpen ? 'block' : 'none';
+            mobileMenuBtn.setAttribute('aria-expanded', isOpen);
+        });
+        
+        // Close mobile menu when clicking a link
+        document.querySelectorAll('.mobile-menu-link').forEach(link => {
+            link.addEventListener('click', () => {
+                mobileMenu.classList.remove('open');
+                navbar.classList.remove('menu-open');
+                menuIcon.style.display = 'block';
+                closeIcon.style.display = 'none';
+                mobileMenuBtn.setAttribute('aria-expanded', 'false');
+            });
+        });
+        
+        // FAQ accordion
+        document.querySelectorAll('.faq-question').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const item = btn.parentElement;
+                const wasOpen = item.classList.contains('open');
+                document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+                if (!wasOpen) item.classList.add('open');
+            });
+        });
+        
+        // ROI Calculator
+        let fte = 1;
+        let fteCost = 3200;
+        let mistakes = 1000;
+        let planCost = 149; // Default: Basic
+        
+        function updateROI() {
+            const savings = (fte * fteCost) + mistakes;
+            const net = savings - planCost;
+            const payback = planCost > 0 ? (planCost / savings * 30).toFixed(0) : 0;
+            const roi = planCost > 0 ? Math.round((net / planCost) * 100) : 0;
+            
+            document.getElementById('monthlySavings').textContent = '£' + savings.toLocaleString();
+            document.getElementById('subscriptionCost').textContent = '£' + planCost + '/mo';
+            document.getElementById('netGain').textContent = '£' + net.toLocaleString() + '/mo';
+            document.getElementById('paybackDays').textContent = payback + ' days';
+            document.getElementById('roiPercent').textContent = roi + '%';
+        }
+        
+        // FTE buttons
+        document.querySelectorAll('.roi-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.roi-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                fte = parseFloat(btn.dataset.fte);
+                updateROI();
+            });
+        });
+        
+        // FTE cost slider
+        document.getElementById('fteCostSlider').addEventListener('input', (e) => {
+            fteCost = parseInt(e.target.value);
+            document.getElementById('fteCostValue').textContent = '£' + fteCost.toLocaleString();
+            updateROI();
+        });
+        
+        // Mistakes slider
+        document.getElementById('mistakesSlider').addEventListener('input', (e) => {
+            mistakes = parseInt(e.target.value);
+            document.getElementById('mistakesValue').textContent = '£' + mistakes.toLocaleString();
+            updateROI();
+        });
+        
+        // Plan tabs
+        document.querySelectorAll('.roi-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.roi-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                planCost = parseInt(tab.dataset.plan);
+                updateROI();
+            });
+        });
+        
+        // Contact form
+        document.getElementById('contactForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = e.target.querySelector('button[type="submit"]');
+            const origHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span>Sending...</span>';
+            
+            try {
+                const resp = await fetch(`${window.API_URL || 'https://joinerycore.com'}/api/contact`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: document.getElementById('name').value,
+                        company: document.getElementById('company').value,
+                        email: document.getElementById('email').value,
+                        phone: document.getElementById('phone').value || '',
+                        message: document.getElementById('message').value || ''
+                    })
+                });
+                
+                if (resp.ok) {
+                    btn.innerHTML = '✓ Message Sent!';
+                    btn.style.background = '#2ecc71';
+                    e.target.reset();
+                    setTimeout(() => { btn.innerHTML = origHTML; btn.style.background = ''; btn.disabled = false; }, 3000);
+                } else {
+                    throw new Error('Failed');
+                }
+            } catch (err) {
+                btn.innerHTML = '✗ Failed - Try again';
+                btn.style.background = '#e74c3c';
+                setTimeout(() => { btn.innerHTML = origHTML; btn.style.background = ''; btn.disabled = false; }, 3000);
+            }
+        });
+        
+        // Smooth scroll
+        document.querySelectorAll('a[href^="#"]').forEach(a => {
+            a.addEventListener('click', (e) => {
+                const href = a.getAttribute('href');
+                if (!href || href === '#') return;
+                
+                const target = document.querySelector(href);
+                if (!target) return;
+                
+                e.preventDefault();
+                target.scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+        
+        // Track page visit (fire & forget, silent)
+        fetch('/api/track-visit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ page: 'landing' })
+        }).catch(() => {});
+        
+        // Screenshot modals - clickable keywords in hero
+        const modalData = {
+            'modal-plan': {
+                title: 'Production Planning — Gantt View',
+                img: 'landingimg/modal-plan.webp',
+                desc: 'Drag-and-drop production scheduling. See every project phase across weeks — who does what and when.'
+            },
+            'modal-joiner': {
+                title: "Worker View — John Max, Joiner",
+                img: 'landingimg/modal-joiner.webp',
+                desc: 'Filter by any worker to see their personal schedule. Every joiner knows exactly what\'s next.'
+            },
+            'modal-sheet': {
+                title: 'Stock Control — Live Inventory',
+                img: 'landingimg/modal-sheet.webp',
+                desc: 'Track every sheet, board and fitting in real time. Get alerts before you run out.'
+            }
+        };
+        
+        const overlay = document.getElementById('screenshotModalOverlay');
+        const modalImg = document.getElementById('screenshotModalImg');
+        const modalTitle = document.getElementById('screenshotModalTitle');
+        const modalDesc = document.getElementById('screenshotModalDesc');
+        const placeholder = document.getElementById('screenshotPlaceholder');
+        
+        document.querySelectorAll('.hero-keyword').forEach(kw => {
+            kw.addEventListener('click', () => {
+                const key = kw.dataset.modal;
+                const data = modalData[key];
+                if (!data) return;
+                
+                modalTitle.textContent = data.title;
+                modalDesc.textContent = data.desc;
+                modalImg.src = data.img;
+                modalImg.alt = data.title;
+                
+                // Show placeholder if image fails to load
+                placeholder.classList.remove('visible');
+                modalImg.style.display = 'block';
+                modalImg.onerror = () => {
+                    modalImg.style.display = 'none';
+                    placeholder.classList.add('visible');
+                };
+                
+                overlay.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            });
+        });
+
+        // Thumbnail clicks — same modal
+        document.querySelectorAll('.hero-thumb').forEach(thumb => {
+            thumb.addEventListener('click', () => {
+                const key = thumb.dataset.modal;
+                const data = modalData[key];
+                if (!data) return;
+                
+                modalTitle.textContent = data.title;
+                modalDesc.textContent = data.desc;
+                modalImg.src = data.img;
+                modalImg.alt = data.title;
+                
+                placeholder.classList.remove('visible');
+                modalImg.style.display = 'block';
+                modalImg.onerror = () => {
+                    modalImg.style.display = 'none';
+                    placeholder.classList.add('visible');
+                };
+                
+                overlay.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            });
+        });
+        
+        // Close modal
+        document.getElementById('screenshotModalClose').addEventListener('click', closeModal);
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) closeModal();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+        
+        function closeModal() {
+            overlay.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+    </script>
+    <script defer src="js/chat-widget-public.js?v=4"></script>
+</body>
+</html>
