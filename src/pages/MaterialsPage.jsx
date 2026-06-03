@@ -577,7 +577,7 @@ export default function MaterialsPage() {
                       {/* Size */}
                       <td className="px-3 py-1.5 text-ink-300">{m.size || '—'}</td>
                       {/* Thickness */}
-                      <td className="px-3 py-1.5 text-ink-300">{m.thickness ? `${m.thickness}${m.thickness.includes('mm') ? '' : 'mm'}` : '—'}</td>
+                      <td className="px-3 py-1.5 text-ink-300">{m.thickness ? `${m.thickness}${String(m.thickness).includes('mm') ? '' : 'mm'}` : '—'}</td>
                       {/* Color */}
                       <td className="px-3 py-1.5 text-ink-300">{m.color || '—'}</td>
                       {/* Category */}
