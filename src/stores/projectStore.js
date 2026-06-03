@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import * as cloud from '../services/cloudSync.js';
 
 // ─── Production settings (preserved from original — used by calculations engine) ───
 const defaultSettings = {
@@ -107,9 +107,7 @@ const uid = () => `id-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 export { BATCH_DEFAULTS, BATCH_STATUSES };
 
-export const useProjectStore = create(
-  persist(
-    (set, get) => ({
+export const useProjectStore = create((set, get) => ({
 
   // ─── State ───
   projects: [],
@@ -146,14 +144,16 @@ export const useProjectStore = create(
   selectWindow: (id) => set({ selectedWindowId: id }),
 
   // ─── Settings (preserved — used by calculations engine) ───
-  updateSettings: (patch) =>
+  updateSettings: (patch) => {
     set((s) => ({
       settings: {
         ...s.settings,
         ...patch,
         sectionMap: { ...s.settings.sectionMap, ...(patch.sectionMap || {}) }
       }
-    })),
+    }));
+    cloud.saveSettings(get().settings);
+  },
 
   setSprayNote: (key, value) =>
     set((s) => {
@@ -187,6 +187,7 @@ export const useProjectStore = create(
       batches: [],
     };
     set((s) => ({ projects: [...s.projects, project] }));
+    cloud.saveProject(project);
     return project;
   },
 
@@ -202,6 +203,7 @@ export const useProjectStore = create(
       currentBatch: null,
       currentWindows: [],
     }));
+    cloud.deleteProjectCloud(projectId);
   },
 
   updateProject: (projectId, patch) => {
@@ -214,6 +216,8 @@ export const useProjectStore = create(
         : s.currentProject;
       return { projects: updatedProjects, currentProject: updatedCurrent };
     });
+    const p = get().projects.find((x) => x.id === projectId);
+    if (p) cloud.saveProject(p);
   },
 
   // ─── BATCH CRUD ───
@@ -242,6 +246,7 @@ export const useProjectStore = create(
         : s.currentProject;
       return { projects: updatedProjects, currentProject: updatedCurrent };
     });
+    cloud.saveBatch(batch, projectId);
     return batch;
   },
 
@@ -270,6 +275,7 @@ export const useProjectStore = create(
         currentWindows: s.currentBatch?.id === batchId ? [] : s.currentWindows,
       };
     });
+    cloud.deleteBatchCloud(batchId);
   },
 
   updateBatchDefaults: (projectId, batchId, newDefaults) => {
@@ -290,6 +296,8 @@ export const useProjectStore = create(
         : s.currentBatch;
       return { projects: updatedProjects, currentProject: updatedCurrent, currentBatch: updatedBatch };
     });
+    const b = get().getBatchById(projectId, batchId);
+    if (b) cloud.saveBatch(b, projectId);
   },
 
   updateBatchStatus: (projectId, batchId, status) => {
@@ -304,6 +312,8 @@ export const useProjectStore = create(
       const updatedBatch = s.currentBatch?.id === batchId ? { ...s.currentBatch, status } : s.currentBatch;
       return { projects: updatedProjects, currentProject: updatedCurrent, currentBatch: updatedBatch };
     });
+    const b = get().getBatchById(projectId, batchId);
+    if (b) cloud.saveBatch(b, projectId);
   },
 
   updateBatchLabel: (projectId, batchId, label) => {
@@ -318,6 +328,8 @@ export const useProjectStore = create(
       const updatedBatch = s.currentBatch?.id === batchId ? { ...s.currentBatch, label } : s.currentBatch;
       return { projects: updatedProjects, currentProject: updatedCurrent, currentBatch: updatedBatch };
     });
+    const b = get().getBatchById(projectId, batchId);
+    if (b) cloud.saveBatch(b, projectId);
   },
 
   // ─── PRODUCTION PACK CRUD ───
@@ -334,11 +346,13 @@ export const useProjectStore = create(
       created_at: new Date().toISOString(),
     };
     set((s) => ({ productionPacks: [...s.productionPacks, pack] }));
+    cloud.savePack(pack);
     return pack;
   },
 
   deleteProductionPack: (ppId) => {
     set((s) => ({ productionPacks: s.productionPacks.filter((pp) => pp.id !== ppId) }));
+    cloud.deletePackCloud(ppId);
   },
 
   updateProductionPack: (ppId, patch) => {
@@ -347,6 +361,8 @@ export const useProjectStore = create(
         pp.id === ppId ? { ...pp, ...patch } : pp
       ),
     }));
+    const pp = get().productionPacks.find((x) => x.id === ppId);
+    if (pp) cloud.savePack(pp);
   },
 
   // Persist pre-cut editable settings (stock lengths + offcuts) to the active
@@ -358,6 +374,8 @@ export const useProjectStore = create(
           pp.id === id ? { ...pp, precutSettings } : pp
         ),
       }));
+      const pp = get().productionPacks.find((x) => x.id === id);
+      if (pp) cloud.savePack(pp);
       return;
     }
     set((s) => {
@@ -372,6 +390,11 @@ export const useProjectStore = create(
           : s.currentProject,
       };
     });
+    // find batch + its project for cloud save
+    for (const p of get().projects) {
+      const b = (p.batches || []).find((x) => x.id === id);
+      if (b) { cloud.saveBatch(b, p.id); break; }
+    }
   },
 
   assignBatchToProductionPack: (ppId, projectId, batchId) => {
@@ -391,6 +414,8 @@ export const useProjectStore = create(
         }),
       };
     });
+    const pp = get().productionPacks.find((x) => x.id === ppId);
+    if (pp) cloud.savePack(pp);
   },
 
   unassignBatchFromProductionPack: (ppId, projectId, batchId) => {
@@ -405,6 +430,8 @@ export const useProjectStore = create(
         };
       }),
     }));
+    const pp = get().productionPacks.find((x) => x.id === ppId);
+    if (pp) cloud.savePack(pp);
   },
 
   getProductionPackById: (id) => get().productionPacks.find((pp) => pp.id === id) || null,
@@ -522,6 +549,8 @@ export const useProjectStore = create(
         currentWindows: updatedWindows,
       };
     });
+    const sortOrder = (batch.windows?.length || 0);
+    cloud.saveWindow(win, batchId, sortOrder);
     return windowId;
   },
 
@@ -611,6 +640,8 @@ export const useProjectStore = create(
         currentWindows: updatedWindows,
       };
     });
+    const idx = (batch.windows || []).findIndex((w) => w.id === windowId);
+    cloud.saveWindow(win, batchId, idx >= 0 ? idx : 0);
     return windowId;
   },
 
@@ -639,36 +670,36 @@ export const useProjectStore = create(
         currentWindows: updatedWindows,
       };
     });
+    cloud.deleteWindowCloud(windowId);
   },
 
-}),
-    {
-      name: 'sp-projects',
-      partialize: (state) => ({
-        projects: state.projects,
-        productionPacks: state.productionPacks,
-        settings: state.settings,
-        sprayNotes: state.sprayNotes,
-        projectsLoaded: state.projectsLoaded,
-      }),
-      merge: (persisted, current) => {
-        if (!persisted || !persisted.projects) {
-          // First visit — start empty (no mock data).
-          return { ...current, projects: [], productionPacks: [], projectsLoaded: true };
-        }
-        // Saved data exists — always restore it.
-        // Deep-merge settings so newly-added defaults (e.g. company) survive old saves.
-        return {
-          ...current,
-          ...persisted,
-          settings: {
-            ...current.settings,
-            ...(persisted.settings || {}),
-            company: { ...current.settings.company, ...((persisted.settings || {}).company || {}) },
-          },
+  // ─── CLOUD ───
+  // Load the whole tree for the logged-in user from Supabase. Call on login.
+  loadFromCloud: async () => {
+    set({ projectsLoading: true, projectsError: null });
+    try {
+      const data = await cloud.loadAll();
+      if (data) {
+        set((s) => ({
+          projects: data.projects,
+          productionPacks: data.productionPacks,
+          settings: data.settings ? { ...s.settings, ...data.settings, company: { ...s.settings.company, ...(data.settings.company || {}) } } : s.settings,
           projectsLoaded: true,
-        };
-      },
+          projectsLoading: false,
+        }));
+      } else {
+        set({ projectsLoaded: true, projectsLoading: false });
+      }
+    } catch (e) {
+      console.error('loadFromCloud', e);
+      set({ projectsError: String(e), projectsLoading: false, projectsLoaded: true });
     }
-  )
-);
+  },
+
+  // Clear all in-memory data (call on sign-out so nothing leaks between accounts).
+  clearAll: () => set({
+    projects: [], productionPacks: [], currentProject: null, currentBatch: null,
+    currentWindows: [], selectedWindowId: null, projectsLoaded: false,
+  }),
+
+}));

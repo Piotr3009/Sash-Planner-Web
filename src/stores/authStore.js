@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase, hasSupabaseConfig } from '../services/supabase.js';
+import { useProjectStore } from './projectStore.js';
 
 export const useAuthStore = create(
   persist(
@@ -16,7 +17,12 @@ export const useAuthStore = create(
     }
     const { data } = await supabase.auth.getSession();
     set({ session: data.session, loading: false });
-    supabase.auth.onAuthStateChange((_event, sess) => set({ session: sess }));
+    if (data.session) useProjectStore.getState().loadFromCloud();
+    supabase.auth.onAuthStateChange((_event, sess) => {
+      set({ session: sess });
+      if (sess) useProjectStore.getState().loadFromCloud();
+      else useProjectStore.getState().clearAll();
+    });
   },
 
   signIn: async (email, password) => {
@@ -32,6 +38,8 @@ export const useAuthStore = create(
       return { ok: false, error: error.message };
     }
     set({ session: data.session });
+    useProjectStore.getState().clearAll();
+    await useProjectStore.getState().loadFromCloud();
     return { ok: true };
   },
 
@@ -40,6 +48,7 @@ export const useAuthStore = create(
       await supabase.auth.signOut();
     }
     set({ session: null });
+    useProjectStore.getState().clearAll();
   }
 }),
     {
