@@ -4,16 +4,19 @@ import { supabase, hasSupabaseConfig } from '../services/supabase.js';
 import { useProjectStore } from './projectStore.js';
 import { useMaterialStore } from './materialStore.js';
 import { useIronmongeryStore } from './ironmongeryStore.js';
+import { useMaterialAssignmentStore } from './materialAssignmentStore.js';
 
 function loadAllStores() {
   useProjectStore.getState().loadFromCloud();
   useMaterialStore.getState().loadFromCloud();
   useIronmongeryStore.getState().loadFromCloud();
+  useMaterialAssignmentStore.getState().loadFromCloud();
 }
 function clearAllStores() {
   useProjectStore.getState().clearAll();
   useMaterialStore.getState().clearAll();
   useIronmongeryStore.getState().clearAll();
+  useMaterialAssignmentStore.getState().clearAll();
 }
 
 export const useAuthStore = create(

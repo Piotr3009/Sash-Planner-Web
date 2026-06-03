@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import * as cloud from '../services/cloudSync.js';
 
 // ─── Sash Window Parts (hardcoded — structural, used by calculations engine) ───
 // section = pre-cut (raw) section that needs to be matched to a stock material
@@ -71,9 +71,7 @@ export const ALL_PARTS = [
 ];
 
 // ─── Store ───
-export const useMaterialAssignmentStore = create(
-  persist(
-    (set, get) => ({
+export const useMaterialAssignmentStore = create((set, get) => ({
       // assignments: { [part_id]: { material_id, yield } }
       assignments: {},
 
@@ -90,6 +88,7 @@ export const useMaterialAssignmentStore = create(
             },
           },
         }));
+        cloud.saveAssignments(get().assignments);
       },
 
       // Update filter (category/subcategory) for a part
@@ -106,6 +105,7 @@ export const useMaterialAssignmentStore = create(
             },
           },
         }));
+        cloud.saveAssignments(get().assignments);
       },
 
       // Update yield only
@@ -116,6 +116,7 @@ export const useMaterialAssignmentStore = create(
             [partId]: { ...s.assignments[partId], yield: yieldCoeff },
           },
         }));
+        cloud.saveAssignments(get().assignments);
       },
 
       // Remove assignment
@@ -125,16 +126,18 @@ export const useMaterialAssignmentStore = create(
           delete next[partId];
           return { assignments: next };
         });
+        cloud.saveAssignments(get().assignments);
       },
 
       // Get assignment for a part
       getAssignment: (partId) => get().assignments[partId] || null,
 
-      // Clear all assignments
+      // Clear all assignments (local only — used on sign-out)
       clearAll: () => set({ assignments: {} }),
-    }),
-    {
-      name: 'sp-material-assignments',
-    }
-  )
-);
+
+      // Load assignments for the logged-in user from the cloud.
+      loadFromCloud: async () => {
+        const data = await cloud.loadAssignments();
+        if (data) set({ assignments: data });
+      },
+}));

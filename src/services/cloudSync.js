@@ -312,3 +312,28 @@ export async function deleteIronCloud(id) {
   if (!enabled()) return;
   bg(supabase.from('ironmongery').delete().eq('id', id), 'deleteIron');
 }
+
+// ─────────────────────────────────────────────────────────────
+// MATERIAL ASSIGNMENTS — small per-user map {part_id:{material_id,
+// yield,…}}. Stored inside settings.constants.assignments (no own table).
+// ─────────────────────────────────────────────────────────────
+export async function loadAssignments() {
+  if (!enabled()) return null;
+  const uid = await currentUserId();
+  if (!uid) return null;
+  const { data, error } = await supabase.from('settings').select('constants').eq('user_id', uid).maybeSingle();
+  if (error) { console.error('loadAssignments', error); return null; }
+  return data?.constants?.assignments || {};
+}
+
+export async function saveAssignments(assignments) {
+  if (!enabled()) return;
+  const uid = await currentUserId();
+  if (!uid) return;
+  // Merge into existing constants so we don't clobber other settings.
+  const { data } = await supabase.from('settings').select('company, constants').eq('user_id', uid).maybeSingle();
+  const constants = { ...(data?.constants || {}), assignments: assignments || {} };
+  bg(supabase.from('settings').upsert({
+    user_id: uid, company: data?.company || {}, constants,
+  }, { onConflict: 'user_id' }), 'saveAssignments');
+}
