@@ -103,7 +103,13 @@ const BATCH_DEFAULTS = {
 
 const BATCH_STATUSES = ['preparation', 'in-production', 'complete'];
 
-const uid = () => `id-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const uid = () =>
+  (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+      });
 
 export { BATCH_DEFAULTS, BATCH_STATUSES };
 
