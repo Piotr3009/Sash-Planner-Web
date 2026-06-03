@@ -221,3 +221,94 @@ export async function saveSettings(settings) {
     user_id: uid, company: company || {}, constants,
   }, { onConflict: 'user_id' }), 'saveSettings');
 }
+
+// ─────────────────────────────────────────────────────────────
+// MATERIALS — common cols + config jsonb (category/subcategory/
+// color/unit live in config; they aren't dedicated columns).
+// ─────────────────────────────────────────────────────────────
+function memMaterialToDb(m, userId) {
+  const { id, item_number, name, size, thickness, cost_per_unit, image_url, jc_uuid, notes,
+    ...rest } = m;  // rest = category, subcategory, color, unit, created_at…
+  return {
+    id, user_id: userId, item_number: item_number || null, name,
+    size: size || null,
+    thickness: (thickness === '' || thickness == null) ? null : Number(thickness) || null,
+    cost: cost_per_unit || null,
+    photo_url: image_url || null,
+    jc_uuid: jc_uuid || null, notes: notes || null,
+    config: { category: rest.category, subcategory: rest.subcategory, color: rest.color, unit: rest.unit },
+  };
+}
+function dbMaterialToMem(r) {
+  const c = r.config || {};
+  return {
+    id: r.id, item_number: r.item_number || '', name: r.name,
+    size: r.size || '', thickness: r.thickness ?? '',
+    cost_per_unit: r.cost || 0, image_url: r.photo_url || '',
+    jc_uuid: r.jc_uuid || '', notes: r.notes || '',
+    category: c.category || 'consumables', subcategory: c.subcategory || '',
+    color: c.color || '', unit: c.unit || 'pcs',
+    created_at: r.created_at,
+  };
+}
+
+export async function loadMaterials() {
+  if (!enabled()) return null;
+  const uid = await currentUserId();
+  if (!uid) return null;
+  const { data, error } = await supabase.from('materials').select('*').eq('user_id', uid).eq('archived', false).order('item_number', { ascending: true });
+  if (error) { console.error('loadMaterials', error); return null; }
+  return (data || []).map(dbMaterialToMem);
+}
+export async function saveMaterial(m) {
+  if (!enabled()) return;
+  const uid = await currentUserId();
+  if (!uid) return;
+  bg(supabase.from('materials').upsert(memMaterialToDb(m, uid)), 'saveMaterial');
+}
+export async function deleteMaterialCloud(id) {
+  if (!enabled()) return;
+  bg(supabase.from('materials').delete().eq('id', id), 'deleteMaterial');
+}
+
+// ─────────────────────────────────────────────────────────────
+// IRONMONGERY — maps to ironmongery table.
+// ─────────────────────────────────────────────────────────────
+function memIronToDb(it, userId) {
+  const { id, name, category, finish, size, is_pas24, auto_quantity, cost, cost_per_unit,
+    image_url, jc_uuid, notes, ...rest } = it;
+  return {
+    id, user_id: userId, category: category || 'other', name,
+    finish: finish || rest.color || null, size: size || null,
+    is_pas24: !!is_pas24, auto_quantity: auto_quantity ?? null,
+    cost: cost ?? cost_per_unit ?? null,
+    photo_url: image_url || null, jc_uuid: jc_uuid || null, notes: notes || null,
+  };
+}
+function dbIronToMem(r) {
+  return {
+    id: r.id, category: r.category, name: r.name, finish: r.finish || '',
+    size: r.size || '', is_pas24: !!r.is_pas24, auto_quantity: r.auto_quantity ?? null,
+    cost_per_unit: r.cost || 0, image_url: r.photo_url || '',
+    jc_uuid: r.jc_uuid || '', notes: r.notes || '', created_at: r.created_at,
+  };
+}
+
+export async function loadIronmongery() {
+  if (!enabled()) return null;
+  const uid = await currentUserId();
+  if (!uid) return null;
+  const { data, error } = await supabase.from('ironmongery').select('*').eq('user_id', uid).eq('archived', false).order('category', { ascending: true });
+  if (error) { console.error('loadIronmongery', error); return null; }
+  return (data || []).map(dbIronToMem);
+}
+export async function saveIron(it) {
+  if (!enabled()) return;
+  const uid = await currentUserId();
+  if (!uid) return;
+  bg(supabase.from('ironmongery').upsert(memIronToDb(it, uid)), 'saveIron');
+}
+export async function deleteIronCloud(id) {
+  if (!enabled()) return;
+  bg(supabase.from('ironmongery').delete().eq('id', id), 'deleteIron');
+}

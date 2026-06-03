@@ -1,7 +1,13 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import * as cloud from '../services/cloudSync.js';
 
-const uid = () => `mat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const uid = () =>
+  (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+      });
 
 // Auto-generate item_number: MAT-001, MAT-002, ...
 const nextItemNumber = (materials) => {
@@ -22,9 +28,7 @@ export const MATERIAL_CATEGORIES = [
 
 export const MATERIAL_UNITS = ['pcs', 'm', 'kg', 'set', 'unit', 'litre', 'pair'];
 
-export const useMaterialStore = create(
-  persist(
-    (set, get) => ({
+export const useMaterialStore = create((set, get) => ({
   materials: [],
   materialsLoaded: false,
 
@@ -50,6 +54,7 @@ export const useMaterialStore = create(
       created_at: new Date().toISOString(),
     };
     set({ materials: [...materials, material] });
+    cloud.saveMaterial(material);
     return material;
   },
 
@@ -57,12 +62,15 @@ export const useMaterialStore = create(
     set((s) => ({
       materials: s.materials.map((m) => (m.id === id ? { ...m, ...patch } : m)),
     }));
+    const m = get().materials.find((x) => x.id === id);
+    if (m) cloud.saveMaterial(m);
   },
 
   deleteMaterial: (id) => {
     set((s) => ({
       materials: s.materials.filter((m) => m.id !== id),
     }));
+    cloud.deleteMaterialCloud(id);
   },
 
   // ─── Queries ───
@@ -128,6 +136,7 @@ export const useMaterialStore = create(
     });
     if (imported.length > 0) {
       set((s) => ({ materials: [...s.materials, ...imported] }));
+      imported.forEach((m) => cloud.saveMaterial(m));
     }
     return { added: imported.length, updated };
   },
@@ -160,15 +169,12 @@ export const useMaterialStore = create(
   canDeleteSubcategory: (category, subcategory) => {
     return !get().materials.some((m) => m.category === category && m.subcategory === subcategory);
   },
-}),
-    {
-      name: 'sp-materials',
-      merge: (persisted, current) => {
-        if (!persisted || !persisted.materials) {
-          return { ...current, materials: [], materialsLoaded: true };
-        }
-        return { ...current, ...persisted, materialsLoaded: true };
-      },
-    }
-  )
-);
+
+  // ─── CLOUD ───
+  loadFromCloud: async () => {
+    const data = await cloud.loadMaterials();
+    if (data) set({ materials: data, materialsLoaded: true });
+    else set({ materialsLoaded: true });
+  },
+  clearAll: () => set({ materials: [], materialsLoaded: false }),
+}));

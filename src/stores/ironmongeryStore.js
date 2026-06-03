@@ -1,7 +1,13 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import * as cloud from '../services/cloudSync.js';
 
-const uid = () => `irn-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const uid = () =>
+  (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+      });
 
 const nextItemNumber = (items) => {
   let max = 0;
@@ -25,9 +31,7 @@ export const IRONMONGERY_FINISHES = [
   'brass', 'chrome', 'stainless', 'antique brass', 'black', 'white', 'satin', 'other',
 ];
 
-export const useIronmongeryStore = create(
-  persist(
-    (set, get) => ({
+export const useIronmongeryStore = create((set, get) => ({
       items: [],
       loaded: false,
 
@@ -52,6 +56,7 @@ export const useIronmongeryStore = create(
           created_at: new Date().toISOString(),
         };
         set({ items: [...items, item] });
+        cloud.saveIron(item);
         return item;
       },
 
@@ -59,15 +64,19 @@ export const useIronmongeryStore = create(
         set((s) => ({
           items: s.items.map((m) => (m.id === id ? { ...m, ...patch } : m)),
         }));
+        const it = get().items.find((x) => x.id === id);
+        if (it) cloud.saveIron(it);
       },
 
       deleteItem: (id) => {
         set((s) => ({ items: s.items.filter((m) => m.id !== id) }));
+        cloud.deleteIronCloud(id);
       },
 
       deleteMultiple: (ids) => {
         const idSet = new Set(ids);
         set((s) => ({ items: s.items.filter((m) => !idSet.has(m.id)) }));
+        ids.forEach((id) => cloud.deleteIronCloud(id));
       },
 
       // ─── Queries ───
@@ -130,18 +139,16 @@ export const useIronmongeryStore = create(
         });
         if (imported.length > 0) {
           set((s) => ({ items: [...s.items, ...imported] }));
+          imported.forEach((it) => cloud.saveIron(it));
         }
         return { added: imported.length, updated };
       },
-    }),
-    {
-      name: 'sp-ironmongery',
-      merge: (persisted, current) => {
-        if (!persisted || !persisted.items) {
-          return { ...current, items: [], loaded: true };
-        }
-        return { ...current, ...persisted, loaded: true };
+
+      // ─── CLOUD ───
+      loadFromCloud: async () => {
+        const data = await cloud.loadIronmongery();
+        if (data) set({ items: data, loaded: true });
+        else set({ loaded: true });
       },
-    }
-  )
-);
+      clearAll: () => set({ items: [], loaded: false }),
+}));

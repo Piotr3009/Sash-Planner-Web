@@ -2,6 +2,19 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase, hasSupabaseConfig } from '../services/supabase.js';
 import { useProjectStore } from './projectStore.js';
+import { useMaterialStore } from './materialStore.js';
+import { useIronmongeryStore } from './ironmongeryStore.js';
+
+function loadAllStores() {
+  useProjectStore.getState().loadFromCloud();
+  useMaterialStore.getState().loadFromCloud();
+  useIronmongeryStore.getState().loadFromCloud();
+}
+function clearAllStores() {
+  useProjectStore.getState().clearAll();
+  useMaterialStore.getState().clearAll();
+  useIronmongeryStore.getState().clearAll();
+}
 
 export const useAuthStore = create(
   persist(
@@ -17,11 +30,11 @@ export const useAuthStore = create(
     }
     const { data } = await supabase.auth.getSession();
     set({ session: data.session, loading: false });
-    if (data.session) useProjectStore.getState().loadFromCloud();
+    if (data.session) loadAllStores();
     supabase.auth.onAuthStateChange((_event, sess) => {
       set({ session: sess });
-      if (sess) useProjectStore.getState().loadFromCloud();
-      else useProjectStore.getState().clearAll();
+      if (sess) loadAllStores();
+      else clearAllStores();
     });
   },
 
@@ -38,8 +51,8 @@ export const useAuthStore = create(
       return { ok: false, error: error.message };
     }
     set({ session: data.session });
-    useProjectStore.getState().clearAll();
-    await useProjectStore.getState().loadFromCloud();
+    clearAllStores();
+    await loadAllStores();
     return { ok: true };
   },
 
@@ -48,7 +61,7 @@ export const useAuthStore = create(
       await supabase.auth.signOut();
     }
     set({ session: null });
-    useProjectStore.getState().clearAll();
+    clearAllStores();
   }
 }),
     {
