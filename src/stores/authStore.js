@@ -5,6 +5,7 @@ import { useProjectStore } from './projectStore.js';
 import { useMaterialStore } from './materialStore.js';
 import { useIronmongeryStore } from './ironmongeryStore.js';
 import { useMaterialAssignmentStore } from './materialAssignmentStore.js';
+import { clearTenantCache } from '../services/cloudSync.js';
 
 function loadAllStores() {
   useProjectStore.getState().loadFromCloud();
@@ -13,6 +14,7 @@ function loadAllStores() {
   useMaterialAssignmentStore.getState().loadFromCloud();
 }
 function clearAllStores() {
+  clearTenantCache();
   useProjectStore.getState().clearAll();
   useMaterialStore.getState().clearAll();
   useIronmongeryStore.getState().clearAll();

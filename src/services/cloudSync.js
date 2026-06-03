@@ -15,6 +15,24 @@ async function currentUserId() {
   return data?.user?.id || null;
 }
 
+// The tenant (organization) the logged-in user belongs to. Everything is
+// scoped to this, not to the individual user — so all members of a firm
+// share the same data. Resolved from user_profiles.
+let _tenantCache = null;
+async function currentTenantId() {
+  if (!hasSupabaseConfig) return null;
+  if (_tenantCache) return _tenantCache;
+  const uid = await currentUserId();
+  if (!uid) return null;
+  const { data, error } = await supabase.from('user_profiles').select('tenant_id').eq('id', uid).maybeSingle();
+  if (error) { console.error('currentTenantId', error); return null; }
+  _tenantCache = data?.tenant_id || null;
+  return _tenantCache;
+}
+
+// Call on sign-out so the next user doesn't inherit the cached tenant.
+export function clearTenantCache() { _tenantCache = null; }
+
 const enabled = () => hasSupabaseConfig;
 
 // ─────────────────────────────────────────────────────────────
@@ -23,15 +41,15 @@ const enabled = () => hasSupabaseConfig;
 // ─────────────────────────────────────────────────────────────
 export async function loadAll() {
   if (!enabled()) return null;
-  const uid = await currentUserId();
-  if (!uid) return null;
+  const tenantId = await currentTenantId();
+  if (!tenantId) return null;
 
   const [projectsRes, batchesRes, windowsRes, packsRes, settingsRes] = await Promise.all([
     supabase.from('projects').select('*').eq('archived', false).order('created_at', { ascending: true }),
     supabase.from('batches').select('*').order('created_at', { ascending: true }),
     supabase.from('windows').select('*').order('sort_order', { ascending: true }),
     supabase.from('production_packs').select('*').eq('archived', false).order('created_at', { ascending: true }),
-    supabase.from('settings').select('*').eq('user_id', uid).maybeSingle(),
+    supabase.from('settings').select('*').eq('tenant_id', tenantId).maybeSingle(),
   ]);
 
   if (projectsRes.error) { console.error('loadAll projects', projectsRes.error); return null; }
@@ -108,14 +126,14 @@ function dbWindowToMem(w) {
   };
 }
 
-function memWindowToDb(w, userId, batchId, sortOrder) {
+function memWindowToDb(w, tenantId, batchId, sortOrder) {
   // Pull common fields into columns; stash the rest in config.
   const {
     id, batch_id, name, window_type, width, height, openingType, glassFinish, woodColor,
     ...rest
   } = w;
   return {
-    id, user_id: userId, batch_id: batchId || batch_id,
+    id, tenant_id: tenantId, batch_id: batchId || batch_id,
     name, window_type: window_type || 'sash',
     width: width || null, height: height || null,
     opening_type: openingType || null,
@@ -153,10 +171,11 @@ function bg(promise, label) {
 
 export async function saveProject(p) {
   if (!enabled()) return;
+  const tenantId = await currentTenantId();
   const uid = await currentUserId();
-  if (!uid) return;
+  if (!tenantId) return;
   bg(supabase.from('projects').upsert({
-    id: p.id, user_id: uid, name: p.name, project_number: p.project_number,
+    id: p.id, tenant_id: tenantId, created_by: uid, name: p.name, project_number: p.project_number,
     client_id: null, address: p.address || null, status: p.status || 'preparation',
   }), 'saveProject');
 }
@@ -168,11 +187,11 @@ export async function deleteProjectCloud(id) {
 
 export async function saveBatch(b, projectId) {
   if (!enabled()) return;
-  const uid = await currentUserId();
-  if (!uid) return;
+  const tenantId = await currentTenantId();
+  if (!tenantId) return;
   const defaults = { ...(b.defaults || {}), _label: b.label };
   bg(supabase.from('batches').upsert({
-    id: b.id, user_id: uid, project_id: projectId || b.project_id,
+    id: b.id, tenant_id: tenantId, project_id: projectId || b.project_id,
     type: b.type, status: b.status || 'preparation', defaults,
   }), 'saveBatch');
 }
@@ -184,9 +203,9 @@ export async function deleteBatchCloud(id) {
 
 export async function saveWindow(w, batchId, sortOrder) {
   if (!enabled()) return;
-  const uid = await currentUserId();
-  if (!uid) return;
-  bg(supabase.from('windows').upsert(memWindowToDb(w, uid, batchId, sortOrder)), 'saveWindow');
+  const tenantId = await currentTenantId();
+  if (!tenantId) return;
+  bg(supabase.from('windows').upsert(memWindowToDb(w, tenantId, batchId, sortOrder)), 'saveWindow');
 }
 
 export async function deleteWindowCloud(id) {
@@ -196,10 +215,10 @@ export async function deleteWindowCloud(id) {
 
 export async function savePack(pp) {
   if (!enabled()) return;
-  const uid = await currentUserId();
-  if (!uid) return;
+  const tenantId = await currentTenantId();
+  if (!tenantId) return;
   bg(supabase.from('production_packs').upsert({
-    id: pp.id, user_id: uid, name: pp.name, type: pp.type,
+    id: pp.id, tenant_id: tenantId, name: pp.name, type: pp.type,
     status: pp.status || 'preparation', deadline: pp.deadline || null,
     responsible: pp.responsible || null,
     assignments: pp.assignments || [],
@@ -214,23 +233,23 @@ export async function deletePackCloud(id) {
 
 export async function saveSettings(settings) {
   if (!enabled()) return;
-  const uid = await currentUserId();
-  if (!uid) return;
+  const tenantId = await currentTenantId();
+  if (!tenantId) return;
   const { company, ...constants } = settings || {};
   bg(supabase.from('settings').upsert({
-    user_id: uid, company: company || {}, constants,
-  }, { onConflict: 'user_id' }), 'saveSettings');
+    tenant_id: tenantId, company: company || {}, constants,
+  }, { onConflict: 'tenant_id' }), 'saveSettings');
 }
 
 // ─────────────────────────────────────────────────────────────
 // MATERIALS — common cols + config jsonb (category/subcategory/
 // color/unit live in config; they aren't dedicated columns).
 // ─────────────────────────────────────────────────────────────
-function memMaterialToDb(m, userId) {
+function memMaterialToDb(m, tenantId) {
   const { id, item_number, name, size, thickness, cost_per_unit, image_url, jc_uuid, notes,
     ...rest } = m;  // rest = category, subcategory, color, unit, created_at…
   return {
-    id, user_id: userId, item_number: item_number || null, name,
+    id, tenant_id: tenantId, item_number: item_number || null, name,
     size: size || null,
     thickness: (thickness === '' || thickness == null) ? null : Number(thickness) || null,
     cost: cost_per_unit || null,
@@ -254,17 +273,17 @@ function dbMaterialToMem(r) {
 
 export async function loadMaterials() {
   if (!enabled()) return null;
-  const uid = await currentUserId();
-  if (!uid) return null;
-  const { data, error } = await supabase.from('materials').select('*').eq('user_id', uid).eq('archived', false).order('item_number', { ascending: true });
+  const tenantId = await currentTenantId();
+  if (!tenantId) return null;
+  const { data, error } = await supabase.from('materials').select('*').eq('tenant_id', tenantId).eq('archived', false).order('item_number', { ascending: true });
   if (error) { console.error('loadMaterials', error); return null; }
   return (data || []).map(dbMaterialToMem);
 }
 export async function saveMaterial(m) {
   if (!enabled()) return;
-  const uid = await currentUserId();
-  if (!uid) return;
-  bg(supabase.from('materials').upsert(memMaterialToDb(m, uid)), 'saveMaterial');
+  const tenantId = await currentTenantId();
+  if (!tenantId) return;
+  bg(supabase.from('materials').upsert(memMaterialToDb(m, tenantId)), 'saveMaterial');
 }
 export async function deleteMaterialCloud(id) {
   if (!enabled()) return;
@@ -274,11 +293,11 @@ export async function deleteMaterialCloud(id) {
 // ─────────────────────────────────────────────────────────────
 // IRONMONGERY — maps to ironmongery table.
 // ─────────────────────────────────────────────────────────────
-function memIronToDb(it, userId) {
+function memIronToDb(it, tenantId) {
   const { id, name, category, finish, size, is_pas24, auto_quantity, cost, cost_per_unit,
     image_url, jc_uuid, notes, ...rest } = it;
   return {
-    id, user_id: userId, category: category || 'other', name,
+    id, tenant_id: tenantId, category: category || 'other', name,
     finish: finish || rest.color || null, size: size || null,
     is_pas24: !!is_pas24, auto_quantity: auto_quantity ?? null,
     cost: cost ?? cost_per_unit ?? null,
@@ -296,17 +315,17 @@ function dbIronToMem(r) {
 
 export async function loadIronmongery() {
   if (!enabled()) return null;
-  const uid = await currentUserId();
-  if (!uid) return null;
-  const { data, error } = await supabase.from('ironmongery').select('*').eq('user_id', uid).eq('archived', false).order('category', { ascending: true });
+  const tenantId = await currentTenantId();
+  if (!tenantId) return null;
+  const { data, error } = await supabase.from('ironmongery').select('*').eq('tenant_id', tenantId).eq('archived', false).order('category', { ascending: true });
   if (error) { console.error('loadIronmongery', error); return null; }
   return (data || []).map(dbIronToMem);
 }
 export async function saveIron(it) {
   if (!enabled()) return;
-  const uid = await currentUserId();
-  if (!uid) return;
-  bg(supabase.from('ironmongery').upsert(memIronToDb(it, uid)), 'saveIron');
+  const tenantId = await currentTenantId();
+  if (!tenantId) return;
+  bg(supabase.from('ironmongery').upsert(memIronToDb(it, tenantId)), 'saveIron');
 }
 export async function deleteIronCloud(id) {
   if (!enabled()) return;
@@ -319,21 +338,21 @@ export async function deleteIronCloud(id) {
 // ─────────────────────────────────────────────────────────────
 export async function loadAssignments() {
   if (!enabled()) return null;
-  const uid = await currentUserId();
-  if (!uid) return null;
-  const { data, error } = await supabase.from('settings').select('constants').eq('user_id', uid).maybeSingle();
+  const tenantId = await currentTenantId();
+  if (!tenantId) return null;
+  const { data, error } = await supabase.from('settings').select('constants').eq('tenant_id', tenantId).maybeSingle();
   if (error) { console.error('loadAssignments', error); return null; }
   return data?.constants?.assignments || {};
 }
 
 export async function saveAssignments(assignments) {
   if (!enabled()) return;
-  const uid = await currentUserId();
-  if (!uid) return;
+  const tenantId = await currentTenantId();
+  if (!tenantId) return;
   // Merge into existing constants so we don't clobber other settings.
-  const { data } = await supabase.from('settings').select('company, constants').eq('user_id', uid).maybeSingle();
+  const { data } = await supabase.from('settings').select('company, constants').eq('tenant_id', tenantId).maybeSingle();
   const constants = { ...(data?.constants || {}), assignments: assignments || {} };
   bg(supabase.from('settings').upsert({
-    user_id: uid, company: data?.company || {}, constants,
-  }, { onConflict: 'user_id' }), 'saveAssignments');
+    tenant_id: tenantId, company: data?.company || {}, constants,
+  }, { onConflict: 'tenant_id' }), 'saveAssignments');
 }
