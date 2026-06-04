@@ -8,6 +8,8 @@ import BatchDefaultsPage from './pages/BatchDefaultsPage.jsx';
 import MaterialsPage from './pages/MaterialsPage.jsx';
 import MaterialAssignmentsPage from './pages/MaterialAssignmentsPage.jsx';
 import IronmongeryPage from './pages/IronmongeryPage.jsx';
+import ClientsPage from './pages/ClientsPage.jsx';
+import EstimatesPage from './pages/EstimatesPage.jsx';
 import { useAuthStore } from './stores/authStore.js';
 
 // ── Lazy-load pages that import 3D dependencies (THREE.js, R3F, ParametricSashWindow).
@@ -65,6 +67,8 @@ export default function App() {
       <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="estimates" element={<EstimatesPage />} />
+        <Route path="clients" element={<ClientsPage />} />
         <Route path="materials" element={<MaterialsPage />} />
         <Route path="materials/assignments" element={<Navigate to="/materials/assignments/sash" replace />} />
         <Route path="materials/assignments/:typeId" element={<MaterialAssignmentsPage />} />

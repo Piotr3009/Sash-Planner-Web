@@ -33,6 +33,24 @@ export default function AppSidebar() {
       {/* ─── Main nav ─── */}
       <nav className="flex-1 overflow-auto py-2 px-2">
 
+        {/* Estimates */}
+        <NavLink to="/estimates"
+          className={({ isActive }) =>
+            `flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] mb-0.5 transition-colors ${
+              isActive
+                ? 'bg-accent-500/12 text-accent-400 font-medium'
+                : 'text-ink-200 hover:bg-surface-700 hover:text-ink-50'
+            }`
+          }>
+          <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="8" y1="13" x2="16" y2="13" />
+            <line x1="8" y1="17" x2="16" y2="17" />
+          </svg>
+          Estimates
+        </NavLink>
+
         {/* Dashboard */}
         <NavLink to="/dashboard"
           className={({ isActive }) =>
@@ -107,9 +125,6 @@ export default function AppSidebar() {
           )}
         </NavLink>
 
-        {/* ─── Separator ─── */}
-        <div className="h-px bg-surface-500/50 my-2 mx-2" />
-
         {/* Materials (expandable) — Production Materials + Ironmongery */}
         <button
           onClick={() => setMaterialsOpen(!materialsOpen)}
@@ -149,6 +164,28 @@ export default function AppSidebar() {
             </NavLink>
           </div>
         )}
+
+        {/* Clients */}
+        <NavLink to="/clients"
+          className={({ isActive }) =>
+            `flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] mb-0.5 transition-colors ${
+              isActive
+                ? 'bg-accent-500/12 text-accent-400 font-medium'
+                : 'text-ink-200 hover:bg-surface-700 hover:text-ink-50'
+            }`
+          }>
+          <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 00-3-3.87" />
+            <path d="M16 3.13a4 4 0 010 7.75" />
+          </svg>
+          Clients
+        </NavLink>
+
+        {/* ─── Separator + Setup section ─── */}
+        <div className="h-px bg-surface-500/50 my-2 mx-2" />
+        <div className="px-3 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-500">Setup</div>
 
         {/* Assign Materials — top-level with own icon */}
         <button
