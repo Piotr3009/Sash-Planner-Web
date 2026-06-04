@@ -2019,9 +2019,9 @@ function BOMTab({ batch, pp, isPPMode, windowsData, registerExport }) {
                       {(row.material?.image_url || row.product?.image_url) ? (
                         <img src={row.material?.image_url || row.product?.image_url} alt=""
                           onClick={() => setZoomSrc(row.material?.image_url || row.product?.image_url)}
-                          className="w-7 h-7 rounded object-cover border border-surface-500 cursor-zoom-in hover:opacity-80 transition-opacity" />
+                          className="w-[34px] h-[34px] rounded object-cover border border-surface-500 cursor-zoom-in hover:opacity-80 transition-opacity" />
                       ) : (
-                        <div className="w-7 h-7 rounded bg-surface-600 border border-surface-500 grid place-items-center text-ink-500 text-[10px]">{row._assigned ? '—' : '?'}</div>
+                        <div className="w-[34px] h-[34px] rounded bg-surface-600 border border-surface-500 grid place-items-center text-ink-500 text-[10px]">{row._assigned ? '—' : '?'}</div>
                       )}
                       <div>
                         <div className={`font-medium ${row._assigned ? 'text-ink-100' : 'text-ink-300 italic'}`}>{row.name}</div>
