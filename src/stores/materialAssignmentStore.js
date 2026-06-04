@@ -17,7 +17,7 @@ export const SASH_WINDOW_PARTS = {
   ],
   sash: [
     { id: 'top_rail',             name: 'Top Rail',              section: '63×63',  finishedSection: '57×57',  pcs: 1, materialType: 'hardwood' },
-    { id: 'stiles_top_sash',      name: 'Stiles Top Sash',       section: '63×63',  finishedSection: '57×57',  pcs: 2, materialType: 'hardwood', mirror: true },
+    { id: 'stiles_top_sash',      name: 'Stiles Top',            section: '63×63',  finishedSection: '57×57',  pcs: 2, materialType: 'hardwood', mirror: true },
     { id: 'stiles_bottom_sash',   name: 'Stiles Bottom Sash',    section: '63×63',  finishedSection: '57×57',  pcs: 2, materialType: 'hardwood', mirror: true },
     { id: 'bottom_rail',          name: 'Bottom Rail',            section: '63×95',  finishedSection: '57×90',  pcs: 1, materialType: 'hardwood' },
     { id: 'top_meet_rail',        name: 'Top Meeting Rail',       section: '63×63',  finishedSection: '57×43',  pcs: 1, materialType: 'hardwood' },

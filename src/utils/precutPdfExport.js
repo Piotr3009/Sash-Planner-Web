@@ -403,6 +403,7 @@ export function exportPreCutPDF({
   projects = [],
   isPPMode = false,
   format = 'a3',    // 'a3' or 'a4'
+  content = 'both', // 'both' | 'graphics' | 'list'
   companySettings = {},
   returnDoc = false,
 }) {
@@ -487,18 +488,22 @@ export function exportPreCutPDF({
 
     y += sg.materialInfo ? 18 : 12;
 
-    // BLO
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    tc(doc, C.dark);
-    doc.text('BAR LAYOUT OPTIMIZER', PG.bx + 4, y);
-    y += 8;
+    // BLO (skipped when exporting the list only)
+    if (content !== 'list') {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      tc(doc, C.dark);
+      doc.text('BAR LAYOUT OPTIMIZER', PG.bx + 4, y);
+      y += 8;
 
-    y = drawBLO(doc, PG, sg.optGroup, sg.stockLength, y, endTrim, kerf);
-    y += 4;
+      y = drawBLO(doc, PG, sg.optGroup, sg.stockLength, y, endTrim, kerf);
+      y += 4;
+    }
 
-    // Element table
-    y = drawElementTable(doc, PG, sg.items, y, isPPMode);
+    // Element table (skipped when exporting the graphics only)
+    if (content !== 'graphics') {
+      y = drawElementTable(doc, PG, sg.items, y, isPPMode);
+    }
 
     drawFooter(doc, PG, info, idx + 2, totalPages);
   });

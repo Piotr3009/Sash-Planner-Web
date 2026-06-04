@@ -33,6 +33,28 @@ function settingsWithDefaults(settings) {
   };
 }
 
+/**
+ * BOX_MATERIAL_SECTION — maps a box element's FINISHED cross-section (as produced
+ * by the engine) to the RAW cross-section actually purchased. Used ONLY by the
+ * Pre-Cut list for (a) the displayed Section label and (b) grouping elements that
+ * share one purchased material into a single bar-optimizer block (less waste).
+ *
+ * It changes NO calculation: lengths and finished sizes from deriveWindowData are
+ * untouched. Elements sharing a target material are cut from the same stock:
+ *   head + jambs            → 38x150
+ *   all liners (int/ext,    → 25x120
+ *     head + jamb)
+ *   cill                    → 50x75
+ *   cill nose               → 50x150
+ */
+const BOX_MATERIAL_SECTION = {
+  '28x141': '38x150', // head, jambs
+  '17x86':  '25x120', // internal liners (head + jamb)
+  '17x102': '25x120', // external liners (head + jamb)
+  '69x46':  '50x75',  // cill
+  '64x128': '50x150', // cill nose
+};
+
 export function buildCutListForWindow(derived, windowSpec) {
   if (!derived) return [];
   const out = [];
@@ -90,19 +112,22 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg) {
     });
   });
 
-  // Box precut grouped by finished width + allowance
-  const allowance = settings.boxWidthAllowance ?? 20;
-  const byWidth = new Map();
+  // Box precut grouped by PURCHASED material section (Pre-Cut scope only).
+  // Elements that share a stock cross-section (e.g. all liners → 25x120,
+  // head + jambs → 38x150) land in one group so the optimizer cuts them from
+  // the same bars. The displayed Section shows the material we buy; lengths and
+  // finished sizes are unchanged.
+  const byMaterial = new Map();
   derived.components.box.forEach((c) => {
-    if (c.finishedWidth == null) return;
-    const widthWithAllowance = c.finishedWidth + allowance;
-    if (!byWidth.has(widthWithAllowance)) byWidth.set(widthWithAllowance, []);
-    byWidth.get(widthWithAllowance).push({
+    if (c.section == null) return;
+    const materialSection = BOX_MATERIAL_SECTION[c.section] || c.section;
+    if (!byMaterial.has(materialSection)) byMaterial.set(materialSection, []);
+    byMaterial.get(materialSection).push({
       elementName: c.elementName,
       length: Math.round(c.length + MACHINING_ALLOWANCE),
       finishedLength: Math.round(c.length),
-      section: c.section,
-      finishedSection: c.section,
+      section: materialSection,    // purchased material (display + grouping)
+      finishedSection: c.section,  // finished element cross-section (unchanged)
       quantity: c.quantity,
       windowId: c.windowId,
       windowName: c.windowName
@@ -111,7 +136,7 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg) {
 
   return {
     sashEngineering: Array.from(bySection.entries()).map(([section, items]) => ({ section, items })),
-    boxSapele: Array.from(byWidth.entries()).map(([preCutWidth, items]) => ({ preCutWidth, items }))
+    boxSapele: Array.from(byMaterial.entries()).map(([preCutWidth, items]) => ({ preCutWidth, items }))
   };
 }
 
@@ -293,7 +318,7 @@ export const MIRROR_PAIRS = {
   'JAMB LEFT':                { right: 'JAMB RIGHT',                symbol: 'JB-L/R',  label: 'Jambs (pair)' },
   'INTERNAL JAMB LINER (L)':  { right: 'INTERNAL JAMB LINER (R)',  symbol: 'IL-L/R',  label: 'Internal Jamb Liner (pair)' },
   'EXTERNAL JAMB LINER (L)':  { right: 'EXTERNAL JAMB LINER (R)',  symbol: 'EL-L/R',  label: 'External Jamb Liner (pair)' },
-  'STILES TOP SASH (L)':      { right: 'STILES TOP SASH (R)',      symbol: 'STS-L/R', label: 'Stiles Top Sash (pair)' },
+  'STILES TOP (L)':           { right: 'STILES TOP (R)',           symbol: 'ST-L/R',  label: 'Stiles Top (pair)' },
   'STILES BOTTOM SASH (L)':   { right: 'STILES BOTTOM SASH (R)',   symbol: 'SBS-L/R', label: 'Stiles Bottom Sash (pair)' },
 };
 
@@ -315,7 +340,7 @@ export const CUT_LIST_ORDER = [
   { match: 'CILL',                      symbol: 'SILL',    label: 'Cill' },
   { match: 'CILL NOSE',                 symbol: 'CNOS',    label: 'Cill Nose' },
   // ── SASH ──
-  { match: 'STILES TOP SASH (L)',       symbol: 'STS-L/R', label: 'Stiles Top Sash (pair)',      isPair: true },
+  { match: 'STILES TOP (L)',            symbol: 'ST-L/R',  label: 'Stiles Top (pair)',           isPair: true },
   { match: 'STILES BOTTOM SASH (L)',    symbol: 'SBS-L/R', label: 'Stiles Bottom Sash (pair)',   isPair: true },
   { match: 'TOP RAIL',                  symbol: 'TR',      label: 'Top Rail' },
   { match: 'TOP MEET RAIL',             symbol: 'TMR',     label: 'Top Meet Rail' },

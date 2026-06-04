@@ -106,10 +106,19 @@ export default function ProductionPackPage() {
 
   // Header export: each tab registers its export handler; the header button fires the active tab's.
   const [exportFormat, setExportFormat] = useState('a3');
+  const [precutModalOpen, setPrecutModalOpen] = useState(false);
   const exportHandlersRef = useRef({});
   const registerExport = useCallback((id, fn) => { exportHandlersRef.current[id] = fn; }, []);
   const canExport = EXPORTABLE_TABS.includes(tab);
-  const handleHeaderExport = () => exportHandlersRef.current[tab]?.();
+  // Pre-Cut export first asks what to print (graphics / list / both); other tabs run directly.
+  const handleHeaderExport = () => {
+    if (tab === 'precut') { setPrecutModalOpen(true); return; }
+    exportHandlersRef.current[tab]?.();
+  };
+  const runPrecutExport = (content) => {
+    setPrecutModalOpen(false);
+    exportHandlersRef.current['precut']?.(content);
+  };
 
   // Production Pack Book — combine sections into one A3 PDF (Etap 1: overview + cut list).
   const handleExportBook = async () => {
@@ -445,6 +454,39 @@ export default function ProductionPackPage() {
           </div>
         </div>
       </header>
+
+      {/* Pre-Cut export — content choice modal */}
+      {precutModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setPrecutModalOpen(false)}>
+          <div className="w-full max-w-md rounded-xl border border-surface-500 bg-surface-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-surface-600">
+              <h3 className="text-sm font-semibold text-ink-50">Export Pre-Cut List</h3>
+              <p className="text-xs text-ink-400 mt-0.5">Choose what to include in the PDF.</p>
+            </div>
+            <div className="p-4 space-y-2">
+              <button type="button" onClick={() => runPrecutExport('both')}
+                className="w-full text-left px-4 py-3 rounded-lg bg-surface-700 hover:bg-surface-600 border border-surface-500 hover:border-accent-500 transition-colors">
+                <div className="text-sm font-medium text-ink-50">Graphics + List</div>
+                <div className="text-[11px] text-ink-400">Bar layout optimizer and the full element table.</div>
+              </button>
+              <button type="button" onClick={() => runPrecutExport('graphics')}
+                className="w-full text-left px-4 py-3 rounded-lg bg-surface-700 hover:bg-surface-600 border border-surface-500 hover:border-accent-500 transition-colors">
+                <div className="text-sm font-medium text-ink-50">Graphics only</div>
+                <div className="text-[11px] text-ink-400">Bar layout optimizer (cutting diagram) only.</div>
+              </button>
+              <button type="button" onClick={() => runPrecutExport('list')}
+                className="w-full text-left px-4 py-3 rounded-lg bg-surface-700 hover:bg-surface-600 border border-surface-500 hover:border-accent-500 transition-colors">
+                <div className="text-sm font-medium text-ink-50">List only</div>
+                <div className="text-[11px] text-ink-400">Element table only, no diagram.</div>
+              </button>
+            </div>
+            <div className="px-4 py-3 border-t border-surface-600 flex justify-end">
+              <button type="button" onClick={() => setPrecutModalOpen(false)}
+                className="text-xs px-3 py-1.5 rounded-lg text-ink-300 hover:text-ink-100 hover:bg-surface-700 transition-colors">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <nav className="border-b border-surface-500 bg-surface-900/80 px-6 overflow-x-auto">
@@ -1093,6 +1135,7 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
   const [offcutsMap, setOffcutsMap] = useState(savedPrecut?.offcuts || {}); // key → [length, ...]
   const [offcutInput, setOffcutInput] = useState({}); // key → current input string (not persisted)
   const [expandedGroups, setExpandedGroups] = useState({});
+  const [expandedTables, setExpandedTables] = useState({}); // inner element-table toggle (collapsed by default)
 
   // Persist stock/offcut changes back to the store (debounced via effect).
   const persistPrecut = useProjectStore((s) => s.setPrecutSettings);
@@ -1169,6 +1212,7 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
   }, [merged.precut, settings, stockLengths, offcutsMap]);
 
   const toggleExpand = (key) => setExpandedGroups((p) => ({ ...p, [key]: !p[key] }));
+  const toggleTable = (key) => setExpandedTables((p) => ({ ...p, [key]: !p[key] }));
 
   // 3c: step stock length by ±100mm. Lower bound = longest required piece in group.
   const stepStock = (group, current, delta) => {
@@ -1202,7 +1246,7 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
     return localOptimization.boxSapele?.find((g) => String(g.preCutWidth) === group.section);
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = (content = 'both') => {
     const exportGroups = allGroups.map((g) => ({
       ...g,
       stockLength: stockLengths[g.key] || g.defaultStock,
@@ -1224,6 +1268,7 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
       projects: projList,
       isPPMode,
       format: exportFormat,
+      content,
     });
   };
   registerExport('precut', handleExportPDF);
@@ -1402,8 +1447,27 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
                   </div>
                 )}
 
-                {/* Elements table (sorted as BLO) */}
-                <GroupedElementTable items={group.items} />
+                {/* Elements table — independent collapse, collapsed by default */}
+                {(() => {
+                  const tableOpen = expandedTables[group.key] === true;
+                  return (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => toggleTable(group.key)}
+                        className="w-full px-4 py-2 flex items-center gap-2 text-[11px] text-ink-400 hover:text-ink-200 hover:bg-surface-700/30 transition-colors border-t border-surface-500/40 cursor-pointer"
+                        aria-label={tableOpen ? 'Collapse element list' : 'Expand element list'}
+                      >
+                        <svg className={`w-3 h-3 transition-transform ${tableOpen ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M9 18l6-6-6-6" />
+                        </svg>
+                        <span className="font-medium">Element list</span>
+                        <span className="text-ink-500">· {group.items.length} elements</span>
+                      </button>
+                      {tableOpen && <GroupedElementTable items={group.items} />}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>

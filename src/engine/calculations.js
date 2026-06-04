@@ -211,8 +211,8 @@ function calculateSashComponentSet(windowSpec, settings, sashWidth, topSashHeigh
 
     const sashComponents = [];
     sashComponents.push(createComponentRecord(windowSpec, 'sash', 'TOP RAIL', '57x57', railLength, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES TOP SASH (L)', '57x57', topSashHeight + hornExtra, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES TOP SASH (R)', '57x57', topSashHeight + hornExtra, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES TOP (L)', '57x57', topSashHeight + hornExtra, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES TOP (R)', '57x57', topSashHeight + hornExtra, 1));
     sashComponents.push(createComponentRecord(windowSpec, 'sash', 'TOP MEET RAIL', '57x43', railLength, 1));
     sashComponents.push(createComponentRecord(windowSpec, 'sash', 'BOTTOM MEET RAIL', '57x43', railLength, 1));
     sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES BOTTOM SASH (L)', '57x57', bottomSashHeight, 1));

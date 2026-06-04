@@ -24,7 +24,7 @@ export const ELEMENT_TO_PART_ID = {
   'INTERNAL JAMB LINER (L)': 'int_jamb_liner', 'INTERNAL JAMB LINER (R)': 'int_jamb_liner',
   'EXTERNAL JAMB LINER (L)': 'ext_jamb_liner', 'EXTERNAL JAMB LINER (R)': 'ext_jamb_liner',
   'TOP RAIL': 'top_rail', 'BOTTOM RAIL': 'bottom_rail',
-  'STILES TOP SASH (L)': 'stiles_top_sash', 'STILES TOP SASH (R)': 'stiles_top_sash',
+  'STILES TOP (L)': 'stiles_top_sash', 'STILES TOP (R)': 'stiles_top_sash',
   'STILES BOTTOM SASH (L)': 'stiles_bottom_sash', 'STILES BOTTOM SASH (R)': 'stiles_bottom_sash',
   'TOP MEET RAIL': 'top_meet_rail', 'BOTTOM MEET RAIL': 'bottom_meet_rail',
   'GLAZING BEADING': 'glazing_beading', 'TRIANGLE BEADING (EXT)': 'triangle_beading_ext',
