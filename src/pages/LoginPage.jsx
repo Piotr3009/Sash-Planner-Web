@@ -15,8 +15,9 @@ export default function LoginPage() {
   useEffect(() => {
     console.log('[LoginPage] session changed:', session);
     if (session) {
-      console.log('[LoginPage] navigating to /dashboard');
-      navigate('/dashboard', { replace: true });
+      // Land on "/" so the post-login splash (LandingPage) plays; it routes on to the dashboard.
+      console.log('[LoginPage] navigating to /');
+      navigate('/', { replace: true });
     }
   }, [session, navigate]);
 
@@ -25,7 +26,7 @@ export default function LoginPage() {
     setSubmitting(true);
     const result = await signIn(email, password);
     setSubmitting(false);
-    if (result.ok) navigate('/dashboard');
+    if (result.ok) navigate('/');
   };
 
   return (

@@ -18,6 +18,8 @@ import { useAuthStore } from './stores/authStore.js';
 const ConfiguratorPage = lazy(() => import('./pages/ConfiguratorPage.jsx'));
 const WindowDetailPage = lazy(() => import('./pages/WindowDetailPage.jsx'));
 const ProductionPackPage = lazy(() => import('./pages/ProductionPackPage.jsx'));
+// Post-login splash (pulls in 3D deps, so lazy-load it like the other 3D pages).
+const LandingPage = lazy(() => import('./pages/LandingPage.jsx'));
 
 const PageLoading = () => (
   <div className="min-h-screen grid place-items-center">
@@ -43,6 +45,7 @@ export default function App() {
   useEffect(() => {
     if (!session) return;
     const preload = () => {
+      import('./pages/LandingPage.jsx').catch(() => {});
       import('./pages/WindowDetailPage.jsx').catch(() => {});
       import('./pages/ConfiguratorPage.jsx').catch(() => {});
       import('./pages/ProductionPackPage.jsx').catch(() => {});
@@ -65,7 +68,9 @@ export default function App() {
 
       {/* All protected routes share the unified sidebar via MainLayout */}
       <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route index element={
+          <Suspense fallback={<PageLoading />}><LandingPage /></Suspense>
+        } />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="estimates" element={<EstimatesPage />} />
         <Route path="clients" element={<ClientsPage />} />
