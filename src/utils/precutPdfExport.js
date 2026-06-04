@@ -143,17 +143,9 @@ function drawFooter(doc, PG, info, pageNum, totalPages) {
 }
 
 // ─── SUMMARY TABLE (page 1) ───
-function drawSummaryTable(doc, PG, groups, startY) {
+function drawSummaryTable(doc, PG, groups, startY, beginPage) {
   const x = PG.bx + 3;
-  let y = startY + 8;
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  tc(doc, C.grayL);
-  doc.text('PRE-CUT SUMMARY', x, y);
-  y += 10;
-
-  // Header — spread across full width, no Waste/Util
   const cols = [
     { l: '#', dx: 0 },
     { l: 'Section', dx: 12 },
@@ -164,17 +156,31 @@ function drawSummaryTable(doc, PG, groups, startY) {
     { l: 'Bars', dx: 345 },
   ];
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  tc(doc, C.dark);
-  cols.forEach((c) => doc.text(c.l, x + c.dx, y));
-  dc(doc, C.grayXL);
-  doc.setLineWidth(LW.tableLine);
-  doc.line(x, y + 3, x + 380, y + 3);
-  y += 11;
+  const drawHead = (yy, continued) => {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    tc(doc, C.grayL);
+    doc.text(continued ? 'PRE-CUT SUMMARY (continued)' : 'PRE-CUT SUMMARY', x, yy);
+    yy += 10;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    tc(doc, C.dark);
+    cols.forEach((c) => doc.text(c.l, x + c.dx, yy));
+    dc(doc, C.grayXL);
+    doc.setLineWidth(LW.tableLine);
+    doc.line(x, yy + 3, x + 380, yy + 3);
+    return yy + 11;
+  };
 
-  // Rows
+  let y = drawHead(startY + 8, false);
+  const bottom = PG.h - PG.by - FOOTER_H - 8;
+
+  // Rows — break to a continuation page instead of drawing off the page.
   groups.forEach((g, i) => {
+    if (y > bottom) {
+      const ny = beginPage();
+      y = drawHead(ny, true);
+    }
     if (i % 2 === 0) {
       fc(doc, C.rowBg);
       doc.rect(x - 1, y - 5, 382, 10, 'F');
@@ -285,15 +291,8 @@ function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf) {
 }
 
 // ─── ELEMENT TABLE (per section page) ───
-function drawElementTable(doc, PG, items, startY, isPPMode) {
+function drawElementTable(doc, PG, items, startY, isPPMode, sg, beginPage) {
   const x = PG.bx + 4;
-  let y = startY + 5;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  tc(doc, C.grayL);
-  doc.text('ELEMENT LIST', x, y);
-  y += 8;
 
   // Header — tighter columns
   const cols = isPPMode
@@ -317,14 +316,33 @@ function drawElementTable(doc, PG, items, startY, isPPMode) {
         { l: 'Qty', dx: 275 },
       ];
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  tc(doc, C.dark);
-  cols.forEach((c) => doc.text(c.l, x + c.dx, y));
-  dc(doc, C.grayXL);
-  doc.setLineWidth(LW.tableLine);
-  doc.line(x, y + 3, x + 310, y + 3);
-  y += 10;
+  const drawHead = (yy, continued) => {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    tc(doc, C.grayL);
+    doc.text(continued ? 'ELEMENT LIST (continued)' : 'ELEMENT LIST', x, yy);
+    yy += 8;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    tc(doc, C.dark);
+    cols.forEach((c) => doc.text(c.l, x + c.dx, yy));
+    dc(doc, C.grayXL);
+    doc.setLineWidth(LW.tableLine);
+    doc.line(x, yy + 3, x + 310, yy + 3);
+    return yy + 10;
+  };
+
+  // Continuation page for the SAME material: page chrome + title + "(continued)".
+  const continuePage = () => {
+    const ny = beginPage();
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    tc(doc, C.black);
+    doc.text(`${sg?.label || ''} (continued)`, x, ny);
+    return drawHead(ny + 10, true);
+  };
+
+  let y = drawHead(startY + 5, false);
 
   // Group items by elementName + length
   const grouped = new Map();
@@ -337,9 +355,12 @@ function drawElementTable(doc, PG, items, startY, isPPMode) {
   });
 
   const rows = Array.from(grouped.values()).sort((a, b) => a.elementName.localeCompare(b.elementName) || a.length - b.length);
+  const bottom = PG.h - PG.by - FOOTER_H - 8;
 
   rows.forEach((item, i) => {
-    if (y > PG.h - PG.by - FOOTER_H - 8) return; // overflow guard
+    if (y > bottom) {
+      y = continuePage(); // flow onto a new page instead of dropping rows
+    }
 
     if (i % 2 === 0) {
       fc(doc, C.rowBg);
@@ -438,8 +459,6 @@ export function exportPreCutPDF({
     };
   });
 
-  const totalPages = 1 + summaryGroups.length;
-
   const info = {
     companyName: companySettings.companyName || 'COMPANY NAME',
     companyAddress: companySettings.companyAddress || '',
@@ -452,21 +471,28 @@ export function exportPreCutPDF({
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: format });
 
-  // ─── PAGE 1: SUMMARY ───
-  drawPageBorder(doc, PG);
-  drawHeader(doc, PG, info, 1, totalPages);
-  drawSummaryTable(doc, PG, summaryGroups, PG.by + HEADER_H + 1);
-  drawFooter(doc, PG, info, 1, totalPages);
-
-  // ─── PAGE 2+: ONE SECTION PER PAGE ───
-  summaryGroups.forEach((sg, idx) => {
-    doc.addPage();
+  // Page count is unknown up front (tables flow onto extra pages), so we stamp a
+  // running page number plus a placeholder for the total and resolve it at the end.
+  const NB = '{tot}';
+  let pageNum = 0;
+  const beginPage = () => {
+    pageNum += 1;
+    if (pageNum > 1) doc.addPage(); // page 1 is the initial jsPDF page
     drawPageBorder(doc, PG);
-    drawHeader(doc, PG, info, idx + 2, totalPages);
+    drawHeader(doc, PG, info, pageNum, NB);
+    drawFooter(doc, PG, info, pageNum, NB);
+    return PG.by + HEADER_H + 6; // content top Y
+  };
 
-    let y = PG.by + HEADER_H + 6;
+  // ─── PAGE 1: SUMMARY (continues onto extra pages when many materials) ───
+  beginPage();
+  drawSummaryTable(doc, PG, summaryGroups, PG.by + HEADER_H + 1, beginPage);
 
-    // Section title + material info
+  // ─── SECTIONS: one material starts a new page; its list flows onto more pages ───
+  summaryGroups.forEach((sg) => {
+    let y = beginPage();
+
+    // Section title + material info (first page of the material only)
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
     tc(doc, C.black);
@@ -488,7 +514,7 @@ export function exportPreCutPDF({
 
     y += sg.materialInfo ? 18 : 12;
 
-    // BLO (skipped when exporting the list only)
+    // BLO (skipped when exporting the list only) — first page of the material only
     if (content !== 'list') {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
@@ -500,13 +526,14 @@ export function exportPreCutPDF({
       y += 4;
     }
 
-    // Element table (skipped when exporting the graphics only)
+    // Element table (skipped when exporting the graphics only) — paginates internally
     if (content !== 'graphics') {
-      y = drawElementTable(doc, PG, sg.items, y, isPPMode);
+      y = drawElementTable(doc, PG, sg.items, y, isPPMode, sg, beginPage);
     }
-
-    drawFooter(doc, PG, info, idx + 2, totalPages);
   });
+
+  // Resolve the {tot} placeholder to the real page count on every page.
+  doc.putTotalPages(NB);
 
   const filename = `PreCut_${(info.batchName || 'batch').replace(/[^a-zA-Z0-9-]/g, '_')}_${info.date.replace(/\//g, '-')}.pdf`;
   if (returnDoc) return doc.output('arraybuffer');
