@@ -36,7 +36,7 @@ export function exportSprayingPDF(info) {
 
   // ── PART A — Elements ──
   const colsA = [
-    { label: 'No.', dx: 0, auto: true, mono: true },
+    { label: 'No.', dx: 0, mono: true },
     { label: 'Project №', dx: 12, mono: true },
     { label: 'Window', dx: 34 },
     { label: 'Element', dx: 64 },
@@ -47,9 +47,13 @@ export function exportSprayingPDF(info) {
   const rowsA = [{ section: { label: 'PART A — ELEMENTS' } }];
   (info.sections || []).forEach((sec) => {
     rowsA.push({ section: { label: sec.name, hex: sec.hex } });
-    sec.rows.forEach((r) => rowsA.push({
-      cells: [r.projectNum || '—', r.window, r.element, r.colour, r.size, r.additional || ''],
-    }));
+    let n = 0; // restart numbering per colour section
+    sec.rows.forEach((r) => {
+      n += 1;
+      rowsA.push({
+        cells: [String(n), r.projectNum || '—', r.window, r.element, r.colour, r.size, r.additional || ''],
+      });
+    });
   });
 
   let y = drawReportTable(doc, PG, {

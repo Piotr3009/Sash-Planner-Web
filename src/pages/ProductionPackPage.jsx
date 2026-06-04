@@ -1887,6 +1887,7 @@ function SprayingTab({ windowsData, batch, pp, registerExport }) {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-surface-500/50 bg-surface-800">
+                  <th className="px-3 py-2 text-left text-ink-400 font-medium w-10">#</th>
                   <th className="px-3 py-2 text-left text-ink-400 font-medium">Project №</th>
                   <th className="px-3 py-2 text-left text-ink-400 font-medium">Window</th>
                   <th className="px-3 py-2 text-left text-ink-400 font-medium">Element</th>
@@ -1898,6 +1899,7 @@ function SprayingTab({ windowsData, batch, pp, registerExport }) {
               <tbody>
                 {g.rows.map((r, i) => (
                   <tr key={i} className="border-b border-surface-500/30">
+                    <td className="px-3 py-1.5 text-ink-400 font-mono">{i + 1}</td>
                     <td className="px-3 py-1.5 text-ink-300 font-mono">{r.projectNum || '—'}</td>
                     <td className="px-3 py-1.5 text-ink-200">{r.window}</td>
                     <td className="px-3 py-1.5 text-ink-300">{r.element}</td>
