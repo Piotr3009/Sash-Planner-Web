@@ -3,12 +3,14 @@ import { persist } from 'zustand/middleware';
 import { supabase, hasSupabaseConfig } from '../services/supabase.js';
 import { useProjectStore } from './projectStore.js';
 import { useMaterialStore } from './materialStore.js';
+import { useClientStore } from './clientStore.js';
 import { useIronmongeryStore } from './ironmongeryStore.js';
 import { useMaterialAssignmentStore } from './materialAssignmentStore.js';
 import { clearTenantCache } from '../services/cloudSync.js';
 
 function loadAllStores() {
   useProjectStore.getState().loadFromCloud();
+  useClientStore.getState().loadFromCloud();
   useMaterialStore.getState().loadFromCloud();
   useIronmongeryStore.getState().loadFromCloud();
   useMaterialAssignmentStore.getState().loadFromCloud();
@@ -16,6 +18,7 @@ function loadAllStores() {
 function clearAllStores() {
   clearTenantCache();
   useProjectStore.getState().clearAll();
+  useClientStore.getState().clearAll();
   useMaterialStore.getState().clearAll();
   useIronmongeryStore.getState().clearAll();
   useMaterialAssignmentStore.getState().clearAll();

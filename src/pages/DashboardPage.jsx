@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useProjectStore, BATCH_STATUSES } from '../stores/projectStore.js';
+import { useClientStore } from '../stores/clientStore.js';
+import ClientPicker from '../components/clients/ClientPicker.jsx';
 
 // ─── Type colors ───
 const TYPE_COLORS = {
@@ -52,15 +54,17 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
 function EditProjectModal({ project, onSave, onCancel }) {
   const [name, setName] = useState(project.name || '');
   const [number, setNumber] = useState(project.project_number || '');
-  const [client, setClient] = useState(project.client || '');
+  const [clientId, setClientId] = useState(project.client_id || null);
   const [address, setAddress] = useState(project.address || '');
+  const getClient = useClientStore((s) => s.getClient);
 
   const submit = () => {
     if (!name.trim()) return;
     onSave({
       name: name.trim(),
       project_number: number.trim(),
-      client: client.trim(),
+      client_id: clientId,
+      client: clientId ? (getClient(clientId)?.full_name || '') : '',
       address: address.trim(),
     });
   };
@@ -81,7 +85,7 @@ function EditProjectModal({ project, onSave, onCancel }) {
           </div>
           <div>
             <label className="text-[10px] text-ink-400 uppercase tracking-wider block mb-0.5">Client</label>
-            <input className="input text-xs w-full" value={client} onChange={(e) => setClient(e.target.value)} />
+            <ClientPicker value={clientId} onChange={setClientId} />
           </div>
           <div>
             <label className="text-[10px] text-ink-400 uppercase tracking-wider block mb-0.5">Address</label>
@@ -301,13 +305,15 @@ function NewPPForm({ onCreate, onCancel }) {
 function NewProjectForm({ onCreate, onCancel }) {
   const [name, setName] = useState('');
   const [number, setNumber] = useState('');
-  const [client, setClient] = useState('');
+  const [clientId, setClientId] = useState(null);
   const [address, setAddress] = useState('');
+  const getClient = useClientStore((s) => s.getClient);
 
   const submit = () => {
     if (!name.trim()) return;
-    onCreate(name.trim(), address.trim(), number.trim(), client.trim());
-    setName(''); setNumber(''); setClient(''); setAddress('');
+    const clientName = clientId ? (getClient(clientId)?.full_name || '') : '';
+    onCreate(name.trim(), address.trim(), number.trim(), clientId, clientName);
+    setName(''); setNumber(''); setClientId(null); setAddress('');
   };
 
   return (
@@ -320,7 +326,7 @@ function NewProjectForm({ onCreate, onCancel }) {
         <input className="input text-xs w-full" placeholder="Project number (max 5)" maxLength={5} value={number} onChange={(e) => setNumber(e.target.value)} />
         <div className="text-[9px] text-ink-400 mt-0.5 text-right">{number.length}/5</div>
       </div>
-      <input className="input text-xs" placeholder="Client" value={client} onChange={(e) => setClient(e.target.value)} />
+      <ClientPicker value={clientId} onChange={setClientId} />
       <input className="input text-xs" placeholder="Address" value={address} onChange={(e) => setAddress(e.target.value)} />
       <div className="flex gap-2">
         <button className="btn btn-primary text-xs flex-1" onClick={submit}>Create</button>
@@ -406,8 +412,8 @@ export default function DashboardPage() {
     setShowNewPP(false);
   };
 
-  const handleCreateProject = (name, address, number, client) => {
-    createProject(name, address, number, client);
+  const handleCreateProject = (name, address, number, clientId, clientName) => {
+    createProject(name, address, number, clientId, clientName);
     setShowNewProject(false);
   };
 

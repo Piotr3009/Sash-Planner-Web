@@ -181,13 +181,14 @@ export const useProjectStore = create((set, get) => ({
   getItemById: (id) => get().currentWindows.find((w) => w.id === id) || null,
 
   // ─── PROJECT CRUD ───
-  createProject: (name, address, projectNumber, client) => {
+  createProject: (name, address, projectNumber, clientId, clientName) => {
     const id = uid();
     const project = {
       id,
       name: name || 'New Project',
       project_number: projectNumber || `PRJ-${new Date().getFullYear()}-${String(get().projects.length + 1).padStart(3, '0')}`,
-      client: client || '',
+      client_id: clientId || null,
+      client: clientName || '',
       address: address || '',
       created_at: new Date().toISOString(),
       batches: [],

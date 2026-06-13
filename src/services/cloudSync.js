@@ -44,12 +44,13 @@ export async function loadAll() {
   const tenantId = await currentTenantId();
   if (!tenantId) return null;
 
-  const [projectsRes, batchesRes, windowsRes, packsRes, settingsRes] = await Promise.all([
+  const [projectsRes, batchesRes, windowsRes, packsRes, settingsRes, clientsRes] = await Promise.all([
     supabase.from('projects').select('*').eq('archived', false).order('created_at', { ascending: true }),
     supabase.from('batches').select('*').order('created_at', { ascending: true }),
     supabase.from('windows').select('*').order('sort_order', { ascending: true }),
     supabase.from('production_packs').select('*').eq('archived', false).order('created_at', { ascending: true }),
     supabase.from('settings').select('*').eq('tenant_id', tenantId).maybeSingle(),
+    supabase.from('clients').select('*').eq('archived', false),
   ]);
 
   if (projectsRes.error) { console.error('loadAll projects', projectsRes.error); return null; }
@@ -66,8 +67,11 @@ export async function loadAll() {
     (batchesByProject[b.project_id] = batchesByProject[b.project_id] || []).push(mem);
   });
 
+  const clientsById = {};
+  (clientsRes.data || []).forEach((c) => { clientsById[c.id] = c; });
+
   const projects = (projectsRes.data || []).map((p) => {
-    const mem = dbProjectToMem(p);
+    const mem = dbProjectToMem(p, clientsById);
     mem.batches = batchesByProject[p.id] || [];
     return mem;
   });
@@ -84,12 +88,13 @@ export async function loadAll() {
 // ─────────────────────────────────────────────────────────────
 // MAPPERS — memory shape ↔ DB row shape
 // ─────────────────────────────────────────────────────────────
-function dbProjectToMem(p) {
+function dbProjectToMem(p, clientsById) {
   return {
     id: p.id,
     name: p.name,
     project_number: p.project_number,
-    client: p.client_id || '',
+    client_id: p.client_id || null,
+    client: (clientsById && p.client_id && clientsById[p.client_id]?.full_name) || '',
     address: p.address || '',
     status: p.status,
     created_at: p.created_at,
@@ -176,13 +181,63 @@ export async function saveProject(p) {
   if (!tenantId) return;
   bg(supabase.from('projects').upsert({
     id: p.id, tenant_id: tenantId, created_by: uid, name: p.name, project_number: p.project_number,
-    client_id: null, address: p.address || null, status: p.status || 'preparation',
+    client_id: p.client_id || null, address: p.address || null, status: p.status || 'preparation',
   }), 'saveProject');
 }
 
 export async function deleteProjectCloud(id) {
   if (!enabled()) return;
   bg(supabase.from('projects').delete().eq('id', id), 'deleteProject');
+}
+
+// ─────────────────────────────────────────────────────────────
+// CLIENTS — maps to clients table (tenant-scoped via RLS).
+// ─────────────────────────────────────────────────────────────
+function dbClientToMem(c) {
+  return {
+    id: c.id,
+    full_name: c.full_name || '',
+    company_name: c.company_name || '',
+    email: c.email || '',
+    phone: c.phone || '',
+    address: c.address || '',
+    notes: c.notes || '',
+    jc_uuid: c.jc_uuid || '',
+    archived: !!c.archived,
+    created_at: c.created_at,
+  };
+}
+function memClientToDb(c, tenantId) {
+  return {
+    id: c.id,
+    tenant_id: tenantId,
+    full_name: c.full_name || 'New Client',
+    company_name: c.company_name || null,
+    email: c.email || null,
+    phone: c.phone || null,
+    address: c.address || null,
+    notes: c.notes || null,
+    jc_uuid: c.jc_uuid || null,
+    archived: !!c.archived,
+  };
+}
+export async function loadClients() {
+  if (!enabled()) return null;
+  const tenantId = await currentTenantId();
+  if (!tenantId) return null;
+  const { data, error } = await supabase.from('clients').select('*').eq('tenant_id', tenantId).eq('archived', false).order('full_name', { ascending: true });
+  if (error) { console.error('loadClients', error); return null; }
+  return (data || []).map(dbClientToMem);
+}
+export async function saveClient(c) {
+  if (!enabled()) return;
+  const tenantId = await currentTenantId();
+  if (!tenantId) return;
+  bg(supabase.from('clients').upsert(memClientToDb(c, tenantId)), 'saveClient');
+}
+export async function deleteClientCloud(id) {
+  if (!enabled()) return;
+  bg(supabase.from('clients').delete().eq('id', id), 'deleteClient');
 }
 
 export async function saveBatch(b, projectId) {
