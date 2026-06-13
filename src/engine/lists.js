@@ -2,8 +2,8 @@
  * lists.js — production list builders for a single window.
  *
  * Wraps `deriveWindowData` output into shapes that the UI tables and
- * the optimizer expect. Mirrors the aggregation logic in calculations.js
- * (`summariseProjectWindows`) but scoped to a single window.
+ * the optimizer expect. Each builder is scoped to a single window;
+ * `bom.js` (`mergeWindowMaterials`) merges many windows into one list.
  */
 
 import { CONSTANTS, deriveWindowData } from './calculations.js';
@@ -274,40 +274,6 @@ export function buildHardwareList(windowSpec) {
   }
 
   return list;
-}
-
-export function buildProjectAggregates(items, windowSpecs, settingsArg) {
-  const settings = settingsWithDefaults(settingsArg);
-  const allCut = [];
-  const allPrecut = { sashEngineering: [], boxSapele: [] };
-  const allGlass = [];
-  const allHardware = [];
-  const allBeading = [];
-
-  items.forEach((item, idx) => {
-    const ws = windowSpecs[idx];
-    if (!ws) return;
-    const derived = deriveWindowData(ws, settings);
-    allCut.push(...buildCutListForWindow(derived, ws).map((r) => ({ ...r, windowId: ws.id, windowName: ws.name })));
-    const pre = buildPrecutForWindow(derived, ws, settings);
-    pre.sashEngineering.forEach((g) => {
-      const found = allPrecut.sashEngineering.find((x) => x.section === g.section);
-      if (found) found.items.push(...g.items);
-      else allPrecut.sashEngineering.push({ section: g.section, items: [...g.items] });
-    });
-    pre.boxSapele.forEach((g) => {
-      const found = allPrecut.boxSapele.find((x) => x.preCutWidth === g.preCutWidth);
-      if (found) found.items.push(...g.items);
-      else allPrecut.boxSapele.push({ preCutWidth: g.preCutWidth, items: [...g.items] });
-    });
-    allGlass.push(...buildGlassListForWindow(derived, ws));
-    allHardware.push(...buildHardwareList(ws));
-    if (derived.components?.beading) {
-      allBeading.push(...derived.components.beading.map((b) => ({ ...b, windowId: ws.id, windowName: ws.name })));
-    }
-  });
-
-  return { cutList: allCut, precut: allPrecut, glass: allGlass, hardware: allHardware, beading: allBeading };
 }
 
 /**

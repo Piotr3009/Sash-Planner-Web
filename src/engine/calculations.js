@@ -565,25 +565,6 @@ function buildBoxPrecut(components, windowSpecList, settings) {
     return Array.from(grouped.entries()).map(([preCutWidth, items]) => ({ preCutWidth, items }));
 }
 
-export function summariseProjectWindows(windows, settings) {
-    const { sash, box, glazing } = aggregateComponents(windows, settings);
-    const cutLists = {
-        sash: aggregateCutList(sash),
-        box: aggregateCutList(box),
-    };
-
-    const precut = {
-        sashEngineering: buildSashPrecut(sash, settings),
-        boxSapele: buildBoxPrecut(box, windows, settings),
-    };
-
-    return {
-        cutLists,
-        precut,
-        glazing,
-    };
-}
-
 function resolveConfiguration(configuration, options) {
     if (CONFIGURATIONS[configuration]) {
         if (configuration !== 'custom') {

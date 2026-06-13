@@ -411,6 +411,11 @@ export const useProjectStore = create((set, get) => ({
       );
       if (alreadyInOther) return s;
 
+      // Guard: a production pack only holds batches of its own type
+      const targetPack = s.productionPacks.find((pp) => pp.id === ppId);
+      const batch = s.projects.find((p) => p.id === projectId)?.batches?.find((b) => b.id === batchId);
+      if (targetPack && batch && batch.type !== targetPack.type) return s;
+
       return {
         productionPacks: s.productionPacks.map((pp) => {
           if (pp.id !== ppId) return pp;

@@ -6,7 +6,7 @@
  * Glass Schedule | Pre-Cut List | Cut List | BOM
  *
  * Computes derived data for ALL windows in the batch and merges
- * cut lists, glass, hardware using buildProjectAggregates.
+ * cut lists, glass, hardware for the batch production view.
  */
 import { useState, useMemo, useEffect, useRef, useCallback, Suspense } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
