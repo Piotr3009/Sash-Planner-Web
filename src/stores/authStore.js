@@ -64,6 +64,18 @@ export const useAuthStore = create(
     return { ok: true };
   },
 
+  changePassword: async (currentPassword, newPassword) => {
+    if (!hasSupabaseConfig) return { ok: false, error: 'Supabase not configured.' };
+    const email = get().session?.user?.email;
+    if (!email) return { ok: false, error: 'No active session.' };
+    // Re-verify the current password before allowing a change.
+    const { error: reauthErr } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
+    if (reauthErr) return { ok: false, error: 'Current password is incorrect.' };
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  },
+
   signOut: async () => {
     if (hasSupabaseConfig) {
       await supabase.auth.signOut();

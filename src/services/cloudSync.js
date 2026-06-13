@@ -240,6 +240,34 @@ export async function deleteClientCloud(id) {
   bg(supabase.from('clients').delete().eq('id', id), 'deleteClient');
 }
 
+// ─────────────────────────────────────────────────────────────
+// ACCOUNT / ORGANIZATION — read helpers for the Settings page.
+// ─────────────────────────────────────────────────────────────
+export async function getMyProfile() {
+  if (!enabled()) return null;
+  const uid = await currentUserId();
+  if (!uid) return null;
+  const { data: authData } = await supabase.auth.getUser();
+  const email = authData?.user?.email || '';
+  const { data, error } = await supabase.from('user_profiles').select('full_name, role').eq('id', uid).maybeSingle();
+  if (error) { console.error('getMyProfile', error); return { email, full_name: '', role: '' }; }
+  return { email, full_name: data?.full_name || '', role: data?.role || '' };
+}
+export async function saveMyProfile(patch) {
+  if (!enabled()) return;
+  const uid = await currentUserId();
+  if (!uid) return;
+  bg(supabase.from('user_profiles').update({ full_name: patch.full_name ?? null }).eq('id', uid), 'saveMyProfile');
+}
+export async function getMyOrg() {
+  if (!enabled()) return null;
+  const tenantId = await currentTenantId();
+  if (!tenantId) return null;
+  const { data, error } = await supabase.from('organizations').select('name, plan, max_users').eq('id', tenantId).maybeSingle();
+  if (error) { console.error('getMyOrg', error); return null; }
+  return data ? { name: data.name || '', plan: data.plan || 'trial', max_users: data.max_users ?? null } : null;
+}
+
 export async function saveBatch(b, projectId) {
   if (!enabled()) return;
   const tenantId = await currentTenantId();
