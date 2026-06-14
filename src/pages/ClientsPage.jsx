@@ -1,17 +1,27 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useClientStore } from '../stores/clientStore.js';
 import { useProjectStore } from '../stores/projectStore.js';
 import ClientFormModal from '../components/clients/ClientFormModal.jsx';
 
 export default function ClientsPage() {
   const clients = useClientStore((s) => s.clients);
+  const archivedClients = useClientStore((s) => s.archivedClients);
+  const archivedLoaded = useClientStore((s) => s.archivedLoaded);
+  const loadArchived = useClientStore((s) => s.loadArchived);
   const addClient = useClientStore((s) => s.addClient);
   const updateClient = useClientStore((s) => s.updateClient);
   const archiveClient = useClientStore((s) => s.archiveClient);
+  const restoreClient = useClientStore((s) => s.restoreClient);
   const projects = useProjectStore((s) => s.projects);
 
-  const [modal, setModal] = useState(null);          // null | {} (new) | client (edit)
+  const [modal, setModal] = useState(null);            // null | {} (new) | client (edit)
   const [confirmArchive, setConfirmArchive] = useState(null);
+  const [view, setView] = useState('active');          // 'active' | 'archived'
+
+  // Load the archived list the first time that tab is opened.
+  useEffect(() => {
+    if (view === 'archived' && !archivedLoaded) loadArchived();
+  }, [view, archivedLoaded, loadArchived]);
 
   // How many projects point at each client.
   const projectCount = useMemo(() => {
@@ -20,9 +30,11 @@ export default function ClientsPage() {
     return m;
   }, [projects]);
 
-  const sorted = useMemo(
-    () => [...clients].sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '')),
-    [clients]
+  const isArchived = view === 'archived';
+  const source = isArchived ? archivedClients : clients;
+  const rows = useMemo(
+    () => [...source].sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '')),
+    [source]
   );
 
   return (
@@ -32,15 +44,23 @@ export default function ClientsPage() {
           <h1 className="text-xl font-bold text-ink-50">Clients</h1>
           <p className="text-xs text-ink-400 mt-0.5">Client database · linked to projects</p>
         </div>
-        <button className="btn btn-primary text-xs px-4" onClick={() => setModal({})}>+ New client</button>
+        <div className="flex items-center gap-3">
+          <div className="flex rounded-lg border border-surface-500 overflow-hidden text-xs">
+            <button onClick={() => setView('active')} className={`px-3 py-1.5 transition-colors ${!isArchived ? 'bg-accent-500/15 text-accent-400' : 'text-ink-400 hover:text-ink-200'}`}>Active</button>
+            <button onClick={() => setView('archived')} className={`px-3 py-1.5 transition-colors border-l border-surface-500 ${isArchived ? 'bg-accent-500/15 text-accent-400' : 'text-ink-400 hover:text-ink-200'}`}>Archived</button>
+          </div>
+          {!isArchived && <button className="btn btn-primary text-xs px-4" onClick={() => setModal({})}>+ New client</button>}
+        </div>
       </header>
 
       <main className="max-w-[1100px] mx-auto p-6">
-        {sorted.length === 0 ? (
+        {rows.length === 0 ? (
           <div className="card p-12 text-center">
-            <div className="text-lg font-semibold text-ink-200 mb-2">No clients yet</div>
-            <div className="text-sm text-ink-400 mb-5">Add your first client, then attach them to projects.</div>
-            <button className="btn btn-primary text-xs px-4" onClick={() => setModal({})}>+ New client</button>
+            <div className="text-lg font-semibold text-ink-200 mb-2">{isArchived ? 'No archived clients' : 'No clients yet'}</div>
+            {!isArchived && <>
+              <div className="text-sm text-ink-400 mb-5">Add your first client, then attach them to projects.</div>
+              <button className="btn btn-primary text-xs px-4" onClick={() => setModal({})}>+ New client</button>
+            </>}
           </div>
         ) : (
           <div className="card overflow-hidden">
@@ -52,7 +72,7 @@ export default function ClientsPage() {
                 </tr>
               </thead>
               <tbody>
-                {sorted.map((c) => (
+                {rows.map((c) => (
                   <tr key={c.id} className="border-t border-surface-500 hover:bg-surface-700/40 transition-colors">
                     <td className="px-4 py-3 text-ink-50 font-medium">
                       {c.full_name}
@@ -65,8 +85,14 @@ export default function ClientsPage() {
                       <span className="inline-block text-[11px] px-2 py-0.5 rounded-full bg-accent-500/12 text-accent-400">{projectCount[c.id] || 0}</span>
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <button className="text-ink-300 hover:text-accent-400 mr-4 transition-colors" onClick={() => setModal(c)}>Edit</button>
-                      <button className="text-ink-300 hover:text-red-400 transition-colors" onClick={() => setConfirmArchive(c)}>Archive</button>
+                      {isArchived ? (
+                        <button className="text-green-400 hover:text-green-300 transition-colors" onClick={() => restoreClient(c.id)}>Restore</button>
+                      ) : (
+                        <>
+                          <button className="text-ink-300 hover:text-accent-400 mr-4 transition-colors" onClick={() => setModal(c)}>Edit</button>
+                          <button className="text-ink-300 hover:text-red-400 transition-colors" onClick={() => setConfirmArchive(c)}>Archive</button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -94,7 +120,7 @@ export default function ClientsPage() {
           <div className="relative bg-surface-800 border border-surface-500 rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="text-sm font-semibold text-ink-50 mb-2">Archive client?</div>
             <div className="text-xs text-ink-300 mb-4">
-              {confirmArchive.full_name} will be hidden from the list. Projects already linked keep their reference.
+              {confirmArchive.full_name} will be hidden from the list. Projects already linked keep their reference. You can restore them from the Archived tab.
             </div>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setConfirmArchive(null)} className="btn btn-secondary text-xs px-4">Cancel</button>

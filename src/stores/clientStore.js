@@ -12,6 +12,8 @@ const uid = () =>
 export const useClientStore = create((set, get) => ({
   clients: [],
   clientsLoaded: false,
+  archivedClients: [],
+  archivedLoaded: false,
 
   setClients: (clients) => set({ clients, clientsLoaded: true }),
 
@@ -28,6 +30,11 @@ export const useClientStore = create((set, get) => ({
       phone: (data.phone || '').trim(),
       address: (data.address || '').trim(),
       notes: (data.notes || '').trim(),
+      contacts: Array.isArray(data.contacts) ? data.contacts : [],
+      client_number: (data.client_number || '').trim(),
+      vat_number: (data.vat_number || '').trim(),
+      type: data.type || '',
+      source: data.source || '',
       jc_uuid: data.jc_uuid || '',
       archived: false,
       created_at: new Date().toISOString(),
@@ -48,6 +55,22 @@ export const useClientStore = create((set, get) => ({
     const c = get().clients.find((x) => x.id === id);
     if (c) cloud.saveClient({ ...c, archived: true });
     set((s) => ({ clients: s.clients.filter((x) => x.id !== id) }));
+  },
+
+  // Load the archived list on demand (for the "Archived" view).
+  loadArchived: async () => {
+    const data = await cloud.loadArchivedClients();
+    set({ archivedClients: data || [], archivedLoaded: true });
+  },
+
+  // Restore an archived client back into the active list.
+  restoreClient: (id) => {
+    const c = get().archivedClients.find((x) => x.id === id);
+    if (c) cloud.saveClient({ ...c, archived: false });
+    set((s) => ({
+      archivedClients: s.archivedClients.filter((x) => x.id !== id),
+      clients: c ? [...s.clients, { ...c, archived: false }] : s.clients,
+    }));
   },
 
   // ─── CLOUD ───

@@ -202,6 +202,11 @@ function dbClientToMem(c) {
     phone: c.phone || '',
     address: c.address || '',
     notes: c.notes || '',
+    contacts: Array.isArray(c.contacts) ? c.contacts : [],
+    client_number: c.client_number || '',
+    vat_number: c.vat_number || '',
+    type: c.type || '',
+    source: c.source || '',
     jc_uuid: c.jc_uuid || '',
     archived: !!c.archived,
     created_at: c.created_at,
@@ -217,6 +222,11 @@ function memClientToDb(c, tenantId) {
     phone: c.phone || null,
     address: c.address || null,
     notes: c.notes || null,
+    contacts: Array.isArray(c.contacts) ? c.contacts : [],
+    client_number: c.client_number || null,
+    vat_number: c.vat_number || null,
+    type: c.type || null,
+    source: c.source || null,
     jc_uuid: c.jc_uuid || null,
     archived: !!c.archived,
   };
@@ -227,6 +237,16 @@ export async function loadClients() {
   if (!tenantId) return null;
   const { data, error } = await supabase.from('clients').select('*').eq('tenant_id', tenantId).eq('archived', false).order('full_name', { ascending: true });
   if (error) { console.error('loadClients', error); return null; }
+  return (data || []).map(dbClientToMem);
+}
+
+// Archived clients (for the "Archived" view; main loadClients hides them).
+export async function loadArchivedClients() {
+  if (!enabled()) return null;
+  const tenantId = await currentTenantId();
+  if (!tenantId) return null;
+  const { data, error } = await supabase.from('clients').select('*').eq('tenant_id', tenantId).eq('archived', true).order('full_name', { ascending: true });
+  if (error) { console.error('loadArchivedClients', error); return null; }
   return (data || []).map(dbClientToMem);
 }
 export async function saveClient(c) {
