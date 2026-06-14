@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useEstimateStore } from '../stores/estimateStore.js';
+import { useIronmongeryStore, IRONMONGERY_CATEGORIES, IRONMONGERY_FINISHES } from '../stores/ironmongeryStore.js';
+import IronmongeryPickerModal from '../components/IronmongeryPickerModal.jsx';
 import { GLASS_TYPES, GLASS_FINISHES, FROSTED_LOCATIONS, SPACERS, SPACER_TYPES, SWATCHES, RAL_GROUPS, FB_GROUPS } from '../config.js';
 import { buildVentGrilles } from '../engine/lists.js';
-import { calculatePrice, formatPrice } from '../engine/pricing.js';
+import { calculatePrice } from '../engine/pricing.js';
 
 // Reuse the SAME 3D viewer the production configurator uses (window.update3D bridge).
 const Viewer3D = lazy(() => import('../3d/App.jsx'));
@@ -23,18 +25,29 @@ const HEAD_TYPES = [{ value: 'flat', label: 'Flat' }, { value: 'arch', label: 'A
 const OPENINGS = [{ value: 'both', label: 'Both Open' }, { value: 'bottom', label: 'Bottom Only' }, { value: 'fixed', label: 'Fixed' }];
 const ROOM_TYPES = [{ value: 'habitable', label: 'Habitable' }, { value: 'kitchen', label: 'Kitchen' }, { value: 'bathroom', label: 'Bathroom' }, { value: 'other', label: 'No vent' }];
 const SOLE_OPTIONS = [{ value: true, label: 'Only window' }, { value: false, label: 'More than one' }];
-const IRON_OPTIONS = [{ value: 'brass', label: 'Brass' }, { value: 'chrome', label: 'Chrome' }, { value: 'stainless', label: 'Stainless' }, { value: 'antique_brass', label: 'Antique Brass' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' }];
 const HORN_OPTIONS = [{ value: 'none', label: 'No Horns' }, { value: 'A', label: 'Richmond' }, { value: 'D', label: 'Type D' }];
 const COLOUR_MODES = [{ value: 'single', label: 'Single' }, { value: 'dual', label: 'Dual (Ext/Int)' }];
+
+// Ironmongery finish options = the catalogue finishes + a Bespoke escape hatch.
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const FINISH_OPTIONS = [...IRONMONGERY_FINISHES.map((f) => ({ value: f, label: cap(f) })), { value: 'bespoke', label: 'Bespoke' }];
 
 const TRIPLE_CONSTRAINTS = { minW: 1400, maxW: 3000, minH: 1200, maxH: 2500 };
 const DOUBLE_CONSTRAINTS = { minW: 400, maxW: 3000, minH: 400, maxH: 3000 };
 
-// White hexes — used to decide the single-colour surcharge (white = no surcharge).
 const WHITE_HEXES = ['#F6F6F6', '#FAFAFA', '#FFFFFF', '#FFF'];
 const isWhiteHex = (hex) => WHITE_HEXES.includes((hex || '').toUpperCase());
 
-// PC custom bars are [{type:'v'|'h', mm}] → pricing wants {horizontal:[],vertical:[]}.
+// hex → human colour name (RAL / Farrow & Ball / swatch). Built once.
+const COLOR_NAME = {};
+[...RAL_GROUPS, ...FB_GROUPS].forEach((g) => (g.o || []).forEach(([hex, label]) => { COLOR_NAME[(hex || '').toUpperCase()] = label; }));
+SWATCHES.forEach((s) => { const k = (s.hex || '').toUpperCase(); if (!COLOR_NAME[k]) COLOR_NAME[k] = s.name; });
+const hexToName = (hex) => COLOR_NAME[(hex || '').toUpperCase()] || (hex || '—');
+
+// Map a catalogue finish to a value the 3D viewer understands (unknowns → neutral metal).
+const FINISH_3D = { brass: 'brass', chrome: 'chrome', stainless: 'stainless', 'antique brass': 'antique_brass', black: 'black', white: 'white' };
+const finishTo3D = (f) => FINISH_3D[f] || 'stainless';
+
 const toCustomBars = (arr) => ({
   horizontal: (arr || []).filter((b) => b.type === 'h'),
   vertical: (arr || []).filter((b) => b.type === 'v'),
@@ -43,6 +56,20 @@ const toCustomBars = (arr) => ({
 function migrateBars(bars) {
   if (!Array.isArray(bars)) return [];
   return bars.map((b) => ({ type: b.type, mm: b.mm ?? b.position ?? 100 }));
+}
+
+// How many of each hardware category a sash window needs (mirrors buildHardwareList).
+function hardwareQty(key, opening, frameWidth, hasBars, ventQty) {
+  if (key === 'trickleVents') return ventQty;
+  if (opening === 'fixed') return 0; // fixed window = no sash hardware
+  switch (key) {
+    case 'pulleys': return opening === 'bottom' ? 2 : 4;
+    case 'fingerLifts': return 2;
+    case 'locks': return (frameWidth > 1200 || hasBars) ? 2 : 1;
+    case 'pullHandles': return 1;
+    case 'stoppers': return 1;
+    default: return 0;
+  }
 }
 
 export default function EstimateConfiguratorPage() {
@@ -55,6 +82,7 @@ export default function EstimateConfiguratorPage() {
   const addItem = useEstimateStore((s) => s.addItem);
   const updateItem = useEstimateStore((s) => s.updateItem);
   const removeItem = useEstimateStore((s) => s.removeItem);
+  const ironItems = useIronmongeryStore((s) => s.items);
 
   const editItemId = searchParams.get('edit');
   const editingItem = useMemo(
@@ -86,12 +114,13 @@ export default function EstimateConfiguratorPage() {
   const [woodColor, setWoodColor] = useState('#F6F6F6');
   const [woodColorExt, setWoodColorExt] = useState('#F6F6F6');
   const [woodColorInt, setWoodColorInt] = useState('#F6F6F6');
-  const [ironmongery, setIronmongery] = useState('brass');
+  const [ironFinish, setIronFinish] = useState('brass');
+  const [ironSlots, setIronSlots] = useState({}); // { categoryKey: itemId }
+  const [pickerSlot, setPickerSlot] = useState(null);
   const [horn, setHorn] = useState('A');
   const [spacer, setSpacer] = useState('white');
   const [spacerType, setSpacerType] = useState('warm');
   const [pas24, setPas24] = useState(false);
-  const [quantity, setQuantity] = useState(1);
   const [prefilled, setPrefilled] = useState(false);
 
   // ─── Prefill when editing an existing item ───
@@ -119,12 +148,12 @@ export default function EstimateConfiguratorPage() {
       setWoodColor(c.woodColor || '#F6F6F6');
       setWoodColorExt(c.woodColorExt || '#F6F6F6');
       setWoodColorInt(c.woodColorInt || '#F6F6F6');
-      setIronmongery(c.ironmongery || 'brass');
+      setIronFinish(c.ironmongeryBespoke ? 'bespoke' : (c.ironmongery || 'brass'));
+      setIronSlots(c.ironmongerySlots || {});
       setHorn(c.hornType || 'A');
       setSpacer(c.spacerColor || 'white');
       setSpacerType(c.spacerType || 'warm');
       setPas24(c.pas24 || false);
-      setQuantity(editingItem.quantity || 1);
       setPrefilled(true);
     }
   }, [editingItem, prefilled]);
@@ -133,10 +162,19 @@ export default function EstimateConfiguratorPage() {
   const extW = Number(inW) || 400;
   const extH = Number(inH) || 400;
   const isSingle = colourMode === 'single';
+  const isBespoke = ironFinish === 'bespoke';
   const effectiveLBars = sameBars ? uBars : lBars;
   const effectiveLCustom = sameBars ? uCustom : lCustom;
+  const hasBars = uBars !== 'none' || effectiveLBars !== 'none';
   const frameType = 'standard';
   const frameDepth = glassType === 'triple' ? 172 : (frameType === 'standard' ? 164 : 144);
+  const ventQty = buildVentGrilles({ vent: { roomType: ventRoomType, soleWindow: ventSoleWindow } });
+
+  // Categories shown as slots (Trickle Vents only when the room actually needs vents).
+  const slotCategories = useMemo(
+    () => IRONMONGERY_CATEGORIES.filter((c) => c.windowType === 'sash' && (c.key !== 'trickleVents' || ventQty > 0)),
+    [ventQty]
+  );
 
   // ─── 3D sync (same bridge + config shape as the production configurator) ───
   const sync = useCallback(() => {
@@ -148,13 +186,13 @@ export default function EstimateConfiguratorPage() {
       lowerCustomBars: effectiveLBars === 'custom' ? effectiveLCustom : [],
       showHorns: horn !== 'none', hornType: horn === 'none' ? 'A' : horn,
       woodColor, woodColorExt: isSingle ? woodColor : woodColorExt, woodColorInt: isSingle ? woodColor : woodColorInt, sameColor: isSingle,
-      ironmongery,
+      ironmongery: finishTo3D(ironFinish),
       upperGlass: gFin === 'frosted' && frostLoc === 'both' ? 'frosted' : 'clear',
       lowerGlass: gFin === 'frosted' ? 'frosted' : 'clear',
       spacerColor: spacer, sashType, splitRatio, headType, openingType: opening,
       boxType: glassType === 'triple' ? 'standard' : frameType, boxDepth: frameDepth,
     });
-  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, effectiveLCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, ironmongery, gFin, frostLoc, spacer, sashType, splitRatio, headType, opening, glassType, frameType, frameDepth]);
+  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, effectiveLCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, ironFinish, gFin, frostLoc, spacer, sashType, splitRatio, headType, opening, glassType, frameType, frameDepth]);
   useEffect(() => { sync(); }, [sync]);
   useEffect(() => {
     const handler = () => sync();
@@ -162,24 +200,37 @@ export default function EstimateConfiguratorPage() {
     return () => window.removeEventListener('3d-ready', handler);
   }, [sync]);
 
+  // ─── Ironmongery price contribution (per chosen product × its window quantity) ───
+  const ironmongeryForPrice = useMemo(() => {
+    if (isBespoke) return []; // bespoke = no automatic price; added manually
+    const arr = [];
+    Object.entries(ironSlots).forEach(([key, itemId]) => {
+      const prod = ironItems.find((m) => m.id === itemId);
+      if (!prod) return;
+      const qty = hardwareQty(key, opening, extW, hasBars, ventQty);
+      if (qty > 0) arr.push({ price: prod.cost_per_unit || 0, quantity: qty });
+    });
+    return arr;
+  }, [isBespoke, ironSlots, ironItems, opening, extW, hasBars, ventQty]);
+
   // ─── Pricing config (maps current state to what pricing.js expects) ───
   const pricingConfig = useMemo(() => ({
     windowType: 'sash',
     sashType,
     width: extW, height: extH,
-    actualFrameWidth: extW, actualFrameHeight: extH, // entered dims ARE the frame
+    actualFrameWidth: extW, actualFrameHeight: extH,
     upperBars: uBars, lowerBars: effectiveLBars,
     customBars: { upper: toCustomBars(uCustom), lower: toCustomBars(effectiveLCustom) },
     glassType, glassSpec, glassFinish: gFin,
     colorType: colourMode, colorSingle: isWhiteHex(woodColor) ? 'white' : 'custom',
     openingType: opening, headType,
     frameType, sillExtension: 'none', pas24: pas24 ? 'yes' : 'no',
-    quantity,
-  }), [sashType, extW, extH, uBars, effectiveLBars, uCustom, effectiveLCustom, glassType, glassSpec, gFin, colourMode, woodColor, opening, headType, frameType, pas24, quantity]);
+    ironmongery: ironmongeryForPrice,
+  }), [sashType, extW, extH, uBars, effectiveLBars, uCustom, effectiveLCustom, glassType, glassSpec, gFin, colourMode, woodColor, opening, headType, frameType, pas24, ironmongeryForPrice]);
 
   const price = useMemo(() => calculatePrice(pricingConfig, pricingSettings), [pricingConfig, pricingSettings]);
 
-  // ─── Build the full item config (compatible with production save shape) ───
+  // ─── Full item config (compatible with production save shape) ───
   const buildSaveConfig = () => ({
     windowName: winName, windowCategory: 'sash',
     extWidth: extW, extHeight: extH, inputWidth: inW, inputHeight: inH, measurementType: 'box-to-box',
@@ -188,7 +239,9 @@ export default function EstimateConfiguratorPage() {
     lowerCustomBars: effectiveLBars === 'custom' ? effectiveLCustom : [],
     showHorns: horn !== 'none', hornType: horn,
     woodColor, woodColorExt: isSingle ? woodColor : woodColorExt, woodColorInt: isSingle ? woodColor : woodColorInt,
-    colourMode, sameColor: isSingle, ironmongery, doubleGlazing: glassType !== 'single',
+    colourMode, sameColor: isSingle,
+    ironmongery: isBespoke ? 'bespoke' : ironFinish, ironmongerySlots: isBespoke ? {} : ironSlots, ironmongeryBespoke: isBespoke,
+    doubleGlazing: glassType !== 'single',
     upperGlass: gFin === 'frosted' && frostLoc === 'both' ? 'frosted' : 'clear',
     lowerGlass: gFin === 'frosted' ? 'frosted' : 'clear',
     glassType, glassSpec, glassFinish: gFin, frostedLocation: frostLoc,
@@ -201,7 +254,6 @@ export default function EstimateConfiguratorPage() {
     if (!winName.trim()) return;
     const item = {
       windowName: winName.trim(),
-      quantity: Number(quantity) || 1,
       config: buildSaveConfig(),
       pricing: pricingConfig,
       price,
@@ -218,23 +270,16 @@ export default function EstimateConfiguratorPage() {
 
   // ─── Custom bar helpers ───
   const addBar = (setter, list, type) => setter([...list, { type, mm: 200 }].sort((a, b) => a.mm - b.mm));
-  const updateBarMm = (setter, list, idx, val) => {
-    const next = [...list];
-    next[idx] = { ...next[idx], mm: val === '' ? '' : Number(val) };
-    setter(next);
-  };
-  const finalizeBarMm = (setter, list, idx) => {
-    const next = [...list];
-    const v = Number(next[idx].mm);
-    next[idx] = { ...next[idx], mm: (isNaN(v) || v < 10) ? 10 : Math.round(v) };
-    setter(next);
-  };
+  const updateBarMm = (setter, list, idx, val) => { const next = [...list]; next[idx] = { ...next[idx], mm: val === '' ? '' : Number(val) }; setter(next); };
+  const finalizeBarMm = (setter, list, idx) => { const next = [...list]; const v = Number(next[idx].mm); next[idx] = { ...next[idx], mm: (isNaN(v) || v < 10) ? 10 : Math.round(v) }; setter(next); };
   const removeBar = (setter, list, idx) => setter(list.filter((_, i) => i !== idx));
 
   if (!estimate) return <div className="p-8 text-ink-400">Estimate not found.</div>;
 
   const items = estimate.items || [];
   const fmt = (n) => `£${Number(n || 0).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const getSlotItem = (key) => ironItems.find((m) => m.id === ironSlots[key]) || null;
+  const chosenProducts = slotCategories.map((c) => getSlotItem(c.key)).filter(Boolean);
 
   return (
     <div className="h-full flex flex-col bg-surface-800">
@@ -297,7 +342,7 @@ export default function EstimateConfiguratorPage() {
             {(ventRoomType === 'habitable' || ventRoomType === 'kitchen') && (
               <><Lbl>Only window in this room?</Lbl><HChips o={SOLE_OPTIONS} v={ventSoleWindow} c={setVentSoleWindow} /></>
             )}
-            <div className="text-[11px] text-ink-300 mt-1.5">Trickle vents: <span className="text-accent-400 font-medium">{buildVentGrilles({ vent: { roomType: ventRoomType, soleWindow: ventSoleWindow } })}</span></div>
+            <div className="text-[11px] text-ink-300 mt-1.5">Trickle vents: <span className="text-accent-400 font-medium">{ventQty}</span></div>
           </Sec>
 
           <Sec t="Glass">
@@ -314,17 +359,39 @@ export default function EstimateConfiguratorPage() {
             {!isSingle && <ColorField label="Interior" value={woodColorInt} onChange={setWoodColorInt} />}
           </Sec>
 
-          <Sec t="Hardware">
-            <Lbl>Ironmongery</Lbl><HChips o={IRON_OPTIONS} v={ironmongery} c={setIronmongery} />
-            <Lbl>Horns</Lbl><HChips o={HORN_OPTIONS} v={horn} c={setHorn} />
-            <label className="flex items-center gap-2 text-xs text-ink-400 mt-1.5 cursor-pointer"><input type="checkbox" checked={pas24} onChange={(e) => setPas24(e.target.checked)} className="accent-accent-500" />PAS24 security</label>
+          <Sec t="Ironmongery">
+            <Lbl>Finish</Lbl>
+            <HChips o={FINISH_OPTIONS} v={ironFinish} c={setIronFinish} />
+            {isBespoke ? (
+              <div className="mt-1 p-3 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 text-[11px] text-amber-300">
+                Bespoke ironmongery — not priced automatically. Add the cost to the window manually; the BOM will show “Bespoke ironmongery”.
+              </div>
+            ) : (
+              <div className="space-y-2 mt-1">
+                {slotCategories.map((cat) => {
+                  const item = getSlotItem(cat.key);
+                  const qty = hardwareQty(cat.key, opening, extW, hasBars, ventQty);
+                  return (
+                    <div key={cat.key} onClick={() => setPickerSlot(cat.key)}
+                      className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-all ${item ? 'border-accent-500/30 bg-accent-500/5 hover:bg-accent-500/10' : 'border-surface-500 bg-surface-700/20 hover:bg-surface-700/40 border-dashed'}`}>
+                      <div className="w-11 h-11 rounded bg-surface-600 shrink-0 overflow-hidden">
+                        {item?.image_url ? <img src={item.image_url} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-ink-500 text-[10px]">+</div>}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[10px] text-ink-400 uppercase tracking-wider">{cat.label}{qty > 0 ? ` ×${qty}` : ''}</div>
+                        {item ? <div className="text-xs text-ink-100 font-medium truncate">{item.name}</div> : <div className="text-xs text-ink-500 italic">Click to assign…</div>}
+                      </div>
+                      {item && item.cost_per_unit > 0 && <div className="text-xs font-mono text-accent-400 shrink-0">{fmt(item.cost_per_unit * (qty || 1))}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </Sec>
 
-          <Sec t="Quantity">
-            <input type="number" min={1} step={1} value={quantity}
-              onChange={(e) => setQuantity(e.target.value === '' ? '' : Number(e.target.value))}
-              onBlur={(e) => { const v = Number(e.target.value); setQuantity(isNaN(v) || v < 1 ? 1 : Math.round(v)); }}
-              className="w-24 px-3 py-2 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+          <Sec t="Hardware extras">
+            <Lbl>Horns</Lbl><HChips o={HORN_OPTIONS} v={horn} c={setHorn} />
+            <label className="flex items-center gap-2 text-xs text-ink-400 mt-1.5 cursor-pointer"><input type="checkbox" checked={pas24} onChange={(e) => setPas24(e.target.checked)} className="accent-accent-500" />PAS24 security</label>
           </Sec>
         </div>
 
@@ -338,13 +405,32 @@ export default function EstimateConfiguratorPage() {
         {/* RIGHT: spec + price + items list */}
         <div className="w-72 shrink-0 border-l border-surface-500 bg-surface-900 overflow-y-auto text-xs flex flex-col">
           <div className="px-4 py-2 bg-surface-700 border-b border-surface-500 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Specification</div>
-          <SG t="Dimensions"><SR l="Frame" v={`${extW} × ${extH}`} /><SR l="Depth" v={`${frameDepth}mm`} /></SG>
-          <SG t="Product"><SR l="Sash" v={sashType} /><SR l="Head" v={headType} /></SG>
-          <SG t="Bars"><SR l="Upper" v={uBars} />{!sameBars && <SR l="Lower" v={lBars} />}</SG>
-          <SG t="Glass"><SR l="Type" v={glassType} /><SR l="Finish" v={gFin} /><SR l="Spacer" v={spacer} /></SG>
-          <SG t="Colour"><SR l="Mode" v={colourMode} /></SG>
+          <SG t="Dimensions"><SR l="Frame" v={`${extW} × ${extH} mm`} /><SR l="Depth" v={`${frameDepth}mm`} /></SG>
+          <SG t="Product"><SR l="Sash" v={sashType} /><SR l="Head" v={headType} />{sashType === 'triple' && <SR l="Split" v={splitRatio} />}</SG>
+          <SG t="Bars"><SR l="Upper" v={uBars} /><SR l="Lower" v={sameBars ? uBars : lBars} /></SG>
+          <SG t="Ventilation"><SR l="Room" v={(ROOM_TYPES.find((r) => r.value === ventRoomType) || {}).label} /><SR l="Trickle vents" v={ventQty} /></SG>
+          <SG t="Glass">
+            <SR l="Type" v={glassType} /><SR l="Finish" v={gFin} />
+            {gFin === 'frosted' && <SR l="Frosted" v={frostLoc} />}
+            <SR l="Spacer" v={spacer} /><SR l="Spacer type" v={(SPACER_TYPES.find((t) => t.value === spacerType) || {}).label} />
+          </SG>
+          <SG t="Colour">
+            <SR l="Mode" v={colourMode} />
+            <SR l={isSingle ? 'Colour' : 'Exterior'} v={hexToName(isSingle ? woodColor : woodColorExt)} />
+            {!isSingle && <SR l="Interior" v={hexToName(woodColorInt)} />}
+          </SG>
           <SG t="Opening"><SR l="Type" v={opening} /></SG>
-          <SG t="Hardware"><SR l="PAS24" v={pas24 ? 'Yes' : 'No'} /><SR l="Ironmongery" v={ironmongery} /></SG>
+          <SG t="Frame"><SR l="Type" v={frameType} /><SR l="Depth" v={`${frameDepth}mm`} /></SG>
+          <SG t="Hardware">
+            <SR l="Finish" v={isBespoke ? 'Bespoke' : cap(ironFinish)} />
+            <SR l="Horns" v={horn} />
+            <SR l="PAS24" v={pas24 ? 'Yes' : 'No'} />
+            {isBespoke ? (
+              <div className="px-4 py-0.5 text-[10px] text-amber-400">Bespoke ironmongery</div>
+            ) : (
+              chosenProducts.map((p) => <div key={p.id} className="px-4 py-0.5 text-[10px] text-ink-300 truncate">• {p.name}</div>)
+            )}
+          </SG>
 
           {/* PRICE BREAKDOWN */}
           <div className="px-4 py-2 bg-surface-700 border-y border-surface-500 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Price</div>
@@ -356,12 +442,12 @@ export default function EstimateConfiguratorPage() {
                 <PR l={`Base (${price.breakdown.sqm} m²)`} v={fmt(price.breakdown.basePrice)} />
                 {Number(price.breakdown.barsPrice) > 0 && <PR l="Bars" v={fmt(price.breakdown.barsPrice)} />}
                 {Number(price.breakdown.fixBarsPrice) > 0 && <PR l="Fix bars" v={fmt(price.breakdown.fixBarsPrice)} />}
-                {Number(price.breakdown.additionalOptions) !== 0 && <PR l="Options / glass" v={fmt(price.breakdown.additionalOptions)} />}
+                {Number(price.breakdown.additionalOptions) !== 0 && <PR l="Options / glass / iron" v={fmt(price.breakdown.additionalOptions)} />}
+                {isBespoke && <div className="text-[10px] text-amber-400">+ bespoke ironmongery (added manually)</div>}
                 <div className="flex justify-between pt-1.5 border-t border-surface-500">
-                  <span className="text-ink-300">Unit (ex VAT)</span>
+                  <span className="text-ink-300">This window (ex VAT)</span>
                   <span className="text-ink-50 font-medium">{fmt(price.unitPrice)}</span>
                 </div>
-                {quantity > 1 && <PR l={`× ${quantity} qty`} v={fmt(price.totalPrice)} />}
                 <div className="text-[10px] text-ink-400 text-right">{fmt(price.breakdown.totalWithVat)} inc. VAT</div>
               </>
             )}
@@ -378,7 +464,7 @@ export default function EstimateConfiguratorPage() {
               items.map((it) => (
                 <div key={it.id} className={`px-4 py-2 border-b border-surface-500/60 flex items-center justify-between ${it.id === editItemId ? 'bg-accent-500/10' : ''}`}>
                   <div className="min-w-0">
-                    <div className="text-ink-100 font-medium truncate">{it.windowName} {it.quantity > 1 && <span className="text-ink-400">×{it.quantity}</span>}</div>
+                    <div className="text-ink-100 font-medium truncate">{it.windowName}</div>
                     <div className="text-[10px] text-ink-400">{fmt(it.price?.totalPrice)}</div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -397,6 +483,16 @@ export default function EstimateConfiguratorPage() {
           </div>
         </div>
       </div>
+
+      {pickerSlot && (
+        <IronmongeryPickerModal
+          categoryKey={pickerSlot}
+          currentItemId={ironSlots[pickerSlot] || null}
+          finishFilter={ironFinish}
+          onSelect={(itemId) => setIronSlots({ ...ironSlots, [pickerSlot]: itemId })}
+          onClose={() => setPickerSlot(null)}
+        />
+      )}
     </div>
   );
 }
@@ -413,7 +509,7 @@ function ColorField({ label, value, onChange }) {
       <Lbl>{label}</Lbl>
       <div className="flex items-center gap-2 mb-1">
         <div className="w-6 h-6 rounded border border-surface-400 shrink-0" style={{ backgroundColor: value }} />
-        <span className="text-[10px] text-ink-300 font-mono">{(value || '').toUpperCase()}</span>
+        <span className="text-xs text-ink-100 font-medium truncate">{hexToName(value)}</span>
       </div>
       <div className="grid grid-cols-5 gap-1">
         {SWATCHES.map((s) => (

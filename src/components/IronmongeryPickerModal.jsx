@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useIronmongeryStore, IRONMONGERY_CATEGORIES } from '../stores/ironmongeryStore.js';
 
-export default function IronmongeryPickerModal({ categoryKey, currentItemId, onSelect, onClose }) {
+export default function IronmongeryPickerModal({ categoryKey, currentItemId, onSelect, onClose, finishFilter }) {
   const items = useIronmongeryStore((s) => s.items);
   const [selected, setSelected] = useState(currentItemId || null);
   const [search, setSearch] = useState('');
@@ -10,16 +10,23 @@ export default function IronmongeryPickerModal({ categoryKey, currentItemId, onS
 
   const filtered = useMemo(() => {
     let list = items.filter(m => m.category === categoryKey);
+    // Optional finish filter (estimate configurator passes the chosen finish so
+    // only matching products show). When not provided, behaviour is unchanged.
+    if (finishFilter) {
+      const f = finishFilter.toLowerCase();
+      list = list.filter(m => (m.finish || m.color || '').toLowerCase() === f);
+    }
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(m =>
         m.name?.toLowerCase().includes(q) ||
         m.color?.toLowerCase().includes(q) ||
+        m.finish?.toLowerCase().includes(q) ||
         m.size?.toLowerCase().includes(q)
       );
     }
     return list;
-  }, [items, categoryKey, search]);
+  }, [items, categoryKey, search, finishFilter]);
 
   const handleAssign = () => {
     onSelect(selected);
@@ -90,7 +97,7 @@ export default function IronmongeryPickerModal({ categoryKey, currentItemId, onS
                     <div className="text-xs font-medium text-ink-100 truncate">{item.name}</div>
                     <div className="text-[10px] text-ink-400 mt-0.5 space-y-0.5">
                       {item.size && <div>{item.size}</div>}
-                      {item.color && <div>{item.color}</div>}
+                      {(item.color || item.finish) && <div className="capitalize">{item.color || item.finish}</div>}
                       {item.subcategory && <div className="capitalize">{item.subcategory}</div>}
                     </div>
                     <div className="text-xs font-mono text-accent-400 mt-1.5">
