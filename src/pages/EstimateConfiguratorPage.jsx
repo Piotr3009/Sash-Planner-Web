@@ -67,6 +67,7 @@ function hardwareQty(key, opening, frameWidth, hasBars, ventQty) {
     case 'locks': return (frameWidth > 1200 || hasBars) ? 2 : 1;
     case 'pullHandles': return 1;
     case 'stoppers': return 1;
+    case 'other': return 0; // "Others" are priced manually, not auto-counted
     default: return 0;
   }
 }
@@ -368,10 +369,11 @@ export default function EstimateConfiguratorPage() {
               <div className="space-y-1">
                 {chosenProducts.map((p) => {
                   const qty = hardwareQty(p.cat, opening, extW, hasBars, ventQty);
+                  const isOther = p.cat === 'other';
                   return (
                     <div key={p.cat} className="flex items-center justify-between text-[11px] px-2 py-1 rounded bg-surface-700/30">
                       <span className="text-ink-300"><span className="text-ink-500">{catLabel(p.cat)}{qty > 0 ? ` ×${qty}` : ''}:</span> {p.name}</span>
-                      {p.cost_per_unit > 0 && qty > 0 && <span className="font-mono text-accent-400">{fmt(p.cost_per_unit * qty)}</span>}
+                      {isOther ? <span className="text-[10px] text-amber-400">manual</span> : (p.cost_per_unit > 0 && qty > 0 && <span className="font-mono text-accent-400">{fmt(p.cost_per_unit * qty)}</span>)}
                     </div>
                   );
                 })}
