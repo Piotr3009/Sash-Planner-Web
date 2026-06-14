@@ -6,6 +6,7 @@ import { useMaterialStore } from './materialStore.js';
 import { useClientStore } from './clientStore.js';
 import { useIronmongeryStore } from './ironmongeryStore.js';
 import { useMaterialAssignmentStore } from './materialAssignmentStore.js';
+import { useEstimateStore } from './estimateStore.js';
 import { clearTenantCache } from '../services/cloudSync.js';
 
 function loadAllStores() {
@@ -14,6 +15,7 @@ function loadAllStores() {
   useMaterialStore.getState().loadFromCloud();
   useIronmongeryStore.getState().loadFromCloud();
   useMaterialAssignmentStore.getState().loadFromCloud();
+  useEstimateStore.getState().loadFromCloud();
 }
 function clearAllStores() {
   clearTenantCache();
@@ -22,6 +24,7 @@ function clearAllStores() {
   useMaterialStore.getState().clearAll();
   useIronmongeryStore.getState().clearAll();
   useMaterialAssignmentStore.getState().clearAll();
+  useEstimateStore.getState().clearAll();
 }
 
 export const useAuthStore = create(

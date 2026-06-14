@@ -439,3 +439,83 @@ export async function saveAssignments(assignments) {
     tenant_id: tenantId, company: data?.company || {}, constants,
   }, { onConflict: 'tenant_id' }), 'saveAssignments');
 }
+
+// ─────────────────────────────────────────────────────────────
+// ESTIMATES — maps to estimates table (tenant-scoped via RLS).
+// items/extras/totals are stored as jsonb; client_id may be null.
+// ─────────────────────────────────────────────────────────────
+function dbEstimateToMem(e) {
+  return {
+    id: e.id,
+    client_id: e.client_id || null,
+    estimate_number: e.estimate_number || '',
+    title: e.title || '',
+    status: e.status || 'draft',
+    items: Array.isArray(e.items) ? e.items : [],
+    extras: Array.isArray(e.extras) ? e.extras : [],
+    totals: e.totals || { ex_vat: 0, vat: 0, inc_vat: 0 },
+    notes: e.notes || '',
+    archived: !!e.archived,
+    created_at: e.created_at,
+  };
+}
+function memEstimateToDb(e, tenantId, createdBy) {
+  return {
+    id: e.id,
+    tenant_id: tenantId,
+    created_by: createdBy || null,
+    client_id: e.client_id || null,
+    estimate_number: e.estimate_number || null,
+    title: e.title || 'Untitled estimate',
+    status: e.status || 'draft',
+    items: Array.isArray(e.items) ? e.items : [],
+    extras: Array.isArray(e.extras) ? e.extras : [],
+    totals: e.totals || {},
+    notes: e.notes || null,
+    archived: !!e.archived,
+    updated_at: new Date().toISOString(),
+  };
+}
+export async function loadEstimates() {
+  if (!enabled()) return null;
+  const tenantId = await currentTenantId();
+  if (!tenantId) return null;
+  const { data, error } = await supabase.from('estimates')
+    .select('*').eq('tenant_id', tenantId).eq('archived', false)
+    .order('created_at', { ascending: false });
+  if (error) { console.error('loadEstimates', error); return null; }
+  return (data || []).map(dbEstimateToMem);
+}
+export async function saveEstimate(e) {
+  if (!enabled()) return;
+  const tenantId = await currentTenantId();
+  const uid = await currentUserId();
+  if (!tenantId) return;
+  bg(supabase.from('estimates').upsert(memEstimateToDb(e, tenantId, uid)), 'saveEstimate');
+}
+export async function deleteEstimateCloud(id) {
+  if (!enabled()) return;
+  bg(supabase.from('estimates').delete().eq('id', id), 'deleteEstimate');
+}
+
+// ─────────────────────────────────────────────────────────────
+// PRICING SETTINGS — one row per tenant; all editable rates in `config`.
+// Returns null when the tenant has no row yet (engine uses DEFAULT_PRICING).
+// ─────────────────────────────────────────────────────────────
+export async function loadPricingSettings() {
+  if (!enabled()) return null;
+  const tenantId = await currentTenantId();
+  if (!tenantId) return null;
+  const { data, error } = await supabase.from('pricing_settings')
+    .select('config').eq('tenant_id', tenantId).maybeSingle();
+  if (error) { console.error('loadPricingSettings', error); return null; }
+  return data?.config || null;
+}
+export async function savePricingSettings(config) {
+  if (!enabled()) return;
+  const tenantId = await currentTenantId();
+  if (!tenantId) return;
+  bg(supabase.from('pricing_settings').upsert({
+    tenant_id: tenantId, config: config || {}, updated_at: new Date().toISOString(),
+  }, { onConflict: 'tenant_id' }), 'savePricingSettings');
+}
