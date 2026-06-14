@@ -4,7 +4,6 @@ import MainLayout from './components/layout/MainLayout.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import ProjectDetailPage from './pages/ProjectDetailPage.jsx';
-import BatchDefaultsPage from './pages/BatchDefaultsPage.jsx';
 import MaterialsPage from './pages/MaterialsPage.jsx';
 import MaterialAssignmentsPage from './pages/MaterialAssignmentsPage.jsx';
 import IronmongeryPage from './pages/IronmongeryPage.jsx';
@@ -88,7 +87,6 @@ export default function App() {
         <Route path="projects/:projectId/batches/:batchId/windows/:windowId" element={
           <Suspense fallback={<PageLoading />}><WindowDetailPage /></Suspense>
         } />
-        <Route path="projects/:projectId/batches/:batchId/defaults" element={<BatchDefaultsPage />} />
         <Route path="projects/:projectId/batches/:batchId/configurator" element={
           <Suspense fallback={<PageLoading />}><ConfiguratorPage /></Suspense>
         } />

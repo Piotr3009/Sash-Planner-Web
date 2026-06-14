@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
 import { useMaterialStore } from '../stores/materialStore.js';
 import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignmentStore.js';
@@ -21,7 +21,6 @@ const STATUS_STYLES = {
 export default function ProjectDetailPage() {
   const { projectId } = useParams();
   const [zoomMatSrc, setZoomMatSrc] = useState(null);
-  const navigate = useNavigate();
   const projects = useProjectStore((s) => s.projects);
   const currentProject = useProjectStore((s) => s.currentProject);
   const setCurrentProject = useProjectStore((s) => s.setCurrentProject);
@@ -68,9 +67,8 @@ export default function ProjectDetailPage() {
   if (!currentProject) return <div className="p-8 text-sm text-ink-400">Project not found.</div>;
 
   const handleAddBatch = (type) => {
-    const batch = createBatch(projectId, type);
+    createBatch(projectId, type);
     setShowAddBatch(false);
-    navigate(`/projects/${projectId}/batches/${batch.id}/defaults`);
   };
 
   const handleDeleteBatch = (batchId) => {
@@ -220,8 +218,6 @@ export default function ProjectDetailPage() {
                 <span>Frame: <strong className="text-ink-100">{batch.defaults?.frameType}</strong></span>
                 {batch.type === 'sash' && <span>Horns: <strong className="text-ink-100">{batch.defaults?.hornType}</strong></span>}
                 <span>PAS24: <strong className="text-ink-100">{batch.defaults?.pas24 ? 'Yes' : 'No'}</strong></span>
-                <Link to={`/projects/${projectId}/batches/${batch.id}/defaults`}
-                  className="text-accent-400 hover:text-accent-300 ml-auto transition-colors">Edit defaults</Link>
               </div>
 
               {/* Windows */}

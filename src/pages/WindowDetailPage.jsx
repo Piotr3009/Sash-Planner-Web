@@ -469,7 +469,7 @@ function BOMPanel({ item, windowSpec, settings, derived, batch }) {
                         {g.product.jc_uuid && <span className="text-[8px] px-1 py-0.5 rounded bg-amber-600/15 text-amber-500 border border-amber-500/25">JC</span>}
                       </>
                     ) : (
-                      <span>{g.line.item} — go to Batch Defaults to assign</span>
+                      <span>{g.line.item} — unassigned</span>
                     )}
                   </div>
                 </div>

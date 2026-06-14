@@ -1,7 +1,7 @@
 /**
  * config.js — Single source of truth for all shared window options.
  *
- * Shared across: BatchDefaultsPage, ConfiguratorPage, 3D App, specification.js, windowSpecToConfig.js
+ * Shared across: ConfiguratorPage, 3D App, specification.js, windowSpecToConfig.js
  * Per-type options (sash horns, casement layouts, door styles) stay in their respective files.
  */
 
