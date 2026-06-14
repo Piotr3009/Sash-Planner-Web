@@ -92,7 +92,7 @@ export const useEstimateStore = create((set, get) => ({
   },
 
   // ─── WINDOW ITEMS (inside an estimate) ───
-  // Each item: { id, windowName, quantity, config, pricing, price:{unitPrice,totalPrice,breakdown} }.
+  // Each item: { id, windowName, config, pricing, price:{unitPrice,totalPrice,breakdown} }.
   // After any change we recompute totals and persist the whole estimate.
   addItem: (estimateId, item) => {
     const e = get().estimates.find((x) => x.id === estimateId);

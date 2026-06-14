@@ -383,7 +383,7 @@ export default function EstimateConfiguratorPage() {
             )}
           </Sec>
 
-          <Sec t="Hardware extras">
+          <Sec t="Horns & security">
             <Lbl>Horns</Lbl><HChips o={HORN_OPTIONS} v={horn} c={setHorn} />
             <label className="flex items-center gap-2 text-xs text-ink-400 mt-1.5 cursor-pointer"><input type="checkbox" checked={pas24} onChange={(e) => setPas24(e.target.checked)} className="accent-accent-500" />PAS24 security</label>
           </Sec>
