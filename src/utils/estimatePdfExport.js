@@ -114,17 +114,24 @@ export function exportEstimatePdf(estimate, opts = {}) {
     y += 12;
 
     const drawingTop = y;
-    // 2D drawing (left)
+    const IMG_W = 85, IMG_H = 50;
+    // 2D drawing (left, top)
     try {
       const windowSpec = normaliseToWindowSpec({
         ...c, width: c.extWidth, height: c.extHeight, name: it.windowName, id: it.id, quantity: 1,
       });
       const dataUrl = renderDrawingToDataURL(windowSpec, settings);
-      doc.addImage(dataUrl, 'PNG', MARGIN, y, 85, 64);
+      doc.addImage(dataUrl, 'PNG', MARGIN, y, IMG_W, IMG_H);
     } catch (e) {
       doc.setTextColor(150, 150, 150); doc.setFontSize(8);
-      doc.text('(drawing unavailable)', MARGIN, y + 30);
+      doc.text('(drawing unavailable)', MARGIN, y + 24);
     }
+    // 3D render (left, below 2D) — only when a screenshot was captured for this window
+    const shot = opts.screenshots && opts.screenshots[it.id];
+    if (shot) {
+      try { doc.addImage(shot, 'PNG', MARGIN, y + IMG_H + 4, IMG_W, IMG_H); } catch { /* ignore */ }
+    }
+    const leftColH = shot ? (IMG_H * 2 + 4) : IMG_H;
 
     // Spec table (right)
     const isBespoke = !!c.ironmongeryBespoke;
@@ -151,7 +158,7 @@ export function exportEstimatePdf(estimate, opts = {}) {
       columnStyles: { 0: { textColor: [110, 110, 110], cellWidth: 32 }, 1: { fontStyle: 'bold' } },
     });
 
-    y = Math.max(drawingTop + 64, doc.lastAutoTable.finalY) + 8;
+    y = Math.max(drawingTop + leftColH, doc.lastAutoTable.finalY) + 8;
   });
 
   // ─── SUMMARY ───

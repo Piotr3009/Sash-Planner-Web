@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useEstimateStore } from '../stores/estimateStore.js';
 import { useClientStore } from '../stores/clientStore.js';
 import { useProjectStore } from '../stores/projectStore.js';
-import { exportEstimatePdf } from '../utils/estimatePdfExport.js';
 import { moveToProduction, planProduction } from '../utils/moveToProduction.js';
+import EstimatePdfBuilder from '../components/EstimatePdfBuilder.jsx';
 import EstimateFormModal from '../components/estimates/EstimateFormModal.jsx';
 
 const STATUSES = ['draft', 'sent', 'won', 'lost'];
@@ -34,6 +34,7 @@ export default function EstimatesPage() {
   const [modal, setModal] = useState(null);          // null | {} (new) | estimate (edit)
   const [confirmArchive, setConfirmArchive] = useState(null);
   const [confirmMove, setConfirmMove] = useState(null);
+  const [pdfJob, setPdfJob] = useState(null); // estimate currently being exported to PDF
 
   const handleMove = () => {
     const e = confirmMove;
@@ -115,7 +116,7 @@ export default function EstimatesPage() {
                           <button className="text-accent-400 hover:text-accent-300 font-semibold mr-4 transition-colors" onClick={() => setConfirmMove(e)}>→ Move to production</button>
                         ) : null}
                         <button className="text-accent-400 hover:text-accent-300 font-medium mr-4 transition-colors" onClick={() => navigate(`/estimates/${e.id}/configure`)}>Configure</button>
-                        <button className="text-ink-300 hover:text-accent-400 mr-4 transition-colors" onClick={() => exportEstimatePdf(e, { company, pdfSettings, settings: {}, clientName: clientName(e.client_id) })}>PDF</button>
+                        <button className="text-ink-300 hover:text-accent-400 mr-4 transition-colors disabled:opacity-50" disabled={!!pdfJob} onClick={() => setPdfJob(e)}>{pdfJob?.id === e.id ? 'Generating…' : 'PDF'}</button>
                         <button className="text-ink-300 hover:text-accent-400 mr-4 transition-colors" onClick={() => setModal(e)}>Edit</button>
                         <button className="text-ink-300 hover:text-red-400 transition-colors" onClick={() => setConfirmArchive(e)}>Archive</button>
                       </td>
@@ -137,6 +138,14 @@ export default function EstimatesPage() {
             else addEstimate(data);
             setModal(null);
           }}
+        />
+      )}
+
+      {pdfJob && (
+        <EstimatePdfBuilder
+          estimate={pdfJob}
+          opts={{ company, pdfSettings, settings: {}, clientName: clientName(pdfJob.client_id) }}
+          onDone={() => setPdfJob(null)}
         />
       )}
 
