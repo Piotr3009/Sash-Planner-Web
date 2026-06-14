@@ -4,6 +4,7 @@ import { useEstimateStore } from '../stores/estimateStore.js';
 import { useClientStore } from '../stores/clientStore.js';
 import { useProjectStore } from '../stores/projectStore.js';
 import { exportEstimatePdf } from '../utils/estimatePdfExport.js';
+import { moveToProduction, planProduction } from '../utils/moveToProduction.js';
 import EstimateFormModal from '../components/estimates/EstimateFormModal.jsx';
 
 const STATUSES = ['draft', 'sent', 'won', 'lost'];
@@ -25,10 +26,24 @@ export default function EstimatesPage() {
   const clients = useClientStore((s) => s.clients);
   const pdfSettings = useEstimateStore((s) => s.pdfSettings);
   const company = useProjectStore((s) => s.settings.company || {});
+  const createProject = useProjectStore((s) => s.createProject);
+  const createBatch = useProjectStore((s) => s.createBatch);
+  const addWindowToBatch = useProjectStore((s) => s.addWindowToBatch);
   const navigate = useNavigate();
 
   const [modal, setModal] = useState(null);          // null | {} (new) | estimate (edit)
   const [confirmArchive, setConfirmArchive] = useState(null);
+  const [confirmMove, setConfirmMove] = useState(null);
+
+  const handleMove = () => {
+    const e = confirmMove;
+    if (!e) return;
+    const project = moveToProduction(e, {
+      createProject, createBatch, addWindowToBatch, updateEstimate, clientName: clientName(e.client_id),
+    });
+    setConfirmMove(null);
+    if (project) navigate(`/projects/${project.id}`);
+  };
 
   const clientName = (id) => {
     if (!id) return null;
@@ -94,6 +109,11 @@ export default function EstimatesPage() {
                       <td className="px-4 py-3 text-right text-ink-200">{fmtMoney(e.totals?.ex_vat)}</td>
                       <td className="px-4 py-3 text-ink-400">{fmtDate(e.created_at)}</td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
+                        {e.project_id ? (
+                          <button className="text-green-400 hover:text-green-300 font-medium mr-4 transition-colors" onClick={() => navigate(`/projects/${e.project_id}`)}>View project →</button>
+                        ) : e.status === 'won' ? (
+                          <button className="text-accent-400 hover:text-accent-300 font-semibold mr-4 transition-colors" onClick={() => setConfirmMove(e)}>→ Move to production</button>
+                        ) : null}
                         <button className="text-accent-400 hover:text-accent-300 font-medium mr-4 transition-colors" onClick={() => navigate(`/estimates/${e.id}/configure`)}>Configure</button>
                         <button className="text-ink-300 hover:text-accent-400 mr-4 transition-colors" onClick={() => exportEstimatePdf(e, { company, pdfSettings, settings: {}, clientName: clientName(e.client_id) })}>PDF</button>
                         <button className="text-ink-300 hover:text-accent-400 mr-4 transition-colors" onClick={() => setModal(e)}>Edit</button>
@@ -119,6 +139,25 @@ export default function EstimatesPage() {
           }}
         />
       )}
+
+      {confirmMove && (() => {
+        const plan = planProduction(confirmMove);
+        return (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={() => setConfirmMove(null)}>
+            <div className="absolute inset-0 bg-black/60" />
+            <div className="relative bg-surface-800 border border-surface-500 rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <div className="text-sm font-semibold text-ink-50 mb-2">Move to production?</div>
+              <div className="text-xs text-ink-300 mb-4">
+                Creates project <span className="text-ink-100 font-medium">“{confirmMove.title || confirmMove.estimate_number}”</span> with <span className="text-ink-100 font-medium">{plan.windowCount}</span> window{plan.windowCount === 1 ? '' : 's'} grouped into <span className="text-ink-100 font-medium">{plan.batchCount}</span> batch{plan.batchCount === 1 ? '' : 'es'} by type. Continue?
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setConfirmMove(null)} className="btn btn-secondary text-xs px-4">Cancel</button>
+                <button onClick={handleMove} className="btn btn-primary text-xs px-4">Create project</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {confirmArchive && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={() => setConfirmArchive(null)}>

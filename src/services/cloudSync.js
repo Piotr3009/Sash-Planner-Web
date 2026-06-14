@@ -456,6 +456,7 @@ function dbEstimateToMem(e) {
     totals: e.totals || { ex_vat: 0, vat: 0, inc_vat: 0 },
     notes: e.notes || '',
     archived: !!e.archived,
+    project_id: e.project_id || null,
     created_at: e.created_at,
   };
 }
@@ -473,6 +474,7 @@ function memEstimateToDb(e, tenantId, createdBy) {
     totals: e.totals || {},
     notes: e.notes || null,
     archived: !!e.archived,
+    project_id: e.project_id || null,
     updated_at: new Date().toISOString(),
   };
 }
