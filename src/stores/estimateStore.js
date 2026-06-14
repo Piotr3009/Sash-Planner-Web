@@ -45,6 +45,10 @@ export const useEstimateStore = create((set, get) => ({
   pricingSettings: null,
   pricingLoaded: false,
 
+  // Tenant estimate-PDF settings (accent colour, terms, payment terms).
+  pdfSettings: null,
+  pdfLoaded: false,
+
   setEstimates: (estimates) => set({ estimates, estimatesLoaded: true }),
 
   // Resolve an estimate by id (helper for detail page). Not a getter.
@@ -129,14 +133,28 @@ export const useEstimateStore = create((set, get) => ({
     set({ pricingSettings: config || null, pricingLoaded: true });
   },
 
+  // ─── ESTIMATE PDF SETTINGS ───
+  setPdfSettings: (s) => set({ pdfSettings: s, pdfLoaded: true }),
+
+  savePdfSettings: (s) => {
+    set({ pdfSettings: s });
+    cloud.saveEstimatePdfSettings(s);
+  },
+
+  loadPdfFromCloud: async () => {
+    const s = await cloud.loadEstimatePdfSettings();
+    set({ pdfSettings: s || null, pdfLoaded: true });
+  },
+
   // ─── CLOUD ───
   loadFromCloud: async () => {
     const data = await cloud.loadEstimates();
     if (data) set({ estimates: data, estimatesLoaded: true });
     else set({ estimatesLoaded: true });
-    // Pricing rates are part of the estimates module — load them together.
+    // Pricing rates + PDF settings are part of the estimates module — load together.
     get().loadPricingFromCloud();
+    get().loadPdfFromCloud();
   },
 
-  clearAll: () => set({ estimates: [], estimatesLoaded: false, pricingSettings: null, pricingLoaded: false }),
+  clearAll: () => set({ estimates: [], estimatesLoaded: false, pricingSettings: null, pricingLoaded: false, pdfSettings: null, pdfLoaded: false }),
 }));

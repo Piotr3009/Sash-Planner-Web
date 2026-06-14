@@ -5,6 +5,8 @@ import { useMaterialStore } from '../stores/materialStore.js';
 import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
 import { useMaterialAssignmentStore } from '../stores/materialAssignmentStore.js';
 import { useAuthStore } from '../stores/authStore.js';
+import { useEstimateStore } from '../stores/estimateStore.js';
+import { DEFAULT_PRICING, resolvePricing } from '../engine/pricing.js';
 import * as cloud from '../services/cloudSync.js';
 
 // Placeholder pricing — PC's usage-based model isn't finalised. Edit here when set.
@@ -24,6 +26,8 @@ const CURRENCIES = [
 const TABS = [
   { id: 'account', label: 'Account' },
   { id: 'company', label: 'Company', admin: true },
+  { id: 'pricing', label: 'Pricing', admin: true },
+  { id: 'estimate_pdf', label: 'Estimate PDF', admin: true },
   { id: 'billing', label: 'Billing' },
   { id: 'data',    label: 'Your Data' },
   { id: 'about',   label: 'About' },
@@ -62,6 +66,8 @@ export default function SettingsPage() {
       <main className="max-w-[820px] mx-auto p-6">
         {tab === 'account' && <AccountTab />}
         {tab === 'company' && <CompanyTab />}
+        {tab === 'pricing' && <PricingTab />}
+        {tab === 'estimate_pdf' && <EstimatePdfTab />}
         {tab === 'billing' && <BillingTab />}
         {tab === 'data' && <DataTab />}
         {tab === 'about' && <AboutTab />}
@@ -404,6 +410,189 @@ function AboutTab() {
 // ─────────────────────────────────────────────────────────────
 // Shared bits
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// PRICING (admin) — tenant pricing rates for estimates
+// ─────────────────────────────────────────────────────────────
+function PricingTab() {
+  const pricingSettings = useEstimateStore((s) => s.pricingSettings);
+  const pricingLoaded = useEstimateStore((s) => s.pricingLoaded);
+  const loadPricing = useEstimateStore((s) => s.loadPricingFromCloud);
+  const savePricing = useEstimateStore((s) => s.savePricingSettings);
+
+  // Full config (defaults + tenant overrides) so every field has a value.
+  const [p, setP] = useState(() => ({ ...resolvePricing(pricingSettings || {}) }));
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => { if (!pricingLoaded) loadPricing(); }, [pricingLoaded, loadPricing]);
+  // Re-seed once cloud values arrive (only if user hasn't started editing — simple: reseed on load flip)
+  useEffect(() => { if (pricingLoaded) setP({ ...resolvePricing(pricingSettings || {}) }); }, [pricingLoaded]); // eslint-disable-line
+
+  const set = (key, v) => setP((prev) => ({ ...prev, [key]: v }));
+  const setIn = (key, sub, v) => setP((prev) => ({ ...prev, [key]: { ...prev[key], [sub]: v } }));
+  const setMul = (idx, v) => setP((prev) => ({ ...prev, sizeMultipliers: prev.sizeMultipliers.map((t, i) => (i === idx ? { ...t, multiplier: v } : t)) }));
+
+  const save = () => { savePricing(p); setSaved(true); setTimeout(() => setSaved(false), 2000); };
+  const resetDefaults = () => setP({ ...DEFAULT_PRICING });
+
+  return (
+    <div className="space-y-5">
+      <div className="text-xs text-ink-400 bg-surface-700/40 border border-surface-500 rounded-lg px-4 py-3">
+        These rates drive every estimate price. They start from the Prime Sash defaults; change any value and save — your rates apply from the next price calculation.
+      </div>
+
+      <Section title="Sash — base price (per m²)">
+        <div className="grid grid-cols-2 gap-4">
+          <NumF label="Double hung" value={p.basePricePerSqm} onChange={(v) => set('basePricePerSqm', v)} hint="size multiplier applies" />
+          <NumF label="Triple sash" value={p.triplePricePerSqm} onChange={(v) => set('triplePricePerSqm', v)} hint="flat (no degression)" />
+        </div>
+      </Section>
+
+      <Section title="Size multipliers (bigger window → cheaper per m²)">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {p.sizeMultipliers.map((t, i) => (
+            <NumF key={i} prefix="×" step={0.01} label={t.maxSqm >= 999 ? '> 3.0 m²' : `≤ ${t.maxSqm} m²`} value={t.multiplier} onChange={(v) => setMul(i, v)} />
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Georgian bars">
+        <NumF label="Price per bar" value={p.pricePerBar} onChange={(v) => set('pricePerBar', v)} hint="6×6 = 5 bars/sash" />
+      </Section>
+
+      <Section title="Glass (surcharges)">
+        <div className="grid grid-cols-2 gap-4">
+          <NumF label="Triple glazing" value={p.glassTypes.triple} onChange={(v) => setIn('glassTypes', 'triple', v)} />
+          <NumF label="Passive glazing" value={p.glassTypes.passive} onChange={(v) => setIn('glassTypes', 'passive', v)} />
+          <NumF label="Laminated (per m²)" value={p.glassSpec.laminated} onChange={(v) => setIn('glassSpec', 'laminated', v)} />
+          <NumF label="Frosted" value={p.glassFinish.frosted} onChange={(v) => setIn('glassFinish', 'frosted', v)} />
+        </div>
+      </Section>
+
+      <Section title="Opening (price change — negative = discount)">
+        <div className="grid grid-cols-2 gap-4">
+          <NumF label="Bottom only" value={p.openingTypes.bottom} onChange={(v) => setIn('openingTypes', 'bottom', v)} />
+          <NumF label="Fixed" value={p.openingTypes.fixed} onChange={(v) => setIn('openingTypes', 'fixed', v)} />
+        </div>
+      </Section>
+
+      <Section title="Colour & head (% of subtotal)">
+        <div className="grid grid-cols-3 gap-4">
+          <PctF label="Single non-white" value={p.colorSingleNonWhite} onChange={(v) => set('colorSingleNonWhite', v)} />
+          <PctF label="Dual colour" value={p.colorDual} onChange={(v) => set('colorDual', v)} />
+          <PctF label="Arched head" value={p.archedHead} onChange={(v) => set('archedHead', v)} />
+        </div>
+      </Section>
+
+      <Section title="Other window types — base rate (per m²)">
+        <div className="grid grid-cols-3 gap-4">
+          <NumF label="Casement" value={p.casement.basePricePerSqm} onChange={(v) => setIn('casement', 'basePricePerSqm', v)} />
+          <NumF label="Fix (rectangle)" value={p.fix.rectanglePerSqm} onChange={(v) => setIn('fix', 'rectanglePerSqm', v)} />
+          <NumF label="Door" value={p.door.basePerSqm} onChange={(v) => setIn('door', 'basePerSqm', v)} />
+        </div>
+        <div className="text-[10px] text-ink-500 mt-1">Detailed casement/door options (mullions, layouts, sliding rates…) keep the defaults; editable later.</div>
+      </Section>
+
+      <Section title="VAT">
+        <PctF label="VAT rate" value={p.vatRate} onChange={(v) => set('vatRate', v)} />
+      </Section>
+
+      <div className="flex items-center gap-3">
+        <button className="btn btn-primary text-sm" onClick={save}>Save pricing</button>
+        <button className="text-sm px-3 py-1.5 rounded-lg border border-surface-500 text-ink-300 hover:text-ink-100" onClick={resetDefaults}>Reset to defaults</button>
+        {saved && <span className="text-xs text-green-400">Saved ✓</span>}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// ESTIMATE PDF (admin) — branding for the customer-facing quote PDF
+// ─────────────────────────────────────────────────────────────
+function EstimatePdfTab() {
+  const company = useProjectStore((s) => s.settings.company || {});
+  const pdfSettings = useEstimateStore((s) => s.pdfSettings);
+  const pdfLoaded = useEstimateStore((s) => s.pdfLoaded);
+  const loadPdf = useEstimateStore((s) => s.loadPdfFromCloud);
+  const savePdf = useEstimateStore((s) => s.savePdfSettings);
+
+  const [accent, setAccent] = useState(pdfSettings?.accent_color || '#0A1628');
+  const [terms, setTerms] = useState(pdfSettings?.terms_text || '');
+  const [payment, setPayment] = useState(pdfSettings?.payment_terms || '');
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => { if (!pdfLoaded) loadPdf(); }, [pdfLoaded, loadPdf]);
+  useEffect(() => {
+    if (pdfLoaded) {
+      setAccent(pdfSettings?.accent_color || '#0A1628');
+      setTerms(pdfSettings?.terms_text || '');
+      setPayment(pdfSettings?.payment_terms || '');
+    }
+  }, [pdfLoaded]); // eslint-disable-line
+
+  const save = () => { savePdf({ accent_color: accent, terms_text: terms.trim(), payment_terms: payment.trim() }); setSaved(true); setTimeout(() => setSaved(false), 2000); };
+
+  return (
+    <div className="space-y-5">
+      <Section title="Branding">
+        <Label>Logo</Label>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-[100px] h-[50px] rounded-lg border border-dashed border-surface-500 bg-surface-900 flex items-center justify-center overflow-hidden shrink-0">
+            {company.logo ? <img src={company.logo} alt="logo" className="max-w-full max-h-full object-contain" /> : <span className="text-[10px] text-ink-400">No logo</span>}
+          </div>
+          <span className="text-xs text-ink-400">Reused from the <b className="text-ink-200">Company</b> tab — set it there.</span>
+        </div>
+        <Label>Accent colour (cover + section headers)</Label>
+        <div className="flex items-center gap-3">
+          <input type="color" value={accent} onChange={(e) => setAccent(e.target.value)} className="w-10 h-10 rounded border border-surface-500 bg-transparent cursor-pointer" />
+          <input className="input text-sm w-32 font-mono" value={accent} onChange={(e) => setAccent(e.target.value)} />
+        </div>
+      </Section>
+
+      <Section title="Payment terms">
+        <textarea className="input text-sm w-full" rows={3} value={payment} onChange={(e) => setPayment(e.target.value)} placeholder="e.g. 50% deposit on order, 50% balance on completion. Delivery 4–5 weeks." />
+        <div className="text-[10px] text-ink-500 mt-1">Printed above the terms in every estimate PDF.</div>
+      </Section>
+
+      <Section title="Terms & conditions">
+        <textarea className="input text-sm w-full" rows={6} value={terms} onChange={(e) => setTerms(e.target.value)} placeholder="Your full terms — printed on the estimate PDF." />
+      </Section>
+
+      <div className="flex items-center gap-3">
+        <button className="btn btn-primary text-sm" onClick={save}>Save</button>
+        {saved && <span className="text-xs text-green-400">Saved ✓</span>}
+      </div>
+    </div>
+  );
+}
+
+function NumF({ label, value, onChange, prefix = '£', step = 1, hint }) {
+  return (
+    <div>
+      <Label>{label}</Label>
+      <div className="flex items-center gap-1.5">
+        <span className="text-ink-400 text-sm w-3">{prefix}</span>
+        <input type="number" step={step} className="input text-sm w-24" value={value}
+          onChange={(e) => onChange(e.target.value === '' ? 0 : Number(e.target.value))} />
+        {hint && <span className="text-[10px] text-ink-500 leading-tight">{hint}</span>}
+      </div>
+    </div>
+  );
+}
+
+function PctF({ label, value, onChange }) {
+  // value is a fraction (0.20) shown as percent (20)
+  return (
+    <div>
+      <Label>{label}</Label>
+      <div className="flex items-center gap-1.5">
+        <input type="number" step={1} className="input text-sm w-20" value={Math.round((Number(value) || 0) * 100)}
+          onChange={(e) => onChange((e.target.value === '' ? 0 : Number(e.target.value)) / 100)} />
+        <span className="text-ink-400 text-sm">%</span>
+      </div>
+    </div>
+  );
+}
+
 function Section({ title, children, danger }) {
   return (
     <div className="card p-5">

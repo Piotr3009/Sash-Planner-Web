@@ -519,3 +519,29 @@ export async function savePricingSettings(config) {
     tenant_id: tenantId, config: config || {}, updated_at: new Date().toISOString(),
   }, { onConflict: 'tenant_id' }), 'savePricingSettings');
 }
+
+// ─────────────────────────────────────────────────────────────
+// ESTIMATE PDF SETTINGS — one row per tenant (accent colour, terms, payment).
+// Logo is reused from settings.company (not stored here).
+// ─────────────────────────────────────────────────────────────
+export async function loadEstimatePdfSettings() {
+  if (!enabled()) return null;
+  const tenantId = await currentTenantId();
+  if (!tenantId) return null;
+  const { data, error } = await supabase.from('estimate_pdf_settings')
+    .select('accent_color, terms_text, payment_terms').eq('tenant_id', tenantId).maybeSingle();
+  if (error) { console.error('loadEstimatePdfSettings', error); return null; }
+  return data || null;
+}
+export async function saveEstimatePdfSettings(s) {
+  if (!enabled()) return;
+  const tenantId = await currentTenantId();
+  if (!tenantId) return;
+  bg(supabase.from('estimate_pdf_settings').upsert({
+    tenant_id: tenantId,
+    accent_color: s.accent_color || '#0A1628',
+    terms_text: s.terms_text || null,
+    payment_terms: s.payment_terms || null,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'tenant_id' }), 'saveEstimatePdfSettings');
+}
