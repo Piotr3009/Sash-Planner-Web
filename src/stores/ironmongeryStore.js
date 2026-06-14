@@ -27,9 +27,23 @@ export const IRONMONGERY_CATEGORIES = [
   { key: 'trickleVents', label: 'Trickle Vents', windowType: 'sash' },
 ];
 
+// Ironmongery finishes — single source of truth, matching PSW exactly so
+// Materials, the estimate matrix and PSW all line up. (Bespoke lives only in
+// the estimate as an escape hatch; it is not a catalogue finish.)
 export const IRONMONGERY_FINISHES = [
-  'brass', 'chrome', 'stainless', 'antique brass', 'black', 'white', 'satin', 'other',
+  { value: 'chrome', label: 'Chrome' },
+  { value: 'satin', label: 'Satin' },
+  { value: 'brass', label: 'Brass (Gold)' },
+  { value: 'antique-brass', label: 'Antique Brass' },
+  { value: 'black', label: 'Black' },
+  { value: 'white', label: 'White' },
 ];
+
+// Swatch colour for each finish (UI dots in the matrix / pickers).
+export const FINISH_SWATCH = {
+  chrome: '#C0C0C8', satin: '#B8B0A0', brass: '#C8A24B',
+  'antique-brass': '#8A7A55', black: '#2A2A2A', white: '#F0F0F0',
+};
 
 export const useIronmongeryStore = create((set, get) => ({
       items: [],

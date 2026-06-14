@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useIronmongeryStore, IRONMONGERY_CATEGORIES } from '../stores/ironmongeryStore.js';
+import { useIronmongeryStore, IRONMONGERY_CATEGORIES, IRONMONGERY_FINISHES } from '../stores/ironmongeryStore.js';
 
 const IRONMONGERY_UNITS = ['pcs', 'pair', 'set', 'unit'];
 
@@ -90,7 +90,10 @@ function ItemFormModal({ material, activeCategory, onSave, onCancel }) {
             </div>
             <div>
               <label className="text-[10px] text-ink-400 uppercase tracking-wider block mb-1">Color / Finish</label>
-              <input className="input text-xs w-full" value={form.color} onChange={(e) => update('color', e.target.value)} placeholder="e.g. PVD Brass" />
+              <select className="input text-xs w-full" value={form.color} onChange={(e) => update('color', e.target.value)}>
+                <option value="">— Select —</option>
+                {IRONMONGERY_FINISHES.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+              </select>
             </div>
           </div>
 
