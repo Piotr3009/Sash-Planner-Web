@@ -52,7 +52,7 @@ export default function IronmongeryMatrixModal({ currentSlots = {}, currentBespo
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60" />
-      <div className="relative bg-surface-800 border border-surface-500 rounded-xl w-[95vw] max-w-6xl shadow-xl max-h-[92vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="relative bg-surface-800 border border-surface-500 rounded-xl w-[97vw] max-w-7xl shadow-xl max-h-[92vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="px-6 py-4 border-b border-surface-500 shrink-0 flex items-center justify-between">
           <div className="text-base font-semibold text-ink-50">Select ironmongery</div>
@@ -61,7 +61,7 @@ export default function IronmongeryMatrixModal({ currentSlots = {}, currentBespo
 
         {/* Grid */}
         <div className={`px-6 py-4 overflow-auto ${bespoke ? 'opacity-40 pointer-events-none' : ''}`}>
-          <table className="w-full border-collapse text-[11px] min-w-[820px]">
+          <table className="w-full border-collapse text-[11px] min-w-[980px]">
             <thead>
               <tr>
                 <th className="text-left py-2 px-2 text-ink-400 font-medium sticky left-0 bg-surface-800"></th>
@@ -87,17 +87,17 @@ export default function IronmongeryMatrixModal({ currentSlots = {}, currentBespo
                           <td key={c.key} className="text-center py-2 px-1.5 align-top">
                             {p ? (
                               <button onClick={() => pickCell(c.key, p)} className="block mx-auto group" title={p.name}>
-                                <div className={`relative w-14 h-14 mx-auto rounded-md overflow-hidden border-2 transition-colors ${sel ? 'border-accent-500' : 'border-surface-500 group-hover:border-surface-400'} bg-surface-700`}>
+                                <div className={`relative w-24 h-24 mx-auto rounded-md overflow-hidden border-2 transition-colors ${sel ? 'border-accent-500' : 'border-surface-500 group-hover:border-surface-400'} bg-surface-700`}>
                                   {p.image_url
                                     ? <img src={p.image_url} alt="" className="w-full h-full object-cover" />
-                                    : <div className="w-full h-full flex items-center justify-center text-ink-500 text-lg">+</div>}
-                                  {sel && <span className="absolute -top-1.5 -right-1.5 w-[18px] h-[18px] rounded-full bg-accent-500 text-white text-[10px] leading-[18px] text-center shadow">✓</span>}
+                                    : <div className="w-full h-full flex items-center justify-center text-ink-500 text-3xl">+</div>}
+                                  {sel && <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-accent-500 text-white text-[11px] leading-5 text-center shadow">✓</span>}
                                 </div>
-                                <div className="text-[9px] text-ink-400 mt-1 truncate max-w-[60px] mx-auto">{p.name}</div>
-                                {p.cost_per_unit > 0 && <div className="text-[9px] text-ink-500">{fmt(p.cost_per_unit)}{c.key === 'other' ? '*' : ''}</div>}
+                                <div className="text-[10px] text-ink-400 mt-1 truncate max-w-[96px] mx-auto">{p.name}</div>
+                                {p.cost_per_unit > 0 && <div className="text-[10px] text-ink-500">{fmt(p.cost_per_unit)}{c.key === 'other' ? '*' : ''}</div>}
                               </button>
                             ) : (
-                              <span className="text-ink-600 inline-block pt-5">—</span>
+                              <span className="text-ink-600 inline-block pt-10">—</span>
                             )}
                           </td>
                         );
