@@ -1,5 +1,16 @@
 import { create } from 'zustand';
 import * as cloud from '../services/cloudSync.js';
+import { resolvePricing } from '../engine/pricing.js';
+
+// Recompute cached money totals from the window items. VAT rate comes from the
+// tenant's pricing config (falls back to DEFAULT_PRICING via resolvePricing).
+function recomputeTotals(items, pricingConfig) {
+  const vatRate = resolvePricing(pricingConfig).vatRate;
+  const exVat = (items || []).reduce((sum, it) => sum + Number(it?.price?.totalPrice || 0), 0);
+  const vat = exVat * vatRate;
+  const round = (n) => Math.round(n * 100) / 100;
+  return { ex_vat: round(exVat), vat: round(vat), inc_vat: round(exVat + vat) };
+}
 
 const uid = () =>
   (typeof crypto !== 'undefined' && crypto.randomUUID)
@@ -74,6 +85,35 @@ export const useEstimateStore = create((set, get) => ({
     const e = get().estimates.find((x) => x.id === id);
     if (e) cloud.saveEstimate({ ...e, archived: true });
     set((s) => ({ estimates: s.estimates.filter((x) => x.id !== id) }));
+  },
+
+  // ─── WINDOW ITEMS (inside an estimate) ───
+  // Each item: { id, windowName, quantity, config, pricing, price:{unitPrice,totalPrice,breakdown} }.
+  // After any change we recompute totals and persist the whole estimate.
+  addItem: (estimateId, item) => {
+    const e = get().estimates.find((x) => x.id === estimateId);
+    if (!e) return null;
+    const withId = { id: item.id || uid(), ...item };
+    const items = [...(e.items || []), withId];
+    const totals = recomputeTotals(items, get().pricingSettings);
+    get().updateEstimate(estimateId, { items, totals });
+    return withId;
+  },
+
+  updateItem: (estimateId, itemId, patch) => {
+    const e = get().estimates.find((x) => x.id === estimateId);
+    if (!e) return;
+    const items = (e.items || []).map((it) => (it.id === itemId ? { ...it, ...patch } : it));
+    const totals = recomputeTotals(items, get().pricingSettings);
+    get().updateEstimate(estimateId, { items, totals });
+  },
+
+  removeItem: (estimateId, itemId) => {
+    const e = get().estimates.find((x) => x.id === estimateId);
+    if (!e) return;
+    const items = (e.items || []).filter((it) => it.id !== itemId);
+    const totals = recomputeTotals(items, get().pricingSettings);
+    get().updateEstimate(estimateId, { items, totals });
   },
 
   // ─── PRICING SETTINGS ───

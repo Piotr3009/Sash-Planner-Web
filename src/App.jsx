@@ -17,6 +17,7 @@ import { useAuthStore } from './stores/authStore.js';
 // Without this, static imports pull ~2MB of 3D code into the main bundle,
 // causing WebGL Context Lost on first Canvas mount from cold start.
 const ConfiguratorPage = lazy(() => import('./pages/ConfiguratorPage.jsx'));
+const EstimateConfiguratorPage = lazy(() => import('./pages/EstimateConfiguratorPage.jsx'));
 const WindowDetailPage = lazy(() => import('./pages/WindowDetailPage.jsx'));
 const ProductionPackPage = lazy(() => import('./pages/ProductionPackPage.jsx'));
 // Post-login splash (pulls in 3D deps, so lazy-load it like the other 3D pages).
@@ -74,6 +75,9 @@ export default function App() {
         } />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="estimates" element={<EstimatesPage />} />
+        <Route path="estimates/:estimateId/configure" element={
+          <Suspense fallback={<PageLoading />}><EstimateConfiguratorPage /></Suspense>
+        } />
         <Route path="clients" element={<ClientsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="materials" element={<MaterialsPage />} />

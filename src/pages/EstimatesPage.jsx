@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useEstimateStore } from '../stores/estimateStore.js';
 import { useClientStore } from '../stores/clientStore.js';
 import EstimateFormModal from '../components/estimates/EstimateFormModal.jsx';
@@ -20,6 +21,7 @@ export default function EstimatesPage() {
   const setStatus = useEstimateStore((s) => s.setStatus);
   const archiveEstimate = useEstimateStore((s) => s.archiveEstimate);
   const clients = useClientStore((s) => s.clients);
+  const navigate = useNavigate();
 
   const [modal, setModal] = useState(null);          // null | {} (new) | estimate (edit)
   const [confirmArchive, setConfirmArchive] = useState(null);
@@ -88,6 +90,7 @@ export default function EstimatesPage() {
                       <td className="px-4 py-3 text-right text-ink-200">{fmtMoney(e.totals?.ex_vat)}</td>
                       <td className="px-4 py-3 text-ink-400">{fmtDate(e.created_at)}</td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <button className="text-accent-400 hover:text-accent-300 font-medium mr-4 transition-colors" onClick={() => navigate(`/estimates/${e.id}/configure`)}>Configure</button>
                         <button className="text-ink-300 hover:text-accent-400 mr-4 transition-colors" onClick={() => setModal(e)}>Edit</button>
                         <button className="text-ink-300 hover:text-red-400 transition-colors" onClick={() => setConfirmArchive(e)}>Archive</button>
                       </td>
