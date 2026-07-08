@@ -29,13 +29,18 @@ function detectGridMode(spec, item) {
 }
 
 function customBarsFromSpec(spec, item) {
-  // New format: item stores custom bars directly as arrays of {type, position}
+  // New format: item stores custom bars directly as arrays of {type, mm}
+  // (legacy entries may still carry {type, position} — accept both).
   const uCustom = item?.upperCustomBars || [];
   const lCustom = item?.lowerCustomBars || [];
   if (Array.isArray(uCustom) && uCustom.length > 0) {
+    const positions = (list, type) => list
+      .filter(b => b && b.type === type)
+      .map(b => Number(b.mm ?? b.position))
+      .filter((n) => Number.isFinite(n) && n > 0);
     return {
-      vertical: uCustom.filter(b => b.type === 'v').map(b => b.position),
-      horizontal: uCustom.filter(b => b.type === 'h').map(b => b.position),
+      vertical: positions(uCustom, 'v'),
+      horizontal: positions(uCustom, 'h'),
     };
   }
   // Old format from spec

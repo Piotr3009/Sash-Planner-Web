@@ -81,10 +81,27 @@ export function windowSpecToConfig(windowSpec) {
   const gridMode = windowSpec.sash?.grid?.mode || 'none';
   const barsValue = gridMode === 'custom' ? 'custom' : gridMode;
 
-  // Custom bars
-  const customBars = windowSpec.sash?.grid?.customBars || {};
-  const upperCustom = customBars.vertical || [];
-  const lowerCustom = customBars.horizontal || [];
+  // Custom bars — ParametricSashWindow expects per-sash arrays of {type:'v'|'h', mm}.
+  // Primary source: rawSpec.fullConfig, which stores the exact per-sash bars the
+  // configurator saved. Accepts legacy {type, position} entries and skips junk.
+  const cleanBars = (list) => (Array.isArray(list) ? list : [])
+    .filter((b) => b && (b.type === 'v' || b.type === 'h'))
+    .map((b) => ({ type: b.type, mm: Number(b.mm ?? b.position) }))
+    .filter((b) => Number.isFinite(b.mm) && b.mm > 0);
+  const rawFc = windowSpec.rawSpec?.fullConfig || {};
+  let upperCustom = cleanBars(rawFc.upperCustomBars);
+  let lowerCustom = cleanBars(rawFc.lowerCustomBars);
+  if (upperCustom.length === 0 && lowerCustom.length === 0) {
+    // Legacy fallback: windowSpec grid keeps direction-keyed positions
+    // (vertical/horizontal) without the upper/lower split — apply to both sashes.
+    const cb = windowSpec.sash?.grid?.customBars || {};
+    const legacy = [
+      ...(Array.isArray(cb.vertical) ? cb.vertical : []).map(Number).filter(Number.isFinite).map((mm) => ({ type: 'v', mm })),
+      ...(Array.isArray(cb.horizontal) ? cb.horizontal : []).map(Number).filter(Number.isFinite).map((mm) => ({ type: 'h', mm })),
+    ];
+    upperCustom = legacy;
+    lowerCustom = legacy;
+  }
 
   // Horns
   const hasHorns = Boolean(windowSpec.sash?.horns);

@@ -927,10 +927,12 @@ function GlazingBars({ clearWidth, clearHeight, glassDepth, barPattern = 'none',
 
   const bars = useMemo(() => {
     if (barPattern === 'custom') {
-      const vBars = customBars.filter(b => b.type === 'v');
-      const hBars = customBars.filter(b => b.type === 'h');
+      // Defensive: skip malformed entries so bad data can never crash the whole app
+      const safeBars = customBars.filter(b => b && (b.type === 'v' || b.type === 'h') && Number.isFinite(Number(b.mm)));
+      const vBars = safeBars.filter(b => b.type === 'v');
+      const hBars = safeBars.filter(b => b.type === 'h');
       const result = [];
-      customBars.forEach(b => {
+      safeBars.forEach(b => {
         if (b.type === 'v') {
           const idx = vBars.indexOf(b);
           const x = idx === 0
