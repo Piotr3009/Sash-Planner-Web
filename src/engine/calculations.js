@@ -18,6 +18,11 @@ export const CONSTANTS = Object.freeze({
     EXTERNAL_HEAD_LINER_DEDUCTION: 204,
     INTERNAL_HEAD_LINER_DEDUCTION: 172,
 
+    // Frame/box depths (mm) per frame type; triple glazing forces the deeper box
+    FRAME_DEPTH_STANDARD: 164,
+    FRAME_DEPTH_SLIM: 144,
+    FRAME_DEPTH_TRIPLE: 172,
+
     // Timber dimensions (mm) - visible from front elevation
     JAMBS_WIDTH: 28,
     HEAD_WIDTH: 28,

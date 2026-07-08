@@ -15,6 +15,7 @@ import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignm
 import { useMaterialStore } from '../stores/materialStore.js';
 import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
 import { mergeWindowMaterials, formatQty } from '../engine/bom.js';
+import { summarizeWindows } from '../utils/batchSummary.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
 import {
@@ -549,15 +550,16 @@ function OverviewTab({ batch, pp, isPPMode, windowsData, registerExport }) {
       {/* Batch/PP info summary */}
       {!isPPMode && batch && (
         <div className="card p-4">
-          <div className="text-sm font-semibold text-ink-50 mb-3">Batch Defaults</div>
+          <div className="text-sm font-semibold text-ink-50 mb-3">Batch Specification</div>
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-ink-400">
             <span>Type: <strong className="text-ink-100">{batch.type}</strong></span>
-            <span>Colour: <strong className="text-ink-100">{batch.defaults?.colourMode === 'dual' ? 'Dual' : 'Single'}</strong></span>
-            <span>Glass: <strong className="text-ink-100">{batch.defaults?.glassType}</strong></span>
-            <span>Frame: <strong className="text-ink-100">{batch.defaults?.frameType}</strong></span>
-            <span>Ironmongery: <strong className="text-ink-100">{batch.defaults?.ironmongery}</strong></span>
-            {batch.type === 'sash' && <span>Horns: <strong className="text-ink-100">{batch.defaults?.hornType}</strong></span>}
-            <span>PAS24: <strong className="text-ink-100">{batch.defaults?.pas24 ? 'Yes' : 'No'}</strong></span>
+            {(batch.windows?.length || 0) > 0 ? (
+              summarizeWindows(batch.windows, batch.type).map((row) => (
+                <span key={row.label}>{row.label}: <strong className="text-ink-100">{row.text}</strong></span>
+              ))
+            ) : (
+              <span className="italic">No windows in this batch yet.</span>
+            )}
           </div>
         </div>
       )}

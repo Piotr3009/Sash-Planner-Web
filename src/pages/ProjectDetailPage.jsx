@@ -8,6 +8,7 @@ import { parseSpecification, normaliseToWindowSpec } from '../engine/specificati
 import { deriveWindowData } from '../engine/calculations.js';
 import { mergeWindowMaterials, formatQty } from '../engine/bom.js';
 import { exportBomPDF } from '../utils/bomPdfExport.js';
+import { summarizeWindows } from '../utils/batchSummary.js';
 import ImageLightbox from '../components/ImageLightbox.jsx';
 
 
@@ -210,15 +211,14 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
 
-              {/* Batch defaults summary */}
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-400 mb-4 px-4 py-2.5 bg-surface-600 rounded-lg border border-surface-500">
-                <span>Ironmongery: <strong className="text-ink-100">{batch.defaults?.ironmongery}</strong></span>
-                <span>Colour: <strong className="text-ink-100">{batch.defaults?.colourMode === 'dual' ? 'Dual' : 'Single'}</strong></span>
-                <span>Glass: <strong className="text-ink-100">{batch.defaults?.glassType}</strong></span>
-                <span>Frame: <strong className="text-ink-100">{batch.defaults?.frameType}</strong></span>
-                {batch.type === 'sash' && <span>Horns: <strong className="text-ink-100">{batch.defaults?.hornType}</strong></span>}
-                <span>PAS24: <strong className="text-ink-100">{batch.defaults?.pas24 ? 'Yes' : 'No'}</strong></span>
-              </div>
+              {/* Batch specification summary — aggregated from windows (windows are the source of truth) */}
+              {winCount > 0 && (
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-400 mb-4 px-4 py-2.5 bg-surface-600 rounded-lg border border-surface-500">
+                  {summarizeWindows(batch.windows, batch.type).map((row) => (
+                    <span key={row.label}>{row.label}: <strong className="text-ink-100">{row.text}</strong></span>
+                  ))}
+                </div>
+              )}
 
               {/* Windows */}
               {winCount > 0 ? (
