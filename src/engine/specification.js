@@ -142,7 +142,9 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
     },
     hardware: {
       finish: ironFinish,
-      catches: pas24 ? 'PAS24' : 'NON PAS24'
+      catches: pas24 ? 'PAS24' : 'NON PAS24',
+      // Per-window ironmongery product assignments { categoryKey: itemId }
+      slots: item?.ironmongerySlots || fc.ironmongerySlots || {},
     },
     vent: {
       roomType: ventRoomType,   // 'habitable' | 'kitchen' | 'bathroom' | 'other'

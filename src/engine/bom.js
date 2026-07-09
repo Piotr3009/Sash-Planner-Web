@@ -151,13 +151,17 @@ export function resolvePartTotal(entry, yieldCoeff = 1.0) {
 }
 
 /**
- * Hardware lines for a window with the ironmongery product assigned via the
- * batch slots. qty comes from buildHardwareList (rule-based per window).
+ * Hardware lines for a window with the ironmongery product assigned via slots.
+ * Per-window slots (windowSpec.hardware.slots) take precedence, category by
+ * category, over legacy batch-level defaults. qty comes from buildHardwareList.
  */
 export function buildWindowHardware(windowSpec, batch, ironmongeryItems = []) {
   if (!windowSpec) return [];
   const lines = buildHardwareList(windowSpec);
-  const slots = batch?.defaults?.ironmongerySlots || {};
+  const slots = {
+    ...(batch?.defaults?.ironmongerySlots || {}),
+    ...(windowSpec?.hardware?.slots || {}),
+  };
   return lines.map((h) => {
     const slotKey = HARDWARE_TO_SLOT_KEY[h.item];
     const itemId = slotKey ? slots[slotKey] : null;
