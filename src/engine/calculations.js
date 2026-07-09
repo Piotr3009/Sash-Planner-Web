@@ -378,8 +378,8 @@ function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, to
     const siliconeMeters = ((perimPerSash + barPerSash) * 2) / 1000;
     const siliconeTubes = round(0.1 * siliconeMeters);
 
-    // Weights — type depends on frame
-    const weightType = isSlim ? 'slim' : 'normal';
+    // Weights — slim counterweights for slim AND heritage boxes (lighter glass, shallower box)
+    const weightType = (isSlim || windowSpec.frame?.type === 'heritage') ? 'slim' : 'normal';
 
     // Seals — +10%
     const SEAL_FACTOR = 1.10;

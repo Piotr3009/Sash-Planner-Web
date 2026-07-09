@@ -34,8 +34,9 @@ export const SASH_WINDOW_PARTS = {
   ],
   glass: [
     { id: 'glass_double',     name: 'Double Glazing',       section: '4-16-4',   pcs: 2, materialType: 'glass', unit: 'm²' },
-    { id: 'glass_triple',     name: 'Triple Glazing',       section: '4-12-4-12-4', pcs: 2, materialType: 'glass', unit: 'm²' },
-    { id: 'glass_single',     name: 'Single Heritage',      section: '6mm',      pcs: 2, materialType: 'glass', unit: 'm²' },
+    { id: 'glass_double_slim', name: 'Double Slim Glazing',  section: '4-8-4',    pcs: 2, materialType: 'glass', unit: 'm²' },
+    { id: 'glass_triple',     name: 'Triple Glazing',       section: '4-8-4-8-4', pcs: 2, materialType: 'glass', unit: 'm²' },
+    { id: 'glass_single',     name: 'Single Heritage',      section: '6.8mm lam',      pcs: 2, materialType: 'glass', unit: 'm²' },
     { id: 'glass_passive',    name: 'Passive (Vacuum)',     section: 'vacuum',   pcs: 2, materialType: 'glass', unit: 'm²' },
   ],
   paint: [
@@ -47,7 +48,7 @@ export const SASH_WINDOW_PARTS = {
     { id: 'cord',               name: 'Cord / Rope',              section: '—',  pcs: 1, materialType: 'consumable', unit: 'm' },
     { id: 'glazing_clips_24mm', name: 'Glazing Clips 24mm',       section: '24mm', pcs: 20, materialType: 'consumable', unit: 'pcs', note: 'double glazing' },
     { id: 'glazing_clips_28mm', name: 'Glazing Clips 28mm',       section: '28mm', pcs: 20, materialType: 'consumable', unit: 'pcs', note: 'triple glazing' },
-    { id: 'glazing_clips_14mm', name: 'Glazing Clips 14mm',       section: '14mm', pcs: 20, materialType: 'consumable', unit: 'pcs', note: 'slim frame' },
+    { id: 'glazing_clips_14mm', name: 'Glazing Clips 16mm',       section: '16mm', pcs: 20, materialType: 'consumable', unit: 'pcs', note: 'slim frame' },
     { id: 'spacer_1mm',         name: 'Glazing Packer 1mm',       section: '—',  pcs: 20, materialType: 'consumable', unit: 'pcs' },
     { id: 'spacer_2mm',         name: 'Glazing Packer 2mm',       section: '—',  pcs: 4, materialType: 'consumable', unit: 'pcs' },
     { id: 'bead_tape',          name: 'Georgian Bar/Bead Tape 1mm', section: '1mm', pcs: 1, materialType: 'consumable', unit: 'm' },

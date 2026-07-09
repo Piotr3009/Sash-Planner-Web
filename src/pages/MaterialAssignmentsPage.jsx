@@ -331,7 +331,7 @@ export default function MaterialAssignmentsPage() {
 
         {/* Box Frame */}
         <PartGroupSection
-          title="Box Frame"
+          title="🪵 Box Frame"
           subtitle={`${SASH_WINDOW_PARTS.box.length} parts · frame, cill, liners`}
           parts={SASH_WINDOW_PARTS.box}
           assignments={assignments}
@@ -347,7 +347,7 @@ export default function MaterialAssignmentsPage() {
 
         {/* Sash */}
         <PartGroupSection
-          title="Sash"
+          title="🪵 Sash"
           subtitle={`${SASH_WINDOW_PARTS.sash.length} parts · rails, stiles`}
           parts={SASH_WINDOW_PARTS.sash}
           assignments={assignments}
@@ -363,7 +363,7 @@ export default function MaterialAssignmentsPage() {
 
         {/* Beading */}
         <PartGroupSection
-          title="Beading"
+          title="📏 Beading"
           subtitle={`${SASH_WINDOW_PARTS.beading.length} parts · glazing, triangle, parting, staff, meeting`}
           parts={SASH_WINDOW_PARTS.beading}
           assignments={assignments}
@@ -379,8 +379,8 @@ export default function MaterialAssignmentsPage() {
 
         {/* Glass */}
         <PartGroupSection
-          title="Glass"
-          subtitle={`${SASH_WINDOW_PARTS.glass.length} types · double, triple, single, passive`}
+          title="🪟 Glass"
+          subtitle={`${SASH_WINDOW_PARTS.glass.length} types · double, slim, triple, single, passive`}
           parts={SASH_WINDOW_PARTS.glass}
           assignments={assignments}
           materials={materials}
@@ -395,7 +395,7 @@ export default function MaterialAssignmentsPage() {
 
         {/* Paint */}
         <PartGroupSection
-          title="Paint"
+          title="🎨 Paint"
           subtitle={`${SASH_WINDOW_PARTS.paint.length} types · primer, white 9016, bespoke`}
           parts={SASH_WINDOW_PARTS.paint}
           assignments={assignments}
@@ -411,7 +411,7 @@ export default function MaterialAssignmentsPage() {
 
         {/* Consumables */}
         <PartGroupSection
-          title="Consumables"
+          title="🔩 Consumables"
           subtitle={`${SASH_WINDOW_PARTS.consumables.length} items · cord, clips, spacers, tape, silicone, weights`}
           parts={SASH_WINDOW_PARTS.consumables}
           assignments={assignments}
