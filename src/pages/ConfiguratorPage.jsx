@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
 import { useIronmongeryStore, IRONMONGERY_CATEGORIES } from '../stores/ironmongeryStore.js';
 import IronmongeryPickerModal from '../components/IronmongeryPickerModal.jsx';
-import { GLASS_TYPES, GLASS_SPECS, GLASS_FINISHES, FROSTED_LOCATIONS, SPACERS, SPACER_TYPES, SWATCHES, RAL_GROUPS, FB_GROUPS } from '../config.js';
+import { GLASS_TYPES, GLASS_SPECS, GLASS_COATINGS, GLASS_FINISHES, FROSTED_LOCATIONS, SPACERS, SPACER_TYPES, SWATCHES, RAL_GROUPS, FB_GROUPS } from '../config.js';
 import { CONSTANTS } from '../engine/calculations.js';
 import { buildVentGrilles } from '../engine/lists.js';
 
@@ -127,6 +127,7 @@ export default function ConfiguratorPage() {
   const [woodColorInt, setWoodColorInt] = useState('#F6F6F6');
   const [glassType, setGlassType] = useState('double');
   const [glassSpec, setGlassSpec] = useState('toughened');
+  const [glassCoating, setGlassCoating] = useState('standard');
   const [spacerColor, setSpacerColor] = useState('white');
   const [spacerType, setSpacerType] = useState('warm');
   const [pas24, setPas24] = useState(false);
@@ -174,6 +175,7 @@ export default function ConfiguratorPage() {
     setWoodColorInt(w.woodColorInt || w.woodColor || def.woodColorInt || '#F6F6F6');
     setGlassType(w.glassType || def.glassType || 'double');
     setGlassSpec(w.glassSpec || def.glassSpec || 'toughened');
+    setGlassCoating(w.glassCoating || def.glassCoating || 'standard');
     setSpacerColor(w.spacerColor || def.spacerColor || 'white');
     setSpacerType(w.spacerType || def.spacerType || 'warm');
     setPas24(w.pas24 !== undefined ? !!w.pas24 : (def.pas24 || false));
@@ -207,6 +209,7 @@ export default function ConfiguratorPage() {
         setWoodColorExt(def.woodColorExt || '#F6F6F6');
         setWoodColorInt(def.woodColorInt || '#F6F6F6');
         setGlassSpec(def.glassSpec || 'toughened');
+        setGlassCoating(def.glassCoating || 'standard');
         setSpacerColor(def.spacerColor || 'white');
         setSpacerType(def.spacerType || 'warm');
         setPas24(def.pas24 || false);
@@ -243,6 +246,7 @@ export default function ConfiguratorPage() {
 
   // ─── Effective values ───
   const isSingle = colourMode === 'single';
+  const hasGasFill = glassType !== 'single' && glassType !== 'passive'; // sealed units only
   const frameDepth = FRAME_DEPTHS[frameType] || CONSTANTS.FRAME_DEPTH_STANDARD;
 
   const extW = Number(inW) || 400;
@@ -289,7 +293,7 @@ export default function ConfiguratorPage() {
       colourMode, sameColor: isSingle, ironmongery: iron, ironmongerySlots: ironSlots, doubleGlazing: glassType !== 'single',
       upperGlass: gFin === 'frosted' && frostLoc === 'both' ? 'frosted' : 'clear',
       lowerGlass: gFin === 'frosted' ? 'frosted' : 'clear',
-      glassType, glassSpec, glassFinish: gFin, frostedLocation: frostLoc,
+      glassType, glassSpec, glassCoating, glassFinish: gFin, frostedLocation: frostLoc,
       spacerColor, spacerType, sashType, splitRatio, headType, openingType: opening,
       ventRoomType, ventSoleWindow,
       frameType, frameDepth, pas24,
@@ -416,10 +420,12 @@ export default function ConfiguratorPage() {
               <div className="text-[11px] text-ink-300 mb-2">Type: <span className="text-accent-400 font-medium">{glassLabel(glassType)}</span> <span className="text-ink-500">— set by frame</span></div>
             )}
             <Lbl>Spec</Lbl><HChips o={GLASS_SPECS} v={glassSpec} c={setGlassSpec} />
+            <Lbl>Coating</Lbl><HChips o={GLASS_COATINGS} v={glassCoating} c={setGlassCoating} />
             <Lbl>Finish</Lbl><HChips o={GLASS_FINISHES} v={gFin} c={setGFin} />
             {gFin === 'frosted' && <><Lbl>Location</Lbl><HChips o={FROSTED_LOCATIONS} v={frostLoc} c={setFrostLoc} /></>}
             <Lbl>Spacer</Lbl><HChips o={SPACERS} v={spacerColor} c={setSpacerColor} />
             <Lbl>Spacer type</Lbl><HChips o={SPACER_TYPES} v={spacerType} c={setSpacerType} />
+            {hasGasFill && <div className="text-[11px] text-ink-300 mt-1">Gas: <span className="text-accent-400 font-medium">Argon</span> <span className="text-ink-500">— fixed</span></div>}
           </Sec>
 
           <Sec t="Horns & Security">
@@ -509,7 +515,10 @@ export default function ConfiguratorPage() {
           </SG>
           <SG t="Glass">
             <SR l="Type" v={glassLabel(glassType)} />
-            <SR l="Spec" v={glassSpec} /><SR l="Finish" v={gFin} />
+            <SR l="Spec" v={glassSpec} />
+            <SR l="Coating" v={(GLASS_COATINGS.find(c => c.value === glassCoating) || {}).label || 'Standard'} />
+            <SR l="Finish" v={gFin} />
+            {hasGasFill && <SR l="Gas" v="Argon" />}
             <SR l="Spacer" v={spacerColor} />
             <SR l="Spacer Type" v={(SPACER_TYPES.find(t => t.value === spacerType) || {}).label || 'Warm Edge'} />
           </SG>

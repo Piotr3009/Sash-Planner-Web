@@ -7,6 +7,7 @@
  */
 
 import { CONSTANTS, deriveWindowData } from './calculations.js';
+import { GLASS_MAKEUP, glassGas } from './specification.js';
 
 const DEFAULT_SETTINGS = {
   kerf: 3,
@@ -159,9 +160,9 @@ export function buildGlassListForWindow(derived, windowSpec) {
   const glassSpec = windowSpec?.glazing?.spec || 'toughened';
   const spacer = windowSpec?.glazing?.spacerColour || 'silver';
   const spacerType = windowSpec?.glazing?.spacerType || 'warm';
-  // Sealed unit makeup per glass type; passive (vacuum) and single have no unit makeup
-  const GLASS_MAKEUP = { double: '4x16x4', double_slim: '4x8x4', triple: '4x8x4x8x4', passive: '', single: '' };
-  const makeup = windowSpec?.glazing?.makeup || (GLASS_MAKEUP[glassType] ?? GLASS_MAKEUP.double);
+  const makeup = windowSpec?.glazing?.makeup ?? (GLASS_MAKEUP[glassType] ?? GLASS_MAKEUP.double);
+  const coating = windowSpec?.glazing?.coating || 'standard';
+  const gas = windowSpec?.glazing?.gas ?? glassGas(glassType);
   const isFrosted = windowSpec?.glazing?.finish === 'frosted';
   const frostedLoc = windowSpec?.glazing?.frostedLocation || 'bottom';
 
@@ -189,6 +190,8 @@ export function buildGlassListForWindow(derived, windowSpec) {
       spacerType,
       finish: upperFinish,
       makeup,
+      coating,
+      gas,
       bars: gridMode,
     },
     {
@@ -203,6 +206,8 @@ export function buildGlassListForWindow(derived, windowSpec) {
       spacerType,
       finish: lowerFinish,
       makeup,
+      coating,
+      gas,
       bars: gridMode,
     },
   ];

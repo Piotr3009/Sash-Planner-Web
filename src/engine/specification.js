@@ -28,6 +28,12 @@ function detectGridMode(spec, item) {
   return 'none';
 }
 
+// Sealed unit makeup/thickness per glass type — single source of truth.
+// Passive (vacuum) and single have no unit makeup; gas fill only applies to sealed units.
+export const GLASS_MAKEUP = { double: '4x16x4', double_slim: '4x8x4', triple: '4x8x4x8x4', passive: '', single: '' };
+export const GLASS_THICKNESS = { double: 24, double_slim: 16, triple: 28 };
+export const glassGas = (type) => (type === 'single' || type === 'passive') ? '' : 'argon';
+
 function customBarsFromSpec(spec, item) {
   // New format: item stores custom bars directly as arrays of {type, mm}
   // (legacy entries may still carry {type, position} — accept both).
@@ -148,8 +154,10 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       spec: glassSpec,
       finish: glassFinish,
       frostedLocation,
-      thickness: glassType === 'triple' ? 28 : 24,
-      makeup: glassType === 'triple' ? '4x8x4x8x4' : '4x16x4',
+      coating: item?.glassCoating || fc.glassCoating || 'standard',
+      gas: glassGas(glassType),
+      thickness: GLASS_THICKNESS[glassType] ?? 24,
+      makeup: GLASS_MAKEUP[glassType] ?? GLASS_MAKEUP.double,
       toughened: glassSpec === 'toughened',
       frosted: glassFinish === 'frosted',
       spacerColour: spacerColor,

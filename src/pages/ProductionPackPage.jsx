@@ -1043,6 +1043,8 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) 
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Type</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Makeup</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Spec</th>
+                <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Coating</th>
+                <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Gas</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Finish</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Spacer</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Spacer Type</th>
@@ -1059,6 +1061,8 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) 
                   <td className="px-4 py-2.5 text-ink-300">{g.type}</td>
                   <td className="px-4 py-2.5 text-ink-300">{g.makeup || '—'}</td>
                   <td className="px-4 py-2.5 text-ink-300">{g.spec || '—'}</td>
+                  <td className="px-4 py-2.5 text-ink-300">{g.coating === 'soft_coat' ? 'Soft Coat (Low-E)' : 'Standard'}</td>
+                  <td className="px-4 py-2.5 text-ink-300">{g.gas ? 'Argon' : '—'}</td>
                   <td className="px-4 py-2.5 text-ink-300">{g.finish}</td>
                   <td className="px-4 py-2.5 text-ink-300">{g.spacer}</td>
                   <td className="px-4 py-2.5 text-ink-300">{g.spacerType === 'alu' ? 'Aluminium' : 'Warm Edge'}</td>
@@ -2235,15 +2239,16 @@ function groupCutListItems(cutList) {
   return Array.from(map.values()).sort((a, b) => a.element.localeCompare(b.element) || a.length - b.length);
 }
 
-/** Group glass items by width+height+type+spec+spacer+finish */
+/** Group glass items by width+height+type+spec+coating+spacer+finish */
 function groupGlassItems(glassList) {
   const map = new Map();
   glassList.forEach((g) => {
-    const key = `${g.width}|${g.height}|${g.type}|${g.spec}|${g.spacer}|${g.spacerType || 'warm'}|${g.finish}`;
+    const key = `${g.width}|${g.height}|${g.type}|${g.spec}|${g.coating || 'standard'}|${g.spacer}|${g.spacerType || 'warm'}|${g.finish}`;
     if (!map.has(key)) {
       map.set(key, {
         width: g.width, height: g.height,
         type: g.type, spec: g.spec || 'toughened',
+        coating: g.coating || 'standard', gas: g.gas ?? '',
         spacer: g.spacer, spacerType: g.spacerType || 'warm', finish: g.finish,
         makeup: g.makeup,
         totalQty: 0, windows: [], projects: [],

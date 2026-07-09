@@ -128,6 +128,11 @@ export function getColorName(hex) {
 // ═══════════════════════════════════════════════════════════════
 // GLASS OPTIONS
 // ═══════════════════════════════════════════════════════════════
+export const GLASS_COATINGS = [
+  { value: 'standard', label: 'Standard' },
+  { value: 'soft_coat', label: 'Soft Coat (Low-E)' },
+];
+
 export const GLASS_TYPES = [
   { value: 'double_slim', label: 'Double Slim 16mm (U: 1.6)' },
   { value: 'double', label: 'Double (U: 1.4)' },

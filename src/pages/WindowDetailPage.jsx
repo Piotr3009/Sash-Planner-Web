@@ -223,6 +223,8 @@ function GlassPanel({ item, windowSpec, derived, batch, settings }) {
                 <th className="px-4 py-2 text-right text-ink-400 font-medium">Qty</th>
                 <th className="px-4 py-2 text-left text-ink-400 font-medium">Type</th>
                 <th className="px-4 py-2 text-left text-ink-400 font-medium">Makeup</th>
+                <th className="px-4 py-2 text-left text-ink-400 font-medium">Coating</th>
+                <th className="px-4 py-2 text-left text-ink-400 font-medium">Gas</th>
                 <th className="px-4 py-2 text-left text-ink-400 font-medium">Finish</th>
                 <th className="px-4 py-2 text-left text-ink-400 font-medium">Spacer</th>
                 <th className="px-4 py-2 text-left text-ink-400 font-medium">Spacer Type</th>
@@ -237,6 +239,8 @@ function GlassPanel({ item, windowSpec, derived, batch, settings }) {
                   <td className="px-4 py-2 text-right text-ink-200">{g.quantity}</td>
                   <td className="px-4 py-2 text-ink-300">{g.type} / {g.spec}</td>
                   <td className="px-4 py-2 text-ink-300">{g.makeup || '—'}</td>
+                  <td className="px-4 py-2 text-ink-300">{g.coating === 'soft_coat' ? 'Soft Coat (Low-E)' : 'Standard'}</td>
+                  <td className="px-4 py-2 text-ink-300">{g.gas ? 'Argon' : '—'}</td>
                   <td className="px-4 py-2 text-ink-300">{g.finish}</td>
                   <td className="px-4 py-2 text-ink-300">{g.spacer}</td>
                   <td className="px-4 py-2 text-ink-300">{g.spacerType === 'alu' ? 'Aluminium' : 'Warm Edge'}</td>
