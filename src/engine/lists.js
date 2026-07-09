@@ -159,7 +159,9 @@ export function buildGlassListForWindow(derived, windowSpec) {
   const glassSpec = windowSpec?.glazing?.spec || 'toughened';
   const spacer = windowSpec?.glazing?.spacerColour || 'silver';
   const spacerType = windowSpec?.glazing?.spacerType || 'warm';
-  const makeup = windowSpec?.glazing?.makeup || (glassType === 'triple' ? '4x8x4x8x4' : '4x16x4');
+  // Sealed unit makeup per glass type; passive (vacuum) and single have no unit makeup
+  const GLASS_MAKEUP = { double: '4x16x4', double_slim: '4x8x4', triple: '4x8x4x8x4', passive: '', single: '' };
+  const makeup = windowSpec?.glazing?.makeup || (GLASS_MAKEUP[glassType] ?? GLASS_MAKEUP.double);
   const isFrosted = windowSpec?.glazing?.finish === 'frosted';
   const frostedLoc = windowSpec?.glazing?.frostedLocation || 'bottom';
 

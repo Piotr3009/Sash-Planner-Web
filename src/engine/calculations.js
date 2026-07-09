@@ -22,6 +22,7 @@ export const CONSTANTS = Object.freeze({
     FRAME_DEPTH_STANDARD: 164,
     FRAME_DEPTH_SLIM: 144,
     FRAME_DEPTH_TRIPLE: 172,
+    FRAME_DEPTH_HERITAGE: 134,
 
     // Timber dimensions (mm) - visible from front elevation
     JAMBS_WIDTH: 28,
@@ -291,9 +292,10 @@ const KG_PER_METER = {
 
 const GLASS_KG_PER_SQM = {
     'double': 21,
+    'double_slim': 15,   // slim unit 16mm — verify vs Excel
     'triple': 33,
-    'single': 10,    // single heritage
-    'passive': 18,   // vacuum
+    'single': 12,    // single heritage laminated
+    'passive': 12,   // vacuum
 };
 
 function calculateWeights(windowSpec, sashWidth, topSashHeight, bottomSashHeight) {
@@ -358,9 +360,9 @@ function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, to
     const cordM = round((3 * frameHeight) / 1000);
 
     // Glazing clips — 20 per window, size depends on glass type + frame type
-    // double/single/passive → 24mm, triple → 28mm, slim frame → 14mm
+    // double/single/passive → 24mm, triple → 28mm, slim frame → 16mm
     const isSlim = windowSpec.frame?.type === 'slim';
-    const clipSize = isSlim ? '14mm' : (glassType === 'triple' ? '28mm' : '24mm');
+    const clipSize = isSlim ? '16mm' : (glassType === 'triple' ? '28mm' : '24mm');
     const clipQty = 20;
 
     // Spacer 1mm — 20 per window

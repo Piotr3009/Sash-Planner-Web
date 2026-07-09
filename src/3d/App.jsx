@@ -615,6 +615,7 @@ export default function App() {
   const doubleGlazing = true;
   const [spacerColor, setSpacerColor] = useState('silver');
   const [boxType, setBoxType] = useState('standard');
+  const [boxDepthOverride, setBoxDepthOverride] = useState(null);
   const [woodColor, setWoodColor] = useState('#F6F6F6');
   const [woodColorExt, setWoodColorExt] = useState('#F6F6F6');
   const [woodColorInt, setWoodColorInt] = useState('#F6F6F6');
@@ -833,6 +834,7 @@ export default function App() {
       if (cfg.lowerGlass   !== undefined) setLowerGlass(cfg.lowerGlass);
       if (cfg.spacerColor  !== undefined) setSpacerColor(cfg.spacerColor);
       if (cfg.boxType      !== undefined) setBoxType(cfg.boxType);
+      if (cfg.boxDepth     !== undefined) setBoxDepthOverride(cfg.boxDepth);
       if (cfg.ironmongery  !== undefined) setIronmongery(cfg.ironmongery);
       if (cfg.showHorns    !== undefined) setShowHorns(cfg.showHorns);
       if (cfg.hornType     !== undefined) setHornType(cfg.hornType);
@@ -921,7 +923,7 @@ export default function App() {
       doubleGlazing,
       spacerColor,
       brightness,
-      boxDepth: boxType === 'standard' ? 164 : 146,
+      boxDepth: boxDepthOverride ?? (boxType === 'standard' ? 164 : 146),
       sashDepth: 57,
       boxType,
       upperBars,
@@ -989,7 +991,7 @@ export default function App() {
       trafficDoor,
       bifoldOpenDirection,
     }),
-    [width, height, extWidth, extHeight, opening, upperOpening, autoRotate, showGuides, showHorns, hornType, ironmongery, upperGlass, lowerGlass, doubleGlazing, spacerColor, brightness, boxType, upperBars, lowerBars, upperCustomBars, lowerCustomBars, woodColor, woodColorExt, woodColorInt, sameColor, sashType, splitRatio, headType, fixUpperBars, fixLowerBars, fixUpperCustomBars, fixLowerCustomBars, windowCategory, casementLayout, casementOpening, fanlightRatio, casementHBars, casementVBars, glassFinish, trickleVent, trickleColour, sillExtension, sillWider, sealColour, fixShape, fixType, fixArchRise, fixGothicBars, fixCircleBarPattern, fixCircleBarOffset, fixSemiBarPattern, casementType, casArchShape, casArchHinge, doorType, doorShape, doorStyle, doorHinge, doorHBars, doorVBars, centerMullion, paneling, sidePanels, sideLeftWidth, sideRightWidth, sideHBars, sideVBars, sideStyle, thresholdType, thresholdExtension, doorOpening, doorOpenDirection, panelCount, slideDirection, extraWidth, glassWidth, panelDepth, frameDepth, foldDirection, trafficDoor, bifoldOpenDirection],
+    [width, height, extWidth, extHeight, opening, upperOpening, autoRotate, showGuides, showHorns, hornType, ironmongery, upperGlass, lowerGlass, doubleGlazing, spacerColor, brightness, boxType, boxDepthOverride, upperBars, lowerBars, upperCustomBars, lowerCustomBars, woodColor, woodColorExt, woodColorInt, sameColor, sashType, splitRatio, headType, fixUpperBars, fixLowerBars, fixUpperCustomBars, fixLowerCustomBars, windowCategory, casementLayout, casementOpening, fanlightRatio, casementHBars, casementVBars, glassFinish, trickleVent, trickleColour, sillExtension, sillWider, sealColour, fixShape, fixType, fixArchRise, fixGothicBars, fixCircleBarPattern, fixCircleBarOffset, fixSemiBarPattern, casementType, casArchShape, casArchHinge, doorType, doorShape, doorStyle, doorHinge, doorHBars, doorVBars, centerMullion, paneling, sidePanels, sideLeftWidth, sideRightWidth, sideHBars, sideVBars, sideStyle, thresholdType, thresholdExtension, doorOpening, doorOpenDirection, panelCount, slideDirection, extraWidth, glassWidth, panelDepth, frameDepth, foldDirection, trafficDoor, bifoldOpenDirection],
   );
 
   return (

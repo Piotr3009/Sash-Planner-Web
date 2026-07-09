@@ -156,7 +156,7 @@ export function windowSpecToConfig(windowSpec) {
     opening: 0,
     upperOpening: 0,
     showGuides: false,
-    boxDepth: 164,
+    boxDepth: windowSpec.frame?.depth || 164,
     sashDepth: 57,
   };
 }

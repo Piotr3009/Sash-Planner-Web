@@ -94,6 +94,9 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
 
   // Frame depth — new: item.frameDepth
   const frameDepth = item?.frameDepth || (glassType === 'triple' ? 172 : 164);
+  // Frame type — feeds engine's isSlim (clip size, weight type). Was never set before,
+  // so slim-specific consumables silently fell back to standard.
+  const frameType = item?.frameType || item?.frame_type || fc.frameType || 'standard';
 
   // Opening type — new: item.openingType
   const openingType = item?.openingType || item?.opening_type || fc.openingType || 'both';
@@ -111,7 +114,7 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
     name: item?.name || item?.window_number || spec.windowName || 'Window',
     type: item?.window_type || spec.windowType || 'sash',
     quantity: Number(item?.quantity || 1),
-    frame: { width, height, depth: frameDepth },
+    frame: { width, height, depth: frameDepth, type: frameType },
     sash: {
       openingType,
       horns: hasHorns,

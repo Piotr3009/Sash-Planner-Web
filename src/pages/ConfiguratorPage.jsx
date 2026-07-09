@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectStore } from '../stores/projectStore.js';
+import { useIronmongeryStore, IRONMONGERY_CATEGORIES } from '../stores/ironmongeryStore.js';
+import IronmongeryPickerModal from '../components/IronmongeryPickerModal.jsx';
 import { GLASS_TYPES, GLASS_SPECS, GLASS_FINISHES, FROSTED_LOCATIONS, SPACERS, SPACER_TYPES, SWATCHES, RAL_GROUPS, FB_GROUPS } from '../config.js';
 import { CONSTANTS } from '../engine/calculations.js';
 import { buildVentGrilles } from '../engine/lists.js';
@@ -25,7 +27,26 @@ const SOLE_OPTIONS = [{ value: true, label: 'Only window' }, { value: false, lab
 const IRON_OPTIONS = [{ value: 'brass', label: 'Brass' }, { value: 'chrome', label: 'Chrome' }, { value: 'stainless', label: 'Stainless' }, { value: 'antique_brass', label: 'Antique Brass' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' }];
 const HORN_OPTIONS = [{ value: 'none', label: 'No Horns' }, { value: 'A', label: 'Richmond' }, { value: 'D', label: 'Type D' }];
 const COLOUR_MODES = [{ value: 'single', label: 'Single' }, { value: 'dual', label: 'Dual (Ext/Int)' }];
-const FRAME_OPTIONS = [{ value: 'standard', label: `Standard (${CONSTANTS.FRAME_DEPTH_STANDARD}mm)` }, { value: 'slim', label: `Slim (${CONSTANTS.FRAME_DEPTH_SLIM}mm)` }];
+
+// ─── Frame drives the glass type (box depth + glazing are one decision) ───
+const FRAME_OPTIONS = [
+  { value: 'slim', label: `Slim (${CONSTANTS.FRAME_DEPTH_SLIM}mm)` },
+  { value: 'standard', label: `Standard (${CONSTANTS.FRAME_DEPTH_STANDARD}mm)` },
+  { value: 'triple', label: `Triple glazing (${CONSTANTS.FRAME_DEPTH_TRIPLE}mm)` },
+  { value: 'heritage', label: `Heritage (${CONSTANTS.FRAME_DEPTH_HERITAGE}mm)` },
+];
+const FRAME_DEPTHS = {
+  slim: CONSTANTS.FRAME_DEPTH_SLIM,
+  standard: CONSTANTS.FRAME_DEPTH_STANDARD,
+  triple: CONSTANTS.FRAME_DEPTH_TRIPLE,
+  heritage: CONSTANTS.FRAME_DEPTH_HERITAGE,
+};
+const FRAME_GLASS = { slim: 'double_slim', standard: 'double', triple: 'triple' }; // heritage → user picks
+const HERITAGE_GLASS_OPTIONS = [
+  { value: 'passive', label: 'Passive (U: 0.8)' },
+  { value: 'single', label: 'Single Laminated' },
+];
+const glassLabel = (v) => (GLASS_TYPES.find((g) => g.value === v) || {}).label || v;
 
 // Hex → colour name lookup (RAL / F&B / swatches), matching EstimateConfiguratorPage
 const COLOR_NAME = {};
@@ -43,6 +64,16 @@ function migrateBars(bars) {
   return bars.map(b => ({ type: b.type, mm: b.mm ?? b.position ?? 100 }));
 }
 
+// Map a saved window onto the new 4-value frame choice.
+// Legacy windows stored frameType slim|standard, with triple/heritage implied by glass.
+function frameFromWindow(w) {
+  const ft = w.frameType;
+  if (ft === 'triple' || ft === 'heritage' || ft === 'slim') return ft;
+  if (w.glassType === 'triple') return 'triple';
+  if (w.glassType === 'single' || w.glassType === 'passive') return 'heritage';
+  return ft === 'standard' ? 'standard' : 'standard';
+}
+
 export default function ConfiguratorPage() {
   const { projectId, batchId } = useParams();
   const [searchParams] = useSearchParams();
@@ -53,6 +84,7 @@ export default function ConfiguratorPage() {
   const project = useProjectStore((s) => s.projects.find(p => p.id === projectId));
   const batch = project?.batches?.find(b => b.id === batchId);
   const def = batch?.defaults || {};
+  const ironItems = useIronmongeryStore((s) => s.items);
 
   // ─── Edit mode ───
   const editWindowId = searchParams.get('edit');
@@ -85,6 +117,8 @@ export default function ConfiguratorPage() {
 
   // ─── Full per-window specification (no batch overrides — window is the source of truth) ───
   const [iron, setIron] = useState('brass');
+  const [ironSlots, setIronSlots] = useState({});      // { categoryKey: itemId }
+  const [pickerSlot, setPickerSlot] = useState(null);  // categoryKey of the open picker
   const [horn, setHorn] = useState('A');
   const [frameType, setFrameType] = useState('standard');
   const [colourMode, setColourMode] = useState('single');
@@ -96,6 +130,20 @@ export default function ConfiguratorPage() {
   const [spacerColor, setSpacerColor] = useState('white');
   const [spacerType, setSpacerType] = useState('warm');
   const [pas24, setPas24] = useState(false);
+
+  // Frame choice drives glass type; heritage opens a passive/single choice instead.
+  const changeFrame = (v) => {
+    setFrameType(v);
+    if (v === 'heritage') {
+      if (glassType !== 'passive' && glassType !== 'single') setGlassType('passive');
+    } else {
+      setGlassType(FRAME_GLASS[v]);
+    }
+  };
+  const changeHeritageGlass = (v) => {
+    setGlassType(v);
+    if (v === 'single') setGlassSpec('laminated');
+  };
 
   // Applies a saved window's values to the form (edit mode + copy-from-last prefill)
   const applyWindow = useCallback((w, { copyName }) => {
@@ -117,8 +165,9 @@ export default function ConfiguratorPage() {
     setFrostLoc(w.frostedLocation || 'bottom');
     // Specification (windows store effective values, incl. legacy override-era windows)
     setIron(w.ironmongery || def.ironmongery || 'brass');
+    setIronSlots(w.ironmongerySlots || def.ironmongerySlots || {});
     setHorn(w.hornType || def.hornType || 'A');
-    setFrameType(w.frameType || def.frameType || 'standard');
+    setFrameType(frameFromWindow(w));
     setColourMode(w.colourMode || def.colourMode || 'single');
     setWoodColor(w.woodColor || def.woodColor || '#F6F6F6');
     setWoodColorExt(w.woodColorExt || w.woodColor || def.woodColorExt || '#F6F6F6');
@@ -148,13 +197,15 @@ export default function ConfiguratorPage() {
         setPrefillSource(last.name || 'previous window');
       } else {
         setIron(def.ironmongery || 'brass');
+        setIronSlots(def.ironmongerySlots || {});
         setHorn(def.hornType || 'A');
-        setFrameType(def.frameType || 'standard');
+        const ft = (def.frameType === 'slim') ? 'slim' : 'standard';
+        setFrameType(ft);
+        setGlassType(FRAME_GLASS[ft]);
         setColourMode(def.colourMode || 'single');
         setWoodColor(def.woodColor || '#F6F6F6');
         setWoodColorExt(def.woodColorExt || '#F6F6F6');
         setWoodColorInt(def.woodColorInt || '#F6F6F6');
-        setGlassType(def.glassType || 'double');
         setGlassSpec(def.glassSpec || 'toughened');
         setSpacerColor(def.spacerColor || 'white');
         setSpacerType(def.spacerType || 'warm');
@@ -192,12 +243,7 @@ export default function ConfiguratorPage() {
 
   // ─── Effective values ───
   const isSingle = colourMode === 'single';
-  const isTripleGlass = glassType === 'triple';
-  // Triple glazing needs the deeper box — slim is not available, standard is forced.
-  const effFrameType = isTripleGlass ? 'standard' : frameType;
-  const frameDepth = isTripleGlass
-    ? CONSTANTS.FRAME_DEPTH_TRIPLE
-    : (effFrameType === 'slim' ? CONSTANTS.FRAME_DEPTH_SLIM : CONSTANTS.FRAME_DEPTH_STANDARD);
+  const frameDepth = FRAME_DEPTHS[frameType] || CONSTANTS.FRAME_DEPTH_STANDARD;
 
   const extW = Number(inW) || 400;
   const extH = Number(inH) || 400;
@@ -216,10 +262,11 @@ export default function ConfiguratorPage() {
       ironmongery: iron,
       upperGlass: gFin === 'frosted' && frostLoc === 'both' ? 'frosted' : 'clear',
       lowerGlass: gFin === 'frosted' ? 'frosted' : 'clear',
+      doubleGlazing: glassType !== 'single',
       spacerColor, sashType, splitRatio, headType, openingType: opening,
-      boxType: effFrameType, boxDepth: frameDepth,
+      boxType: frameType === 'slim' ? 'slim' : 'standard', boxDepth: frameDepth,
     });
-  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, spacerColor, sashType, splitRatio, headType, opening, effFrameType, frameDepth, batch?.type]);
+  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type]);
   useEffect(() => { sync(); }, [sync]);
 
   // ─── B4: Listen for 3D ready event and re-sync ───
@@ -239,13 +286,13 @@ export default function ConfiguratorPage() {
       lowerCustomBars: effectiveLBars === 'custom' ? (sameBars ? uCustom : lCustom) : [],
       showHorns: horn !== 'none', hornType: horn,
       woodColor, woodColorExt: isSingle ? woodColor : woodColorExt, woodColorInt: isSingle ? woodColor : woodColorInt,
-      colourMode, sameColor: isSingle, ironmongery: iron, doubleGlazing: glassType !== 'single',
+      colourMode, sameColor: isSingle, ironmongery: iron, ironmongerySlots: ironSlots, doubleGlazing: glassType !== 'single',
       upperGlass: gFin === 'frosted' && frostLoc === 'both' ? 'frosted' : 'clear',
       lowerGlass: gFin === 'frosted' ? 'frosted' : 'clear',
       glassType, glassSpec, glassFinish: gFin, frostedLocation: frostLoc,
       spacerColor, spacerType, sashType, splitRatio, headType, openingType: opening,
       ventRoomType, ventSoleWindow,
-      frameType: effFrameType, frameDepth, pas24,
+      frameType, frameDepth, pas24,
     };
 
     if (isEditMode) {
@@ -277,6 +324,8 @@ export default function ConfiguratorPage() {
 
   if (!batch) return <div className="p-8 text-ink-400">Batch not found.</div>;
   const isSash = batch.type === 'sash';
+  const slotCategories = IRONMONGERY_CATEGORIES.filter(c => c.windowType === (batch.type || 'sash'));
+  const getSlotItem = (key) => ironItems.find(m => m.id === ironSlots[key]) || null;
 
   // Format custom bars for spec panel
   const formatBars = (bars) => bars.map(b => `${b.type.toUpperCase()}:${b.mm}`).join(', ');
@@ -313,6 +362,14 @@ export default function ConfiguratorPage() {
             {sashType === 'triple' && <select value={splitRatio} onChange={e => setSplitRatio(e.target.value)} className="w-full px-3 py-2 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs mb-2">{SPLIT_RATIOS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}</select>}
             <Lbl>Head</Lbl><HChips o={HEAD_TYPES} v={headType} c={setHeadType} />
           </Sec>}
+
+          <Sec t="Frame">
+            <HChips o={FRAME_OPTIONS} v={frameType} c={changeFrame} />
+            <div className="text-[11px] text-ink-300">
+              Box depth: <span className="text-accent-400 font-medium">{frameDepth}mm</span>
+              {frameType !== 'heritage' && <> · Glass: <span className="text-accent-400 font-medium">{glassLabel(glassType)}</span></>}
+            </div>
+          </Sec>
 
           <Sec t="Dimensions (Frame)">
             <div className="grid grid-cols-2 gap-3">
@@ -353,7 +410,11 @@ export default function ConfiguratorPage() {
           </Sec>
 
           <Sec t="Glass">
-            <Lbl>Type</Lbl><HChips o={GLASS_TYPES} v={glassType} c={setGlassType} />
+            {frameType === 'heritage' ? (
+              <><Lbl>Type</Lbl><HChips o={HERITAGE_GLASS_OPTIONS} v={glassType} c={changeHeritageGlass} /></>
+            ) : (
+              <div className="text-[11px] text-ink-300 mb-2">Type: <span className="text-accent-400 font-medium">{glassLabel(glassType)}</span> <span className="text-ink-500">— set by frame</span></div>
+            )}
             <Lbl>Spec</Lbl><HChips o={GLASS_SPECS} v={glassSpec} c={setGlassSpec} />
             <Lbl>Finish</Lbl><HChips o={GLASS_FINISHES} v={gFin} c={setGFin} />
             {gFin === 'frosted' && <><Lbl>Location</Lbl><HChips o={FROSTED_LOCATIONS} v={frostLoc} c={setFrostLoc} /></>}
@@ -361,16 +422,7 @@ export default function ConfiguratorPage() {
             <Lbl>Spacer type</Lbl><HChips o={SPACER_TYPES} v={spacerType} c={setSpacerType} />
           </Sec>
 
-          <Sec t="Frame & Horns">
-            <Lbl>Frame</Lbl>
-            {isTripleGlass ? (
-              <div className="px-3 py-2 mb-2 rounded-lg border border-amber-500/40 bg-amber-500/5 text-[11px] text-amber-300">
-                Triple glazing forces the standard box — {CONSTANTS.FRAME_DEPTH_TRIPLE}mm deep. Slim frame is not available.
-              </div>
-            ) : (
-              <HChips o={FRAME_OPTIONS} v={frameType} c={setFrameType} />
-            )}
-            <div className="text-[11px] text-ink-300 mb-1">Box depth: <span className="text-accent-400 font-medium">{frameDepth}mm</span></div>
+          <Sec t="Horns & Security">
             {isSash && <><Lbl>Horns</Lbl><HChips o={HORN_OPTIONS} v={horn} c={setHorn} /></>}
             <label className="flex items-center gap-2 text-xs text-ink-400 mt-1.5 cursor-pointer"><input type="checkbox" checked={pas24} onChange={e => setPas24(e.target.checked)} className="accent-accent-500" />PAS24 security</label>
           </Sec>
@@ -382,7 +434,43 @@ export default function ConfiguratorPage() {
           </Sec>
 
           <Sec t="Ironmongery">
+            <Lbl>Finish</Lbl>
             <HChips o={IRON_OPTIONS} v={iron} c={setIron} />
+            <Lbl>Products</Lbl>
+            <div className="space-y-1.5">
+              {slotCategories.map(cat => {
+                const item = getSlotItem(cat.key);
+                return (
+                  <div key={cat.key}
+                    onClick={() => setPickerSlot(cat.key)}
+                    className={`flex items-center gap-2.5 p-2 rounded-lg border cursor-pointer transition-all ${
+                      item
+                        ? 'border-accent-500/30 bg-accent-500/5 hover:bg-accent-500/10'
+                        : 'border-surface-500 bg-surface-700/20 hover:bg-surface-700/40 border-dashed'
+                    }`}
+                  >
+                    <div className="w-9 h-9 rounded bg-surface-600 shrink-0 overflow-hidden">
+                      {item?.image_url ? (
+                        <img src={item.image_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-ink-500 text-[10px]">+</div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[9px] text-ink-400 uppercase tracking-wider">{cat.label}</div>
+                      {item ? (
+                        <div className="text-[11px] text-ink-100 font-medium truncate">{item.name} {item.color && `(${item.color})`}</div>
+                      ) : (
+                        <div className="text-[11px] text-ink-500 italic">Click to assign...</div>
+                      )}
+                    </div>
+                    {item && item.cost_per_unit > 0 && (
+                      <div className="text-[10px] font-mono text-accent-400 shrink-0">£{Number(item.cost_per_unit).toFixed(2)}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </Sec>
         </div>
 
@@ -405,7 +493,7 @@ export default function ConfiguratorPage() {
             {!sameBars && lBars === 'custom' && lCustom.length > 0 && <div className="px-4 py-0.5 text-[10px] text-accent-400">{formatBars(lCustom)}</div>}
           </SG>
           <SG t="Frame & Horns">
-            <SR l="Frame" v={`${effFrameType} · ${frameDepth}mm`} />
+            <SR l="Frame" v={`${frameType} · ${frameDepth}mm`} />
             {isSash && <SR l="Horns" v={horn} />}
           </SG>
           <SG t="Colour">
@@ -420,7 +508,7 @@ export default function ConfiguratorPage() {
             </div>}
           </SG>
           <SG t="Glass">
-            <SR l="Type" v={glassType} />
+            <SR l="Type" v={glassLabel(glassType)} />
             <SR l="Spec" v={glassSpec} /><SR l="Finish" v={gFin} />
             <SR l="Spacer" v={spacerColor} />
             <SR l="Spacer Type" v={(SPACER_TYPES.find(t => t.value === spacerType) || {}).label || 'Warm Edge'} />
@@ -429,9 +517,23 @@ export default function ConfiguratorPage() {
           <SG t="Hardware">
             <SR l="PAS24" v={pas24 ? 'Yes' : 'No'} />
             <SR l="Ironmongery" v={iron} />
+            {slotCategories.map(cat => {
+              const item = getSlotItem(cat.key);
+              return item ? <SR key={cat.key} l={cat.label} v={item.name} /> : null;
+            })}
           </SG>
         </div>
       </div>
+
+      {/* Ironmongery Picker Modal */}
+      {pickerSlot && (
+        <IronmongeryPickerModal
+          categoryKey={pickerSlot}
+          currentItemId={ironSlots[pickerSlot] || null}
+          onSelect={(itemId) => setIronSlots(s => ({ ...s, [pickerSlot]: itemId }))}
+          onClose={() => setPickerSlot(null)}
+        />
+      )}
     </div>
   );
 }
@@ -442,22 +544,22 @@ function Lbl({ children }) { return <div className="text-xs text-ink-400 font-me
 function HChips({ o, v, c }) { return <div className="flex flex-wrap gap-1.5 mb-2">{o.map(x => <button key={String(x.value)} onClick={() => c(x.value)} className={`px-2.5 py-1 text-[11px] rounded-lg border transition-all ${v === x.value ? 'border-accent-500 bg-accent-500/15 text-accent-400 font-medium' : 'border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500'}`}>{x.label}</button>)}</div>; }
 function GChips({ o, v, c }) { return <div className="grid grid-cols-4 gap-1 mb-2">{o.map(x => <button key={x.value} onClick={() => c(x.value)} className={`px-1.5 py-1 text-[11px] rounded border transition-all ${v === x.value ? 'border-accent-500 bg-accent-500/15 text-accent-400 font-medium' : 'border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500'}`}>{x.label}</button>)}</div>; }
 
-// ─── Colour picker field (swatches + custom + RAL + F&B), matching EstimateConfiguratorPage ───
+// ─── Colour picker field: single row of 5 small swatches + custom, RAL + F&B dropdowns ───
 function ColorField({ label, value, onChange }) {
   return (
     <div className="mb-2">
       <Lbl>{label}</Lbl>
       <div className="flex items-center gap-2 mb-1">
-        <div className="w-6 h-6 rounded border border-surface-400 shrink-0" style={{ backgroundColor: value }} />
+        <div className="w-5 h-5 rounded border border-surface-400 shrink-0" style={{ backgroundColor: value }} />
         <span className="text-xs text-ink-100 font-medium truncate">{hexToName(value)}</span>
       </div>
-      <div className="grid grid-cols-5 gap-1">
-        {SWATCHES.map((s) => (
+      <div className="flex gap-1">
+        {SWATCHES.slice(0, 5).map((s) => (
           <div key={s.hex} onClick={() => onChange(s.hex)} title={s.name}
-            className={`aspect-square rounded cursor-pointer border ${value === s.hex ? 'border-accent-500 border-2' : 'border-surface-500'}`}
+            className={`w-6 h-6 rounded cursor-pointer border ${value === s.hex ? 'border-accent-500 border-2' : 'border-surface-500'}`}
             style={{ backgroundColor: s.hex }} />
         ))}
-        <label className="aspect-square rounded border border-dashed border-surface-400 flex items-center justify-center cursor-pointer text-ink-400 hover:text-ink-200 text-sm relative" title="Custom colour">
+        <label className="w-6 h-6 rounded border border-dashed border-surface-400 flex items-center justify-center cursor-pointer text-ink-400 hover:text-ink-200 text-xs relative" title="Custom colour">
           +
           <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="absolute opacity-0 w-0 h-0" />
         </label>
