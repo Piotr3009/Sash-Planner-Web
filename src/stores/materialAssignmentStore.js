@@ -7,6 +7,12 @@ export const SASH_WINDOW_PARTS = {
   box: [
     { id: 'head',            name: 'Head',                  section: '28×141',  pcs: 1, materialType: 'hardwood' },
     { id: 'jambs',           name: 'Jambs',                 section: '28×141',  pcs: 2, materialType: 'hardwood' },
+    { id: 'head_slim',       name: 'Head (Slim)',           section: '28×121',  pcs: 1, materialType: 'hardwood', note: 'slim frame' },
+    { id: 'jambs_slim',      name: 'Jambs (Slim)',          section: '28×121',  pcs: 2, materialType: 'hardwood', note: 'slim frame' },
+    { id: 'head_heritage',   name: 'Head (Heritage)',       section: '28×111',  pcs: 1, materialType: 'hardwood', note: 'heritage frame' },
+    { id: 'jambs_heritage',  name: 'Jambs (Heritage)',      section: '28×111',  pcs: 2, materialType: 'hardwood', note: 'heritage frame' },
+    { id: 'head_triple',     name: 'Head (Triple)',         section: '28×149',  pcs: 1, materialType: 'hardwood', note: 'triple glazing frame' },
+    { id: 'jambs_triple',    name: 'Jambs (Triple)',        section: '28×149',  pcs: 2, materialType: 'hardwood', note: 'triple glazing frame' },
     { id: 'cill',            name: 'Cill',                  section: '69×46',   pcs: 1, materialType: 'hardwood' },
     { id: 'cill_nose',       name: 'Cill Nose',             section: '64×128',  pcs: 1, materialType: 'hardwood' },
     { id: 'cill_extension',  name: 'Cill Extension',        section: '—',       pcs: 1, materialType: 'hardwood', optional: true },

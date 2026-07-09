@@ -50,6 +50,9 @@ export const GLASS_TYPE_TO_PART_ID = {
   passive: 'glass_passive',
 };
 
+// Box head/jamb parts split per frame type (raw board width differs)
+export const FRAME_BOX_PART_SUFFIX = { slim: '_slim', heritage: '_heritage', triple: '_triple' };
+
 // Hardware line (buildHardwareList item name) → ironmongery slot category key
 export const HARDWARE_TO_SLOT_KEY = {
   'Sash lock': 'locks',
@@ -86,10 +89,16 @@ export function buildWindowPartQtys(derived, windowSpec, settings) {
   };
 
   // ── Timber from pre-cut (has machining allowance) — totals in mm ──
+  // Head/Jambs use a different board width per frame type → route to the matching part.
+  const boxSuffix = FRAME_BOX_PART_SUFFIX[windowSpec?.frame?.type] || '';
+  const partIdFor = (elementName) => {
+    const pid = ELEMENT_TO_PART_ID[elementName];
+    return (boxSuffix && (pid === 'head' || pid === 'jambs')) ? `${pid}${boxSuffix}` : pid;
+  };
   const precut = buildPrecutForWindow(derived, windowSpec, settings);
   if (precut) {
     const addItems = (items) => items.forEach((it) => {
-      addMm(ELEMENT_TO_PART_ID[it.elementName], it.length * (it.quantity || 1));
+      addMm(partIdFor(it.elementName), it.length * (it.quantity || 1));
     });
     (precut.sashEngineering || []).forEach((g) => addItems(g.items));
     (precut.boxSapele || []).forEach((g) => addItems(g.items));

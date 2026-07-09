@@ -24,6 +24,15 @@ export const CONSTANTS = Object.freeze({
     FRAME_DEPTH_TRIPLE: 172,
     FRAME_DEPTH_HERITAGE: 134,
 
+    // Sash finished depth (mm) per frame type — face widths stay the same,
+    // raw stock stays 63x63 / 63x95; only the planed depth differs.
+    SASH_DEPTH_STANDARD: 57,
+    SASH_DEPTH_SLIM: 47,
+    SASH_DEPTH_HERITAGE: 42,
+    SASH_DEPTH_TRIPLE: 61,
+    // Head/Jamb board width = box depth − inset (164−23=141, 144→121, 134→111, 172→149)
+    BOX_BOARD_INSET: 23,
+
     // Timber dimensions (mm) - visible from front elevation
     JAMBS_WIDTH: 28,
     HEAD_WIDTH: 28,
@@ -215,15 +224,17 @@ function calculateSashComponentSet(windowSpec, settings, sashWidth, topSashHeigh
     const hornExtra = windowSpec.sash?.horns ? Number(windowSpec.sash?.hornExtension ?? settings.hornExtensionDefault) : 0;
     const railLength = sashWidth;
 
+    // Finished sash depth depends on the frame type (slim/heritage/triple/standard)
+    const sd = sashDepthFor(windowSpec.frame?.type);
     const sashComponents = [];
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'TOP RAIL', '57x57', railLength, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES TOP (L)', '57x57', topSashHeight + hornExtra, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES TOP (R)', '57x57', topSashHeight + hornExtra, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'TOP MEET RAIL', '57x43', railLength, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'BOTTOM MEET RAIL', '57x43', railLength, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES BOTTOM SASH (L)', '57x57', bottomSashHeight, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES BOTTOM SASH (R)', '57x57', bottomSashHeight, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'BOTTOM RAIL', '57x90', railLength, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'TOP RAIL', `${sd}x57`, railLength, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES TOP (L)', `${sd}x57`, topSashHeight + hornExtra, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES TOP (R)', `${sd}x57`, topSashHeight + hornExtra, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'TOP MEET RAIL', `${sd}x43`, railLength, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'BOTTOM MEET RAIL', `${sd}x43`, railLength, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES BOTTOM SASH (L)', `${sd}x57`, bottomSashHeight, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES BOTTOM SASH (R)', `${sd}x57`, bottomSashHeight, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'BOTTOM RAIL', `${sd}x90`, railLength, 1));
 
     return sashComponents;
 }
@@ -235,12 +246,13 @@ function calculateBoxComponentSet(windowSpec, frameWidth, frameHeight) {
     const extHeadLinerLength = frameWidth - CONSTANTS.EXTERNAL_HEAD_LINER_DEDUCTION;
     const intHeadLinerLength = frameWidth - CONSTANTS.INTERNAL_HEAD_LINER_DEDUCTION;
 
+    const bw = boxBoardWidthFor(windowSpec.frame?.depth);
     const boxComponents = [];
-    boxComponents.push(createComponentRecord(windowSpec, 'box', 'HEAD', '28x141', headLength, 1));
+    boxComponents.push(createComponentRecord(windowSpec, 'box', 'HEAD', `28x${bw}`, headLength, 1));
     boxComponents.push(createComponentRecord(windowSpec, 'box', 'CILL', '69x46', headLength + cillExtension, 1, `Extension ${cillExtension}mm`));
     boxComponents.push(createComponentRecord(windowSpec, 'box', 'CILL NOSE', '64x128', headLength + cillExtension, 1));
-    boxComponents.push(createComponentRecord(windowSpec, 'box', 'JAMB LEFT', '28x141', jambLength, 1));
-    boxComponents.push(createComponentRecord(windowSpec, 'box', 'JAMB RIGHT', '28x141', jambLength, 1));
+    boxComponents.push(createComponentRecord(windowSpec, 'box', 'JAMB LEFT', `28x${bw}`, jambLength, 1));
+    boxComponents.push(createComponentRecord(windowSpec, 'box', 'JAMB RIGHT', `28x${bw}`, jambLength, 1));
     boxComponents.push(createComponentRecord(windowSpec, 'box', 'INTERNAL HEAD LINER', '17x86', intHeadLinerLength, 1));
     boxComponents.push(createComponentRecord(windowSpec, 'box', 'EXTERNAL HEAD LINER', '17x102', extHeadLinerLength, 1));
     boxComponents.push(createComponentRecord(windowSpec, 'box', 'INTERNAL JAMB LINER (L)', '17x86', frameHeight, 1));
@@ -283,6 +295,19 @@ function calculateGlazingSummaryForWindow(windowSpec, sashWidth, sashHeight, set
 
 const OFFCUT_FACTOR = 1.15; // 15% waste for off-cuts
 
+// ─── Frame-dependent finished sections ───
+export function sashDepthFor(frameType) {
+    switch (frameType) {
+        case 'slim': return CONSTANTS.SASH_DEPTH_SLIM;
+        case 'heritage': return CONSTANTS.SASH_DEPTH_HERITAGE;
+        case 'triple': return CONSTANTS.SASH_DEPTH_TRIPLE;
+        default: return CONSTANTS.SASH_DEPTH_STANDARD;
+    }
+}
+export function boxBoardWidthFor(frameDepth) {
+    return (Number(frameDepth) || CONSTANTS.FRAME_DEPTH_STANDARD) - CONSTANTS.BOX_BOARD_INSET;
+}
+
 // ─── Weight constants ───
 const KG_PER_METER = {
     '57x57': 2.0,   // stiles, top rail
@@ -300,6 +325,8 @@ const GLASS_KG_PER_SQM = {
 
 function calculateWeights(windowSpec, sashWidth, topSashHeight, bottomSashHeight) {
     const sw = sashWidth / 1000; // to meters
+    // KG_PER_METER is calibrated for 57mm-deep sections; scale by actual sash depth
+    const depthScale = sashDepthFor(windowSpec.frame?.type) / CONSTANTS.SASH_DEPTH_STANDARD;
 
     // Upper sash: 2× stiles (57×57) + top rail (57×57) + meeting rail (57×43)
     const upperTimber =
@@ -321,11 +348,11 @@ function calculateWeights(windowSpec, sashWidth, topSashHeight, bottomSashHeight
     const glassSqmPerSash = (glassW * glassH) / 1_000_000;
     const glassTotal = glassSqmPerSash * kgPerSqm * 2;
 
-    const subtotal = upperTimber + lowerTimber + glassTotal;
+    const subtotal = (upperTimber + lowerTimber) * depthScale + glassTotal;
     const total = round(subtotal * 1.05); // +5% silicone, clips, etc.
 
     return {
-        timber: round(upperTimber + lowerTimber),
+        timber: round((upperTimber + lowerTimber) * depthScale),
         glass: round(glassTotal),
         total,
         glassType,
@@ -647,25 +674,26 @@ function calculateFrameComponents(frameWidth, frameHeight) {
 function calculateSashComponents(sashWidth, sashHeight, config) {
     // Rails are cut at sash width — tenons protrude into stile mortices
     const horizontalLength = sashWidth;
+    const sashSection = `${sashDepthFor(config?.frame?.type)} x 57`;
     const availableWidth = sashWidth - 2 * CONSTANTS.STILE_WIDTH;
     const availableHeight = sashHeight - CONSTANTS.TOP_RAIL_WIDTH - CONSTANTS.BOTTOM_RAIL_WIDTH;
 
-    const stiles = buildComponent('Sash stiles', CONSTANTS.STILE_WIDTH, sashHeight, 2, CONSTANTS.SASH_SECTION, 'Hardwood', {
+    const stiles = buildComponent('Sash stiles', CONSTANTS.STILE_WIDTH, sashHeight, 2, sashSection, 'Hardwood', {
         preCutLength: sashHeight + CONSTANTS.HORN_ALLOWANCE_VERTICAL,
         cutLength: sashHeight
     });
 
-    const topRail = buildComponent('Top rail', CONSTANTS.TOP_RAIL_WIDTH, horizontalLength, 1, CONSTANTS.SASH_SECTION, 'Hardwood', {
+    const topRail = buildComponent('Top rail', CONSTANTS.TOP_RAIL_WIDTH, horizontalLength, 1, sashSection, 'Hardwood', {
         preCutLength: horizontalLength + CONSTANTS.HORN_ALLOWANCE_HORIZONTAL,
         cutLength: horizontalLength
     });
 
-    const meetingRail = buildComponent('Meeting rail', CONSTANTS.MEETING_RAIL_WIDTH, horizontalLength, 1, CONSTANTS.SASH_SECTION, 'Hardwood', {
+    const meetingRail = buildComponent('Meeting rail', CONSTANTS.MEETING_RAIL_WIDTH, horizontalLength, 1, sashSection, 'Hardwood', {
         preCutLength: horizontalLength + CONSTANTS.HORN_ALLOWANCE_HORIZONTAL,
         cutLength: horizontalLength
     });
 
-    const bottomRail = buildComponent('Bottom rail', CONSTANTS.BOTTOM_RAIL_WIDTH, horizontalLength, 1, CONSTANTS.SASH_SECTION, 'Hardwood', {
+    const bottomRail = buildComponent('Bottom rail', CONSTANTS.BOTTOM_RAIL_WIDTH, horizontalLength, 1, sashSection, 'Hardwood', {
         preCutLength: horizontalLength + CONSTANTS.HORN_ALLOWANCE_HORIZONTAL,
         cutLength: horizontalLength
     });
@@ -803,7 +831,7 @@ function buildPrecutList(frameComponents, sashComponents) {
             width: CONSTANTS.GLAZING_BAR_WIDTH,
             length: sashComponents.glazingBars.vertical.length,
             quantity: sashComponents.glazingBars.vertical.quantity,
-            section: CONSTANTS.SASH_SECTION,
+            section: sashComponents.stiles.section,
             material: 'Hardwood'
         });
     }
@@ -814,7 +842,7 @@ function buildPrecutList(frameComponents, sashComponents) {
             width: CONSTANTS.GLAZING_BAR_WIDTH,
             length: sashComponents.glazingBars.horizontal.length,
             quantity: sashComponents.glazingBars.horizontal.quantity,
-            section: CONSTANTS.SASH_SECTION,
+            section: sashComponents.stiles.section,
             material: 'Hardwood'
         });
     }

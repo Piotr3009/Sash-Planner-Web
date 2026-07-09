@@ -332,7 +332,7 @@ export default function MaterialAssignmentsPage() {
         {/* Box Frame */}
         <PartGroupSection
           title="🪵 Box Frame"
-          subtitle={`${SASH_WINDOW_PARTS.box.length} parts · frame, cill, liners`}
+          subtitle={`${SASH_WINDOW_PARTS.box.length} parts · frame, cill, liners · head/jambs per frame type`}
           parts={SASH_WINDOW_PARTS.box}
           assignments={assignments}
           materials={materials}
