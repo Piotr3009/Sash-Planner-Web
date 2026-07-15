@@ -371,7 +371,7 @@ export default function WindowSettingsPage() {
       <div className="text-[11px] text-ink-500 mt-2">Defaults = OTD profile · glazing bars stay built-in · values apply to new calculations immediately</div>
         </div>
 
-        <div className="w-[380px] xl:w-[460px] shrink-0 sticky top-4">
+        <div className="flex-1 min-w-0 shrink-0 sticky top-4">
       {/* Technical drawings — click an element to edit it */}
       {sample && (
         <>
@@ -386,9 +386,9 @@ export default function WindowSettingsPage() {
                 selectedElement={selected} onElementClick={setSelected} />
             </div>
             <div className="card p-2 col-span-2 flex justify-center">
-              <div className="w-1/2">
+              <div className="w-3/4">
                 <JambDetail2D boardWidth={boardW} thickness={els.jambs.thickness}
-                  selected={selected === 'jambs'} onClick={setSelected} />
+                  selectedElement={selected} onElementClick={setSelected} />
               </div>
             </div>
             <div className="card p-2">
