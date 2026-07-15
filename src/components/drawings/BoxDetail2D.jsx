@@ -217,7 +217,7 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
                 style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onElementClick('cill'); }} />
 
               {/* Board mounting indicators — where the head / jamb boards sit */}
-              {hl('jamb') && (
+              {hl('jambs') && (
                 <>
                   <line x1={X(BOX.jambW_top / 2)} y1={Y(BOX.sillTop + 10)} x2={X(BOX.jambW_top / 2)} y2={Y(fh - BOX.headH)}
                     stroke={COLORS.highlight} strokeWidth={STROKES.boardIndicator} {...NS} />
