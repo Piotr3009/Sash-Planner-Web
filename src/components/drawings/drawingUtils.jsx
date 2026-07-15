@@ -115,7 +115,7 @@ export function DimV({ x, y1, y2, label, small, vbw, extFrom }) {
 }
 
 // ─── Horizontal dimension CHAIN ───
-export function DimChainH({ y, cuts, extFrom, vbw, minSegment = 40, fmt }) {
+export function DimChainH({ y, cuts, extFrom, vbw, minSegment = 40, fmt, labels }) {
   if (!cuts || cuts.length < 2) return null;
   const ts = vbw / VIEWBOX_REF;
   const tick = DIMS.tickHalf * ts;
@@ -148,7 +148,7 @@ export function DimChainH({ y, cuts, extFrom, vbw, minSegment = 40, fmt }) {
         const nx = cuts[i + 1];
         const width = nx - cx;
         const mid = (cx + nx) / 2;
-        const lbl = format(width);
+        const lbl = (labels && labels[i] !== undefined) ? String(labels[i]) : format(width);
         if (width < minSegment) {
           return (
             <g key={`lbl-${i}`}>
@@ -173,7 +173,7 @@ export function DimChainH({ y, cuts, extFrom, vbw, minSegment = 40, fmt }) {
 }
 
 // ─── Vertical dimension CHAIN ───
-export function DimChainV({ x, cuts, extFrom, vbw, minSegment = 40, fmt }) {
+export function DimChainV({ x, cuts, extFrom, vbw, minSegment = 40, fmt, labels }) {
   if (!cuts || cuts.length < 2) return null;
   const ts = vbw / VIEWBOX_REF;
   const tick = DIMS.tickHalf * ts;
@@ -206,7 +206,7 @@ export function DimChainV({ x, cuts, extFrom, vbw, minSegment = 40, fmt }) {
         const ny = cuts[i + 1];
         const height = Math.abs(ny - cy);
         const mid = (cy + ny) / 2;
-        const lbl = format(height);
+        const lbl = (labels && labels[i] !== undefined) ? String(labels[i]) : format(height);
         if (height < minSegment) {
           return (
             <g key={`lbl-${i}`}>

@@ -624,6 +624,16 @@ export function deriveWindowData(windowSpec, settings = {}) {
         topSashHeight,
         bottomSashHeight,
         config,
+        // Profile numbers for drawing dimension labels (schematic geometry stays
+        // fixed; only the printed numbers follow the active/snapshotted profile).
+        boxDims: (() => {
+            const e = getWindowProfile().elements || {};
+            return {
+                intJamb: e.intJambLiner?.h, intHead: e.intHeadLiner?.h,
+                extJamb: e.extJambLiner?.h, extHead: e.extHeadLiner?.h,
+                cillH: e.cill?.w,
+            };
+        })(),
         components: { sash: sashComponents, box: boxComponents, beading: beadingComponents },
         glazingItems: [glazingSummary],
         barPositions,

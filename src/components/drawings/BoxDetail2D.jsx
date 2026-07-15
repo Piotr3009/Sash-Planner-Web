@@ -65,24 +65,45 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
   const X = (x) => ox + x;
   const Y = (y) => oy + (fh - y);
 
-  const rJamb = [
-    `M ${X(fw - BOX.jambW_bottom)} ${Y(0)}`,
-    `L ${X(fw - BOX.jambW_bottom)} ${Y(BOX.sillTop)}`,
-    bulgeArc(X(fw - BOX.jambW_bottom), Y(BOX.sillTop), X(fw - BOX.jambW_top), Y(BOX.sillCurveTop), BOX.bulge),
-    `L ${X(fw - BOX.jambW_top)} ${Y(fh)}`,
-    `L ${X(fw)} ${Y(fh)}`, `L ${X(fw)} ${Y(0)}`, 'Z',
-  ].join(' ');
+  // External: jamb narrows at the sill nose via an arc (real external profile).
+  // Internal: staff-bead face — liners run straight full height, no arc; the
+  // sill is a plain band between the liners with one straight top line.
+  const rJamb = isInternal
+    ? `M ${X(fw - BOX.jambW_top)} ${Y(0)} L ${X(fw - BOX.jambW_top)} ${Y(fh)} L ${X(fw)} ${Y(fh)} L ${X(fw)} ${Y(0)} Z`
+    : [
+        `M ${X(fw - BOX.jambW_bottom)} ${Y(0)}`,
+        `L ${X(fw - BOX.jambW_bottom)} ${Y(BOX.sillTop)}`,
+        bulgeArc(X(fw - BOX.jambW_bottom), Y(BOX.sillTop), X(fw - BOX.jambW_top), Y(BOX.sillCurveTop), BOX.bulge),
+        `L ${X(fw - BOX.jambW_top)} ${Y(fh)}`,
+        `L ${X(fw)} ${Y(fh)}`, `L ${X(fw)} ${Y(0)}`, 'Z',
+      ].join(' ');
 
-  const lJamb = [
-    `M ${X(BOX.jambW_bottom)} ${Y(0)}`,
-    `L ${X(BOX.jambW_bottom)} ${Y(BOX.sillTop)}`,
-    bulgeArc(X(BOX.jambW_bottom), Y(BOX.sillTop), X(BOX.jambW_top), Y(BOX.sillCurveTop), -BOX.bulge),
-    `L ${X(BOX.jambW_top)} ${Y(fh)}`,
-    `L ${X(0)} ${Y(fh)}`, `L ${X(0)} ${Y(0)}`, 'Z',
-  ].join(' ');
+  const lJamb = isInternal
+    ? `M ${X(BOX.jambW_top)} ${Y(0)} L ${X(BOX.jambW_top)} ${Y(fh)} L ${X(0)} ${Y(fh)} L ${X(0)} ${Y(0)} Z`
+    : [
+        `M ${X(BOX.jambW_bottom)} ${Y(0)}`,
+        `L ${X(BOX.jambW_bottom)} ${Y(BOX.sillTop)}`,
+        bulgeArc(X(BOX.jambW_bottom), Y(BOX.sillTop), X(BOX.jambW_top), Y(BOX.sillCurveTop), -BOX.bulge),
+        `L ${X(BOX.jambW_top)} ${Y(fh)}`,
+        `L ${X(0)} ${Y(fh)}`, `L ${X(0)} ${Y(0)}`, 'Z',
+      ].join(' ');
 
   const head = `M ${X(BOX.jambW_top)} ${Y(fh)} L ${X(fw - BOX.jambW_top)} ${Y(fh)} L ${X(fw - BOX.jambW_top)} ${Y(fh - BOX.headH)} L ${X(BOX.jambW_top)} ${Y(fh - BOX.headH)} Z`;
-  const sill = `M ${X(BOX.jambW_bottom)} ${Y(0)} L ${X(fw - BOX.jambW_bottom)} ${Y(0)} L ${X(fw - BOX.jambW_bottom)} ${Y(BOX.sillNose)} L ${X(BOX.jambW_bottom)} ${Y(BOX.sillNose)} Z`;
+  const sill = isInternal
+    ? `M ${X(BOX.jambW_top)} ${Y(0)} L ${X(fw - BOX.jambW_top)} ${Y(0)} L ${X(fw - BOX.jambW_top)} ${Y(BOX.sillTop)} L ${X(BOX.jambW_top)} ${Y(BOX.sillTop)} Z`
+    : `M ${X(BOX.jambW_bottom)} ${Y(0)} L ${X(fw - BOX.jambW_bottom)} ${Y(0)} L ${X(fw - BOX.jambW_bottom)} ${Y(BOX.sillNose)} L ${X(BOX.jambW_bottom)} ${Y(BOX.sillNose)} Z`;
+
+  // Dimension numbers — live from the profile the derived data was computed
+  // with (snapshot-aware); geometry above stays schematic.
+  const pd = derived?.boxDims || {};
+  const intJambDim = Math.round(Number(pd.intJamb ?? 86));
+  const intHeadDim = Math.round(Number(pd.intHead ?? 86));
+  const extJambDim = Math.round(Number(pd.extJamb ?? BOX.jambW_top));
+  const extHeadDim = Math.round(Number(pd.extHead ?? BOX.headH));
+  const cillHDim = Math.round(Number(pd.cillH ?? 69));
+  const jambDim = isInternal ? intJambDim : extJambDim;
+  const headDim = isInternal ? intHeadDim : extHeadDim;
+  const innerDim = fw - 2 * jambDim;
 
   const winName = windowSpec?.name || 'Window';
   const projNum = projectNumber || '';
@@ -105,13 +126,20 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
           <path d={head} fill={COL.frameFill} stroke={COL.frame} strokeWidth={STROKES.frame} {...NS} />
           <path d={sill} fill={COL.frameFill} stroke={COL.frame} strokeWidth={STROKES.frame} {...NS} />
 
-          {/* Sill details */}
-          <line x1={X(BOX.jambW_bottom)} y1={Y(BOX.sillWeatherbar)} x2={X(fw - BOX.jambW_bottom)} y2={Y(BOX.sillWeatherbar)}
-            stroke={COL.sillDetail} strokeWidth={STROKES.sash} {...NS} />
-          <line x1={X(BOX.jambW_bottom)} y1={Y(BOX.sillDrip)} x2={X(fw - BOX.jambW_bottom)} y2={Y(BOX.sillDrip)}
-            stroke={COL.sillDetail} strokeWidth={STROKES.sash} {...NS} />
-          <line x1={X(BOX.jambW_bottom)} y1={Y(BOX.sillTop)} x2={X(fw - BOX.jambW_bottom)} y2={Y(BOX.sillTop)}
-            stroke={COL.sillDetail} strokeWidth={STROKES.sash} {...NS} />
+          {/* Sill details — external: full profile; internal: one straight top line between liners */}
+          {isInternal ? (
+            <line x1={X(BOX.jambW_top)} y1={Y(BOX.sillTop)} x2={X(fw - BOX.jambW_top)} y2={Y(BOX.sillTop)}
+              stroke={COL.sillDetail} strokeWidth={STROKES.sash} {...NS} />
+          ) : (
+            <>
+              <line x1={X(BOX.jambW_bottom)} y1={Y(BOX.sillWeatherbar)} x2={X(fw - BOX.jambW_bottom)} y2={Y(BOX.sillWeatherbar)}
+                stroke={COL.sillDetail} strokeWidth={STROKES.sash} {...NS} />
+              <line x1={X(BOX.jambW_bottom)} y1={Y(BOX.sillDrip)} x2={X(fw - BOX.jambW_bottom)} y2={Y(BOX.sillDrip)}
+                stroke={COL.sillDetail} strokeWidth={STROKES.sash} {...NS} />
+              <line x1={X(BOX.jambW_bottom)} y1={Y(BOX.sillTop)} x2={X(fw - BOX.jambW_bottom)} y2={Y(BOX.sillTop)}
+                stroke={COL.sillDetail} strokeWidth={STROKES.sash} {...NS} />
+            </>
+          )}
 
           {/* Labels */}
           <text x={X(BOX.jambW_bottom / 2)} y={Y(fh / 2)} fill={COL.label}
@@ -131,7 +159,7 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
             fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}>
             {linerPrefix} HEAD LINER
           </text>
-          <text x={X(fw / 2)} y={Y(BOX.sillNose / 2) + 8 * totalW / VIEWBOX_REF} fill={COL.label}
+          <text x={X(fw / 2)} y={Y((isInternal ? BOX.sillTop : BOX.sillNose) / 2) + 8 * totalW / VIEWBOX_REF} fill={COL.label}
             fontSize={tfs(SIZES.label, totalW)} fontWeight={WEIGHTS.label}
             fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}>
             SILL
@@ -144,17 +172,27 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
 
           {/* Dimensions */}
           <DimChainH y={Y(0) + DM * 1.3} extFrom={Y(0)} vbw={totalW}
-            cuts={[X(0), X(BOX.jambW_bottom), X(fw - BOX.jambW_bottom), X(fw)]} />
+            cuts={isInternal
+              ? [X(0), X(BOX.jambW_top), X(fw - BOX.jambW_top), X(fw)]
+              : [X(0), X(BOX.jambW_bottom), X(fw - BOX.jambW_bottom), X(fw)]}
+            labels={isInternal ? [intJambDim, innerDim, intJambDim] : undefined} />
           <DimH y={Y(fh) - DM * 1.2} x1={X(BOX.jambW_top)} x2={X(fw - BOX.jambW_top)}
-            extFrom={Y(fh)} label={`${d.innerW} (inner)`} small vbw={totalW} />
+            extFrom={Y(fh)} label={`${innerDim} (inner)`} small vbw={totalW} />
           <DimChainV x={X(fw) + DM * 1.3} extFrom={X(fw)} vbw={totalW}
-            cuts={[Y(0), Y(BOX.sillTop), Y(fh - BOX.headH), Y(fh)]} />
+            cuts={[Y(0), Y(BOX.sillTop), Y(fh - BOX.headH), Y(fh)]}
+            labels={isInternal
+              ? [cillHDim, fh - cillHDim - intHeadDim, intHeadDim]
+              : [BOX.sillTop, fh - BOX.sillTop - extHeadDim, extHeadDim]} />
           <DimV x={X(0) - DM} y1={Y(fh)} y2={Y(fh - BOX.headH)}
-            extFrom={X(0)} label={`${BOX.headH}`} small vbw={totalW} />
-          <DimV x={X(fw) + DM * 2.5} y1={Y(0)} y2={Y(BOX.sillNose)}
-            extFrom={X(fw)} label={`${BOX.sillNose}`} small vbw={totalW} />
-          <DimV x={X(fw) + DM * 2.5} y1={Y(BOX.sillNose)} y2={Y(BOX.sillTop)}
-            extFrom={X(fw)} label={`${BOX.sillTop - BOX.sillNose}`} small vbw={totalW} />
+            extFrom={X(0)} label={`${headDim}`} small vbw={totalW} />
+          {!isInternal && (
+            <>
+              <DimV x={X(fw) + DM * 2.5} y1={Y(0)} y2={Y(BOX.sillNose)}
+                extFrom={X(fw)} label={`${BOX.sillNose}`} small vbw={totalW} />
+              <DimV x={X(fw) + DM * 2.5} y1={Y(BOX.sillNose)} y2={Y(BOX.sillTop)}
+                extFrom={X(fw)} label={`${BOX.sillTop - BOX.sillNose}`} small vbw={totalW} />
+            </>
+          )}
 
 
           {/* Selection overlays (Window Settings) — invisible click zones + highlight */}
@@ -172,7 +210,8 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
                 fill={hl(headKey) ? COLORS.highlightFill : 'transparent'}
                 stroke={hl(headKey) ? COLORS.highlight : 'none'} strokeWidth={STROKES.frame} {...NS}
                 style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onElementClick(headKey); }} />
-              <rect x={X(0)} y={Y(BOX.sillTop)} width={fw} height={BOX.sillTop}
+              <rect x={isInternal ? X(BOX.jambW_top) : X(0)} y={Y(BOX.sillTop)}
+                width={isInternal ? fw - 2 * BOX.jambW_top : fw} height={BOX.sillTop}
                 fill={hl('cill') ? COLORS.highlightFill : 'transparent'}
                 stroke={hl('cill') ? COLORS.highlight : 'none'} strokeWidth={STROKES.frame} {...NS}
                 style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onElementClick('cill'); }} />
@@ -183,7 +222,7 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
           <text x={totalW / 2} y={totalH - 10 * totalW / VIEWBOX_REF} fill={COL.title}
             fontSize={tfs(SIZES.title, totalW)}
             fontFamily={FONT.family} textAnchor="middle" fontWeight={WEIGHTS.title}>
-            Box — {isInternal ? 'Internal' : 'Front'}{projNum ? ` — ${projNum}` : ''} — {winName}
+            Box — {isInternal ? 'Internal' : 'External'}{projNum ? ` — ${projNum}` : ''} — {winName}
           </text>
           <text x={totalW / 2} y={totalH + 14 * totalW / VIEWBOX_REF} fill={COL.title}
             fontSize={tfs(SIZES.subtitle, totalW)}
