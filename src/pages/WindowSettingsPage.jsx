@@ -116,7 +116,7 @@ export default function WindowSettingsPage() {
   const num = (v, fb = 0) => (v === '' ? '' : Number(v) || fb);
 
   return (
-    <div className="p-6 max-w-6xl">
+    <div className="p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <div>
@@ -385,12 +385,6 @@ export default function WindowSettingsPage() {
               <BoxDetail2D windowSpec={sample.ws} derived={sample.derived} view="internal"
                 selectedElement={selected} onElementClick={setSelected} />
             </div>
-            <div className="card p-2 col-span-2 flex justify-center">
-              <div className="w-3/4">
-                <JambDetail2D boardWidth={boardW} thickness={els.jambs.thickness}
-                  selectedElement={selected} onElementClick={setSelected} />
-              </div>
-            </div>
             <div className="card p-2">
               <SashDetail2D windowSpec={sample.ws} derived={sample.derived} type="upper"
                 selectedElement={selected} onElementClick={setSelected} />
@@ -398,6 +392,12 @@ export default function WindowSettingsPage() {
             <div className="card p-2">
               <SashDetail2D windowSpec={sample.ws} derived={sample.derived} type="lower"
                 selectedElement={selected} onElementClick={setSelected} />
+            </div>
+            <div className="card p-2 col-span-2 flex justify-center">
+              <div className="w-[56%]">
+                <JambDetail2D boardWidth={boardW} thickness={els.jambs.thickness}
+                  selectedElement={selected} onElementClick={setSelected} />
+              </div>
             </div>
           </div>
         </>
