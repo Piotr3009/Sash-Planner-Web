@@ -212,9 +212,10 @@ export default function ProductionPackPage() {
     return sourceWindows.map((win) => {
       const spec = parseSpecification(win.specification);
       const windowSpec = normaliseToWindowSpec(win, spec);
+      const b = win._batch || batch;
       let derived = null;
       try {
-        derived = withProfiles(batch?.defaults?._profileSnapshot?.sash, batch?.defaults?._profileSnapshot?.casement, () => deriveWindowData(windowSpec, settings));
+        derived = withProfiles(b?.defaults?._profileSnapshot?.sash, b?.defaults?._profileSnapshot?.casement, () => deriveWindowData(windowSpec, settings));
       } catch (e) {
         console.warn(`Calc failed for ${win.name}:`, e);
       }

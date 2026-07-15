@@ -57,7 +57,7 @@ export default function ProjectDetailPage() {
         const spec = parseSpecification(win.specification);
         const windowSpec = normaliseToWindowSpec(win, spec);
         let derived = null;
-        try { derived = withProfiles(batch?.defaults?._profileSnapshot?.sash, batch?.defaults?._profileSnapshot?.casement, () => deriveWindowData(windowSpec, settings)); }
+        try { derived = withProfiles(b?.defaults?._profileSnapshot?.sash, b?.defaults?._profileSnapshot?.casement, () => deriveWindowData(windowSpec, settings)); }
         catch (e) { console.warn(`Calc failed for ${win.name}:`, e); }
         if (derived) windows.push({ derived, windowSpec, batch: b });
       });
