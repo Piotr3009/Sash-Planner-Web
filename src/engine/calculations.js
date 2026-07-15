@@ -11,7 +11,7 @@ export const CONSTANTS = Object.freeze({
     // Total sash height deduction from frame: top_sash + bot_sash = frame_height - 92
     // Bottom sash is 33mm taller than top sash
     SASH_HEIGHT_DEDUCTION: 92,
-    SASH_HEIGHT_DIFFERENCE: 33,
+    SASH_HEIGHT_DIFFERENCE: 33,   // legacy fallback — live value = bottomRail.face − topRail.face (sashFaces().diff)
 
     // Frame component deductions (verified against Excel)
     JAMB_HEIGHT_DEDUCTION: 108,
@@ -82,6 +82,25 @@ export const CONSTANTS = Object.freeze({
     // Miscellaneous
     VAT_RATE: 0.2
 });
+
+/** Live sash face widths from the active (or snapshotted) profile.
+ *  Schematic drawings keep CONSTANTS; all calculations use these. */
+function sashFaces() {
+    const e = getWindowProfile().elements || {};
+    const stile = Number(e.stiles?.face) || CONSTANTS.STILE_WIDTH;
+    const top = Number(e.topRail?.face) || CONSTANTS.TOP_RAIL_WIDTH;
+    const meet = Number(e.meetingRail?.face) || CONSTANTS.MEETING_RAIL_WIDTH;
+    const bottom = Number(e.bottomRail?.face) || CONSTANTS.BOTTOM_RAIL_WIDTH;
+    return { stile, top, meet, bottom, diff: bottom - top };
+}
+
+/** dedSchema 2: total sash height = frame H − opening deduction + meeting rail. */
+function totalSashHeightFor(frameHeight) {
+    const p = getWindowProfile();
+    const mr = Number(p.elements?.meetingRail?.face) || CONSTANTS.MEETING_RAIL_WIDTH;
+    return frameHeight - p.deductions.sashHeight + mr;
+}
+
 
 export const CONFIGURATIONS = Object.freeze({
     'none': {
@@ -155,9 +174,10 @@ export function calculateWindow(frameWidth, frameHeight, configuration = '2x2', 
     validateInputs(frameWidth, frameHeight, configData);
 
     const sashWidth = frameWidth - getWindowProfile().deductions.sashWidth;
-    const totalSashHeight = frameHeight - getWindowProfile().deductions.sashHeight;
-    const topSashHeight = (totalSashHeight - CONSTANTS.SASH_HEIGHT_DIFFERENCE) / 2;
-    const bottomSashHeight = topSashHeight + CONSTANTS.SASH_HEIGHT_DIFFERENCE;
+    const totalSashHeight = totalSashHeightFor(frameHeight);
+    const sashDiff = sashFaces().diff;
+    const topSashHeight = (totalSashHeight - sashDiff) / 2;
+    const bottomSashHeight = topSashHeight + sashDiff;
     // For legacy compatibility, sashHeight = totalSashHeight
     const sashHeight = totalSashHeight;
 
@@ -311,8 +331,9 @@ function calculateBoxComponentSet(windowSpec, frameWidth, frameHeight) {
 
 function calculateGlazingSummaryForWindow(windowSpec, sashWidth, sashHeight, settings) {
     const grid = windowSpec.sash?.grid ?? { rows: 2, cols: 2 };
-    const clearWidth = Math.max(sashWidth - 2 * CONSTANTS.STILE_WIDTH, 0);
-    const clearHeight = Math.max((sashHeight / 2) - CONSTANTS.TOP_RAIL_WIDTH - CONSTANTS.BOTTOM_RAIL_WIDTH, 0);
+    const _f = sashFaces();
+    const clearWidth = Math.max(sashWidth - 2 * _f.stile, 0);
+    const clearHeight = Math.max((sashHeight / 2) - _f.top - _f.bottom, 0);
 
     const paneWidth = Math.max(
         clearWidth / Math.max(grid.cols ?? 1, 1) - settings.glazingAllowanceWidth,
@@ -382,8 +403,9 @@ function calculateWeights(windowSpec, sashWidth, topSashHeight, bottomSashHeight
         sw * KG_PER_METER.meetingRail;
 
     // Glass — both sashes (glassH identical for upper & lower)
-    const glassW = sashWidth - 2 * CONSTANTS.STILE_WIDTH;
-    const glassH = topSashHeight - CONSTANTS.TOP_RAIL_WIDTH - CONSTANTS.MEETING_RAIL_WIDTH;
+    const _f = sashFaces();
+    const glassW = sashWidth - 2 * _f.stile;
+    const glassH = topSashHeight - _f.top - _f.meet;
     const glassType = windowSpec.glazing?.type || 'double';
     const kgPerSqm = GLASS_KG_PER_SQM[glassType] || GLASS_KG_PER_SQM['double'];
     const glassSqmPerSash = (glassW * glassH) / 1_000_000;
@@ -412,8 +434,9 @@ function calculatePaint(frameWidth, frameHeight) {
 }
 
 function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight) {
-    const glassW = sashWidth - 2 * CONSTANTS.STILE_WIDTH;
-    const glassH = topSashHeight - CONSTANTS.TOP_RAIL_WIDTH - CONSTANTS.MEETING_RAIL_WIDTH;
+    const _f = sashFaces();
+    const glassW = sashWidth - 2 * _f.stile;
+    const glassH = topSashHeight - _f.top - _f.meet;
     const glassType = windowSpec.glazing?.type || 'double';
 
     const gridMode = windowSpec.sash?.grid?.mode || 'none';
@@ -477,8 +500,9 @@ const BEADING_BAR_PATTERNS = {
 
 function calculateBeadingComponents(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight) {
     const F = OFFCUT_FACTOR;
-    const glassW = sashWidth - 2 * CONSTANTS.STILE_WIDTH;
-    const glassH = topSashHeight - CONSTANTS.TOP_RAIL_WIDTH - CONSTANTS.MEETING_RAIL_WIDTH;
+    const _f = sashFaces();
+    const glassW = sashWidth - 2 * _f.stile;
+    const glassH = topSashHeight - _f.top - _f.meet;
 
     const gridMode = windowSpec.sash?.grid?.mode || 'none';
     const pattern = BEADING_BAR_PATTERNS[gridMode] || BEADING_BAR_PATTERNS['none'];
@@ -585,9 +609,10 @@ export function deriveWindowData(windowSpec, settings = {}) {
 
     const config = resolveConfiguration(gridMode, windowSpec.sash?.grid ?? {});
     const sashWidth = frameWidth - getWindowProfile().deductions.sashWidth;
-    const totalSashHeight = frameHeight - getWindowProfile().deductions.sashHeight;
-    const topSashHeight = (totalSashHeight - CONSTANTS.SASH_HEIGHT_DIFFERENCE) / 2;
-    const bottomSashHeight = topSashHeight + CONSTANTS.SASH_HEIGHT_DIFFERENCE;
+    const totalSashHeight = totalSashHeightFor(frameHeight);
+    const sashDiff = sashFaces().diff;
+    const topSashHeight = (totalSashHeight - sashDiff) / 2;
+    const bottomSashHeight = topSashHeight + sashDiff;
     const sashHeight = totalSashHeight;
 
     const sashComponents = isTripleSash
@@ -798,25 +823,26 @@ function calculateSashComponents(sashWidth, sashHeight, config) {
     // Rails are cut at sash width — tenons protrude into stile mortices
     const horizontalLength = sashWidth;
     const sashSection = `${sashDepthFor(config?.frame?.type)} x ${getWindowProfile().elements.stiles.face}`;
-    const availableWidth = sashWidth - 2 * CONSTANTS.STILE_WIDTH;
-    const availableHeight = sashHeight - CONSTANTS.TOP_RAIL_WIDTH - CONSTANTS.BOTTOM_RAIL_WIDTH;
+    const _f = sashFaces();
+    const availableWidth = sashWidth - 2 * _f.stile;
+    const availableHeight = sashHeight - _f.top - _f.bottom;
 
-    const stiles = buildComponent('Sash stiles', CONSTANTS.STILE_WIDTH, sashHeight, 2, sashSection, 'Hardwood', {
+    const stiles = buildComponent('Sash stiles', sashFaces().stile, sashHeight, 2, sashSection, 'Hardwood', {
         preCutLength: sashHeight + CONSTANTS.HORN_ALLOWANCE_VERTICAL,
         cutLength: sashHeight
     });
 
-    const topRail = buildComponent('Top rail', CONSTANTS.TOP_RAIL_WIDTH, horizontalLength, 1, sashSection, 'Hardwood', {
+    const topRail = buildComponent('Top rail', sashFaces().top, horizontalLength, 1, sashSection, 'Hardwood', {
         preCutLength: horizontalLength + CONSTANTS.HORN_ALLOWANCE_HORIZONTAL,
         cutLength: horizontalLength
     });
 
-    const meetingRail = buildComponent('Meeting rail', CONSTANTS.MEETING_RAIL_WIDTH, horizontalLength, 1, sashSection, 'Hardwood', {
+    const meetingRail = buildComponent('Meeting rail', sashFaces().meet, horizontalLength, 1, sashSection, 'Hardwood', {
         preCutLength: horizontalLength + CONSTANTS.HORN_ALLOWANCE_HORIZONTAL,
         cutLength: horizontalLength
     });
 
-    const bottomRail = buildComponent('Bottom rail', CONSTANTS.BOTTOM_RAIL_WIDTH, horizontalLength, 1, sashSection, 'Hardwood', {
+    const bottomRail = buildComponent('Bottom rail', sashFaces().bottom, horizontalLength, 1, sashSection, 'Hardwood', {
         preCutLength: horizontalLength + CONSTANTS.HORN_ALLOWANCE_HORIZONTAL,
         cutLength: horizontalLength
     });
@@ -876,8 +902,9 @@ function calculateGlazingBars(availableWidth, availableHeight, config) {
 }
 
 function calculateGlazing(sashWidth, sashHeight, config, glazingType = '4mm Clear') {
-    const availableWidth = sashWidth - 2 * CONSTANTS.STILE_WIDTH;
-    const availableHeight = sashHeight - CONSTANTS.TOP_RAIL_WIDTH - CONSTANTS.BOTTOM_RAIL_WIDTH;
+    const _f = sashFaces();
+    const availableWidth = sashWidth - 2 * _f.stile;
+    const availableHeight = sashHeight - _f.top - _f.bottom;
 
     const paneWidthRaw = config.cols > 0
         ? (availableWidth - config.verticalBars * CONSTANTS.GLAZING_BAR_WIDTH) / config.cols

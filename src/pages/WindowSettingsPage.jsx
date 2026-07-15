@@ -97,8 +97,9 @@ export default function WindowSettingsPage() {
   const W = Number(sampleW) || 1000;
   const H = Number(sampleH) || 1500;
   const sashW = W - ded.sashWidth;
-  const totalSashH = H - ded.sashHeight;
-  const topSashH = Math.round((totalSashH - CONSTANTS.SASH_HEIGHT_DIFFERENCE) / 2);
+  const totalSashH = H - ded.sashHeight + (Number(profile.elements?.meetingRail?.face) || 43);
+  const sashDiff = (Number(profile.elements?.bottomRail?.face) || 90) - (Number(profile.elements?.topRail?.face) || 57);
+  const topSashH = Math.round((totalSashH - sashDiff) / 2);
 
   const lengthInfo = (el) => {
     switch (el.lenBase) {
@@ -470,7 +471,7 @@ export default function WindowSettingsPage() {
               className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
           </div>
           <div>
-            <div className="text-ink-400 mb-1">Total sash height = frame H −</div>
+            <div className="text-ink-400 mb-1">Opening deduction · total sash H = frame H − this + MR</div>
             <input type="number" value={ded.sashHeight} onChange={(e) => setDeduction('sashHeight', e.target.value)}
               className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
           </div>

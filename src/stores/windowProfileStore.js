@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { DEFAULT_SASH_PROFILE, DEFAULT_CASEMENT_PROFILE, setActiveWindowProfile, setActiveCasementProfile } from '../engine/profile.js';
+import { normalizeSashProfile, DEFAULT_SASH_PROFILE, DEFAULT_CASEMENT_PROFILE, setActiveWindowProfile, setActiveCasementProfile } from '../engine/profile.js';
 import { loadWindowProfiles, saveWindowProfiles } from '../services/cloudSync.js';
 
 let cloudSaveTimer = null;
@@ -102,7 +102,7 @@ export const useWindowProfileStore = create(
           const cloud = await loadWindowProfiles();
           if (cloud?.sash || cloud?.casement) {
             set({
-              ...(cloud.sash ? { sash: cloud.sash } : {}),
+              ...(cloud.sash ? { sash: normalizeSashProfile(cloud.sash) } : {}),
               ...(cloud.casement ? { casement: cloud.casement } : {}),
             });
             setActiveWindowProfile(get().sash);
@@ -117,7 +117,7 @@ export const useWindowProfileStore = create(
       name: 'pc-window-profile',
       onRehydrateStorage: () => (state) => {
         // Push the persisted profile into the engine on app start
-        if (state?.sash) setActiveWindowProfile(state.sash);
+        if (state?.sash) setActiveWindowProfile(normalizeSashProfile(state.sash));
         if (state?.casement) setActiveCasementProfile(state.casement);
         // Tenant profile from Supabase wins over the local cache
         setTimeout(() => useWindowProfileStore.getState().loadFromCloud(), 0);

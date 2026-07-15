@@ -45,9 +45,10 @@ export const DEFAULT_SASH_PROFILE = {
   },
   // Length rules (mm subtracted from the window dimension). "Advanced" —
   // geometrically coupled values; changing them reshapes the whole window.
+  dedSchema: 2,       // v2: sashHeight is the PURE opening deduction (MR excluded)
   deductions: {
     sashWidth: 178,   // sash W = frame W − this
-    sashHeight: 92,   // total sash H = frame H − this
+    sashHeight: 135,  // OPENING deduction: total sash H = frame H − this + meeting rail face
     jambHeight: 108,  // jamb L = frame H − this
     headWidth: 0,     // head L = frame W − this
   },
@@ -94,9 +95,26 @@ export function getCasementProfile() {
 }
 
 
+/**
+ * Schema migration for stored sash profiles (Supabase, localStorage cache,
+ * batch _profileSnapshot). v1: deductions.sashHeight already "contained" the
+ * meeting rail (calibrated at MR=43, total = H − 92). v2: sashHeight is the
+ * pure opening deduction and the engine adds MR (total = H − 135 + MR).
+ * Idempotent: v1 value += that profile's own meetingRail face, flag set.
+ */
+export function normalizeSashProfile(p) {
+  if (!p || !p.deductions) return p;
+  if (p.dedSchema !== 2) {
+    const mr = Number(p.elements?.meetingRail?.face) || DEFAULT_SASH_PROFILE.elements.meetingRail.face;
+    p.deductions.sashHeight = (Number(p.deductions.sashHeight) || 0) + mr;
+    p.dedSchema = 2;
+  }
+  return p;
+}
+
 /** Called by windowProfileStore whenever the persisted profile changes. */
 export function setActiveWindowProfile(profile) {
-  activeProfile = profile || null;
+  activeProfile = profile ? normalizeSashProfile(profile) : null;
 }
 
 /** The engine's single read point. Falls back to the OTD defaults. */
@@ -138,7 +156,7 @@ export function boardWidthForDepth(frameDepth) {
 export function withProfiles(sashProfile, casementProfile, fn) {
   const prevSash = activeProfile;
   const prevCas = activeCasementProfile;
-  if (sashProfile) activeProfile = sashProfile;
+  if (sashProfile) activeProfile = normalizeSashProfile(sashProfile);
   if (casementProfile) activeCasementProfile = casementProfile;
   try { return fn(); } finally {
     activeProfile = prevSash;
