@@ -115,6 +115,7 @@ export default function WindowSettingsPage() {
   const selData = els[sel.key];
   const selLen = sel.kind === 'liner' ? linerLength(sel) : lengthInfo(sel);
   const selKg = sel.kind === 'sash' ? kgPerM(selData.face, variant.sashDepth) : null;
+  const isBoxSelected = BOX_ELEMENTS.some((e) => e.key === selected);
 
   const num = (v, fb = 0) => (v === '' ? '' : Number(v) || fb);
 
@@ -187,6 +188,7 @@ export default function WindowSettingsPage() {
         </div>
       </div>
 
+      {/* ── BOX FRAME — parts, edit panel (when a box element is selected), window sill ── */}
       {/* Box frame parts */}
       <div className="text-sm font-semibold text-ink-50 mb-2">Box frame</div>
       <div className="flex gap-4 items-start mb-5 flex-wrap">
@@ -209,26 +211,10 @@ export default function WindowSettingsPage() {
         </div>
       </div>
 
-      {/* Sash parts */}
-      <div className="text-sm font-semibold text-ink-50 mb-2">Sash</div>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(168px,1fr))] gap-1.5 mb-5">
-        {SASH_ELEMENTS.map((el) => {
-          const L = lengthInfo(el);
-          const active = selected === el.key;
-          return (
-            <div key={el.key} onClick={() => setSelected(el.key)}
-              className={`p-2 rounded-lg border cursor-pointer transition-all ${active ? 'border-accent-500 bg-accent-500/10' : 'border-surface-500 bg-surface-700/30 hover:bg-surface-700/60'}`}>
-              <div className={`text-[12px] font-medium ${active ? 'text-accent-400' : 'text-ink-100'}`}>{el.name} {el.qty || ''}</div>
-              <div className="text-[11px] text-ink-400">{sectionOf(el)}</div>
-              <div className="text-[11px] font-mono text-ink-300">L = {L.rule} <span className="text-ink-500">→ {L.val}</span></div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Edit panel + cill toggle */}
-      <div className="flex gap-3 items-stretch mb-5 flex-wrap">
-        <div className="card p-4 flex-[1.5] min-w-[320px]">
+      <div className="flex gap-3 items-stretch mb-6 flex-wrap">
+        {isBoxSelected && (
+          <>
+<div className="card p-4 flex-[1.5] min-w-[320px]">
           <div className="flex justify-between items-baseline mb-3">
             <div><span className="text-[11px] text-ink-400">Selected: </span><span className="text-sm font-semibold text-ink-50">{sel.name}</span></div>
             {selKg !== null && <span className="text-[11px] text-ink-400">{selKg.toFixed(2)} kg/m auto</span>}
@@ -311,8 +297,9 @@ export default function WindowSettingsPage() {
             = {selLen.val} mm for sample {W} × {H} · feeds cut list, pre-cut, BOM{sel.kind === 'sash' ? ', weights' : ''}
           </div>
         </div>
-
-        <div className="card p-4 flex-1 min-w-[260px] flex flex-col justify-center gap-2 text-xs">
+          </>
+        )}
+<div className="card p-4 flex-1 min-w-[260px] flex flex-col justify-center gap-2 text-xs">
           <div className="text-ink-400 font-medium">Window sill</div>
           <label className="flex items-center gap-2 text-ink-200 cursor-pointer">
             <input type="radio" name="cillMode" checked={!profile.cillTwoPiece} onChange={() => setCillTwoPiece(false)} className="accent-accent-500" />
@@ -326,9 +313,114 @@ export default function WindowSettingsPage() {
         </div>
       </div>
 
-      {/* Advanced deductions */}
-      <div className="card p-4 mb-5 border-amber-500/30">
-        <div className="text-xs font-semibold text-amber-400 mb-1">Advanced — geometry deductions</div>
+      {/* ── SASH — parts, edit panel (when a sash element is selected), fitting deductions ── */}
+      {/* Sash parts */}
+      <div className="text-sm font-semibold text-ink-50 mb-2">Sash</div>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(168px,1fr))] gap-1.5 mb-3">
+        {SASH_ELEMENTS.map((el) => {
+          const L = lengthInfo(el);
+          const active = selected === el.key;
+          return (
+            <div key={el.key} onClick={() => setSelected(el.key)}
+              className={`p-2 rounded-lg border cursor-pointer transition-all ${active ? 'border-accent-500 bg-accent-500/10' : 'border-surface-500 bg-surface-700/30 hover:bg-surface-700/60'}`}>
+              <div className={`text-[12px] font-medium ${active ? 'text-accent-400' : 'text-ink-100'}`}>{el.name} {el.qty || ''}</div>
+              <div className="text-[11px] text-ink-400">{sectionOf(el)}</div>
+              <div className="text-[11px] font-mono text-ink-300">L = {L.rule} <span className="text-ink-500">→ {L.val}</span></div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex gap-3 items-stretch mb-6 flex-wrap">
+        {!isBoxSelected && (
+          <>
+<div className="card p-4 flex-[1.5] min-w-[320px]">
+          <div className="flex justify-between items-baseline mb-3">
+            <div><span className="text-[11px] text-ink-400">Selected: </span><span className="text-sm font-semibold text-ink-50">{sel.name}</span></div>
+            {selKg !== null && <span className="text-[11px] text-ink-400">{selKg.toFixed(2)} kg/m auto</span>}
+          </div>
+          <div className="flex flex-wrap gap-3 text-xs">
+            {sel.kind === 'sash' && (
+              <>
+                <div>
+                  <div className="text-ink-400 mb-1">Depth (mm) · from variant</div>
+                  <input value={variant.sashDepth} readOnly className="w-24 px-2 py-1.5 bg-surface-700 border border-surface-500 text-ink-400 rounded-lg text-sm" />
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Face (mm)</div>
+                  <input type="number" value={selData.face} onChange={(e) => setElementField(sel.key, 'face', e.target.value)}
+                    className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Raw stock</div>
+                  <select value={selData.raw} onChange={(e) => setElementField(sel.key, 'raw', e.target.value)}
+                    className="px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm">
+                    {RAW_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+              </>
+            )}
+            {sel.kind === 'board' && (
+              <>
+                <div>
+                  <div className="text-ink-400 mb-1">Thickness (mm)</div>
+                  <input type="number" value={selData.thickness} onChange={(e) => setElementField(sel.key, 'thickness', e.target.value)}
+                    className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Width (mm) · box depth − inset</div>
+                  <input value={boardW} readOnly className="w-24 px-2 py-1.5 bg-surface-700 border border-surface-500 text-ink-400 rounded-lg text-sm" />
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Length deduction (mm)</div>
+                  <input type="number" value={ded[sel.dedKey]} onChange={(e) => setDeduction(sel.dedKey, e.target.value)}
+                    className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+                </div>
+              </>
+            )}
+            {sel.kind === 'liner' && (
+              <>
+                <div>
+                  <div className="text-ink-400 mb-1">Thickness (mm)</div>
+                  <input type="number" value={selData.w} onChange={(e) => setElementField(sel.key, 'w', e.target.value)}
+                    className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Width (mm)</div>
+                  <input type="number" value={selData.h} onChange={(e) => setElementField(sel.key, 'h', e.target.value)}
+                    className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Length deduction (mm)</div>
+                  <input type="number" value={selData.deduction} onChange={(e) => setElementField(sel.key, 'deduction', e.target.value)}
+                    className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+                </div>
+              </>
+            )}
+            {sel.kind === 'cill' && (
+              <>
+                <div>
+                  <div className="text-ink-400 mb-1">Width (mm)</div>
+                  <input type="number" value={selData.w} onChange={(e) => setElementField(sel.key, 'w', e.target.value)}
+                    className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Height (mm)</div>
+                  <input type="number" value={selData.h} onChange={(e) => setElementField(sel.key, 'h', e.target.value)}
+                    className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+                </div>
+                <div className="text-ink-400 pt-5">Length = frame W + per-window extension</div>
+              </>
+            )}
+          </div>
+          <div className="text-[11px] text-ink-500 mt-3 pt-2 border-t border-surface-500">
+            = {selLen.val} mm for sample {W} × {H} · feeds cut list, pre-cut, BOM{sel.kind === 'sash' ? ', weights' : ''}
+          </div>
+        </div>
+          </>
+        )}
+<div className="card p-4 flex-1 min-w-[280px] border-amber-500/30">
+        <div className="text-xs font-semibold text-amber-400 mb-1">Sash fitting — total deductions</div>
         <div className="text-[11px] text-ink-400 mb-3">These are coupled to jamb, liner and bead geometry. Changing them reshapes every window — verify with a test window before production.</div>
         <div className="flex flex-wrap gap-4 text-xs">
           <div>
@@ -344,6 +436,7 @@ export default function WindowSettingsPage() {
           <div className="text-ink-500 pt-5">Sample: sash {sashW} × {totalSashH} mm</div>
         </div>
       </div>
+      </div>
 
       {/* Summary table */}
       <div className="card overflow-hidden">
@@ -358,9 +451,30 @@ export default function WindowSettingsPage() {
             </tr>
           </thead>
           <tbody>
-            {allElements.filter((el) => el.key !== 'cillNose' || profile.cillTwoPiece).map((el) => {
+            <tr className="border-t border-surface-500 bg-surface-700/60">
+              <td colSpan={5} className="px-4 py-1 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Box frame</td>
+            </tr>
+            {BOX_ELEMENTS.filter((el) => el.key !== 'cillNose' || profile.cillTwoPiece).map((el) => {
               const L = el.kind === 'liner' ? linerLength(el) : lengthInfo(el);
               const kg = el.kind === 'sash' ? kgPerM(els[el.key].face, variant.sashDepth).toFixed(2) : '—';
+              const active = selected === el.key;
+              return (
+                <tr key={el.key} onClick={() => setSelected(el.key)}
+                  className={`cursor-pointer border-t border-surface-500 ${active ? 'bg-accent-500/10 text-accent-400' : 'text-ink-200 hover:bg-surface-700/40'}`}>
+                  <td className="px-4 py-1.5 font-medium">{el.name} {el.qty || ''}</td>
+                  <td className="px-4 py-1.5">{sectionOf(el)}</td>
+                  <td className="px-4 py-1.5 font-mono text-[11px]">{L.rule}</td>
+                  <td className="px-4 py-1.5 text-right font-mono">{L.val}</td>
+                  <td className="px-4 py-1.5 text-right">{kg}</td>
+                </tr>
+              );
+            })}
+            <tr className="border-t border-surface-500 bg-surface-700/60">
+              <td colSpan={5} className="px-4 py-1 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Sash</td>
+            </tr>
+            {SASH_ELEMENTS.map((el) => {
+              const L = lengthInfo(el);
+              const kg = kgPerM(els[el.key].face, variant.sashDepth).toFixed(2);
               const active = selected === el.key;
               return (
                 <tr key={el.key} onClick={() => setSelected(el.key)}
