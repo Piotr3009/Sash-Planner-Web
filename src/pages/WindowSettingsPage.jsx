@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
-import { kgPerM } from '../engine/profile.js';
+import { kgPerM, VARIANT_ORDER } from '../engine/profile.js';
 import { CONSTANTS, deriveWindowData } from '../engine/calculations.js';
 import { normaliseToWindowSpec } from '../engine/specification.js';
 import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
@@ -10,6 +10,23 @@ import JambDetail2D from '../components/drawings/JambDetail2D.jsx';
 
 // ─── Element metadata: engine names, groups, editable fields, length rules ───
 const RAW_OPTIONS = ['63x63', '63x95'];
+
+// ─── Section lock: everything locked on page open; unlock to edit (session-only, never persisted) ───
+const LockClosedIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+);
+const LockOpenIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" /></svg>
+);
+function LockToggle({ locked, onToggle }) {
+  return (
+    <button type="button" onClick={onToggle} title={locked ? 'Unlock to edit' : 'Lock section'}
+      className={`flex items-center gap-1.5 px-2 py-1 text-[11px] rounded-lg border transition-colors shrink-0 ${locked ? 'border-surface-500 text-ink-400 bg-surface-700 hover:bg-surface-600' : 'border-amber-500/60 text-amber-400 bg-amber-500/10 hover:bg-amber-500/20'}`}>
+      {locked ? <LockClosedIcon /> : <LockOpenIcon />}
+      {locked ? 'Locked' : 'Editing'}
+    </button>
+  );
+}
 
 const BOX_ELEMENTS = [
   { key: 'head',         name: 'Head',                  kind: 'board',  lenBase: 'W', dedKey: 'headWidth' },
@@ -35,7 +52,6 @@ export default function WindowSettingsPage() {
   const setVariantField = useWindowProfileStore((s) => s.setVariantField);
   const setElementField = useWindowProfileStore((s) => s.setElementField);
   const setDeduction = useWindowProfileStore((s) => s.setDeduction);
-  const setBoardInset = useWindowProfileStore((s) => s.setBoardInset);
   const setCillTwoPiece = useWindowProfileStore((s) => s.setCillTwoPiece);
   const resetToDefaults = useWindowProfileStore((s) => s.resetToDefaults);
 
@@ -44,7 +60,17 @@ export default function WindowSettingsPage() {
   const [sampleW, setSampleW] = useState(1000);
   const [sampleH, setSampleH] = useState(1500);
 
+  // Section locks — default locked on every page open
+  const [variantLock, setVariantLock] = useState(true);
+  const [elementLock, setElementLock] = useState(true);
+  const [sillLock, setSillLock] = useState(true);
+  const [fittingLock, setFittingLock] = useState(true);
+
   const variant = profile.variants[variantKey] || profile.variants.standard;
+  const variantKeys = [
+    ...VARIANT_ORDER.filter((k) => profile.variants[k]),
+    ...Object.keys(profile.variants).filter((k) => !VARIANT_ORDER.includes(k)),
+  ];
   const els = profile.elements;
   const ded = profile.deductions;
   const boardW = variant.boardWidth ?? (variant.boxDepth - (profile.boardInset ?? 23));
@@ -148,16 +174,19 @@ export default function WindowSettingsPage() {
       <div className="flex gap-5 items-start">
         <div className="flex-1 min-w-0">
       {/* Variant tabs + variant fields */}
-      <div className="card p-4 mb-4">
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {Object.entries(profile.variants).map(([k, v]) => (
+      <div className={`card p-4 mb-4 ${variantLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div className="flex flex-wrap gap-1.5">
+          {variantKeys.map((k) => { const v = profile.variants[k]; return (
             <button key={k} onClick={() => setVariantKey(k)}
               className={`px-3 py-1.5 text-xs rounded-lg border transition-all ${variantKey === k ? 'border-accent-500 bg-accent-500/15 text-accent-400 font-medium' : 'border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500'}`}>
               {v.label} · {v.boxDepth}
             </button>
-          ))}
+          ); })}
+          </div>
+          <LockToggle locked={variantLock} onToggle={() => setVariantLock((x) => !x)} />
         </div>
-        <div className="flex flex-wrap gap-x-6 gap-y-2 items-end text-xs">
+        <fieldset disabled={variantLock} className={`flex flex-wrap gap-x-6 gap-y-2 items-end text-xs border-0 p-0 m-0 min-w-0 ${variantLock ? 'opacity-60' : ''}`}>
           <div>
             <div className="text-ink-400 mb-1">Variant name</div>
             <input type="text" value={variant.label}
@@ -185,7 +214,7 @@ export default function WindowSettingsPage() {
           <div className="text-ink-300 pb-1.5">
             <span className="text-ink-500">depth − board = {variant.boxDepth - boardW} mm</span>
           </div>
-        </div>
+        </fieldset>
       </div>
 
       {/* ── BOX FRAME — parts, edit panel (when a box element is selected), window sill ── */}
@@ -214,12 +243,15 @@ export default function WindowSettingsPage() {
       <div className="flex gap-3 items-stretch mb-6 flex-wrap">
         {isBoxSelected && (
           <>
-<div className="card p-4 flex-[1.5] min-w-[320px]">
+<div className={`card p-4 flex-[1.5] min-w-[320px] ${elementLock ? '' : 'ring-1 ring-amber-500/40'}`}>
           <div className="flex justify-between items-baseline mb-3">
             <div><span className="text-[11px] text-ink-400">Selected: </span><span className="text-sm font-semibold text-ink-50">{sel.name}</span></div>
-            {selKg !== null && <span className="text-[11px] text-ink-400">{selKg.toFixed(2)} kg/m auto</span>}
+            <div className="flex items-center gap-2">
+              {selKg !== null && <span className="text-[11px] text-ink-400">{selKg.toFixed(2)} kg/m auto</span>}
+              <LockToggle locked={elementLock} onToggle={() => setElementLock((x) => !x)} />
+            </div>
           </div>
-          <div className="flex flex-wrap gap-3 text-xs">
+          <fieldset disabled={elementLock} className={`flex flex-wrap gap-3 text-xs border-0 p-0 m-0 min-w-0 ${elementLock ? 'opacity-60' : ''}`}>
             {sel.kind === 'sash' && (
               <>
                 <div>
@@ -292,23 +324,28 @@ export default function WindowSettingsPage() {
                 <div className="text-ink-400 pt-5">Length = frame W + per-window extension</div>
               </>
             )}
-          </div>
+          </fieldset>
           <div className="text-[11px] text-ink-500 mt-3 pt-2 border-t border-surface-500">
             = {selLen.val} mm for sample {W} × {H} · feeds cut list, pre-cut, BOM{sel.kind === 'sash' ? ', weights' : ''}
           </div>
         </div>
           </>
         )}
-<div className="card p-4 flex-1 min-w-[260px] flex flex-col justify-center gap-2 text-xs">
-          <div className="text-ink-400 font-medium">Window sill</div>
-          <label className="flex items-center gap-2 text-ink-200 cursor-pointer">
+<div className={`card p-4 flex-1 min-w-[260px] flex flex-col justify-center gap-2 text-xs ${sillLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+          <div className="flex items-center justify-between">
+            <div className="text-ink-400 font-medium">Window sill</div>
+            <LockToggle locked={sillLock} onToggle={() => setSillLock((x) => !x)} />
+          </div>
+          <fieldset disabled={sillLock} className={`flex flex-col gap-2 border-0 p-0 m-0 min-w-0 ${sillLock ? 'opacity-60' : ''}`}>
+          <label className={`flex items-center gap-2 text-ink-200 ${sillLock ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
             <input type="radio" name="cillMode" checked={!profile.cillTwoPiece} onChange={() => setCillTwoPiece(false)} className="accent-accent-500" />
             One piece
           </label>
-          <label className="flex items-center gap-2 text-ink-200 cursor-pointer">
+          <label className={`flex items-center gap-2 text-ink-200 ${sillLock ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
             <input type="radio" name="cillMode" checked={profile.cillTwoPiece} onChange={() => setCillTwoPiece(true)} className="accent-accent-500" />
             Two piece (cill + nose)
           </label>
+          </fieldset>
           <div className="text-[10px] text-ink-500">Affects cut list, pre-cut, BOM parts and drawings.</div>
         </div>
       </div>
@@ -334,12 +371,15 @@ export default function WindowSettingsPage() {
       <div className="flex gap-3 items-stretch mb-6 flex-wrap">
         {!isBoxSelected && (
           <>
-<div className="card p-4 flex-[1.5] min-w-[320px]">
+<div className={`card p-4 flex-[1.5] min-w-[320px] ${elementLock ? '' : 'ring-1 ring-amber-500/40'}`}>
           <div className="flex justify-between items-baseline mb-3">
             <div><span className="text-[11px] text-ink-400">Selected: </span><span className="text-sm font-semibold text-ink-50">{sel.name}</span></div>
-            {selKg !== null && <span className="text-[11px] text-ink-400">{selKg.toFixed(2)} kg/m auto</span>}
+            <div className="flex items-center gap-2">
+              {selKg !== null && <span className="text-[11px] text-ink-400">{selKg.toFixed(2)} kg/m auto</span>}
+              <LockToggle locked={elementLock} onToggle={() => setElementLock((x) => !x)} />
+            </div>
           </div>
-          <div className="flex flex-wrap gap-3 text-xs">
+          <fieldset disabled={elementLock} className={`flex flex-wrap gap-3 text-xs border-0 p-0 m-0 min-w-0 ${elementLock ? 'opacity-60' : ''}`}>
             {sel.kind === 'sash' && (
               <>
                 <div>
@@ -412,17 +452,20 @@ export default function WindowSettingsPage() {
                 <div className="text-ink-400 pt-5">Length = frame W + per-window extension</div>
               </>
             )}
-          </div>
+          </fieldset>
           <div className="text-[11px] text-ink-500 mt-3 pt-2 border-t border-surface-500">
             = {selLen.val} mm for sample {W} × {H} · feeds cut list, pre-cut, BOM{sel.kind === 'sash' ? ', weights' : ''}
           </div>
         </div>
           </>
         )}
-<div className="card p-4 flex-1 min-w-[280px] border-amber-500/30">
-        <div className="text-xs font-semibold text-amber-400 mb-1">Sash fitting — total deductions</div>
+<div className={`card p-4 flex-1 min-w-[280px] border-amber-500/30 ${fittingLock ? '' : 'ring-1 ring-amber-500/60'}`}>
+        <div className="flex items-center justify-between mb-1">
+          <div className="text-xs font-semibold text-amber-400">Sash fitting — total deductions</div>
+          <LockToggle locked={fittingLock} onToggle={() => setFittingLock((x) => !x)} />
+        </div>
         <div className="text-[11px] text-ink-400 mb-3">These are coupled to jamb, liner and bead geometry. Changing them reshapes every window — verify with a test window before production.</div>
-        <div className="flex flex-wrap gap-4 text-xs">
+        <fieldset disabled={fittingLock} className={`flex flex-wrap gap-4 text-xs border-0 p-0 m-0 min-w-0 ${fittingLock ? 'opacity-60' : ''}`}>
           <div>
             <div className="text-ink-400 mb-1">Sash width = frame W −</div>
             <input type="number" value={ded.sashWidth} onChange={(e) => setDeduction('sashWidth', e.target.value)}
@@ -434,7 +477,7 @@ export default function WindowSettingsPage() {
               className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
           </div>
           <div className="text-ink-500 pt-5">Sample: sash {sashW} × {totalSashH} mm</div>
-        </div>
+        </fieldset>
       </div>
       </div>
 
@@ -549,6 +592,10 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
   const resetToDefaults = useWindowProfileStore((s) => s.resetToDefaults);
   const [selected, setSelected] = useState('sashBottom');
 
+  // Section locks — default locked on every page open
+  const [fieldsLock, setFieldsLock] = useState(true);
+  const [elementLock, setElementLock] = useState(true);
+
   const W = Number(sampleW) || 1000;
   const H = Number(sampleH) || 1200;
   const sashW = W - casement.deductions.sashWidth;
@@ -584,7 +631,9 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
         </div>
       </div>
 
-      <div className="card p-4 mb-4 flex flex-wrap gap-x-6 gap-y-2 items-end text-xs">
+      <div className={`card p-4 mb-4 ${fieldsLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+        <div className="flex justify-end mb-2"><LockToggle locked={fieldsLock} onToggle={() => setFieldsLock((x) => !x)} /></div>
+        <fieldset disabled={fieldsLock} className={`flex flex-wrap gap-x-6 gap-y-2 items-end text-xs border-0 p-0 m-0 min-w-0 ${fieldsLock ? 'opacity-60' : ''}`}>
         <div>
           <div className="text-ink-400 mb-1">Finished depth (mm) · all members</div>
           <input type="number" value={casement.depth} onChange={(e) => setDepth(e.target.value)}
@@ -613,6 +662,7 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
         <div className="text-ink-300 pb-1.5">
           Sample: sash <span className="text-accent-400 font-medium">{sashW} × {sashH}</span> · glass <span className="text-accent-400 font-medium">{glassW} × {glassH}</span>
         </div>
+        </fieldset>
       </div>
 
       <div className="flex gap-3 items-start flex-wrap">
@@ -645,9 +695,12 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
           </table>
         </div>
 
-        <div className="card p-4 w-[300px] shrink-0">
-          <div className="mb-3"><span className="text-[11px] text-ink-400">Selected: </span><span className="text-sm font-semibold text-ink-50">{sel.name}</span></div>
-          <div className="flex flex-wrap gap-3 text-xs">
+        <div className={`card p-4 w-[300px] shrink-0 ${elementLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+          <div className="mb-3 flex items-center justify-between">
+            <div><span className="text-[11px] text-ink-400">Selected: </span><span className="text-sm font-semibold text-ink-50">{sel.name}</span></div>
+            <LockToggle locked={elementLock} onToggle={() => setElementLock((x) => !x)} />
+          </div>
+          <fieldset disabled={elementLock} className={`flex flex-wrap gap-3 text-xs border-0 p-0 m-0 min-w-0 ${elementLock ? 'opacity-60' : ''}`}>
             <div>
               <div className="text-ink-400 mb-1">Face (mm)</div>
               <input type="number" value={selData.face} onChange={(e) => setEl(sel.key, 'face', e.target.value)}
@@ -660,7 +713,7 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
                 {RAW_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
-          </div>
+          </fieldset>
           <div className="text-[11px] text-ink-500 mt-3 pt-2 border-t border-surface-500">
             Feeds cut list, pre-cut and BOM for casement batches. Defaults are provisional — verify before production.
           </div>

@@ -8,6 +8,11 @@
 // the engine always reads through getWindowProfile() so plain-function code
 // needs no React/store imports.
 
+// Canonical UI order for frame variants. Supabase stores the profile as
+// JSONB, which re-sorts object keys (by length, then bytewise) — so tab
+// order must NEVER come from Object.keys of the stored object.
+export const VARIANT_ORDER = ['standard', 'slim', 'triple', 'heritage'];
+
 export const DEFAULT_SASH_PROFILE = {
   // Frame variants: box depth + finished sash depth (planed from the same raw stock)
   variants: {

@@ -55,11 +55,6 @@ export const useWindowProfileStore = create(
         get()._sync();
       },
 
-      setBoardInset: (value) => {
-        set((s) => ({ sash: { ...clone(s.sash), boardInset: Number(value) || 0 } }));
-        get()._sync();
-      },
-
       setCillTwoPiece: (twoPiece) => {
         set((s) => ({ sash: { ...clone(s.sash), cillTwoPiece: !!twoPiece } }));
         get()._sync();
