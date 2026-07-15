@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { profileBoxDepth, getWindowProfile, getCasementProfile } from '../engine/profile.js';
 import * as cloud from '../services/cloudSync.js';
 
 // ─── Production settings (preserved from original — used by calculations engine) ───
@@ -309,7 +310,23 @@ export const useProjectStore = create((set, get) => ({
 
   updateBatchStatus: (projectId, batchId, status) => {
     set((s) => {
-      const updateBatch = (b) => b.id === batchId ? { ...b, status } : b;
+      const updateBatch = (b) => {
+        if (b.id !== batchId) return b;
+        // Freeze the workshop profile the first time a batch leaves preparation,
+        // so later profile edits can't rewrite work already in production.
+        const needsSnapshot = status !== 'preparation' && !b.defaults?._profileSnapshot;
+        const defaults = needsSnapshot
+          ? {
+              ...b.defaults,
+              _profileSnapshot: {
+                takenAt: new Date().toISOString(),
+                sash: JSON.parse(JSON.stringify(getWindowProfile())),
+                casement: JSON.parse(JSON.stringify(getCasementProfile())),
+              },
+            }
+          : b.defaults;
+        return { ...b, status, defaults };
+      };
       const updatedProjects = s.projects.map((p) =>
         p.id === projectId ? { ...p, batches: (p.batches || []).map(updateBatch) } : p
       );
@@ -503,7 +520,7 @@ export const useProjectStore = create((set, get) => ({
       // Inherited from batch defaults (can be overridden)
       hornType: windowConfig.hornType || defaults.hornType || 'A',
       frameType: windowConfig.frameType || defaults.frameType || 'standard',
-      frameDepth: windowConfig.frameDepth || (defaults.frameType === 'slim' ? 144 : 164),
+      frameDepth: windowConfig.frameDepth || profileBoxDepth(defaults.frameType === 'slim' ? 'slim' : 'standard'),
       ironmongery: windowConfig.ironmongery || defaults.ironmongery || 'brass',
       colourMode: windowConfig.colourMode || defaults.colourMode || 'single',
       woodColor: windowConfig.woodColor || defaults.woodColor || '#F6F6F6',
@@ -595,7 +612,7 @@ export const useProjectStore = create((set, get) => ({
       frostedLocation: windowConfig.frostedLocation || 'bottom',
       hornType: windowConfig.hornType || defaults.hornType || 'A',
       frameType: windowConfig.frameType || defaults.frameType || 'standard',
-      frameDepth: windowConfig.frameDepth || (defaults.frameType === 'slim' ? 144 : 164),
+      frameDepth: windowConfig.frameDepth || profileBoxDepth(defaults.frameType === 'slim' ? 'slim' : 'standard'),
       ironmongery: windowConfig.ironmongery || defaults.ironmongery || 'brass',
       colourMode: windowConfig.colourMode || defaults.colourMode || 'single',
       woodColor: windowConfig.woodColor || defaults.woodColor || '#F6F6F6',

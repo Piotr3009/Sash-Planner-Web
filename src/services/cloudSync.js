@@ -461,6 +461,31 @@ export async function saveAssignments(assignments) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// WINDOW PROFILES — workshop construction profiles (Window Settings).
+// Stored inside settings.constants.windowProfiles (no own table/column).
+// ─────────────────────────────────────────────────────────────
+export async function loadWindowProfiles() {
+  if (!enabled()) return null;
+  const tenantId = await currentTenantId();
+  if (!tenantId) return null;
+  const { data, error } = await supabase.from('settings').select('constants').eq('tenant_id', tenantId).maybeSingle();
+  if (error) { console.error('loadWindowProfiles', error); return null; }
+  return data?.constants?.windowProfiles || null;
+}
+
+export async function saveWindowProfiles(profiles) {
+  if (!enabled()) return;
+  const tenantId = await currentTenantId();
+  if (!tenantId) return;
+  // Merge into existing constants so we don't clobber other settings.
+  const { data } = await supabase.from('settings').select('company, constants').eq('tenant_id', tenantId).maybeSingle();
+  const constants = { ...(data?.constants || {}), windowProfiles: profiles || {} };
+  bg(supabase.from('settings').upsert({
+    tenant_id: tenantId, company: data?.company || {}, constants,
+  }, { onConflict: 'tenant_id' }), 'saveWindowProfiles');
+}
+
+// ─────────────────────────────────────────────────────────────
 // ESTIMATES — maps to estimates table (tenant-scoped via RLS).
 // items/extras/totals are stored as jsonb; client_id may be null.
 // ─────────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignm
 import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
+import { withProfiles } from '../engine/profile.js';
 import { buildGlassListForWindow, buildVentGrilles } from '../engine/lists.js';
 import { buildWindowPartQtys, buildWindowHardware, resolvePartTotal, formatQty, mergeWindowMaterials } from '../engine/bom.js';
 import ImageLightbox from '../components/ImageLightbox.jsx';
@@ -61,7 +62,7 @@ export default function WindowDetailPage() {
   const windowSpec = useMemo(() => (item ? normaliseToWindowSpec(item, spec) : null), [item, spec]);
   const derived = useMemo(() => {
     if (!windowSpec) return null;
-    try { return deriveWindowData(windowSpec, settings); }
+    try { return withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, () => deriveWindowData(windowSpec, settings)); }
     catch (e) { console.warn('Calculation failed:', e); return null; }
   }, [windowSpec, settings]);
 

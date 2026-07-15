@@ -18,6 +18,7 @@ import { mergeWindowMaterials, formatQty } from '../engine/bom.js';
 import { summarizeWindows } from '../utils/batchSummary.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
+import { withProfiles } from '../engine/profile.js';
 import {
   buildCutListForWindow,
   buildGroupedCutList,
@@ -213,7 +214,7 @@ export default function ProductionPackPage() {
       const windowSpec = normaliseToWindowSpec(win, spec);
       let derived = null;
       try {
-        derived = deriveWindowData(windowSpec, settings);
+        derived = withProfiles(batch?.defaults?._profileSnapshot?.sash, batch?.defaults?._profileSnapshot?.casement, () => deriveWindowData(windowSpec, settings));
       } catch (e) {
         console.warn(`Calc failed for ${win.name}:`, e);
       }

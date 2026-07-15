@@ -6,6 +6,7 @@ import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignm
 import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
+import { withProfiles } from '../engine/profile.js';
 import { mergeWindowMaterials, formatQty } from '../engine/bom.js';
 import { exportBomPDF } from '../utils/bomPdfExport.js';
 import { summarizeWindows } from '../utils/batchSummary.js';
@@ -56,7 +57,7 @@ export default function ProjectDetailPage() {
         const spec = parseSpecification(win.specification);
         const windowSpec = normaliseToWindowSpec(win, spec);
         let derived = null;
-        try { derived = deriveWindowData(windowSpec, settings); }
+        try { derived = withProfiles(batch?.defaults?._profileSnapshot?.sash, batch?.defaults?._profileSnapshot?.casement, () => deriveWindowData(windowSpec, settings)); }
         catch (e) { console.warn(`Calc failed for ${win.name}:`, e); }
         if (derived) windows.push({ derived, windowSpec, batch: b });
       });

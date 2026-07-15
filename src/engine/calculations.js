@@ -1,4 +1,4 @@
-import { getWindowProfile, getCasementProfile, profileSashDepth, profileBoardWidth, kgPerM } from './profile.js';
+import { getWindowProfile, getCasementProfile, profileSashDepth, profileBoardWidth, boardWidthForDepth, kgPerM } from './profile.js';
 
 /**
  * calculations.js - ETAP 3
@@ -264,7 +264,7 @@ function tripleSectionWidths(windowSpec, sashWidth) {
 function calculateTripleSashComponentSet(windowSpec, settings, sashWidth, topSashHeight, bottomSashHeight, frameHeight) {
     const { left, center, right, mullionFace } = tripleSectionWidths(windowSpec, sashWidth);
     const prof = getWindowProfile();
-    const bw = boxBoardWidthFor(windowSpec.frame?.depth);
+    const bw = windowSpec.frame?.type ? profileBoardWidth(windowSpec.frame.type) : boxBoardWidthFor(windowSpec.frame?.depth);
     const jambLength = frameHeight - prof.deductions.jambHeight;
 
     const parts = [
@@ -289,7 +289,7 @@ function calculateBoxComponentSet(windowSpec, frameWidth, frameHeight) {
     const extJambLinerLength = frameHeight - els.extJambLiner.deduction;
     const intJambLinerLength = frameHeight - els.intJambLiner.deduction;
 
-    const bw = boxBoardWidthFor(windowSpec.frame?.depth);
+    const bw = windowSpec.frame?.type ? profileBoardWidth(windowSpec.frame.type) : boxBoardWidthFor(windowSpec.frame?.depth);
     const bt = els.head.thickness;
     const boxComponents = [];
     boxComponents.push(createComponentRecord(windowSpec, 'box', 'HEAD', `${bt}x${bw}`, headLength, 1));
@@ -346,7 +346,7 @@ export function sashDepthFor(frameType) {
     return profileSashDepth(frameType);
 }
 export function boxBoardWidthFor(frameDepth) {
-    return profileBoardWidth(frameDepth);
+    return boardWidthForDepth(frameDepth);
 }
 
 const GLASS_KG_PER_SQM = {

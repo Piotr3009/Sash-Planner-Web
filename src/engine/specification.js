@@ -33,6 +33,7 @@ function detectGridMode(spec, item) {
 export const GLASS_MAKEUP = { double: '4x16x4', double_slim: '4x8x4', triple: '4x8x4x8x4', passive: '', single: '' };
 export const GLASS_THICKNESS = { double: 24, double_slim: 16, triple: 28 };
 export const glassGas = (type) => (type === 'single' || type === 'passive') ? '' : 'argon';
+import { profileBoxDepth } from './profile.js';
 
 function customBarsFromSpec(spec, item) {
   // New format: item stores custom bars directly as arrays of {type, mm}
@@ -98,11 +99,12 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
   const ironFinish = item?.ironmongery || item?.ironmongery_finish || fc.ironmongeryFinish || fc.ironmongery || 'brass';
   const pas24 = item?.pas24 !== undefined ? item.pas24 : (fc.pas24 || false);
 
-  // Frame depth — new: item.frameDepth
-  const frameDepth = item?.frameDepth || (glassType === 'triple' ? 172 : 164);
   // Frame type — feeds engine's isSlim (clip size, weight type). Was never set before,
   // so slim-specific consumables silently fell back to standard.
   const frameType = item?.frameType || item?.frame_type || fc.frameType || 'standard';
+  // Frame depth — stored on the window; legacy windows fall back to the profile
+  const frameDepth = item?.frameDepth
+    || profileBoxDepth(glassType === 'triple' ? 'triple' : frameType);
 
   // Opening type — new: item.openingType
   const openingType = item?.openingType || item?.opening_type || fc.openingType || 'both';

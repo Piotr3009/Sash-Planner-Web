@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { DEFAULT_SASH_PROFILE, DEFAULT_CASEMENT_PROFILE, setActiveWindowProfile, setActiveCasementProfile } from '../engine/profile.js';
+import { loadWindowProfiles, saveWindowProfiles } from '../services/cloudSync.js';
+
+let cloudSaveTimer = null;
+const scheduleCloudSave = (profiles) => {
+  clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(() => saveWindowProfiles(profiles), 800);
+};
 
 // Deep clone helper for the plain-JSON profile object
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -21,7 +28,8 @@ export const useWindowProfileStore = create(
         set((s) => {
           const sash = clone(s.sash);
           if (!sash.variants[variantKey]) return {};
-          sash.variants[variantKey][field] = Number(value) || 0;
+          sash.variants[variantKey][field] =
+            field === 'label' ? String(value) : (Number(value) || 0);
           return { sash };
         });
         get()._sync();
@@ -90,6 +98,24 @@ export const useWindowProfileStore = create(
       _sync: () => {
         setActiveWindowProfile(get().sash);
         setActiveCasementProfile(get().casement);
+        scheduleCloudSave({ sash: get().sash, casement: get().casement });
+      },
+
+      // Pull tenant profiles from Supabase (called once after rehydrate)
+      loadFromCloud: async () => {
+        try {
+          const cloud = await loadWindowProfiles();
+          if (cloud?.sash || cloud?.casement) {
+            set({
+              ...(cloud.sash ? { sash: cloud.sash } : {}),
+              ...(cloud.casement ? { casement: cloud.casement } : {}),
+            });
+            setActiveWindowProfile(get().sash);
+            setActiveCasementProfile(get().casement);
+          }
+        } catch (err) {
+          console.error('windowProfile loadFromCloud', err);
+        }
       },
     }),
     {
@@ -98,6 +124,8 @@ export const useWindowProfileStore = create(
         // Push the persisted profile into the engine on app start
         if (state?.sash) setActiveWindowProfile(state.sash);
         if (state?.casement) setActiveCasementProfile(state.casement);
+        // Tenant profile from Supabase wins over the local cache
+        setTimeout(() => useWindowProfileStore.getState().loadFromCloud(), 0);
       },
     }
   )

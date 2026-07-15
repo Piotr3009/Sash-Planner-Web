@@ -11,12 +11,13 @@
 export const DEFAULT_SASH_PROFILE = {
   // Frame variants: box depth + finished sash depth (planed from the same raw stock)
   variants: {
-    standard: { label: 'Standard', boxDepth: 164, sashDepth: 57 },
-    slim:     { label: 'Slim',     boxDepth: 144, sashDepth: 47 },
-    heritage: { label: 'Heritage', boxDepth: 134, sashDepth: 42 },
-    triple:   { label: 'Triple glazing', boxDepth: 172, sashDepth: 61 },
+    standard: { label: 'Standard', boxDepth: 164, sashDepth: 57, boardWidth: 141 },
+    slim:     { label: 'Slim',     boxDepth: 144, sashDepth: 47, boardWidth: 121 },
+    heritage: { label: 'Heritage', boxDepth: 134, sashDepth: 42, boardWidth: 111 },
+    triple:   { label: 'Triple glazing', boxDepth: 172, sashDepth: 61, boardWidth: 149 },
   },
-  // Head/Jamb board width = boxDepth − boardInset (164−23=141, 144→121, 134→111, 172→149)
+  // Legacy only: pre-boardWidth profiles derived board = boxDepth − boardInset.
+  // boardWidth on each variant is now the source of truth (workshop-editable).
   boardInset: 23,
   // Window sill construction: true = cill + separate nose, false = one piece
   cillTwoPiece: true,
@@ -111,10 +112,33 @@ export function profileBoxDepth(frameType) {
   return profileVariant(frameType).boxDepth;
 }
 
-export function profileBoardWidth(frameDepth) {
+/** Head/Jamb board width for a frame variant. boardWidth is authoritative;
+ *  legacy persisted profiles without it fall back to depth − inset. */
+export function profileBoardWidth(frameType) {
+  const p = getWindowProfile();
+  const v = p.variants[frameType] || p.variants.standard;
+  return v.boardWidth ?? (v.boxDepth - (p.boardInset ?? 23));
+}
+
+/** Legacy helper (by depth) kept for old call sites. */
+export function boardWidthForDepth(frameDepth) {
   const p = getWindowProfile();
   const depth = Number(frameDepth) || p.variants.standard.boxDepth;
-  return depth - p.boardInset;
+  const v = Object.values(p.variants).find((x) => x.boxDepth === depth);
+  if (v) return v.boardWidth ?? (v.boxDepth - (p.boardInset ?? 23));
+  return depth - (p.boardInset ?? 23);
+}
+
+/** Temporarily compute with frozen (batch snapshot) profiles. */
+export function withProfiles(sashProfile, casementProfile, fn) {
+  const prevSash = activeProfile;
+  const prevCas = activeCasementProfile;
+  if (sashProfile) activeProfile = sashProfile;
+  if (casementProfile) activeCasementProfile = casementProfile;
+  try { return fn(); } finally {
+    activeProfile = prevSash;
+    activeCasementProfile = prevCas;
+  }
 }
 
 /**

@@ -47,7 +47,7 @@ export default function WindowSettingsPage() {
   const variant = profile.variants[variantKey] || profile.variants.standard;
   const els = profile.elements;
   const ded = profile.deductions;
-  const boardW = variant.boxDepth - profile.boardInset;
+  const boardW = variant.boardWidth ?? (variant.boxDepth - (profile.boardInset ?? 23));
 
   // Live sample window for the technical drawings (recomputes with the profile)
   const sample = useMemo(() => {
@@ -158,6 +158,12 @@ export default function WindowSettingsPage() {
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-2 items-end text-xs">
           <div>
+            <div className="text-ink-400 mb-1">Variant name</div>
+            <input type="text" value={variant.label}
+              onChange={(e) => setVariantField(variantKey, 'label', e.target.value)}
+              className="w-36 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+          </div>
+          <div>
             <div className="text-ink-400 mb-1">Box depth (mm)</div>
             <input type="number" value={variant.boxDepth}
               onChange={(e) => setVariantField(variantKey, 'boxDepth', e.target.value)}
@@ -170,14 +176,13 @@ export default function WindowSettingsPage() {
               className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
           </div>
           <div>
-            <div className="text-ink-400 mb-1">Head/Jamb board inset (mm)</div>
-            <input type="number" value={profile.boardInset}
-              onChange={(e) => setBoardInset(e.target.value)}
+            <div className="text-ink-400 mb-1">Head/Jamb board width (mm)</div>
+            <input type="number" value={boardW}
+              onChange={(e) => setVariantField(variantKey, 'boardWidth', e.target.value)}
               className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
           </div>
           <div className="text-ink-300 pb-1.5">
-            Board width: <span className="text-accent-400 font-medium">{boardW} mm</span>
-            <span className="text-ink-500"> = {variant.boxDepth} − {profile.boardInset}</span>
+            <span className="text-ink-500">depth − board = {variant.boxDepth - boardW} mm</span>
           </div>
         </div>
       </div>

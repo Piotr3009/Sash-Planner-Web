@@ -46,6 +46,7 @@ const COLOR_MAP = {
 };
 
 import { RAL_LOOKUP as RAL_COLORS } from '../config.js';
+import { profileBoxDepth } from '../engine/profile.js';
 
 function resolveColor(name, ral) {
   if (!name && !ral) return '#F4F4F2'; // default white
@@ -156,7 +157,7 @@ export function windowSpecToConfig(windowSpec) {
     opening: 0,
     upperOpening: 0,
     showGuides: false,
-    boxDepth: windowSpec.frame?.depth || 164,
+    boxDepth: windowSpec.frame?.depth || profileBoxDepth('standard'),
     sashDepth: 57,
   };
 }

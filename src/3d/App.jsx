@@ -5,6 +5,7 @@ import { useMemo, useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { RAL_LOOKUP as RAL_COLORS, RAL_GROUPS, FB_GROUPS, SWATCHES } from '../config.js';
 import ParametricSashWindow from './components/ParametricSashWindow';
+import { profileBoxDepth } from '../engine/profile.js';
 import CasementWindow from './components/casement/CasementWindow';
 import ArchedCasementWindow from './components/casement/ArchedCasementWindow';
 import FixFrameWindow from './components/fix-frame/FixFrameWindow';
@@ -923,7 +924,7 @@ export default function App() {
       doubleGlazing,
       spacerColor,
       brightness,
-      boxDepth: boxDepthOverride ?? (boxType === 'standard' ? 164 : 146),
+      boxDepth: boxDepthOverride ?? profileBoxDepth(boxType === 'standard' ? 'standard' : 'slim'),
       sashDepth: 57,
       boxType,
       upperBars,
