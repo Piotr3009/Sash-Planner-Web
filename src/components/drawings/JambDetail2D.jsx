@@ -10,7 +10,7 @@ const NS = { vectorEffect: 'non-scaling-stroke' };
 
 export default function JambDetail2D({ boardWidth = 141, thickness = 28, selected = false, onClick }) {
   const bw = Math.max(60, Number(boardWidth) || 141);
-  const bh = 560;                 // shortened board with a break line
+  const bh = 300;                 // shortened board with a break line
   const M = 46;                   // margin for dims/labels
   const totalW = bw + M * 2 + 40;
   const totalH = bh + M * 2 + 20;
@@ -22,14 +22,14 @@ export default function JambDetail2D({ boardWidth = 141, thickness = 28, selecte
 
   // Pulley pockets: one each side of the groove, near the top
   const pkW = Math.min(24, bw * 0.16);
-  const pkH = 110;
-  const pkY = oy + 46;
+  const pkH = 78;
+  const pkY = oy + 30;
   const pkGap = grooveW / 2 + 10;
   const pkLx = ox + bw / 2 - pkGap - pkW;
   const pkRx = ox + bw / 2 + pkGap;
 
   // Break line (zig-zag) near the bottom to show the board continues
-  const brY = oy + bh - 70;
+  const brY = oy + bh - 44;
   const zig = Array.from({ length: 9 }, (_, i) => {
     const x = ox - 6 + ((bw + 12) / 8) * i;
     const y = brY + (i % 2 === 0 ? -6 : 6);

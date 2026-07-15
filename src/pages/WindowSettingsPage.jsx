@@ -57,7 +57,7 @@ export default function WindowSettingsPage() {
         frameType: variantKey, frameDepth: variant.boxDepth,
         sashType: 'double', glassType: variantKey === 'triple' ? 'triple' : 'double',
         upperBars: 'none', lowerBars: 'none', sameBars: true,
-        showHorns: false, hornType: 'none', openingType: 'both',
+        showHorns: true, hornType: 'A', openingType: 'both',
       };
       const ws = normaliseToWindowSpec(item);
       return { ws, derived: deriveWindowData(ws) };
@@ -141,6 +141,8 @@ export default function WindowSettingsPage() {
         </div>
       </div>
 
+      <div className="flex gap-5 items-start">
+        <div className="flex-1 min-w-0">
       {/* Variant tabs + variant fields */}
       <div className="card p-4 mb-4">
         <div className="flex flex-wrap gap-1.5 mb-3">
@@ -176,35 +178,6 @@ export default function WindowSettingsPage() {
           </div>
         </div>
       </div>
-
-      {/* Technical drawings — click an element to edit it */}
-      {sample && (
-        <>
-          <div className="text-sm font-semibold text-ink-50 mb-2">Drawings <span className="text-ink-500 font-normal text-xs">— live from sample {W} × {H} · {variant.label}</span></div>
-          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3 mb-5">
-            <div className="card p-2">
-              <BoxDetail2D windowSpec={sample.ws} derived={sample.derived} view="external"
-                selectedElement={selected} onElementClick={setSelected} />
-            </div>
-            <div className="card p-2">
-              <BoxDetail2D windowSpec={sample.ws} derived={sample.derived} view="internal"
-                selectedElement={selected} onElementClick={setSelected} />
-            </div>
-            <div className="card p-2">
-              <JambDetail2D boardWidth={boardW} thickness={els.jambs.thickness}
-                selected={selected === 'jambs'} onClick={setSelected} />
-            </div>
-            <div className="card p-2">
-              <SashDetail2D windowSpec={sample.ws} derived={sample.derived} type="upper"
-                selectedElement={selected} onElementClick={setSelected} />
-            </div>
-            <div className="card p-2">
-              <SashDetail2D windowSpec={sample.ws} derived={sample.derived} type="lower"
-                selectedElement={selected} onElementClick={setSelected} />
-            </div>
-          </div>
-        </>
-      )}
 
       {/* Box frame parts */}
       <div className="text-sm font-semibold text-ink-50 mb-2">Box frame</div>
@@ -396,6 +369,42 @@ export default function WindowSettingsPage() {
         </table>
       </div>
       <div className="text-[11px] text-ink-500 mt-2">Defaults = OTD profile · glazing bars stay built-in · values apply to new calculations immediately</div>
+        </div>
+
+        <div className="w-[380px] xl:w-[460px] shrink-0 sticky top-4">
+      {/* Technical drawings — click an element to edit it */}
+      {sample && (
+        <>
+          <div className="text-sm font-semibold text-ink-50 mb-2">Drawings <span className="text-ink-500 font-normal text-xs">— {W} × {H} · {variant.label}</span></div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="card p-2">
+              <BoxDetail2D windowSpec={sample.ws} derived={sample.derived} view="external"
+                selectedElement={selected} onElementClick={setSelected} />
+            </div>
+            <div className="card p-2">
+              <BoxDetail2D windowSpec={sample.ws} derived={sample.derived} view="internal"
+                selectedElement={selected} onElementClick={setSelected} />
+            </div>
+            <div className="card p-2 col-span-2 flex justify-center">
+              <div className="w-1/2">
+                <JambDetail2D boardWidth={boardW} thickness={els.jambs.thickness}
+                  selected={selected === 'jambs'} onClick={setSelected} />
+              </div>
+            </div>
+            <div className="card p-2">
+              <SashDetail2D windowSpec={sample.ws} derived={sample.derived} type="upper"
+                selectedElement={selected} onElementClick={setSelected} />
+            </div>
+            <div className="card p-2">
+              <SashDetail2D windowSpec={sample.ws} derived={sample.derived} type="lower"
+                selectedElement={selected} onElementClick={setSelected} />
+            </div>
+          </div>
+        </>
+      )}
+
+        </div>
+      </div>
     </div>
   );
 }
