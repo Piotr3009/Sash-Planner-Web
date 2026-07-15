@@ -533,6 +533,26 @@ export default function WindowSettingsPage() {
         </table>
       </div>
       <div className="text-[11px] text-ink-500 mt-2">Defaults = OTD profile · glazing bars stay built-in · values apply to new calculations immediately</div>
+      {/* TEMP DEBUG — glass source comparison; remove after verifying vs real OTD glass orders */}
+      {sample?.derived && (() => {
+        const f = {
+          stile: Number(profile.elements?.stiles?.face) || 57,
+          top: Number(profile.elements?.topRail?.face) || 57,
+          meet: Number(profile.elements?.meetingRail?.face) || 43,
+          bottom: Number(profile.elements?.bottomRail?.face) || 90,
+        };
+        const d = sample.derived;
+        const gU = d.topSashHeight - f.top - f.meet;
+        const gL = d.bottomSashHeight - f.meet - f.bottom;
+        const gw = d.sashWidth - 2 * f.stile;
+        // glass-list legacy model (calculateGlazingSummaryForWindow): total/2 − top − bottom
+        const listH = (d.topSashHeight + d.bottomSashHeight) / 2 - f.top - f.bottom;
+        return (
+          <div className="text-[11px] text-amber-400 mt-1">
+            TEMP · engine per-sash glass: US {gw} × {gU} · LS {gw} × {gL} {gU === gL ? '(równe ✓)' : '(NIERÓWNE ✗)'} · glass-list model: {gw} × {listH}
+          </div>
+        );
+      })()}
         </div>
 
         <div className="flex-1 min-w-0 shrink-0 sticky top-4">
