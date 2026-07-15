@@ -252,10 +252,10 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
             const topKey = geom.isUpper ? 'topRail' : 'meetingRail';
             const botKey = geom.isUpper ? 'meetingRail' : 'bottomRail';
             const zones = [
-              { key: 'stiles', x: X(0), y: Y(geom.sashH), w: geom.stile, h: geom.sashH },
-              { key: 'stiles', x: X(geom.sashW - geom.stile), y: Y(geom.sashH), w: geom.stile, h: geom.sashH },
-              { key: topKey, x: X(geom.stile), y: Y(geom.sashH), w: geom.sashW - 2 * geom.stile, h: geom.topEdge },
-              { key: botKey, x: X(geom.stile), y: Y(geom.botEdge), w: geom.sashW - 2 * geom.stile, h: geom.botEdge },
+              { key: 'stiles', x: X(0), y: Y(0), w: geom.stile, h: geom.sashH },
+              { key: 'stiles', x: X(geom.sashW - geom.stile), y: Y(0), w: geom.stile, h: geom.sashH },
+              { key: topKey, x: X(geom.stile), y: Y(0), w: geom.sashW - 2 * geom.stile, h: geom.topEdge },
+              { key: botKey, x: X(geom.stile), y: Y(geom.sashH - geom.botEdge), w: geom.sashW - 2 * geom.stile, h: geom.botEdge },
             ];
             return (
               <g>
