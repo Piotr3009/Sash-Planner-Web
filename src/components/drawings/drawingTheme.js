@@ -64,6 +64,7 @@ export const WEIGHTS = {
 // Change these → line thickness changes everywhere, identically.
 export const STROKES = {
   frame:       1.5,
+  boardIndicator: 3,   // head/jamb board mounting indicator (board is 28 mm)
   frameLight:  0.5,
   sash:        1,
   sashLight:   0.3,

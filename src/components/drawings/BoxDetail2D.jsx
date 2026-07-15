@@ -215,6 +215,20 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
                 fill={hl('cill') ? COLORS.highlightFill : 'transparent'}
                 stroke={hl('cill') ? COLORS.highlight : 'none'} strokeWidth={STROKES.frame} {...NS}
                 style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onElementClick('cill'); }} />
+
+              {/* Board mounting indicators — where the head / jamb boards sit */}
+              {hl('jamb') && (
+                <>
+                  <line x1={X(BOX.jambW_top / 2)} y1={Y(BOX.sillTop + 10)} x2={X(BOX.jambW_top / 2)} y2={Y(fh - BOX.headH)}
+                    stroke={COLORS.highlight} strokeWidth={STROKES.boardIndicator} {...NS} />
+                  <line x1={X(fw - BOX.jambW_top / 2)} y1={Y(BOX.sillTop + 10)} x2={X(fw - BOX.jambW_top / 2)} y2={Y(fh - BOX.headH)}
+                    stroke={COLORS.highlight} strokeWidth={STROKES.boardIndicator} {...NS} />
+                </>
+              )}
+              {hl('head') && (
+                <line x1={X(0)} y1={Y(fh - BOX.headH / 2)} x2={X(fw)} y2={Y(fh - BOX.headH / 2)}
+                  stroke={COLORS.highlight} strokeWidth={STROKES.boardIndicator} {...NS} />
+              )}
             </g>
           )}
 
