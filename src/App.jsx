@@ -6,6 +6,7 @@ import DashboardPage from './pages/DashboardPage.jsx';
 import ProjectDetailPage from './pages/ProjectDetailPage.jsx';
 import MaterialsPage from './pages/MaterialsPage.jsx';
 import MaterialAssignmentsPage from './pages/MaterialAssignmentsPage.jsx';
+import WindowSettingsPage from './pages/WindowSettingsPage.jsx';
 import IronmongeryPage from './pages/IronmongeryPage.jsx';
 import ClientsPage from './pages/ClientsPage.jsx';
 import EstimatesPage from './pages/EstimatesPage.jsx';
@@ -82,6 +83,8 @@ export default function App() {
         <Route path="materials" element={<MaterialsPage />} />
         <Route path="materials/assignments" element={<Navigate to="/materials/assignments/sash" replace />} />
         <Route path="materials/assignments/:typeId" element={<MaterialAssignmentsPage />} />
+        <Route path="window-settings" element={<Navigate to="/window-settings/sash" replace />} />
+        <Route path="window-settings/:typeId" element={<WindowSettingsPage />} />
         <Route path="ironmongery" element={<IronmongeryPage />} />
         <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="projects/:projectId/batches/:batchId/windows/:windowId" element={

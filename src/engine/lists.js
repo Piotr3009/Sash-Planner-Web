@@ -8,6 +8,7 @@
 
 import { CONSTANTS, deriveWindowData } from './calculations.js';
 import { GLASS_MAKEUP, glassGas } from './specification.js';
+import { profileRawForSection } from './profile.js';
 
 const DEFAULT_SETTINGS = {
   kerf: 3,
@@ -98,7 +99,7 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg) {
   // Sash precut groups by section (mapped via settings.sectionMap to raw)
   const bySection = new Map();
   derived.components.sash.forEach((c) => {
-    const raw = settings.sectionMap[c.section] || settings.sectionMap['57x57'];
+    const raw = (settings?.sectionMap?.[c.section] || profileRawForSection(c.section) || settings.sectionMap[c.section]) || settings.sectionMap['57x57'];
     if (!raw) return;
     if (!bySection.has(raw)) bySection.set(raw, []);
     bySection.get(raw).push({

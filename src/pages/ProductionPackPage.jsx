@@ -590,6 +590,7 @@ function OverviewTab({ batch, pp, isPPMode, windowsData, registerExport }) {
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Type</th>
                 <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Width</th>
                 <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Height</th>
+                <th className="px-4 py-2.5 text-right text-ink-400 font-medium">Box</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Bars</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Head</th>
                 <th className="px-4 py-2.5 text-left text-ink-400 font-medium">Glass</th>
@@ -606,6 +607,7 @@ function OverviewTab({ batch, pp, isPPMode, windowsData, registerExport }) {
                   <td className="px-4 py-2.5 text-ink-300">{win.sashType || 'double'}</td>
                   <td className="px-4 py-2.5 text-right text-ink-200">{win.width} mm</td>
                   <td className="px-4 py-2.5 text-right text-ink-200">{win.height} mm</td>
+                  <td className="px-4 py-2.5 text-right text-ink-200">{win.frameDepth || (win.glassType === 'triple' ? 172 : win.frameType === 'slim' ? 144 : 164)} mm</td>
                   <td className="px-4 py-2.5 text-ink-300">{win.upperBars || 'none'}</td>
                   <td className="px-4 py-2.5 text-ink-300">{win.headType || 'flat'}</td>
                   <td className="px-4 py-2.5 text-ink-300">{win.glassFinish || 'clear'}</td>

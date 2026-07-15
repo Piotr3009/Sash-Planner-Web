@@ -12,6 +12,7 @@ export default function AppSidebar() {
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [materialsOpen, setMaterialsOpen] = useState(false);
   const [assignmentsOpen, setAssignmentsOpen] = useState(false);
+  const [winSettingsOpen, setWinSettingsOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -202,6 +203,36 @@ export default function AppSidebar() {
             <path d="M9 18l6-6-6-6" />
           </svg>
         </button>
+
+
+        {/* Window Settings — workshop construction profile */}
+        <button
+          onClick={() => setWinSettingsOpen(!winSettingsOpen)}
+          className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] mb-0.5 transition-colors text-ink-200 hover:bg-surface-700 hover:text-ink-50 w-full text-left"
+        >
+          <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="4" y="3" width="16" height="18" rx="1" />
+            <path d="M4 12h16M12 3v18" />
+          </svg>
+          <span className="flex-1">Window Settings</span>
+          <svg className={`w-3.5 h-3.5 text-ink-400 transition-transform ${winSettingsOpen ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        </button>
+
+        {winSettingsOpen && (
+          <div className="pl-4 mb-1">
+            <div className="pl-3 ml-2 border-l border-surface-500/50">
+              <NavLink to="/window-settings/sash"
+                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                Sash windows
+              </NavLink>
+              <div className="px-3 py-1 text-[11px] text-ink-400/50 cursor-default">Casement — soon</div>
+              <div className="px-3 py-1 text-[11px] text-ink-400/50 cursor-default">Fix frame — soon</div>
+              <div className="px-3 py-1 text-[11px] text-ink-400/50 cursor-default">Doors — soon</div>
+            </div>
+          </div>
+        )}
 
         {assignmentsOpen && (
           <div className="pl-4 mb-1">

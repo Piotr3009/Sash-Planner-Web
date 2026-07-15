@@ -4,7 +4,7 @@ import { useProjectStore } from '../stores/projectStore.js';
 import { useIronmongeryStore, IRONMONGERY_CATEGORIES } from '../stores/ironmongeryStore.js';
 import IronmongeryPickerModal from '../components/IronmongeryPickerModal.jsx';
 import { GLASS_TYPES, GLASS_SPECS, GLASS_COATINGS, GLASS_FINISHES, FROSTED_LOCATIONS, SPACERS, SPACER_TYPES, SWATCHES, RAL_GROUPS, FB_GROUPS } from '../config.js';
-import { CONSTANTS } from '../engine/calculations.js';
+import { useWindowProfileStore } from '../stores/windowProfileStore.js';
 import { buildVentGrilles } from '../engine/lists.js';
 
 const Viewer3D = lazy(() => import('../3d/App.jsx'));
@@ -29,18 +29,8 @@ const HORN_OPTIONS = [{ value: 'none', label: 'No Horns' }, { value: 'A', label:
 const COLOUR_MODES = [{ value: 'single', label: 'Single' }, { value: 'dual', label: 'Dual (Ext/Int)' }];
 
 // ─── Frame drives the glass type (box depth + glazing are one decision) ───
-const FRAME_OPTIONS = [
-  { value: 'slim', label: `Slim (${CONSTANTS.FRAME_DEPTH_SLIM}mm)` },
-  { value: 'standard', label: `Standard (${CONSTANTS.FRAME_DEPTH_STANDARD}mm)` },
-  { value: 'triple', label: `Triple glazing (${CONSTANTS.FRAME_DEPTH_TRIPLE}mm)` },
-  { value: 'heritage', label: `Heritage (${CONSTANTS.FRAME_DEPTH_HERITAGE}mm)` },
-];
-const FRAME_DEPTHS = {
-  slim: CONSTANTS.FRAME_DEPTH_SLIM,
-  standard: CONSTANTS.FRAME_DEPTH_STANDARD,
-  triple: CONSTANTS.FRAME_DEPTH_TRIPLE,
-  heritage: CONSTANTS.FRAME_DEPTH_HERITAGE,
-};
+// Depths come from the workshop Window Settings profile (live).
+const FRAME_ORDER = ['slim', 'standard', 'triple', 'heritage'];
 const FRAME_GLASS = { slim: 'double_slim', standard: 'double', triple: 'triple' }; // heritage → user picks
 const HERITAGE_GLASS_OPTIONS = [
   { value: 'passive', label: 'Passive (U: 0.8)' },
@@ -85,6 +75,14 @@ export default function ConfiguratorPage() {
   const batch = project?.batches?.find(b => b.id === batchId);
   const def = batch?.defaults || {};
   const ironItems = useIronmongeryStore((s) => s.items);
+  const sashProfile = useWindowProfileStore((s) => s.sash);
+  const FRAME_DEPTHS = useMemo(() => Object.fromEntries(
+    FRAME_ORDER.map((k) => [k, sashProfile.variants[k]?.boxDepth || 164])
+  ), [sashProfile]);
+  const FRAME_OPTIONS = useMemo(() => FRAME_ORDER.map((k) => ({
+    value: k,
+    label: `${sashProfile.variants[k]?.label || k} (${FRAME_DEPTHS[k]}mm)`,
+  })), [sashProfile, FRAME_DEPTHS]);
 
   // ─── Edit mode ───
   const editWindowId = searchParams.get('edit');
@@ -247,7 +245,7 @@ export default function ConfiguratorPage() {
   // ─── Effective values ───
   const isSingle = colourMode === 'single';
   const hasGasFill = glassType !== 'single' && glassType !== 'passive'; // sealed units only
-  const frameDepth = FRAME_DEPTHS[frameType] || CONSTANTS.FRAME_DEPTH_STANDARD;
+  const frameDepth = FRAME_DEPTHS[frameType] || 164;
 
   const extW = Number(inW) || 400;
   const extH = Number(inH) || 400;
