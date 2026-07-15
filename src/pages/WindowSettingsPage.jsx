@@ -311,14 +311,18 @@ export default function WindowSettingsPage() {
             )}
             {sel.kind === 'cill' && (
               <>
+                {/* Cill legacy fields: profile 'w' is the vertical HEIGHT, 'h' is the WIDTH
+                    (see profile.js). Labels below bind flipped for 'cill'; cillNose unchanged. */}
                 <div>
                   <div className="text-ink-400 mb-1">Width (mm)</div>
-                  <input type="number" value={selData.w} onChange={(e) => setElementField(sel.key, 'w', e.target.value)}
+                  <input type="number" value={sel.key === 'cill' ? selData.h : selData.w}
+                    onChange={(e) => setElementField(sel.key, sel.key === 'cill' ? 'h' : 'w', e.target.value)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
                 <div>
                   <div className="text-ink-400 mb-1">Height (mm)</div>
-                  <input type="number" value={selData.h} onChange={(e) => setElementField(sel.key, 'h', e.target.value)}
+                  <input type="number" value={sel.key === 'cill' ? selData.w : selData.h}
+                    onChange={(e) => setElementField(sel.key, sel.key === 'cill' ? 'w' : 'h', e.target.value)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
                 <div className="text-ink-400 pt-5">Length = frame W + per-window extension</div>
@@ -439,14 +443,18 @@ export default function WindowSettingsPage() {
             )}
             {sel.kind === 'cill' && (
               <>
+                {/* Cill legacy fields: profile 'w' is the vertical HEIGHT, 'h' is the WIDTH
+                    (see profile.js). Labels below bind flipped for 'cill'; cillNose unchanged. */}
                 <div>
                   <div className="text-ink-400 mb-1">Width (mm)</div>
-                  <input type="number" value={selData.w} onChange={(e) => setElementField(sel.key, 'w', e.target.value)}
+                  <input type="number" value={sel.key === 'cill' ? selData.h : selData.w}
+                    onChange={(e) => setElementField(sel.key, sel.key === 'cill' ? 'h' : 'w', e.target.value)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
                 <div>
                   <div className="text-ink-400 mb-1">Height (mm)</div>
-                  <input type="number" value={selData.h} onChange={(e) => setElementField(sel.key, 'h', e.target.value)}
+                  <input type="number" value={sel.key === 'cill' ? selData.w : selData.h}
+                    onChange={(e) => setElementField(sel.key, sel.key === 'cill' ? 'w' : 'h', e.target.value)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
                 <div className="text-ink-400 pt-5">Length = frame W + per-window extension</div>

@@ -38,7 +38,7 @@ export const DEFAULT_SASH_PROFILE = {
     intHeadLiner: { w: 17, h: 86,  deduction: 172 },
     extJambLiner: { w: 17, h: 102, deduction: 0 },
     intJambLiner: { w: 17, h: 86,  deduction: 0 },
-    cill:         { w: 69, h: 46 },
+    cill:         { w: 69, h: 46 },   // legacy field names: w = vertical HEIGHT (69), h = WIDTH/depth (46); UI + drawings map accordingly — do not swap the data (stored profiles, "69×46" section convention)
     cillNose:     { w: 64, h: 128 },
     // Triple sash mullion post (matches the 3D viewer's 50mm) — FLAGGED default
     mullion:      { face: 50, raw: '63x63' },
