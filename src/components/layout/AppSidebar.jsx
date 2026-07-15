@@ -227,7 +227,10 @@ export default function AppSidebar() {
                 className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
                 Sash windows
               </NavLink>
-              <div className="px-3 py-1 text-[11px] text-ink-400/50 cursor-default">Casement — soon</div>
+              <NavLink to="/window-settings/casement"
+                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                Casement
+              </NavLink>
               <div className="px-3 py-1 text-[11px] text-ink-400/50 cursor-default">Fix frame — soon</div>
               <div className="px-3 py-1 text-[11px] text-ink-400/50 cursor-default">Doors — soon</div>
             </div>

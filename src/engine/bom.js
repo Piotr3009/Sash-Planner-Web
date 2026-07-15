@@ -50,6 +50,20 @@ export const GLASS_TYPE_TO_PART_ID = {
   passive: 'glass_passive',
 };
 
+// Triple sash + casement element → part mappings
+Object.assign(ELEMENT_TO_PART_ID, {
+  'MULLION (L)': 'mullion',
+  'MULLION (R)': 'mullion',
+  'C-FRAME HEAD': 'c_frame_head',
+  'C-FRAME CILL': 'c_frame_cill',
+  'C-FRAME JAMB (L)': 'c_frame_jamb',
+  'C-FRAME JAMB (R)': 'c_frame_jamb',
+  'C-STILE (L)': 'c_sash_stile',
+  'C-STILE (R)': 'c_sash_stile',
+  'C-TOP RAIL': 'c_sash_top_rail',
+  'C-BOTTOM RAIL': 'c_sash_bottom_rail',
+});
+
 // Box head/jamb parts split per frame type (raw board width differs)
 export const FRAME_BOX_PART_SUFFIX = { slim: '_slim', heritage: '_heritage', triple: '_triple' };
 
@@ -92,7 +106,9 @@ export function buildWindowPartQtys(derived, windowSpec, settings) {
   // Head/Jambs use a different board width per frame type → route to the matching part.
   const boxSuffix = FRAME_BOX_PART_SUFFIX[windowSpec?.frame?.type] || '';
   const partIdFor = (elementName) => {
-    const pid = ELEMENT_TO_PART_ID[elementName];
+    // Triple sash suffixes '(FIX L)/(C)/(FIX R)' map to the same base parts
+    const baseName = String(elementName).replace(/ \((FIX L|FIX R|C)\)$/, '');
+    const pid = ELEMENT_TO_PART_ID[baseName] || ELEMENT_TO_PART_ID[elementName];
     return (boxSuffix && (pid === 'head' || pid === 'jambs')) ? `${pid}${boxSuffix}` : pid;
   };
   const precut = buildPrecutForWindow(derived, windowSpec, settings);
@@ -168,6 +184,7 @@ export function resolvePartTotal(entry, yieldCoeff = 1.0) {
  */
 export function buildWindowHardware(windowSpec, batch, ironmongeryItems = []) {
   if (!windowSpec) return [];
+  if ((windowSpec.category || 'sash') !== 'sash') return [];
   const lines = buildHardwareList(windowSpec);
   const slots = {
     ...(batch?.defaults?.ironmongerySlots || {}),

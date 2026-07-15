@@ -121,7 +121,10 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
     type: item?.window_type || spec.windowType || 'sash',
     quantity: Number(item?.quantity || 1),
     frame: { width, height, depth: frameDepth, type: frameType },
+    category: item?.windowCategory || fc.windowCategory || 'sash',
     sash: {
+      type: item?.sashType || fc.sashType || 'double',
+      splitRatio: item?.splitRatio || fc.splitRatio || '1/4-1/2-1/4',
       openingType,
       horns: hasHorns,
       hornType: hornsVal,

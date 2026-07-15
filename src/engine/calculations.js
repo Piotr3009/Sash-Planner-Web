@@ -1,4 +1,4 @@
-import { getWindowProfile, profileSashDepth, profileBoardWidth, kgPerM } from './profile.js';
+import { getWindowProfile, getCasementProfile, profileSashDepth, profileBoardWidth, kgPerM } from './profile.js';
 
 /**
  * calculations.js - ETAP 3
@@ -222,9 +222,10 @@ function createComponentRecord(windowSpec, group, elementName, section, length, 
     };
 }
 
-function calculateSashComponentSet(windowSpec, settings, sashWidth, topSashHeight, bottomSashHeight) {
+function calculateSashComponentSet(windowSpec, settings, sashWidth, topSashHeight, bottomSashHeight, suffix = '') {
     const hornExtra = windowSpec.sash?.horns ? Number(windowSpec.sash?.hornExtension ?? settings.hornExtensionDefault) : 0;
     const railLength = sashWidth;
+    const sfx = suffix ? ` ${suffix}` : '';
 
     // Finished sash depth from the frame variant; face widths from the profile
     const prof = getWindowProfile();
@@ -234,16 +235,47 @@ function calculateSashComponentSet(windowSpec, settings, sashWidth, topSashHeigh
     const fMeet = prof.elements.meetingRail.face;
     const fBottom = prof.elements.bottomRail.face;
     const sashComponents = [];
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'TOP RAIL', `${sd}x${fTop}`, railLength, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES TOP (L)', `${sd}x${fStile}`, topSashHeight + hornExtra, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES TOP (R)', `${sd}x${fStile}`, topSashHeight + hornExtra, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'TOP MEET RAIL', `${sd}x${fMeet}`, railLength, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'BOTTOM MEET RAIL', `${sd}x${fMeet}`, railLength, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES BOTTOM SASH (L)', `${sd}x${fStile}`, bottomSashHeight, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'STILES BOTTOM SASH (R)', `${sd}x${fStile}`, bottomSashHeight, 1));
-    sashComponents.push(createComponentRecord(windowSpec, 'sash', 'BOTTOM RAIL', `${sd}x${fBottom}`, railLength, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', `TOP RAIL${sfx}`, `${sd}x${fTop}`, railLength, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', `STILES TOP (L)${sfx}`, `${sd}x${fStile}`, topSashHeight + hornExtra, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', `STILES TOP (R)${sfx}`, `${sd}x${fStile}`, topSashHeight + hornExtra, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', `TOP MEET RAIL${sfx}`, `${sd}x${fMeet}`, railLength, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', `BOTTOM MEET RAIL${sfx}`, `${sd}x${fMeet}`, railLength, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', `STILES BOTTOM SASH (L)${sfx}`, `${sd}x${fStile}`, bottomSashHeight, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', `STILES BOTTOM SASH (R)${sfx}`, `${sd}x${fStile}`, bottomSashHeight, 1));
+    sashComponents.push(createComponentRecord(windowSpec, 'sash', `BOTTOM RAIL${sfx}`, `${sd}x${fBottom}`, railLength, 1));
 
     return sashComponents;
+}
+
+function tripleSectionWidths(windowSpec, sashWidth) {
+    const prof = getWindowProfile();
+    const mullionFace = prof.elements.mullion?.face || 50;
+    const split = windowSpec.sash?.splitRatio || '1/4-1/2-1/4';
+    let leftR = 0.25, centerR = 0.5;
+    if (split === '1/3-1/3-1/3') { leftR = 1 / 3; centerR = 1 / 3; }
+    else if (split === '1/5-3/5-1/5') { leftR = 0.2; centerR = 0.6; }
+    const avail = sashWidth - 2 * mullionFace;
+    const left = Math.round(avail * leftR);
+    const center = Math.round(avail * centerR);
+    const right = avail - left - center;
+    return { left, center, right, mullionFace };
+}
+
+function calculateTripleSashComponentSet(windowSpec, settings, sashWidth, topSashHeight, bottomSashHeight, frameHeight) {
+    const { left, center, right, mullionFace } = tripleSectionWidths(windowSpec, sashWidth);
+    const prof = getWindowProfile();
+    const bw = boxBoardWidthFor(windowSpec.frame?.depth);
+    const jambLength = frameHeight - prof.deductions.jambHeight;
+
+    const parts = [
+        ...calculateSashComponentSet(windowSpec, settings, left, topSashHeight, bottomSashHeight, '(FIX L)'),
+        ...calculateSashComponentSet(windowSpec, settings, center, topSashHeight, bottomSashHeight, '(C)'),
+        ...calculateSashComponentSet(windowSpec, settings, right, topSashHeight, bottomSashHeight, '(FIX R)'),
+    ];
+    // Two mullion posts — treated like intermediate jamb boards (FLAGGED section)
+    parts.push(createComponentRecord(windowSpec, 'sash', `MULLION (L)`, `${mullionFace}x${bw}`, jambLength, 1));
+    parts.push(createComponentRecord(windowSpec, 'sash', `MULLION (R)`, `${mullionFace}x${bw}`, jambLength, 1));
+    return parts;
 }
 
 function calculateBoxComponentSet(windowSpec, frameWidth, frameHeight) {
@@ -489,9 +521,66 @@ function calculateBeadingComponents(windowSpec, frameWidth, frameHeight, sashWid
     return beading;
 }
 
+function emptyDerived(category, frameWidth, frameHeight) {
+    return {
+        unsupported: category,
+        sashWidth: 0, sashHeight: 0, topSashHeight: 0, bottomSashHeight: 0,
+        config: { key: 'none', rows: 0, cols: 0 },
+        components: { sash: [], box: [], beading: [] },
+        glazingItems: [],
+        barPositions: { vertical: [], horizontal: [] },
+        weights: { timber: 0, glass: 0, total: 0 },
+        paint: { areaSqm: 0 },
+        consumables: {},
+        frame: { width: frameWidth, height: frameHeight },
+    };
+}
+
+function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
+    const p = getCasementProfile();
+    const els = p.elements;
+    const d = p.depth;
+    const sashW = frameWidth - p.deductions.sashWidth;
+    const sashH = frameHeight - p.deductions.sashHeight;
+    const jambLength = frameHeight - 2 * els.frameHead.face;
+    const glassW = Math.max(0, sashW - p.deductions.glassWidth);
+    const glassH = Math.max(0, sashH - p.deductions.glassHeight);
+
+    const box = [
+        createComponentRecord(windowSpec, 'box', 'C-FRAME HEAD', `${d}x${els.frameHead.face}`, frameWidth, 1),
+        createComponentRecord(windowSpec, 'box', 'C-FRAME CILL', `${d}x${els.frameCill.face}`, frameWidth, 1),
+        createComponentRecord(windowSpec, 'box', 'C-FRAME JAMB (L)', `${d}x${els.frameJamb.face}`, jambLength, 1),
+        createComponentRecord(windowSpec, 'box', 'C-FRAME JAMB (R)', `${d}x${els.frameJamb.face}`, jambLength, 1),
+    ];
+    const sash = [
+        createComponentRecord(windowSpec, 'sash', 'C-STILE (L)', `${d}x${els.sashStile.face}`, sashH, 1),
+        createComponentRecord(windowSpec, 'sash', 'C-STILE (R)', `${d}x${els.sashStile.face}`, sashH, 1),
+        createComponentRecord(windowSpec, 'sash', 'C-TOP RAIL', `${d}x${els.sashTop.face}`, sashW, 1),
+        createComponentRecord(windowSpec, 'sash', 'C-BOTTOM RAIL', `${d}x${els.sashBottom.face}`, sashW, 1),
+    ];
+
+    return {
+        category: 'casement',
+        sashWidth: sashW, sashHeight: sashH, topSashHeight: 0, bottomSashHeight: 0,
+        config: { key: 'none', rows: 0, cols: 0 },
+        components: { sash, box, beading: [] },
+        glazingItems: [],
+        customGlassUnits: [{ width: glassW, height: glassH, location: 'casement', qty: 1 }],
+        barPositions: { vertical: [], horizontal: [] },
+        weights: { timber: 0, glass: 0, total: 0 },
+        paint: calculatePaint(frameWidth, frameHeight),
+        consumables: {},
+        frame: { width: frameWidth, height: frameHeight },
+    };
+}
+
 export function deriveWindowData(windowSpec, settings = {}) {
     const frameWidth = Number(windowSpec.frame?.width ?? 0);
     const frameHeight = Number(windowSpec.frame?.height ?? 0);
+    const category = windowSpec.category || 'sash';
+    if (category === 'casement') return deriveCasementWindow(windowSpec, frameWidth, frameHeight);
+    if (category !== 'sash') return emptyDerived(category, frameWidth, frameHeight);
+    const isTripleSash = windowSpec.sash?.type === 'triple';
     const gridMode = windowSpec.sash?.grid?.mode ?? 'none';
 
     const config = resolveConfiguration(gridMode, windowSpec.sash?.grid ?? {});
@@ -501,8 +590,11 @@ export function deriveWindowData(windowSpec, settings = {}) {
     const bottomSashHeight = topSashHeight + CONSTANTS.SASH_HEIGHT_DIFFERENCE;
     const sashHeight = totalSashHeight;
 
-    const sashComponents = calculateSashComponentSet(windowSpec, settings, sashWidth, topSashHeight, bottomSashHeight);
+    const sashComponents = isTripleSash
+        ? calculateTripleSashComponentSet(windowSpec, settings, sashWidth, topSashHeight, bottomSashHeight, frameHeight)
+        : calculateSashComponentSet(windowSpec, settings, sashWidth, topSashHeight, bottomSashHeight);
     const boxComponents = calculateBoxComponentSet(windowSpec, frameWidth, frameHeight);
+    const tripleSections = isTripleSash ? tripleSectionWidths(windowSpec, sashWidth) : null;
     const glazingSummary = calculateGlazingSummaryForWindow(windowSpec, sashWidth, sashHeight, settings);
 
     const result = calculateWindow(frameWidth, frameHeight, config.key, {
@@ -519,11 +611,14 @@ export function deriveWindowData(windowSpec, settings = {}) {
         windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight
     );
 
-    const weights = calculateWeights(windowSpec, sashWidth, topSashHeight, bottomSashHeight);
+    // Triple sash: counterweights balance only the centre (opening) section
+    const weights = calculateWeights(windowSpec, tripleSections ? tripleSections.center : sashWidth, topSashHeight, bottomSashHeight);
     const paint = calculatePaint(frameWidth, frameHeight);
     const consumables = calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight);
 
     return {
+        category: 'sash',
+        tripleSections,
         sashWidth,
         sashHeight,
         topSashHeight,

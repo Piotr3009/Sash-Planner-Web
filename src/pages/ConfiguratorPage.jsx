@@ -365,13 +365,13 @@ export default function ConfiguratorPage() {
             <Lbl>Head</Lbl><HChips o={HEAD_TYPES} v={headType} c={setHeadType} />
           </Sec>}
 
-          <Sec t="Frame">
+          {isSash && <Sec t="Frame">
             <HChips o={FRAME_OPTIONS} v={frameType} c={changeFrame} />
             <div className="text-[11px] text-ink-300">
               Box depth: <span className="text-accent-400 font-medium">{frameDepth}mm</span>
               {frameType !== 'heritage' && <> · Glass: <span className="text-accent-400 font-medium">{glassLabel(glassType)}</span></>}
             </div>
-          </Sec>
+          </Sec>}
 
           <Sec t="Dimensions (Frame)">
             <div className="grid grid-cols-2 gap-3">
@@ -412,7 +412,9 @@ export default function ConfiguratorPage() {
           </Sec>
 
           <Sec t="Glass">
-            {frameType === 'heritage' ? (
+            {!isSash ? (
+              <><Lbl>Type</Lbl><HChips o={GLASS_TYPES.filter(g => g.value === 'double' || g.value === 'double_slim' || g.value === 'triple')} v={glassType} c={setGlassType} /></>
+            ) : frameType === 'heritage' ? (
               <><Lbl>Type</Lbl><HChips o={HERITAGE_GLASS_OPTIONS} v={glassType} c={changeHeritageGlass} /></>
             ) : (
               <div className="text-[11px] text-ink-300 mb-2">Type: <span className="text-accent-400 font-medium">{glassLabel(glassType)}</span> <span className="text-ink-500">— set by frame</span></div>

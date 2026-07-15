@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { DEFAULT_SASH_PROFILE, setActiveWindowProfile } from '../engine/profile.js';
+import { DEFAULT_SASH_PROFILE, DEFAULT_CASEMENT_PROFILE, setActiveWindowProfile, setActiveCasementProfile } from '../engine/profile.js';
 
 // Deep clone helper for the plain-JSON profile object
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -15,6 +15,7 @@ export const useWindowProfileStore = create(
   persist(
     (set, get) => ({
       sash: clone(DEFAULT_SASH_PROFILE),
+      casement: clone(DEFAULT_CASEMENT_PROFILE),
 
       setVariantField: (variantKey, field, value) => {
         set((s) => {
@@ -56,18 +57,47 @@ export const useWindowProfileStore = create(
         get()._sync();
       },
 
-      resetToDefaults: () => {
-        set({ sash: clone(DEFAULT_SASH_PROFILE) });
+      setCasementElementField: (elementKey, field, value) => {
+        set((s) => {
+          const casement = clone(s.casement);
+          if (!casement.elements[elementKey]) return {};
+          casement.elements[elementKey][field] =
+            field === 'raw' ? String(value) : (Number(value) || 0);
+          return { casement };
+        });
         get()._sync();
       },
 
-      _sync: () => setActiveWindowProfile(get().sash),
+      setCasementDeduction: (key, value) => {
+        set((s) => {
+          const casement = clone(s.casement);
+          casement.deductions[key] = Number(value) || 0;
+          return { casement };
+        });
+        get()._sync();
+      },
+
+      setCasementDepth: (value) => {
+        set((s) => ({ casement: { ...clone(s.casement), depth: Number(value) || 57 } }));
+        get()._sync();
+      },
+
+      resetToDefaults: () => {
+        set({ sash: clone(DEFAULT_SASH_PROFILE), casement: clone(DEFAULT_CASEMENT_PROFILE) });
+        get()._sync();
+      },
+
+      _sync: () => {
+        setActiveWindowProfile(get().sash);
+        setActiveCasementProfile(get().casement);
+      },
     }),
     {
       name: 'pc-window-profile',
       onRehydrateStorage: () => (state) => {
         // Push the persisted profile into the engine on app start
         if (state?.sash) setActiveWindowProfile(state.sash);
+        if (state?.casement) setActiveCasementProfile(state.casement);
       },
     }
   )

@@ -98,11 +98,14 @@ export default function WindowSettingsPage() {
     return `${e.w} × ${e.h}`;
   };
 
+  if (typeId === 'casement') {
+    return <CasementSettings sampleW={sampleW} sampleH={sampleH} setSampleW={setSampleW} setSampleH={setSampleH} />;
+  }
   if (typeId && typeId !== 'sash') {
     return (
       <div className="p-8">
         <h1 className="text-lg font-semibold text-ink-50 mb-2">Window Settings</h1>
-        <div className="text-sm text-ink-400">Profile for "{typeId}" is coming soon. Sash windows are available now.</div>
+        <div className="text-sm text-ink-400">Profile for "{typeId}" is coming soon.</div>
       </div>
     );
   }
@@ -408,3 +411,143 @@ export default function WindowSettingsPage() {
     </div>
   );
 }
+
+// ─── Casement profile (simple: outer frame + sash all round) ───
+const CASEMENT_ELEMENT_DEFS = [
+  { key: 'frameHead',  name: 'Frame head',       group: 'Frame', lenRule: (W, H) => ({ rule: 'frame W', val: W }) },
+  { key: 'frameJamb',  name: 'Frame jambs ×2',   group: 'Frame', lenRule: (W, H, p) => ({ rule: `frame H − 2×${p.elements.frameHead.face}`, val: H - 2 * p.elements.frameHead.face }) },
+  { key: 'frameCill',  name: 'Frame cill',       group: 'Frame', lenRule: (W) => ({ rule: 'frame W', val: W }) },
+  { key: 'sashStile',  name: 'Sash stiles ×2',   group: 'Sash',  lenRule: (W, H, p) => ({ rule: `frame H − ${p.deductions.sashHeight}`, val: H - p.deductions.sashHeight }) },
+  { key: 'sashTop',    name: 'Sash top rail',    group: 'Sash',  lenRule: (W, H, p) => ({ rule: `frame W − ${p.deductions.sashWidth}`, val: W - p.deductions.sashWidth }) },
+  { key: 'sashBottom', name: 'Sash bottom rail', group: 'Sash',  lenRule: (W, H, p) => ({ rule: `frame W − ${p.deductions.sashWidth}`, val: W - p.deductions.sashWidth }) },
+];
+
+function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
+  const casement = useWindowProfileStore((s) => s.casement);
+  const setEl = useWindowProfileStore((s) => s.setCasementElementField);
+  const setDed = useWindowProfileStore((s) => s.setCasementDeduction);
+  const setDepth = useWindowProfileStore((s) => s.setCasementDepth);
+  const resetToDefaults = useWindowProfileStore((s) => s.resetToDefaults);
+  const [selected, setSelected] = useState('sashBottom');
+
+  const W = Number(sampleW) || 1000;
+  const H = Number(sampleH) || 1200;
+  const sashW = W - casement.deductions.sashWidth;
+  const sashH = H - casement.deductions.sashHeight;
+  const glassW = sashW - casement.deductions.glassWidth;
+  const glassH = sashH - casement.deductions.glassHeight;
+  const sel = CASEMENT_ELEMENT_DEFS.find((e) => e.key === selected) || CASEMENT_ELEMENT_DEFS[0];
+  const selData = casement.elements[sel.key];
+  const num = (v, fb = 0) => (v === '' ? '' : Number(v) || fb);
+
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-ink-50">Window Settings — Casement</h1>
+          <div className="text-xs text-ink-400">Simple construction: outer frame + sash all round · mullions and transoms coming later</div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 text-xs text-ink-400">
+            Sample window:
+            <input type="number" value={sampleW} onChange={(e) => setSampleW(num(e.target.value, 1000))}
+              className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs text-center" />
+            ×
+            <input type="number" value={sampleH} onChange={(e) => setSampleH(num(e.target.value, 1200))}
+              className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs text-center" />
+            mm
+          </div>
+          <button
+            onClick={() => { if (window.confirm('Reset sash AND casement profiles to defaults?')) resetToDefaults(); }}
+            className="px-3 py-1.5 text-xs rounded-lg border border-surface-500 text-ink-200 bg-surface-700 hover:bg-surface-600 transition-colors">
+            Reset to defaults
+          </button>
+        </div>
+      </div>
+
+      <div className="card p-4 mb-4 flex flex-wrap gap-x-6 gap-y-2 items-end text-xs">
+        <div>
+          <div className="text-ink-400 mb-1">Finished depth (mm) · all members</div>
+          <input type="number" value={casement.depth} onChange={(e) => setDepth(e.target.value)}
+            className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+        </div>
+        <div>
+          <div className="text-ink-400 mb-1">Sash W = frame W −</div>
+          <input type="number" value={casement.deductions.sashWidth} onChange={(e) => setDed('sashWidth', e.target.value)}
+            className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+        </div>
+        <div>
+          <div className="text-ink-400 mb-1">Sash H = frame H −</div>
+          <input type="number" value={casement.deductions.sashHeight} onChange={(e) => setDed('sashHeight', e.target.value)}
+            className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+        </div>
+        <div>
+          <div className="text-ink-400 mb-1">Glass W = sash W −</div>
+          <input type="number" value={casement.deductions.glassWidth} onChange={(e) => setDed('glassWidth', e.target.value)}
+            className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+        </div>
+        <div>
+          <div className="text-ink-400 mb-1">Glass H = sash H −</div>
+          <input type="number" value={casement.deductions.glassHeight} onChange={(e) => setDed('glassHeight', e.target.value)}
+            className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+        </div>
+        <div className="text-ink-300 pb-1.5">
+          Sample: sash <span className="text-accent-400 font-medium">{sashW} × {sashH}</span> · glass <span className="text-accent-400 font-medium">{glassW} × {glassH}</span>
+        </div>
+      </div>
+
+      <div className="flex gap-3 items-start flex-wrap">
+        <div className="card overflow-hidden flex-1 min-w-[420px]">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-surface-700 text-ink-400">
+                <th className="px-4 py-2 text-left font-medium">Element</th>
+                <th className="px-4 py-2 text-left font-medium">Finished</th>
+                <th className="px-4 py-2 text-left font-medium">Length rule</th>
+                <th className="px-4 py-2 text-right font-medium">Sample</th>
+              </tr>
+            </thead>
+            <tbody>
+              {CASEMENT_ELEMENT_DEFS.map((el) => {
+                const L = el.lenRule(W, H, casement);
+                const active = selected === el.key;
+                const e = casement.elements[el.key];
+                return (
+                  <tr key={el.key} onClick={() => setSelected(el.key)}
+                    className={`cursor-pointer border-t border-surface-500 ${active ? 'bg-accent-500/10 text-accent-400' : 'text-ink-200 hover:bg-surface-700/40'}`}>
+                    <td className="px-4 py-1.5 font-medium">{el.name} <span className="text-ink-500 font-normal">({el.group})</span></td>
+                    <td className="px-4 py-1.5">{casement.depth} × {e.face}</td>
+                    <td className="px-4 py-1.5 font-mono text-[11px]">{L.rule}</td>
+                    <td className="px-4 py-1.5 text-right font-mono">{L.val}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="card p-4 w-[300px] shrink-0">
+          <div className="mb-3"><span className="text-[11px] text-ink-400">Selected: </span><span className="text-sm font-semibold text-ink-50">{sel.name}</span></div>
+          <div className="flex flex-wrap gap-3 text-xs">
+            <div>
+              <div className="text-ink-400 mb-1">Face (mm)</div>
+              <input type="number" value={selData.face} onChange={(e) => setEl(sel.key, 'face', e.target.value)}
+                className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+            </div>
+            <div>
+              <div className="text-ink-400 mb-1">Raw stock</div>
+              <select value={selData.raw} onChange={(e) => setEl(sel.key, 'raw', e.target.value)}
+                className="px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm">
+                {RAW_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="text-[11px] text-ink-500 mt-3 pt-2 border-t border-surface-500">
+            Feeds cut list, pre-cut and BOM for casement batches. Defaults are provisional — verify before production.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+

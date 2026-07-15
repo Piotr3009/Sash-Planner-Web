@@ -58,6 +58,7 @@ const BOX_MATERIAL_SECTION = {
 };
 
 export function buildCutListForWindow(derived, windowSpec) {
+  if (derived?.unsupported) return [];
   if (!derived) return [];
   const out = [];
   // Box (frame) components
@@ -91,6 +92,7 @@ export function buildCutListForWindow(derived, windowSpec) {
 }
 
 export function buildPrecutForWindow(derived, windowSpec, settingsArg) {
+  if (derived?.unsupported) return [];
   const settings = settingsWithDefaults(settingsArg);
   if (!derived) return { sashEngineering: [], boxSapele: [] };
 
@@ -142,8 +144,42 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg) {
   };
 }
 
+function buildGlassRow(windowSpec, width, height, location, qty) {
+  const glassType = windowSpec?.glazing?.type || 'double';
+  const glassSpec = windowSpec?.glazing?.spec || 'toughened';
+  const spacer = windowSpec?.glazing?.spacerColour || 'silver';
+  const spacerType = windowSpec?.glazing?.spacerType || 'warm';
+  const makeup = windowSpec?.glazing?.makeup ?? (GLASS_MAKEUP[glassType] ?? GLASS_MAKEUP.double);
+  const coating = windowSpec?.glazing?.coating || 'standard';
+  const gas = windowSpec?.glazing?.gas ?? glassGas(glassType);
+  const finish = windowSpec?.glazing?.finish || windowSpec?.glazing?.lowerGlass || 'clear';
+  return {
+    width: Math.round(Math.max(0, width) * 100) / 100,
+    height: Math.round(Math.max(0, height) * 100) / 100,
+    qty, location,
+    type: glassType, spec: glassSpec,
+    spacer, spacerType, makeup, coating, gas, finish,
+  };
+}
+
 export function buildGlassListForWindow(derived, windowSpec) {
-  if (!derived) return [];
+  if (!derived || derived.unsupported) return [];
+
+  // Non-double-hung sources (casement, triple sections) supply units directly
+  if (Array.isArray(derived.customGlassUnits) && derived.customGlassUnits.length > 0) {
+    return derived.customGlassUnits.map((u) => buildGlassRow(windowSpec, u.width, u.height, u.location, u.qty || 1));
+  }
+  // Triple sash: two panes per section, same heights as double-hung
+  if (derived.tripleSections) {
+    const t = derived.tripleSections;
+    const rows = [];
+    [['fix L', t.left], ['centre', t.center], ['fix R', t.right]].forEach(([loc, w]) => {
+      rows.push(buildGlassRow(windowSpec, w - CONSTANTS.GLASS_WIDTH_DEDUCTION, derived.topSashHeight - CONSTANTS.GLASS_HEIGHT_DEDUCTION, `${loc} upper`, 1));
+      const LOWER_DEDUCTION = CONSTANTS.MEETING_RAIL_WIDTH + CONSTANTS.BOTTOM_RAIL_WIDTH - 2 * 12.5;
+      rows.push(buildGlassRow(windowSpec, w - CONSTANTS.GLASS_WIDTH_DEDUCTION, derived.bottomSashHeight - LOWER_DEDUCTION, `${loc} lower`, 1));
+    });
+    return rows;
+  }
 
   const sw = derived.sashWidth;
   const topH = derived.topSashHeight;
@@ -239,6 +275,8 @@ export function buildVentGrilles(windowSpec) {
 }
 
 export function buildHardwareList(windowSpec) {
+  const cat = windowSpec?.category || 'sash';
+  if (cat !== 'sash') return []; // casement/door hardware comes later
   const finish = windowSpec?.hardware?.finish || 'brass';
   const isPas24 = windowSpec?.hardware?.catches === 'PAS24';
   const openingType = windowSpec?.sash?.openingType || 'both';

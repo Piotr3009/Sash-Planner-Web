@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useMaterialStore } from '../stores/materialStore.js';
-import { useMaterialAssignmentStore, SASH_WINDOW_PARTS, ALL_PARTS } from '../stores/materialAssignmentStore.js';
+import { useMaterialAssignmentStore, SASH_WINDOW_PARTS, ALL_PARTS, CASEMENT_PARTS, CASEMENT_ALL_PARTS } from '../stores/materialAssignmentStore.js';
 
 const TYPE_LABELS = {
   sash: 'Sash Windows',
@@ -240,7 +240,8 @@ export default function MaterialAssignmentsPage() {
   }, [materials]);
 
   // Stats — only for current type
-  const typeParts = isSash ? ALL_PARTS : [];
+  const isCasement = typeId === 'casement';
+  const typeParts = isSash ? ALL_PARTS : isCasement ? CASEMENT_ALL_PARTS : [];
   const totalParts = typeParts.length;
   const assignedCount = typeParts.filter((p) => assignments[p.id]?.material_id).length;
   const requiredParts = typeParts.filter((p) => !p.optional);
@@ -329,6 +330,36 @@ export default function MaterialAssignmentsPage() {
           </div>
         )}
 
+        {isCasement && (
+          <>
+            <PartGroupSection
+              title="🪵 Frame"
+              subtitle={`${CASEMENT_PARTS.frame.length} parts · head, jambs, cill`}
+              parts={CASEMENT_PARTS.frame}
+              assignments={assignments}
+              materials={materials}
+              categories={categories}
+              subcategoriesByCategory={subcategoriesByCategory}
+              onAssign={setAssignment}
+              onFilter={setFilter}
+              onYield={setYield}
+            />
+            <PartGroupSection
+              title="🪵 Sash"
+              subtitle={`${CASEMENT_PARTS.sash.length} parts · stiles, rails`}
+              parts={CASEMENT_PARTS.sash}
+              assignments={assignments}
+              materials={materials}
+              categories={categories}
+              subcategoriesByCategory={subcategoriesByCategory}
+              onAssign={setAssignment}
+              onFilter={setFilter}
+              onYield={setYield}
+            />
+          </>
+        )}
+
+        {isSash && <>
         {/* Box Frame */}
         <PartGroupSection
           title="🪵 Box Frame"
@@ -424,6 +455,7 @@ export default function MaterialAssignmentsPage() {
           onRemove={removeAssignment}
           disabled={locked}
         />
+        </>}
 
         {/* Legend */}
         <div className="mt-3 flex gap-4 flex-wrap text-[10px] text-ink-400">

@@ -34,6 +34,8 @@ export const DEFAULT_SASH_PROFILE = {
     intJambLiner: { w: 17, h: 86,  deduction: 0 },
     cill:         { w: 69, h: 46 },
     cillNose:     { w: 64, h: 128 },
+    // Triple sash mullion post (matches the 3D viewer's 50mm) — FLAGGED default
+    mullion:      { face: 50, raw: '63x63' },
   },
   // Length rules (mm subtracted from the window dimension). "Advanced" —
   // geometrically coupled values; changing them reshapes the whole window.
@@ -54,7 +56,37 @@ export function kgPerM(faceMm, depthMm) {
   return (Number(faceMm) * Number(depthMm) * TIMBER_DENSITY_KG_M3) / 1e6;
 }
 
+// ─── Casement profile (simple: outer frame + sash all round; mullions/transoms later) ───
+// FLAGGED defaults — drawn from sash practice, Piotr to verify in Window Settings.
+export const DEFAULT_CASEMENT_PROFILE = {
+  depth: 57, // finished depth for all casement members
+  elements: {
+    frameHead:  { face: 57, raw: '63x63' },
+    frameJamb:  { face: 57, raw: '63x63' },
+    frameCill:  { face: 70, raw: '63x95' },
+    sashStile:  { face: 47, raw: '63x63' },
+    sashTop:    { face: 47, raw: '63x63' },
+    sashBottom: { face: 70, raw: '63x95' },
+  },
+  deductions: {
+    // sash sits inside the outer frame: opening minus fitting gap each side
+    sashWidth: 122,   // frame W − 2×frame face − 2×4 gap
+    sashHeight: 122,
+    glassWidth: 64,   // sash W − 2×stile face + 2×15 rebate
+    glassHeight: 64,
+  },
+};
+
 let activeProfile = null;
+let activeCasementProfile = null;
+
+export function setActiveCasementProfile(profile) {
+  activeCasementProfile = profile || null;
+}
+export function getCasementProfile() {
+  return activeCasementProfile || DEFAULT_CASEMENT_PROFILE;
+}
+
 
 /** Called by windowProfileStore whenever the persisted profile changes. */
 export function setActiveWindowProfile(profile) {
@@ -99,5 +131,10 @@ export function profileRawForSection(section) {
   if (face === els.meetingRail.face) return els.meetingRail.raw;
   if (face === els.stiles.face) return els.stiles.raw;
   if (face === els.topRail.face) return els.topRail.raw;
+  if (els.mullion && face === els.mullion.face) return els.mullion.raw;
+  const c = getCasementProfile().elements;
+  for (const el of Object.values(c)) {
+    if (face === el.face) return el.raw;
+  }
   return null;
 }

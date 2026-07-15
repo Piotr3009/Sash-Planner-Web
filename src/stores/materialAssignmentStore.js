@@ -13,6 +13,7 @@ export const SASH_WINDOW_PARTS = {
     { id: 'jambs_heritage',  name: 'Jambs (Heritage)',      section: '28×111',  pcs: 2, materialType: 'hardwood', note: 'heritage frame' },
     { id: 'head_triple',     name: 'Head (Triple)',         section: '28×149',  pcs: 1, materialType: 'hardwood', note: 'triple glazing frame' },
     { id: 'jambs_triple',    name: 'Jambs (Triple)',        section: '28×149',  pcs: 2, materialType: 'hardwood', note: 'triple glazing frame' },
+    { id: 'mullion',         name: 'Mullion Post',          section: '50×141',  pcs: 2, materialType: 'hardwood', note: 'triple sash' },
     { id: 'cill',            name: 'Cill',                  section: '69×46',   pcs: 1, materialType: 'hardwood' },
     { id: 'cill_nose',       name: 'Cill Nose',             section: '64×128',  pcs: 1, materialType: 'hardwood' },
     { id: 'cill_extension',  name: 'Cill Extension',        section: '—',       pcs: 1, materialType: 'hardwood', optional: true },
@@ -66,6 +67,21 @@ export const SASH_WINDOW_PARTS = {
     { id: 'seal_bottom_6009',   name: 'Bottom Seal 6009',         section: '—',  pcs: 1, materialType: 'consumable', unit: 'm' },
   ],
 };
+
+// ─── Casement (simple: outer frame + sash all round; mullions/transoms later) ───
+export const CASEMENT_PARTS = {
+  frame: [
+    { id: 'c_frame_head', name: 'Frame Head',   section: '57×57', pcs: 1, materialType: 'hardwood' },
+    { id: 'c_frame_jamb', name: 'Frame Jambs',  section: '57×57', pcs: 2, materialType: 'hardwood' },
+    { id: 'c_frame_cill', name: 'Frame Cill',   section: '57×70', pcs: 1, materialType: 'hardwood' },
+  ],
+  sash: [
+    { id: 'c_sash_stile',       name: 'Sash Stiles',      section: '57×47', pcs: 2, materialType: 'hardwood' },
+    { id: 'c_sash_top_rail',    name: 'Sash Top Rail',    section: '57×47', pcs: 1, materialType: 'hardwood' },
+    { id: 'c_sash_bottom_rail', name: 'Sash Bottom Rail', section: '57×70', pcs: 1, materialType: 'hardwood' },
+  ],
+};
+export const CASEMENT_ALL_PARTS = [...CASEMENT_PARTS.frame, ...CASEMENT_PARTS.sash];
 
 // Flat list for lookups
 export const ALL_PARTS = [
