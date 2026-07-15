@@ -263,13 +263,8 @@ export default function WindowSettingsPage() {
                   <input type="number" value={selData.face} onChange={(e) => setElementField(sel.key, 'face', e.target.value)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
-                <div>
-                  <div className="text-ink-400 mb-1">Raw stock</div>
-                  <select value={selData.raw} onChange={(e) => setElementField(sel.key, 'raw', e.target.value)}
-                    className="px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm">
-                    {RAW_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                </div>
+                {/* Raw stock select hidden — raw size belongs to the assigned material
+                    (TODO: pre-cut raw from Assign Materials); engine keeps using stored profile raw. */}
               </>
             )}
             {sel.kind === 'board' && (
@@ -395,13 +390,8 @@ export default function WindowSettingsPage() {
                   <input type="number" value={selData.face} onChange={(e) => setElementField(sel.key, 'face', e.target.value)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
-                <div>
-                  <div className="text-ink-400 mb-1">Raw stock</div>
-                  <select value={selData.raw} onChange={(e) => setElementField(sel.key, 'raw', e.target.value)}
-                    className="px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm">
-                    {RAW_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                </div>
+                {/* Raw stock select hidden — raw size belongs to the assigned material
+                    (TODO: pre-cut raw from Assign Materials); engine keeps using stored profile raw. */}
               </>
             )}
             {sel.kind === 'board' && (

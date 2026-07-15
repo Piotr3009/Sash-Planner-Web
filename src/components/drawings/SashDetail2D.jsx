@@ -130,6 +130,21 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
   const leftDimX = ox - 24 * ts;
   const leftExtLineEnd = ox - 4 * ts;
 
+  // Dimension numbers — live from the profile the derived data was computed
+  // with (snapshot-aware); drawn geometry above stays schematic (CONSTANTS).
+  const sd = derived?.sashDims || {};
+  const stileDim = Number(sd.stile ?? geom.stile);
+  const topEdgeDim = Number((geom.isUpper ? sd.topRail : sd.meetingRail) ?? geom.topEdge);
+  const botEdgeDim = Number((geom.isUpper ? sd.meetingRail : sd.bottomRail) ?? geom.botEdge);
+  const topLabels = Array(topCuts.length - 1).fill(undefined);
+  topLabels[0] = fmt(stileDim);
+  topLabels[topLabels.length - 1] = fmt(stileDim);
+  if (topLabels.length === 3) topLabels[1] = fmt(geom.sashW - 2 * stileDim);
+  const leftLabels = Array(leftCuts.length - 1).fill(undefined);
+  leftLabels[0] = fmt(topEdgeDim);
+  leftLabels[leftLabels.length - 1] = fmt(botEdgeDim);
+  if (leftLabels.length === 3) leftLabels[1] = fmt(geom.sashH - topEdgeDim - botEdgeDim);
+
   return (
     <div className="w-full relative">
       <div className="absolute top-2 right-2 z-10 text-[10px] text-ink-400 bg-surface-700/80 px-2 py-1 rounded cursor-pointer hover:text-accent-400"
@@ -292,10 +307,10 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
 
           {/* Dimension chains */}
           <DimChainH y={topDimY} extFrom={topExtLineEnd}
-            cuts={topCuts.map(cx => X(cx))}
+            cuts={topCuts.map(cx => X(cx))} labels={topLabels}
             vbw={totalW} minSegment={BAR_WIDTH * 2} fmt={fmt} />
           <DimChainV x={leftDimX} extFrom={leftExtLineEnd}
-            cuts={leftCuts.map(cy => Y(cy))}
+            cuts={leftCuts.map(cy => Y(cy))} labels={leftLabels}
             vbw={totalW} minSegment={BAR_WIDTH * 2} fmt={fmt} />
 
           {/* Overall dims */}

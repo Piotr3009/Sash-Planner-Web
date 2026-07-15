@@ -626,6 +626,15 @@ export function deriveWindowData(windowSpec, settings = {}) {
         config,
         // Profile numbers for drawing dimension labels (schematic geometry stays
         // fixed; only the printed numbers follow the active/snapshotted profile).
+        // Sash rail/stile face numbers for drawing dimension labels (schematic
+        // geometry stays fixed; printed numbers follow the active profile).
+        sashDims: (() => {
+            const e = getWindowProfile().elements || {};
+            return {
+                stile: e.stiles?.face, topRail: e.topRail?.face,
+                meetingRail: e.meetingRail?.face, bottomRail: e.bottomRail?.face,
+            };
+        })(),
         boxDims: (() => {
             const e = getWindowProfile().elements || {};
             return {
