@@ -29,7 +29,13 @@ function bulgeArc(x1, y1, x2, y2, bulge) {
   return `A ${r} ${r} 0 ${la} ${sw} ${x2} ${y2}`;
 }
 
-export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumber }) {
+export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumber, view = 'external', selectedElement, onElementClick }) {
+  const isInternal = view === 'internal';
+  const jambKey = isInternal ? 'intJambLiner' : 'extJambLiner';
+  const headKey = isInternal ? 'intHeadLiner' : 'extHeadLiner';
+  const linerPrefix = isInternal ? 'INT.' : 'EXT.';
+  const clickable = typeof onElementClick === 'function';
+  const hl = (key) => clickable && selectedElement === key;
   const [expanded, setExpanded] = useState(false);
   const isExternalExpand = !!onExpand;
   const handleExpand = (e) => {
@@ -112,18 +118,18 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
             fontSize={tfs(SIZES.label, totalW)} fontWeight={WEIGHTS.label}
             fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}
             transform={`rotate(-90, ${X(BOX.jambW_bottom / 2)}, ${Y(fh / 2)})`}>
-            EXT. JAMB LINER (L)
+            {linerPrefix} JAMB LINER (L)
           </text>
           <text x={X(fw - BOX.jambW_bottom / 2)} y={Y(fh / 2)} fill={COL.label}
             fontSize={tfs(SIZES.label, totalW)} fontWeight={WEIGHTS.label}
             fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}
             transform={`rotate(90, ${X(fw - BOX.jambW_bottom / 2)}, ${Y(fh / 2)})`}>
-            EXT. JAMB LINER (R)
+            {linerPrefix} JAMB LINER (R)
           </text>
           <text x={X(fw / 2)} y={Y(fh - BOX.headH / 2) + 8 * totalW / VIEWBOX_REF} fill={COL.label}
             fontSize={tfs(SIZES.label, totalW)} fontWeight={WEIGHTS.label}
             fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}>
-            EXT. HEAD LINER
+            {linerPrefix} HEAD LINER
           </text>
           <text x={X(fw / 2)} y={Y(BOX.sillNose / 2) + 8 * totalW / VIEWBOX_REF} fill={COL.label}
             fontSize={tfs(SIZES.label, totalW)} fontWeight={WEIGHTS.label}
@@ -150,11 +156,34 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
           <DimV x={X(fw) + DM * 2.5} y1={Y(BOX.sillNose)} y2={Y(BOX.sillTop)}
             extFrom={X(fw)} label={`${BOX.sillTop - BOX.sillNose}`} small vbw={totalW} />
 
+
+          {/* Selection overlays (Window Settings) — invisible click zones + highlight */}
+          {clickable && (
+            <g>
+              <rect x={X(0)} y={Y(fh)} width={BOX.jambW_top} height={fh}
+                fill={hl(jambKey) ? COLORS.highlightFill : 'transparent'}
+                stroke={hl(jambKey) ? COLORS.highlight : 'none'} strokeWidth={STROKES.frame} {...NS}
+                style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onElementClick(jambKey); }} />
+              <rect x={X(fw - BOX.jambW_top)} y={Y(fh)} width={BOX.jambW_top} height={fh}
+                fill={hl(jambKey) ? COLORS.highlightFill : 'transparent'}
+                stroke={hl(jambKey) ? COLORS.highlight : 'none'} strokeWidth={STROKES.frame} {...NS}
+                style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onElementClick(jambKey); }} />
+              <rect x={X(BOX.jambW_top)} y={Y(fh)} width={fw - 2 * BOX.jambW_top} height={BOX.headH}
+                fill={hl(headKey) ? COLORS.highlightFill : 'transparent'}
+                stroke={hl(headKey) ? COLORS.highlight : 'none'} strokeWidth={STROKES.frame} {...NS}
+                style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onElementClick(headKey); }} />
+              <rect x={X(0)} y={Y(BOX.sillTop)} width={fw} height={BOX.sillTop}
+                fill={hl('cill') ? COLORS.highlightFill : 'transparent'}
+                stroke={hl('cill') ? COLORS.highlight : 'none'} strokeWidth={STROKES.frame} {...NS}
+                style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onElementClick('cill'); }} />
+            </g>
+          )}
+
           {/* Title */}
           <text x={totalW / 2} y={totalH - 10 * totalW / VIEWBOX_REF} fill={COL.title}
             fontSize={tfs(SIZES.title, totalW)}
             fontFamily={FONT.family} textAnchor="middle" fontWeight={WEIGHTS.title}>
-            Box — Front{projNum ? ` — ${projNum}` : ''} — {winName}
+            Box — {isInternal ? 'Internal' : 'Front'}{projNum ? ` — ${projNum}` : ''} — {winName}
           </text>
           <text x={totalW / 2} y={totalH + 14 * totalW / VIEWBOX_REF} fill={COL.title}
             fontSize={tfs(SIZES.subtitle, totalW)}

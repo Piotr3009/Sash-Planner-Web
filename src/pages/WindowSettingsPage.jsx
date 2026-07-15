@@ -2,7 +2,11 @@ import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
 import { kgPerM } from '../engine/profile.js';
-import { CONSTANTS } from '../engine/calculations.js';
+import { CONSTANTS, deriveWindowData } from '../engine/calculations.js';
+import { normaliseToWindowSpec } from '../engine/specification.js';
+import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
+import SashDetail2D from '../components/drawings/SashDetail2D.jsx';
+import JambDetail2D from '../components/drawings/JambDetail2D.jsx';
 
 // ─── Element metadata: engine names, groups, editable fields, length rules ───
 const RAW_OPTIONS = ['63x63', '63x95'];
@@ -44,6 +48,24 @@ export default function WindowSettingsPage() {
   const els = profile.elements;
   const ded = profile.deductions;
   const boardW = variant.boxDepth - profile.boardInset;
+
+  // Live sample window for the technical drawings (recomputes with the profile)
+  const sample = useMemo(() => {
+    try {
+      const item = {
+        name: 'SAMPLE', width: Number(sampleW) || 1000, height: Number(sampleH) || 1500,
+        frameType: variantKey, frameDepth: variant.boxDepth,
+        sashType: 'double', glassType: variantKey === 'triple' ? 'triple' : 'double',
+        upperBars: 'none', lowerBars: 'none', sameBars: true,
+        showHorns: false, hornType: 'none', openingType: 'both',
+      };
+      const ws = normaliseToWindowSpec(item);
+      return { ws, derived: deriveWindowData(ws) };
+    } catch (err) {
+      console.error('WindowSettings sample derive failed:', err);
+      return null;
+    }
+  }, [sampleW, sampleH, variantKey, variant.boxDepth, profile]);
 
   // Live sample lengths
   const W = Number(sampleW) || 1000;
@@ -155,44 +177,38 @@ export default function WindowSettingsPage() {
         </div>
       </div>
 
-      {/* Box frame: elevation + parts */}
+      {/* Technical drawings — click an element to edit it */}
+      {sample && (
+        <>
+          <div className="text-sm font-semibold text-ink-50 mb-2">Drawings <span className="text-ink-500 font-normal text-xs">— live from sample {W} × {H} · {variant.label}</span></div>
+          <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3 mb-5">
+            <div className="card p-2">
+              <BoxDetail2D windowSpec={sample.ws} derived={sample.derived} view="external"
+                selectedElement={selected} onElementClick={setSelected} />
+            </div>
+            <div className="card p-2">
+              <BoxDetail2D windowSpec={sample.ws} derived={sample.derived} view="internal"
+                selectedElement={selected} onElementClick={setSelected} />
+            </div>
+            <div className="card p-2">
+              <JambDetail2D boardWidth={boardW} thickness={els.jambs.thickness}
+                selected={selected === 'jambs'} onClick={setSelected} />
+            </div>
+            <div className="card p-2">
+              <SashDetail2D windowSpec={sample.ws} derived={sample.derived} type="upper"
+                selectedElement={selected} onElementClick={setSelected} />
+            </div>
+            <div className="card p-2">
+              <SashDetail2D windowSpec={sample.ws} derived={sample.derived} type="lower"
+                selectedElement={selected} onElementClick={setSelected} />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Box frame parts */}
       <div className="text-sm font-semibold text-ink-50 mb-2">Box frame</div>
       <div className="flex gap-4 items-start mb-5 flex-wrap">
-        <svg viewBox="0 0 212 200" className="w-[212px] shrink-0" role="img" aria-label="Box elevation with side view">
-          {/* front */}
-          <rect x="8" y="8" width="150" height="18" rx="2" onClick={() => setSelected('head')}
-            className="cursor-pointer" fill={selected === 'head' ? 'rgba(45,212,191,0.25)' : 'rgb(41,44,52)'}
-            stroke={selected === 'head' ? '#2dd4bf' : '#4b5163'} />
-          <text x="83" y="20" textAnchor="middle" fontSize="9" fill="#9aa1b2" pointerEvents="none">Head</text>
-          <rect x="8" y="26" width="18" height="140" rx="2" onClick={() => setSelected('jambs')}
-            className="cursor-pointer" fill={selected === 'jambs' ? 'rgba(45,212,191,0.25)' : 'rgb(41,44,52)'}
-            stroke={selected === 'jambs' ? '#2dd4bf' : '#4b5163'} />
-          <rect x="140" y="26" width="18" height="140" rx="2" onClick={() => setSelected('jambs')}
-            className="cursor-pointer" fill={selected === 'jambs' ? 'rgba(45,212,191,0.25)' : 'rgb(41,44,52)'}
-            stroke={selected === 'jambs' ? '#2dd4bf' : '#4b5163'} />
-          <text x="17" y="98" textAnchor="middle" fontSize="8" fill="#9aa1b2" transform="rotate(-90 17 98)" pointerEvents="none">Jamb L</text>
-          <text x="149" y="98" textAnchor="middle" fontSize="8" fill="#9aa1b2" transform="rotate(-90 149 98)" pointerEvents="none">Jamb R</text>
-          <rect x="26" y="26" width="114" height="140" fill="rgb(24,26,32)" stroke="#3a3f4d" strokeWidth="0.5" />
-          <rect x="2" y="166" width="162" height="13" rx="2" onClick={() => setSelected('cill')}
-            className="cursor-pointer" fill={selected === 'cill' ? 'rgba(45,212,191,0.25)' : 'rgb(41,44,52)'}
-            stroke={selected === 'cill' ? '#2dd4bf' : '#4b5163'} />
-          <text x="83" y="176" textAnchor="middle" fontSize="8" fill="#9aa1b2" pointerEvents="none">Cill</text>
-          {profile.cillTwoPiece && (
-            <>
-              <rect x="2" y="179" width="60" height="12" rx="2" onClick={() => setSelected('cillNose')}
-                className="cursor-pointer" fill={selected === 'cillNose' ? 'rgba(45,212,191,0.25)' : 'rgb(41,44,52)'}
-                stroke={selected === 'cillNose' ? '#2dd4bf' : '#4b5163'} />
-              <text x="32" y="188" textAnchor="middle" fontSize="7" fill="#9aa1b2" pointerEvents="none">Nose</text>
-            </>
-          )}
-          <text x="83" y="198" textAnchor="middle" fontSize="8" fill="#6b7280">front</text>
-          {/* side */}
-          <rect x="176" y="8" width="28" height="18" rx="2" fill="rgb(41,44,52)" stroke="#3a3f4d" strokeWidth="0.5" />
-          <rect x="176" y="26" width="28" height="140" rx="2" fill="rgb(41,44,52)" stroke="#3a3f4d" strokeWidth="0.5" />
-          <text x="190" y="98" textAnchor="middle" fontSize="7" fill="#6b7280" transform="rotate(-90 190 98)">depth {boardW}</text>
-          <text x="190" y="198" textAnchor="middle" fontSize="8" fill="#6b7280">side</text>
-        </svg>
-
         <div className="flex-1 min-w-[280px] grid grid-cols-[repeat(auto-fit,minmax(168px,1fr))] gap-1.5">
           {BOX_ELEMENTS.filter((el) => el.key !== 'cillNose' || profile.cillTwoPiece).map((el) => {
             const L = el.kind === 'liner' ? linerLength(el) : lengthInfo(el);

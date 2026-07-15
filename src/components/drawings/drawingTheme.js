@@ -16,6 +16,8 @@ export const VIEWBOX_REF = 700;
 
 // ─── Colors ───
 export const COLORS = {
+  highlight: '#2dd4bf',
+  highlightFill: 'rgba(45,212,191,0.16)',
   frame:       '#CBD5E1',
   frameFill:   'rgba(148,163,184,0.06)',
   sash:        '#E2E8F0',

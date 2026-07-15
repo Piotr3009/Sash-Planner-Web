@@ -39,7 +39,9 @@ function computeSegments(from, to, cutPairs) {
   return segs;
 }
 
-export default function SashDetail2D({ windowSpec, derived, type = 'upper', onExpand, projectNumber }) {
+export default function SashDetail2D({ windowSpec, derived, type = 'upper', onExpand, projectNumber, selectedElement, onElementClick }) {
+  const clickable = typeof onElementClick === 'function';
+  const hl = (key) => clickable && selectedElement === key;
   const [expanded, setExpanded] = useState(false);
   const isExternalExpand = !!onExpand;
   const handleExpand = (e) => {
@@ -243,6 +245,30 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
                 strokeDasharray={`${sw(3)},${sw(2)}`} />
             </g>
           ))}
+
+
+          {/* Selection overlays (Window Settings) — invisible click zones + highlight */}
+          {clickable && (() => {
+            const topKey = geom.isUpper ? 'topRail' : 'meetingRail';
+            const botKey = geom.isUpper ? 'meetingRail' : 'bottomRail';
+            const zones = [
+              { key: 'stiles', x: X(0), y: Y(geom.sashH), w: geom.stile, h: geom.sashH },
+              { key: 'stiles', x: X(geom.sashW - geom.stile), y: Y(geom.sashH), w: geom.stile, h: geom.sashH },
+              { key: topKey, x: X(geom.stile), y: Y(geom.sashH), w: geom.sashW - 2 * geom.stile, h: geom.topEdge },
+              { key: botKey, x: X(geom.stile), y: Y(geom.botEdge), w: geom.sashW - 2 * geom.stile, h: geom.botEdge },
+            ];
+            return (
+              <g>
+                {zones.map((z, i) => (
+                  <rect key={i} x={z.x} y={z.y} width={z.w} height={z.h}
+                    fill={hl(z.key) ? COLORS.highlightFill : 'transparent'}
+                    stroke={hl(z.key) ? COLORS.highlight : 'none'} strokeWidth={STROKES.sash} {...NS}
+                    style={{ cursor: 'pointer' }}
+                    onClick={(e) => { e.stopPropagation(); onElementClick(z.key); }} />
+                ))}
+              </g>
+            );
+          })()}
 
           {/* Labels */}
           <text x={X(geom.sashW / 2)} y={Y(geom.sashH - geom.botEdge / 2)}
