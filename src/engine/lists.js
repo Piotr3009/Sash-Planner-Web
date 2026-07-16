@@ -173,10 +173,15 @@ export function buildGlassListForWindow(derived, windowSpec) {
   if (derived.tripleSections) {
     const t = derived.tripleSections;
     const rows = [];
+    const sd3 = derived.sashDims || {};
+    const s3 = Number(sd3.stile) || CONSTANTS.STILE_WIDTH;
+    const t3 = Number(sd3.topRail) || CONSTANTS.TOP_RAIL_WIDTH;
+    const m3 = Number(sd3.meetingRail) || CONSTANTS.MEETING_RAIL_WIDTH;
+    const b3 = Number(sd3.bottomRail) || CONSTANTS.BOTTOM_RAIL_WIDTH;
+    const R3 = 2 * CONSTANTS.GLASS_REBATE;
     [['fix L', t.left], ['centre', t.center], ['fix R', t.right]].forEach(([loc, w]) => {
-      rows.push(buildGlassRow(windowSpec, w - CONSTANTS.GLASS_WIDTH_DEDUCTION, derived.topSashHeight - CONSTANTS.GLASS_HEIGHT_DEDUCTION, `${loc} upper`, 1));
-      const LOWER_DEDUCTION = CONSTANTS.MEETING_RAIL_WIDTH + CONSTANTS.BOTTOM_RAIL_WIDTH - 2 * 12.5;
-      rows.push(buildGlassRow(windowSpec, w - CONSTANTS.GLASS_WIDTH_DEDUCTION, derived.bottomSashHeight - LOWER_DEDUCTION, `${loc} lower`, 1));
+      rows.push(buildGlassRow(windowSpec, w - (2 * s3 - R3), derived.topSashHeight - (t3 + m3 - R3), `${loc} upper`, 1));
+      rows.push(buildGlassRow(windowSpec, w - (2 * s3 - R3), derived.bottomSashHeight - (m3 + b3 - R3), `${loc} lower`, 1));
     });
     return rows;
   }
@@ -186,12 +191,18 @@ export function buildGlassListForWindow(derived, windowSpec) {
   const botH = derived.bottomSashHeight;
   if (!sw || !topH || !botH) return [];
 
-  // Sealed glass unit dimensions (verified against Excel)
-  const unitW = Math.round((sw - CONSTANTS.GLASS_WIDTH_DEDUCTION) * 100) / 100;
-  const unitHupper = Math.round((topH - CONSTANTS.GLASS_HEIGHT_DEDUCTION) * 100) / 100;
-  // Lower deduction: meetRail(43) + botRail(90) - 2×rebate(12.5) = 108
-  const LOWER_DEDUCTION = CONSTANTS.MEETING_RAIL_WIDTH + CONSTANTS.BOTTOM_RAIL_WIDTH - 2 * 12.5;
-  const unitHlower = Math.round((botH - LOWER_DEDUCTION) * 100) / 100;
+  // Sealed glass unit dimensions (verified against Excel; defaults 89/75/108).
+  // Live rail/stile faces come from derived.sashDims (snapshot-aware), so a
+  // meeting rail of 53 or a bottom rail of 120 keeps both units correct & equal.
+  const sd = derived.sashDims || {};
+  const fStile = Number(sd.stile) || CONSTANTS.STILE_WIDTH;
+  const fTop = Number(sd.topRail) || CONSTANTS.TOP_RAIL_WIDTH;
+  const fMeet = Number(sd.meetingRail) || CONSTANTS.MEETING_RAIL_WIDTH;
+  const fBottom = Number(sd.bottomRail) || CONSTANTS.BOTTOM_RAIL_WIDTH;
+  const R2 = 2 * CONSTANTS.GLASS_REBATE;
+  const unitW = Math.round((sw - (2 * fStile - R2)) * 100) / 100;
+  const unitHupper = Math.round((topH - (fTop + fMeet - R2)) * 100) / 100;
+  const unitHlower = Math.round((botH - (fMeet + fBottom - R2)) * 100) / 100;
 
   const glassType = windowSpec?.glazing?.type || 'double';
   const glassSpec = windowSpec?.glazing?.spec || 'toughened';

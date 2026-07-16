@@ -11,6 +11,7 @@ export const CONSTANTS = Object.freeze({
     // Total sash height deduction from frame: top_sash + bot_sash = frame_height - 92
     // Bottom sash is 33mm taller than top sash
     SASH_HEIGHT_DEDUCTION: 92,
+    GLASS_REBATE: 12.5,           // glass sits this deep into each rail/stile rebate
     SASH_HEIGHT_DIFFERENCE: 33,   // legacy fallback — live value = bottomRail.face − topRail.face (sashFaces().diff)
 
     // Frame component deductions (verified against Excel)

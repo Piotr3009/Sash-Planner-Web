@@ -210,6 +210,16 @@ function GlassPanel({ item, windowSpec, derived, batch, settings }) {
       <div className="card p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="text-sm font-semibold text-ink-50">Glass Schedule</div>
+          {/* TEMP DEBUG — engine glass units next to the table; remove after verification */}
+          {derived && (() => {
+            const sd = derived.sashDims || {};
+            const R2 = 2 * 12.5;
+            const st = Number(sd.stile) || 57, tp = Number(sd.topRail) || 57, mt = Number(sd.meetingRail) || 43, bt = Number(sd.bottomRail) || 90;
+            const w = Math.round((derived.sashWidth - (2 * st - R2)) * 100) / 100;
+            const uH = Math.round((derived.topSashHeight - (tp + mt - R2)) * 100) / 100;
+            const lH = Math.round((derived.bottomSashHeight - (mt + bt - R2)) * 100) / 100;
+            return <div className="text-[11px] text-amber-400">TEMP · engine units: {w} × {uH} (upper) · {w} × {lH} (lower) {uH === lH ? '· równe ✓' : '· NIERÓWNE ✗'}</div>;
+          })()}
           <button onClick={handleExport} className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors">
             📄 Export PDF
           </button>
