@@ -186,7 +186,7 @@ function GlassPane({ size, position, frosted = false, doubleGlazing = false, spa
   // Double glazing: 4mm + 16mm spacer + 4mm = 24mm total
   const paneThickness = mm(4);
   const gapThickness  = mm(16);
-  const spacerWidth   = mm(1);  // widoczna szerokość spacera na krawędzi
+  const spacerWidth   = mm(1);  // visible spacer width at the glass edge
   const pane1Z =  (gapThickness / 2 + paneThickness / 2);
   const pane2Z = -(gapThickness / 2 + paneThickness / 2);
 
@@ -232,13 +232,13 @@ function GlassPane({ size, position, frosted = false, doubleGlazing = false, spa
         <boxGeometry args={[w, h, paneThickness]} />
         {glassMat}
       </mesh>
-      {/* Spacery — 4 krawędzie */}
+      {/* Spacers — 4 edges */}
       {/* Góra */}
       <mesh position={[0,  h / 2 - spacerWidth / 2, 0]}>
         <boxGeometry args={[w, spacerWidth, gapThickness]} />
         <meshStandardMaterial color={spacerColorHex} metalness={0.6} roughness={0.4} />
       </mesh>
-      {/* Dół */}
+      {/* Bottom */}
       <mesh position={[0, -h / 2 + spacerWidth / 2, 0]}>
         <boxGeometry args={[w, spacerWidth, gapThickness]} />
         <meshStandardMaterial color={spacerColorHex} metalness={0.6} roughness={0.4} />
@@ -732,7 +732,7 @@ function ArchedGlassPane({ size, position, archRise = 0, frosted = false, double
       <mesh geometry={glassGeom} castShadow={false} receiveShadow position={[0, 0, pane2Z]}>
         {glassMat}
       </mesh>
-      {/* Spacery — dół */}
+      {/* Spacers — bottom */}
       <mesh position={[0, -h / 2 + spacerWidth / 2, 0]}>
         <boxGeometry args={[w, spacerWidth, gapThickness]} />
         <meshStandardMaterial color={spacerColorHex} metalness={0.6} roughness={0.4} />
@@ -942,7 +942,7 @@ function GlazingBars({ clearWidth, clearHeight, glassDepth, barPattern = 'none',
         } else {
           const idx = hBars.indexOf(b);
           const y = idx === 0
-            ? -clearHeight / 2 + mm(b.mm)  // 1. od dołu
+            ? -clearHeight / 2 + mm(b.mm)  // 1st from the bottom
             : clearHeight / 2 - mm(b.mm);  // 2. od góry
           result.push({ type: 'h', x: 0, y });
         }
@@ -981,7 +981,7 @@ function GlazingBars({ clearWidth, clearHeight, glassDepth, barPattern = 'none',
             <mesh geometry={geom} position={[0, 0, glassHalf]} rotation={[Math.PI, 0, 0]} castShadow receiveShadow>
               <primitive object={material} attach="material" />
             </mesh>
-            {/* DG spacer bar między szybami */}
+            {/* DG spacer bar between the panes */}
             {doubleGlazing && (
               <mesh position={[0, 0, 0]} castShadow receiveShadow>
                 {bar.type === 'v'
@@ -2949,7 +2949,7 @@ export default function ParametricSashWindow({
         </group>
       )}
 
-      {/* Fitch Fasteners — na meeting railach, od wewnątrz */}
+      {/* Fitch Fasteners — on the meeting rails, inside face */}
       {(() => {
         const twoFasteneres = width > 1200 || upperBars !== 'none';
         const xPositions = twoFasteneres
@@ -2993,7 +2993,7 @@ export default function ParametricSashWindow({
         ];
       })()}
 
-      {/* Sash Stoppers — cylindry na stilach górnej sashki, 100mm powyżej meeting railu */}
+      {/* Sash Stoppers — cylinders on the upper-sash stiles, 100mm above the meeting rail */}
       {(() => {
         const upperSashBottom = (yTopClosed - mm(upperOpeningDrop)) - mm(upperSashHeight) / 2;
         const stopperY = upperSashBottom + mm(43) + mm(100) + exSashY;

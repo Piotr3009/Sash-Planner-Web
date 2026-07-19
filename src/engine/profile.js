@@ -45,7 +45,7 @@ export const DEFAULT_SASH_PROFILE = {
   },
   // Length rules (mm subtracted from the window dimension). "Advanced" —
   // geometrically coupled values; changing them reshapes the whole window.
-  hornExtension: 75,  // sash horn height; per-window spec override wins, this is the workshop default
+  hornExtension: 70,  // sash horn height; per-window spec override wins, this is the workshop default
   dedSchema: 2,       // v2: sashHeight is the PURE opening deduction (MR excluded)
   deductions: {
     sashWidth: 178,   // sash W = frame W − this

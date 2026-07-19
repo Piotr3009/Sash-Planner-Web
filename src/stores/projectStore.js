@@ -10,7 +10,7 @@ const defaultSettings = {
   stockLengthSash: 5900,
   stockLengthBox: 3700,
   boxWidthAllowance: 20,
-  hornExtensionDefault: 75,
+  hornExtensionDefault: 70,
   glazingAllowanceWidth: 4,
   glazingAllowanceHeight: 4,
   sectionMap: {

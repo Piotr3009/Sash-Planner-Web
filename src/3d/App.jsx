@@ -164,7 +164,7 @@ function WallBackground() {
     canvas.width = size; canvas.height = size;
     const ctx = canvas.getContext('2d');
 
-    // Gradient od ciemnego góra/boki do jasnego centrum
+    // Gradient from dark top/sides to a bright centre
     const grad = ctx.createRadialGradient(size*0.55, size*0.4, 0, size*0.55, size*0.4, size * 0.85);
     grad.addColorStop(0,   '#d4d4d4');
     grad.addColorStop(0.55,'#b4b4b4');
@@ -172,7 +172,7 @@ function WallBackground() {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
 
-    // Tynk — drobny pył, inny niż microcement (count scaled with area)
+    // Plaster — fine dust, different from microcement (count scaled with area)
     for (let i = 0; i < 25000; i++) { // was 100000 — proportional to 4× smaller area
       const x = Math.random() * size;
       const y = Math.random() * size;
@@ -403,7 +403,7 @@ function Scene({ config, isMobile }) {
       {/* Hemisphere */}
       <hemisphereLight args={['#fdf6e8', '#c8c0b0', 0.72 * b]} />
 
-      {/* Główne słońce */}
+      {/* Main sun */}
       <directionalLight
         position={[4, 6, 5]}
         intensity={1.12 * b}
@@ -413,13 +413,13 @@ function Scene({ config, isMobile }) {
         shadow-bias={-0.0001}
       />
 
-      {/* Fill boki — symetrycznie przód i tył */}
+      {/* Fill sides — symmetrical front and back */}
       <directionalLight position={[-3, 2,  3]} intensity={0.6 * b} />
       <directionalLight position={[-3, 2, -3]} intensity={0.6 * b} />
       <directionalLight position={[ 3, 2,  3]} intensity={0.56 * b} />
       <directionalLight position={[ 3, 2, -3]} intensity={0.56 * b} />
 
-      {/* Fill z dołu pod 45° — obydwie strony */}
+      {/* Fill from below at 45° — both sides */}
       <directionalLight position={[-2, -2,  2]} intensity={0.25 * b} color="#e8d8c0" />
       <directionalLight position={[ 2, -2, -2]} intensity={0.25 * b} color="#e8d8c0" />
 
@@ -427,11 +427,11 @@ function Scene({ config, isMobile }) {
       <pointLight position={[ 0.5, 0.5,  1.2]} intensity={0.98 * b} distance={6} decay={2} color="#fff8f0" />
       <pointLight position={[-0.5, 0,    1.2]} intensity={0.98 * b} distance={6} decay={2} color="#fff4e8" />
 
-      {/* Point lights — tył */}
+      {/* Point lights — back */}
       <pointLight position={[ 0.5, 0,   -1.5]} intensity={0.98 * b} distance={6} decay={2} color="#f0f4ff" />
       <pointLight position={[-0.5, 0,   -1.5]} intensity={0.98 * b} distance={6} decay={2} color="#f0f4ff" />
 
-      {/* Point lights — boki tył po skosie */}
+      {/* Point lights — back sides at an angle */}
       <pointLight position={[ 1.5, 0.5, -1.5]} intensity={0.70 * b} distance={6} decay={2} color="#f0f4ff" />
       <pointLight position={[-1.5, 0.5, -1.5]} intensity={0.70 * b} distance={6} decay={2} color="#f0f4ff" />
 
@@ -439,7 +439,7 @@ function Scene({ config, isMobile }) {
       <pointLight position={[ 1.5, 0.5,  1.2]} intensity={0.70 * b} distance={6} decay={2} color="#fff8f0" />
       <pointLight position={[-1.5, 0.5,  1.2]} intensity={0.70 * b} distance={6} decay={2} color="#fff8f0" />
 
-      {/* Dedykowane światła na finger lift — z tyłu okna */}
+      {/* Dedicated finger-lift lights — behind the window */}
       <pointLight position={[ 0.4, -0.3, -2.0]} intensity={0.96 * b} distance={3} decay={2} color="#f0f4ff" />
       <pointLight position={[-0.4, -0.3, -2.0]} intensity={0.96 * b} distance={3} decay={2} color="#f0f4ff" />
 

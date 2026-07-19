@@ -75,7 +75,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
       glassX, glassY, glassW, glassH, vCount: v, hCount: h, barW: BAR_WIDTH,
     });
     const hasHorns = !!windowSpec.sash?.horns;
-    const hornExt = hasHorns ? (windowSpec.sash?.hornExtension || derived?.sashDims?.horn || 75) : 0;
+    const hornExt = hasHorns ? (windowSpec.sash?.hornExtension || derived?.sashDims?.horn || 70) : 0;
     return { sashW, sashH, stile, topEdge, botEdge, glassX, glassY, glassW, glassH,
       rebateX, rebateY, rebateW, rebateH, vBars, hBars, v, h, paneW, paneH,
       isUpper, hasHorns, hornExt, gridMode };

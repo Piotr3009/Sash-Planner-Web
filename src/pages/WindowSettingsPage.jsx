@@ -101,7 +101,7 @@ export default function WindowSettingsPage() {
   const totalSashH = H - ded.sashHeight + (Number(profile.elements?.meetingRail?.face) || 43);
   const sashDiff = (Number(profile.elements?.bottomRail?.face) || 90) - (Number(profile.elements?.topRail?.face) || 57);
   const topSashH = Math.round((totalSashH - sashDiff) / 2);
-  const hornExt = Number(profile.hornExtension) || 75;
+  const hornExt = Number(profile.hornExtension) || 70;
 
   const lengthInfo = (el) => {
     switch (el.lenBase) {
@@ -271,7 +271,7 @@ export default function WindowSettingsPage() {
                 {sel.key === 'stiles' && (
                   <div>
                     <div className="text-ink-400 mb-1">Horn extension (mm)</div>
-                    <input type="number" value={profile.hornExtension ?? 75}
+                    <input type="number" value={profile.hornExtension ?? 70}
                       onChange={(e) => setHornExtension(e.target.value)}
                       className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                   </div>
@@ -406,7 +406,7 @@ export default function WindowSettingsPage() {
                 {sel.key === 'stiles' && (
                   <div>
                     <div className="text-ink-400 mb-1">Horn extension (mm)</div>
-                    <input type="number" value={profile.hornExtension ?? 75}
+                    <input type="number" value={profile.hornExtension ?? 70}
                       onChange={(e) => setHornExtension(e.target.value)}
                       className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                   </div>
@@ -568,7 +568,7 @@ export default function WindowSettingsPage() {
         const uH = gU + 25;
         return (
           <div className="text-[11px] text-amber-400 mt-1">
-            TEMP · światło: US {gw} × {gU} · LS {gw} × {gL} {gU === gL ? '(równe ✓)' : '(NIERÓWNE ✗)'} · jednostka szklana: {uW} × {uH}
+            TEMP · clear light: US {gw} × {gU} · LS {gw} × {gL} {gU === gL ? '(equal ✓)' : '(NOT EQUAL ✗)'} · sealed unit: {uW} × {uH}
           </div>
         );
       })()}

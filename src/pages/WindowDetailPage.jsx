@@ -218,7 +218,7 @@ function GlassPanel({ item, windowSpec, derived, batch, settings }) {
             const w = Math.round((derived.sashWidth - (2 * st - R2)) * 100) / 100;
             const uH = Math.round((derived.topSashHeight - (tp + mt - R2)) * 100) / 100;
             const lH = Math.round((derived.bottomSashHeight - (mt + bt - R2)) * 100) / 100;
-            return <div className="text-[11px] text-amber-400">TEMP · engine units: {w} × {uH} (upper) · {w} × {lH} (lower) {uH === lH ? '· równe ✓' : '· NIERÓWNE ✗'}</div>;
+            return <div className="text-[11px] text-amber-400">TEMP · engine units: {w} × {uH} (upper) · {w} × {lH} (lower) {uH === lH ? '· equal ✓' : '· NOT EQUAL ✗'}</div>;
           })()}
           <button onClick={handleExport} className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors">
             📄 Export PDF

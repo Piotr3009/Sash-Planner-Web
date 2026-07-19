@@ -205,6 +205,36 @@ export default function AppSidebar() {
         </button>
 
 
+        {assignmentsOpen && (
+          <div className="pl-4 mb-1">
+            <div className="pl-3 ml-2 border-l border-surface-500/50">
+              <NavLink to="/materials/assignments/sash"
+                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                Sash windows
+              </NavLink>
+              <NavLink to="/materials/assignments/casement"
+                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                Casement
+              </NavLink>
+              <NavLink to="/materials/assignments/fix-frame"
+                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                Fix frame
+              </NavLink>
+              <NavLink to="/materials/assignments/doors"
+                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                Doors
+              </NavLink>
+              <NavLink to="/materials/assignments/other"
+                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                Other
+              </NavLink>
+              <div className="px-3 py-1 text-[11px] text-ink-400/50 cursor-default">
+                + Add new
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Window Settings — workshop construction profile */}
         <button
           onClick={() => setWinSettingsOpen(!winSettingsOpen)}
@@ -237,35 +267,6 @@ export default function AppSidebar() {
           </div>
         )}
 
-        {assignmentsOpen && (
-          <div className="pl-4 mb-1">
-            <div className="pl-3 ml-2 border-l border-surface-500/50">
-              <NavLink to="/materials/assignments/sash"
-                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
-                Sash windows
-              </NavLink>
-              <NavLink to="/materials/assignments/casement"
-                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
-                Casement
-              </NavLink>
-              <NavLink to="/materials/assignments/fix-frame"
-                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
-                Fix frame
-              </NavLink>
-              <NavLink to="/materials/assignments/doors"
-                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
-                Doors
-              </NavLink>
-              <NavLink to="/materials/assignments/other"
-                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
-                Other
-              </NavLink>
-              <div className="px-3 py-1 text-[11px] text-ink-400/50 cursor-default">
-                + Add new
-              </div>
-            </div>
-          </div>
-        )}
       </nav>
 
       {/* ─── Bottom section ─── */}
