@@ -8,6 +8,7 @@
  * Page 2+: compact header + 6 CAD drawings per page (3×2)
  */
 import { jsPDF } from 'jspdf';
+import { buildGlassListForWindow } from '../engine/lists.js';
 import { CONSTANTS } from '../engine/calculations.js';
 import { computeGlassBarPositions } from '../components/drawings/drawingUtils.jsx';
 
@@ -319,7 +320,7 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
   const pat = BAR_PATTERNS[g.bars] || BAR_PATTERNS['none'];
   const bars = computeGlassBarPositions({
     sashW: g.sashW, sashH: g.sashH, isUpper: g.sash === 'Upper',
-    vCount: pat.v, hCount: pat.h,
+    vCount: pat.v, hCount: pat.h, faces: g.faces,
   });
 
   doc.setLineWidth(LW.seal);
@@ -461,10 +462,11 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
     const botH = derived.bottomSashHeight;
     if (!sw || !topH || !botH) return;
 
-    const glassW = sw - CONSTANTS.GLASS_WIDTH_DEDUCTION;
-    const lowerDed = CONSTANTS.MEETING_RAIL_WIDTH + CONSTANTS.BOTTOM_RAIL_WIDTH - 25;
-    const glassHupper = topH - CONSTANTS.GLASS_HEIGHT_DEDUCTION;
-    const glassHlower = botH - lowerDed;
+    // SINGLE SOURCE: same rows as the on-screen Glass Schedule (live faces).
+    const gRows = buildGlassListForWindow(derived, windowSpec) || [];
+    const glassW = gRows[0]?.width ?? (sw - CONSTANTS.GLASS_WIDTH_DEDUCTION);
+    const glassHupper = gRows[0]?.height ?? (topH - CONSTANTS.GLASS_HEIGHT_DEDUCTION);
+    const glassHlower = gRows[1]?.height ?? (botH - (CONSTANTS.MEETING_RAIL_WIDTH + CONSTANTS.BOTTOM_RAIL_WIDTH - 25));
 
     const type = windowSpec?.glazing?.type || 'double';
     const spec = windowSpec?.glazing?.spec || 'toughened';
@@ -475,7 +477,7 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
     const fLoc = windowSpec?.glazing?.frostedLocation || 'bottom';
     const grid = windowSpec?.sash?.grid?.mode || 'none';
 
-    const base = { windowName: win.name, projectNumber: win._projectNumber || '', type, spec, spacer, spacerType, makeup, bars: grid, sashW: sw };
+    const base = { windowName: win.name, projectNumber: win._projectNumber || '', type, spec, spacer, spacerType, makeup, bars: grid, sashW: sw, faces: derived?.sashDims };
 
     glassItems.push({ ...base, index: idx++, sash: 'Upper', sashH: topH, glassW, glassH: glassHupper, finish: isFrosted && fLoc === 'both' ? 'frosted' : 'clear' });
     glassItems.push({ ...base, index: idx++, sash: 'Lower', sashH: botH, glassW, glassH: glassHlower, finish: isFrosted ? 'frosted' : 'clear' });

@@ -287,8 +287,9 @@ export function computeBarPositions({ glassX, glassY, glassW, glassH, vCount, hC
 // ─── Glass spacer bar positions (derived from WOOD bar centers) ───
 // Spacer bars share the same center line as wood bars but are 18mm wide (not 22mm).
 // Positions returned in GLASS coordinate system (origin = glass top-left corner).
-export function computeGlassBarPositions({ sashW, sashH, isUpper, vCount, hCount }) {
-  const STILE = 57, TOP_RAIL = 57, MEET_RAIL = 43, BOT_RAIL = 90;
+// faces: live rail/stile faces (derived.sashDims) — literals stay as fallback
+export function computeGlassBarPositions({ sashW, sashH, isUpper, vCount, hCount, faces }) {
+  const STILE = Number(faces?.stile) || 57, TOP_RAIL = Number(faces?.topRail) || 57, MEET_RAIL = Number(faces?.meetingRail) || 43, BOT_RAIL = Number(faces?.bottomRail) || 90;
   const REBATE = 12.5, WOOD_BAR = 22, SPACER = 18;
 
   const topEdge = isUpper ? TOP_RAIL : MEET_RAIL;

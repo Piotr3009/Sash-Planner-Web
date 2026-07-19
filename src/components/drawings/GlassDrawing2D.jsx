@@ -7,6 +7,7 @@
  */
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
+import { buildGlassListForWindow } from '../../engine/lists.js';
 import { STROKE, COLORS, FONT, SIZES, WEIGHTS, STROKES, VIEWBOX_REF,
   DimH, DimV, DimChainH, DimChainV, tfs, computeGlassBarPositions } from './drawingUtils.jsx';
 
@@ -42,8 +43,13 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
     const topH = derived.topSashHeight;
     const botH = derived.bottomSashHeight;
 
-    const glassW = sashW - 114 + 2 * REBATE;
-    const glassH = isUpper ? topH - 100 + 2 * REBATE : botH - 133 + 2 * REBATE;
+    // SINGLE SOURCE: sealed-unit sizes come from the same rows as the Glass
+    // Schedule table (live profile faces). No local deduction math — the old
+    // baked 100/133 constants lied the moment rails were edited (642.5 bug).
+    const gRows = buildGlassListForWindow(derived, windowSpec) || [];
+    const gRow = gRows[isUpper ? 0 : 1];
+    const glassW = gRow ? gRow.width : sashW - 114 + 2 * REBATE;
+    const glassH = gRow ? gRow.height : (isUpper ? topH - 100 : botH - 133) + 2 * REBATE;
 
     const gridMode = windowSpec.sash?.grid?.mode || 'none';
     const BAR_PATTERNS = {
@@ -56,7 +62,7 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
 
     const sashH = isUpper ? topH : botH;
     const bars = computeGlassBarPositions({
-      sashW, sashH, isUpper, vCount, hCount,
+      sashW, sashH, isUpper, vCount, hCount, faces: derived?.sashDims,
     });
 
     // Chain cuts — 11 | seg | 18 | seg | 18 | seg | 11
@@ -71,9 +77,10 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
     // Cross-check: verify bar centers align with wood bar centers
     let checkOk = true;
     const errs = [];
-    const STILE = 57, WOOD_BAR = 22;
-    const topEdge = isUpper ? 57 : 43;
-    const botEdge = isUpper ? 43 : 90;
+    const sd = derived?.sashDims || {};
+    const STILE = Number(sd.stile) || 57, WOOD_BAR = 22;
+    const topEdge = isUpper ? (Number(sd.topRail) || 57) : (Number(sd.meetingRail) || 43);
+    const botEdge = isUpper ? (Number(sd.meetingRail) || 43) : (Number(sd.bottomRail) || 90);
     const woodW = sashW - 2 * STILE;
     const woodH = sashH - topEdge - botEdge;
     const glassOriginX = STILE - REBATE;
