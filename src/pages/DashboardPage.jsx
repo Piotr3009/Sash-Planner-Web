@@ -359,6 +359,12 @@ export default function DashboardPage() {
   const containerRef = useRef(null);
 
   const [showNewPP, setShowNewPP] = useState(false);
+  const [q, setQ] = useState('');
+  const needle = q.trim().toLowerCase();
+  const visibleProjects = needle
+    ? projects.filter((p) => [p.name, p.project_number, p.client, p.client_name]
+        .filter(Boolean).join(' ').toLowerCase().includes(needle))
+    : projects;
   const [showNewProject, setShowNewProject] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [editProject, setEditProject] = useState(null); // project being edited
@@ -370,10 +376,10 @@ export default function DashboardPage() {
       heights[p.id] = getProjectCardHeight((p.batches || []).length);
     });
     return heights;
-  }, [projects]);
+  }, [visibleProjects]);
 
   const deliveryData = useMemo(() => {
-    return projects.map((project) => {
+    return visibleProjects.map((project) => {
       const batches = project.batches || [];
       const summary = {};
       let totalWindows = 0;
@@ -399,7 +405,7 @@ export default function DashboardPage() {
         allComplete: batches.length > 0 && completedBatches === batches.length,
       };
     });
-  }, [projects, productionPacks]);
+  }, [visibleProjects, productionPacks]);
 
   const handleAssign = (batchId, projectId, ppId) => {
     const currentPP = getPackForBatch(projectId, batchId);
@@ -457,15 +463,23 @@ export default function DashboardPage() {
 
   return (
     <>
-      <div className="p-6">
+      <div className="p-6" style={{ zoom: 1.05 }}>
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div>
             <h1 className="text-lg font-semibold text-ink-50">Production planner</h1>
             <p className="text-[10px] text-ink-400 mt-0.5">Assign batches to production packs · track project completion</p>
           </div>
-          <div className="text-[10px] text-ink-400">
-            {projects.length} projects · {productionPacks.length} production packs
+          <div className="flex items-center gap-3">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search projects…"
+              className="input text-xs w-[220px]"
+            />
+            <div className="text-[10px] text-ink-400">
+              {visibleProjects.length}/{projects.length} projects · {productionPacks.length} packs
+            </div>
           </div>
         </div>
 
@@ -486,7 +500,7 @@ export default function DashboardPage() {
             {/* ─── Col 1: Projects (160px, dynamic height cards) ─── */}
             <div style={{ width: 160 }} className="shrink-0">
               <div style={{ display: 'flex', flexDirection: 'column', gap: PROJECT_GAP }}>
-                {projects.map((project) => {
+                {visibleProjects.map((project) => {
                   const h = projectHeights[project.id] || MIN_CARD_H;
                   return (
                     <div
@@ -543,7 +557,7 @@ export default function DashboardPage() {
             {/* ─── Col 2: Batches (200px, dynamic height, centered per project) ─── */}
             <div style={{ width: 200, marginLeft: 16 }} className="shrink-0">
               <div style={{ display: 'flex', flexDirection: 'column', gap: PROJECT_GAP }}>
-                {projects.map((project) => {
+                {visibleProjects.map((project) => {
                   const batches = project.batches || [];
                   const h = projectHeights[project.id] || MIN_CARD_H;
                   return (
