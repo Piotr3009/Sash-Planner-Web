@@ -101,7 +101,8 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
       </tr>
       {open && REGISTRY_VARIANTS.map((vk) => (
         <VariantRow key={vk} part={part} vk={vk} materials={materials}
-          onAssign={onAssign} onYieldChange={onYieldChange} onRemove={onRemove} disabled={disabled} />
+          categories={categories} subcategoriesByCategory={subcategoriesByCategory}
+          onAssign={onAssign} onFilter={onFilter} onYieldChange={onYieldChange} onRemove={onRemove} disabled={disabled} />
       ))}
       </>
     );
@@ -223,7 +224,7 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
 
 // ─── Variant row — four equal selects; Standard is the anchor (base), the
 // others follow it until the user picks something else for that variant. ───
-function VariantRow({ part, vk, materials, onAssign, onYieldChange, onRemove, disabled }) {
+function VariantRow({ part, vk, materials, categories, subcategoriesByCategory, onAssign, onFilter, onYieldChange, onRemove, disabled }) {
   const sashProfile = useWindowProfileStore((s) => s.sash);
   const flat = useMaterialAssignmentStore((s) => s.assignments);
   const overrides = useMaterialAssignmentStore((s) => s.data?.overrides);
@@ -233,6 +234,15 @@ function VariantRow({ part, vk, materials, onAssign, onYieldChange, onRemove, di
   const hasOverride = !!(legacyId && overrides?.[part.id]?.[vk]);
   const live = liveSectionsFor(part.id, sashProfile, vk);
   const vLabel = sashProfile?.variants?.[vk]?.label || vk;
+  const selCat = eff?.category || '';
+  const selSub = eff?.subcategory || '';
+  const filteredMaterials = useMemo(() => {
+    let list = materials;
+    if (selCat) list = list.filter((m) => m.category === selCat);
+    if (selSub) list = list.filter((m) => m.subcategory === selSub);
+    return list;
+  }, [materials, selCat, selSub]);
+  const subcategories = selCat ? (subcategoriesByCategory[selCat] || []) : [];
 
   return (
     <tr className="border-b border-surface-500/60 bg-surface-800/60 text-[11px]">
@@ -240,10 +250,26 @@ function VariantRow({ part, vk, materials, onAssign, onYieldChange, onRemove, di
         <span className="text-ink-300 pl-5">↳ {vLabel}</span>
       </td>
       <td className="px-3 py-1.5 font-mono text-ink-300">{live?.section || '—'}</td>
-      <td></td><td></td><td></td>
+      <td></td>
+      <td className="px-3 py-1.5">
+        <select value={selCat} disabled={disabled}
+          onChange={(e) => onFilter(targetId, e.target.value, '')}
+          className="input text-[11px] w-full">
+          <option value="">All</option>
+          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </td>
+      <td className="px-3 py-1.5">
+        <select value={selSub} disabled={disabled || !selCat}
+          onChange={(e) => onFilter(targetId, selCat, e.target.value)}
+          className="input text-[11px] w-full">
+          <option value="">All</option>
+          {subcategories.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </td>
       <td className="px-3 py-1.5">
         <MaterialPicker
-          materials={materials}
+          materials={filteredMaterials}
           value={eff?.material_id || ''}
           disabled={disabled}
           onSelect={(m) => m && onAssign(targetId, m.id, eff?.yield ?? 1.0)}
