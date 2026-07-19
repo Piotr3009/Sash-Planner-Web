@@ -244,7 +244,7 @@ function createComponentRecord(windowSpec, group, elementName, section, length, 
 }
 
 function calculateSashComponentSet(windowSpec, settings, sashWidth, topSashHeight, bottomSashHeight, suffix = '') {
-    const hornExtra = windowSpec.sash?.horns ? Number(windowSpec.sash?.hornExtension ?? settings.hornExtensionDefault) : 0;
+    const hornExtra = windowSpec.sash?.horns ? Number(windowSpec.sash?.hornExtension ?? getWindowProfile().hornExtension ?? settings?.hornExtensionDefault ?? 75) : 0;
     const railLength = sashWidth;
     const sfx = suffix ? ` ${suffix}` : '';
 
@@ -659,6 +659,7 @@ export function deriveWindowData(windowSpec, settings = {}) {
             return {
                 stile: e.stiles?.face, topRail: e.topRail?.face,
                 meetingRail: e.meetingRail?.face, bottomRail: e.bottomRail?.face,
+                horn: Number(getWindowProfile().hornExtension) || 75,
             };
         })(),
         boxDims: (() => {

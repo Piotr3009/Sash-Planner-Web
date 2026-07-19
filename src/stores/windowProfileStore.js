@@ -46,6 +46,15 @@ export const useWindowProfileStore = create(
         get()._sync();
       },
 
+      setHornExtension: (value) => {
+        set((s) => {
+          const sash = clone(s.sash);
+          sash.hornExtension = Number(value) || 0;
+          return { sash };
+        });
+        get()._sync();
+      },
+
       setDeduction: (key, value) => {
         set((s) => {
           const sash = clone(s.sash);

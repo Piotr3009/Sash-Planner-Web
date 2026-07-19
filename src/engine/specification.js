@@ -130,7 +130,9 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       openingType,
       horns: hasHorns,
       hornType: hornsVal,
-      hornExtension: 75,
+      // Per-window override only when explicitly provided; otherwise undefined so
+      // the engine falls back to the workshop profile (getWindowProfile().hornExtension).
+      hornExtension: Number(item?.hornExtension) || Number(spec?.sash?.hornExtension) || undefined,
       grid: {
         mode: gridMode,
         rows,

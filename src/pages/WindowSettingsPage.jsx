@@ -52,6 +52,7 @@ export default function WindowSettingsPage() {
   const setVariantField = useWindowProfileStore((s) => s.setVariantField);
   const setElementField = useWindowProfileStore((s) => s.setElementField);
   const setDeduction = useWindowProfileStore((s) => s.setDeduction);
+  const setHornExtension = useWindowProfileStore((s) => s.setHornExtension);
   const setCillTwoPiece = useWindowProfileStore((s) => s.setCillTwoPiece);
   const resetToDefaults = useWindowProfileStore((s) => s.resetToDefaults);
 
@@ -100,6 +101,7 @@ export default function WindowSettingsPage() {
   const totalSashH = H - ded.sashHeight + (Number(profile.elements?.meetingRail?.face) || 43);
   const sashDiff = (Number(profile.elements?.bottomRail?.face) || 90) - (Number(profile.elements?.topRail?.face) || 57);
   const topSashH = Math.round((totalSashH - sashDiff) / 2);
+  const hornExt = Number(profile.hornExtension) || 75;
 
   const lengthInfo = (el) => {
     switch (el.lenBase) {
@@ -107,7 +109,7 @@ export default function WindowSettingsPage() {
       case 'H': return { rule: `frame H − ${ded[el.dedKey] ?? 0}`, val: H - (ded[el.dedKey] ?? 0) };
       case 'W+': return { rule: 'frame W + extension', val: W };
       case 'sashW': return { rule: `frame W − ${ded.sashWidth}`, val: sashW };
-      case 'sashH': return { rule: 'sash height (+ horn)', val: topSashH };
+      case 'sashH': return { rule: `sash height (+ ${hornExt} horn = ${topSashH + hornExt})`, val: topSashH };
       default: return { rule: '—', val: 0 };
     }
   };
@@ -266,6 +268,14 @@ export default function WindowSettingsPage() {
                 </div>
                 {/* Raw stock select hidden — raw size belongs to the assigned material
                     (TODO: pre-cut raw from Assign Materials); engine keeps using stored profile raw. */}
+                {sel.key === 'stiles' && (
+                  <div>
+                    <div className="text-ink-400 mb-1">Horn extension (mm)</div>
+                    <input type="number" value={profile.hornExtension ?? 75}
+                      onChange={(e) => setHornExtension(e.target.value)}
+                      className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+                  </div>
+                )}
               </>
             )}
             {sel.kind === 'board' && (
@@ -393,6 +403,14 @@ export default function WindowSettingsPage() {
                 </div>
                 {/* Raw stock select hidden — raw size belongs to the assigned material
                     (TODO: pre-cut raw from Assign Materials); engine keeps using stored profile raw. */}
+                {sel.key === 'stiles' && (
+                  <div>
+                    <div className="text-ink-400 mb-1">Horn extension (mm)</div>
+                    <input type="number" value={profile.hornExtension ?? 75}
+                      onChange={(e) => setHornExtension(e.target.value)}
+                      className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+                  </div>
+                )}
               </>
             )}
             {sel.kind === 'board' && (

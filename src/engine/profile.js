@@ -45,10 +45,16 @@ export const DEFAULT_SASH_PROFILE = {
   },
   // Length rules (mm subtracted from the window dimension). "Advanced" —
   // geometrically coupled values; changing them reshapes the whole window.
+  hornExtension: 75,  // sash horn height; per-window spec override wins, this is the workshop default
   dedSchema: 2,       // v2: sashHeight is the PURE opening deduction (MR excluded)
   deductions: {
     sashWidth: 178,   // sash W = frame W − this
     sashHeight: 135,  // OPENING deduction: total sash H = frame H − this + meeting rail face
+    // Derivation (Adam's Excel, verified 1:1): upper sash = H/2 − 62.5, lower = H/2 − 29.5
+    //   62.5 + 29.5 = 92   → legacy v1 total-CUT deduction (MR=43 baked in)
+    //   62.5 − 29.5 = 33   → sash height difference = bottomRail.face − topRail.face
+    //   92 + 43     = 135  → v2 pure OPENING deduction; engine adds live MR
+    // This number does NOT react to MR/rail edits by design — those enter the formulas directly.
     jambHeight: 108,  // jamb L = frame H − this
     headWidth: 0,     // head L = frame W − this
   },
