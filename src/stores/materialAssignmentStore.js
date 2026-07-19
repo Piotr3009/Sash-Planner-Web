@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import * as cloud from '../services/cloudSync.js';
+import { normalizeAssignments, expandAssignments, legacyToCanonical } from '../engine/partRegistry.js';
 
 // ─── Sash Window Parts (hardcoded — structural, used by calculations engine) ───
 // section = pre-cut (raw) section that needs to be matched to a stock material
@@ -94,73 +95,113 @@ export const ALL_PARTS = [
 ];
 
 // ─── Store ───
+// Canonical shape (schema 2): base assignment per part + per-variant overrides.
+// `assignments` stays as a FLAT legacy view (expanded, inheritance applied) so
+// the current page, counter and any flat consumers keep working unchanged.
+function project(data) {
+  const d = normalizeAssignments(data);
+  return { data: d, assignments: expandAssignments(d) };
+}
+
 export const useMaterialAssignmentStore = create((set, get) => ({
-      // assignments: { [part_id]: { material_id, yield } }
+      // data: { schema: 2, base: {...}, overrides: {...} } — source of truth
+      data: { schema: 2, base: {}, overrides: {} },
+      // assignments: flat legacy view derived from `data` (read-only)
       assignments: {},
 
       // Set assignment for a part (includes category/subcategory filter)
       setAssignment: (partId, materialId, yieldCoeff = 1.0, category = '', subcategory = '') => {
-        set((s) => ({
-          assignments: {
-            ...s.assignments,
-            [partId]: {
-              material_id: materialId,
-              yield: yieldCoeff,
-              category: category || s.assignments[partId]?.category || '',
-              subcategory: subcategory || s.assignments[partId]?.subcategory || '',
-            },
-          },
-        }));
-        cloud.saveAssignments(get().assignments);
+        set((s) => {
+          const { key, variantKey } = legacyToCanonical(partId);
+          const d = normalizeAssignments(s.data);
+          const prev = (variantKey ? d.overrides?.[key]?.[variantKey] : d.base?.[key]) || s.assignments[partId] || {};
+          const next = {
+            material_id: materialId,
+            yield: yieldCoeff,
+            category: category || prev.category || '',
+            subcategory: subcategory || prev.subcategory || '',
+          };
+          if (variantKey) {
+            d.overrides[key] = { ...(d.overrides[key] || {}), [variantKey]: next };
+          } else {
+            d.base[key] = next;
+          }
+          return project(d);
+        });
+        cloud.saveAssignments(get().data);
       },
 
       // Update filter (category/subcategory) for a part
       setFilter: (partId, category, subcategory = '') => {
-        set((s) => ({
-          assignments: {
-            ...s.assignments,
-            [partId]: {
-              ...s.assignments[partId],
-              material_id: s.assignments[partId]?.material_id || '',
-              yield: s.assignments[partId]?.yield ?? 1.0,
-              category,
-              subcategory,
-            },
-          },
-        }));
-        cloud.saveAssignments(get().assignments);
+        set((s) => {
+          const { key, variantKey } = legacyToCanonical(partId);
+          const d = normalizeAssignments(s.data);
+          const prev = (variantKey ? d.overrides?.[key]?.[variantKey] : d.base?.[key]) || s.assignments[partId] || {};
+          const next = {
+            material_id: prev.material_id || '',
+            yield: prev.yield ?? 1.0,
+            category,
+            subcategory,
+          };
+          if (variantKey) {
+            d.overrides[key] = { ...(d.overrides[key] || {}), [variantKey]: next };
+          } else {
+            d.base[key] = next;
+          }
+          return project(d);
+        });
+        cloud.saveAssignments(get().data);
       },
 
       // Update yield only
       setYield: (partId, yieldCoeff) => {
-        set((s) => ({
-          assignments: {
-            ...s.assignments,
-            [partId]: { ...s.assignments[partId], yield: yieldCoeff },
-          },
-        }));
-        cloud.saveAssignments(get().assignments);
+        set((s) => {
+          const { key, variantKey } = legacyToCanonical(partId);
+          const d = normalizeAssignments(s.data);
+          const prev = (variantKey ? d.overrides?.[key]?.[variantKey] : d.base?.[key]) || s.assignments[partId] || {};
+          const next = { ...prev, yield: yieldCoeff };
+          if (variantKey) {
+            d.overrides[key] = { ...(d.overrides[key] || {}), [variantKey]: next };
+          } else {
+            d.base[key] = next;
+          }
+          return project(d);
+        });
+        cloud.saveAssignments(get().data);
       },
 
       // Remove assignment
+      // Base part → removes base (and its overrides). Variant row → removes
+      // just the override; the row falls back to the inherited base value.
       removeAssignment: (partId) => {
         set((s) => {
-          const next = { ...s.assignments };
-          delete next[partId];
-          return { assignments: next };
+          const { key, variantKey } = legacyToCanonical(partId);
+          const d = normalizeAssignments(s.data);
+          if (variantKey) {
+            if (d.overrides[key]) {
+              const o = { ...d.overrides[key] };
+              delete o[variantKey];
+              if (Object.keys(o).length) d.overrides[key] = o; else delete d.overrides[key];
+            }
+          } else {
+            delete d.base[key];
+            delete d.overrides[key];
+          }
+          return project(d);
         });
-        cloud.saveAssignments(get().assignments);
+        cloud.saveAssignments(get().data);
       },
 
       // Get assignment for a part
       getAssignment: (partId) => get().assignments[partId] || null,
 
       // Clear all assignments (local only — used on sign-out)
-      clearAll: () => set({ assignments: {} }),
+      clearAll: () => set({ data: { schema: 2, base: {}, overrides: {} }, assignments: {} }),
 
       // Load assignments for the logged-in user from the cloud.
+      // Legacy flat blobs are migrated to schema 2 on the fly (idempotent).
       loadFromCloud: async () => {
-        const data = await cloud.loadAssignments();
-        if (data) set({ assignments: data });
+        const raw = await cloud.loadAssignments();
+        if (raw) set(project(raw));
       },
 }));

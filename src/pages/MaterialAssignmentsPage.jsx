@@ -1,7 +1,10 @@
 import { useState, useMemo } from 'react';
+import NumInput from '../components/NumInput.jsx';
 import { useParams } from 'react-router-dom';
 import { useMaterialStore } from '../stores/materialStore.js';
 import { useMaterialAssignmentStore, SASH_WINDOW_PARTS, ALL_PARTS, CASEMENT_PARTS, CASEMENT_ALL_PARTS } from '../stores/materialAssignmentStore.js';
+import { liveSectionsFor } from '../engine/partRegistry.js';
+import { useWindowProfileStore } from '../stores/windowProfileStore.js';
 
 const TYPE_LABELS = {
   sash: 'Sash Windows',
@@ -25,6 +28,8 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
   }, [materials, selCat, selSub]);
 
   const subcategories = selCat ? (subcategoriesByCategory[selCat] || []) : [];
+  const sashProfile = useWindowProfileStore((s) => s.sash);
+  const live = liveSectionsFor(part.id, sashProfile);
   const assignedMat = assignment?.material_id
     ? materials.find((m) => m.id === assignment.material_id)
     : null;
@@ -44,13 +49,13 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
             <span className="text-[8px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/25 uppercase tracking-wider">mirror</span>
           )}
         </div>
-        {part.finishedSection && (
-          <div className="text-[10px] text-ink-400 mt-0.5">finished: {part.finishedSection}</div>
+        {(live?.finishedSection || part.finishedSection) && (
+          <div className="text-[10px] text-ink-400 mt-0.5">finished: {live?.finishedSection ?? part.finishedSection}</div>
         )}
       </td>
 
       {/* Section (pre-cut) */}
-      <td className="px-3 py-2 font-mono text-[11px] text-ink-300">{part.section}</td>
+      <td className="px-3 py-2 font-mono text-[11px] text-ink-300">{live?.section ?? part.section}</td>
 
       {/* Pcs */}
       <td className="px-3 py-2 text-center text-ink-300">{part.pcs}</td>
@@ -125,15 +130,14 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
 
       {/* Yield */}
       <td className="px-3 py-2 text-center">
-        <input
-          type="number"
+        <NumInput
           step="0.05"
           min="0.01"
           max="10"
           className="input text-xs w-[60px] text-center font-mono"
           value={assignment?.yield ?? 1.0}
-          onChange={(e) => {
-            const val = parseFloat(e.target.value);
+          onCommit={(v) => {
+            const val = parseFloat(v);
             if (!isNaN(val) && val > 0) onYieldChange(part.id, val);
           }}
           disabled={disabled || !assignment?.material_id}
