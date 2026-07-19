@@ -54,9 +54,9 @@ export const SASH_WINDOW_PARTS = {
   ],
   consumables: [
     { id: 'cord',               name: 'Cord / Rope',              section: '—',  pcs: 1, materialType: 'consumable', unit: 'm' },
-    { id: 'glazing_clips_24mm', name: 'Glazing Clips 24mm',       section: '24mm', pcs: 20, materialType: 'consumable', unit: 'pcs', note: 'double glazing' },
-    { id: 'glazing_clips_28mm', name: 'Glazing Clips 28mm',       section: '28mm', pcs: 20, materialType: 'consumable', unit: 'pcs', note: 'triple glazing' },
-    { id: 'glazing_clips_14mm', name: 'Glazing Clips 16mm',       section: '16mm', pcs: 20, materialType: 'consumable', unit: 'pcs', note: 'slim frame' },
+    { id: 'glazing_clips_24mm', name: 'Glazing Clips — standard frame', section: '—', pcs: 20, materialType: 'consumable', unit: 'pcs', note: 'size = assigned material' },
+    { id: 'glazing_clips_28mm', name: 'Glazing Clips — triple frame',   section: '—', pcs: 20, materialType: 'consumable', unit: 'pcs', note: 'size = assigned material' },
+    { id: 'glazing_clips_14mm', name: 'Glazing Clips — slim frame',     section: '—', pcs: 20, materialType: 'consumable', unit: 'pcs', note: 'size = assigned material' },
     { id: 'spacer_1mm',         name: 'Glazing Packer 1mm',       section: '—',  pcs: 20, materialType: 'consumable', unit: 'pcs' },
     { id: 'spacer_2mm',         name: 'Glazing Packer 2mm',       section: '—',  pcs: 4, materialType: 'consumable', unit: 'pcs' },
     { id: 'bead_tape',          name: 'Georgian Bar/Bead Tape 1mm', section: '1mm', pcs: 1, materialType: 'consumable', unit: 'm' },

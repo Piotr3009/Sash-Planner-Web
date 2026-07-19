@@ -695,7 +695,7 @@ export default function MaterialAssignmentsPage() {
           onSelect={toggleSelect}
         />
         <div className="mb-6 -mt-3">
-          <button type="button" disabled={locked}
+          <button type="button"
             onClick={() => setCustomModal({})}
             className="text-xs px-3 py-1.5 rounded-lg bg-surface-600 text-ink-200 border border-surface-500 hover:bg-surface-500 hover:text-ink-50 transition-colors disabled:opacity-50">
             + Add consumable

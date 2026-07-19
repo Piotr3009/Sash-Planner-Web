@@ -221,7 +221,19 @@ export function assignmentFor(data, partKey, variantKey = 'standard') {
 // Returns { section, finishedSection } computed from the profile, or null when
 // the part is not in the registry (beading/glass/paint/consumables/casement —
 // their static labels are profile-independent).
+// Glass assignment rows show the LIVE makeup from Window Settings (same text
+// that prints on glass orders); falls back to the static list label.
+const GLASS_PART_TO_TYPE = {
+  glass_double: 'double', glass_double_slim: 'double_slim', glass_triple: 'triple',
+  glass_single: 'single', glass_passive: 'passive',
+};
+
 export function liveSectionsFor(partId, profile, variantKey = 'standard') {
+  const gType = GLASS_PART_TO_TYPE[partId];
+  if (gType) {
+    const mk = profile?.glassMakeup?.[gType];
+    return mk ? { section: mk, finishedSection: null } : null;
+  }
   const def = PART_REGISTRY[legacyToCanonical(partId).key];
   if (!def) return null;
   const vk = legacyToCanonical(partId).variantKey || variantKey;
