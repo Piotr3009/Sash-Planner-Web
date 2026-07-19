@@ -5,6 +5,7 @@
  */
 import { useState, useMemo } from 'react';
 import { buildPrecutForWindow } from '../../engine/lists.js';
+import { effectiveAssignment, materialSizeToRaw, ELEMENT_TO_PART_ID } from '../../engine/bom.js';
 import { optimisePrecut } from '../../engine/optimizer.js';
 import { getPartSymbol } from '../../engine/partSymbols.js';
 import { useMaterialAssignmentStore } from '../../stores/materialAssignmentStore.js';
@@ -20,10 +21,23 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
   const [offcutInput, setOffcutInput] = useState({});
   const [expandedGroups, setExpandedGroups] = useState({});
 
+  const assignmentsData = useMaterialAssignmentStore((s) => s.data);
+
   const precut = useMemo(() => {
     if (!derived || !windowSpec) return null;
-    return buildPrecutForWindow(derived, windowSpec, settings);
-  }, [derived, windowSpec, settings]);
+    // Raw stock from the ASSIGNED MATERIAL (per this window's frame variant);
+    // profile raw stays as the fallback for unassigned parts — same resolver
+    // pattern as the BOM path (delivery 3), engine untouched.
+    const frameType = windowSpec?.frame?.type || 'standard';
+    const resolveRaw = (elementName) => {
+      const base = String(elementName).replace(/ \((FIX L|FIX R|C)\)$/, '');
+      const pid = ELEMENT_TO_PART_ID[base] || ELEMENT_TO_PART_ID[elementName];
+      const a = pid ? effectiveAssignment(pid, frameType, assignmentsData, assignments) : null;
+      const mat = a?.material_id ? materials.find((m) => m.id === a.material_id) : null;
+      return mat ? materialSizeToRaw(mat.size) : null;
+    };
+    return buildPrecutForWindow(derived, windowSpec, settings, resolveRaw);
+  }, [derived, windowSpec, settings, assignments, assignmentsData, materials]);
 
   if (!precut) {
     return <div className="card p-8 text-center text-ink-400">No pre-cut data available.</div>;
