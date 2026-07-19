@@ -15,6 +15,26 @@
  */
 
 import { buildPrecutForWindow, buildHardwareList } from './lists.js';
+import { assignmentFor, legacyToCanonical } from './partRegistry.js';
+
+/** Normalise a material catalog size ('150 x 38mm') to a raw-section key ('150x38'). */
+export function materialSizeToRaw(size) {
+  const s = String(size || '').toLowerCase().replace(/mm/g, '').replace(/\s+/g, '');
+  return /^\d+x\d+$/.test(s) ? s : null;
+}
+
+/**
+ * Effective assignment for a legacy/canonical part id in the context of ONE
+ * window (frame variant). schema-2 aware: per-variant overrides win, base
+ * inherits; falls back to the flat map when no schema-2 data is provided.
+ */
+export function effectiveAssignment(part_id, frameType, assignmentsData, flatAssignments) {
+  if (assignmentsData) {
+    const { key, variantKey } = legacyToCanonical(part_id);
+    return assignmentFor(assignmentsData, key, variantKey || frameType || 'standard');
+  }
+  return flatAssignments?.[part_id] || null;
+}
 
 // Engine element name → materialAssignmentStore part id (timber + beading)
 export const ELEMENT_TO_PART_ID = {
@@ -89,7 +109,7 @@ export function formatQty(value, unit) {
  * Timber/beading carry `mm` (raw length, before yield); other parts carry
  * `qty` in their native unit. Yield is NOT applied here — apply per consumer.
  */
-export function buildWindowPartQtys(derived, windowSpec, settings) {
+export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
   if (!derived || !windowSpec) return {};
   const map = {}; // partId → { mm?, qty?, unit }
   const addMm = (pid, mm) => {
@@ -111,7 +131,7 @@ export function buildWindowPartQtys(derived, windowSpec, settings) {
     const pid = ELEMENT_TO_PART_ID[baseName] || ELEMENT_TO_PART_ID[elementName];
     return (boxSuffix && (pid === 'head' || pid === 'jambs')) ? `${pid}${boxSuffix}` : pid;
   };
-  const precut = buildPrecutForWindow(derived, windowSpec, settings);
+  const precut = buildPrecutForWindow(derived, windowSpec, settings, resolveRaw);
   if (precut) {
     const addItems = (items) => items.forEach((it) => {
       addMm(partIdFor(it.elementName), it.length * (it.quantity || 1));
@@ -206,7 +226,7 @@ export function buildWindowHardware(windowSpec, batch, ironmongeryItems = []) {
  * Returns: [{ key, name, qty, unit, costPerUnit, source, material|product|null }]
  *   sorted with assigned materials first, then unassigned.
  */
-export function mergeWindowMaterials(windows, { assignments, materials, ALL_PARTS, ironmongeryItems, settings }) {
+export function mergeWindowMaterials(windows, { assignments, assignmentsData, materials, ALL_PARTS, ironmongeryItems, settings }) {
   // key → { name, qty, unit, costPerUnit, source, material/product, _assigned }
   const acc = {};
 
@@ -219,11 +239,18 @@ export function mergeWindowMaterials(windows, { assignments, materials, ALL_PART
     if (!derived || !windowSpec) return;
 
     // ── materialAssignmentStore parts (timber/beading/glass/consumables/paint) ──
-    const partQtys = buildWindowPartQtys(derived, windowSpec, settings);
+    const frameType = windowSpec?.frame?.type || 'standard';
+    const resolveRaw = (elementName) => {
+      const pid = ELEMENT_TO_PART_ID[String(elementName).replace(/ \((FIX L|FIX R|C)\)$/, '')] || ELEMENT_TO_PART_ID[elementName];
+      const a = pid ? effectiveAssignment(pid, frameType, assignmentsData, assignments) : null;
+      const mat = a?.material_id ? materials.find((m) => m.id === a.material_id) : null;
+      return mat ? materialSizeToRaw(mat.size) : null;
+    };
+    const partQtys = buildWindowPartQtys(derived, windowSpec, settings, resolveRaw);
     ALL_PARTS.forEach((part) => {
       const entry = partQtys[part.id];
       if (!entry) return;
-      const assignment = assignments[part.id];
+      const assignment = effectiveAssignment(part.id, frameType, assignmentsData, assignments);
       const yieldCoeff = assignment?.yield || 1.0;
       const { total, unit } = resolvePartTotal(entry, yieldCoeff);
       if (!total) return;

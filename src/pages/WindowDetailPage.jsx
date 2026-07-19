@@ -281,6 +281,7 @@ function GlassPanel({ item, windowSpec, derived, batch, settings }) {
 function BOMPanel({ item, windowSpec, settings, derived, batch }) {
   const materials = useMaterialStore((s) => s.materials);
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
+  const assignmentsData = useMaterialAssignmentStore((s) => s.data);
   const ironmongeryItems = useIronmongeryStore((s) => s.items);
   const [zoomSrc, setZoomSrc] = useState(null);
 
@@ -338,7 +339,7 @@ function BOMPanel({ item, windowSpec, settings, derived, batch }) {
     if (!derived || !windowSpec) return [];
     return mergeWindowMaterials(
       [{ derived, windowSpec, batch }],
-      { assignments, materials, ALL_PARTS, ironmongeryItems, settings }
+      { assignments, assignmentsData, materials, ALL_PARTS, ironmongeryItems, settings }
     );
   }, [derived, windowSpec, batch, assignments, materials, ironmongeryItems, settings]);
 

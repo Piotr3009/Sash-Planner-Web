@@ -1121,6 +1121,7 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) 
 function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerExport, exportFormat }) {
   // Material assignment lookup
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
+  const assignmentsData = useMaterialAssignmentStore((s) => s.data);
   const getMaterialById = useMaterialStore((s) => s.getMaterialById);
 
   // Resolve full material info for a group by checking assignments of its items
@@ -1971,7 +1972,7 @@ function BOMTab({ batch, pp, isPPMode, windowsData, registerExport }) {
       .filter((wd) => wd.derived && wd.windowSpec)
       .map((wd) => ({ derived: wd.derived, windowSpec: wd.windowSpec, batch: wd.win?._batch }));
     if (!windows.length) return [];
-    return mergeWindowMaterials(windows, { assignments, materials, ALL_PARTS, ironmongeryItems, settings });
+    return mergeWindowMaterials(windows, { assignments, assignmentsData, materials, ALL_PARTS, ironmongeryItems, settings });
   }, [windowsData, assignments, materials, ironmongeryItems, settings]);
 
   const totalCost = rows.reduce((s, r) => s + (r.costPerUnit > 0 ? r.qty * r.costPerUnit : 0), 0);

@@ -91,7 +91,10 @@ export function buildCutListForWindow(derived, windowSpec) {
   return out.map((row) => ({ ...row, length: Math.round(row.length) }));
 }
 
-export function buildPrecutForWindow(derived, windowSpec, settingsArg) {
+// resolveRaw?: (elementName) => rawSectionString|null — raw stock taken from the
+// ASSIGNED MATERIAL's size (e.g. '150 x 38mm' → '150x38'); falls back to the
+// legacy chain (sectionMap / profile raw) when absent. Optional → zero regression.
+export function buildPrecutForWindow(derived, windowSpec, settingsArg, resolveRaw) {
   if (derived?.unsupported) return [];
   const settings = settingsWithDefaults(settingsArg);
   if (!derived) return { sashEngineering: [], boxSapele: [] };
@@ -101,7 +104,7 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg) {
   // Sash precut groups by section (mapped via settings.sectionMap to raw)
   const bySection = new Map();
   derived.components.sash.forEach((c) => {
-    const raw = (settings?.sectionMap?.[c.section] || profileRawForSection(c.section) || settings.sectionMap[c.section]) || settings.sectionMap['57x57'];
+    const raw = resolveRaw?.(c.elementName) || (settings?.sectionMap?.[c.section] || profileRawForSection(c.section) || settings.sectionMap[c.section]) || settings.sectionMap['57x57'];
     if (!raw) return;
     if (!bySection.has(raw)) bySection.set(raw, []);
     bySection.get(raw).push({
