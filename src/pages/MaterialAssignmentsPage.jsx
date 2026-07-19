@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import NumInput from '../components/NumInput.jsx';
 import MaterialPicker from '../components/MaterialPicker.jsx';
 import { useParams } from 'react-router-dom';
