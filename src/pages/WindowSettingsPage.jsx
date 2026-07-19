@@ -545,11 +545,12 @@ export default function WindowSettingsPage() {
         const gU = d.topSashHeight - f.top - f.meet;
         const gL = d.bottomSashHeight - f.meet - f.bottom;
         const gw = d.sashWidth - 2 * f.stile;
-        // glass-list legacy model (calculateGlazingSummaryForWindow): total/2 − top − bottom
-        const listH = (d.topSashHeight + d.bottomSashHeight) / 2 - f.top - f.bottom;
+        // sealed unit = clear light + 2×rebate(12.5) per axis — same numbers as Glass Schedule
+        const uW = gw + 25;
+        const uH = gU + 25;
         return (
           <div className="text-[11px] text-amber-400 mt-1">
-            TEMP · engine per-sash glass: US {gw} × {gU} · LS {gw} × {gL} {gU === gL ? '(równe ✓)' : '(NIERÓWNE ✗)'} · glass-list model: {gw} × {listH}
+            TEMP · światło: US {gw} × {gU} · LS {gw} × {gL} {gU === gL ? '(równe ✓)' : '(NIERÓWNE ✗)'} · jednostka szklana: {uW} × {uH}
           </div>
         );
       })()}
