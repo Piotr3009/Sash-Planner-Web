@@ -3,7 +3,11 @@ import NumInput from '../components/NumInput.jsx';
 import { useParams } from 'react-router-dom';
 import { useMaterialStore } from '../stores/materialStore.js';
 import { useMaterialAssignmentStore, SASH_WINDOW_PARTS, ALL_PARTS, CASEMENT_PARTS, CASEMENT_ALL_PARTS } from '../stores/materialAssignmentStore.js';
-import { liveSectionsFor } from '../engine/partRegistry.js';
+import { liveSectionsFor, PART_REGISTRY, REGISTRY_VARIANTS } from '../engine/partRegistry.js';
+import { deriveWindowData } from '../engine/calculations.js';
+import { normaliseToWindowSpec } from '../engine/specification.js';
+import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
+import SashDetail2D from '../components/drawings/SashDetail2D.jsx';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
 
 const TYPE_LABELS = {
@@ -15,7 +19,29 @@ const TYPE_LABELS = {
 };
 
 // ─── Part Row ───
-function PartRow({ part, assignment, materials, categories, subcategoriesByCategory, onAssign, onFilter, onYieldChange, onRemove, disabled }) {
+// Base part lists generated from the registry — variant families collapse to
+// ONE row (head, jambs, …) with an expandable per-variant panel. Static
+// categories (beading/glass/paint/consumables) stay on their legacy lists.
+const regPartsFor = (category) => Object.entries(PART_REGISTRY)
+  .filter(([, d]) => d.category === category)
+  .map(([id, d]) => ({
+    id, name: d.label, pcs: d.pcs, materialType: d.materialType,
+    optional: d.optional, note: d.note, mirror: d.mirror,
+    variantAware: !!d.variantAware, section: '—',
+  }));
+const REG_BOX_PARTS = regPartsFor('box');
+const REG_SASH_PARTS = regPartsFor('sash');
+
+// drawingKey → registry part key, per drawing context (stiles/meeting are ambiguous)
+function partForDrawingKey(dk, ctx) {
+  if (dk === 'stiles') return ctx === 'lower' ? 'stiles_bottom_sash' : 'stiles_top_sash';
+  if (dk === 'meetingRail') return ctx === 'lower' ? 'bottom_meet_rail' : 'top_meet_rail';
+  const hit = Object.entries(PART_REGISTRY).find(([, d]) => d.drawingKey === dk);
+  return hit ? hit[0] : null;
+}
+
+function PartRow({ part, assignment, materials, categories, subcategoriesByCategory, onAssign, onFilter, onYieldChange, onRemove, disabled, selected, onSelect }) {
+  const [open, setOpen] = useState(false);
   const selCat = assignment?.category || '';
   const selSub = assignment?.subcategory || '';
 
@@ -35,12 +61,21 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
     : null;
 
   return (
-    <tr className={`border-b border-surface-500/50 transition-colors ${
+    <>
+    <tr className={`border-b border-surface-500/50 transition-colors cursor-pointer ${
       part.optional ? 'opacity-60 hover:opacity-100' : ''
-    } ${assignment?.material_id ? 'hover:bg-surface-700/30' : 'hover:bg-surface-700/20'}`}>
+    } ${selected ? 'bg-accent-500/10 border-l-2 border-l-accent-500' : assignment?.material_id ? 'hover:bg-surface-700/30' : 'hover:bg-surface-700/20'}`}
+      onClick={() => onSelect?.(part.id)}>
       {/* Part name */}
       <td className="px-3 py-2">
         <div className="flex items-center gap-1.5">
+          {part.variantAware && (
+            <button type="button" onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+              title={open ? 'Hide variants' : 'Per-variant overrides'}
+              className="w-4 h-4 flex items-center justify-center text-ink-400 hover:text-ink-100 text-[10px] shrink-0">
+              {open ? '▾' : '▸'}
+            </button>
+          )}
           <span className="text-ink-100 font-medium">{part.name}</span>
           {part.optional && (
             <span className="text-[8px] px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400 border border-yellow-500/25 uppercase tracking-wider">opt</span>
@@ -153,11 +188,77 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
         )}
       </td>
     </tr>
+    {open && part.variantAware && REGISTRY_VARIANTS.map((vk) => (
+      <VariantRow key={vk} part={part} vk={vk} materials={materials}
+        onAssign={onAssign} onYieldChange={onYieldChange} onRemove={onRemove} disabled={disabled} />
+    ))}
+    </>
   );
 }
 
+// ─── Variant override row (inherits from base unless overridden) ───
+function VariantRow({ part, vk, materials, onAssign, onYieldChange, onRemove, disabled }) {
+  const sashProfile = useWindowProfileStore((s) => s.sash);
+  const flat = useMaterialAssignmentStore((s) => s.assignments);
+  const overrides = useMaterialAssignmentStore((s) => s.data?.overrides);
+  const legacyId = PART_REGISTRY[part.id]?.legacyVariantIds?.[vk] || null;
+  const isBaseVariant = !legacyId; // 'standard' — the base itself
+  const eff = legacyId ? flat[legacyId] : flat[part.id];
+  const hasOverride = !!(legacyId && overrides?.[part.id]?.[vk]);
+  const live = liveSectionsFor(part.id, sashProfile, vk);
+  const vLabel = sashProfile?.variants?.[vk]?.label || vk;
+  const effMat = eff?.material_id ? materials.find((m) => m.id === eff.material_id) : null;
+
+  return (
+    <tr className="border-b border-surface-500/30 bg-surface-800/40 text-[11px]">
+      <td className="px-3 py-1.5">
+        <span className="text-ink-400 pl-5">↳ {vLabel}</span>
+        {isBaseVariant && <span className="text-[9px] text-ink-500 ml-2">base</span>}
+        {hasOverride && <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/25 ml-2">override</span>}
+      </td>
+      <td className="px-3 py-1.5 font-mono text-ink-400">
+        {live?.section}{live?.finishedSection ? ` · fin ${live.finishedSection}` : ''}
+      </td>
+      <td></td><td></td><td></td>
+      <td className="px-3 py-1.5">
+        {isBaseVariant ? (
+          <span className="text-ink-300">{effMat ? `${effMat.item_number || effMat.id} — ${effMat.name}` : '—'}</span>
+        ) : (
+          <select
+            value={hasOverride ? (eff?.material_id || '') : ''}
+            onChange={(e) => e.target.value && onAssign(legacyId, e.target.value, eff?.yield ?? 1.0)}
+            disabled={disabled}
+            className="input text-[11px] w-full max-w-[420px]"
+          >
+            <option value="">{effMat ? `inherits: ${effMat.name}` : '— inherits base —'}</option>
+            {materials.map((m) => (
+              <option key={m.id} value={m.id}>{m.item_number || m.id} — {m.name}{m.size ? ` (${m.size})` : ''}</option>
+            ))}
+          </select>
+        )}
+      </td>
+      <td className="px-3 py-1.5 text-center">
+        {!isBaseVariant && (
+          <NumInput step="0.05" min="0.01" max="10" value={eff?.yield ?? 1.0}
+            onCommit={(v) => { const val = parseFloat(v); if (!isNaN(val) && val > 0) onYieldChange(legacyId, val); }}
+            disabled={disabled}
+            className="input text-[11px] w-[60px] text-center font-mono" />
+        )}
+      </td>
+      <td className="px-3 py-1.5 text-center">
+        {hasOverride && (
+          <button type="button" onClick={() => onRemove(legacyId)} disabled={disabled}
+            title="Remove override — back to base"
+            className="text-ink-500 hover:text-red-400 text-xs">✕</button>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+
 // ─── Part Group Section ───
-function PartGroupSection({ title, subtitle, parts, assignments, materials, categories, subcategoriesByCategory, onAssign, onFilter, onYieldChange, onRemove, disabled }) {
+function PartGroupSection({ title, subtitle, parts, assignments, materials, categories, subcategoriesByCategory, onAssign, onFilter, onYieldChange, onRemove, disabled, selectedPart, onSelect }) {
   return (
     <div className="mb-6">
       <div className="flex items-center gap-3 mb-3">
@@ -194,6 +295,8 @@ function PartGroupSection({ title, subtitle, parts, assignments, materials, cate
                   onYieldChange={onYieldChange}
                   onRemove={onRemove}
                   disabled={disabled}
+                  selected={selectedPart === part.id}
+                  onSelect={onSelect}
                 />
               ))}
             </tbody>
@@ -222,6 +325,30 @@ export default function MaterialAssignmentsPage() {
   const [locked, setLocked] = useState(true);
   const [confirmUnlock, setConfirmUnlock] = useState(false);
 
+  // ── Split view: selected part ↔ drawings highlight ──
+  const [selectedPart, setSelectedPart] = useState(null);
+  const sashProfile = useWindowProfileStore((s) => s.sash);
+  const drawingsSpec = useMemo(() => normaliseToWindowSpec({
+    name: 'SAMPLE', width: 1000, height: 1500, frameType: 'standard', frameDepth: 164,
+    sashType: 'double', glassType: 'double', upperBars: 'none', lowerBars: 'none',
+    sameBars: true, hornType: 'A', openingType: 'both',
+  }), []);
+  const drawingsDerived = useMemo(() => {
+    try { return deriveWindowData(drawingsSpec); } catch { return null; }
+    // sashProfile in deps → drawings re-derive live when the workshop profile changes
+  }, [drawingsSpec, sashProfile]);
+  const selDrawKey = selectedPart ? (PART_REGISTRY[selectedPart]?.drawingKey || null) : null;
+  const boxKeys = ['head', 'jambs', 'cill', 'extHeadLiner', 'intHeadLiner', 'extJambLiner', 'intJambLiner'];
+  const sashKeys = ['stiles', 'topRail', 'meetingRail', 'bottomRail'];
+  const extSel = boxKeys.includes(selDrawKey) && !selDrawKey.startsWith('int') ? selDrawKey : null;
+  const intSel = boxKeys.includes(selDrawKey) && !selDrawKey.startsWith('ext') ? selDrawKey : null;
+  const sashSel = sashKeys.includes(selDrawKey) ? selDrawKey : null;
+  const toggleSelect = (id) => setSelectedPart((cur) => (cur === id ? null : id));
+  const pickFromDrawing = (ctx) => (dk) => {
+    const pid = partForDrawingKey(dk, ctx);
+    if (pid) setSelectedPart(pid);
+  };
+
   // Dynamic categories from all materials
   const categories = useMemo(() => {
     const s = new Set();
@@ -245,7 +372,9 @@ export default function MaterialAssignmentsPage() {
 
   // Stats — only for current type
   const isCasement = typeId === 'casement';
-  const typeParts = isSash ? ALL_PARTS : isCasement ? CASEMENT_ALL_PARTS : [];
+  const typeParts = isSash
+    ? [...REG_BOX_PARTS, ...REG_SASH_PARTS, ...SASH_WINDOW_PARTS.beading, ...SASH_WINDOW_PARTS.glass, ...SASH_WINDOW_PARTS.paint, ...SASH_WINDOW_PARTS.consumables]
+    : isCasement ? CASEMENT_ALL_PARTS : [];
   const totalParts = typeParts.length;
   const assignedCount = typeParts.filter((p) => assignments[p.id]?.material_id).length;
   const requiredParts = typeParts.filter((p) => !p.optional);
@@ -363,12 +492,13 @@ export default function MaterialAssignmentsPage() {
           </>
         )}
 
-        {isSash && <>
+        {isSash && <div className="flex gap-5 items-start">
+        <div className="flex-1 min-w-0">
         {/* Box Frame */}
         <PartGroupSection
           title="🪵 Box Frame"
-          subtitle={`${SASH_WINDOW_PARTS.box.length} parts · frame, cill, liners · head/jambs per frame type`}
-          parts={SASH_WINDOW_PARTS.box}
+          subtitle={`${REG_BOX_PARTS.length} parts · one material per part covers every frame variant · ▸ = per-variant override`}
+          parts={REG_BOX_PARTS}
           assignments={assignments}
           materials={materials}
           categories={categories}
@@ -378,13 +508,15 @@ export default function MaterialAssignmentsPage() {
           onYieldChange={setYield}
           onRemove={removeAssignment}
           disabled={locked}
+          selectedPart={selectedPart}
+          onSelect={toggleSelect}
         />
 
         {/* Sash */}
         <PartGroupSection
           title="🪵 Sash"
           subtitle={`${SASH_WINDOW_PARTS.sash.length} parts · rails, stiles`}
-          parts={SASH_WINDOW_PARTS.sash}
+          parts={REG_SASH_PARTS}
           assignments={assignments}
           materials={materials}
           categories={categories}
@@ -394,6 +526,8 @@ export default function MaterialAssignmentsPage() {
           onYieldChange={setYield}
           onRemove={removeAssignment}
           disabled={locked}
+          selectedPart={selectedPart}
+          onSelect={toggleSelect}
         />
 
         {/* Beading */}
@@ -410,6 +544,8 @@ export default function MaterialAssignmentsPage() {
           onYieldChange={setYield}
           onRemove={removeAssignment}
           disabled={locked}
+          selectedPart={selectedPart}
+          onSelect={toggleSelect}
         />
 
         {/* Glass */}
@@ -426,6 +562,8 @@ export default function MaterialAssignmentsPage() {
           onYieldChange={setYield}
           onRemove={removeAssignment}
           disabled={locked}
+          selectedPart={selectedPart}
+          onSelect={toggleSelect}
         />
 
         {/* Paint */}
@@ -442,6 +580,8 @@ export default function MaterialAssignmentsPage() {
           onYieldChange={setYield}
           onRemove={removeAssignment}
           disabled={locked}
+          selectedPart={selectedPart}
+          onSelect={toggleSelect}
         />
 
         {/* Consumables */}
@@ -458,8 +598,26 @@ export default function MaterialAssignmentsPage() {
           onYieldChange={setYield}
           onRemove={removeAssignment}
           disabled={locked}
+          selectedPart={selectedPart}
+          onSelect={toggleSelect}
         />
-        </>}
+        </div>
+
+        {/* Right: sticky drawings — click a row to see where the part lives */}
+        <div className="hidden xl:block w-[520px] shrink-0 sticky top-4">
+          <div className="text-[10px] text-ink-400 mb-2">Sample 1000 × 1500 · click a part row or a drawing element</div>
+          <div className="grid grid-cols-2 gap-3">
+            <BoxDetail2D windowSpec={drawingsSpec} derived={drawingsDerived} view="external"
+              selectedElement={extSel} onElementClick={pickFromDrawing('box')} />
+            <BoxDetail2D windowSpec={drawingsSpec} derived={drawingsDerived} view="internal"
+              selectedElement={intSel} onElementClick={pickFromDrawing('box')} />
+            <SashDetail2D windowSpec={drawingsSpec} derived={drawingsDerived} type="upper"
+              selectedElement={sashSel} onElementClick={pickFromDrawing('upper')} />
+            <SashDetail2D windowSpec={drawingsSpec} derived={drawingsDerived} type="lower"
+              selectedElement={sashSel} onElementClick={pickFromDrawing('lower')} />
+          </div>
+        </div>
+        </div>}
 
         {/* Legend */}
         <div className="mt-3 flex gap-4 flex-wrap text-[10px] text-ink-400">

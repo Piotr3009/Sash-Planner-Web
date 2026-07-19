@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
 import { kgPerM, VARIANT_ORDER } from '../engine/profile.js';
+import NumInput from '../components/NumInput.jsx';
 import { CONSTANTS, deriveWindowData } from '../engine/calculations.js';
 import { normaliseToWindowSpec } from '../engine/specification.js';
 import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
@@ -159,10 +160,10 @@ export default function WindowSettingsPage() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 text-xs text-ink-400">
             Sample window:
-            <input type="number" value={sampleW} onChange={(e) => setSampleW(num(e.target.value, 1000))}
+            <NumInput value={sampleW} onCommit={(v) => setSampleW(num(v, 1000))}
               className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs text-center" />
             ×
-            <input type="number" value={sampleH} onChange={(e) => setSampleH(num(e.target.value, 1500))}
+            <NumInput value={sampleH} onCommit={(v) => setSampleH(num(v, 1500))}
               className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs text-center" />
             mm
           </div>
@@ -198,20 +199,20 @@ export default function WindowSettingsPage() {
           </div>
           <div>
             <div className="text-ink-400 mb-1">Box depth (mm)</div>
-            <input type="number" value={variant.boxDepth}
-              onChange={(e) => setVariantField(variantKey, 'boxDepth', e.target.value)}
+            <NumInput value={variant.boxDepth}
+              onCommit={(v) => setVariantField(variantKey, 'boxDepth', v)}
               className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
           </div>
           <div>
             <div className="text-ink-400 mb-1">Sash finished depth (mm)</div>
-            <input type="number" value={variant.sashDepth}
-              onChange={(e) => setVariantField(variantKey, 'sashDepth', e.target.value)}
+            <NumInput value={variant.sashDepth}
+              onCommit={(v) => setVariantField(variantKey, 'sashDepth', v)}
               className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
           </div>
           <div>
             <div className="text-ink-400 mb-1">Head/Jamb board width (mm)</div>
-            <input type="number" value={boardW}
-              onChange={(e) => setVariantField(variantKey, 'boardWidth', e.target.value)}
+            <NumInput value={boardW}
+              onCommit={(v) => setVariantField(variantKey, 'boardWidth', v)}
               className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
           </div>
           <div className="text-ink-300 pb-1.5">
@@ -263,7 +264,7 @@ export default function WindowSettingsPage() {
                 </div>
                 <div>
                   <div className="text-ink-400 mb-1">Face (mm)</div>
-                  <input type="number" value={selData.face} onChange={(e) => setElementField(sel.key, 'face', e.target.value)}
+                  <NumInput value={selData.face} onCommit={(v) => setElementField(sel.key, 'face', v)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
                 {/* Raw stock select hidden — raw size belongs to the assigned material
@@ -271,8 +272,8 @@ export default function WindowSettingsPage() {
                 {sel.key === 'stiles' && (
                   <div>
                     <div className="text-ink-400 mb-1">Horn extension (mm)</div>
-                    <input type="number" value={profile.hornExtension ?? 70}
-                      onChange={(e) => setHornExtension(e.target.value)}
+                    <NumInput value={profile.hornExtension ?? 70}
+                      onCommit={(v) => setHornExtension(v)}
                       className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                   </div>
                 )}
@@ -282,7 +283,7 @@ export default function WindowSettingsPage() {
               <>
                 <div>
                   <div className="text-ink-400 mb-1">Thickness (mm)</div>
-                  <input type="number" value={selData.thickness} onChange={(e) => setElementField(sel.key, 'thickness', e.target.value)}
+                  <NumInput value={selData.thickness} onCommit={(v) => setElementField(sel.key, 'thickness', v)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
                 <div>
@@ -291,7 +292,7 @@ export default function WindowSettingsPage() {
                 </div>
                 <div>
                   <div className="text-ink-400 mb-1">Length deduction (mm)</div>
-                  <input type="number" value={ded[sel.dedKey]} onChange={(e) => setDeduction(sel.dedKey, e.target.value)}
+                  <NumInput value={ded[sel.dedKey]} onCommit={(v) => setDeduction(sel.dedKey, v)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
               </>
@@ -300,17 +301,17 @@ export default function WindowSettingsPage() {
               <>
                 <div>
                   <div className="text-ink-400 mb-1">Thickness (mm)</div>
-                  <input type="number" value={selData.w} onChange={(e) => setElementField(sel.key, 'w', e.target.value)}
+                  <NumInput value={selData.w} onCommit={(v) => setElementField(sel.key, 'w', v)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
                 <div>
                   <div className="text-ink-400 mb-1">Width (mm)</div>
-                  <input type="number" value={selData.h} onChange={(e) => setElementField(sel.key, 'h', e.target.value)}
+                  <NumInput value={selData.h} onCommit={(v) => setElementField(sel.key, 'h', v)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
                 <div>
                   <div className="text-ink-400 mb-1">Length deduction (mm)</div>
-                  <input type="number" value={selData.deduction} onChange={(e) => setElementField(sel.key, 'deduction', e.target.value)}
+                  <NumInput value={selData.deduction} onCommit={(v) => setElementField(sel.key, 'deduction', v)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
               </>
@@ -321,14 +322,14 @@ export default function WindowSettingsPage() {
                     (see profile.js). Labels below bind flipped for 'cill'; cillNose unchanged. */}
                 <div>
                   <div className="text-ink-400 mb-1">Width (mm)</div>
-                  <input type="number" value={sel.key === 'cill' ? selData.h : selData.w}
-                    onChange={(e) => setElementField(sel.key, sel.key === 'cill' ? 'h' : 'w', e.target.value)}
+                  <NumInput value={sel.key === 'cill' ? selData.h : selData.w}
+                    onCommit={(v) => setElementField(sel.key, sel.key === 'cill' ? 'h' : 'w', v)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
                 <div>
                   <div className="text-ink-400 mb-1">Height (mm)</div>
-                  <input type="number" value={sel.key === 'cill' ? selData.w : selData.h}
-                    onChange={(e) => setElementField(sel.key, sel.key === 'cill' ? 'w' : 'h', e.target.value)}
+                  <NumInput value={sel.key === 'cill' ? selData.w : selData.h}
+                    onCommit={(v) => setElementField(sel.key, sel.key === 'cill' ? 'w' : 'h', v)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
                 <div className="text-ink-400 pt-5">Length = frame W + per-window extension</div>
@@ -398,7 +399,7 @@ export default function WindowSettingsPage() {
                 </div>
                 <div>
                   <div className="text-ink-400 mb-1">Face (mm)</div>
-                  <input type="number" value={selData.face} onChange={(e) => setElementField(sel.key, 'face', e.target.value)}
+                  <NumInput value={selData.face} onCommit={(v) => setElementField(sel.key, 'face', v)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
                 {/* Raw stock select hidden — raw size belongs to the assigned material
@@ -406,8 +407,8 @@ export default function WindowSettingsPage() {
                 {sel.key === 'stiles' && (
                   <div>
                     <div className="text-ink-400 mb-1">Horn extension (mm)</div>
-                    <input type="number" value={profile.hornExtension ?? 70}
-                      onChange={(e) => setHornExtension(e.target.value)}
+                    <NumInput value={profile.hornExtension ?? 70}
+                      onCommit={(v) => setHornExtension(v)}
                       className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                   </div>
                 )}
@@ -417,7 +418,7 @@ export default function WindowSettingsPage() {
               <>
                 <div>
                   <div className="text-ink-400 mb-1">Thickness (mm)</div>
-                  <input type="number" value={selData.thickness} onChange={(e) => setElementField(sel.key, 'thickness', e.target.value)}
+                  <NumInput value={selData.thickness} onCommit={(v) => setElementField(sel.key, 'thickness', v)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
                 <div>
@@ -426,7 +427,7 @@ export default function WindowSettingsPage() {
                 </div>
                 <div>
                   <div className="text-ink-400 mb-1">Length deduction (mm)</div>
-                  <input type="number" value={ded[sel.dedKey]} onChange={(e) => setDeduction(sel.dedKey, e.target.value)}
+                  <NumInput value={ded[sel.dedKey]} onCommit={(v) => setDeduction(sel.dedKey, v)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
               </>
@@ -435,17 +436,17 @@ export default function WindowSettingsPage() {
               <>
                 <div>
                   <div className="text-ink-400 mb-1">Thickness (mm)</div>
-                  <input type="number" value={selData.w} onChange={(e) => setElementField(sel.key, 'w', e.target.value)}
+                  <NumInput value={selData.w} onCommit={(v) => setElementField(sel.key, 'w', v)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
                 <div>
                   <div className="text-ink-400 mb-1">Width (mm)</div>
-                  <input type="number" value={selData.h} onChange={(e) => setElementField(sel.key, 'h', e.target.value)}
+                  <NumInput value={selData.h} onCommit={(v) => setElementField(sel.key, 'h', v)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
                 <div>
                   <div className="text-ink-400 mb-1">Length deduction (mm)</div>
-                  <input type="number" value={selData.deduction} onChange={(e) => setElementField(sel.key, 'deduction', e.target.value)}
+                  <NumInput value={selData.deduction} onCommit={(v) => setElementField(sel.key, 'deduction', v)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
               </>
@@ -456,14 +457,14 @@ export default function WindowSettingsPage() {
                     (see profile.js). Labels below bind flipped for 'cill'; cillNose unchanged. */}
                 <div>
                   <div className="text-ink-400 mb-1">Width (mm)</div>
-                  <input type="number" value={sel.key === 'cill' ? selData.h : selData.w}
-                    onChange={(e) => setElementField(sel.key, sel.key === 'cill' ? 'h' : 'w', e.target.value)}
+                  <NumInput value={sel.key === 'cill' ? selData.h : selData.w}
+                    onCommit={(v) => setElementField(sel.key, sel.key === 'cill' ? 'h' : 'w', v)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
                 <div>
                   <div className="text-ink-400 mb-1">Height (mm)</div>
-                  <input type="number" value={sel.key === 'cill' ? selData.w : selData.h}
-                    onChange={(e) => setElementField(sel.key, sel.key === 'cill' ? 'w' : 'h', e.target.value)}
+                  <NumInput value={sel.key === 'cill' ? selData.w : selData.h}
+                    onCommit={(v) => setElementField(sel.key, sel.key === 'cill' ? 'w' : 'h', v)}
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
                 <div className="text-ink-400 pt-5">Length = frame W + per-window extension</div>
@@ -485,12 +486,12 @@ export default function WindowSettingsPage() {
         <fieldset disabled={fittingLock} className={`flex flex-wrap gap-4 text-xs border-0 p-0 m-0 min-w-0 ${fittingLock ? 'opacity-60' : ''}`}>
           <div>
             <div className="text-ink-400 mb-1">Sash width = frame W −</div>
-            <input type="number" value={ded.sashWidth} onChange={(e) => setDeduction('sashWidth', e.target.value)}
+            <NumInput value={ded.sashWidth} onCommit={(v) => setDeduction('sashWidth', v)}
               className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
           </div>
           <div>
             <div className="text-ink-400 mb-1">Opening deduction · total sash H = frame H − this + MR</div>
-            <input type="number" value={ded.sashHeight} onChange={(e) => setDeduction('sashHeight', e.target.value)}
+            <NumInput value={ded.sashHeight} onCommit={(v) => setDeduction('sashHeight', v)}
               className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
           </div>
           <div className="text-ink-500 pt-5">Sample: sash {sashW} × {totalSashH} mm</div>
@@ -654,10 +655,10 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 text-xs text-ink-400">
             Sample window:
-            <input type="number" value={sampleW} onChange={(e) => setSampleW(num(e.target.value, 1000))}
+            <NumInput value={sampleW} onCommit={(v) => setSampleW(num(v, 1000))}
               className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs text-center" />
             ×
-            <input type="number" value={sampleH} onChange={(e) => setSampleH(num(e.target.value, 1200))}
+            <NumInput value={sampleH} onCommit={(v) => setSampleH(num(v, 1200))}
               className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs text-center" />
             mm
           </div>
@@ -674,27 +675,27 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
         <fieldset disabled={fieldsLock} className={`flex flex-wrap gap-x-6 gap-y-2 items-end text-xs border-0 p-0 m-0 min-w-0 ${fieldsLock ? 'opacity-60' : ''}`}>
         <div>
           <div className="text-ink-400 mb-1">Finished depth (mm) · all members</div>
-          <input type="number" value={casement.depth} onChange={(e) => setDepth(e.target.value)}
+          <NumInput value={casement.depth} onCommit={(v) => setDepth(v)}
             className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
         </div>
         <div>
           <div className="text-ink-400 mb-1">Sash W = frame W −</div>
-          <input type="number" value={casement.deductions.sashWidth} onChange={(e) => setDed('sashWidth', e.target.value)}
+          <NumInput value={casement.deductions.sashWidth} onCommit={(v) => setDed('sashWidth', v)}
             className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
         </div>
         <div>
           <div className="text-ink-400 mb-1">Sash H = frame H −</div>
-          <input type="number" value={casement.deductions.sashHeight} onChange={(e) => setDed('sashHeight', e.target.value)}
+          <NumInput value={casement.deductions.sashHeight} onCommit={(v) => setDed('sashHeight', v)}
             className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
         </div>
         <div>
           <div className="text-ink-400 mb-1">Glass W = sash W −</div>
-          <input type="number" value={casement.deductions.glassWidth} onChange={(e) => setDed('glassWidth', e.target.value)}
+          <NumInput value={casement.deductions.glassWidth} onCommit={(v) => setDed('glassWidth', v)}
             className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
         </div>
         <div>
           <div className="text-ink-400 mb-1">Glass H = sash H −</div>
-          <input type="number" value={casement.deductions.glassHeight} onChange={(e) => setDed('glassHeight', e.target.value)}
+          <NumInput value={casement.deductions.glassHeight} onCommit={(v) => setDed('glassHeight', v)}
             className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
         </div>
         <div className="text-ink-300 pb-1.5">
@@ -741,7 +742,7 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
           <fieldset disabled={elementLock} className={`flex flex-wrap gap-3 text-xs border-0 p-0 m-0 min-w-0 ${elementLock ? 'opacity-60' : ''}`}>
             <div>
               <div className="text-ink-400 mb-1">Face (mm)</div>
-              <input type="number" value={selData.face} onChange={(e) => setEl(sel.key, 'face', e.target.value)}
+              <NumInput value={selData.face} onCommit={(v) => setEl(sel.key, 'face', v)}
                 className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
             </div>
             <div>
