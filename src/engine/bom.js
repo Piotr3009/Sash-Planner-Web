@@ -59,6 +59,7 @@ export const CLIP_SIZE_TO_PART_ID = {
   '28mm': 'glazing_clips_28mm',
   '16mm': 'glazing_clips_14mm', // part id kept for existing assignments; label is 16mm
   '14mm': 'glazing_clips_14mm', // legacy derived snapshots
+  'heritage': 'glazing_clips_heritage',
 };
 
 // Glass type → assignment part id

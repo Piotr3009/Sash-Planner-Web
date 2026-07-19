@@ -65,7 +65,7 @@ export default function ProjectDetailPage() {
     });
     if (windows.length === 0) return [];
     return mergeWindowMaterials(windows, { assignments, assignmentsData, materials, ALL_PARTS, ironmongeryItems, settings });
-  }, [batches, assignments, materials, ironmongeryItems, settings]);
+  }, [batches, assignments, assignmentsData, materials, ironmongeryItems, settings]);
 
   if (!currentProject) return <div className="p-8 text-sm text-ink-400">Project not found.</div>;
 

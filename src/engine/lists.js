@@ -104,7 +104,7 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg, resolveRa
   // Sash precut groups by section (mapped via settings.sectionMap to raw)
   const bySection = new Map();
   derived.components.sash.forEach((c) => {
-    const raw = resolveRaw?.(c.elementName) || (settings?.sectionMap?.[c.section] || profileRawForSection(c.section) || settings.sectionMap[c.section]) || settings.sectionMap['57x57'];
+    const raw = resolveRaw?.(c.elementName) || settings?.sectionMap?.[c.section] || profileRawForSection(c.section) || c.section;
     if (!raw) return;
     if (!bySection.has(raw)) bySection.set(raw, []);
     bySection.get(raw).push({

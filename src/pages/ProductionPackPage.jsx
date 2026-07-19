@@ -1973,7 +1973,7 @@ function BOMTab({ batch, pp, isPPMode, windowsData, registerExport }) {
       .map((wd) => ({ derived: wd.derived, windowSpec: wd.windowSpec, batch: wd.win?._batch }));
     if (!windows.length) return [];
     return mergeWindowMaterials(windows, { assignments, assignmentsData, materials, ALL_PARTS, ironmongeryItems, settings });
-  }, [windowsData, assignments, materials, ironmongeryItems, settings]);
+  }, [windowsData, assignments, assignmentsData, materials, ironmongeryItems, settings]);
 
   const totalCost = rows.reduce((s, r) => s + (r.costPerUnit > 0 ? r.qty * r.costPerUnit : 0), 0);
 

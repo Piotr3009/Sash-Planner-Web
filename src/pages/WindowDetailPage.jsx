@@ -8,7 +8,9 @@ import { parseSpecification, normaliseToWindowSpec } from '../engine/specificati
 import { deriveWindowData } from '../engine/calculations.js';
 import { withProfiles } from '../engine/profile.js';
 import { buildGlassListForWindow, buildVentGrilles } from '../engine/lists.js';
-import { buildWindowPartQtys, buildWindowHardware, resolvePartTotal, formatQty, mergeWindowMaterials } from '../engine/bom.js';
+import { effectiveAssignment, buildWindowPartQtys, buildWindowHardware, resolvePartTotal, formatQty, mergeWindowMaterials } from '../engine/bom.js';
+import { liveSectionsFor } from '../engine/partRegistry.js';
+import { useWindowProfileStore } from '../stores/windowProfileStore.js';
 import ImageLightbox from '../components/ImageLightbox.jsx';
 import DrawingsPanel from '../components/drawings/DrawingsPanel.jsx';
 import GlassDrawing2D from '../components/drawings/GlassDrawing2D.jsx';
@@ -296,15 +298,20 @@ function BOMPanel({ item, windowSpec, settings, derived, batch }) {
     const matMap = {};
     const unassigned = { material: null, parts: [], total: 0, unit: 'm' };
 
+    const frameType = windowSpec?.frame?.type || 'standard';
+    const sashProfile = batch?.defaults?.sashProfile || useWindowProfileStore.getState().sash;
     ALL_PARTS.forEach((part) => {
       const entry = partQtys[part.id];
       if (!entry) return;
 
-      const assignment = assignments[part.id];
+      const assignment = effectiveAssignment(part.id, frameType, assignmentsData, assignments);
       const yieldCoeff = assignment?.yield || 1.0;
       const { total, unit } = resolvePartTotal(entry, yieldCoeff);
       const pcsTotal = part.pcs;
-      const partData = { ...part, pcsTotal, total, unit, yield: yieldCoeff };
+      // Section: LIVE finished dims from the profile (per this window's frame
+      // variant) — static list labels never show invented material sizes.
+      const live = liveSectionsFor(part.id, sashProfile, frameType);
+      const partData = { ...part, section: live?.section || part.section || '—', pcsTotal, total, unit, yield: yieldCoeff };
 
       if (assignment?.material_id) {
         const matId = assignment.material_id;
@@ -325,7 +332,7 @@ function BOMPanel({ item, windowSpec, settings, derived, batch }) {
     const groups = Object.values(matMap);
     if (unassigned.parts.length > 0) groups.push(unassigned);
     return groups;
-  }, [partQtys, assignments, materials]);
+  }, [partQtys, assignments, assignmentsData, materials, windowSpec, batch]);
 
   // Ironmongery (hardware) as card-A groups — shared single source (bom.js)
   const hardwareGroups = useMemo(
@@ -341,7 +348,7 @@ function BOMPanel({ item, windowSpec, settings, derived, batch }) {
       [{ derived, windowSpec, batch }],
       { assignments, assignmentsData, materials, ALL_PARTS, ironmongeryItems, settings }
     );
-  }, [derived, windowSpec, batch, assignments, materials, ironmongeryItems, settings]);
+  }, [derived, windowSpec, batch, assignments, assignmentsData, materials, ironmongeryItems, settings]);
 
   const windowCost = useMemo(
     () => bomRows.reduce((s, r) => s + (r.costPerUnit > 0 ? r.qty * r.costPerUnit : 0), 0),
