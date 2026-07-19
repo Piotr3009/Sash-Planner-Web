@@ -8,6 +8,7 @@ import { deriveWindowData } from '../engine/calculations.js';
 import { normaliseToWindowSpec } from '../engine/specification.js';
 import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
 import SashDetail2D from '../components/drawings/SashDetail2D.jsx';
+import JambDetail2D from '../components/drawings/JambDetail2D.jsx';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
 
 const TYPE_LABELS = {
@@ -59,23 +60,61 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
   const assignedMat = assignment?.material_id
     ? materials.find((m) => m.id === assignment.material_id)
     : null;
+  const flat = useMaterialAssignmentStore((s) => s.assignments);
+
+  // Variant families: header row is a SUMMARY only (no material name — every
+  // workshop uses its own); the four equal selects live in the expansion.
+  if (part.variantAware) {
+    const ids = [part.id, ...Object.values(PART_REGISTRY[part.id]?.legacyVariantIds || {})];
+    const mats = ids.map((id) => flat[id]?.material_id).filter(Boolean);
+    const assignedN = mats.length;
+    const distinct = new Set(mats).size;
+    const status = assignedN === ids.length
+      ? (distinct === 1 ? 'All variants assigned' : `${distinct} materials across variants`)
+      : `${assignedN}/${ids.length} variants assigned`;
+    return (
+      <>
+      <tr className={`border-b border-surface-400/60 transition-colors cursor-pointer ${
+        selected ? 'bg-accent-500/10 border-l-2 border-l-accent-500' : 'hover:bg-surface-700/30'
+      }`} onClick={() => onSelect?.(part.id)}>
+        <td className="px-3 py-2">
+          <div className="flex items-center gap-1.5">
+            <button type="button" onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+              title={open ? 'Hide variants' : 'Show variants'}
+              className="w-4 h-4 flex items-center justify-center text-ink-400 hover:text-ink-100 text-[10px] shrink-0">
+              {open ? '▾' : '▸'}
+            </button>
+            <span className="text-ink-100 font-medium">{part.name} materials</span>
+          </div>
+        </td>
+        <td className="px-3 py-2 font-mono text-[11px] text-ink-500">—</td>
+        <td className="px-3 py-2 text-center text-ink-300">{part.pcs}</td>
+        <td></td><td></td>
+        <td className="px-3 py-2 text-[11px] text-ink-300">{status}</td>
+        <td></td>
+        <td className="px-3 py-2 text-center">
+          {assignedN === ids.length
+            ? <span className="text-green-400" title="All variants assigned">✓</span>
+            : <span className="text-ink-500" title="Not fully assigned">—</span>}
+        </td>
+      </tr>
+      {open && REGISTRY_VARIANTS.map((vk) => (
+        <VariantRow key={vk} part={part} vk={vk} materials={materials}
+          onAssign={onAssign} onYieldChange={onYieldChange} onRemove={onRemove} disabled={disabled} />
+      ))}
+      </>
+    );
+  }
 
   return (
     <>
-    <tr className={`border-b border-surface-500/50 transition-colors cursor-pointer ${
+    <tr className={`border-b border-surface-400/60 transition-colors cursor-pointer ${
       part.optional ? 'opacity-60 hover:opacity-100' : ''
     } ${selected ? 'bg-accent-500/10 border-l-2 border-l-accent-500' : assignment?.material_id ? 'hover:bg-surface-700/30' : 'hover:bg-surface-700/20'}`}
       onClick={() => onSelect?.(part.id)}>
       {/* Part name */}
       <td className="px-3 py-2">
         <div className="flex items-center gap-1.5">
-          {part.variantAware && (
-            <button type="button" onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-              title={open ? 'Hide variants' : 'Per-variant overrides'}
-              className="w-4 h-4 flex items-center justify-center text-ink-400 hover:text-ink-100 text-[10px] shrink-0">
-              {open ? '▾' : '▸'}
-            </button>
-          )}
           <span className="text-ink-100 font-medium">{part.name}</span>
           {part.optional && (
             <span className="text-[8px] px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400 border border-yellow-500/25 uppercase tracking-wider">opt</span>
@@ -188,74 +227,64 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
         )}
       </td>
     </tr>
-    {open && part.variantAware && REGISTRY_VARIANTS.map((vk) => (
-      <VariantRow key={vk} part={part} vk={vk} materials={materials}
-        onAssign={onAssign} onYieldChange={onYieldChange} onRemove={onRemove} disabled={disabled} />
-    ))}
     </>
   );
 }
 
-// ─── Variant override row (inherits from base unless overridden) ───
+// ─── Variant row — four equal selects; Standard is the anchor (base), the
+// others follow it until the user picks something else for that variant. ───
 function VariantRow({ part, vk, materials, onAssign, onYieldChange, onRemove, disabled }) {
   const sashProfile = useWindowProfileStore((s) => s.sash);
   const flat = useMaterialAssignmentStore((s) => s.assignments);
   const overrides = useMaterialAssignmentStore((s) => s.data?.overrides);
   const legacyId = PART_REGISTRY[part.id]?.legacyVariantIds?.[vk] || null;
-  const isBaseVariant = !legacyId; // 'standard' — the base itself
-  const eff = legacyId ? flat[legacyId] : flat[part.id];
+  const targetId = legacyId || part.id;           // standard edits the base
+  const eff = flat[targetId];
   const hasOverride = !!(legacyId && overrides?.[part.id]?.[vk]);
   const live = liveSectionsFor(part.id, sashProfile, vk);
   const vLabel = sashProfile?.variants?.[vk]?.label || vk;
-  const effMat = eff?.material_id ? materials.find((m) => m.id === eff.material_id) : null;
 
   return (
-    <tr className="border-b border-surface-500/30 bg-surface-800/40 text-[11px]">
+    <tr className="border-b border-surface-500/60 bg-surface-800/60 text-[11px]">
       <td className="px-3 py-1.5">
-        <span className="text-ink-400 pl-5">↳ {vLabel}</span>
-        {isBaseVariant && <span className="text-[9px] text-ink-500 ml-2">base</span>}
-        {hasOverride && <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/25 ml-2">override</span>}
+        <span className="text-ink-300 pl-5">↳ {vLabel}</span>
       </td>
-      <td className="px-3 py-1.5 font-mono text-ink-400">
-        {live?.section}{live?.finishedSection ? ` · fin ${live.finishedSection}` : ''}
-      </td>
+      <td className="px-3 py-1.5 font-mono text-ink-300">{live?.section || '—'}</td>
       <td></td><td></td><td></td>
       <td className="px-3 py-1.5">
-        {isBaseVariant ? (
-          <span className="text-ink-300">{effMat ? `${effMat.item_number || effMat.id} — ${effMat.name}` : '—'}</span>
-        ) : (
-          <select
-            value={hasOverride ? (eff?.material_id || '') : ''}
-            onChange={(e) => e.target.value && onAssign(legacyId, e.target.value, eff?.yield ?? 1.0)}
-            disabled={disabled}
-            className="input text-[11px] w-full max-w-[420px]"
-          >
-            <option value="">{effMat ? `inherits: ${effMat.name}` : '— inherits base —'}</option>
-            {materials.map((m) => (
-              <option key={m.id} value={m.id}>{m.item_number || m.id} — {m.name}{m.size ? ` (${m.size})` : ''}</option>
-            ))}
-          </select>
-        )}
+        <select
+          value={eff?.material_id || ''}
+          onChange={(e) => e.target.value && onAssign(targetId, e.target.value, eff?.yield ?? 1.0)}
+          disabled={disabled}
+          className="input text-[11px] w-full max-w-[420px]"
+        >
+          <option value="">— select material —</option>
+          {materials.map((m) => (
+            <option key={m.id} value={m.id}>{m.item_number || m.id} — {m.name}{m.size ? ` (${m.size})` : ''}</option>
+          ))}
+        </select>
       </td>
       <td className="px-3 py-1.5 text-center">
-        {!isBaseVariant && (
-          <NumInput step="0.05" min="0.01" max="10" value={eff?.yield ?? 1.0}
-            onCommit={(v) => { const val = parseFloat(v); if (!isNaN(val) && val > 0) onYieldChange(legacyId, val); }}
-            disabled={disabled}
-            className="input text-[11px] w-[60px] text-center font-mono" />
-        )}
+        <NumInput step="0.05" min="0.01" max="10" value={eff?.yield ?? 1.0}
+          onCommit={(v) => { const val = parseFloat(v); if (!isNaN(val) && val > 0) onYieldChange(targetId, val); }}
+          disabled={disabled}
+          className="input text-[11px] w-[60px] text-center font-mono" />
       </td>
       <td className="px-3 py-1.5 text-center">
         {hasOverride && (
           <button type="button" onClick={() => onRemove(legacyId)} disabled={disabled}
-            title="Remove override — back to base"
+            title="Back to Standard material"
+            className="text-ink-500 hover:text-red-400 text-xs">✕</button>
+        )}
+        {!legacyId && eff?.material_id && (
+          <button type="button" onClick={() => onRemove(part.id)} disabled={disabled}
+            title="Clear this part (all variants)"
             className="text-ink-500 hover:text-red-400 text-xs">✕</button>
         )}
       </td>
     </tr>
   );
 }
-
 
 // ─── Part Group Section ───
 function PartGroupSection({ title, subtitle, parts, assignments, materials, categories, subcategoriesByCategory, onAssign, onFilter, onYieldChange, onRemove, disabled, selectedPart, onSelect }) {
@@ -604,7 +633,7 @@ export default function MaterialAssignmentsPage() {
         </div>
 
         {/* Right: sticky drawings — click a row to see where the part lives */}
-        <div className="hidden xl:block w-[520px] shrink-0 sticky top-4">
+        <div className="hidden xl:block flex-[1.15] min-w-[600px] shrink-0 sticky top-4">
           <div className="text-[10px] text-ink-400 mb-2">Sample 1000 × 1500 · click a part row or a drawing element</div>
           <div className="grid grid-cols-2 gap-3">
             <BoxDetail2D windowSpec={drawingsSpec} derived={drawingsDerived} view="external"
@@ -615,6 +644,13 @@ export default function MaterialAssignmentsPage() {
               selectedElement={sashSel} onElementClick={pickFromDrawing('upper')} />
             <SashDetail2D windowSpec={drawingsSpec} derived={drawingsDerived} type="lower"
               selectedElement={sashSel} onElementClick={pickFromDrawing('lower')} />
+            <div className="col-span-2">
+              <JambDetail2D
+                boardWidth={sashProfile?.variants?.standard?.boardWidth ?? 141}
+                thickness={sashProfile?.elements?.head?.thickness ?? 28}
+                selectedElement={selDrawKey === 'head' || selDrawKey === 'jambs' ? selDrawKey : null}
+                onElementClick={pickFromDrawing('box')} />
+            </div>
           </div>
         </div>
         </div>}

@@ -90,48 +90,42 @@ export const PART_REGISTRY = {
     label: 'Top Rail', category: 'sash', pcs: 1, materialType: 'hardwood',
     variantAware: true,
     engineNames: ['TOP RAIL'], drawingKey: 'topRail',
-    liveRaw: (p) => p?.elements?.topRail?.raw ?? '63x63',
-    liveFinished: (p, v = 'standard') =>
+    liveSection: (p, v = 'standard') =>
       fmt(p?.variants?.[v]?.sashDepth ?? 57, p?.elements?.topRail?.face ?? 57),
   },
   stiles_top_sash: {
     label: 'Stiles Top', category: 'sash', pcs: 2, materialType: 'hardwood', mirror: true,
     variantAware: true,
     engineNames: ['STILES TOP (L)', 'STILES TOP (R)'], drawingKey: 'stiles',
-    liveRaw: (p) => p?.elements?.stiles?.raw ?? '63x63',
-    liveFinished: (p, v = 'standard') =>
+    liveSection: (p, v = 'standard') =>
       fmt(p?.variants?.[v]?.sashDepth ?? 57, p?.elements?.stiles?.face ?? 57),
   },
   stiles_bottom_sash: {
     label: 'Stiles Bottom Sash', category: 'sash', pcs: 2, materialType: 'hardwood', mirror: true,
     variantAware: true,
     engineNames: ['STILES BOTTOM SASH (L)', 'STILES BOTTOM SASH (R)'], drawingKey: 'stiles',
-    liveRaw: (p) => p?.elements?.stiles?.raw ?? '63x63',
-    liveFinished: (p, v = 'standard') =>
+    liveSection: (p, v = 'standard') =>
       fmt(p?.variants?.[v]?.sashDepth ?? 57, p?.elements?.stiles?.face ?? 57),
   },
   bottom_rail: {
     label: 'Bottom Rail', category: 'sash', pcs: 1, materialType: 'hardwood',
     variantAware: true,
     engineNames: ['BOTTOM RAIL'], drawingKey: 'bottomRail',
-    liveRaw: (p) => p?.elements?.bottomRail?.raw ?? '63x95',
-    liveFinished: (p, v = 'standard') =>
+    liveSection: (p, v = 'standard') =>
       fmt(p?.variants?.[v]?.sashDepth ?? 57, p?.elements?.bottomRail?.face ?? 90),
   },
   top_meet_rail: {
     label: 'Top Meeting Rail', category: 'sash', pcs: 1, materialType: 'hardwood',
     variantAware: true,
     engineNames: ['TOP MEETING RAIL'], drawingKey: 'meetingRail',
-    liveRaw: (p) => p?.elements?.meetingRail?.raw ?? '63x63',
-    liveFinished: (p, v = 'standard') =>
+    liveSection: (p, v = 'standard') =>
       fmt(p?.variants?.[v]?.sashDepth ?? 57, p?.elements?.meetingRail?.face ?? 43),
   },
   bottom_meet_rail: {
     label: 'Bottom Meeting Rail', category: 'sash', pcs: 1, materialType: 'hardwood',
     variantAware: true,
     engineNames: ['BOTTOM MEETING RAIL'], drawingKey: 'meetingRail',
-    liveRaw: (p) => p?.elements?.meetingRail?.raw ?? '63x63',
-    liveFinished: (p, v = 'standard') =>
+    liveSection: (p, v = 'standard') =>
       fmt(p?.variants?.[v]?.sashDepth ?? 57, p?.elements?.meetingRail?.face ?? 43),
   },
 };
