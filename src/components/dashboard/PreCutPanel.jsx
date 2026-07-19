@@ -140,14 +140,20 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
     return localOptimization.boxSapele?.find((g) => String(g.preCutWidth) === group.section);
   };
 
+  // Variant-aware (schema 2): slim/triple overrides of THIS window's frame
+  // resolve correctly; flat map stays as fallback. Mixed materials in one
+  // group return { mixed: n } instead of a false single identity.
   const getMaterialForGroup = (items) => {
-    const el = items?.[0]?.elementName;
-    if (!el) return null;
-    const sym = getPartSymbol(el);
-    if (sym?.partId) {
-      const a = assignments[sym.partId];
-      if (a?.material_id) return materials.find((m) => m.id === a.material_id) || null;
-    }
+    const frameType = windowSpec?.frame?.type || 'standard';
+    const ids = new Set();
+    (items || []).forEach((it) => {
+      const base = String(it.elementName || '').replace(/ \((FIX L|FIX R|C)\)$/, '');
+      const pid = ELEMENT_TO_PART_ID[base] || ELEMENT_TO_PART_ID[it.elementName];
+      const a = pid ? effectiveAssignment(pid, frameType, assignmentsData, assignments) : null;
+      if (a?.material_id) ids.add(a.material_id);
+    });
+    if (ids.size === 1) return materials.find((m) => m.id === [...ids][0]) || null;
+    if (ids.size > 1) return { mixed: ids.size };
     return null;
   };
 
@@ -222,7 +228,21 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
               </button>
               <div>
                 <div className="text-sm font-semibold text-ink-50">{group.label}</div>
-                <div className="text-[10px] text-ink-400">pre-cut: {group.precutSection}</div>
+                <div className="text-[10px] text-ink-400">
+                  pre-cut: {group.precutSection}
+                  {(() => {
+                    const mat = getMaterialForGroup(group.items);
+                    if (!mat) return null;
+                    if (mat.mixed) return <span className="ml-2 text-amber-400">{mat.mixed} materials</span>;
+                    return (
+                      <span className="ml-2">
+                        <span className="text-accent-400 font-mono">{mat.item_number}</span>
+                        <span className="text-ink-200 ml-1">{mat.name}</span>
+                        {mat.size && <span className="text-ink-400 ml-1">· {mat.size}</span>}
+                      </span>
+                    );
+                  })()}
+                </div>
               </div>
               <div className="ml-auto flex items-center gap-3">
                 <div className="flex items-center gap-1.5">
