@@ -55,10 +55,13 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
     const sashW = derived.sashWidth;
     const sashH = isUpper ? derived.topSashHeight : derived.bottomSashHeight;
     if (!sashW || !sashH) return null;
-    const stile = CONSTANTS.STILE_WIDTH;
-    const topRail = CONSTANTS.TOP_RAIL_WIDTH;
-    const meetRail = CONSTANTS.MEETING_RAIL_WIDTH;
-    const botRail = CONSTANTS.BOTTOM_RAIL_WIDTH;
+    // LIVE faces from the profile (derived.sashDims): edit Bottom rail 90→100
+    // and the drawn beam thickens accordingly. CONSTANTS stay as fallback only.
+    const sd = derived?.sashDims || {};
+    const stile = Number(sd.stile) || CONSTANTS.STILE_WIDTH;
+    const topRail = Number(sd.topRail) || CONSTANTS.TOP_RAIL_WIDTH;
+    const meetRail = Number(sd.meetingRail) || CONSTANTS.MEETING_RAIL_WIDTH;
+    const botRail = Number(sd.bottomRail) || CONSTANTS.BOTTOM_RAIL_WIDTH;
     const topEdge = isUpper ? topRail : meetRail;
     const botEdge = isUpper ? meetRail : botRail;
     const glassX = stile, glassY = topEdge;
@@ -87,7 +90,9 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
   const sw = (n) => n * layoutSc;
   const MGN_TOP_DIM = 80 * layoutSc;
   const MGN_LEFT_DIM = 80 * layoutSc;
-  const MGN_RIGHT_DIM = (geom.isUpper && geom.hasHorns && geom.hornExt > 0 ? 110 : 60) * layoutSc;
+  // Same horizontal frame on BOTH drawings → identical totalW → identical
+  // mm-to-px scale side by side (a 57 stile looks 57 on US and LS alike).
+  const MGN_RIGHT_DIM = 110 * layoutSc;
   const MGN_BOT_DIM = 60 * layoutSc;
   const MGN_TITLE = 40 * layoutSc;
   const MGN_HORN = geom.isUpper && geom.hornExt > 0 ? geom.hornExt + 20 * layoutSc : 0;
