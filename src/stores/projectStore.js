@@ -531,6 +531,12 @@ export const useProjectStore = create((set, get) => ({
       spacerColor: windowConfig.spacerColor || defaults.spacerColor || 'silver',
       spacerType: windowConfig.spacerType || defaults.spacerType || 'warm',
       pas24: windowConfig.pas24 !== undefined ? windowConfig.pas24 : (defaults.pas24 || false),
+      // Fields the configurator sends but the whitelist silently dropped —
+      // the exact trio the user watched reset after every save (F5 bug).
+      glassCoating: windowConfig.glassCoating || defaults.glassCoating || 'standard',
+      ironmongerySlots: windowConfig.ironmongerySlots || defaults.ironmongerySlots || {},
+      ventRoomType: windowConfig.ventRoomType || 'habitable',
+      ventSoleWindow: windowConfig.ventSoleWindow !== undefined ? windowConfig.ventSoleWindow : true,
       // Full specification JSON for calculations engine
       specification: JSON.stringify({
         windowType: batch.type,
@@ -623,6 +629,12 @@ export const useProjectStore = create((set, get) => ({
       spacerColor: windowConfig.spacerColor || defaults.spacerColor || 'silver',
       spacerType: windowConfig.spacerType || defaults.spacerType || 'warm',
       pas24: windowConfig.pas24 !== undefined ? windowConfig.pas24 : (defaults.pas24 || false),
+      // Fields the configurator sends but the whitelist silently dropped —
+      // the exact trio the user watched reset after every save (F5 bug).
+      glassCoating: windowConfig.glassCoating || defaults.glassCoating || 'standard',
+      ironmongerySlots: windowConfig.ironmongerySlots || defaults.ironmongerySlots || {},
+      ventRoomType: windowConfig.ventRoomType || 'habitable',
+      ventSoleWindow: windowConfig.ventSoleWindow !== undefined ? windowConfig.ventSoleWindow : true,
       specification: JSON.stringify({
         windowType: batch.type,
         width: (windowConfig.extWidth || existing.width) - 104,
