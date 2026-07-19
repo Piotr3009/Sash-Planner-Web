@@ -195,6 +195,39 @@ export const useMaterialAssignmentStore = create((set, get) => ({
       // Get assignment for a part
       getAssignment: (partId) => get().assignments[partId] || null,
 
+      // ── Custom consumables (user-defined, counted as qtyPerWindow × windows) ──
+      addCustomPart: ({ name, unit, qtyPerWindow }) => {
+        set((s) => {
+          const d = normalizeAssignments(s.data);
+          d.customParts = [...(d.customParts || []), {
+            id: `custom_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`,
+            name: String(name || '').trim() || 'Custom consumable',
+            unit: unit || 'pcs',
+            qtyPerWindow: Number(qtyPerWindow) || 1,
+          }];
+          return project(d);
+        });
+        cloud.saveAssignments(get().data);
+      },
+      updateCustomPart: (id, patch) => {
+        set((s) => {
+          const d = normalizeAssignments(s.data);
+          d.customParts = (d.customParts || []).map((cp) => (cp.id === id ? { ...cp, ...patch, qtyPerWindow: Number(patch.qtyPerWindow ?? cp.qtyPerWindow) || 1 } : cp));
+          return project(d);
+        });
+        cloud.saveAssignments(get().data);
+      },
+      removeCustomPart: (id) => {
+        set((s) => {
+          const d = normalizeAssignments(s.data);
+          d.customParts = (d.customParts || []).filter((cp) => cp.id !== id);
+          delete d.base[id];
+          delete d.overrides[id];
+          return project(d);
+        });
+        cloud.saveAssignments(get().data);
+      },
+
       // Clear all assignments (local only — used on sign-out)
       clearAll: () => set({ data: { schema: 2, base: {}, overrides: {} }, assignments: {} }),
 

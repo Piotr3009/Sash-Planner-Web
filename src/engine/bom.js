@@ -247,6 +247,28 @@ export function mergeWindowMaterials(windows, { assignments, assignmentsData, ma
       return mat ? materialSizeToRaw(mat.size) : null;
     };
     const partQtys = buildWindowPartQtys(derived, windowSpec, settings, resolveRaw);
+
+    // ── User-defined consumables: fixed quantity per window ──
+    (assignmentsData?.customParts || []).forEach((cp) => {
+      const assignment = effectiveAssignment(cp.id, frameType, assignmentsData, assignments);
+      const yieldCoeff = assignment?.yield || 1.0;
+      const total = (Number(cp.qtyPerWindow) || 0) * yieldCoeff;
+      if (!total) return;
+      const mat = assignment?.material_id ? materials.find((m) => m.id === assignment.material_id) : null;
+      if (mat) {
+        bump(`mat:${mat.id}`, {
+          name: mat.name, unit: cp.unit || 'pcs',
+          costPerUnit: Number(mat.cost_per_unit) || 0,
+          source: 'material', material: mat, _assigned: true,
+        }, total);
+      } else {
+        bump(`part:${cp.id}`, {
+          name: cp.name, unit: cp.unit || 'pcs',
+          costPerUnit: 0, source: 'part', material: null, _assigned: false,
+        }, total);
+      }
+    });
+
     ALL_PARTS.forEach((part) => {
       const entry = partQtys[part.id];
       if (!entry) return;

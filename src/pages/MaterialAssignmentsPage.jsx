@@ -118,6 +118,16 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
       <td className="px-3 py-2">
         <div className="flex items-center gap-1.5">
           <span className="text-ink-100 font-medium">{part.name}</span>
+          {part.custom && (
+            <span className="flex items-center gap-1 ml-1">
+              <button type="button" title="Edit"
+                onClick={(e) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('pc-edit-custom', { detail: part.id })); }}
+                className="text-ink-500 hover:text-ink-200 text-[11px]">✎</button>
+              <button type="button" title="Delete"
+                onClick={(e) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('pc-del-custom', { detail: part.id })); }}
+                className="text-ink-500 hover:text-red-400 text-[11px]">🗑</button>
+            </span>
+          )}
           {part.optional && (
             <span className="text-[8px] px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400 border border-yellow-500/25 uppercase tracking-wider">opt</span>
           )}
@@ -361,6 +371,15 @@ export default function MaterialAssignmentsPage() {
   const setYield = useMaterialAssignmentStore((s) => s.setYield);
   const removeAssignment = useMaterialAssignmentStore((s) => s.removeAssignment);
   const clearAll = useMaterialAssignmentStore((s) => s.clearAll);
+  const customParts = useMaterialAssignmentStore((s) => s.data?.customParts) || [];
+  const addCustomPart = useMaterialAssignmentStore((s) => s.addCustomPart);
+  const updateCustomPart = useMaterialAssignmentStore((s) => s.updateCustomPart);
+  const removeCustomPart = useMaterialAssignmentStore((s) => s.removeCustomPart);
+  const [customModal, setCustomModal] = useState(null); // null | {} | {id,...}
+  const customPartRows = customParts.map((cp) => ({
+    id: cp.id, name: cp.name, pcs: cp.qtyPerWindow, unit: cp.unit,
+    materialType: 'consumable', custom: true,
+  }));
 
   const [confirmClear, setConfirmClear] = useState(false);
   const [locked, setLocked] = useState(true);
@@ -385,6 +404,23 @@ export default function MaterialAssignmentsPage() {
   const intSel = boxKeys.includes(selDrawKey) && !selDrawKey.startsWith('ext') ? selDrawKey : null;
   const sashSel = sashKeys.includes(selDrawKey) ? selDrawKey : null;
   const toggleSelect = (id) => setSelectedPart((cur) => (cur === id ? null : id));
+
+  useEffect(() => {
+    const onEdit = (e) => {
+      const cp = (useMaterialAssignmentStore.getState().data?.customParts || []).find((c) => c.id === e.detail);
+      if (cp) setCustomModal({ ...cp });
+    };
+    const onDel = (e) => {
+      const cp = (useMaterialAssignmentStore.getState().data?.customParts || []).find((c) => c.id === e.detail);
+      if (cp && window.confirm(`Delete "${cp.name}"? Its assignment will be removed too.`)) removeCustomPart(cp.id);
+    };
+    window.addEventListener('pc-edit-custom', onEdit);
+    window.addEventListener('pc-del-custom', onDel);
+    return () => {
+      window.removeEventListener('pc-edit-custom', onEdit);
+      window.removeEventListener('pc-del-custom', onDel);
+    };
+  }, [removeCustomPart]);
   const pickFromDrawing = (ctx) => (dk) => {
     const pid = partForDrawingKey(dk, ctx);
     if (pid) setSelectedPart(pid);
@@ -414,7 +450,7 @@ export default function MaterialAssignmentsPage() {
   // Stats — only for current type
   const isCasement = typeId === 'casement';
   const typeParts = isSash
-    ? [...REG_BOX_PARTS, ...REG_SASH_PARTS, ...SASH_WINDOW_PARTS.beading, ...SASH_WINDOW_PARTS.glass, ...SASH_WINDOW_PARTS.paint, ...SASH_WINDOW_PARTS.consumables]
+    ? [...REG_BOX_PARTS, ...REG_SASH_PARTS, ...SASH_WINDOW_PARTS.beading, ...SASH_WINDOW_PARTS.glass, ...SASH_WINDOW_PARTS.paint, ...SASH_WINDOW_PARTS.consumables, ...customPartRows]
     : isCasement ? CASEMENT_ALL_PARTS : [];
   // Counter counts EVERY unit (part × variant), not families — the base
   // assignment still fills all four variants in one click via inheritance,
@@ -645,7 +681,7 @@ export default function MaterialAssignmentsPage() {
         <PartGroupSection
           title="🔩 Consumables"
           subtitle={`${SASH_WINDOW_PARTS.consumables.length} items · cord, clips, spacers, tape, silicone, weights`}
-          parts={SASH_WINDOW_PARTS.consumables}
+          parts={[...SASH_WINDOW_PARTS.consumables, ...customPartRows]}
           assignments={assignments}
           materials={materials}
           categories={categories}
@@ -658,6 +694,13 @@ export default function MaterialAssignmentsPage() {
           selectedPart={selectedPart}
           onSelect={toggleSelect}
         />
+        <div className="mb-6 -mt-3">
+          <button type="button" disabled={locked}
+            onClick={() => setCustomModal({})}
+            className="text-xs px-3 py-1.5 rounded-lg bg-surface-600 text-ink-200 border border-surface-500 hover:bg-surface-500 hover:text-ink-50 transition-colors disabled:opacity-50">
+            + Add consumable
+          </button>
+        </div>
         </div>
 
         {/* Right: sticky drawings — click a row to see where the part lives */}
@@ -716,6 +759,47 @@ export default function MaterialAssignmentsPage() {
             <div className="flex gap-2 justify-end">
               <button onClick={() => setConfirmUnlock(false)} className="btn btn-secondary text-xs px-4">Cancel</button>
               <button onClick={() => { setLocked(false); setConfirmUnlock(false); }} className="text-xs px-4 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 transition-colors">Unlock</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {customModal && (
+        <div className="fixed inset-0 z-[900] bg-black/50 flex items-center justify-center" onClick={() => setCustomModal(null)}>
+          <div className="bg-surface-700 border border-surface-500 rounded-xl p-5 w-[360px]" onClick={(e) => e.stopPropagation()}>
+            <div className="text-sm font-semibold text-ink-50 mb-4">{customModal.id ? 'Edit consumable' : 'Add consumable'}</div>
+            <div className="space-y-3 text-xs">
+              <div>
+                <div className="text-ink-400 mb-1">Name</div>
+                <input autoFocus className="input w-full" value={customModal.name || ''}
+                  onChange={(e) => setCustomModal((m) => ({ ...m, name: e.target.value }))} />
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <div className="text-ink-400 mb-1">Unit</div>
+                  <select className="input w-full" value={customModal.unit || 'pcs'}
+                    onChange={(e) => setCustomModal((m) => ({ ...m, unit: e.target.value }))}>
+                    {['pcs', 'm', 'tubes', 'kg', 'L'].map((u) => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
+                <div className="w-[120px]">
+                  <div className="text-ink-400 mb-1">Qty per window</div>
+                  <NumInput className="input w-full" value={customModal.qtyPerWindow ?? 1}
+                    onCommit={(v) => setCustomModal((m) => ({ ...m, qtyPerWindow: v }))} />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button className="text-xs px-3 py-1.5 rounded-lg bg-surface-600 text-ink-300 hover:bg-surface-500" onClick={() => setCustomModal(null)}>Cancel</button>
+              <button className="text-xs px-3 py-1.5 rounded-lg bg-accent-500/20 text-accent-300 border border-accent-500/40 hover:bg-accent-500/30"
+                onClick={() => {
+                  if (!(customModal.name || '').trim()) return;
+                  if (customModal.id) updateCustomPart(customModal.id, customModal);
+                  else addCustomPart(customModal);
+                  setCustomModal(null);
+                }}>
+                {customModal.id ? 'Save' : 'Add'}
+              </button>
             </div>
           </div>
         </div>

@@ -156,9 +156,9 @@ export function legacyToCanonical(id) {
 export function normalizeAssignments(raw) {
   if (!raw || typeof raw !== 'object') return { schema: 2, base: {}, overrides: {} };
   if (raw.schema === 2) {
-    return { schema: 2, base: raw.base || {}, overrides: raw.overrides || {} };
+    return { schema: 2, base: raw.base || {}, overrides: raw.overrides || {}, customParts: raw.customParts || [] };
   }
-  const out = { schema: 2, base: {}, overrides: {} };
+  const out = { schema: 2, base: {}, overrides: {}, customParts: [] };
   for (const [id, val] of Object.entries(raw)) {
     if (!val || typeof val !== 'object') continue;
     const { key, variantKey } = legacyToCanonical(id);
