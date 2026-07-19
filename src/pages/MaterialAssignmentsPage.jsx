@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import NumInput from '../components/NumInput.jsx';
+import MaterialPicker from '../components/MaterialPicker.jsx';
 import { useParams } from 'react-router-dom';
 import { useMaterialStore } from '../stores/materialStore.js';
 import { useMaterialAssignmentStore, SASH_WINDOW_PARTS, ALL_PARTS, CASEMENT_PARTS, CASEMENT_ALL_PARTS } from '../stores/materialAssignmentStore.js';
@@ -173,25 +174,14 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
 
       {/* Material dropdown (filtered) */}
       <td className="px-3 py-2">
-        <select
-          className="input text-xs w-full"
+        <MaterialPicker
+          materials={filteredMaterials}
           value={assignment?.material_id || ''}
           disabled={disabled}
-          onChange={(e) => {
-            if (e.target.value) {
-              onAssign(part.id, e.target.value, assignment?.yield || 1.0, selCat, selSub);
-            } else {
-              onRemove(part.id);
-            }
-          }}
-        >
-          <option value="">— Select material —</option>
-          {filteredMaterials.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.item_number} — {m.name} {m.size ? `(${m.size})` : ''} {m.cost_per_unit > 0 ? `£${Number(m.cost_per_unit).toFixed(2)}/${m.unit}` : ''}
-            </option>
-          ))}
-        </select>
+          allowClear
+          onSelect={(m) => (m ? onAssign(part.id, m.id, assignment?.yield || 1.0, selCat, selSub) : onRemove(part.id))}
+          className="w-full"
+        />
         {assignedMat && (
           <div className="text-[10px] text-ink-400 mt-0.5 flex items-center gap-2">
             <span>{assignedMat.size || '—'}</span>
@@ -252,17 +242,13 @@ function VariantRow({ part, vk, materials, onAssign, onYieldChange, onRemove, di
       <td className="px-3 py-1.5 font-mono text-ink-300">{live?.section || '—'}</td>
       <td></td><td></td><td></td>
       <td className="px-3 py-1.5">
-        <select
+        <MaterialPicker
+          materials={materials}
           value={eff?.material_id || ''}
-          onChange={(e) => e.target.value && onAssign(targetId, e.target.value, eff?.yield ?? 1.0)}
           disabled={disabled}
-          className="input text-[11px] w-full max-w-[420px]"
-        >
-          <option value="">— select material —</option>
-          {materials.map((m) => (
-            <option key={m.id} value={m.id}>{m.item_number || m.id} — {m.name}{m.size ? ` (${m.size})` : ''}</option>
-          ))}
-        </select>
+          onSelect={(m) => m && onAssign(targetId, m.id, eff?.yield ?? 1.0)}
+          className="w-full max-w-[420px]"
+        />
       </td>
       <td className="px-3 py-1.5 text-center">
         <NumInput step="0.05" min="0.01" max="10" value={eff?.yield ?? 1.0}
