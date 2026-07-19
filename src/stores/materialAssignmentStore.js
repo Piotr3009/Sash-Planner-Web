@@ -111,9 +111,11 @@ export const useMaterialAssignmentStore = create((set, get) => ({
       assignments: {},
 
       // Set assignment for a part (includes category/subcategory filter)
-      setAssignment: (partId, materialId, yieldCoeff = 1.0, category = '', subcategory = '') => {
+      setAssignment: (partId, materialId, yieldCoeff = 1.0, category = '', subcategory = '', explicitVariant = null) => {
         set((s) => {
-          const { key, variantKey } = legacyToCanonical(partId);
+          const canon = legacyToCanonical(partId);
+          const key = canon.key;
+          const variantKey = explicitVariant && explicitVariant !== 'standard' ? explicitVariant : canon.variantKey;
           const d = normalizeAssignments(s.data);
           const prev = (variantKey ? d.overrides?.[key]?.[variantKey] : d.base?.[key]) || s.assignments[partId] || {};
           const next = {
@@ -133,9 +135,11 @@ export const useMaterialAssignmentStore = create((set, get) => ({
       },
 
       // Update filter (category/subcategory) for a part
-      setFilter: (partId, category, subcategory = '') => {
+      setFilter: (partId, category, subcategory = '', explicitVariant = null) => {
         set((s) => {
-          const { key, variantKey } = legacyToCanonical(partId);
+          const canon = legacyToCanonical(partId);
+          const key = canon.key;
+          const variantKey = explicitVariant && explicitVariant !== 'standard' ? explicitVariant : canon.variantKey;
           const d = normalizeAssignments(s.data);
           const prev = (variantKey ? d.overrides?.[key]?.[variantKey] : d.base?.[key]) || s.assignments[partId] || {};
           const next = {
@@ -155,9 +159,11 @@ export const useMaterialAssignmentStore = create((set, get) => ({
       },
 
       // Update yield only
-      setYield: (partId, yieldCoeff) => {
+      setYield: (partId, yieldCoeff, explicitVariant = null) => {
         set((s) => {
-          const { key, variantKey } = legacyToCanonical(partId);
+          const canon = legacyToCanonical(partId);
+          const key = canon.key;
+          const variantKey = explicitVariant && explicitVariant !== 'standard' ? explicitVariant : canon.variantKey;
           const d = normalizeAssignments(s.data);
           const prev = (variantKey ? d.overrides?.[key]?.[variantKey] : d.base?.[key]) || s.assignments[partId] || {};
           const next = { ...prev, yield: yieldCoeff };
@@ -174,9 +180,11 @@ export const useMaterialAssignmentStore = create((set, get) => ({
       // Remove assignment
       // Base part → removes base (and its overrides). Variant row → removes
       // just the override; the row falls back to the inherited base value.
-      removeAssignment: (partId) => {
+      removeAssignment: (partId, explicitVariant = null) => {
         set((s) => {
-          const { key, variantKey } = legacyToCanonical(partId);
+          const canon = legacyToCanonical(partId);
+          const key = canon.key;
+          const variantKey = explicitVariant && explicitVariant !== 'standard' ? explicitVariant : canon.variantKey;
           const d = normalizeAssignments(s.data);
           if (variantKey) {
             if (d.overrides[key]) {

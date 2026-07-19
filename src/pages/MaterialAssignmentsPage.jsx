@@ -240,8 +240,12 @@ function VariantRow({ part, vk, materials, categories, subcategoriesByCategory, 
   const overrides = useMaterialAssignmentStore((s) => s.data?.overrides);
   const legacyId = PART_REGISTRY[part.id]?.legacyVariantIds?.[vk] || null;
   const targetId = legacyId || part.id;           // standard edits the base
-  const eff = flat[targetId];
-  const hasOverride = !!(legacyId && overrides?.[part.id]?.[vk]);
+  // Sash families have NO legacy per-variant ids — pass the variant explicitly
+  // so Slim/Triple/Heritage write an OVERRIDE, never the shared base.
+  const explicitVk = !legacyId && vk !== 'standard' ? vk : null;
+  const ov = overrides?.[part.id]?.[vk];
+  const eff = ov || (legacyId ? flat[targetId] : flat[part.id]);
+  const hasOverride = !!ov;
   const live = liveSectionsFor(part.id, sashProfile, vk);
   const vLabel = sashProfile?.variants?.[vk]?.label || vk;
   const selCat = eff?.category || '';
@@ -263,7 +267,7 @@ function VariantRow({ part, vk, materials, categories, subcategoriesByCategory, 
       <td></td>
       <td className="px-3 py-1.5">
         <select value={selCat} disabled={disabled}
-          onChange={(e) => onFilter(targetId, e.target.value, '')}
+          onChange={(e) => onFilter(targetId, e.target.value, '', explicitVk)}
           className="input text-[11px] w-full">
           <option value="">All</option>
           {categories.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -271,7 +275,7 @@ function VariantRow({ part, vk, materials, categories, subcategoriesByCategory, 
       </td>
       <td className="px-3 py-1.5">
         <select value={selSub} disabled={disabled || !selCat}
-          onChange={(e) => onFilter(targetId, selCat, e.target.value)}
+          onChange={(e) => onFilter(targetId, selCat, e.target.value, explicitVk)}
           className="input text-[11px] w-full">
           <option value="">All</option>
           {subcategories.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -282,19 +286,19 @@ function VariantRow({ part, vk, materials, categories, subcategoriesByCategory, 
           materials={filteredMaterials}
           value={eff?.material_id || ''}
           disabled={disabled}
-          onSelect={(m) => m && onAssign(targetId, m.id, eff?.yield ?? 1.0)}
+          onSelect={(m) => m && onAssign(targetId, m.id, eff?.yield ?? 1.0, selCat, selSub, explicitVk)}
           className="w-full max-w-[420px]"
         />
       </td>
       <td className="px-3 py-1.5 text-center">
         <NumInput step="0.05" min="0.01" max="10" value={eff?.yield ?? 1.0}
-          onCommit={(v) => { const val = parseFloat(v); if (!isNaN(val) && val > 0) onYieldChange(targetId, val); }}
+          onCommit={(v) => { const val = parseFloat(v); if (!isNaN(val) && val > 0) onYieldChange(targetId, val, explicitVk); }}
           disabled={disabled}
           className="input text-[11px] w-[60px] text-center font-mono" />
       </td>
       <td className="px-3 py-1.5 text-center">
         {hasOverride && (
-          <button type="button" onClick={() => onRemove(legacyId)} disabled={disabled}
+          <button type="button" onClick={() => onRemove(legacyId || part.id, explicitVk)} disabled={disabled}
             title="Back to Standard material"
             className="text-ink-500 hover:text-red-400 text-xs">✕</button>
         )}
