@@ -39,11 +39,11 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onCancel}>
       <div className="absolute inset-0 bg-black/60" />
       <div className="relative bg-surface-800 border border-surface-500 rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="text-sm font-semibold text-ink-50 mb-2">{title}</div>
-        <div className="text-xs text-ink-300 mb-4">{message}</div>
+        <div className="text-[15px] font-semibold text-ink-50 mb-2">{title}</div>
+        <div className="text-[13px] text-ink-300 mb-4">{message}</div>
         <div className="flex gap-2 justify-end">
-          <button onClick={onCancel} className="btn btn-secondary text-xs px-4">Cancel</button>
-          <button onClick={onConfirm} className="text-xs px-4 py-1.5 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors">Delete</button>
+          <button onClick={onCancel} className="btn btn-secondary text-[13px] px-4">Cancel</button>
+          <button onClick={onConfirm} className="text-[13px] px-4 py-1.5 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors">Delete</button>
         </div>
       </div>
     </div>
@@ -73,28 +73,28 @@ function EditProjectModal({ project, onSave, onCancel }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onCancel}>
       <div className="absolute inset-0 bg-black/60" />
       <div className="relative bg-surface-800 border border-surface-500 rounded-xl p-5 max-w-sm w-full mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="text-sm font-semibold text-ink-50 mb-3">Edit Project</div>
+        <div className="text-[15px] font-semibold text-ink-50 mb-3">Edit Project</div>
         <div className="space-y-2">
           <div>
-            <label className="text-[10px] text-ink-400 uppercase tracking-wider block mb-0.5">Project name (max 5 chars) *</label>
-            <input className="input text-xs w-full" value={name} maxLength={5} onChange={(e) => setName(e.target.value)} autoFocus />
+            <label className="text-[11px] text-ink-400 uppercase tracking-wider block mb-0.5">Project name (max 5 chars) *</label>
+            <input className="input text-[13px] w-full" value={name} maxLength={5} onChange={(e) => setName(e.target.value)} autoFocus />
           </div>
           <div>
-            <label className="text-[10px] text-ink-400 uppercase tracking-wider block mb-0.5">Project number (max 5 chars)</label>
-            <input className="input text-xs w-full" value={number} maxLength={5} onChange={(e) => setNumber(e.target.value)} />
+            <label className="text-[11px] text-ink-400 uppercase tracking-wider block mb-0.5">Project number (max 5 chars)</label>
+            <input className="input text-[13px] w-full" value={number} maxLength={5} onChange={(e) => setNumber(e.target.value)} />
           </div>
           <div>
-            <label className="text-[10px] text-ink-400 uppercase tracking-wider block mb-0.5">Client</label>
+            <label className="text-[11px] text-ink-400 uppercase tracking-wider block mb-0.5">Client</label>
             <ClientPicker value={clientId} onChange={setClientId} />
           </div>
           <div>
-            <label className="text-[10px] text-ink-400 uppercase tracking-wider block mb-0.5">Address</label>
-            <input className="input text-xs w-full" value={address} onChange={(e) => setAddress(e.target.value)} />
+            <label className="text-[11px] text-ink-400 uppercase tracking-wider block mb-0.5">Address</label>
+            <input className="input text-[13px] w-full" value={address} onChange={(e) => setAddress(e.target.value)} />
           </div>
         </div>
         <div className="flex gap-2 justify-end mt-4">
-          <button onClick={onCancel} className="btn btn-secondary text-xs px-4">Cancel</button>
-          <button onClick={submit} className="btn btn-primary text-xs px-4">Save</button>
+          <button onClick={onCancel} className="btn btn-secondary text-[13px] px-4">Cancel</button>
+          <button onClick={submit} className="btn btn-primary text-[13px] px-4">Save</button>
         </div>
       </div>
     </div>
@@ -119,7 +119,7 @@ function BatchAssignDropdown({ batchId, projectId, productionPacks, currentPPId,
     <div ref={ref} className="relative">
       <button
         onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-        className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded bg-surface-700/60 hover:bg-surface-600 text-ink-300 hover:text-ink-100 transition-colors"
+        className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-surface-700/60 hover:bg-surface-600 text-ink-300 hover:text-ink-100 transition-colors"
       >
         <span className="truncate max-w-[60px]">{currentPP ? currentPP.name : '— assign'}</span>
         <svg className="w-2.5 h-2.5 shrink-0 text-ink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6" /></svg>
@@ -127,7 +127,7 @@ function BatchAssignDropdown({ batchId, projectId, productionPacks, currentPPId,
       {open && (
         <div className="absolute z-40 top-full mt-1 left-0 min-w-[140px] bg-surface-700 border border-surface-500 rounded-lg shadow-xl py-1 max-h-[200px] overflow-y-auto">
           <button
-            className={`w-full text-left px-3 py-1.5 text-[10px] hover:bg-surface-600 transition-colors ${!currentPPId ? 'text-accent-400 font-medium' : 'text-ink-300'}`}
+            className={`w-full text-left px-3 py-1.5 text-[11px] hover:bg-surface-600 transition-colors ${!currentPPId ? 'text-accent-400 font-medium' : 'text-ink-300'}`}
             onClick={(e) => { e.stopPropagation(); onAssign(batchId, projectId, null); setOpen(false); }}
           >
             — unassign
@@ -137,7 +137,7 @@ function BatchAssignDropdown({ batchId, projectId, productionPacks, currentPPId,
             return (
               <button
                 key={pp.id}
-                className={`w-full text-left px-3 py-1.5 text-[10px] hover:bg-surface-600 transition-colors flex items-center gap-2 ${pp.id === currentPPId ? 'text-accent-400 font-medium' : 'text-ink-200'}`}
+                className={`w-full text-left px-3 py-1.5 text-[11px] hover:bg-surface-600 transition-colors flex items-center gap-2 ${pp.id === currentPPId ? 'text-accent-400 font-medium' : 'text-ink-200'}`}
                 onClick={(e) => { e.stopPropagation(); onAssign(batchId, projectId, pp.id); setOpen(false); }}
               >
                 <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: tc.dot }} />
@@ -283,19 +283,19 @@ function NewPPForm({ onCreate, onCancel }) {
 
   return (
     <div className="card p-3 space-y-2">
-      <input className="input text-xs" placeholder="Name, e.g. #2 Sash windows" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+      <input className="input text-[13px]" placeholder="Name, e.g. #2 Sash windows" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
       <div className="flex gap-2">
-        <select className="input text-xs flex-1" value={type} onChange={(e) => setType(e.target.value)}>
+        <select className="input text-[13px] flex-1" value={type} onChange={(e) => setType(e.target.value)}>
           <option value="sash">Sash</option>
           <option value="casement">Casement</option>
           <option value="doors">Doors</option>
           <option value="special">Special / Other</option>
         </select>
-        <input type="date" className="input text-xs flex-1" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+        <input type="date" className="input text-[13px] flex-1" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
       </div>
       <div className="flex gap-2">
-        <button className="btn btn-primary text-xs flex-1" onClick={submit}>Create</button>
-        <button className="btn btn-secondary text-xs" onClick={onCancel}>Cancel</button>
+        <button className="btn btn-primary text-[13px] flex-1" onClick={submit}>Create</button>
+        <button className="btn btn-secondary text-[13px]" onClick={onCancel}>Cancel</button>
       </div>
     </div>
   );
@@ -319,21 +319,21 @@ function NewProjectForm({ onCreate, onCancel }) {
   return (
     <div className="card p-3 space-y-2">
       <div>
-        <input className="input text-xs w-full" placeholder="Project name * (max 5)" maxLength={5} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-        <div className="text-[9px] text-ink-400 mt-0.5 text-right">{name.length}/5</div>
+        <input className="input text-[13px] w-full" placeholder="Project name * (max 5)" maxLength={5} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        <div className="text-[10px] text-ink-400 mt-0.5 text-right">{name.length}/5</div>
       </div>
       <div>
-        <input className="input text-xs w-full" placeholder="Project number (max 5)" maxLength={5} value={number} onChange={(e) => setNumber(e.target.value)} />
-        <div className="text-[9px] text-ink-400 mt-0.5 text-right">{number.length}/5</div>
+        <input className="input text-[13px] w-full" placeholder="Project number (max 5)" maxLength={5} value={number} onChange={(e) => setNumber(e.target.value)} />
+        <div className="text-[10px] text-ink-400 mt-0.5 text-right">{number.length}/5</div>
       </div>
       <ClientPicker value={clientId} onChange={setClientId} />
-      <input className="input text-xs" placeholder="Address" value={address} onChange={(e) => setAddress(e.target.value)} />
+      <input className="input text-[13px]" placeholder="Address" value={address} onChange={(e) => setAddress(e.target.value)} />
       <div className="flex gap-2">
-        <button className="btn btn-primary text-xs flex-1" onClick={submit}>Create</button>
-        <button className="btn btn-secondary text-xs" onClick={onCancel}>Cancel</button>
+        <button className="btn btn-primary text-[13px] flex-1" onClick={submit}>Create</button>
+        <button className="btn btn-secondary text-[13px]" onClick={onCancel}>Cancel</button>
       </div>
       <button
-        className="w-full py-2 rounded-lg border border-surface-500 text-accent-400 text-[10px] hover:bg-surface-700 transition-all"
+        className="w-full py-2 rounded-lg border border-surface-500 text-accent-400 text-[11px] hover:bg-surface-700 transition-all"
         onClick={() => { /* Future: Joinery Core import */ }}
       >
         Upload from <svg className="inline w-3.5 h-3.5 -mt-0.5 mx-0.5" viewBox="0 0 24 24" fill="none"><path d="M12 2L3 7v10l9 5 9-5V7l-9-5z" stroke="#D4A030" strokeWidth="1.5" fill="#D4A030" fillOpacity="0.15"/></svg> Joinery Core
@@ -463,21 +463,21 @@ export default function DashboardPage() {
 
   return (
     <>
-      <div className="p-6" style={{ zoom: 1.05 }}>
+      <div className="p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div>
             <h1 className="text-lg font-semibold text-ink-50">Production planner</h1>
-            <p className="text-[10px] text-ink-400 mt-0.5">Assign batches to production packs · track project completion</p>
+            <p className="text-[11px] text-ink-400 mt-0.5">Assign batches to production packs · track project completion</p>
           </div>
           <div className="flex items-center gap-3">
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search projects…"
-              className="input text-xs w-[220px]"
+              className="input text-[13px] w-[220px]"
             />
-            <div className="text-[10px] text-ink-400">
+            <div className="text-[11px] text-ink-400">
               {visibleProjects.length}/{projects.length} projects · {productionPacks.length} packs
             </div>
           </div>
@@ -485,10 +485,10 @@ export default function DashboardPage() {
 
         {/* Column headers */}
         <div className="flex mb-2">
-          <div style={{ width: 160 }} className="text-[9px] uppercase tracking-widest text-ink-400 font-semibold">Projects</div>
-          <div style={{ width: 200, marginLeft: 16 }} className="text-[9px] uppercase tracking-widest text-ink-400 font-semibold">Batches</div>
-          <div style={{ width: 500, marginLeft: 100 }} className="text-[9px] uppercase tracking-widest text-ink-400 font-semibold">Production packs</div>
-          <div style={{ marginLeft: 100 }} className="text-[9px] uppercase tracking-widest text-ink-400 font-semibold">Project complete</div>
+          <div style={{ width: 160 }} className="text-[10px] uppercase tracking-widest text-ink-400 font-semibold">Projects</div>
+          <div style={{ width: 200, marginLeft: 16 }} className="text-[10px] uppercase tracking-widest text-ink-400 font-semibold">Batches</div>
+          <div style={{ width: 500, marginLeft: 100 }} className="text-[10px] uppercase tracking-widest text-ink-400 font-semibold">Production packs</div>
+          <div style={{ marginLeft: 100 }} className="text-[10px] uppercase tracking-widest text-ink-400 font-semibold">Project complete</div>
         </div>
 
         {/* Main content with connections */}
@@ -513,10 +513,10 @@ export default function DashboardPage() {
                         to={`/projects/${project.id}`}
                         className="card p-3 block hover:border-accent-500/40 transition-all overflow-hidden h-full"
                       >
-                        <div className="text-xs font-semibold text-ink-50 truncate pr-10">{project.name}</div>
-                        <div className="text-[10px] text-ink-400 mt-0.5">{project.project_number}</div>
-                        <div className="text-[10px] text-ink-200 mt-1 truncate">{project.client}</div>
-                        <div className="text-[9px] text-ink-400 mt-1 truncate">{project.address}</div>
+                        <div className="text-[13px] font-semibold text-ink-50 truncate pr-10">{project.name}</div>
+                        <div className="text-[11px] text-ink-400 mt-0.5">{project.project_number}</div>
+                        <div className="text-[11px] text-ink-200 mt-1 truncate">{project.client}</div>
+                        <div className="text-[10px] text-ink-400 mt-1 truncate">{project.address}</div>
                       </Link>
                       {/* Edit button */}
                       <button
@@ -531,7 +531,7 @@ export default function DashboardPage() {
                       {/* Delete button */}
                       <button
                         onClick={(e) => handleDeleteProject(e, project)}
-                        className="absolute top-2 right-2 w-5 h-5 rounded flex items-center justify-center text-[10px] text-ink-400 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
+                        className="absolute top-2 right-2 w-5 h-5 rounded flex items-center justify-center text-[11px] text-ink-400 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
                         title="Delete project"
                       >
                         🗑️
@@ -546,7 +546,7 @@ export default function DashboardPage() {
                 ) : (
                   <button
                     onClick={() => setShowNewProject(true)}
-                    className="w-full py-2.5 rounded-xl border border-dashed border-surface-500 text-ink-400 text-xs hover:border-accent-500 hover:text-accent-400 transition-all"
+                    className="w-full py-2.5 rounded-xl border border-dashed border-surface-500 text-ink-400 text-[13px] hover:border-accent-500 hover:text-accent-400 transition-all"
                   >
                     + New project
                   </button>
@@ -572,7 +572,7 @@ export default function DashboardPage() {
                             <div
                               key={batch.id}
                               data-batch-id={batch.id}
-                              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs"
+                              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[13px]"
                               style={{ background: tc.bg, border: `0.5px solid ${tc.border}` }}
                             >
                               <span className="w-2 h-2 rounded-full shrink-0" style={{ background: tc.dot }} />
@@ -592,7 +592,7 @@ export default function DashboardPage() {
                           );
                         })}
                         {batches.length === 0 && (
-                          <div className="text-[10px] text-ink-400 italic">No batches</div>
+                          <div className="text-[11px] text-ink-400 italic">No batches</div>
                         )}
                       </div>
                     </div>
@@ -631,15 +631,15 @@ export default function DashboardPage() {
                       >
                         <div className="flex items-center gap-2 mb-1">
                           <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: tc.dot }} />
-                          <span className="text-[9px] px-1.5 py-0.5 rounded shrink-0 font-medium" style={{ background: tc.bg, color: tc.text }}>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0 font-medium" style={{ background: tc.bg, color: tc.text }}>
                             {typeLabel(pp.type)}
                           </span>
-                          <span className="text-xs font-semibold text-ink-50 truncate pr-6">{pp.name}</span>
+                          <span className="text-[13px] font-semibold text-ink-50 truncate pr-6">{pp.name}</span>
                         </div>
 
                         <div className="flex items-center gap-2 mb-1.5">
                           <select
-                            className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full cursor-pointer outline-none"
+                            className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full cursor-pointer outline-none"
                             style={{
                               background: `${statusColor}20`,
                               color: statusColor,
@@ -658,13 +658,13 @@ export default function DashboardPage() {
                           </select>
                           <span style={{ color: statusColor, fontSize: '7px', marginLeft: '-12px', pointerEvents: 'none' }}>▾</span>
                           {pp.deadline && (
-                            <span className="text-[9px] text-ink-400">
+                            <span className="text-[10px] text-ink-400">
                               DL {new Date(pp.deadline).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                             </span>
                           )}
                         </div>
 
-                        <div className="text-[10px] text-ink-200 mb-1.5">
+                        <div className="text-[11px] text-ink-200 mb-1.5">
                           {totalWindows} window{totalWindows !== 1 ? 's' : ''} · {assignedBatches.length} batch{assignedBatches.length !== 1 ? 'es' : ''}
                         </div>
 
@@ -673,7 +673,7 @@ export default function DashboardPage() {
                             {projectSummary.map((ps, i) => (
                               <span
                                 key={i}
-                                className="text-[9px] px-1.5 py-0.5 rounded"
+                                className="text-[10px] px-1.5 py-0.5 rounded"
                                 style={{ background: tc.bg, color: tc.text }}
                               >
                                 {ps.name} ×{ps.count}
@@ -684,7 +684,7 @@ export default function DashboardPage() {
                       </div>
                       <button
                         onClick={(e) => handleDeletePP(e, pp)}
-                        className="absolute top-2 right-2 w-5 h-5 rounded flex items-center justify-center text-[10px] text-ink-400 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
+                        className="absolute top-2 right-2 w-5 h-5 rounded flex items-center justify-center text-[11px] text-ink-400 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
                         title="Delete production pack"
                       >
                         🗑️
@@ -698,7 +698,7 @@ export default function DashboardPage() {
                 ) : (
                   <button
                     onClick={() => setShowNewPP(true)}
-                    className="w-full py-2.5 rounded-xl border border-dashed border-surface-500 text-ink-400 text-xs hover:border-accent-500 hover:text-accent-400 transition-all"
+                    className="w-full py-2.5 rounded-xl border border-dashed border-surface-500 text-ink-400 text-[13px] hover:border-accent-500 hover:text-accent-400 transition-all"
                   >
                     + New production pack
                   </button>
@@ -722,14 +722,14 @@ export default function DashboardPage() {
                       className="card p-3 overflow-hidden"
                       style={{ height: h }}
                     >
-                      <div className="text-xs font-semibold text-ink-50 truncate">{d.projectNumber}</div>
-                      <div className="text-[10px] text-ink-200 mt-0.5 truncate">{d.projectName}</div>
+                      <div className="text-[13px] font-semibold text-ink-50 truncate">{d.projectNumber}</div>
+                      <div className="text-[11px] text-ink-200 mt-0.5 truncate">{d.projectName}</div>
 
                       <div className="mt-1.5 space-y-0.5">
                         {Object.entries(d.summary).map(([type, count]) => {
                           const tc = typeColor(type);
                           return (
-                            <div key={type} className="flex items-center gap-1.5 text-[10px]">
+                            <div key={type} className="flex items-center gap-1.5 text-[11px]">
                               <span className="w-1.5 h-1.5 rounded-full" style={{ background: tc.dot }} />
                               <span style={{ color: tc.text }}>{count} {typeLabel(type).toLowerCase()}</span>
                             </div>
@@ -739,7 +739,7 @@ export default function DashboardPage() {
 
                       {/* Progress bar */}
                       <div className="mt-1.5">
-                        <div className="flex justify-between text-[9px] text-ink-400 mb-0.5">
+                        <div className="flex justify-between text-[10px] text-ink-400 mb-0.5">
                           <span>{d.completedBatches}/{d.totalBatches} batches</span>
                           <span>{progress}%</span>
                         </div>
@@ -755,7 +755,7 @@ export default function DashboardPage() {
                       </div>
 
                       {d.allComplete && (
-                        <div className="text-[9px] text-green-400 mt-1 uppercase tracking-wider font-medium">
+                        <div className="text-[10px] text-green-400 mt-1 uppercase tracking-wider font-medium">
                           Ready for delivery
                         </div>
                       )}
