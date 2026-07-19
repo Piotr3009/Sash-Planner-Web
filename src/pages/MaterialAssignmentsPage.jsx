@@ -81,7 +81,7 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
           <div className="flex items-center gap-1.5">
             <button type="button" onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
               title={open ? 'Hide variants' : 'Show variants'}
-              className="w-4 h-4 flex items-center justify-center text-ink-400 hover:text-ink-100 text-[10px] shrink-0">
+              className="w-6 h-6 -ml-1 flex items-center justify-center rounded text-accent-400 hover:text-accent-300 hover:bg-surface-600 text-base shrink-0">
               {open ? '▾' : '▸'}
             </button>
             <span className="text-ink-100 font-medium">{part.name} materials</span>
@@ -404,10 +404,26 @@ export default function MaterialAssignmentsPage() {
   const typeParts = isSash
     ? [...REG_BOX_PARTS, ...REG_SASH_PARTS, ...SASH_WINDOW_PARTS.beading, ...SASH_WINDOW_PARTS.glass, ...SASH_WINDOW_PARTS.paint, ...SASH_WINDOW_PARTS.consumables]
     : isCasement ? CASEMENT_ALL_PARTS : [];
-  const totalParts = typeParts.length;
-  const assignedCount = typeParts.filter((p) => assignments[p.id]?.material_id).length;
-  const requiredParts = typeParts.filter((p) => !p.optional);
-  const requiredAssigned = requiredParts.filter((p) => assignments[p.id]?.material_id).length;
+  // Counter counts EVERY unit (part × variant), not families — the base
+  // assignment still fills all four variants in one click via inheritance,
+  // so the counter tells the whole truth without extra clicking.
+  const unitCounts = useMemo(() => {
+    let total = 0, assigned = 0, reqTotal = 0, reqAssigned = 0;
+    typeParts.forEach((p) => {
+      const ids = p.variantAware
+        ? [p.id, ...Object.values(PART_REGISTRY[p.id]?.legacyVariantIds || {})]
+        : [p.id];
+      ids.forEach((id) => {
+        total += 1;
+        const ok = !!assignments[id]?.material_id;
+        if (ok) assigned += 1;
+        if (!p.optional) { reqTotal += 1; if (ok) reqAssigned += 1; }
+      });
+    });
+    return { total, assigned, reqTotal, reqAssigned };
+  }, [typeParts, assignments]);
+  const totalParts = unitCounts.total;
+  const assignedCount = unitCounts.assigned;
 
   // Coming soon for non-sash types
   if (!isSash) {
@@ -442,7 +458,7 @@ export default function MaterialAssignmentsPage() {
           <div className="flex items-center gap-3">
             <div className="text-right">
               <div className="text-[11px] text-ink-200">
-                <span className={requiredAssigned === requiredParts.length ? 'text-green-400' : 'text-yellow-400'}>
+                <span className={unitCounts.reqAssigned === unitCounts.reqTotal ? 'text-green-400' : 'text-yellow-400'}>
                   {assignedCount}
                 </span>
                 <span className="text-ink-400"> / {totalParts} assigned</span>
@@ -450,7 +466,7 @@ export default function MaterialAssignmentsPage() {
               <div className="w-[120px] h-1.5 bg-surface-600 rounded-full mt-1 overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all ${
-                    requiredAssigned === requiredParts.length ? 'bg-green-500' : 'bg-yellow-500'
+                    unitCounts.reqAssigned === unitCounts.reqTotal ? 'bg-green-500' : 'bg-yellow-500'
                   }`}
                   style={{ width: `${(assignedCount / totalParts) * 100}%` }}
                 />
@@ -633,7 +649,7 @@ export default function MaterialAssignmentsPage() {
         </div>
 
         {/* Right: sticky drawings — click a row to see where the part lives */}
-        <div className="hidden xl:block flex-[1.15] min-w-[600px] shrink-0 sticky top-4">
+        <div className="hidden xl:block w-[520px] shrink-0 sticky top-4">
           <div className="text-[10px] text-ink-400 mb-2">Sample 1000 × 1500 · click a part row or a drawing element</div>
           <div className="grid grid-cols-2 gap-3">
             <BoxDetail2D windowSpec={drawingsSpec} derived={drawingsDerived} view="external"
