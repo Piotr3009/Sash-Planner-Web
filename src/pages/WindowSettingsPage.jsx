@@ -54,11 +54,15 @@ export default function WindowSettingsPage() {
   const setElementField = useWindowProfileStore((s) => s.setElementField);
   const setDeduction = useWindowProfileStore((s) => s.setDeduction);
   const setHornExtension = useWindowProfileStore((s) => s.setHornExtension);
+  const setGlassMakeup = useWindowProfileStore((s) => s.setGlassMakeup);
   const setCillTwoPiece = useWindowProfileStore((s) => s.setCillTwoPiece);
   const resetToDefaults = useWindowProfileStore((s) => s.resetToDefaults);
 
   const [variantKey, setVariantKey] = useState('standard');
   const [selected, setSelected] = useState('bottomRail');
+  // frame variant -> glass type it drives (engine convention)
+  const VARIANT_TO_GLASS = { standard: 'double', slim: 'double_slim', triple: 'triple', heritage: 'single' };
+  const GLASS_TYPE_LABEL = { double: 'double glazing', double_slim: 'double slim glazing', triple: 'triple glazing', single: 'single glazing', passive: 'passive (vacuum)' };
   const [sampleW, setSampleW] = useState(1000);
   const [sampleH, setSampleH] = useState(1500);
 
@@ -377,10 +381,39 @@ export default function WindowSettingsPage() {
             </div>
           );
         })}
+        <div onClick={() => setSelected('glassMakeup')}
+          className={`p-2 rounded-lg border cursor-pointer transition-all ${selected === 'glassMakeup' ? 'border-blue-400 bg-blue-500/15' : 'border-blue-500/40 bg-blue-500/5 hover:bg-blue-500/10'}`}>
+          <div className={`text-[12px] font-medium ${selected === 'glassMakeup' ? 'text-blue-300' : 'text-blue-400'}`}>Glass</div>
+          <div className="text-[11px] text-blue-500/80">makeup per variant</div>
+          <div className="text-[11px] font-mono text-ink-300">{(profile.glassMakeup || {})[VARIANT_TO_GLASS[variantKey] || 'double'] || '—'}</div>
+        </div>
       </div>
 
       <div className="flex gap-3 items-stretch mb-6 flex-wrap">
-        {!isBoxSelected && (
+        {selected === 'glassMakeup' && (() => {
+          const gType = VARIANT_TO_GLASS[variantKey] || 'double';
+          const val = (profile.glassMakeup || {})[gType] ?? '';
+          const nums = String(val).split(/[^0-9.]+/).map(Number).filter((n) => n > 0);
+          const sum = nums.length >= 2 ? nums.reduce((a, b) => a + b, 0) : null;
+          return (
+            <div className="card p-4 mb-3 border border-blue-500/40 bg-blue-500/5">
+              <div className="flex justify-between items-baseline mb-1">
+                <div className="text-sm font-semibold text-blue-300">Glass — {profile.variants?.[variantKey]?.label || variantKey}</div>
+                <LockToggle locked={elementLock} onToggle={() => setElementLock((x) => !x)} />
+              </div>
+              <div className="text-[11px] text-ink-400 mb-3">Free text · printed on glass orders · no effect on sizes or weights · spacer is chosen per window</div>
+              <fieldset disabled={elementLock} className={`border-0 p-0 m-0 ${elementLock ? 'opacity-60' : ''}`}>
+                <div className="text-[11px] text-ink-400 mb-1">Makeup (mm)</div>
+                <input type="text" value={val}
+                  onChange={(e) => setGlassMakeup(gType, e.target.value)}
+                  className="px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm font-mono w-[200px]" />
+                <div className="text-[11px] text-ink-300 mt-2">{GLASS_TYPE_LABEL[gType]}{sum ? <span className="text-blue-300"> · {sum} mm</span> : null}</div>
+              </fieldset>
+            </div>
+          );
+        })()}
+
+        {!isBoxSelected && selected !== 'glassMakeup' && (
           <>
 <div className={`card p-4 flex-[1.5] min-w-[320px] ${elementLock ? '' : 'ring-1 ring-amber-500/40'}`}>
           <div className="flex justify-between items-baseline mb-3">

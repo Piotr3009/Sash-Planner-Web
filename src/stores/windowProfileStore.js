@@ -46,6 +46,15 @@ export const useWindowProfileStore = create(
         get()._sync();
       },
 
+      setGlassMakeup: (glassType, value) => {
+        set((s) => {
+          const sash = clone(s.sash);
+          sash.glassMakeup = { ...(sash.glassMakeup || {}), [glassType]: String(value) };
+          return { sash };
+        });
+        get()._sync();
+      },
+
       setHornExtension: (value) => {
         set((s) => {
           const sash = clone(s.sash);

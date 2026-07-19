@@ -45,6 +45,9 @@ export const DEFAULT_SASH_PROFILE = {
   },
   // Length rules (mm subtracted from the window dimension). "Advanced" —
   // geometrically coupled values; changing them reshapes the whole window.
+  // Glass makeup labels printed on glass orders (free text; no effect on sizes).
+  // Keyed by glass type; the frame variant chooses the type per window.
+  glassMakeup: { double: '4x16x4', double_slim: '4x8x4', triple: '4x8x4x8x4', single: '', passive: '' },
   hornExtension: 70,  // sash horn height; per-window spec override wins, this is the workshop default
   dedSchema: 2,       // v2: sashHeight is the PURE opening deduction (MR excluded)
   deductions: {
@@ -110,6 +113,9 @@ export function getCasementProfile() {
  */
 export function normalizeSashProfile(p) {
   if (!p || !p.deductions) return p;
+  if (!p.glassMakeup) {
+    p.glassMakeup = { ...DEFAULT_SASH_PROFILE.glassMakeup };
+  }
   if (p.dedSchema !== 2) {
     const mr = Number(p.elements?.meetingRail?.face) || DEFAULT_SASH_PROFILE.elements.meetingRail.face;
     p.deductions.sashHeight = (Number(p.deductions.sashHeight) || 0) + mr;

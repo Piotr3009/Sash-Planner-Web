@@ -166,7 +166,9 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       coating: item?.glassCoating || fc.glassCoating || 'standard',
       gas: glassGas(glassType),
       thickness: GLASS_THICKNESS[glassType] ?? 24,
-      makeup: GLASS_MAKEUP[glassType] ?? GLASS_MAKEUP.double,
+      // Explicit per-window override only; otherwise undefined so consumers
+      // fall back to the workshop profile's glassMakeup (live, snapshot-aware).
+      makeup: item?.makeup ?? item?.glazing?.makeup ?? undefined,
       toughened: glassSpec === 'toughened',
       frosted: glassFinish === 'frosted',
       spacerColour: spacerColor,

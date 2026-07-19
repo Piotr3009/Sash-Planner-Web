@@ -8,7 +8,7 @@
 
 import { CONSTANTS, deriveWindowData } from './calculations.js';
 import { GLASS_MAKEUP, glassGas } from './specification.js';
-import { profileRawForSection } from './profile.js';
+import { profileRawForSection, getWindowProfile } from './profile.js';
 
 const DEFAULT_SETTINGS = {
   kerf: 3,
@@ -152,7 +152,7 @@ function buildGlassRow(windowSpec, width, height, location, qty) {
   const glassSpec = windowSpec?.glazing?.spec || 'toughened';
   const spacer = windowSpec?.glazing?.spacerColour || 'silver';
   const spacerType = windowSpec?.glazing?.spacerType || 'warm';
-  const makeup = windowSpec?.glazing?.makeup ?? (GLASS_MAKEUP[glassType] ?? GLASS_MAKEUP.double);
+  const makeup = windowSpec?.glazing?.makeup ?? getWindowProfile()?.glassMakeup?.[glassType] ?? (GLASS_MAKEUP[glassType] ?? GLASS_MAKEUP.double);
   const coating = windowSpec?.glazing?.coating || 'standard';
   const gas = windowSpec?.glazing?.gas ?? glassGas(glassType);
   const finish = windowSpec?.glazing?.finish || windowSpec?.glazing?.lowerGlass || 'clear';
@@ -211,7 +211,7 @@ export function buildGlassListForWindow(derived, windowSpec) {
   const glassSpec = windowSpec?.glazing?.spec || 'toughened';
   const spacer = windowSpec?.glazing?.spacerColour || 'silver';
   const spacerType = windowSpec?.glazing?.spacerType || 'warm';
-  const makeup = windowSpec?.glazing?.makeup ?? (GLASS_MAKEUP[glassType] ?? GLASS_MAKEUP.double);
+  const makeup = windowSpec?.glazing?.makeup ?? getWindowProfile()?.glassMakeup?.[glassType] ?? (GLASS_MAKEUP[glassType] ?? GLASS_MAKEUP.double);
   const coating = windowSpec?.glazing?.coating || 'standard';
   const gas = windowSpec?.glazing?.gas ?? glassGas(glassType);
   const isFrosted = windowSpec?.glazing?.finish === 'frosted';
