@@ -1017,8 +1017,11 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) 
   const grouped = groupGlassItems(merged.glass);
 
   const handleExportPDF = () => {
+    // Project numbers live on the window rows (same source as every other tab);
+    // pp.assignments carries no _projectNumber, which printed raw UUIDs.
     const projects = isPPMode
-      ? pp?.assignments?.map((a) => ({ number: a._projectNumber || '', name: '', id: a.projectId })) || []
+      ? [...new Set(windowsData.map(({ win }) => win?._projectNumber).filter(Boolean))]
+          .map((number) => ({ number, name: '', id: number }))
       : batch ? [{ number: batch.projectNumber || '', name: batch.projectName || '', id: batch.id }] : [];
 
     exportGlassPDF({

@@ -9,7 +9,6 @@
  */
 import { jsPDF } from 'jspdf';
 import { buildGlassListForWindow } from '../engine/lists.js';
-import { CONSTANTS } from '../engine/calculations.js';
 import { computeGlassBarPositions } from '../components/drawings/drawingUtils.jsx';
 
 // ─── COLORS (RGB 0-255) ───
@@ -61,6 +60,19 @@ function fmt(n) {
   const r = Math.round(n * 10) / 10;
   return Number.isInteger(r) ? r.toString() : r.toFixed(1);
 }
+
+// ─── SUMMARY TABLE COLUMN OFFSETS (mm from table x) ───
+const COL = {
+  no: 0, window: 8, sash: 32, width: 62, height: 86, type: 112,
+  makeup: 138, spec: 164, coating: 190, gas: 214, finish: 228,
+  spacer: 246, bars: 266,
+};
+
+// Label helpers — mirror the on-screen Glass Schedule wording.
+const coatingLabel = (c) => (c === 'soft_coat' ? 'Soft Coat' : 'Standard');
+const gasLabel = (g) => (g ? String(g).charAt(0).toUpperCase() + String(g).slice(1) : '—');
+const spacerTypeLabel = (t) => (t === 'alu' ? 'alu' : 'warm');
+const spacerLabel = (g) => `${g.spacer || '—'} · ${spacerTypeLabel(g.spacerType)}`;
 
 function segsBetween(from, to, cutPairs) {
   if (!cutPairs.length) return [{ a: from, b: to }];
@@ -134,7 +146,7 @@ function drawHeader(doc, info, pageNum, totalPages) {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(5);
   tc(doc, C.black);
-  const projStr = (info.projects || []).join(' · ');
+  const projStr = (info.projects || []).join(' · ') || '—';
   doc.text(projStr.substring(0, 90), x + col1 + 22, y + h / 2 + 7);
 
   // Date / Units
@@ -176,17 +188,19 @@ function drawTable(doc, items, startY) {
 
   // Columns
   const cols = [
-    { l: '#',         dx: 0 },
-    { l: 'Window',    dx: 10 },
-    { l: 'Sash',      dx: 35 },
-    { l: 'Width (mm)',dx: 58 },
-    { l: 'Height (mm)',dx: 88 },
-    { l: 'Type',      dx: 120 },
-    { l: 'Makeup',    dx: 148 },
-    { l: 'Spec',      dx: 178 },
-    { l: 'Finish',    dx: 210 },
-    { l: 'Spacer',    dx: 238 },
-    { l: 'Bars',      dx: 262 },
+    { l: '#',          dx: COL.no },
+    { l: 'Window',     dx: COL.window },
+    { l: 'Sash',       dx: COL.sash },
+    { l: 'Width (mm)', dx: COL.width },
+    { l: 'Height (mm)',dx: COL.height },
+    { l: 'Type',       dx: COL.type },
+    { l: 'Makeup',     dx: COL.makeup },
+    { l: 'Spec',       dx: COL.spec },
+    { l: 'Coating',    dx: COL.coating },
+    { l: 'Gas',        dx: COL.gas },
+    { l: 'Finish',     dx: COL.finish },
+    { l: 'Spacer',     dx: COL.spacer },
+    { l: 'Bars',       dx: COL.bars },
   ];
 
   doc.setFont('helvetica', 'bold');
@@ -214,22 +228,24 @@ function drawTable(doc, items, startY) {
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6);
-    doc.text(g.windowName || '', x + 10, y);
-    doc.text(g.sash || '', x + 35, y);
+    doc.text(g.windowName || '', x + COL.window, y);
+    doc.text(g.sash || '', x + COL.sash, y);
 
     doc.setFont('courier', 'normal');
-    doc.text(fmt(g.glassW), x + 58, y);
-    doc.text(fmt(g.glassH), x + 88, y);
+    doc.text(fmt(g.glassW), x + COL.width, y);
+    doc.text(fmt(g.glassH), x + COL.height, y);
 
     doc.setFont('helvetica', 'normal');
-    doc.text(g.type || '', x + 120, y);
-    doc.text(g.makeup || '', x + 148, y);
-    doc.text(g.spec || '', x + 178, y);
-    doc.text(g.finish || '', x + 210, y);
+    doc.text(g.type || '', x + COL.type, y);
+    doc.text(g.makeup || '—', x + COL.makeup, y);
+    doc.text(g.spec || '', x + COL.spec, y);
+    doc.text(coatingLabel(g.coating), x + COL.coating, y);
+    doc.text(gasLabel(g.gas), x + COL.gas, y);
+    doc.text(g.finish || '', x + COL.finish, y);
     doc.setFontSize(5.5);
-    doc.text(`${g.spacer || ''} · ${g.spacerType === 'alu' ? 'alu' : 'warm'}`, x + 238, y);
+    doc.text(spacerLabel(g), x + COL.spacer, y);
     doc.setFontSize(6);
-    doc.text(g.bars || '', x + 262, y);
+    doc.text(g.bars || 'none', x + COL.bars, y);
 
     y += TABLE_ROW_H;
   });
@@ -251,11 +267,19 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(5);
   tc(doc, C.black);
-  doc.text(`${g.index} · ${g.windowName} — ${g.sash.toUpperCase()} GLASS`, cx + 2, cy + 4);
+  doc.text(`${g.index} · ${g.windowName} — ${String(g.sash || '').toUpperCase()} GLASS`, cx + 2, cy + 4);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(5);
   tc(doc, C.glass);
-  doc.text(`${g.type} / ${g.finish} · spacer: ${g.spacer} (${g.spacerType === 'alu' ? 'aluminium' : 'warm edge'})`, cx + cw - 2, cy + 4, { align: 'right' });
+  const specLine = [
+    `${g.type}${g.makeup ? ' ' + g.makeup : ''}`,
+    g.spec,
+    coatingLabel(g.coating),
+    gasLabel(g.gas),
+    g.finish,
+    `spacer: ${g.spacer} (${g.spacerType === 'alu' ? 'aluminium' : 'warm edge'})`,
+  ].filter(Boolean).join(' · ');
+  doc.text(specLine, cx + cw - 2, cy + 4, { align: 'right' });
   dc(doc, C.black);
   doc.setLineWidth(LW.cellIn);
   doc.line(cx + 0.3, cy + 6, cx + cw - 0.3, cy + 6);
@@ -316,12 +340,16 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
     if (hasGS) doc.restoreGraphicsState();
   }
 
-  // Bars
+  // Bars — only double-hung rows carry the sash frame context needed to place
+  // them. Casement / triple panes have no sash W/H here, so they draw plain.
   const pat = BAR_PATTERNS[g.bars] || BAR_PATTERNS['none'];
-  const bars = computeGlassBarPositions({
-    sashW: g.sashW, sashH: g.sashH, isUpper: g.sash === 'Upper',
-    vCount: pat.v, hCount: pat.h, faces: g.faces,
-  });
+  const canDrawBars = (pat.v > 0 || pat.h > 0) && g.sashW > 0 && g.sashH > 0;
+  const bars = canDrawBars
+    ? computeGlassBarPositions({
+        sashW: g.sashW, sashH: g.sashH, isUpper: !!g.isUpper,
+        vCount: pat.v, hCount: pat.h, faces: g.faces,
+      })
+    : { vBars: [], hBars: [] };
 
   doc.setLineWidth(LW.seal);
 
@@ -457,30 +485,59 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
 
   windowsData.forEach(({ win, windowSpec, derived }) => {
     if (!derived || !windowSpec) return;
+
+    // SINGLE SOURCE OF TRUTH: the same rows the on-screen Glass Schedule shows.
+    // Every value (makeup, coating, gas, spacer, finish, bars) comes from here —
+    // never re-read from windowSpec, or the PDF drifts away from the screen.
+    const gRows = buildGlassListForWindow(derived, windowSpec) || [];
+    if (!gRows.length) return;
+
     const sw = derived.sashWidth;
     const topH = derived.topSashHeight;
     const botH = derived.bottomSashHeight;
-    if (!sw || !topH || !botH) return;
 
-    // SINGLE SOURCE: same rows as the on-screen Glass Schedule (live faces).
-    const gRows = buildGlassListForWindow(derived, windowSpec) || [];
-    const glassW = gRows[0]?.width ?? (sw - CONSTANTS.GLASS_WIDTH_DEDUCTION);
-    const glassHupper = gRows[0]?.height ?? (topH - CONSTANTS.GLASS_HEIGHT_DEDUCTION);
-    const glassHlower = gRows[1]?.height ?? (botH - (CONSTANTS.MEETING_RAIL_WIDTH + CONSTANTS.BOTTOM_RAIL_WIDTH - 25));
+    gRows.forEach((r) => {
+      const w = Number(r.width);
+      const h = Number(r.height);
+      if (!(w > 0) || !(h > 0)) return;
 
-    const type = windowSpec?.glazing?.type || 'double';
-    const spec = windowSpec?.glazing?.spec || 'toughened';
-    const spacer = windowSpec?.glazing?.spacerColour || 'silver';
-    const spacerType = windowSpec?.glazing?.spacerType || 'warm';
-    const makeup = windowSpec?.glazing?.makeup || '4x16x4';
-    const isFrosted = windowSpec?.glazing?.finish === 'frosted';
-    const fLoc = windowSpec?.glazing?.frostedLocation || 'bottom';
-    const grid = windowSpec?.sash?.grid?.mode || 'none';
+      const qty = Math.max(1, Math.round(Number(r.quantity ?? r.qty ?? 1)));
+      const sashKey = String(r.sash || '').toLowerCase();
+      const isUpper = sashKey === 'upper';
+      const isLower = sashKey === 'lower';
+      // Double-hung rows name the sash; casement / triple rows name the location.
+      const sashLabel = sashKey
+        ? sashKey.charAt(0).toUpperCase() + sashKey.slice(1)
+        : (r.location || r.label || '—');
+      // Sash frame context exists for double-hung rows only (used to place bars).
+      const sashH = isUpper ? topH : isLower ? botH : null;
+      const sashW = sashH != null ? sw : null;
 
-    const base = { windowName: win.name, projectNumber: win._projectNumber || '', type, spec, spacer, spacerType, makeup, bars: grid, sashW: sw, faces: derived?.sashDims };
-
-    glassItems.push({ ...base, index: idx++, sash: 'Upper', sashH: topH, glassW, glassH: glassHupper, finish: isFrosted && fLoc === 'both' ? 'frosted' : 'clear' });
-    glassItems.push({ ...base, index: idx++, sash: 'Lower', sashH: botH, glassW, glassH: glassHlower, finish: isFrosted ? 'frosted' : 'clear' });
+      // qty > 1 (casement units) must appear as separate ordered units.
+      for (let n = 0; n < qty; n++) {
+        glassItems.push({
+          index: idx++,
+          windowName: win.name,
+          projectNumber: win._projectNumber || '',
+          sash: sashLabel,
+          isUpper,
+          glassW: w,
+          glassH: h,
+          type: r.type,
+          spec: r.spec,
+          makeup: r.makeup,
+          coating: r.coating,
+          gas: r.gas,
+          finish: r.finish,
+          spacer: r.spacer,
+          spacerType: r.spacerType,
+          bars: r.bars || 'none',
+          sashW,
+          sashH,
+          faces: derived?.sashDims,
+        });
+      }
+    });
   });
 
   if (!glassItems.length) return null;
@@ -494,7 +551,11 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
     companyAddress: companySettings.companyAddress || '',
     companyEmail: companySettings.companyEmail || '',
     batchName: batch?.name || batch?.id || 'Batch',
-    projects: projects.map(p => `${p.number || p.id}${p.name ? ' (' + p.name + ')' : ''}`),
+    // Never fall back to a raw record id — an order sheet must show the project
+    // number the workshop and the glass supplier recognise.
+    projects: projects
+      .map(p => (p.number ? `${p.number}${p.name ? ' (' + p.name + ')' : ''}` : (p.name || '')))
+      .filter(Boolean),
     date: new Date().toLocaleDateString('en-GB'),
     totalUnits: glassItems.length,
     revision: 'A',
