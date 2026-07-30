@@ -133,8 +133,32 @@ export const DEFAULT_CASEMENT_PROFILE = {
 let activeProfile = null;
 let activeCasementProfile = null;
 
+/**
+ * Casement profile schema migration. Stored copies (windowProfileStore
+ * persistence, batch _profileSnapshot.casement) may predate v1/v1.1:
+ * - pre-v1 prototype (raw fields, sashWidth deductions, no geometry/lengths):
+ *   nothing user-set worth keeping — replaced by the current default;
+ * - v1 (missing v1.1 transom-layer keys): missing keys filled from the
+ *   default, existing values preserved.
+ * Without this, deriveCasementWindow crashes on `geometry.land` of undefined
+ * and every consumer sees derived = null (blank tabs).
+ */
+export function migrateCasementProfile(profile) {
+  if (!profile) return null;
+  const D = DEFAULT_CASEMENT_PROFILE;
+  const oldShape = !profile.geometry || !profile.lengths || !profile.elements?.leafStile;
+  if (oldShape) return D;
+  return {
+    ...D, ...profile,
+    elements: { ...D.elements, ...profile.elements },
+    geometry: { ...D.geometry, ...profile.geometry },
+    deductions: { ...D.deductions, ...profile.deductions },
+    lengths: { ...D.lengths, ...profile.lengths },
+  };
+}
+
 export function setActiveCasementProfile(profile) {
-  activeCasementProfile = profile || null;
+  activeCasementProfile = migrateCasementProfile(profile);
 }
 export function getCasementProfile() {
   return activeCasementProfile || DEFAULT_CASEMENT_PROFILE;
@@ -206,7 +230,7 @@ export function withProfiles(sashProfile, casementProfile, fn) {
   const prevSash = activeProfile;
   const prevCas = activeCasementProfile;
   if (sashProfile) activeProfile = normalizeSashProfile(sashProfile);
-  if (casementProfile) activeCasementProfile = casementProfile;
+  if (casementProfile) activeCasementProfile = migrateCasementProfile(casementProfile);
   try { return fn(); } finally {
     activeProfile = prevSash;
     activeCasementProfile = prevCas;
