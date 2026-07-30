@@ -161,11 +161,12 @@ export default function WindowDetailPage() {
           </SpecSection>
           <SpecSection title="Colour">
             <SpecRow label="Mode" value={windowSpec?.color.type} />
-            <ColourRow label="Colour" hex={windowSpec?.color.single} />
-            {windowSpec?.color.type === 'dual' && <>
+            {windowSpec?.color.type === 'dual' ? <>
               <ColourRow label="Exterior" hex={windowSpec?.color.outside} />
               <ColourRow label="Interior" hex={windowSpec?.color.inside} />
-            </>}
+            </> : (
+              <ColourRow label="Colour" hex={windowSpec?.color.single} />
+            )}
           </SpecSection>
           <SpecSection title="Hardware">
             <SpecRow label="Finish" value={windowSpec?.hardware.finish} />

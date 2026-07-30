@@ -101,6 +101,8 @@ export const TRIPLE_LAYOUTS = Object.freeze(['130', '131', '132', '133']);
 // only the default opening differed — opening is now chosen per pane.
 // Codes stay fully valid engine-side (old PSW estimates, pricing, imports).
 export const HIDDEN_DUPLICATES = Object.freeze({
+    '010': 1, // alias of 040L in PSW (same panel + default hinge) — one card is enough
+
   '051L': 1, '051R': 1, '021L': 1, '021R': 1,
   '031L': 1, '031R': 1, '040R': 1, '140R': 1,
 });

@@ -79,7 +79,8 @@ export function kgPerM(faceMm, depthMm) {
 // exclusively from this object — no bare numbers there.
 export const DEFAULT_CASEMENT_PROFILE = {
   frameDepth: 93,   // finished depth of frame / mullion / transom members
-  leafDepth: 57,    // finished depth of all leaf members
+  leafDepth: 57,
+  leafDepthTriple: 61,  // 28mm triple unit needs a deeper rebate    // finished depth of all leaf members
   elements: {
     frameHead:  { face: 57 },
     frameJamb:  { face: 57 },

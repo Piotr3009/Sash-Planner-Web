@@ -33,6 +33,8 @@ const CAS_FAN_BAR_COUNTS = [0, 1, 2].map(n => ({ value: n, label: String(n) }));
 const ROOM_TYPES = [{ value: 'habitable', label: 'Habitable' }, { value: 'kitchen', label: 'Kitchen' }, { value: 'bathroom', label: 'Bathroom' }, { value: 'other', label: 'No vent' }];
 const SOLE_OPTIONS = [{ value: true, label: 'Only window' }, { value: false, label: 'More than one' }];
 const IRON_OPTIONS = [{ value: 'brass', label: 'Brass' }, { value: 'chrome', label: 'Chrome' }, { value: 'stainless', label: 'Stainless' }, { value: 'antique_brass', label: 'Antique Brass' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' }];
+const GAS_OPTIONS = [{ value: 'argon', label: 'Argon' }, { value: 'air', label: 'Air' }];
+const BAR_TYPE_OPTIONS = [{ value: 'astragal', label: 'External astragal (stick-on)' }, { value: 'georgian', label: 'Internal georgian' }];
 const HORN_OPTIONS = [{ value: 'none', label: 'No Horns' }, { value: 'A', label: 'Richmond' }, { value: 'D', label: 'Type D' }];
 const COLOUR_MODES = [{ value: 'single', label: 'Single' }, { value: 'dual', label: 'Dual (Ext/Int)' }];
 
@@ -134,6 +136,8 @@ export default function ConfiguratorPage() {
   const [glassType, setGlassType] = useState('double');
   const [glassSpec, setGlassSpec] = useState('toughened');
   const [glassCoating, setGlassCoating] = useState('standard');
+  const [glassGas, setGlassGas] = useState('argon');
+  const [casBarType, setCasBarType] = useState('astragal');
   const [spacerColor, setSpacerColor] = useState('white');
   const [spacerType, setSpacerType] = useState('warm');
   const [pas24, setPas24] = useState(false);
@@ -195,6 +199,8 @@ export default function ConfiguratorPage() {
     setGlassType(w.glassType || def.glassType || 'double');
     setGlassSpec(w.glassSpec || def.glassSpec || 'toughened');
     setGlassCoating(w.glassCoating || def.glassCoating || 'standard');
+    setGlassGas(w.glassGas || def.glassGas || 'argon');
+    setCasBarType(w.casementBarType || def.casementBarType || 'astragal');
     setSpacerColor(w.spacerColor || def.spacerColor || 'white');
     setSpacerType(w.spacerType || def.spacerType || 'warm');
     setPas24(w.pas24 !== undefined ? !!w.pas24 : (def.pas24 || false));
@@ -241,6 +247,8 @@ export default function ConfiguratorPage() {
         setWoodColorInt(def.woodColorInt || '#F6F6F6');
         setGlassSpec(def.glassSpec || 'toughened');
         setGlassCoating(def.glassCoating || 'standard');
+        setGlassGas(def.glassGas || 'argon');
+        setCasBarType(def.casementBarType || 'astragal');
         setSpacerColor(def.spacerColor || 'white');
         setSpacerType(def.spacerType || 'warm');
         setPas24(def.pas24 || false);
@@ -342,7 +350,7 @@ export default function ConfiguratorPage() {
         casementOpening: 0.3,
         woodColor, woodColorExt: isSingle ? woodColor : woodColorExt,
         woodColorInt: isSingle ? woodColor : woodColorInt, sameColor: isSingle,
-        doubleGlazing: true, spacerColor,
+        doubleGlazing: glassType !== 'triple', spacerColor,
         glassFinish: gFin, trickleVent: 'none', sealColour: 'black',
         sillExtension: 0, ironmongery: iron,
       });
@@ -385,12 +393,11 @@ export default function ConfiguratorPage() {
       colourMode, sameColor: isSingle, ironmongery: iron, ironmongerySlots: ironSlots, doubleGlazing: glassType !== 'single',
       upperGlass: gFin === 'frosted' && frostLoc === 'both' ? 'frosted' : 'clear',
       lowerGlass: gFin === 'frosted' ? 'frosted' : 'clear',
-      glassType, glassSpec, glassCoating, glassFinish: gFin, frostedLocation: frostLoc,
+      glassType, glassSpec, glassCoating, glassGas, casementBarType: casBarType, glassFinish: gFin, frostedLocation: frostLoc,
       spacerColor, spacerType, sashType, splitRatio, headType, openingType: opening,
       ventRoomType, ventSoleWindow,
       frameType, frameDepth, pas24,
       ...(isCasement ? {
-        glassType: 'double', // casement: single 24mm unit for now
         casementLayout: casLayout,
         casementHinges: casHinges ? [...casHinges] : null,
         fanlightHeight: casCalc.hasFan ? casCalc.fanEff : null,
@@ -548,6 +555,9 @@ export default function ConfiguratorPage() {
               <Lbl>Fanlight 2 — horizontal</Lbl><HChips o={CAS_FAN_BAR_COUNTS} v={casFan2HB} c={setCasFan2HB} />
               <Lbl>Fanlight 2 — vertical</Lbl><HChips o={CAS_FAN_BAR_COUNTS} v={casFan2VB} c={setCasFan2VB} />
             </>}
+            {(casHB + casVB + casFanHB + casFanVB + casFan2HB + casFan2VB) > 0 && (
+              <><Lbl>Bar type</Lbl><HChips o={BAR_TYPE_OPTIONS} v={casBarType} c={setCasBarType} /></>
+            )}
           </Sec>}
 
           {isSash && <Sec t="Georgian Bars">
@@ -570,7 +580,7 @@ export default function ConfiguratorPage() {
 
           <Sec t="Glass">
             {isCasement ? (
-              <div className="text-[11px] text-ink-300 mb-2">Type: <span className="text-accent-400 font-medium">24mm (4/16/4)</span> <span className="text-ink-500">— fixed for casement</span></div>
+              <><Lbl>Type</Lbl><HChips o={GLASS_TYPES.filter(g => g.value === 'double' || g.value === 'triple')} v={glassType} c={setGlassType} /></>
             ) : !isSash ? (
               <><Lbl>Type</Lbl><HChips o={GLASS_TYPES.filter(g => g.value === 'double' || g.value === 'double_slim' || g.value === 'triple')} v={glassType} c={setGlassType} /></>
             ) : frameType === 'heritage' ? (
@@ -584,7 +594,9 @@ export default function ConfiguratorPage() {
             {gFin === 'frosted' && <><Lbl>Location</Lbl><HChips o={FROSTED_LOCATIONS} v={frostLoc} c={setFrostLoc} /></>}
             <Lbl>Spacer</Lbl><HChips o={SPACERS} v={spacerColor} c={setSpacerColor} />
             <Lbl>Spacer type</Lbl><HChips o={SPACER_TYPES} v={spacerType} c={setSpacerType} />
-            {hasGasFill && <div className="text-[11px] text-ink-300 mt-1">Gas: <span className="text-accent-400 font-medium">Argon</span> <span className="text-ink-500">— fixed</span></div>}
+            {isCasement ? (
+              <><Lbl>Gas</Lbl><HChips o={GAS_OPTIONS} v={glassGas} c={setGlassGas} /></>
+            ) : (hasGasFill && <div className="text-[11px] text-ink-300 mt-1">Gas: <span className="text-accent-400 font-medium">Argon</span> <span className="text-ink-500">— fixed</span></div>)}
           </Sec>
 
           <Sec t="Horns & Security">
@@ -658,6 +670,9 @@ export default function ConfiguratorPage() {
             {casCalc.hasFan2 && <SR l="Fanlight 2" v={`${casCalc.fan2Eff}mm`} />}
             {casCalc.isTriple && <SR l="Middle" v={casCalc.midEff > 0 ? `${casCalc.midEff}mm` : 'equal'} />}
             <SR l="Bars" v={`${casHB}H × ${casVB}V`} />
+            {(casHB + casVB + casFanHB + casFanVB + casFan2HB + casFan2VB) > 0 && (
+              <SR l="Bar type" v={casBarType === 'astragal' ? 'External astragal' : 'Internal georgian'} />
+            )}
           </SG>}
           {isSash && <SG t="Bars">
             <SR l="Upper" v={uBars} />
@@ -685,7 +700,7 @@ export default function ConfiguratorPage() {
             <SR l="Spec" v={glassSpec} />
             <SR l="Coating" v={(GLASS_COATINGS.find(c => c.value === glassCoating) || {}).label || 'Standard'} />
             <SR l="Finish" v={gFin} />
-            {hasGasFill && <SR l="Gas" v="Argon" />}
+            {(isCasement || hasGasFill) && <SR l="Gas" v={isCasement ? (glassGas === 'argon' ? 'Argon' : 'Air') : 'Argon'} />}
             <SR l="Spacer" v={spacerColor} />
             <SR l="Spacer Type" v={(SPACER_TYPES.find(t => t.value === spacerType) || {}).label || 'Warm Edge'} />
           </SG>

@@ -536,6 +536,8 @@ export const useProjectStore = create((set, get) => ({
       glassCoating: windowConfig.glassCoating || defaults.glassCoating || 'standard',
       ironmongerySlots: windowConfig.ironmongerySlots || defaults.ironmongerySlots || {},
       ventRoomType: windowConfig.ventRoomType || 'habitable',
+      glassGas: windowConfig.glassGas || 'argon',
+      casementBarType: windowConfig.casementBarType || 'astragal',
       ventSoleWindow: windowConfig.ventSoleWindow !== undefined ? windowConfig.ventSoleWindow : true,
       // Casement fields — PSW-compatible names (import/export contract).
       // Added to the whitelist explicitly: spread-only survival is not enough
@@ -648,6 +650,8 @@ export const useProjectStore = create((set, get) => ({
       glassCoating: windowConfig.glassCoating || defaults.glassCoating || 'standard',
       ironmongerySlots: windowConfig.ironmongerySlots || defaults.ironmongerySlots || {},
       ventRoomType: windowConfig.ventRoomType || 'habitable',
+      glassGas: windowConfig.glassGas || 'argon',
+      casementBarType: windowConfig.casementBarType || 'astragal',
       ventSoleWindow: windowConfig.ventSoleWindow !== undefined ? windowConfig.ventSoleWindow : true,
       // Casement fields — PSW-compatible names (import/export contract).
       // Added to the whitelist explicitly: spread-only survival is not enough

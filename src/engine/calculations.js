@@ -571,7 +571,11 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
     const els = p.elements;
     const ded = p.deductions;
     const geo = p.geometry;
-    const fd = p.frameDepth, ld = p.leafDepth;
+    const fd = p.frameDepth;
+    // Triple 28mm units need a deeper leaf rebate: 57 -> 61 (profile-driven).
+    const ld = windowSpec.glazing?.type === 'triple'
+        ? (p.leafDepthTriple || p.leafDepth)
+        : p.leafDepth;
     const r1 = (v) => Math.round(v / p.rounding) * p.rounding / 1;
     const R = (v) => Math.round(v * 10) / 10; // one decimal, CNC-ready
 

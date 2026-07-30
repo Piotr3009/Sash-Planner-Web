@@ -147,6 +147,7 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       fanlightHeight: item?.fanlightHeight ?? fc.fanlightHeight ?? null,
       fan2Height: item?.casementFan2Height ?? fc.casementFan2Height ?? null,
       middleWidth: Number(item?.casementMiddleWidth ?? fc.casementMiddleWidth) || 0,
+      barType: item?.casementBarType || fc.casementBarType || 'astragal',
       bars: {
         h: Number(item?.casementHBars ?? fc.casementHBars) || 0,
         v: Number(item?.casementVBars ?? fc.casementVBars) || 0,
@@ -180,7 +181,7 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       finish: glassFinish,
       frostedLocation,
       coating: item?.glassCoating || fc.glassCoating || 'standard',
-      gas: glassGas(glassType),
+      gas: item?.glassGas ?? fc.glassGas ?? glassGas(glassType),
       thickness: GLASS_THICKNESS[glassType] ?? 24,
       // Explicit per-window override only; otherwise undefined so consumers
       // fall back to the workshop profile's glassMakeup (live, snapshot-aware).
