@@ -6,6 +6,12 @@ import IronmongeryPickerModal from '../components/IronmongeryPickerModal.jsx';
 import { GLASS_TYPES, GLASS_SPECS, GLASS_COATINGS, GLASS_FINISHES, FROSTED_LOCATIONS, SPACERS, SPACER_TYPES, SWATCHES, RAL_GROUPS, FB_GROUPS } from '../config.js';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
 import { buildVentGrilles } from '../engine/lists.js';
+import CasementLayoutPicker from '../components/configurator/CasementLayoutPicker.jsx';
+import {
+  LAYOUT_DEFAULTS as CAS_LAYOUT_DEFAULTS,
+  FANLIGHT_LAYOUTS, FAN2_LAYOUTS, TRIPLE_LAYOUTS,
+  CASEMENT_GEO_DEFAULTS,
+} from '../engine/casementLayouts.js';
 
 const Viewer3D = lazy(() => import('../3d/App.jsx'));
 
@@ -22,6 +28,8 @@ const SPLIT_RATIOS = [
 ];
 const HEAD_TYPES = [{ value: 'flat', label: 'Flat' }, { value: 'arch', label: 'Arch' }];
 const OPENINGS = [{ value: 'both', label: 'Both Open' }, { value: 'bottom', label: 'Bottom Only' }, { value: 'fixed', label: 'Fixed' }];
+const CAS_BAR_COUNTS = [0, 1, 2, 3, 4].map(n => ({ value: n, label: String(n) }));
+const CAS_FAN_BAR_COUNTS = [0, 1, 2].map(n => ({ value: n, label: String(n) }));
 const ROOM_TYPES = [{ value: 'habitable', label: 'Habitable' }, { value: 'kitchen', label: 'Kitchen' }, { value: 'bathroom', label: 'Bathroom' }, { value: 'other', label: 'No vent' }];
 const SOLE_OPTIONS = [{ value: true, label: 'Only window' }, { value: false, label: 'More than one' }];
 const IRON_OPTIONS = [{ value: 'brass', label: 'Brass' }, { value: 'chrome', label: 'Chrome' }, { value: 'stainless', label: 'Stainless' }, { value: 'antique_brass', label: 'Antique Brass' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' }];
@@ -130,6 +138,19 @@ export default function ConfiguratorPage() {
   const [spacerType, setSpacerType] = useState('warm');
   const [pas24, setPas24] = useState(false);
 
+  // Casement state — field names match PSW payload 1:1 (import/export contract)
+  const [casLayout, setCasLayout] = useState('040L');
+  const [casHinges, setCasHinges] = useState(null);
+  const [fanMm, setFanMm] = useState('');
+  const [fan2Mm, setFan2Mm] = useState('');
+  const [midMm, setMidMm] = useState('');
+  const [casHB, setCasHB] = useState(0);
+  const [casVB, setCasVB] = useState(0);
+  const [casFanHB, setCasFanHB] = useState(0);
+  const [casFanVB, setCasFanVB] = useState(0);
+  const [casFan2HB, setCasFan2HB] = useState(0);
+  const [casFan2VB, setCasFan2VB] = useState(0);
+
   // Frame choice drives glass type; heritage opens a passive/single choice instead.
   const changeFrame = (v) => {
     setFrameType(v);
@@ -177,6 +198,18 @@ export default function ConfiguratorPage() {
     setSpacerColor(w.spacerColor || def.spacerColor || 'white');
     setSpacerType(w.spacerType || def.spacerType || 'warm');
     setPas24(w.pas24 !== undefined ? !!w.pas24 : (def.pas24 || false));
+    // Casement fields (harmless no-ops for sash windows)
+    setCasLayout(w.casementLayout || '040L');
+    setCasHinges(Array.isArray(w.casementHinges) ? w.casementHinges : null);
+    setFanMm(w.fanlightHeight ?? '');
+    setFan2Mm(w.casementFan2Height ?? '');
+    setMidMm(w.casementMiddleWidth || '');
+    setCasHB(w.casementHBars || 0);
+    setCasVB(w.casementVBars || 0);
+    setCasFanHB(w.casementFanHBars || 0);
+    setCasFanVB(w.casementFanVBars || 0);
+    setCasFan2HB(w.casementFan2HBars || 0);
+    setCasFan2VB(w.casementFan2VBars || 0);
   }, [def]);
 
   // Prefill form when editing an existing window
@@ -250,10 +283,71 @@ export default function ConfiguratorPage() {
   const extW = Number(inW) || 400;
   const extH = Number(inH) || 400;
   const effectiveLBars = sameBars ? uBars : lBars;
+  const isCasement = batch?.type === 'casement';
+
+  // Casement effective values — PSW clamps 1:1: fanlight 15–50% innerH step 10,
+  // fan2 shares a 70% guard with fanlight, middle 300..(W-600) step 10.
+  const casCalc = useMemo(() => {
+    const innerH = extH - CASEMENT_GEO_DEFAULTS.frameFace - CASEMENT_GEO_DEFAULTS.bottomFace;
+    const fMin = Math.ceil(innerH * 0.15 / 10) * 10;
+    const fMax = Math.min(800, Math.floor(innerH * 0.5 / 10) * 10);
+    const rawFan = Number(fanMm);
+    let fanEff = Math.round((rawFan > 0 ? rawFan : innerH * 0.3) / 10) * 10;
+    fanEff = Math.max(fMin, Math.min(fMax, fanEff));
+    const guardMax = Math.floor((innerH * 0.7 - fanEff) / 10) * 10;
+    const f2Min = fMin;
+    const f2Max = Math.min(fMax, Math.max(f2Min, guardMax));
+    const rawFan2 = Number(fan2Mm);
+    let fan2Eff = Math.round((rawFan2 > 0 ? rawFan2 : innerH * 0.33) / 10) * 10;
+    fan2Eff = Math.max(f2Min, Math.min(f2Max, fan2Eff));
+    const midMax = Math.floor((extW - 600) / 10) * 10;
+    const rawMid = Number(midMm);
+    const midEff = rawMid > 0 ? Math.max(300, Math.min(midMax, Math.round(rawMid / 10) * 10)) : 0;
+    return {
+      innerH, fMin, fMax, fanEff, f2Min, f2Max, fan2Eff, midMax, midEff,
+      hasFan: FANLIGHT_LAYOUTS.includes(casLayout),
+      hasFan2: FAN2_LAYOUTS.includes(casLayout),
+      isTriple: TRIPLE_LAYOUTS.includes(casLayout),
+      fanRatio: Math.max(0.15, Math.min(0.5, fanEff / innerH)),
+      fan2Ratio: Math.max(0.15, Math.min(0.5, fan2Eff / innerH)),
+    };
+  }, [extW, extH, fanMm, fan2Mm, midMm, casLayout]);
+
+  // Layout picker apply: PSW behaviour — new layout sets its default frame
+  // dimensions and resets fanlight/fan2/middle to auto.
+  const applyCasementLayout = (code, hingesArr) => {
+    setCasLayout(code);
+    setCasHinges(hingesArr);
+    const d = CAS_LAYOUT_DEFAULTS[code];
+    if (d) { setInW(d.w); setInH(d.h); }
+    setFanMm(''); setFan2Mm(''); setMidMm('');
+  };
 
   // ─── 3D sync ───
   const sync = useCallback(() => {
     if (typeof window.update3D !== 'function') return;
+    if (isCasement) {
+      window.update3D({
+        windowCategory: 'casement', extWidth: extW, extHeight: extH,
+        casementLayout: casLayout,
+        casementHinges: casHinges ? [...casHinges] : null,
+        casementMiddleWidth: casCalc.isTriple ? casCalc.midEff : 0,
+        fanlightRatio: casCalc.fanRatio,
+        casementFan2Ratio: casCalc.fan2Ratio,
+        casementHBars: casHB, casementVBars: casVB,
+        casementFanHBars: casCalc.hasFan ? Math.min(2, casFanHB) : 0,
+        casementFanVBars: casCalc.hasFan ? Math.min(2, casFanVB) : 0,
+        casementFan2HBars: casCalc.hasFan2 ? Math.min(2, casFan2HB) : 0,
+        casementFan2VBars: casCalc.hasFan2 ? Math.min(2, casFan2VB) : 0,
+        casementOpening: 0.3,
+        woodColor, woodColorExt: isSingle ? woodColor : woodColorExt,
+        woodColorInt: isSingle ? woodColor : woodColorInt, sameColor: isSingle,
+        doubleGlazing: glassType !== 'single', spacerColor,
+        glassFinish: gFin, trickleVent: 'none', sealColour: 'black',
+        sillExtension: 0, ironmongery: iron,
+      });
+      return;
+    }
     window.update3D({
       windowCategory: batch?.type || 'sash', extWidth: extW, extHeight: extH,
       upperBars: uBars, lowerBars: effectiveLBars, sameBars,
@@ -268,7 +362,7 @@ export default function ConfiguratorPage() {
       spacerColor, sashType, splitRatio, headType, openingType: opening,
       boxType: frameType === 'slim' ? 'slim' : 'standard', boxDepth: frameDepth,
     });
-  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type]);
+  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB]);
   useEffect(() => { sync(); }, [sync]);
 
   // ─── B4: Listen for 3D ready event and re-sync ───
@@ -295,6 +389,16 @@ export default function ConfiguratorPage() {
       spacerColor, spacerType, sashType, splitRatio, headType, openingType: opening,
       ventRoomType, ventSoleWindow,
       frameType, frameDepth, pas24,
+      ...(isCasement ? {
+        casementLayout: casLayout,
+        casementHinges: casHinges ? [...casHinges] : null,
+        fanlightHeight: casCalc.hasFan ? casCalc.fanEff : null,
+        casementFan2Height: casCalc.hasFan2 ? casCalc.fan2Eff : null,
+        casementMiddleWidth: casCalc.isTriple ? casCalc.midEff : 0,
+        casementHBars: casHB, casementVBars: casVB,
+        casementFanHBars: Math.min(2, casFanHB), casementFanVBars: Math.min(2, casFanVB),
+        casementFan2HBars: Math.min(2, casFan2HB), casementFan2VBars: Math.min(2, casFan2VB),
+      } : {}),
     };
 
     if (isEditMode) {
@@ -359,6 +463,15 @@ export default function ConfiguratorPage() {
             </div>
           )}
 
+          {isCasement && <Sec t="Window Type">
+            <CasementLayoutPicker
+              layout={casLayout}
+              casementHinges={casHinges}
+              dims={{ w: extW, h: extH, fanMm: casCalc.fanEff, fan2Mm: casCalc.fan2Eff, middleMm: casCalc.midEff }}
+              onApply={applyCasementLayout}
+            />
+          </Sec>}
+
           {isSash && <Sec t="Sash Type">
             <HChips o={SASH_TYPES} v={sashType} c={setSashType} />
             {sashType === 'triple' && <select value={splitRatio} onChange={e => setSplitRatio(e.target.value)} className="w-full px-3 py-2 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs mb-2">{SPLIT_RATIOS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}</select>}
@@ -391,7 +504,50 @@ export default function ConfiguratorPage() {
                   className="w-full px-3 py-2 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
               </div>
             </div>
+            {isCasement && casCalc.hasFan && <>
+              <Lbl>Fanlight height (mm) <span className="text-ink-500">({casCalc.fMin}–{casCalc.fMax})</span></Lbl>
+              <input type="number" min={casCalc.fMin} max={casCalc.fMax} step={10}
+                value={fanMm === '' ? casCalc.fanEff : fanMm}
+                onChange={e => setFanMm(e.target.value === '' ? '' : Number(e.target.value))}
+                onBlur={() => setFanMm(casCalc.fanEff)}
+                className="w-full px-3 py-2 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+            </>}
+            {isCasement && casCalc.hasFan2 && <>
+              <Lbl>Fanlight 2 height (mm) <span className="text-ink-500">({casCalc.f2Min}–{casCalc.f2Max})</span></Lbl>
+              <input type="number" min={casCalc.f2Min} max={casCalc.f2Max} step={10}
+                value={fan2Mm === '' ? casCalc.fan2Eff : fan2Mm}
+                onChange={e => setFan2Mm(e.target.value === '' ? '' : Number(e.target.value))}
+                onBlur={() => setFan2Mm(casCalc.fan2Eff)}
+                className="w-full px-3 py-2 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+            </>}
+            {isCasement && casCalc.isTriple && <>
+              <Lbl>Middle section (mm) <span className="text-ink-500">(300–{casCalc.midMax}, empty = equal)</span></Lbl>
+              <input type="number" min={300} max={casCalc.midMax} step={10}
+                value={midMm}
+                placeholder="Equal split"
+                onChange={e => setMidMm(e.target.value === '' ? '' : Number(e.target.value))}
+                onBlur={() => setMidMm(casCalc.midEff > 0 ? casCalc.midEff : '')}
+                className="w-full px-3 py-2 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+              <div className="text-[11px] text-ink-300 mt-1">
+                Sides: <span className="text-accent-400 font-medium">
+                  {casCalc.midEff > 0 ? `${Math.round((extW - casCalc.midEff) / 2)}mm each` : 'equal split'}
+                </span>
+              </div>
+            </>}
           </Sec>
+
+          {isCasement && <Sec t="Glazing Bars">
+            <Lbl>Main — horizontal</Lbl><HChips o={CAS_BAR_COUNTS} v={casHB} c={setCasHB} />
+            <Lbl>Main — vertical</Lbl><HChips o={CAS_BAR_COUNTS} v={casVB} c={setCasVB} />
+            {casCalc.hasFan && <>
+              <Lbl>Fanlight — horizontal</Lbl><HChips o={CAS_FAN_BAR_COUNTS} v={casFanHB} c={setCasFanHB} />
+              <Lbl>Fanlight — vertical</Lbl><HChips o={CAS_FAN_BAR_COUNTS} v={casFanVB} c={setCasFanVB} />
+            </>}
+            {casCalc.hasFan2 && <>
+              <Lbl>Fanlight 2 — horizontal</Lbl><HChips o={CAS_FAN_BAR_COUNTS} v={casFan2HB} c={setCasFan2HB} />
+              <Lbl>Fanlight 2 — vertical</Lbl><HChips o={CAS_FAN_BAR_COUNTS} v={casFan2VB} c={setCasFan2VB} />
+            </>}
+          </Sec>}
 
           {isSash && <Sec t="Georgian Bars">
             <Lbl>Upper</Lbl><GChips o={BAR_OPTIONS} v={uBars} c={v => { setUBars(v); if (sameBars) setLBars(v); }} />
@@ -400,7 +556,7 @@ export default function ConfiguratorPage() {
             {!sameBars && <><Lbl>Lower</Lbl><GChips o={BAR_OPTIONS} v={lBars} c={setLBars} />{lBars === 'custom' && <CBarEd bars={lCustom} maxVal={extW} onAdd={type => addBar(setLCustom, lCustom, type)} onChange={(i, v) => updateBarMm(setLCustom, lCustom, i, v)} onFinalize={i => finalizeBarMm(setLCustom, lCustom, i)} onRemove={i => removeBar(setLCustom, lCustom, i)} />}</>}
           </Sec>}
 
-          <Sec t="Opening"><HChips o={OPENINGS} v={opening} c={setOpening} /></Sec>
+          {isSash && <Sec t="Opening"><HChips o={OPENINGS} v={opening} c={setOpening} /></Sec>}
 
           <Sec t="Ventilation">
             <Lbl>Room type</Lbl>
@@ -492,12 +648,20 @@ export default function ConfiguratorPage() {
           <div className="px-4 py-2 bg-surface-700 border-b border-surface-500 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Specification</div>
           <SG t="Dimensions"><SR l="Frame" v={`${extW} × ${extH}`} /><SR l="Depth" v={`${frameDepth}mm`} /></SG>
           {isSash && <SG t="Product"><SR l="Sash" v={sashType} /><SR l="Head" v={headType} /></SG>}
-          <SG t="Bars">
+          {isCasement && <SG t="Layout">
+            <SR l="Type" v={casLayout} />
+            <SR l="Openers" v={casHinges ? String(casHinges.filter(h => h === true || (typeof h === 'string' && h !== 'fixed')).length) : '—'} />
+            {casCalc.hasFan && <SR l="Fanlight" v={`${casCalc.fanEff}mm`} />}
+            {casCalc.hasFan2 && <SR l="Fanlight 2" v={`${casCalc.fan2Eff}mm`} />}
+            {casCalc.isTriple && <SR l="Middle" v={casCalc.midEff > 0 ? `${casCalc.midEff}mm` : 'equal'} />}
+            <SR l="Bars" v={`${casHB}H × ${casVB}V`} />
+          </SG>}
+          {isSash && <SG t="Bars">
             <SR l="Upper" v={uBars} />
             {uBars === 'custom' && uCustom.length > 0 && <div className="px-4 py-0.5 text-[10px] text-accent-400">{formatBars(uCustom)}</div>}
             {!sameBars && <SR l="Lower" v={lBars} />}
             {!sameBars && lBars === 'custom' && lCustom.length > 0 && <div className="px-4 py-0.5 text-[10px] text-accent-400">{formatBars(lCustom)}</div>}
-          </SG>
+          </SG>}
           <SG t="Frame & Horns">
             <SR l="Frame" v={`${frameType} · ${frameDepth}mm`} />
             {isSash && <SR l="Horns" v={horn} />}
@@ -522,7 +686,7 @@ export default function ConfiguratorPage() {
             <SR l="Spacer" v={spacerColor} />
             <SR l="Spacer Type" v={(SPACER_TYPES.find(t => t.value === spacerType) || {}).label || 'Warm Edge'} />
           </SG>
-          <SG t="Opening"><SR l="Type" v={opening} /></SG>
+          {isSash && <SG t="Opening"><SR l="Type" v={opening} /></SG>}
           <SG t="Hardware">
             <SR l="PAS24" v={pas24 ? 'Yes' : 'No'} />
             <SR l="Ironmongery" v={iron} />

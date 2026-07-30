@@ -537,6 +537,20 @@ export const useProjectStore = create((set, get) => ({
       ironmongerySlots: windowConfig.ironmongerySlots || defaults.ironmongerySlots || {},
       ventRoomType: windowConfig.ventRoomType || 'habitable',
       ventSoleWindow: windowConfig.ventSoleWindow !== undefined ? windowConfig.ventSoleWindow : true,
+      // Casement fields — PSW-compatible names (import/export contract).
+      // Added to the whitelist explicitly: spread-only survival is not enough
+      // for edit-mode prefill, which reads top-level fields.
+      casementLayout: windowConfig.casementLayout || '040L',
+      casementHinges: Array.isArray(windowConfig.casementHinges) ? windowConfig.casementHinges : null,
+      fanlightHeight: windowConfig.fanlightHeight ?? null,
+      casementFan2Height: windowConfig.casementFan2Height ?? null,
+      casementMiddleWidth: windowConfig.casementMiddleWidth || 0,
+      casementHBars: windowConfig.casementHBars || 0,
+      casementVBars: windowConfig.casementVBars || 0,
+      casementFanHBars: windowConfig.casementFanHBars || 0,
+      casementFanVBars: windowConfig.casementFanVBars || 0,
+      casementFan2HBars: windowConfig.casementFan2HBars || 0,
+      casementFan2VBars: windowConfig.casementFan2VBars || 0,
       // Full specification JSON for calculations engine
       specification: JSON.stringify({
         windowType: batch.type,
@@ -635,6 +649,20 @@ export const useProjectStore = create((set, get) => ({
       ironmongerySlots: windowConfig.ironmongerySlots || defaults.ironmongerySlots || {},
       ventRoomType: windowConfig.ventRoomType || 'habitable',
       ventSoleWindow: windowConfig.ventSoleWindow !== undefined ? windowConfig.ventSoleWindow : true,
+      // Casement fields — PSW-compatible names (import/export contract).
+      // Added to the whitelist explicitly: spread-only survival is not enough
+      // for edit-mode prefill, which reads top-level fields.
+      casementLayout: windowConfig.casementLayout || '040L',
+      casementHinges: Array.isArray(windowConfig.casementHinges) ? windowConfig.casementHinges : null,
+      fanlightHeight: windowConfig.fanlightHeight ?? null,
+      casementFan2Height: windowConfig.casementFan2Height ?? null,
+      casementMiddleWidth: windowConfig.casementMiddleWidth || 0,
+      casementHBars: windowConfig.casementHBars || 0,
+      casementVBars: windowConfig.casementVBars || 0,
+      casementFanHBars: windowConfig.casementFanHBars || 0,
+      casementFanVBars: windowConfig.casementFanVBars || 0,
+      casementFan2HBars: windowConfig.casementFan2HBars || 0,
+      casementFan2VBars: windowConfig.casementFan2VBars || 0,
       specification: JSON.stringify({
         windowType: batch.type,
         width: (windowConfig.extWidth || existing.width) - 104,
