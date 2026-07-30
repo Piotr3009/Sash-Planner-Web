@@ -14,6 +14,8 @@ import { useWindowProfileStore } from '../stores/windowProfileStore.js';
 import ImageLightbox from '../components/ImageLightbox.jsx';
 import DrawingsPanel from '../components/drawings/DrawingsPanel.jsx';
 import GlassDrawing2D from '../components/drawings/GlassDrawing2D.jsx';
+import CasementGlassDrawing2D from '../components/drawings/CasementGlassDrawing2D.jsx';
+import { groupCasementGlass } from '../components/drawings/casementDrawUtils.js';
 import CutListPanel from '../components/dashboard/CutListPanel.jsx';
 import PreCutPanel from '../components/dashboard/PreCutPanel.jsx';
 import ThreeDPanel from '../components/dashboard/ThreeDPanel.jsx';
@@ -212,16 +214,6 @@ function GlassPanel({ item, windowSpec, derived, batch, settings }) {
       <div className="card p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="text-sm font-semibold text-ink-50">Glass Schedule</div>
-          {/* TEMP DEBUG — engine glass units next to the table; remove after verification */}
-          {derived && (() => {
-            const sd = derived.sashDims || {};
-            const R2 = 2 * 12.5;
-            const st = Number(sd.stile) || 57, tp = Number(sd.topRail) || 57, mt = Number(sd.meetingRail) || 43, bt = Number(sd.bottomRail) || 90;
-            const w = Math.round((derived.sashWidth - (2 * st - R2)) * 100) / 100;
-            const uH = Math.round((derived.topSashHeight - (tp + mt - R2)) * 100) / 100;
-            const lH = Math.round((derived.bottomSashHeight - (mt + bt - R2)) * 100) / 100;
-            return <div className="text-[11px] text-amber-400">TEMP · engine units: {w} × {uH} (upper) · {w} × {lH} (lower) {uH === lH ? '· equal ✓' : '· NOT EQUAL ✗'}</div>;
-          })()}
           <button onClick={handleExport} className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors">
             📄 Export PDF
           </button>
@@ -264,17 +256,30 @@ function GlassPanel({ item, windowSpec, derived, batch, settings }) {
         </div>
       </div>
 
-      {/* Glass drawings — upper + lower */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="card p-4">
-          <div className="text-xs font-semibold text-ink-200 mb-2">Upper Glass</div>
-          <GlassDrawing2D windowSpec={windowSpec} derived={derived} type="upper" />
+      {/* Glass drawings — per sash (upper/lower) or per unique casement unit */}
+      {(windowSpec?.category || 'sash') === 'casement' ? (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {groupCasementGlass(derived).map((gp) => (
+            <div key={gp.key} className="card p-4">
+              <div className="text-xs font-semibold text-ink-200 mb-2">
+                Glass {gp.w} × {gp.h} · ×{gp.panes.length}
+              </div>
+              <CasementGlassDrawing2D windowSpec={windowSpec} derived={derived} group={gp} />
+            </div>
+          ))}
         </div>
-        <div className="card p-4">
-          <div className="text-xs font-semibold text-ink-200 mb-2">Lower Glass</div>
-          <GlassDrawing2D windowSpec={windowSpec} derived={derived} type="lower" />
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="card p-4">
+            <div className="text-xs font-semibold text-ink-200 mb-2">Upper Glass</div>
+            <GlassDrawing2D windowSpec={windowSpec} derived={derived} type="upper" />
+          </div>
+          <div className="card p-4">
+            <div className="text-xs font-semibold text-ink-200 mb-2">Lower Glass</div>
+            <GlassDrawing2D windowSpec={windowSpec} derived={derived} type="lower" />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

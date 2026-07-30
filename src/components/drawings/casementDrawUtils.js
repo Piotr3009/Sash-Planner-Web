@@ -44,3 +44,21 @@ export function paneTitle(group) {
   const list = group.panes.map((p) => `P${p.index + 1}`).join(', ');
   return group.panes.length > 1 ? `${group.role} ×${group.panes.length} (${list})` : `${group.role} — ${list}`;
 }
+
+/** Unique glass sizes → one factory drawing per size; pane labels listed. */
+export function groupCasementGlass(derived) {
+  const cas = derived?.casement;
+  if (!cas?.leaves) return [];
+  const groups = [];
+  cas.leaves.forEach((mm, i) => {
+    const pn = cas.layoutDef.panels[i];
+    const u = derived.customGlassUnits?.[i];
+    const w = u?.width, h = u?.height;
+    if (!w || !h) return;
+    const key = `${w}x${h}`;
+    let g = groups.find((x) => x.key === key);
+    if (!g) { g = { key, w, h, rep: i, panes: [] }; groups.push(g); }
+    g.panes.push(`P${i + 1} ${pn.hinge === 'fixed' ? 'fixed' : pn.hinge}`);
+  });
+  return groups;
+}

@@ -45,6 +45,8 @@ import FrontElevation2D from '../components/drawings/FrontElevation2D.jsx';
 import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
 import SashDetail2D from '../components/drawings/SashDetail2D.jsx';
 import GlassDrawing2D from '../components/drawings/GlassDrawing2D.jsx';
+import CasementGlassDrawing2D from '../components/drawings/CasementGlassDrawing2D.jsx';
+import { groupCasementGlass } from '../components/drawings/casementDrawUtils.js';
 import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 import Window3DCaptureRig from '../components/viewer/Window3DCaptureRig.jsx';
 import ImageLightbox from '../components/ImageLightbox.jsx';
@@ -1083,7 +1085,16 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) 
 
       {/* Glass drawings per window — upper + lower */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {windowsData.flatMap(({ win, windowSpec, derived }) => [
+        {windowsData.flatMap(({ win, windowSpec, derived }) => (windowSpec?.category || 'sash') === 'casement'
+          ? groupCasementGlass(derived).map((gp) => (
+            <div key={`${win.id}-${gp.key}`} className="card p-4">
+              <div className="text-xs font-semibold text-ink-200 mb-2">
+                {isPPMode && win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — Glass {gp.w} × {gp.h} · ×{gp.panes.length}
+              </div>
+              <CasementGlassDrawing2D windowSpec={windowSpec} derived={derived} group={gp} />
+            </div>
+          ))
+          : [
           <div key={`${win.id}-upper`} className="card p-4">
             <div className="text-xs font-semibold text-ink-200 mb-2">
               {isPPMode && win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — Upper Glass
