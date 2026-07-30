@@ -9,7 +9,7 @@
  */
 import { useMemo } from 'react';
 import { getCasementProfile } from '../../engine/profile.js';
-import { DimChainH, DimChainV, DimH, DimV, TitleBlock, Label, tfs } from './drawingUtils.jsx';
+import { DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
@@ -51,7 +51,7 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
   const X = (x) => ox + x;
   const Y = (y) => oy + y;
   const ts = totalW / VIEWBOX_REF;
-  const annFs = tfs(SIZES.annotation, totalW);
+  const annFs = tfs(SIZES.code, totalW);
 
   const landRect = {
     x: X(g.land), y: Y(g.land),
@@ -74,7 +74,7 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
   const winName = windowSpec?.name || 'Window';
   const projNum = projectNumber || '';
   const titleText = `Frame Detail${projNum ? ` — ${projNum}` : ''} — ${winName}`;
-  const subtitleText = `C-H ${fmt(fw)} · C-CILL ${fmt(fw)} · C-J ×2 ${fmt(fh)} · frame ${geom.secF} · cill ${geom.secC}`;
+  const subtitleText = `C-H ${fmt(fw)} · C-CILL ${fmt(fw)} · C-J ×2 ${fmt(fh)}`;
 
   return (
     <div className="w-full">
@@ -107,7 +107,7 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
             <text x={X(mu.axisX)} y={Y(fh * 0.32) + i * annFs * 1.3} fill={COLORS.label}
               fontSize={annFs} fontFamily={FONT_FAMILY} textAnchor="middle"
               fontWeight={WEIGHTS.label} transform={`rotate(-90, ${X(mu.axisX) - annFs * 0.9}, ${Y(fh * 0.32)})`}>
-              {`${mu.code} ${fmt(mu.length)} · ${geom.secM}${mu.full ? '' : ' · partial'}`}
+              {`${mu.code} ${fmt(mu.length)}${mu.full ? '' : ' · partial'}`}
             </text>
           </g>
         ))}
@@ -124,23 +124,25 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
             <text x={X((tr.x1 + tr.x2) / 2)} y={Y(tr.bandTop) - annFs * 0.6}
               fill={COLORS.label} fontSize={annFs} fontFamily={FONT_FAMILY}
               textAnchor="middle" fontWeight={WEIGHTS.label}>
-              {`${tr.code} ${fmt(tr.length)} · ${geom.secM}`}
+              {`${tr.code} ${fmt(tr.length)}`}
             </text>
           </g>
         ))}
 
         {/* ── Frame member codes ── */}
-        <Label x={X(fw / 2)} y={Y(g.land / 2) + annFs * 0.35} text={`C-H ${fmt(fw)} · ${geom.secF}`} vbw={totalW} />
-        <Label x={X(fw / 2)} y={Y(fh - g.cillVisible / 2) + annFs * 0.35} text={`C-CILL ${fmt(fw)} · ${geom.secC}`} vbw={totalW} />
+        <text x={X(fw / 2)} y={Y(g.land / 2) + annFs * 0.35} fill={COLORS.label} fontSize={annFs}
+          fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>{`C-H ${fmt(fw)}`}</text>
+        <text x={X(fw / 2)} y={Y(fh - g.cillVisible / 2) + annFs * 0.35} fill={COLORS.label} fontSize={annFs}
+          fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>{`C-CILL ${fmt(fw)}`}</text>
         <text x={X(g.land / 2)} y={Y(fh / 2)} fill={COLORS.label} fontSize={annFs}
           fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
           transform={`rotate(-90, ${X(g.land / 2)}, ${Y(fh / 2)})`}>
-          {`C-J/L ${fmt(fh)} · ${geom.secF}`}
+          {`C-J/L ${fmt(fh)}`}
         </text>
         <text x={X(fw - g.land / 2)} y={Y(fh / 2)} fill={COLORS.label} fontSize={annFs}
           fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
           transform={`rotate(-90, ${X(fw - g.land / 2)}, ${Y(fh / 2)})`}>
-          {`C-J/R ${fmt(fh)} · ${geom.secF}`}
+          {`C-J/R ${fmt(fh)}`}
         </text>
 
         {/* ── AXIS DIMS ── */}

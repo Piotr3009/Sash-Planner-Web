@@ -49,6 +49,7 @@ export const SIZES = {
   title:       24,
   subtitle:    18,
   annotation:  17,
+  code:        13,   // element code labels on casement frame detail
   notch:       14,
 };
 
