@@ -33,6 +33,9 @@ const CAS_FAN_BAR_COUNTS = [0, 1, 2].map(n => ({ value: n, label: String(n) }));
 const ROOM_TYPES = [{ value: 'habitable', label: 'Habitable' }, { value: 'kitchen', label: 'Kitchen' }, { value: 'bathroom', label: 'Bathroom' }, { value: 'other', label: 'No vent' }];
 const SOLE_OPTIONS = [{ value: true, label: 'Only window' }, { value: false, label: 'More than one' }];
 const IRON_OPTIONS = [{ value: 'brass', label: 'Brass' }, { value: 'chrome', label: 'Chrome' }, { value: 'stainless', label: 'Stainless' }, { value: 'antique_brass', label: 'Antique Brass' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' }];
+const SEAL_OPTIONS = [{ value: 'black', label: 'Black' }, { value: 'white', label: 'White' }];
+const SILL_OPTIONS = [{ value: 0, label: 'None' }, { value: 35, label: '35mm' }, { value: 60, label: '60mm' }, { value: 85, label: '85mm' }];
+const SILL_WIDER_OPTIONS = [{ value: false, label: 'No' }, { value: true, label: 'Yes (+50mm each side)' }];
 const GAS_OPTIONS = [{ value: 'argon', label: 'Argon' }, { value: 'air', label: 'Air' }];
 const BAR_TYPE_OPTIONS = [{ value: 'astragal', label: 'External astragal (stick-on)' }, { value: 'georgian', label: 'Internal georgian' }];
 const HORN_OPTIONS = [{ value: 'none', label: 'No Horns' }, { value: 'A', label: 'Richmond' }, { value: 'D', label: 'Type D' }];
@@ -138,6 +141,9 @@ export default function ConfiguratorPage() {
   const [glassCoating, setGlassCoating] = useState('standard');
   const [glassGas, setGlassGas] = useState('argon');
   const [casBarType, setCasBarType] = useState('astragal');
+  const [sealColour, setSealColour] = useState('black');
+  const [sillExt, setSillExt] = useState(0);
+  const [sillWider, setSillWider] = useState(false);
   const [spacerColor, setSpacerColor] = useState('white');
   const [spacerType, setSpacerType] = useState('warm');
   const [pas24, setPas24] = useState(false);
@@ -201,6 +207,9 @@ export default function ConfiguratorPage() {
     setGlassCoating(w.glassCoating || def.glassCoating || 'standard');
     setGlassGas(w.glassGas || def.glassGas || 'argon');
     setCasBarType(w.casementBarType || def.casementBarType || 'astragal');
+    setSealColour(w.sealColour || def.sealColour || 'black');
+    setSillExt(Number(w.sillExtension ?? def.sillExtension) || 0);
+    setSillWider(!!(w.sillWider ?? def.sillWider));
     setSpacerColor(w.spacerColor || def.spacerColor || 'white');
     setSpacerType(w.spacerType || def.spacerType || 'warm');
     setPas24(w.pas24 !== undefined ? !!w.pas24 : (def.pas24 || false));
@@ -249,6 +258,9 @@ export default function ConfiguratorPage() {
         setGlassCoating(def.glassCoating || 'standard');
         setGlassGas(def.glassGas || 'argon');
         setCasBarType(def.casementBarType || 'astragal');
+        setSealColour(def.sealColour || 'black');
+        setSillExt(Number(def.sillExtension) || 0);
+        setSillWider(!!def.sillWider);
         setSpacerColor(def.spacerColor || 'white');
         setSpacerType(def.spacerType || 'warm');
         setPas24(def.pas24 || false);
@@ -351,8 +363,10 @@ export default function ConfiguratorPage() {
         woodColor, woodColorExt: isSingle ? woodColor : woodColorExt,
         woodColorInt: isSingle ? woodColor : woodColorInt, sameColor: isSingle,
         doubleGlazing: glassType !== 'triple', spacerColor,
-        glassFinish: gFin, trickleVent: 'none', sealColour: 'black',
-        sillExtension: 0, ironmongery: iron,
+        glassFinish: gFin,
+        trickleVent: buildVentGrilles({ vent: { roomType: ventRoomType, soleWindow: ventSoleWindow } }) > 0 ? 'frame' : 'none',
+        trickleColour: 'white',
+        sealColour, sillExtension: sillExt, sillWider, ironmongery: iron,
       });
       return;
     }
@@ -393,7 +407,7 @@ export default function ConfiguratorPage() {
       colourMode, sameColor: isSingle, ironmongery: iron, ironmongerySlots: ironSlots, doubleGlazing: glassType !== 'single',
       upperGlass: gFin === 'frosted' && frostLoc === 'both' ? 'frosted' : 'clear',
       lowerGlass: gFin === 'frosted' ? 'frosted' : 'clear',
-      glassType, glassSpec, glassCoating, glassGas, casementBarType: casBarType, glassFinish: gFin, frostedLocation: frostLoc,
+      glassType, glassSpec, glassCoating, glassGas, casementBarType: casBarType, sealColour, sillExtension: sillExt, sillWider, glassFinish: gFin, frostedLocation: frostLoc,
       spacerColor, spacerType, sashType, splitRatio, headType, openingType: opening,
       ventRoomType, ventSoleWindow,
       frameType, frameDepth, pas24,
@@ -599,8 +613,12 @@ export default function ConfiguratorPage() {
             ) : (hasGasFill && <div className="text-[11px] text-ink-300 mt-1">Gas: <span className="text-accent-400 font-medium">Argon</span> <span className="text-ink-500">— fixed</span></div>)}
           </Sec>
 
-          <Sec t="Horns & Security">
+          <Sec t={isCasement ? 'Security & External Cill' : 'Horns & Security'}>
             {isSash && <><Lbl>Horns</Lbl><HChips o={HORN_OPTIONS} v={horn} c={setHorn} /></>}
+            {isCasement && <>
+              <Lbl>Cill projection</Lbl><HChips o={SILL_OPTIONS} v={sillExt} c={setSillExt} />
+              <Lbl>Extend cill 50mm each side?</Lbl><HChips o={SILL_WIDER_OPTIONS} v={sillWider} c={setSillWider} />
+            </>}
             <label className="flex items-center gap-2 text-xs text-ink-400 mt-1.5 cursor-pointer"><input type="checkbox" checked={pas24} onChange={e => setPas24(e.target.checked)} className="accent-accent-500" />PAS24 security</label>
           </Sec>
 
@@ -608,6 +626,7 @@ export default function ConfiguratorPage() {
             <HChips o={COLOUR_MODES} v={colourMode} c={setColourMode} />
             <ColorField label={isSingle ? 'Colour' : 'Exterior'} value={isSingle ? woodColor : woodColorExt} onChange={isSingle ? setWoodColor : setWoodColorExt} />
             {!isSingle && <ColorField label="Interior" value={woodColorInt} onChange={setWoodColorInt} />}
+            {isCasement && <><Lbl>Seal colour</Lbl><HChips o={SEAL_OPTIONS} v={sealColour} c={setSealColour} /></>}
           </Sec>
 
           <Sec t="Ironmongery">
@@ -704,6 +723,16 @@ export default function ConfiguratorPage() {
             <SR l="Spacer" v={spacerColor} />
             <SR l="Spacer Type" v={(SPACER_TYPES.find(t => t.value === spacerType) || {}).label || 'Warm Edge'} />
           </SG>
+          <SG t="Ventilation">
+            <SR l="Room" v={ventRoomType} />
+            <SR l="Sole window" v={ventSoleWindow ? 'Yes' : 'No'} />
+            <SR l="Trickle vents" v={String(buildVentGrilles({ vent: { roomType: ventRoomType, soleWindow: ventSoleWindow } }))} />
+          </SG>
+          {isCasement && <SG t="External Cill">
+            <SR l="Projection" v={sillExt ? `${sillExt}mm` : 'None'} />
+            <SR l="Wider" v={sillWider ? '+50mm each side' : 'No'} />
+            <SR l="Seal" v={sealColour === 'black' ? 'Black' : 'White'} />
+          </SG>}
           {isSash && <SG t="Opening"><SR l="Type" v={opening} /></SG>}
           <SG t="Hardware">
             <SR l="PAS24" v={pas24 ? 'Yes' : 'No'} />

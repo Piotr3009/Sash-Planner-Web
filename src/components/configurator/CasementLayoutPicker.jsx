@@ -60,7 +60,11 @@ function LayoutThumb({ code, width, className = '' }) {
   const lines = [];
   (def.mullions || []).forEach((mu, i) => {
     const mx = (typeof mu === 'number' ? mu : mu.x) * scale;
-    lines.push(<line key={`m${i}`} x1={mx} y1={fT} x2={mx} y2={H - fT} stroke="currentColor" strokeWidth="1.6" />);
+    // Partial mullions (e.g. 031: only between the fans) draw their true
+    // vertical extent; full-height numbers span the whole inner box.
+    const y1 = typeof mu === 'number' ? fT : H - (mu.endY ?? d.h) * scale;
+    const y2 = typeof mu === 'number' ? H - fT : H - mu.startY * scale;
+    lines.push(<line key={`m${i}`} x1={mx} y1={Math.max(fT, y1)} x2={mx} y2={Math.min(H - fT, y2)} stroke="currentColor" strokeWidth="1.6" />);
   });
   (def.transoms || []).forEach((tr, i) => {
     const ty = typeof tr === 'number' ? tr : tr.y;
@@ -73,27 +77,10 @@ function LayoutThumb({ code, width, className = '' }) {
       lines.push(<line key={`t${i}`} x1={cx - hw} y1={y} x2={cx + hw} y2={y} stroke="currentColor" strokeWidth="1.6" />);
     }
   });
-  // Default-opening triangles (PSW cards show them): map inner coords
-  // (y up from inner bottom) into the [fT .. edge-fT] box.
-  const tris = [];
-  const ix = (v) => fT + (v / innerW) * (width - 2 * fT);
-  const iy = (v) => fT + ((innerH - v) / innerH) * (H - 2 * fT);
-  (def.panels || []).forEach((p, i) => {
-    if (!p.hinge || p.hinge === 'fixed') return;
-    const x1 = ix(p.x), x2 = ix(p.x + p.w);
-    const yT = iy(p.y + p.h), yB = iy(p.y);
-    let dPath = '';
-    if (p.hinge === 'top') dPath = `M ${x1} ${yT} L ${(x1 + x2) / 2} ${yB} L ${x2} ${yT}`;
-    if (p.hinge === 'left') dPath = `M ${x2} ${yT} L ${x1} ${(yT + yB) / 2} L ${x2} ${yB}`;
-    if (p.hinge === 'right') dPath = `M ${x1} ${yT} L ${x2} ${(yT + yB) / 2} L ${x1} ${yB}`;
-    tris.push(<path key={`o${i}`} d={dPath} fill="none" stroke="currentColor"
-      strokeWidth="1.1" opacity="0.65" />);
-  });
   return (
     <svg width={width} height={H} viewBox={`0 0 ${width} ${H}`} className={className}>
       <rect x="1" y="1" width={width - 2} height={H - 2} fill="none" stroke="currentColor" strokeWidth="2" />
       {lines}
-      {tris}
     </svg>
   );
 }

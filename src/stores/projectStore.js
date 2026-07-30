@@ -537,6 +537,9 @@ export const useProjectStore = create((set, get) => ({
       ironmongerySlots: windowConfig.ironmongerySlots || defaults.ironmongerySlots || {},
       ventRoomType: windowConfig.ventRoomType || 'habitable',
       glassGas: windowConfig.glassGas || 'argon',
+      sealColour: windowConfig.sealColour || 'black',
+      sillExtension: Number(windowConfig.sillExtension) || 0,
+      sillWider: !!windowConfig.sillWider,
       casementBarType: windowConfig.casementBarType || 'astragal',
       ventSoleWindow: windowConfig.ventSoleWindow !== undefined ? windowConfig.ventSoleWindow : true,
       // Casement fields — PSW-compatible names (import/export contract).
@@ -651,6 +654,9 @@ export const useProjectStore = create((set, get) => ({
       ironmongerySlots: windowConfig.ironmongerySlots || defaults.ironmongerySlots || {},
       ventRoomType: windowConfig.ventRoomType || 'habitable',
       glassGas: windowConfig.glassGas || 'argon',
+      sealColour: windowConfig.sealColour || 'black',
+      sillExtension: Number(windowConfig.sillExtension) || 0,
+      sillWider: !!windowConfig.sillWider,
       casementBarType: windowConfig.casementBarType || 'astragal',
       ventSoleWindow: windowConfig.ventSoleWindow !== undefined ? windowConfig.ventSoleWindow : true,
       // Casement fields — PSW-compatible names (import/export contract).

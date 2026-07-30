@@ -147,7 +147,7 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg, resolveRa
   };
 }
 
-function buildGlassRow(windowSpec, width, height, location, qty) {
+function buildGlassRow(windowSpec, width, height, location, qty, finishOverride) {
   const glassType = windowSpec?.glazing?.type || 'double';
   const glassSpec = windowSpec?.glazing?.spec || 'toughened';
   const spacer = windowSpec?.glazing?.spacerColour || 'silver';
@@ -155,7 +155,7 @@ function buildGlassRow(windowSpec, width, height, location, qty) {
   const makeup = windowSpec?.glazing?.makeup ?? getWindowProfile()?.glassMakeup?.[glassType] ?? (GLASS_MAKEUP[glassType] ?? GLASS_MAKEUP.double);
   const coating = windowSpec?.glazing?.coating || 'standard';
   const gas = windowSpec?.glazing?.gas ?? glassGas(glassType);
-  const finish = windowSpec?.glazing?.finish || windowSpec?.glazing?.lowerGlass || 'clear';
+  const finish = finishOverride || windowSpec?.glazing?.finish || windowSpec?.glazing?.lowerGlass || 'clear';
   return {
     width: Math.round(Math.max(0, width) * 100) / 100,
     height: Math.round(Math.max(0, height) * 100) / 100,
@@ -170,7 +170,17 @@ export function buildGlassListForWindow(derived, windowSpec) {
 
   // Non-double-hung sources (casement, triple sections) supply units directly
   if (Array.isArray(derived.customGlassUnits) && derived.customGlassUnits.length > 0) {
-    return derived.customGlassUnits.map((u) => buildGlassRow(windowSpec, u.width, u.height, u.location, u.qty || 1));
+    return derived.customGlassUnits.map((u) => {
+      // Casement frosted scope: 'bottom' = main lights only (fans stay clear),
+      // 'both' = every pane. Uniform finish for all other custom-unit sources.
+      let finishOverride;
+      const gz = windowSpec?.glazing || {};
+      if (gz.finish === 'frosted' && (u.role === 'fan' || u.role === 'fan2')
+          && (gz.frostedLocation || 'bottom') === 'bottom') {
+        finishOverride = 'clear';
+      }
+      return buildGlassRow(windowSpec, u.width, u.height, u.location, u.qty || 1, finishOverride);
+    });
   }
   // Triple sash: two panes per section, same heights as double-hung
   if (derived.tripleSections) {

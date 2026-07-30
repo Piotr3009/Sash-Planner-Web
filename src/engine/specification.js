@@ -148,6 +148,7 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       fan2Height: item?.casementFan2Height ?? fc.casementFan2Height ?? null,
       middleWidth: Number(item?.casementMiddleWidth ?? fc.casementMiddleWidth) || 0,
       barType: item?.casementBarType || fc.casementBarType || 'astragal',
+      sealColour: item?.sealColour || fc.sealColour || 'black',
       bars: {
         h: Number(item?.casementHBars ?? fc.casementHBars) || 0,
         v: Number(item?.casementVBars ?? fc.casementVBars) || 0,
@@ -174,7 +175,10 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       roomType: ventRoomType,   // 'habitable' | 'kitchen' | 'bathroom' | 'other'
       soleWindow: ventSoleWindow
     },
-    cill: { extension: Number(spec.sillExtension || item?.sill_extension || 0) },
+    cill: {
+      extension: Number(item?.sillExtension ?? spec.sillExtension ?? item?.sill_extension) || 0,
+      wider: !!(item?.sillWider ?? spec.sillWider),
+    },
     glazing: {
       type: glassType,
       spec: glassSpec,

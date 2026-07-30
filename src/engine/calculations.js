@@ -798,6 +798,7 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
         width: Math.max(0, R(leafSizes[i].leafW - ded.glass)),
         height: Math.max(0, R(leafSizes[i].leafH - ded.glass)),
         location: `${layout} P${i + 1} ${pn.hinge === 'fixed' ? 'fixed' : pn.hinge}`,
+        role: pn._role || 'main',
         qty: 1,
     }));
     const glassSqm = paneGlass.reduce((a, g) => a + (g.width * g.height) / 1e6, 0);
