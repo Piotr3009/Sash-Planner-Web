@@ -347,7 +347,7 @@ export default function ConfiguratorPage() {
         casementFanVBars: casCalc.hasFan ? Math.min(2, casFanVB) : 0,
         casementFan2HBars: casCalc.hasFan2 ? Math.min(2, casFan2HB) : 0,
         casementFan2VBars: casCalc.hasFan2 ? Math.min(2, casFan2VB) : 0,
-        casementOpening: 0.3,
+        casementOpening: 0,
         woodColor, woodColorExt: isSingle ? woodColor : woodColorExt,
         woodColorInt: isSingle ? woodColor : woodColorInt, sameColor: isSingle,
         doubleGlazing: glassType !== 'triple', spacerColor,
