@@ -667,6 +667,24 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
         return { leafW: R(leafW), leafH: R(leafH), heightNote };
     });
 
+    // ── Leaf rectangles (mm, origin = frame top-left, exterior view) ──
+    const leafRects = paneBounds.map((b, i) => {
+        const x = b.leftIsJamb
+            ? geo.land + geo.gap
+            : b.leftAxis + geo.mullionLand / 2 + geo.gap;
+        const y = b.topIsHead
+            ? geo.land + geo.gap
+            : b.topAxisT + geo.transomLandBelow + geo.gapBelowTransom;
+        return { x: R(x), y: R(y), w: leafSizes[i].leafW, h: leafSizes[i].leafH };
+    });
+
+    // ── Drawing-ready member runs (mm, exterior view) ──
+    const landX = (b, side) => side === 'L'
+        ? (b.leftIsJamb ? geo.land : b.leftAxis + geo.mullionLand / 2)
+        : (b.rightIsJamb ? frameWidth - geo.land : b.rightAxis - geo.mullionLand / 2);
+    const transomRuns = [];
+    const mullionRuns = [];
+
     // ── Mullions: full-height run through (extH − lengths.mullion);
     //    partial tier dividers (031/032) use the provisional transom-style rule. ──
     const sash = [];
@@ -676,6 +694,12 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
         const idx = (layoutDef.mullions.length > 1) ? String(mullIdx) : '';
         if (typeof mu === 'number') {
             sash.push(mk('sash', 'C-MULLION', secMull, frameHeight - p.lengths.mullion, 1, `C-M${idx}`));
+            mullionRuns.push({
+                axisX: R(mu), full: true,
+                x1: R(mu - geo.mullionLand / 2), x2: R(mu + geo.mullionLand / 2),
+                yTop: geo.land, yBottom: R(frameHeight - geo.cillVisible),
+                code: `C-M${idx}`, length: R(frameHeight - p.lengths.mullion),
+            });
         } else {
             // Partial mullion spans one tier; adjacent tier = the pane tier it divides.
             const tierPane = mu.touchesTop
@@ -684,6 +708,19 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
             const len = (tierPane ? tierPane.leafH : 0) + p.lengths.partialMullionSeat;
             sash.push(mk('sash', 'C-MULLION', secMull, len, 1, `C-M${idx}`,
                 'partial · UNCONFIRMED length rule'));
+            const tierIdx = mu.touchesTop
+                ? paneBounds.findIndex((b) => b.topIsHead)
+                : paneBounds.findIndex((b) => b.bottomIsCill);
+            const tb = tierIdx >= 0 ? paneBounds[tierIdx] : null;
+            mullionRuns.push({
+                axisX: R(mu.x), full: false,
+                x1: R(mu.x - geo.mullionLand / 2), x2: R(mu.x + geo.mullionLand / 2),
+                yTop: tb && !mu.touchesTop ? R(tb.topAxisT + geo.transomLandBelow) : geo.land,
+                yBottom: tb && mu.touchesTop
+                    ? R(tb.bottomAxisT - geo.transomLandAbove)
+                    : R(frameHeight - geo.cillVisible),
+                code: `C-M${idx}`, length: R(len),
+            });
         }
     });
 
@@ -706,6 +743,27 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
             fieldLeafW = i >= 0 ? leafSizes[i].leafW : frameWidth - 2 * ded.leafAtJamb;
         }
         sash.push(mk('sash', 'C-TRANSOM', secTrans, fieldLeafW + p.lengths.transomSeat, 1, `C-T${idx}`));
+        // Drawing run: land band asymmetric around the axis (8 above / 13 below)
+        const axisFromBottom = typeof tr === 'number' ? tr : tr.y;
+        const axisT = R(frameHeight - axisFromBottom);
+        let x1, x2;
+        if (typeof tr === 'number' || tr.width === undefined) {
+            x1 = geo.land; x2 = frameWidth - geo.land;
+        } else {
+            const segCentreAbs2 = cx + (tr.offsetX || 0);
+            const pi = layoutDef.panels.findIndex(
+                (pn) => Math.abs((cx + pn.x) - segCentreAbs2) < eps
+            );
+            const b = pi >= 0 ? paneBounds[pi] : null;
+            x1 = b ? landX(b, 'L') : geo.land;
+            x2 = b ? landX(b, 'R') : frameWidth - geo.land;
+        }
+        transomRuns.push({
+            axisT, x1: R(x1), x2: R(x2),
+            bandTop: R(axisT - geo.transomLandAbove),
+            bandBottom: R(axisT + geo.transomLandBelow),
+            code: `C-T${idx}`, length: R(fieldLeafW + p.lengths.transomSeat),
+        });
     });
 
     // ── Leaf members per pane — vertogen: all four at full leaf dimensions.
@@ -753,7 +811,8 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
         customGlassUnits: paneGlass,
         casement: {
             layout, layoutDef, openers, panes: layoutDef.panels.length,
-            leaves: leafSizes,
+            leaves: leafSizes, paneBounds, leafRects, transomRuns, mullionRuns,
+            geometry: geo,
         },
         barPositions: { vertical: [], horizontal: [] },
         weights: { timber: 0, glass: 0, total: 0 },

@@ -91,19 +91,29 @@ export const DEFAULT_CASEMENT_PROFILE = {
     leafBottom: { face: 67 },
   },
   geometry: {
-    land: 36,          // frame land (przylga) — visible frame margin
-    rebate: 21,        // frame rebate depth (57 − 36)
-    gap: 4,            // leaf fitting gap per side
-    mullionLand: 26,   // mullion visible land (2 × 13)
+    land: 36,             // frame land (przylga) — visible frame margin
+    rebate: 21,           // frame rebate depth (57 − 36)
+    gap: 4,               // leaf side fitting gap (jambs, mullions, head)
+    mullionLand: 26,      // mullion visible land (13 + 13, symmetric)
+    // Transom land is ASYMMETRIC around the element axis (v1.1):
+    transomLandAbove: 8,  // visible land above the axis
+    transomLandBelow: 13, // visible land below the axis
+    gapFanTransom: 6,     // gap between fan bottom rail and transom land
+    gapBelowTransom: 4,   // gap between transom land and lower top rail
+    gapCill: 6,           // gap between bottom rail and cill
+    cillVisible: 41,      // cill front height seen from outside
+    // Layer closure: 36+4 + leafH + 6+41 = extH  (full = extH − 87)
+    //                top 36+4 + fan + 6+8 = T    (fan  = T − 54)
+    //                13+4 + lower + 6+41 = extH − T (lower = extH − T − 64)
   },
   deductions: {
     // Leaf WIDTH per edge (from frame edge / member axis):
     leafAtJamb: 40,        // land 36 + gap 4
     leafAtMullionAxis: 17, // half-land 13 + gap 4
-    // Leaf HEIGHT (T = frame top -> transom axis):
-    leafFullHeight: 89,    // no transom: leafH = extH − 89
-    fanFromAxis: 54,       // fan (above transom): leafH = T − 54
-    lowerFromAxis: 66,     // below transom: leafH = extH − T − 66
+    // Leaf HEIGHT (T = frame top -> transom axis) — v1.1 layer-verified:
+    leafFullHeight: 87,    // no transom: leafH = extH − 87  (40 top + 47 cill side)
+    fanFromAxis: 54,       // fan (above transom): leafH = T − 54  (40 + 6 + 8)
+    lowerFromAxis: 64,     // below transom: leafH = extH − T − 64  (13+4 + 6+41)
     // Middle tier (transom above AND below, 3-tier 013/023):
     // UNCONFIRMED — awaiting Piotr; provisional symmetric 2×17 like mullions.
     middleTierFromAxes: 34,

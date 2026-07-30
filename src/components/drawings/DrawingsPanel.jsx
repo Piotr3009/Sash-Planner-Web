@@ -7,6 +7,7 @@ import FrontElevation2D from './FrontElevation2D.jsx';
 import BoxDetail2D from './BoxDetail2D.jsx';
 import SashDetail2D from './SashDetail2D.jsx';
 import SectionsUpload from './SectionsUpload.jsx';
+import CasementDrawing2D from './CasementDrawing2D.jsx';
 import { useProjectStore } from '../../stores/projectStore.js';
 import { exportElevationsPDF, exportElementsPDF } from '../../utils/drawingsPdfExport.js';
 import { svgNodeToPng } from '../../utils/svgRaster.js';
@@ -23,6 +24,10 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
   const [subTab, setSubTab] = useState('elevation');
   const [busy, setBusy] = useState(false);
   const refs = useRef({});
+  const isCasement = (windowSpec?.category || 'sash') === 'casement';
+  const visibleTabs = isCasement
+    ? SUB_TABS.filter((t) => t.id === 'elevation' || t.id === 'vsection')
+    : SUB_TABS;
 
   const winW = item?.width || windowSpec?.frame?.width || '';
   const winH = item?.height || windowSpec?.frame?.height || '';
@@ -76,7 +81,7 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
     <div>
       {/* Sub-tabs */}
       <div className="flex gap-1 mb-4 flex-wrap">
-        {SUB_TABS.map((t) => (
+        {visibleTabs.map((t) => (
           <button key={t.id} onClick={() => setSubTab(t.id)}
             className={`px-3 py-1.5 text-xs rounded-lg border transition-all ${
               subTab === t.id
@@ -98,14 +103,18 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
               className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               📄 Elevation PDF
             </button>
-            <button onClick={handleExportElements} disabled={busy || !derived}
-              className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-              📄 Elements PDF
-            </button>
+            {!isCasement && (
+              <button onClick={handleExportElements} disabled={busy || !derived}
+                className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                📄 Elements PDF
+              </button>
+            )}
           </div>
           <div className="card p-4 min-h-[400px]">
             {subTab === 'elevation' && (
-              <FrontElevation2D windowSpec={windowSpec} derived={derived} />
+              isCasement
+                ? <CasementDrawing2D windowSpec={windowSpec} derived={derived} batch={batch} />
+                : <FrontElevation2D windowSpec={windowSpec} derived={derived} />
             )}
             {subTab === 'box' && (
               <BoxDetail2D windowSpec={windowSpec} derived={derived} />
@@ -125,8 +134,11 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
       {derived && (
         <div aria-hidden="true" style={{ position: 'absolute', left: '-99999px', top: 0, width: '1200px' }}>
           <div ref={(el) => { refs.current['elevation'] = el; }}>
-            <FrontElevation2D windowSpec={windowSpec} derived={derived} />
+            {isCasement
+              ? <CasementDrawing2D windowSpec={windowSpec} derived={derived} batch={batch} />
+              : <FrontElevation2D windowSpec={windowSpec} derived={derived} />}
           </div>
+          {!isCasement && (<>
           <div ref={(el) => { refs.current['box'] = el; }}>
             <BoxDetail2D windowSpec={windowSpec} derived={derived} />
           </div>
@@ -136,6 +148,7 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
           <div ref={(el) => { refs.current['lower'] = el; }}>
             <SashDetail2D windowSpec={windowSpec} derived={derived} type="lower" />
           </div>
+          </>)}
         </div>
       )}
 

@@ -96,3 +96,33 @@ export const DIMS = {
   leaderHOff:    13,
   dashPattern:   '4,3',
 };
+// ─── CAD scheme (white paper) — casement production drawings ───
+// Approved exterior-view mockups 30.07.2026. Fixed screen px (viewBox 700).
+export const CAD = {
+  bg:        '#FFFFFF',
+  paperEdge: '#C8C8C8',
+  line:      '#1A1A1A',   // frame / member edges
+  leaf:      '#1A1A1A',
+  glassEdge: '#5A5A5A',
+  bar:       '#8A8A8A',
+  axis:      '#8A8A8A',
+  dim:       '#666666',
+  chain:     '#888888',
+  ext:       '#888888',
+  leader:    '#9A9A9A',
+  text:      '#333333',
+  textDark:  '#1A1A1A',
+  textMuted: '#555555',
+  textFaint: '#999999',
+  open:      '#2C6FBF',
+  warn:      '#B23B3B',
+};
+
+export const CAD_SIZES = { dim: 11, label: 11, callout: 11, strip: 11 };
+
+export const CAD_STROKES = {
+  frame: 2, member: 0.9, leaf: 1.3, glassEdge: 0.7, bar: 0.6,
+  open: 1, dim: 0.8, chain: 0.6, ext: 0.5, leader: 0.5, axis: 0.5,
+};
+
+export const CAD_DIMS = { tick: 5, axisDash: '8 3 2 3', leaderDash: '3 3', openDash: '6 4' };
