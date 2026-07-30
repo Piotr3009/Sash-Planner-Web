@@ -565,20 +565,26 @@ function emptyDerived(category, frameWidth, frameHeight) {
 }
 
 function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
+    // ── Casement engine v1 — every number from the casement profile
+    //    (casement-dimensioning-v1.md); no bare constants in formulas. ──
     const p = getCasementProfile();
     const els = p.elements;
-    const d = p.depth;
-    const sashW = frameWidth - p.deductions.sashWidth;
-    const sashH = frameHeight - p.deductions.sashHeight;
-    const jambLength = frameHeight - 2 * els.frameHead.face;
+    const ded = p.deductions;
+    const geo = p.geometry;
+    const fd = p.frameDepth, ld = p.leafDepth;
+    const r1 = (v) => Math.round(v / p.rounding) * p.rounding / 1;
+    const R = (v) => Math.round(v * 10) / 10; // one decimal, CNC-ready
 
-    // ── Layout geometry (single source: casementLayouts.js) ──
-    // Stage 4a uses PSW geo defaults (57/68/68) so pane sizes match the 3D
-    // preview and PSW exactly; profile-driven geo (incl. the 68 vs 70 cill
-    // face question) lands with stage 4b dimensioning.
     const cas = windowSpec.casement || {};
     const layout = cas.layout || '040L';
-    const GEO = CASEMENT_GEO_DEFAULTS;
+
+    // Layout geometry driven by the PROFILE faces (57 / 68 / 68 defaults —
+    // numerically identical to the PSW visual geometry, so 3D/2D/import agree).
+    const GEO = {
+        frameFace: els.frameHead.face,
+        bottomFace: els.frameCill.face,
+        mullionW: els.mullion.face,
+    };
     const innerW = frameWidth - 2 * GEO.frameFace;
     const innerH = frameHeight - GEO.frameFace - GEO.bottomFace;
     const layoutDef = resolveCasementLayout({
@@ -587,46 +593,172 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
         fan2Ratio: clampFanRatio(cas.fan2Height, innerH),
         middleSectionMm: Number(cas.middleWidth) || 0,
         casementHinges: cas.hinges,
+        geo: GEO,
     });
 
-    // PROVISIONAL per-pane glass until 4b: every pane glazed like an opener —
-    // pane opening minus fitting gap (2×4) minus sash-to-glass deduction (64),
-    // consistent with the profile's frame-level numbers (122 − 2×57 = 8).
-    const paneGap = p.deductions.sashWidth - 2 * els.frameJamb.face;
-    const paneGlassDed = paneGap + p.deductions.glassWidth;
-    const openers = layoutDef.panels.filter((pn) => pn.hinge !== 'fixed').length;
+    const secFrame = `${els.frameHead.face}x${fd}`;
+    const secCill = `${els.frameCill.face}x${fd}`;
+    const secMull = `${els.mullion.face}x${fd}`;
+    const secTrans = `${els.transom.face}x${fd}`;
+    const secLeaf = `${els.leafStile.face}x${ld}`;
+
+    // Record helper: profile rounding (0.1) + element letter code on top of
+    // the shared record shape (createComponentRecord rounds to integers).
+    const mk = (group, name, section, length, qty, code, notes = '') => {
+        const rec = createComponentRecord(windowSpec, group, name, section, length, qty, notes);
+        rec.length = R(length);
+        rec.code = code;
+        return rec;
+    };
+
+    // ── Frame: full external dimensions (comb / finger / T&G joints) ──
+    const box = [
+        mk('box', 'C-FRAME HEAD', secFrame, frameWidth, 1, 'C-H'),
+        mk('box', 'C-FRAME CILL', secCill, frameWidth, 1, 'C-CILL'),
+        mk('box', 'C-FRAME JAMB (L)', secFrame, frameHeight, 1, 'C-J/L'),
+        mk('box', 'C-FRAME JAMB (R)', secFrame, frameHeight, 1, 'C-J/R'),
+    ];
+
+    // ── Panel bounds in absolute frame coordinates ──
+    // Layout coords: panels centred on the glass area; transom y from frame
+    // bottom; mullion x from the frame outside edge.
+    const cx = GEO.frameFace + innerW / 2;
+    const cy = GEO.bottomFace + innerH / 2; // from bottom
+    const eps = 0.6;
+    const halfMull = els.mullion.face / 2;
+
+    const paneBounds = layoutDef.panels.map((pn) => {
+        const leftAbs = cx + pn.x - pn.w / 2;
+        const rightAbs = cx + pn.x + pn.w / 2;
+        const bottomAbs = cy + pn.y - pn.h / 2; // from frame bottom
+        const topAbs = cy + pn.y + pn.h / 2;
+        const leftIsJamb = Math.abs(leftAbs - GEO.frameFace) < eps;
+        const rightIsJamb = Math.abs(rightAbs - (frameWidth - GEO.frameFace)) < eps;
+        const topIsHead = Math.abs(topAbs - (frameHeight - GEO.frameFace)) < eps;
+        const bottomIsCill = Math.abs(bottomAbs - GEO.bottomFace) < eps;
+        return {
+            leftAxis: leftIsJamb ? 0 : leftAbs - halfMull,
+            rightAxis: rightIsJamb ? frameWidth : rightAbs + halfMull,
+            leftIsJamb, rightIsJamb, topIsHead, bottomIsCill,
+            // Transom axes as "T" (frame TOP -> axis), matching the profile formulas
+            topAxisT: topIsHead ? 0 : frameHeight - (topAbs + halfMull),
+            bottomAxisT: bottomIsCill ? frameHeight : frameHeight - (bottomAbs - halfMull),
+        };
+    });
+
+    // ── Leaf sizes — Piotr's formulas verbatim, per pane ──
+    const leafSizes = paneBounds.map((b) => {
+        const span = b.rightAxis - b.leftAxis;
+        const leafW = span
+            - (b.leftIsJamb ? ded.leafAtJamb : ded.leafAtMullionAxis)
+            - (b.rightIsJamb ? ded.leafAtJamb : ded.leafAtMullionAxis);
+        let leafH;
+        let heightNote = '';
+        if (b.topIsHead && b.bottomIsCill) {
+            leafH = frameHeight - ded.leafFullHeight;
+        } else if (b.topIsHead) {
+            leafH = b.bottomAxisT - ded.fanFromAxis;                 // fan tier
+        } else if (b.bottomIsCill) {
+            leafH = frameHeight - b.topAxisT - ded.lowerFromAxis;    // lower tier
+        } else {
+            leafH = (b.bottomAxisT - b.topAxisT) - ded.middleTierFromAxes; // 3-tier middle
+            heightNote = 'UNCONFIRMED middle-tier deduction';
+        }
+        return { leafW: R(leafW), leafH: R(leafH), heightNote };
+    });
+
+    // ── Mullions: full-height run through (extH − lengths.mullion);
+    //    partial tier dividers (031/032) use the provisional transom-style rule. ──
+    const sash = [];
+    let mullIdx = 0;
+    (layoutDef.mullions || []).forEach((mu) => {
+        mullIdx += 1;
+        const idx = (layoutDef.mullions.length > 1) ? String(mullIdx) : '';
+        if (typeof mu === 'number') {
+            sash.push(mk('sash', 'C-MULLION', secMull, frameHeight - p.lengths.mullion, 1, `C-M${idx}`));
+        } else {
+            // Partial mullion spans one tier; adjacent tier = the pane tier it divides.
+            const tierPane = mu.touchesTop
+                ? leafSizes[paneBounds.findIndex((b) => b.topIsHead)]
+                : leafSizes[paneBounds.findIndex((b) => b.bottomIsCill)];
+            const len = (tierPane ? tierPane.leafH : 0) + p.lengths.partialMullionSeat;
+            sash.push(mk('sash', 'C-MULLION', secMull, len, 1, `C-M${idx}`,
+                'partial · UNCONFIRMED length rule'));
+        }
+    });
+
+    // ── Transoms: one segment per layout entry; length = field leaf width + seat ──
+    let transIdx = 0;
+    const transomCount = (layoutDef.transoms || []).length;
+    (layoutDef.transoms || []).forEach((tr) => {
+        transIdx += 1;
+        const idx = transomCount > 1 ? String(transIdx) : '';
+        let fieldLeafW;
+        if (typeof tr === 'number' || tr.width === undefined) {
+            // Full-width transom: its field spans jamb to jamb.
+            fieldLeafW = frameWidth - 2 * ded.leafAtJamb;
+        } else {
+            // Sided segment: find the pane whose centre matches the segment centre.
+            const segCentreAbs = cx + (tr.offsetX || 0);
+            const i = layoutDef.panels.findIndex(
+                (pn) => Math.abs((cx + pn.x) - segCentreAbs) < eps
+            );
+            fieldLeafW = i >= 0 ? leafSizes[i].leafW : frameWidth - 2 * ded.leafAtJamb;
+        }
+        sash.push(mk('sash', 'C-TRANSOM', secTrans, fieldLeafW + p.lengths.transomSeat, 1, `C-T${idx}`));
+    });
+
+    // ── Leaf members per pane — vertogen: all four at full leaf dimensions.
+    //    Fixed panes are dummy sashes: identical timber, no hardware. ──
+    const hingeFn = (hinge, side) => {
+        if (hinge === 'left') return side === 'L' ? 'hinge' : 'lock';
+        if (hinge === 'right') return side === 'R' ? 'hinge' : 'lock';
+        return '';
+    };
+    layoutDef.panels.forEach((pn, i) => {
+        const s = leafSizes[i];
+        const pcode = `P${i + 1}`;
+        const dummy = pn.hinge === 'fixed' ? 'dummy sash' : '';
+        const noteBase = [dummy, s.heightNote].filter(Boolean).join(' · ');
+        const fnL = hingeFn(pn.hinge, 'L'), fnR = hingeFn(pn.hinge, 'R');
+        sash.push(mk('sash', 'C-STILE (L)', secLeaf, s.leafH, 1, `C-ST/L-${pcode}`,
+            [fnL, noteBase].filter(Boolean).join(' · ')));
+        sash.push(mk('sash', 'C-STILE (R)', secLeaf, s.leafH, 1, `C-ST/R-${pcode}`,
+            [fnR, noteBase].filter(Boolean).join(' · ')));
+        sash.push(mk('sash', 'C-TOP RAIL', secLeaf, s.leafW, 1, `C-TR-${pcode}`,
+            [pn.hinge === 'top' ? 'hinge' : '', noteBase].filter(Boolean).join(' · ')));
+        sash.push(mk('sash', 'C-BOTTOM RAIL', secLeaf, s.leafW, 1, `C-BR-${pcode}`,
+            [pn.hinge === 'top' ? 'lock' : '', noteBase].filter(Boolean).join(' · ')));
+    });
+
+    // ── Glass: one 24 mm unit per pane (fixed = dummy sash, same math) ──
     const paneGlass = layoutDef.panels.map((pn, i) => ({
-        width: Math.max(0, Math.round(pn.w - paneGlassDed)),
-        height: Math.max(0, Math.round(pn.h - paneGlassDed)),
+        width: Math.max(0, R(leafSizes[i].leafW - ded.glass)),
+        height: Math.max(0, R(leafSizes[i].leafH - ded.glass)),
         location: `${layout} P${i + 1} ${pn.hinge === 'fixed' ? 'fixed' : pn.hinge}`,
         qty: 1,
     }));
+    const glassSqm = paneGlass.reduce((a, g) => a + (g.width * g.height) / 1e6, 0);
+    const openers = layoutDef.panels.filter((pn) => pn.hinge !== 'fixed').length;
 
-    const box = [
-        createComponentRecord(windowSpec, 'box', 'C-FRAME HEAD', `${d}x${els.frameHead.face}`, frameWidth, 1),
-        createComponentRecord(windowSpec, 'box', 'C-FRAME CILL', `${d}x${els.frameCill.face}`, frameWidth, 1),
-        createComponentRecord(windowSpec, 'box', 'C-FRAME JAMB (L)', `${d}x${els.frameJamb.face}`, jambLength, 1),
-        createComponentRecord(windowSpec, 'box', 'C-FRAME JAMB (R)', `${d}x${els.frameJamb.face}`, jambLength, 1),
-    ];
-    const sash = [
-        createComponentRecord(windowSpec, 'sash', 'C-STILE (L)', `${d}x${els.sashStile.face}`, sashH, 1),
-        createComponentRecord(windowSpec, 'sash', 'C-STILE (R)', `${d}x${els.sashStile.face}`, sashH, 1),
-        createComponentRecord(windowSpec, 'sash', 'C-TOP RAIL', `${d}x${els.sashTop.face}`, sashW, 1),
-        createComponentRecord(windowSpec, 'sash', 'C-BOTTOM RAIL', `${d}x${els.sashBottom.face}`, sashW, 1),
-    ];
-
+    void r1;
     return {
         category: 'casement',
-        sashWidth: sashW, sashHeight: sashH, topSashHeight: 0, bottomSashHeight: 0,
+        sashWidth: leafSizes[0]?.leafW || 0,
+        sashHeight: leafSizes[0]?.leafH || 0,
+        topSashHeight: 0, bottomSashHeight: 0,
         config: { key: 'none', rows: 0, cols: 0 },
         components: { sash, box, beading: [] },
         glazingItems: [],
         customGlassUnits: paneGlass,
-        casement: { layout, layoutDef, openers, panes: layoutDef.panels.length },
+        casement: {
+            layout, layoutDef, openers, panes: layoutDef.panels.length,
+            leaves: leafSizes,
+        },
         barPositions: { vertical: [], horizontal: [] },
         weights: { timber: 0, glass: 0, total: 0 },
         paint: calculatePaint(frameWidth, frameHeight),
-        consumables: {},
+        consumables: { glass: { type: windowSpec.glazing?.type || 'double', sqm: Math.round(glassSqm * 100) / 100 } },
         frame: { width: frameWidth, height: frameHeight },
     };
 }

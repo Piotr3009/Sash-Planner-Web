@@ -83,6 +83,8 @@ Object.assign(ELEMENT_TO_PART_ID, {
   'C-STILE (R)': 'c_sash_stile',
   'C-TOP RAIL': 'c_sash_top_rail',
   'C-BOTTOM RAIL': 'c_sash_bottom_rail',
+  'C-MULLION': 'c_mullion',
+  'C-TRANSOM': 'c_transom',
 });
 
 // Box head/jamb parts split per frame type (raw board width differs)

@@ -73,14 +73,16 @@ export const SASH_WINDOW_PARTS = {
 // ─── Casement (simple: outer frame + sash all round; mullions/transoms later) ───
 export const CASEMENT_PARTS = {
   frame: [
-    { id: 'c_frame_head', name: 'Frame Head',   section: '57×57', pcs: 1, materialType: 'hardwood' },
-    { id: 'c_frame_jamb', name: 'Frame Jambs',  section: '57×57', pcs: 2, materialType: 'hardwood' },
-    { id: 'c_frame_cill', name: 'Frame Cill',   section: '57×70', pcs: 1, materialType: 'hardwood' },
+    { id: 'c_frame_head', name: 'Frame Head',   section: '57×93', pcs: 1, materialType: 'hardwood' },
+    { id: 'c_frame_jamb', name: 'Frame Jambs',  section: '57×93', pcs: 2, materialType: 'hardwood' },
+    { id: 'c_frame_cill', name: 'Frame Cill',   section: '68×93', pcs: 1, materialType: 'hardwood', note: 'profiled section' },
+    { id: 'c_mullion',    name: 'Mullion',      section: '68×93', pcs: 1, materialType: 'hardwood' },
+    { id: 'c_transom',    name: 'Transom',      section: '68×93', pcs: 1, materialType: 'hardwood' },
   ],
   sash: [
-    { id: 'c_sash_stile',       name: 'Sash Stiles',      section: '57×47', pcs: 2, materialType: 'hardwood' },
-    { id: 'c_sash_top_rail',    name: 'Sash Top Rail',    section: '57×47', pcs: 1, materialType: 'hardwood' },
-    { id: 'c_sash_bottom_rail', name: 'Sash Bottom Rail', section: '57×70', pcs: 1, materialType: 'hardwood' },
+    { id: 'c_sash_stile',       name: 'Leaf Stiles',      section: '67×57', pcs: 2, materialType: 'hardwood' },
+    { id: 'c_sash_top_rail',    name: 'Leaf Top Rail',    section: '67×57', pcs: 1, materialType: 'hardwood' },
+    { id: 'c_sash_bottom_rail', name: 'Leaf Bottom Rail', section: '67×57', pcs: 1, materialType: 'hardwood' },
   ],
 };
 export const CASEMENT_ALL_PARTS = [...CASEMENT_PARTS.frame, ...CASEMENT_PARTS.sash];

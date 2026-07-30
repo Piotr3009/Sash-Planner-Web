@@ -72,25 +72,52 @@ export function kgPerM(faceMm, depthMm) {
   return (Number(faceMm) * Number(depthMm) * TIMBER_DENSITY_KG_M3) / 1e6;
 }
 
-// ─── Casement profile (simple: outer frame + sash all round; mullions/transoms later) ───
-// FLAGGED defaults — drawn from sash practice, Piotr to verify in Window Settings.
+// ─── Casement profile v1 — Piotr 30.07.2026 (casement-dimensioning-v1.md) ───
+// FINISHED dimensions only. Raw material is never stored here — it comes from
+// Part Registry assignments (resolveRaw). Every value is a per-workshop
+// editable default ("settings by client"); formulas in calculations.js read
+// exclusively from this object — no bare numbers there.
 export const DEFAULT_CASEMENT_PROFILE = {
-  depth: 57, // finished depth for all casement members
+  frameDepth: 93,   // finished depth of frame / mullion / transom members
+  leafDepth: 57,    // finished depth of all leaf members
   elements: {
-    frameHead:  { face: 57, raw: '63x63' },
-    frameJamb:  { face: 57, raw: '63x63' },
-    frameCill:  { face: 70, raw: '63x95' },
-    sashStile:  { face: 47, raw: '63x63' },
-    sashTop:    { face: 47, raw: '63x63' },
-    sashBottom: { face: 70, raw: '63x95' },
+    frameHead:  { face: 57 },
+    frameJamb:  { face: 57 },
+    frameCill:  { face: 68 },   // profiled section; envelope 68×93
+    mullion:    { face: 68 },   // visible land 26 (13 per side)
+    transom:    { face: 68 },
+    leafStile:  { face: 67 },   // vertogen: all four leaf members one section,
+    leafTop:    { face: 67 },   // each cut to the FULL leaf dimension
+    leafBottom: { face: 67 },
+  },
+  geometry: {
+    land: 36,          // frame land (przylga) — visible frame margin
+    rebate: 21,        // frame rebate depth (57 − 36)
+    gap: 4,            // leaf fitting gap per side
+    mullionLand: 26,   // mullion visible land (2 × 13)
   },
   deductions: {
-    // sash sits inside the outer frame: opening minus fitting gap each side
-    sashWidth: 122,   // frame W − 2×frame face − 2×4 gap
-    sashHeight: 122,
-    glassWidth: 64,   // sash W − 2×stile face + 2×15 rebate
-    glassHeight: 64,
+    // Leaf WIDTH per edge (from frame edge / member axis):
+    leafAtJamb: 40,        // land 36 + gap 4
+    leafAtMullionAxis: 17, // half-land 13 + gap 4
+    // Leaf HEIGHT (T = frame top -> transom axis):
+    leafFullHeight: 89,    // no transom: leafH = extH − 89
+    fanFromAxis: 54,       // fan (above transom): leafH = T − 54
+    lowerFromAxis: 66,     // below transom: leafH = extH − T − 66
+    // Middle tier (transom above AND below, 3-tier 013/023):
+    // UNCONFIRMED — awaiting Piotr; provisional symmetric 2×17 like mullions.
+    middleTierFromAxes: 34,
+    // Glass: enters 12.5 into the leaf rebate on every side:
+    glass: 109,            // leaf − 109 = 2×67 − 2×12.5
   },
+  lengths: {
+    mullion: 77,       // C-M = extH − 77 (full height, runs through)
+    transomSeat: 8,    // C-T segment = leaf width of its field + 8
+    // Partial mullion (031/032 tier divider) — UNCONFIRMED, provisional
+    // transom-style rule: adjacent tier leafH + partialMullionSeat.
+    partialMullionSeat: 8,
+  },
+  rounding: 0.1,       // mm — CNC-ready, one decimal
 };
 
 let activeProfile = null;

@@ -342,7 +342,7 @@ export default function ConfiguratorPage() {
         casementOpening: 0.3,
         woodColor, woodColorExt: isSingle ? woodColor : woodColorExt,
         woodColorInt: isSingle ? woodColor : woodColorInt, sameColor: isSingle,
-        doubleGlazing: glassType !== 'single', spacerColor,
+        doubleGlazing: true, spacerColor,
         glassFinish: gFin, trickleVent: 'none', sealColour: 'black',
         sillExtension: 0, ironmongery: iron,
       });
@@ -390,6 +390,7 @@ export default function ConfiguratorPage() {
       ventRoomType, ventSoleWindow,
       frameType, frameDepth, pas24,
       ...(isCasement ? {
+        glassType: 'double', // casement: single 24mm unit for now
         casementLayout: casLayout,
         casementHinges: casHinges ? [...casHinges] : null,
         fanlightHeight: casCalc.hasFan ? casCalc.fanEff : null,
@@ -568,7 +569,9 @@ export default function ConfiguratorPage() {
           </Sec>
 
           <Sec t="Glass">
-            {!isSash ? (
+            {isCasement ? (
+              <div className="text-[11px] text-ink-300 mb-2">Type: <span className="text-accent-400 font-medium">24mm (4/16/4)</span> <span className="text-ink-500">— fixed for casement</span></div>
+            ) : !isSash ? (
               <><Lbl>Type</Lbl><HChips o={GLASS_TYPES.filter(g => g.value === 'double' || g.value === 'double_slim' || g.value === 'triple')} v={glassType} c={setGlassType} /></>
             ) : frameType === 'heritage' ? (
               <><Lbl>Type</Lbl><HChips o={HERITAGE_GLASS_OPTIONS} v={glassType} c={changeHeritageGlass} /></>
