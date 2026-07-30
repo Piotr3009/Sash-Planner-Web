@@ -140,6 +140,22 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
         customBars: customBarsFromSpec(spec, item)
       }
     },
+    casement: {
+      layout: item?.casementLayout || fc.casementLayout || '040L',
+      hinges: Array.isArray(item?.casementHinges) ? item.casementHinges
+        : Array.isArray(fc.casementHinges) ? fc.casementHinges : null,
+      fanlightHeight: item?.fanlightHeight ?? fc.fanlightHeight ?? null,
+      fan2Height: item?.casementFan2Height ?? fc.casementFan2Height ?? null,
+      middleWidth: Number(item?.casementMiddleWidth ?? fc.casementMiddleWidth) || 0,
+      bars: {
+        h: Number(item?.casementHBars ?? fc.casementHBars) || 0,
+        v: Number(item?.casementVBars ?? fc.casementVBars) || 0,
+        fanH: Number(item?.casementFanHBars ?? fc.casementFanHBars) || 0,
+        fanV: Number(item?.casementFanVBars ?? fc.casementFanVBars) || 0,
+        fan2H: Number(item?.casementFan2HBars ?? fc.casementFan2HBars) || 0,
+        fan2V: Number(item?.casementFan2VBars ?? fc.casementFan2VBars) || 0,
+      },
+    },
     color: {
       ral: fc.ralCode || '',
       inside: colorInside,

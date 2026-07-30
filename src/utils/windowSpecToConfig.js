@@ -46,6 +46,7 @@ const COLOR_MAP = {
 };
 
 import { RAL_LOOKUP as RAL_COLORS } from '../config.js';
+import { clampFanRatio, CASEMENT_GEO_DEFAULTS } from '../engine/casementLayouts.js';
 import { profileBoxDepth } from '../engine/profile.js';
 
 function resolveColor(name, ral) {
@@ -74,6 +75,18 @@ function resolveColor(name, ral) {
  */
 export function windowSpecToConfig(windowSpec) {
   if (!windowSpec) return {};
+
+  // Casement windows route to CasementWindow via casementProps; width/height
+  // stay top-level for the shared camera auto-fit in the viewer Scenes.
+  if ((windowSpec.category || 'sash') === 'casement') {
+    const casementProps = windowSpecToCasementProps(windowSpec);
+    return {
+      windowCategory: 'casement',
+      width: casementProps.width,
+      height: casementProps.height,
+      casementProps,
+    };
+  }
 
   const w = windowSpec.frame?.width || 1200;
   const h = windowSpec.frame?.height || 1800;
@@ -159,5 +172,47 @@ export function windowSpecToConfig(windowSpec) {
     showGuides: false,
     boxDepth: windowSpec.frame?.depth || profileBoxDepth('standard'),
     sashDepth: 57,
+  };
+}
+
+// ─── Casement: windowSpec → CasementWindow props ───
+// Same clamps as the configurator/engine (single source: casementLayouts.js).
+
+export function windowSpecToCasementProps(windowSpec) {
+  const frame = windowSpec?.frame || {};
+  const cas = windowSpec?.casement || {};
+  const color = windowSpec?.color || {};
+  const glazing = windowSpec?.glazing || {};
+  const width = Number(frame.width) || 1200;
+  const height = Number(frame.height) || 1200;
+  const innerH = height - CASEMENT_GEO_DEFAULTS.frameFace - CASEMENT_GEO_DEFAULTS.bottomFace;
+  const single = resolveColor(color.single, color.ral);
+  const isDual = color.type === 'dual';
+  return {
+    width, height,
+    layout: cas.layout || '040L',
+    casementHinges: Array.isArray(cas.hinges) ? cas.hinges : null,
+    fanlightRatio: clampFanRatio(cas.fanlightHeight, innerH),
+    fan2Ratio: clampFanRatio(cas.fan2Height, innerH),
+    middleSection: Number(cas.middleWidth) || 0,
+    hBars: cas.bars?.h || 0,
+    vBars: cas.bars?.v || 0,
+    fanHBars: cas.bars?.fanH || 0,
+    fanVBars: cas.bars?.fanV || 0,
+    fan2HBars: cas.bars?.fan2H || 0,
+    fan2VBars: cas.bars?.fan2V || 0,
+    opening: 0,
+    woodColor: single,
+    woodColorExt: isDual ? resolveColor(color.outside, '') : single,
+    woodColorInt: isDual ? resolveColor(color.inside, '') : single,
+    sameColor: !isDual,
+    glassType: glazing.type === 'triple' ? 'triple' : 'double',
+    spacerColor: glazing.spacerColour || 'silver',
+    glassFinish: glazing.finish || 'clear',
+    trickleVent: 'none',
+    sealColour: 'black',
+    sillExtension: 0,
+    showGuides: false,
+    ironmongery: windowSpec?.hardware?.finish || 'brass',
   };
 }

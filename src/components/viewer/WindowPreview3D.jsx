@@ -2,7 +2,8 @@ import { Suspense, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, ContactShadows, Environment } from '@react-three/drei';
 import ParametricSashWindow from '../../3d/components/ParametricSashWindow.jsx';
-import { windowSpecToConfig } from '../../utils/windowSpecToConfig.js';
+import CasementWindow from '../../3d/components/casement/CasementWindow.jsx';
+import { windowSpecToConfig, windowSpecToCasementProps } from '../../utils/windowSpecToConfig.js';
 
 function Scene({ config, side }) {
   // Exterior = front (+Z camera), Interior = back (-Z camera) achieved by rotating group
@@ -19,7 +20,9 @@ function Scene({ config, side }) {
       <directionalLight position={[-2, 3, -3]} intensity={0.4} />
 
       <group rotation={groupRotation}>
-        <ParametricSashWindow {...config} />
+        {config.windowCategory === 'casement'
+          ? <CasementWindow {...config.casementProps} />
+          : <ParametricSashWindow {...config} />}
       </group>
 
       <ContactShadows

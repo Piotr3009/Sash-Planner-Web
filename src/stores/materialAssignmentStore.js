@@ -85,7 +85,9 @@ export const CASEMENT_PARTS = {
 };
 export const CASEMENT_ALL_PARTS = [...CASEMENT_PARTS.frame, ...CASEMENT_PARTS.sash];
 
-// Flat list for lookups
+// Flat list for lookups — includes casement parts: mergeWindowMaterials and
+// the per-window material table iterate THIS list, so anything missing here
+// is silently dropped from every BOM (the audit's casement drop bug).
 export const ALL_PARTS = [
   ...SASH_WINDOW_PARTS.box,
   ...SASH_WINDOW_PARTS.sash,
@@ -93,6 +95,7 @@ export const ALL_PARTS = [
   ...SASH_WINDOW_PARTS.glass,
   ...SASH_WINDOW_PARTS.paint,
   ...SASH_WINDOW_PARTS.consumables,
+  ...CASEMENT_ALL_PARTS,
 ];
 
 // ─── Store ───

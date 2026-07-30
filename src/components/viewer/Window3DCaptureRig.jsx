@@ -23,7 +23,8 @@
 import { useState, useRef, useMemo, useEffect, useCallback, useLayoutEffect } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import ParametricSashWindow from '../../3d/components/ParametricSashWindow.jsx';
-import { windowSpecToConfig } from '../../utils/windowSpecToConfig.js';
+import CasementWindow from '../../3d/components/casement/CasementWindow.jsx';
+import { windowSpecToConfig, windowSpecToCasementProps } from '../../utils/windowSpecToConfig.js';
 
 const FOV = 45;          // vertical field of view (deg)
 const MARGIN = 1.35;     // padding around the window in frame
@@ -76,7 +77,9 @@ function CaptureScene({ config, side, onCaptured }) {
       <directionalLight position={[-3, 2, 4]} intensity={0.45} />
       <directionalLight position={[0, -3, 4]} intensity={0.25} />
       <group rotation={groupRotation}>
-        <ParametricSashWindow {...config} />
+        {config.windowCategory === 'casement'
+          ? <CasementWindow {...config.casementProps} />
+          : <ParametricSashWindow {...config} />}
       </group>
     </>
   );

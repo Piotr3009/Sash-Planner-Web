@@ -1,3 +1,4 @@
+import { resolveCasementLayout, clampFanRatio, CASEMENT_GEO_DEFAULTS } from './casementLayouts.js';
 import { getWindowProfile, getCasementProfile, profileSashDepth, profileBoardWidth, boardWidthForDepth, kgPerM } from './profile.js';
 
 /**
@@ -570,8 +571,36 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
     const sashW = frameWidth - p.deductions.sashWidth;
     const sashH = frameHeight - p.deductions.sashHeight;
     const jambLength = frameHeight - 2 * els.frameHead.face;
-    const glassW = Math.max(0, sashW - p.deductions.glassWidth);
-    const glassH = Math.max(0, sashH - p.deductions.glassHeight);
+
+    // ── Layout geometry (single source: casementLayouts.js) ──
+    // Stage 4a uses PSW geo defaults (57/68/68) so pane sizes match the 3D
+    // preview and PSW exactly; profile-driven geo (incl. the 68 vs 70 cill
+    // face question) lands with stage 4b dimensioning.
+    const cas = windowSpec.casement || {};
+    const layout = cas.layout || '040L';
+    const GEO = CASEMENT_GEO_DEFAULTS;
+    const innerW = frameWidth - 2 * GEO.frameFace;
+    const innerH = frameHeight - GEO.frameFace - GEO.bottomFace;
+    const layoutDef = resolveCasementLayout({
+        code: layout, innerW, innerH, height: frameHeight,
+        fanlightRatio: clampFanRatio(cas.fanlightHeight, innerH),
+        fan2Ratio: clampFanRatio(cas.fan2Height, innerH),
+        middleSectionMm: Number(cas.middleWidth) || 0,
+        casementHinges: cas.hinges,
+    });
+
+    // PROVISIONAL per-pane glass until 4b: every pane glazed like an opener —
+    // pane opening minus fitting gap (2×4) minus sash-to-glass deduction (64),
+    // consistent with the profile's frame-level numbers (122 − 2×57 = 8).
+    const paneGap = p.deductions.sashWidth - 2 * els.frameJamb.face;
+    const paneGlassDed = paneGap + p.deductions.glassWidth;
+    const openers = layoutDef.panels.filter((pn) => pn.hinge !== 'fixed').length;
+    const paneGlass = layoutDef.panels.map((pn, i) => ({
+        width: Math.max(0, Math.round(pn.w - paneGlassDed)),
+        height: Math.max(0, Math.round(pn.h - paneGlassDed)),
+        location: `${layout} P${i + 1} ${pn.hinge === 'fixed' ? 'fixed' : pn.hinge}`,
+        qty: 1,
+    }));
 
     const box = [
         createComponentRecord(windowSpec, 'box', 'C-FRAME HEAD', `${d}x${els.frameHead.face}`, frameWidth, 1),
@@ -592,7 +621,8 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
         config: { key: 'none', rows: 0, cols: 0 },
         components: { sash, box, beading: [] },
         glazingItems: [],
-        customGlassUnits: [{ width: glassW, height: glassH, location: 'casement', qty: 1 }],
+        customGlassUnits: paneGlass,
+        casement: { layout, layoutDef, openers, panes: layoutDef.panels.length },
         barPositions: { vertical: [], horizontal: [] },
         weights: { timber: 0, glass: 0, total: 0 },
         paint: calculatePaint(frameWidth, frameHeight),
