@@ -7,7 +7,10 @@ import FrontElevation2D from './FrontElevation2D.jsx';
 import BoxDetail2D from './BoxDetail2D.jsx';
 import SashDetail2D from './SashDetail2D.jsx';
 import SectionsUpload from './SectionsUpload.jsx';
-import CasementDrawing2D from './CasementDrawing2D.jsx';
+import CasementElevation2D from './CasementElevation2D.jsx';
+import CasementFrameDetail2D from './CasementFrameDetail2D.jsx';
+import CasementLeafDetail2D from './CasementLeafDetail2D.jsx';
+import { groupCasementLeaves, paneTitle } from './casementDrawUtils.js';
 import { useProjectStore } from '../../stores/projectStore.js';
 import { exportElevationsPDF, exportElementsPDF } from '../../utils/drawingsPdfExport.js';
 import { svgNodeToPng } from '../../utils/svgRaster.js';
@@ -25,8 +28,14 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
   const [busy, setBusy] = useState(false);
   const refs = useRef({});
   const isCasement = (windowSpec?.category || 'sash') === 'casement';
+  const leafGroups = isCasement ? groupCasementLeaves(derived) : [];
   const visibleTabs = isCasement
-    ? SUB_TABS.filter((t) => t.id === 'elevation' || t.id === 'vsection')
+    ? [
+        { id: 'elevation', label: 'Front Elevation' },
+        { id: 'frame', label: 'Frame Detail' },
+        ...leafGroups.map((gp, k) => ({ id: `leaf${k}`, label: paneTitle(gp) })),
+        { id: 'vsection', label: '2D Sections' },
+      ]
     : SUB_TABS;
 
   const winW = item?.width || windowSpec?.frame?.width || '';
@@ -57,7 +66,9 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
     if (busy || !derived) return;
     setBusy(true);
     try {
-      const types = [['box', 'Box Detail'], ['upper', 'Upper Sash'], ['lower', 'Lower Sash']];
+      const types = isCasement
+        ? [['frame', 'Frame Detail'], ...leafGroups.map((gp, k) => [`leaf${k}`, paneTitle(gp)])]
+        : [['box', 'Box Detail'], ['upper', 'Upper Sash'], ['lower', 'Lower Sash']];
       const drawings = [];
       for (const [t, label] of types) {
         const svg = refs.current[t]?.querySelector('svg');
@@ -103,19 +114,24 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
               className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
               📄 Elevation PDF
             </button>
-            {!isCasement && (
-              <button onClick={handleExportElements} disabled={busy || !derived}
-                className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                📄 Elements PDF
-              </button>
-            )}
+            <button onClick={handleExportElements} disabled={busy || !derived}
+              className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              📄 Elements PDF
+            </button>
           </div>
           <div className="card p-4 min-h-[400px]">
             {subTab === 'elevation' && (
               isCasement
-                ? <CasementDrawing2D windowSpec={windowSpec} derived={derived} batch={batch} />
+                ? <CasementElevation2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
                 : <FrontElevation2D windowSpec={windowSpec} derived={derived} />
             )}
+            {isCasement && subTab === 'frame' && (
+              <CasementFrameDetail2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
+            )}
+            {isCasement && leafGroups.map((gp, k) => subTab === `leaf${k}` && (
+              <CasementLeafDetail2D key={gp.key} windowSpec={windowSpec} derived={derived}
+                group={gp} projectNumber={batch?.projectNumber} />
+            ))}
             {subTab === 'box' && (
               <BoxDetail2D windowSpec={windowSpec} derived={derived} />
             )}
@@ -135,9 +151,19 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
         <div aria-hidden="true" style={{ position: 'absolute', left: '-99999px', top: 0, width: '1200px' }}>
           <div ref={(el) => { refs.current['elevation'] = el; }}>
             {isCasement
-              ? <CasementDrawing2D windowSpec={windowSpec} derived={derived} batch={batch} />
+              ? <CasementElevation2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
               : <FrontElevation2D windowSpec={windowSpec} derived={derived} />}
           </div>
+          {isCasement && (<>
+          <div ref={(el) => { refs.current['frame'] = el; }}>
+            <CasementFrameDetail2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
+          </div>
+          {leafGroups.map((gp, k) => (
+            <div key={gp.key} ref={(el) => { refs.current[`leaf${k}`] = el; }}>
+              <CasementLeafDetail2D windowSpec={windowSpec} derived={derived} group={gp} projectNumber={batch?.projectNumber} />
+            </div>
+          ))}
+          </>)}
           {!isCasement && (<>
           <div ref={(el) => { refs.current['box'] = el; }}>
             <BoxDetail2D windowSpec={windowSpec} derived={derived} />
