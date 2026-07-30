@@ -476,6 +476,13 @@ function Scene({ config, isMobile }) {
                 layout={config.casementLayout}
                 opening={config.casementOpening || 0}
                 fanlightRatio={config.fanlightRatio || 0.3}
+                middleSection={config.casementMiddleWidth || 0}
+                casementHinges={config.casementHinges || null}
+                fan2Ratio={config.casementFan2Ratio || 0.3}
+                fanHBars={config.casementFanHBars || 0}
+                fanVBars={config.casementFanVBars || 0}
+                fan2HBars={config.casementFan2HBars || 0}
+                fan2VBars={config.casementFan2VBars || 0}
                 woodColor={config.woodColor}
                 woodColorExt={config.woodColorExt}
                 woodColorInt={config.woodColorInt}
@@ -651,6 +658,13 @@ export default function App() {
   const [fanlightRatio, setFanlightRatio] = useState(0.3);
   const [casementHBars, setCasementHBars] = useState(0);
   const [casementVBars, setCasementVBars] = useState(0);
+  const [casementMiddleWidth, setCasementMiddleWidth] = useState(0);
+  const [casementHinges, setCasementHinges] = useState(null);
+  const [casementFan2Ratio, setCasementFan2Ratio] = useState(0.3);
+  const [casementFanHBars, setCasementFanHBars] = useState(0);
+  const [casementFanVBars, setCasementFanVBars] = useState(0);
+  const [casementFan2HBars, setCasementFan2HBars] = useState(0);
+  const [casementFan2VBars, setCasementFan2VBars] = useState(0);
   const [glassFinish, setGlassFinish] = useState('clear');
   const [trickleVent, setTrickleVent] = useState('none');
   const [trickleColour, setTrickleColour] = useState('white');
@@ -700,15 +714,15 @@ export default function App() {
   const buckets = useRef({});
 
   const BUCKET_DEFAULTS = {
-    sash: { extWidth: 1000, extHeight: 1500, woodColor: '#F6F6F6', woodColorExt: '#F6F6F6', woodColorInt: '#F6F6F6', sameColor: true, spacerColor: 'silver', opening: 0, upperOpening: 0, openingType: 'both', boxType: 'standard', showHorns: true, hornType: 'A', ironmongery: 'brass', upperGlass: 'clear', lowerGlass: 'clear', upperBars: 'none', lowerBars: 'none', sameBars: true, upperCustomBars: [], lowerCustomBars: [], sashType: 'double', splitRatio: '1/4-1/2-1/4', headType: 'flat', fixUpperBars: 'none', fixLowerBars: 'none', fixUpperCustomBars: [], fixLowerCustomBars: [], casementLayout: '040L', casementOpening: 0, fanlightRatio: 0.3, casementHBars: 0, casementVBars: 0 },
-    casement: { extWidth: 800, extHeight: 1500, glassFinish: 'clear', trickleVent: 'none', trickleColour: 'white', sillExtension: 0, sillWider: false, sealColour: 'black', woodColor: '#F6F6F6', woodColorExt: '#F6F6F6', woodColorInt: '#F6F6F6', sameColor: true, spacerColor: 'silver', opening: 0, upperOpening: 0, openingType: 'both', boxType: 'standard', showHorns: false, hornType: 'A', ironmongery: 'brass', upperGlass: 'clear', lowerGlass: 'clear', upperBars: 'none', lowerBars: 'none', sameBars: true, upperCustomBars: [], lowerCustomBars: [], sashType: 'double', splitRatio: '1/4-1/2-1/4', headType: 'flat', fixUpperBars: 'none', fixLowerBars: 'none', fixUpperCustomBars: [], fixLowerCustomBars: [], casementLayout: '040L', casementOpening: 0, fanlightRatio: 0.3, casementHBars: 0, casementVBars: 0 },
-    'fix-only': { extWidth: 1000, extHeight: 1500, glassFinish: 'clear', woodColor: '#F6F6F6', woodColorExt: '#F6F6F6', woodColorInt: '#F6F6F6', sameColor: true, spacerColor: 'silver', opening: 0, upperOpening: 0, openingType: 'fixed', boxType: 'standard', showHorns: false, hornType: 'A', ironmongery: 'brass', upperGlass: 'clear', lowerGlass: 'clear', upperBars: 'none', lowerBars: 'none', sameBars: true, upperCustomBars: [], lowerCustomBars: [], sashType: 'double', splitRatio: '1/4-1/2-1/4', headType: 'flat', fixUpperBars: 'none', fixLowerBars: 'none', fixUpperCustomBars: [], fixLowerCustomBars: [], casementLayout: '010', casementOpening: 0, fanlightRatio: 0.3, casementHBars: 0, casementVBars: 0 },
+    sash: { extWidth: 1000, extHeight: 1500, woodColor: '#F6F6F6', woodColorExt: '#F6F6F6', woodColorInt: '#F6F6F6', sameColor: true, spacerColor: 'silver', opening: 0, upperOpening: 0, openingType: 'both', boxType: 'standard', showHorns: true, hornType: 'A', ironmongery: 'brass', upperGlass: 'clear', lowerGlass: 'clear', upperBars: 'none', lowerBars: 'none', sameBars: true, upperCustomBars: [], lowerCustomBars: [], sashType: 'double', splitRatio: '1/4-1/2-1/4', headType: 'flat', fixUpperBars: 'none', fixLowerBars: 'none', fixUpperCustomBars: [], fixLowerCustomBars: [], casementLayout: '040L', casementOpening: 0, fanlightRatio: 0.3, casementHBars: 0, casementVBars: 0, casementMiddleWidth: 0, casementHinges: null, casementFan2Ratio: 0.3, casementFanHBars: 0, casementFanVBars: 0, casementFan2HBars: 0, casementFan2VBars: 0 },
+    casement: { extWidth: 800, extHeight: 1500, glassFinish: 'clear', trickleVent: 'none', trickleColour: 'white', sillExtension: 0, sillWider: false, sealColour: 'black', woodColor: '#F6F6F6', woodColorExt: '#F6F6F6', woodColorInt: '#F6F6F6', sameColor: true, spacerColor: 'silver', opening: 0, upperOpening: 0, openingType: 'both', boxType: 'standard', showHorns: false, hornType: 'A', ironmongery: 'brass', upperGlass: 'clear', lowerGlass: 'clear', upperBars: 'none', lowerBars: 'none', sameBars: true, upperCustomBars: [], lowerCustomBars: [], sashType: 'double', splitRatio: '1/4-1/2-1/4', headType: 'flat', fixUpperBars: 'none', fixLowerBars: 'none', fixUpperCustomBars: [], fixLowerCustomBars: [], casementLayout: '040L', casementOpening: 0, fanlightRatio: 0.3, casementHBars: 0, casementVBars: 0, casementMiddleWidth: 0, casementHinges: null, casementFan2Ratio: 0.3, casementFanHBars: 0, casementFanVBars: 0, casementFan2HBars: 0, casementFan2VBars: 0 },
+    'fix-only': { extWidth: 1000, extHeight: 1500, glassFinish: 'clear', woodColor: '#F6F6F6', woodColorExt: '#F6F6F6', woodColorInt: '#F6F6F6', sameColor: true, spacerColor: 'silver', opening: 0, upperOpening: 0, openingType: 'fixed', boxType: 'standard', showHorns: false, hornType: 'A', ironmongery: 'brass', upperGlass: 'clear', lowerGlass: 'clear', upperBars: 'none', lowerBars: 'none', sameBars: true, upperCustomBars: [], lowerCustomBars: [], sashType: 'double', splitRatio: '1/4-1/2-1/4', headType: 'flat', fixUpperBars: 'none', fixLowerBars: 'none', fixUpperCustomBars: [], fixLowerCustomBars: [], casementLayout: '010', casementOpening: 0, fanlightRatio: 0.3, casementHBars: 0, casementVBars: 0, casementMiddleWidth: 0, casementHinges: null, casementFan2Ratio: 0.3, casementFanHBars: 0, casementFanVBars: 0, casementFan2HBars: 0, casementFan2VBars: 0 },
     door: { extWidth: 900, extHeight: 2100, glassFinish: 'clear', woodColor: '#F6F6F6', woodColorExt: '#F6F6F6', woodColorInt: '#F6F6F6', sameColor: true, spacerColor: 'silver', doorType: 'single-external', doorShape: 'standard', doorStyle: 'full-glass', doorHinge: 'left', doorHBars: 0, doorVBars: 0, centerMullion: false, paneling: 'flat', sidePanels: 'none', sideLeftWidth: 500, sideRightWidth: 500, sideHBars: 0, sideVBars: 0, sideStyle: 'full-glass', thresholdType: 'standard', thresholdExtension: 0, doorOpening: 0, doorOpenDirection: 'outward', panelCount: 2, slideDirection: 'left-to-right', extraWidth: false, glassWidth: 0, panelDepth: 57, frameDepth: 93, foldDirection: 'left', trafficDoor: 'no', bifoldOpenDirection: 'outward' },
   };
 
   // Capture current state snapshot
   function captureState() {
-    return { extWidth, extHeight, woodColor, woodColorExt, woodColorInt, sameColor, spacerColor, opening, upperOpening, openingType, boxType, showHorns, hornType, ironmongery, upperGlass, lowerGlass, upperBars, lowerBars, sameBars, upperCustomBars, lowerCustomBars, sashType, splitRatio, headType, fixUpperBars, fixLowerBars, fixUpperCustomBars, fixLowerCustomBars, casementLayout, casementOpening, fanlightRatio, casementHBars, casementVBars, glassFinish, trickleVent, trickleColour, sillExtension, sillWider, sealColour, fixShape, fixType, fixArchRise, fixGothicBars, fixCircleBarPattern, fixCircleBarOffset, fixSemiBarPattern, casementType, casArchShape, casArchHinge, doorType, doorShape, doorStyle, doorHinge, doorHBars, doorVBars, centerMullion, paneling, sidePanels, sideLeftWidth, sideRightWidth, sideHBars, sideVBars, sideStyle, thresholdType, thresholdExtension, doorOpening, doorOpenDirection, panelCount, slideDirection, extraWidth, glassWidth, panelDepth, frameDepth, foldDirection, trafficDoor, bifoldOpenDirection };
+    return { extWidth, extHeight, woodColor, woodColorExt, woodColorInt, sameColor, spacerColor, opening, upperOpening, openingType, boxType, showHorns, hornType, ironmongery, upperGlass, lowerGlass, upperBars, lowerBars, sameBars, upperCustomBars, lowerCustomBars, sashType, splitRatio, headType, fixUpperBars, fixLowerBars, fixUpperCustomBars, fixLowerCustomBars, casementLayout, casementOpening, fanlightRatio, casementHBars, casementVBars, casementMiddleWidth, casementHinges, casementFan2Ratio, casementFanHBars, casementFanVBars, casementFan2HBars, casementFan2VBars, glassFinish, trickleVent, trickleColour, sillExtension, sillWider, sealColour, fixShape, fixType, fixArchRise, fixGothicBars, fixCircleBarPattern, fixCircleBarOffset, fixSemiBarPattern, casementType, casArchShape, casArchHinge, doorType, doorShape, doorStyle, doorHinge, doorHBars, doorVBars, centerMullion, paneling, sidePanels, sideLeftWidth, sideRightWidth, sideHBars, sideVBars, sideStyle, thresholdType, thresholdExtension, doorOpening, doorOpenDirection, panelCount, slideDirection, extraWidth, glassWidth, panelDepth, frameDepth, foldDirection, trafficDoor, bifoldOpenDirection };
   }
 
   // Restore state from bucket
@@ -747,6 +761,13 @@ export default function App() {
     if (s.fanlightRatio !== undefined) setFanlightRatio(s.fanlightRatio);
     if (s.casementHBars !== undefined) setCasementHBars(s.casementHBars);
     if (s.casementVBars !== undefined) setCasementVBars(s.casementVBars);
+    if (s.casementMiddleWidth !== undefined) setCasementMiddleWidth(s.casementMiddleWidth);
+    if (s.casementHinges !== undefined) setCasementHinges(s.casementHinges);
+    if (s.casementFan2Ratio !== undefined) setCasementFan2Ratio(s.casementFan2Ratio);
+    if (s.casementFanHBars !== undefined) setCasementFanHBars(s.casementFanHBars);
+    if (s.casementFanVBars !== undefined) setCasementFanVBars(s.casementFanVBars);
+    if (s.casementFan2HBars !== undefined) setCasementFan2HBars(s.casementFan2HBars);
+    if (s.casementFan2VBars !== undefined) setCasementFan2VBars(s.casementFan2VBars);
     if (s.glassFinish !== undefined) setGlassFinish(s.glassFinish);
     if (s.trickleVent !== undefined) setTrickleVent(s.trickleVent);
     if (s.trickleColour !== undefined) setTrickleColour(s.trickleColour);
@@ -852,6 +873,13 @@ export default function App() {
       if (cfg.fanlightRatio !== undefined) setFanlightRatio(cfg.fanlightRatio);
       if (cfg.casementHBars !== undefined) setCasementHBars(cfg.casementHBars);
       if (cfg.casementVBars !== undefined) setCasementVBars(cfg.casementVBars);
+      if (cfg.casementMiddleWidth !== undefined) setCasementMiddleWidth(cfg.casementMiddleWidth);
+      if (cfg.casementHinges !== undefined) setCasementHinges(cfg.casementHinges);
+      if (cfg.casementFan2Ratio !== undefined) setCasementFan2Ratio(cfg.casementFan2Ratio);
+      if (cfg.casementFanHBars !== undefined) setCasementFanHBars(cfg.casementFanHBars);
+      if (cfg.casementFanVBars !== undefined) setCasementFanVBars(cfg.casementFanVBars);
+      if (cfg.casementFan2HBars !== undefined) setCasementFan2HBars(cfg.casementFan2HBars);
+      if (cfg.casementFan2VBars !== undefined) setCasementFan2VBars(cfg.casementFan2VBars);
       if (cfg.glassFinish !== undefined) setGlassFinish(cfg.glassFinish);
       if (cfg.trickleVent !== undefined) setTrickleVent(cfg.trickleVent);
       if (cfg.trickleColour !== undefined) setTrickleColour(cfg.trickleColour);
@@ -948,6 +976,13 @@ export default function App() {
       fanlightRatio,
       casementHBars,
       casementVBars,
+      casementMiddleWidth,
+      casementHinges,
+      casementFan2Ratio,
+      casementFanHBars,
+      casementFanVBars,
+      casementFan2HBars,
+      casementFan2VBars,
       glassFinish,
       trickleVent,
       trickleColour,
@@ -992,7 +1027,7 @@ export default function App() {
       trafficDoor,
       bifoldOpenDirection,
     }),
-    [width, height, extWidth, extHeight, opening, upperOpening, autoRotate, showGuides, showHorns, hornType, ironmongery, upperGlass, lowerGlass, doubleGlazing, spacerColor, brightness, boxType, boxDepthOverride, upperBars, lowerBars, upperCustomBars, lowerCustomBars, woodColor, woodColorExt, woodColorInt, sameColor, sashType, splitRatio, headType, fixUpperBars, fixLowerBars, fixUpperCustomBars, fixLowerCustomBars, windowCategory, casementLayout, casementOpening, fanlightRatio, casementHBars, casementVBars, glassFinish, trickleVent, trickleColour, sillExtension, sillWider, sealColour, fixShape, fixType, fixArchRise, fixGothicBars, fixCircleBarPattern, fixCircleBarOffset, fixSemiBarPattern, casementType, casArchShape, casArchHinge, doorType, doorShape, doorStyle, doorHinge, doorHBars, doorVBars, centerMullion, paneling, sidePanels, sideLeftWidth, sideRightWidth, sideHBars, sideVBars, sideStyle, thresholdType, thresholdExtension, doorOpening, doorOpenDirection, panelCount, slideDirection, extraWidth, glassWidth, panelDepth, frameDepth, foldDirection, trafficDoor, bifoldOpenDirection],
+    [width, height, extWidth, extHeight, opening, upperOpening, autoRotate, showGuides, showHorns, hornType, ironmongery, upperGlass, lowerGlass, doubleGlazing, spacerColor, brightness, boxType, boxDepthOverride, upperBars, lowerBars, upperCustomBars, lowerCustomBars, woodColor, woodColorExt, woodColorInt, sameColor, sashType, splitRatio, headType, fixUpperBars, fixLowerBars, fixUpperCustomBars, fixLowerCustomBars, windowCategory, casementLayout, casementOpening, fanlightRatio, casementHBars, casementVBars, casementMiddleWidth, casementHinges, casementFan2Ratio, casementFanHBars, casementFanVBars, casementFan2HBars, casementFan2VBars, glassFinish, trickleVent, trickleColour, sillExtension, sillWider, sealColour, fixShape, fixType, fixArchRise, fixGothicBars, fixCircleBarPattern, fixCircleBarOffset, fixSemiBarPattern, casementType, casArchShape, casArchHinge, doorType, doorShape, doorStyle, doorHinge, doorHBars, doorVBars, centerMullion, paneling, sidePanels, sideLeftWidth, sideRightWidth, sideHBars, sideVBars, sideStyle, thresholdType, thresholdExtension, doorOpening, doorOpenDirection, panelCount, slideDirection, extraWidth, glassWidth, panelDepth, frameDepth, foldDirection, trafficDoor, bifoldOpenDirection],
   );
 
   return (
