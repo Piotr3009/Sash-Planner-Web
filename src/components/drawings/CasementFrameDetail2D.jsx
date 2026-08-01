@@ -19,7 +19,9 @@ function fmt(n) {
   return Number.isInteger(r) ? r.toString() : r.toFixed(1);
 }
 
-export default function CasementFrameDetail2D({ windowSpec, derived, projectNumber }) {
+export default function CasementFrameDetail2D({ windowSpec, derived, projectNumber, selectedElement, onElementClick }) {
+  const clickable = typeof onElementClick === 'function';
+  const hl = (key) => clickable && selectedElement === key;
   const geom = useMemo(() => {
     const cas = derived?.casement;
     if (!windowSpec || !cas) return null;
@@ -168,6 +170,36 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
           label={fmt(fw)} vbw={totalW} />
         <DimV x={ox + fw + DM * 1.15} y1={Y(0)} y2={Y(fh)} extFrom={X(fw)}
           label={fmt(fh)} vbw={totalW} />
+
+        {/* Selection overlays — invisible click zones + highlight (sash pattern) */}
+        {clickable && (() => {
+          const zones = [
+            { key: 'head', x: X(0), y: Y(0), w: fw, h: g.land },
+            { key: 'frameJamb', x: X(0), y: Y(g.land), w: g.land, h: fh - g.land - g.cillVisible },
+            { key: 'frameJamb', x: X(fw - g.land), y: Y(g.land), w: g.land, h: fh - g.land - g.cillVisible },
+            { key: 'cill', x: X(0), y: Y(fh - g.cillVisible), w: fw, h: g.cillVisible },
+            ...geom.mullions.map((mu) => ({
+              key: 'mullion', x: X(mu.x1), y: Y(mu.full ? g.land : mu.yTop),
+              w: mu.x2 - mu.x1,
+              h: (mu.full ? fh - g.cillVisible : mu.yBottom) - (mu.full ? g.land : mu.yTop),
+            })),
+            ...geom.transoms.map((tr) => ({
+              key: 'transom', x: X(tr.x1), y: Y(tr.bandTop),
+              w: tr.x2 - tr.x1, h: tr.bandBottom - tr.bandTop,
+            })),
+          ];
+          return (
+            <g>
+              {zones.map((z, i) => (
+                <rect key={i} x={z.x} y={z.y} width={z.w} height={z.h}
+                  fill={hl(z.key) ? COLORS.highlightFill : 'transparent'}
+                  stroke={hl(z.key) ? COLORS.highlight : 'none'} strokeWidth={STROKES.sash} {...NS}
+                  style={{ cursor: 'pointer' }}
+                  onClick={(e) => { e.stopPropagation(); onElementClick(z.key); }} />
+              ))}
+            </g>
+          );
+        })()}
 
         {/* ── TITLE ── */}
         <TitleBlock x={totalW / 2} y={oy + fh + DM + TITLE_AREA * 0.5}

@@ -42,7 +42,9 @@ function computeSegments(from, to, cutPairs) {
   return segs;
 }
 
-export default function CasementLeafDetail2D({ windowSpec, derived, group, onExpand, projectNumber }) {
+export default function CasementLeafDetail2D({ windowSpec, derived, group, onExpand, projectNumber, selectedElement, onElementClick }) {
+  const clickable = typeof onElementClick === 'function';
+  const hl = (key) => clickable && selectedElement === key;
   const [expanded, setExpanded] = useState(false);
   const isExternalExpand = !!onExpand;
   const handleExpand = (e) => {
@@ -245,6 +247,27 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
                 stroke={C.notch} strokeWidth={STROKES.notch} {...NS} strokeOpacity={0.8} />
             </g>
           ))}
+
+          {/* Selection overlays — invisible click zones + highlight (sash pattern) */}
+          {clickable && (() => {
+            const zones = [
+              { key: 'leafStile', x: X(0), y: Y(0), w: geom.stile, h: geom.leafH },
+              { key: 'leafStile', x: X(geom.leafW - geom.stile), y: Y(0), w: geom.stile, h: geom.leafH },
+              { key: 'leafTopRail', x: X(geom.stile), y: Y(0), w: geom.leafW - 2 * geom.stile, h: geom.stile },
+              { key: 'leafBottomRail', x: X(geom.stile), y: Y(geom.leafH - geom.stile), w: geom.leafW - 2 * geom.stile, h: geom.stile },
+            ];
+            return (
+              <g>
+                {zones.map((z, i) => (
+                  <rect key={i} x={z.x} y={z.y} width={z.w} height={z.h}
+                    fill={hl(z.key) ? COLORS.highlightFill : 'transparent'}
+                    stroke={hl(z.key) ? COLORS.highlight : 'none'} strokeWidth={STROKES.outer} {...NS}
+                    style={{ cursor: 'pointer' }}
+                    onClick={(e) => { e.stopPropagation(); onElementClick(z.key); }} />
+                ))}
+              </g>
+            );
+          })()}
 
           {/* ── DIM CHAINS ── */}
           <DimChainH y={topDimY} cuts={topCuts.map(X)} extFrom={topExtLineEnd}

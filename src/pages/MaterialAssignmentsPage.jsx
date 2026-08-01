@@ -9,6 +9,9 @@ import { deriveWindowData } from '../engine/calculations.js';
 import { normaliseToWindowSpec } from '../engine/specification.js';
 import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
 import SashDetail2D from '../components/drawings/SashDetail2D.jsx';
+import CasementFrameDetail2D from '../components/drawings/CasementFrameDetail2D.jsx';
+import CasementLeafDetail2D from '../components/drawings/CasementLeafDetail2D.jsx';
+import { groupCasementLeaves } from '../components/drawings/casementDrawUtils.js';
 import JambDetail2D from '../components/drawings/JambDetail2D.jsx';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
 
@@ -401,6 +404,28 @@ export default function MaterialAssignmentsPage() {
     try { return deriveWindowData(drawingsSpec); } catch { return null; }
     // sashProfile in deps → drawings re-derive live when the workshop profile changes
   }, [drawingsSpec, sashProfile]);
+  // ── Casement sample drawings (022: mullion + transoms + both leaf types) ──
+  const casDrawSpec = useMemo(() => normaliseToWindowSpec({
+    name: 'SAMPLE', window_type: 'casement', windowCategory: 'casement',
+    width: 1000, height: 1500, casementLayout: '022', fanlightAxis: 500,
+    casementHinges: ['top', 'top', 'left', 'right'], glassType: 'double',
+  }), []);
+  const casDrawDerived = useMemo(() => {
+    try { return deriveWindowData(casDrawSpec); } catch { return null; }
+  }, [casDrawSpec]);
+  const casLeafGroup = useMemo(() => {
+    const gs = groupCasementLeaves(casDrawDerived);
+    return gs.find((x) => x.role === 'Main') || gs[0] || null;
+  }, [casDrawDerived]);
+  const CAS_PART_TO_KEY = {
+    c_frame_head: 'head', c_frame_jamb: 'frameJamb', c_frame_cill: 'cill',
+    c_mullion: 'mullion', c_transom: 'transom',
+    c_sash_stile: 'leafStile', c_sash_top_rail: 'leafTopRail', c_sash_bottom_rail: 'leafBottomRail',
+  };
+  const CAS_KEY_TO_PART = Object.fromEntries(Object.entries(CAS_PART_TO_KEY).map(([p, k]) => [k, p]));
+  const casSel = selectedPart ? (CAS_PART_TO_KEY[selectedPart] || null) : null;
+  const pickCasFromDrawing = (dk) => { const pid = CAS_KEY_TO_PART[dk]; if (pid) setSelectedPart(pid); };
+
   const selDrawKey = selectedPart ? (PART_REGISTRY[selectedPart]?.drawingKey || null) : null;
   const boxKeys = ['head', 'jambs', 'cill', 'extHeadLiner', 'intHeadLiner', 'extJambLiner', 'intJambLiner'];
   const sashKeys = ['stiles', 'topRail', 'meetingRail', 'bottomRail'];
@@ -560,8 +585,8 @@ export default function MaterialAssignmentsPage() {
           </div>
         )}
 
-        {isCasement && (
-          <>
+        {isCasement && <div className="flex gap-5 items-start">
+        <div className="flex-1 min-w-0">
             <PartGroupSection
               title="🪵 Frame"
               subtitle={`${CASEMENT_PARTS.frame.length} parts · head, jambs, cill, mullion, transom`}
@@ -594,8 +619,19 @@ export default function MaterialAssignmentsPage() {
               selectedPart={selectedPart}
               onSelect={toggleSelect}
             />
-          </>
-        )}
+        </div>
+        <div className="hidden xl:block w-[520px] shrink-0 sticky top-4">
+          <div className="text-[10px] text-ink-400 mb-2">Sample 1000 × 1500 · 022 · click a part row or a drawing element</div>
+          <div className="grid grid-cols-1 gap-3">
+            <CasementFrameDetail2D windowSpec={casDrawSpec} derived={casDrawDerived}
+              selectedElement={casSel} onElementClick={pickCasFromDrawing} />
+            {casLeafGroup && (
+              <CasementLeafDetail2D windowSpec={casDrawSpec} derived={casDrawDerived} group={casLeafGroup}
+                selectedElement={casSel} onElementClick={pickCasFromDrawing} />
+            )}
+          </div>
+        </div>
+        </div>}
 
         {isSash && <div className="flex gap-5 items-start">
         <div className="flex-1 min-w-0">
