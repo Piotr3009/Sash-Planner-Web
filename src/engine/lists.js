@@ -165,7 +165,7 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg, resolveRa
   };
 }
 
-function buildGlassRow(windowSpec, width, height, location, qty, finishOverride) {
+function buildGlassRow(windowSpec, width, height, location, qty, finishOverride, role) {
   const glassType = windowSpec?.glazing?.type || 'double';
   const glassSpec = windowSpec?.glazing?.spec || 'toughened';
   const spacer = windowSpec?.glazing?.spacerColour || 'silver';
@@ -178,6 +178,7 @@ function buildGlassRow(windowSpec, width, height, location, qty, finishOverride)
     width: Math.round(Math.max(0, width) * 100) / 100,
     height: Math.round(Math.max(0, height) * 100) / 100,
     qty, location,
+    label: location, quantity: qty, role: role || 'main',
     type: glassType, spec: glassSpec,
     spacer, spacerType, makeup, coating, gas, finish,
   };
@@ -197,7 +198,7 @@ export function buildGlassListForWindow(derived, windowSpec) {
           && (gz.frostedLocation || 'bottom') === 'bottom') {
         finishOverride = 'clear';
       }
-      return buildGlassRow(windowSpec, u.width, u.height, u.location, u.qty || 1, finishOverride);
+      return buildGlassRow(windowSpec, u.width, u.height, u.location, u.qty || 1, finishOverride, u.role);
     });
   }
   // Triple sash: two panes per section, same heights as double-hung

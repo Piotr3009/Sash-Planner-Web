@@ -8,6 +8,8 @@ import { parseSpecification, normaliseToWindowSpec } from '../engine/specificati
 import { deriveWindowData } from '../engine/calculations.js';
 import { withProfiles } from '../engine/profile.js';
 import { buildGlassListForWindow, buildVentGrilles } from '../engine/lists.js';
+import GlassReferences from '../components/settings/GlassReferences.jsx';
+import { casementBarCounts } from '../components/drawings/casementDrawUtils.js';
 import { effectiveAssignment, buildWindowPartQtys, buildWindowHardware, resolvePartTotal, formatQty, mergeWindowMaterials } from '../engine/bom.js';
 import { liveSectionsFor } from '../engine/partRegistry.js';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
@@ -188,6 +190,20 @@ export default function WindowDetailPage() {
 
 // ─── Glass Panel — same source as Production Pack ───
 function GlassPanel({ item, windowSpec, derived, batch, settings }) {
+  const barsText = (spec, g) => {
+    if ((spec?.category || 'sash') === 'casement') {
+      const { v, h } = casementBarCounts(spec?.casement?.bars, g.role);
+      if (!v && !h) return '—';
+      const t = spec?.casement?.barType === 'georgian' ? 'georgian' : 'astragal';
+      return `${h}H × ${v}V ${t}`;
+    }
+    const pat = g.sash === 'upper' ? (spec?.upperBars || spec?.bars?.upper)
+      : g.sash === 'lower' ? (spec?.lowerBars || spec?.bars?.lower) : null;
+    return pat && pat !== 'none' ? String(pat) : '—';
+  };
+  const rowArea = (g) =>
+    ((Number(g.width) || 0) * (Number(g.height) || 0) * (Number(g.quantity) || 0)) / 1e6;
+
   const glassList = useMemo(
     () => (derived && windowSpec ? buildGlassListForWindow(derived, windowSpec) : []),
     [derived, windowSpec]
@@ -234,6 +250,8 @@ function GlassPanel({ item, windowSpec, derived, batch, settings }) {
                 <th className="px-4 py-2 text-left text-ink-400 font-medium">Finish</th>
                 <th className="px-4 py-2 text-left text-ink-400 font-medium">Spacer</th>
                 <th className="px-4 py-2 text-left text-ink-400 font-medium">Spacer Type</th>
+                <th className="px-4 py-2 text-left text-ink-400 font-medium">Bars</th>
+                <th className="px-4 py-2 text-right text-ink-400 font-medium">Area m²</th>
               </tr>
             </thead>
             <tbody>
@@ -250,11 +268,26 @@ function GlassPanel({ item, windowSpec, derived, batch, settings }) {
                   <td className="px-4 py-2 text-ink-300">{g.finish}</td>
                   <td className="px-4 py-2 text-ink-300">{g.spacer}</td>
                   <td className="px-4 py-2 text-ink-300">{g.spacerType === 'alu' ? 'Aluminium' : 'Warm Edge'}</td>
+                  <td className="px-4 py-2 text-ink-300">{barsText(windowSpec, g)}</td>
+                  <td className="px-4 py-2 text-right text-ink-200 font-mono">{rowArea(g).toFixed(2)}</td>
                 </tr>
               ))}
+              <tr className="border-t border-surface-400/60 text-accent-300">
+                <td className="px-4 py-2 font-medium" colSpan={3}>Total</td>
+                <td className="px-4 py-2 text-right">{glassList.reduce((a, g) => a + (Number(g.quantity) || 0), 0)}</td>
+                <td className="px-4 py-2" colSpan={7}></td>
+                <td className="px-4 py-2 text-right font-mono font-medium">
+                  {glassList.reduce((a, g) => a + rowArea(g), 0).toFixed(2)}
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Tenant technical references (bar sections, spacer details) */}
+      <div className="card p-4">
+        <GlassReferences variant="inline" />
       </div>
 
       {/* Glass drawings — per sash (upper/lower) or per unique casement unit */}

@@ -19,7 +19,7 @@ async function currentUserId() {
 // scoped to this, not to the individual user — so all members of a firm
 // share the same data. Resolved from user_profiles.
 let _tenantCache = null;
-async function currentTenantId() {
+export async function currentTenantId() {
   if (!hasSupabaseConfig) return null;
   if (_tenantCache) return _tenantCache;
   const uid = await currentUserId();

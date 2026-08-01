@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import GlassReferences from '../components/settings/GlassReferences.jsx';
 import { useProjectStore } from '../stores/projectStore.js';
 import { useClientStore } from '../stores/clientStore.js';
 import { useMaterialStore } from '../stores/materialStore.js';
@@ -28,6 +29,7 @@ const TABS = [
   { id: 'company', label: 'Company', admin: true },
   { id: 'pricing', label: 'Pricing', admin: true },
   { id: 'estimate_pdf', label: 'Estimate PDF', admin: true },
+  { id: 'glassrefs', label: 'Glass references', admin: true },
   { id: 'billing', label: 'Billing' },
   { id: 'data',    label: 'Your Data' },
   { id: 'about',   label: 'About' },
@@ -68,6 +70,15 @@ export default function SettingsPage() {
         {tab === 'company' && <CompanyTab />}
         {tab === 'pricing' && <PricingTab />}
         {tab === 'estimate_pdf' && <EstimatePdfTab />}
+        {tab === 'glassrefs' && (
+          <div className="card p-5">
+            <p className="text-xs text-ink-400 mb-4">
+              Images shown on every window's Glass tab as technical references —
+              bar sections, spacer details, photos. Stored per tenant.
+            </p>
+            <GlassReferences variant="tab" />
+          </div>
+        )}
         {tab === 'billing' && <BillingTab />}
         {tab === 'data' && <DataTab />}
         {tab === 'about' && <AboutTab />}
