@@ -477,8 +477,8 @@ export default function MaterialAssignmentsPage() {
   const totalParts = unitCounts.total;
   const assignedCount = unitCounts.assigned;
 
-  // Coming soon for non-sash types
-  if (!isSash) {
+  // Coming soon for the remaining types (casement is live)
+  if (!isSash && !isCasement) {
     return (
       <div className="p-6">
         <div className="mb-5">
@@ -564,7 +564,7 @@ export default function MaterialAssignmentsPage() {
           <>
             <PartGroupSection
               title="🪵 Frame"
-              subtitle={`${CASEMENT_PARTS.frame.length} parts · head, jambs, cill`}
+              subtitle={`${CASEMENT_PARTS.frame.length} parts · head, jambs, cill, mullion, transom`}
               parts={CASEMENT_PARTS.frame}
               assignments={assignments}
               materials={materials}
@@ -572,11 +572,15 @@ export default function MaterialAssignmentsPage() {
               subcategoriesByCategory={subcategoriesByCategory}
               onAssign={setAssignment}
               onFilter={setFilter}
-              onYield={setYield}
+              onYieldChange={setYield}
+              onRemove={removeAssignment}
+              disabled={locked}
+              selectedPart={selectedPart}
+              onSelect={toggleSelect}
             />
             <PartGroupSection
-              title="🪵 Sash"
-              subtitle={`${CASEMENT_PARTS.sash.length} parts · stiles, rails`}
+              title="🪵 Leaf (sash)"
+              subtitle={`${CASEMENT_PARTS.sash.length} parts · stiles, rails — one section all round (vertogen)`}
               parts={CASEMENT_PARTS.sash}
               assignments={assignments}
               materials={materials}
@@ -584,7 +588,11 @@ export default function MaterialAssignmentsPage() {
               subcategoriesByCategory={subcategoriesByCategory}
               onAssign={setAssignment}
               onFilter={setFilter}
-              onYield={setYield}
+              onYieldChange={setYield}
+              onRemove={removeAssignment}
+              disabled={locked}
+              selectedPart={selectedPart}
+              onSelect={toggleSelect}
             />
           </>
         )}

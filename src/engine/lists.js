@@ -127,7 +127,10 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg, resolveRa
   const byMaterial = new Map();
   derived.components.box.forEach((c) => {
     if (c.section == null) return;
-    const materialSection = BOX_MATERIAL_SECTION[c.section] || c.section;
+    // Casement frame members (C-*) live in the box group but take their raw
+    // stock from Material Assignments; the static sash box map stays as-is.
+    const viaAssignment = c.elementName?.startsWith('C-') ? resolveRaw?.(c.elementName) : null;
+    const materialSection = viaAssignment || BOX_MATERIAL_SECTION[c.section] || c.section;
     if (!byMaterial.has(materialSection)) byMaterial.set(materialSection, []);
     byMaterial.get(materialSection).push({
       elementName: c.elementName,

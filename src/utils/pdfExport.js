@@ -1,3 +1,6 @@
+import { makeRawResolver } from '../engine/bom.js';
+import { useMaterialAssignmentStore } from '../stores/materialAssignmentStore.js';
+import { useMaterialStore } from '../stores/materialStore.js';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { drawTechnicalElevation } from '../engine/canvas-renderer.js';
@@ -79,7 +82,13 @@ export async function exportWindowToPDF({ item, windowSpec, settings, derived })
   }
 
   // Precut + optimisation
-  const precut = buildPrecutForWindow(derived, windowSpec, settings);
+  const _mas = useMaterialAssignmentStore.getState();
+  const _resolveRaw = makeRawResolver({
+    assignments: _mas.assignments, assignmentsData: _mas.data,
+    materials: useMaterialStore.getState().materials,
+    frameType: windowSpec?.frame?.type || 'standard',
+  });
+  const precut = buildPrecutForWindow(derived, windowSpec, settings, _resolveRaw);
   const optim = optimisePrecut(precut, settings);
   optim.sashEngineering.forEach((g) => {
     if (y > 250) {

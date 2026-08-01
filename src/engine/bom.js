@@ -88,6 +88,20 @@ Object.assign(ELEMENT_TO_PART_ID, {
 });
 
 // Box head/jamb parts split per frame type (raw board width differs)
+/**
+ * makeRawResolver — elementName → raw stock section from Material Assignments.
+ * Single source for BOM merge AND pre-cut, so both always agree on the
+ * purchased section for a part.
+ */
+export function makeRawResolver({ assignments, assignmentsData, materials, frameType = 'standard' }) {
+  return (elementName) => {
+    const pid = ELEMENT_TO_PART_ID[String(elementName).replace(/ \((FIX L|FIX R|C)\)$/, '')] || ELEMENT_TO_PART_ID[elementName];
+    const a = pid ? effectiveAssignment(pid, frameType, assignmentsData, assignments) : null;
+    const mat = a?.material_id ? (materials || []).find((m) => m.id === a.material_id) : null;
+    return mat ? materialSizeToRaw(mat.size) : null;
+  };
+}
+
 export const FRAME_BOX_PART_SUFFIX = { slim: '_slim', heritage: '_heritage', triple: '_triple' };
 
 // Hardware line (buildHardwareList item name) → ironmongery slot category key
@@ -243,12 +257,7 @@ export function mergeWindowMaterials(windows, { assignments, assignmentsData, ma
 
     // ── materialAssignmentStore parts (timber/beading/glass/consumables/paint) ──
     const frameType = windowSpec?.frame?.type || 'standard';
-    const resolveRaw = (elementName) => {
-      const pid = ELEMENT_TO_PART_ID[String(elementName).replace(/ \((FIX L|FIX R|C)\)$/, '')] || ELEMENT_TO_PART_ID[elementName];
-      const a = pid ? effectiveAssignment(pid, frameType, assignmentsData, assignments) : null;
-      const mat = a?.material_id ? materials.find((m) => m.id === a.material_id) : null;
-      return mat ? materialSizeToRaw(mat.size) : null;
-    };
+    const resolveRaw = makeRawResolver({ assignments, assignmentsData, materials, frameType });
     const partQtys = buildWindowPartQtys(derived, windowSpec, settings, resolveRaw);
 
     // ── User-defined consumables: fixed quantity per window ──

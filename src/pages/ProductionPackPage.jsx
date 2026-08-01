@@ -14,7 +14,7 @@ import { useProjectStore, BATCH_STATUSES } from '../stores/projectStore.js';
 import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignmentStore.js';
 import { useMaterialStore } from '../stores/materialStore.js';
 import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
-import { mergeWindowMaterials, formatQty } from '../engine/bom.js';
+import { mergeWindowMaterials, formatQty, makeRawResolver } from '../engine/bom.js';
 import { summarizeWindows } from '../utils/batchSummary.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
@@ -247,7 +247,13 @@ export default function ProductionPackPage() {
       allCut.push(...cuts.map((r) => ({ ...r, windowName: win.name, _projectNumber: win._projectNumber })));
 
       // Precut
-      const pre = buildPrecutForWindow(derived, windowSpec, settings);
+      const st = useMaterialAssignmentStore.getState();
+      const resolveRaw = makeRawResolver({
+        assignments: st.assignments, assignmentsData: st.data,
+        materials: useMaterialStore.getState().materials,
+        frameType: windowSpec?.frame?.type || 'standard',
+      });
+      const pre = buildPrecutForWindow(derived, windowSpec, settings, resolveRaw);
       pre.sashEngineering.forEach((g) => {
         g.items.forEach((it) => { it.windowName = win.name; it._projectNumber = win._projectNumber; });
         const found = allPrecut.sashEngineering.find((x) => x.section === g.section);
