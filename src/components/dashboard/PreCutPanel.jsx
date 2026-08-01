@@ -50,7 +50,7 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
     const finished = g.items[0]?.finishedSection || g.section;
     allGroups.push({
       key: `sash-${g.section}`,
-      label: `Sash Timber — ${finished}`,
+      label: `${(g.items || []).every((it) => String(it.elementName || '').startsWith('C-')) ? 'Timber' : 'Sash Timber'} — ${finished}`,
       precutSection: g.section,
       section: g.section,
       type: 'sash',

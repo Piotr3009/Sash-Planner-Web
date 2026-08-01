@@ -127,10 +127,25 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg, resolveRa
   const byMaterial = new Map();
   derived.components.box.forEach((c) => {
     if (c.section == null) return;
-    // Casement frame members (C-*) live in the box group but take their raw
-    // stock from Material Assignments; the static sash box map stays as-is.
-    const viaAssignment = c.elementName?.startsWith('C-') ? resolveRaw?.(c.elementName) : null;
-    const materialSection = viaAssignment || BOX_MATERIAL_SECTION[c.section] || c.section;
+    // Casement frame members (C-*): same raw-keyed list as the rest of the
+    // casement timber, so one material assigned across frame + mullions +
+    // leaves lands in ONE group and the optimizer cuts it from the same bars.
+    if (c.elementName?.startsWith('C-')) {
+      const raw = resolveRaw?.(c.elementName) || settings?.sectionMap?.[c.section] || profileRawForSection(c.section) || c.section;
+      if (!bySection.has(raw)) bySection.set(raw, []);
+      bySection.get(raw).push({
+        elementName: c.elementName,
+        length: Math.round(c.length + MACHINING_ALLOWANCE),
+        finishedLength: Math.round(c.length),
+        section: raw,
+        finishedSection: c.section,
+        quantity: c.quantity,
+        windowId: c.windowId,
+        windowName: c.windowName
+      });
+      return;
+    }
+    const materialSection = BOX_MATERIAL_SECTION[c.section] || c.section;
     if (!byMaterial.has(materialSection)) byMaterial.set(materialSection, []);
     byMaterial.get(materialSection).push({
       elementName: c.elementName,
