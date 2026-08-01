@@ -7,6 +7,7 @@ import FrontElevation2D from './FrontElevation2D.jsx';
 import BoxDetail2D from './BoxDetail2D.jsx';
 import SashDetail2D from './SashDetail2D.jsx';
 import SectionsUpload from './SectionsUpload.jsx';
+import CasementSection2D from './CasementSection2D.jsx';
 import CasementElevation2D from './CasementElevation2D.jsx';
 import CasementFrameDetail2D from './CasementFrameDetail2D.jsx';
 import CasementLeafDetail2D from './CasementLeafDetail2D.jsx';
@@ -106,7 +107,14 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
 
       {/* Drawing area */}
       {subTab === 'vsection' ? (
-        <SectionsUpload item={item} batch={batch} />
+        <div>
+          {isCasement && (
+            <div className="mb-4">
+              <CasementSection2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
+            </div>
+          )}
+          <SectionsUpload item={item} batch={batch} />
+        </div>
       ) : (
         <div>
           <div className="flex items-center justify-end gap-2 mb-3">
