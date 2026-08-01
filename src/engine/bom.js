@@ -184,7 +184,9 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
   }
 
   // ── Weights (total window mass +5% = counterbalance to buy) ──
-  if (derived.weights?.total) {
+  // Sash only: casement now reports real weights too (hinge selection), but
+  // a casement window has no counterweights to purchase.
+  if (derived.weights?.total && derived.category !== 'casement') {
     const wPid = (c?.weightType === 'slim') ? 'weights_slim' : 'weights_normal';
     setQty(wPid, derived.weights.total, 'kg');
   }

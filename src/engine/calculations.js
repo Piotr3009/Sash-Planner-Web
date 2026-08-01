@@ -7,6 +7,9 @@ import { getWindowProfile, getCasementProfile, profileSashDepth, profileBoardWid
  */
 
 export const CONSTANTS = Object.freeze({
+    // Weight margin: % added on top of timber+glass for hardware, seals and
+    // paint (Piotr 02.08.2026). Moves to per-tenant Settings in a later pass.
+    WEIGHT_MARGIN_PCT: 5,
     // Frame <-> Sash deductions
     SASH_WIDTH_DEDUCTION: 178,
     // Total sash height deduction from frame: top_sash + bot_sash = frame_height - 92
@@ -807,6 +810,29 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
     const glassSqm = paneGlass.reduce((a, g) => a + (g.width * g.height) / 1e6, 0);
     const openers = layoutDef.panels.filter((pn) => pn.hinge !== 'fixed').length;
 
+    // ── Weights: timber from component sections × density (kgPerM), glass
+    // from GLASS_KG_PER_SQM, + WEIGHT_MARGIN_PCT for hardware/seals/paint.
+    // Per-leaf weights (openers only) feed the hinge selector — margin is
+    // included so the pick stays on the safe side of manufacturer limits.
+    const secKgPerM = (sec) => {
+        const [sf, sd2] = String(sec).split('x').map(Number);
+        return kgPerM(sf || 0, sd2 || 0);
+    };
+    const wMargin = 1 + (CONSTANTS.WEIGHT_MARGIN_PCT || 0) / 100;
+    const timberKg = [...box, ...sash].reduce(
+        (a, cpt) => a + secKgPerM(cpt.section) * ((Number(cpt.length) || 0) / 1000) * (Number(cpt.quantity) || 1),
+        0
+    );
+    const glassKgPerSqm = GLASS_KG_PER_SQM[windowSpec.glazing?.type] || GLASS_KG_PER_SQM['double'];
+    const glassKg = glassSqm * glassKgPerSqm;
+    const leafWeights = layoutDef.panels.map((pn, i) => {
+        if (pn.hinge === 'fixed') return null;
+        const s = leafSizes[i];
+        const frameKg = kgPerM(els.leafStile.face, ld) * ((2 * s.leafH + 2 * s.leafW) / 1000);
+        const paneKg = ((paneGlass[i].width * paneGlass[i].height) / 1e6) * glassKgPerSqm;
+        return { panel: i + 1, hinge: pn.hinge, weightKg: R((frameKg + paneKg) * wMargin) };
+    });
+
     void r1;
     return {
         category: 'casement',
@@ -819,6 +845,7 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
         customGlassUnits: paneGlass,
         casement: {
             layout, layoutDef, openers, panes: layoutDef.panels.length,
+            leafWeights,
             leaves: leafSizes, paneBounds, leafRects, transomRuns, mullionRuns,
             geometry: geo,
             cill: {
@@ -827,7 +854,11 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
             },
         },
         barPositions: { vertical: [], horizontal: [] },
-        weights: { timber: 0, glass: 0, total: 0 },
+        weights: {
+            timber: R(timberKg),
+            glass: R(glassKg),
+            total: R((timberKg + glassKg) * wMargin),
+        },
         paint: calculatePaint(frameWidth, frameHeight),
         consumables: { glass: { type: windowSpec.glazing?.type || 'double', sqm: Math.round(glassSqm * 100) / 100 } },
         frame: { width: frameWidth, height: frameHeight },
