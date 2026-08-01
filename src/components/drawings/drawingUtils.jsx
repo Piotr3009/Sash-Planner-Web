@@ -233,8 +233,8 @@ export function DimChainV({ x, cuts, extFrom, vbw, minSegment = 40, fmt, labels 
 }
 
 // ─── Title block ───
-export function TitleBlock({ x, y, title, subtitle, vbw }) {
-  const ts = vbw / VIEWBOX_REF;
+export function TitleBlock({ x, y, title, subtitle, vbw, scale = 1 }) {
+  const ts = (vbw / VIEWBOX_REF) * scale;
   const titleFs = SIZES.title * ts;
   const subFs = SIZES.subtitle * ts;
   const subGap = 20 * ts;

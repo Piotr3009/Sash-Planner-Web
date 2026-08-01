@@ -64,7 +64,7 @@ export default function CasementSection2D({ windowSpec, derived, projectNumber }
   const Y = (y) => oy + y;
 
   return (
-    <div className="card p-3">
+    <div className="card p-3 max-w-[80%] mx-auto">
       <div className="mb-1 px-1">
         <div className="text-[11px] font-semibold text-ink-100">Cill Section</div>
         <div className="text-[9px] text-ink-400">
@@ -95,9 +95,9 @@ export default function CasementSection2D({ windowSpec, derived, projectNumber }
           <DimH x1={X(-ext)} x2={X(0)} y={Y(boardBottom) + 16} label={`${ext}`} vbw={totalW} />
         )}
 
-        <TitleBlock x={totalW - 6} y={svgH - 8} title="CILL SECTION"
+        <TitleBlock x={totalW / 2} y={svgH - 14} title="CILL SECTION"
           subtitle={`ext ${ext || 0}mm${projectNumber ? ` · ${projectNumber}` : ''}`}
-          vbw={totalW} />
+          vbw={totalW} scale={0.5} />
       </svg>
     </div>
   );
