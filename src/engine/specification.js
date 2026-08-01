@@ -33,6 +33,7 @@ function detectGridMode(spec, item) {
 export const GLASS_MAKEUP = { double: '4x16x4', double_slim: '4x8x4', triple: '4x8x4x8x4', passive: '', single: '' };
 export const GLASS_THICKNESS = { double: 24, double_slim: 16, triple: 28 };
 export const glassGas = (type) => (type === 'single' || type === 'passive') ? '' : 'argon';
+import { FAN_AXIS_OFFSET_TOP, FAN_AXIS_OFFSET_BOTTOM } from './casementLayouts.js';
 import { profileBoxDepth } from './profile.js';
 
 function customBarsFromSpec(spec, item) {
@@ -144,8 +145,23 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       layout: item?.casementLayout || fc.casementLayout || '040L',
       hinges: Array.isArray(item?.casementHinges) ? item.casementHinges
         : Array.isArray(fc.casementHinges) ? fc.casementHinges : null,
-      fanlightHeight: item?.fanlightHeight ?? fc.fanlightHeight ?? null,
-      fan2Height: item?.casementFan2Height ?? fc.casementFan2Height ?? null,
+      // v1.2 convention: values below are transom AXES from the frame top.
+      // New saves write fanlightAxis/fan2Axis; legacy rows stored the PSW
+      // internal zone and are converted here once, on read.
+      fanlightHeight: (() => {
+        const ax = item?.fanlightAxis ?? fc.fanlightAxis;
+        if (ax != null && ax !== '') return Number(ax);
+        const z = item?.fanlightHeight ?? fc.fanlightHeight;
+        return z != null && z !== '' ? Number(z) + FAN_AXIS_OFFSET_TOP : null;
+      })(),
+      fan2Height: (() => {
+        const ax = item?.fan2Axis ?? fc.fan2Axis;
+        if (ax != null && ax !== '') return Number(ax);
+        const z = item?.casementFan2Height ?? fc.casementFan2Height;
+        if (z == null || z === '') return null;
+        const H = Number(item?.height ?? item?.extHeight ?? fc.extHeight) || 0;
+        return H - Number(z) - FAN_AXIS_OFFSET_BOTTOM;
+      })(),
       middleWidth: Number(item?.casementMiddleWidth ?? fc.casementMiddleWidth) || 0,
       barType: item?.casementBarType || fc.casementBarType || 'astragal',
       sealColour: item?.sealColour || fc.sealColour || 'black',

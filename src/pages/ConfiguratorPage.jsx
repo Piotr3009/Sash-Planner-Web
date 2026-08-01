@@ -6,6 +6,7 @@ import IronmongeryPickerModal from '../components/IronmongeryPickerModal.jsx';
 import { GLASS_TYPES, GLASS_SPECS, GLASS_COATINGS, GLASS_FINISHES, FROSTED_LOCATIONS, SPACERS, SPACER_TYPES, SWATCHES, RAL_GROUPS, FB_GROUPS } from '../config.js';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
 import { buildVentGrilles } from '../engine/lists.js';
+import { FAN_AXIS_OFFSET_TOP, FAN_AXIS_OFFSET_BOTTOM } from '../engine/casementLayouts.js';
 import CasementLayoutPicker from '../components/configurator/CasementLayoutPicker.jsx';
 import {
   LAYOUT_DEFAULTS as CAS_LAYOUT_DEFAULTS,
@@ -216,8 +217,10 @@ export default function ConfiguratorPage() {
     // Casement fields (harmless no-ops for sash windows)
     setCasLayout(w.casementLayout || '040L');
     setCasHinges(Array.isArray(w.casementHinges) ? w.casementHinges : null);
-    setFanMm(w.fanlightHeight ?? '');
-    setFan2Mm(w.casementFan2Height ?? '');
+    setFanMm(w.fanlightAxis ?? (w.fanlightHeight != null && w.fanlightHeight !== ''
+      ? Number(w.fanlightHeight) + FAN_AXIS_OFFSET_TOP : ''));
+    setFan2Mm(w.fan2Axis ?? (w.casementFan2Height != null && w.casementFan2Height !== ''
+      ? (Number(w.height ?? w.extHeight) || 0) - Number(w.casementFan2Height) - FAN_AXIS_OFFSET_BOTTOM : ''));
     setMidMm(w.casementMiddleWidth || '');
     setCasHB(w.casementHBars || 0);
     setCasVB(w.casementVBars || 0);
@@ -309,17 +312,24 @@ export default function ConfiguratorPage() {
   // fan2 shares a 70% guard with fanlight, middle 300..(W-600) step 10.
   const casCalc = useMemo(() => {
     const innerH = extH - CASEMENT_GEO_DEFAULTS.frameFace - CASEMENT_GEO_DEFAULTS.bottomFace;
-    const fMin = Math.ceil(innerH * 0.15 / 10) * 10;
-    const fMax = Math.min(800, Math.floor(innerH * 0.5 / 10) * 10);
+    // v1.2: inputs are transom AXES from the frame TOP. PSW zone limits
+    // (15–50% of innerH, ≤800, fans together ≤70%) translate through the
+    // fixed offsets: axisTop = zone + 91, axis2 = extH − zone2 − 102.
+    const zMin = innerH * 0.15;
+    const zMax = Math.min(800, innerH * 0.5);
+    const fMin = Math.ceil((zMin + FAN_AXIS_OFFSET_TOP) / 10) * 10;
+    const fMax = Math.floor((zMax + FAN_AXIS_OFFSET_TOP) / 10) * 10;
     const rawFan = Number(fanMm);
-    let fanEff = Math.round((rawFan > 0 ? rawFan : innerH * 0.3) / 10) * 10;
+    let fanEff = Math.round((rawFan > 0 ? rawFan : innerH * 0.3 + FAN_AXIS_OFFSET_TOP) / 10) * 10;
     fanEff = Math.max(fMin, Math.min(fMax, fanEff));
-    const guardMax = Math.floor((innerH * 0.7 - fanEff) / 10) * 10;
-    const f2Min = fMin;
-    const f2Max = Math.min(fMax, Math.max(f2Min, guardMax));
+    const zone1 = fanEff - FAN_AXIS_OFFSET_TOP;
+    const z2Cap = Math.min(zMax, Math.max(zMin, innerH * 0.7 - zone1));
+    const f2Min = Math.ceil((extH - FAN_AXIS_OFFSET_BOTTOM - z2Cap) / 10) * 10;
+    const f2Max = Math.floor((extH - FAN_AXIS_OFFSET_BOTTOM - zMin) / 10) * 10;
     const rawFan2 = Number(fan2Mm);
-    let fan2Eff = Math.round((rawFan2 > 0 ? rawFan2 : innerH * 0.33) / 10) * 10;
+    let fan2Eff = Math.round((rawFan2 > 0 ? rawFan2 : extH - FAN_AXIS_OFFSET_BOTTOM - innerH * 0.33) / 10) * 10;
     fan2Eff = Math.max(f2Min, Math.min(f2Max, fan2Eff));
+    const zone2 = extH - FAN_AXIS_OFFSET_BOTTOM - fan2Eff;
     const midMax = Math.floor((extW - 600) / 10) * 10;
     const rawMid = Number(midMm);
     const midEff = rawMid > 0 ? Math.max(300, Math.min(midMax, Math.round(rawMid / 10) * 10)) : 0;
@@ -328,8 +338,8 @@ export default function ConfiguratorPage() {
       hasFan: FANLIGHT_LAYOUTS.includes(casLayout),
       hasFan2: FAN2_LAYOUTS.includes(casLayout),
       isTriple: TRIPLE_LAYOUTS.includes(casLayout),
-      fanRatio: Math.max(0.15, Math.min(0.5, fanEff / innerH)),
-      fan2Ratio: Math.max(0.15, Math.min(0.5, fan2Eff / innerH)),
+      fanRatio: Math.max(0.15, Math.min(0.5, zone1 / innerH)),
+      fan2Ratio: Math.max(0.15, Math.min(0.5, zone2 / innerH)),
     };
   }, [extW, extH, fanMm, fan2Mm, midMm, casLayout]);
 
@@ -414,8 +424,8 @@ export default function ConfiguratorPage() {
       ...(isCasement ? {
         casementLayout: casLayout,
         casementHinges: casHinges ? [...casHinges] : null,
-        fanlightHeight: casCalc.hasFan ? casCalc.fanEff : null,
-        casementFan2Height: casCalc.hasFan2 ? casCalc.fan2Eff : null,
+        fanlightAxis: casCalc.hasFan ? casCalc.fanEff : null,
+        fan2Axis: casCalc.hasFan2 ? casCalc.fan2Eff : null,
         casementMiddleWidth: casCalc.isTriple ? casCalc.midEff : 0,
         casementHBars: casHB, casementVBars: casVB,
         casementFanHBars: Math.min(2, casFanHB), casementFanVBars: Math.min(2, casFanVB),
@@ -527,7 +537,7 @@ export default function ConfiguratorPage() {
               </div>
             </div>
             {isCasement && casCalc.hasFan && <>
-              <Lbl>Fanlight height (mm) <span className="text-ink-500">({casCalc.fMin}–{casCalc.fMax})</span></Lbl>
+              <Lbl>Transom axis — from frame top (mm) <span className="text-ink-500">({casCalc.fMin}–{casCalc.fMax})</span></Lbl>
               <input type="number" min={casCalc.fMin} max={casCalc.fMax} step={10}
                 value={fanMm === '' ? casCalc.fanEff : fanMm}
                 onChange={e => setFanMm(e.target.value === '' ? '' : Number(e.target.value))}
@@ -535,7 +545,7 @@ export default function ConfiguratorPage() {
                 className="w-full px-3 py-2 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
             </>}
             {isCasement && casCalc.hasFan2 && <>
-              <Lbl>Fanlight 2 height (mm) <span className="text-ink-500">({casCalc.f2Min}–{casCalc.f2Max})</span></Lbl>
+              <Lbl>Transom 2 axis — from frame top (mm) <span className="text-ink-500">({casCalc.f2Min}–{casCalc.f2Max})</span></Lbl>
               <input type="number" min={casCalc.f2Min} max={casCalc.f2Max} step={10}
                 value={fan2Mm === '' ? casCalc.fan2Eff : fan2Mm}
                 onChange={e => setFan2Mm(e.target.value === '' ? '' : Number(e.target.value))}
@@ -685,8 +695,8 @@ export default function ConfiguratorPage() {
           {isCasement && <SG t="Layout">
             <SR l="Type" v={casLayout} />
             <SR l="Openers" v={casHinges ? String(casHinges.filter(h => h === true || (typeof h === 'string' && h !== 'fixed')).length) : '—'} />
-            {casCalc.hasFan && <SR l="Fanlight" v={`${casCalc.fanEff}mm`} />}
-            {casCalc.hasFan2 && <SR l="Fanlight 2" v={`${casCalc.fan2Eff}mm`} />}
+            {casCalc.hasFan && <SR l="Transom axis" v={`${casCalc.fanEff}mm`} />}
+            {casCalc.hasFan2 && <SR l="Transom 2 axis" v={`${casCalc.fan2Eff}mm`} />}
             {casCalc.isTriple && <SR l="Middle" v={casCalc.midEff > 0 ? `${casCalc.midEff}mm` : 'equal'} />}
             <SR l="Bars" v={`${casHB}H × ${casVB}V`} />
             {(casHB + casVB + casFanHB + casFanVB + casFan2HB + casFan2VB) > 0 && (

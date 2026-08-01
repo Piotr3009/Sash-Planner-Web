@@ -46,7 +46,7 @@ const COLOR_MAP = {
 };
 
 import { RAL_LOOKUP as RAL_COLORS } from '../config.js';
-import { clampFanRatio, CASEMENT_GEO_DEFAULTS } from '../engine/casementLayouts.js';
+import { fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from '../engine/casementLayouts.js';
 import { profileBoxDepth } from '../engine/profile.js';
 
 function resolveColor(name, ral) {
@@ -192,8 +192,8 @@ export function windowSpecToCasementProps(windowSpec) {
     width, height,
     layout: cas.layout || '040L',
     casementHinges: Array.isArray(cas.hinges) ? cas.hinges : null,
-    fanlightRatio: clampFanRatio(cas.fanlightHeight, innerH),
-    fan2Ratio: clampFanRatio(cas.fan2Height, innerH),
+    fanlightRatio: fanAxisToRatio(cas.fanlightHeight, innerH),
+    fan2Ratio: fan2AxisToRatio(cas.fan2Height, height, innerH),
     middleSection: Number(cas.middleWidth) || 0,
     hBars: cas.bars?.h || 0,
     vBars: cas.bars?.v || 0,

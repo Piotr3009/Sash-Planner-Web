@@ -1,4 +1,4 @@
-import { resolveCasementLayout, clampFanRatio, CASEMENT_GEO_DEFAULTS } from './casementLayouts.js';
+import { resolveCasementLayout, fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from './casementLayouts.js';
 import { getWindowProfile, getCasementProfile, profileSashDepth, profileBoardWidth, boardWidthForDepth, kgPerM } from './profile.js';
 
 /**
@@ -593,8 +593,8 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
     const innerH = frameHeight - GEO.frameFace - GEO.bottomFace;
     const layoutDef = resolveCasementLayout({
         code: layout, innerW, innerH, height: frameHeight,
-        fanlightRatio: clampFanRatio(cas.fanlightHeight, innerH),
-        fan2Ratio: clampFanRatio(cas.fan2Height, innerH),
+        fanlightRatio: fanAxisToRatio(cas.fanlightHeight, innerH),
+        fan2Ratio: fan2AxisToRatio(cas.fan2Height, frameHeight, innerH),
         middleSectionMm: Number(cas.middleWidth) || 0,
         casementHinges: cas.hinges,
         geo: GEO,

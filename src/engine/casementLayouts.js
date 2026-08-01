@@ -43,6 +43,28 @@ export function clampFanRatio(fanMm, innerH) {
   return Math.max(FAN_RATIO_MIN, Math.min(FAN_RATIO_MAX, mm / innerH));
 }
 
+// ─── Transom-axis input convention (v1.2) ───
+// User input = transom AXIS measured from the frame TOP (production truth).
+// Internally layouts still speak PSW zone-ratios; these helpers are the ONLY
+// place that maps between the two.
+//   top-anchored fan:    axis = frameFace + zone + MEMBER/2   → offset 91
+//   bottom-anchored fan2: axis = H − (bottomFace + zone + MEMBER/2) → offset 102
+const MEMBER_W = 68;
+export const FAN_AXIS_OFFSET_TOP = CASEMENT_GEO_DEFAULTS.frameFace + MEMBER_W / 2;      // 91
+export const FAN_AXIS_OFFSET_BOTTOM = CASEMENT_GEO_DEFAULTS.bottomFace + MEMBER_W / 2;  // 102
+
+export function fanAxisToRatio(axisT, innerH) {
+  if (axisT == null || !Number(axisT)) return clampFanRatio(null, innerH);
+  const zone = Number(axisT) - FAN_AXIS_OFFSET_TOP;
+  return Math.max(FAN_RATIO_MIN, Math.min(FAN_RATIO_MAX, zone / innerH));
+}
+
+export function fan2AxisToRatio(axis2T, frameHeight, innerH) {
+  if (axis2T == null || !Number(axis2T)) return clampFanRatio(null, innerH);
+  const zone = Number(frameHeight) - Number(axis2T) - FAN_AXIS_OFFSET_BOTTOM;
+  return Math.max(FAN_RATIO_MIN, Math.min(FAN_RATIO_MAX, zone / innerH));
+}
+
 /** Inner (glass-area) dimensions from overall frame dimensions. */
 export function casementInnerDims(frameWidth, frameHeight, geo = CASEMENT_GEO_DEFAULTS) {
   return {
