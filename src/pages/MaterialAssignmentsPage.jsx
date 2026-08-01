@@ -586,7 +586,7 @@ export default function MaterialAssignmentsPage() {
         )}
 
         {isCasement && <div className="flex gap-5 items-start">
-        <div className="flex-1 min-w-0">
+        <div className="w-2/3 min-w-0">
             <PartGroupSection
               title="🪵 Frame"
               subtitle={`${CASEMENT_PARTS.frame.length} parts · head, jambs, cill, mullion, transom`}
@@ -620,9 +620,9 @@ export default function MaterialAssignmentsPage() {
               onSelect={toggleSelect}
             />
         </div>
-        <div className="hidden xl:block w-[520px] shrink-0 sticky top-4">
+        <div className="hidden xl:block w-1/3 shrink-0 sticky top-4">
           <div className="text-[10px] text-ink-400 mb-2">Sample 1000 × 1500 · 022 · click a part row or a drawing element</div>
-          <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-2 gap-2 items-start">
             <CasementFrameDetail2D windowSpec={casDrawSpec} derived={casDrawDerived}
               selectedElement={casSel} onElementClick={pickCasFromDrawing} />
             {casLeafGroup && (
