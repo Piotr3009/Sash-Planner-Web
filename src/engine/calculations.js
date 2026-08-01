@@ -616,9 +616,12 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
     };
 
     // ── Frame: full external dimensions (comb / finger / T&G joints) ──
+    const cillWider = !!windowSpec.cill?.wider;
+    const cillLength = frameWidth + (cillWider ? 100 : 0);
     const box = [
         mk('box', 'C-FRAME HEAD', secFrame, frameWidth, 1, 'C-H'),
-        mk('box', 'C-FRAME CILL', secCill, frameWidth, 1, 'C-CILL'),
+        mk('box', 'C-FRAME CILL', secCill, cillLength, 1, 'C-CILL',
+            cillWider ? 'wider +50mm each side' : ''),
         mk('box', 'C-FRAME JAMB (L)', secFrame, frameHeight, 1, 'C-J/L'),
         mk('box', 'C-FRAME JAMB (R)', secFrame, frameHeight, 1, 'C-J/R'),
     ];
@@ -818,6 +821,10 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
             layout, layoutDef, openers, panes: layoutDef.panels.length,
             leaves: leafSizes, paneBounds, leafRects, transomRuns, mullionRuns,
             geometry: geo,
+            cill: {
+                length: R(cillLength), wider: cillWider,
+                extension: Number(windowSpec.cill?.extension) || 0,
+            },
         },
         barPositions: { vertical: [], horizontal: [] },
         weights: { timber: 0, glass: 0, total: 0 },

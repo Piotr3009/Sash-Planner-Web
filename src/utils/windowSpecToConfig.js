@@ -45,6 +45,7 @@ const COLOR_MAP = {
   'unpainted':    '#DEC89A',
 };
 
+import { buildVentGrilles } from '../engine/lists.js';
 import { RAL_LOOKUP as RAL_COLORS } from '../config.js';
 import { fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from '../engine/casementLayouts.js';
 import { profileBoxDepth } from '../engine/profile.js';
@@ -209,9 +210,11 @@ export function windowSpecToCasementProps(windowSpec) {
     glassType: glazing.type === 'triple' ? 'triple' : 'double',
     spacerColor: glazing.spacerColour || 'silver',
     glassFinish: glazing.finish || 'clear',
-    trickleVent: 'none',
-    sealColour: 'black',
-    sillExtension: 0,
+    trickleVent: buildVentGrilles(windowSpec) > 0 ? 'frame' : 'none',
+    trickleColour: 'white',
+    sealColour: windowSpec.casement?.sealColour || 'black',
+    sillExtension: Number(windowSpec.cill?.extension) || 0,
+    sillWider: !!windowSpec.cill?.wider,
     showGuides: false,
     ironmongery: windowSpec?.hardware?.finish || 'brass',
   };

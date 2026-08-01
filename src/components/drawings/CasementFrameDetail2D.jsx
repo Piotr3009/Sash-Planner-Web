@@ -31,6 +31,7 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
     const p = getCasementProfile();
     return {
       fw, fh, g: p.geometry, p,
+      cill: cas.cill || { wider: false, extension: 0, length: fw },
       mullions: cas.mullionRuns || [],
       transoms: cas.transomRuns || [],
       secF: `${p.elements.frameHead.face}×${p.frameDepth}`,
@@ -76,7 +77,7 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
   const winName = windowSpec?.name || 'Window';
   const projNum = projectNumber || '';
   const titleText = `Frame Detail${projNum ? ` — ${projNum}` : ''} — ${winName}`;
-  const subtitleText = `C-H ${fmt(fw)} · C-CILL ${fmt(fw)} · C-J ×2 ${fmt(fh)}`;
+  const subtitleText = `C-H ${fmt(fw)} · C-CILL ${fmt(geom.cill.length)}${geom.cill.wider ? ' (wider)' : ''}${geom.cill.extension > 0 ? ` · proj ${geom.cill.extension}mm` : ''} · C-J ×2 ${fmt(fh)}`;
 
   return (
     <div className="w-full">
@@ -95,6 +96,10 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
           fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
         <line x1={X(0)} y1={Y(fh - g.cillVisible)} x2={X(fw)} y2={Y(fh - g.cillVisible)}
           stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} />
+        {geom.cill.wider && (
+          <path d={`M ${X(-50)} ${Y(fh - g.cillVisible)} H ${X(fw + 50)} V ${Y(fh)} H ${X(-50)} Z`}
+            fill={COLORS.frameFill} stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
+        )}
 
         {/* ── MULLIONS + axes + codes ── */}
         {geom.mullions.map((mu, i) => (
@@ -135,7 +140,7 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
         <text x={X(fw / 2)} y={Y(g.land / 2) + annFs * 0.35} fill={COLORS.label} fontSize={annFs}
           fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>{`C-H ${fmt(fw)}`}</text>
         <text x={X(fw / 2)} y={Y(fh - g.cillVisible / 2) + annFs * 0.35} fill={COLORS.label} fontSize={annFs}
-          fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>{`C-CILL ${fmt(fw)}`}</text>
+          fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>{`C-CILL ${fmt(geom.cill.length)}${geom.cill.extension > 0 ? ` · proj ${geom.cill.extension}mm` : ''}`}</text>
         <text x={X(g.land / 2)} y={Y(fh / 2)} fill={COLORS.label} fontSize={annFs}
           fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
           transform={`rotate(-90, ${X(g.land / 2)}, ${Y(fh / 2)})`}>

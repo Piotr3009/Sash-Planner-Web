@@ -49,6 +49,7 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
       fw, fh, g, stile, leaves,
       mullions: cas.mullionRuns || [],
       transoms: cas.transomRuns || [],
+      cill: cas.cill || { wider: false, extension: 0, length: fw },
     };
   }, [windowSpec, derived]);
 
@@ -93,9 +94,13 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
           fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frame} {...NS} />
         <rect x={landRect.x} y={landRect.y} width={landRect.w} height={landRect.h}
           fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
-        {/* Cill face top edge */}
+        {/* Cill face — overhangs ±50 beyond the frame when 'wider' */}
         <line x1={X(0)} y1={Y(fh - g.cillVisible)} x2={X(fw)} y2={Y(fh - g.cillVisible)}
           stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} />
+        {geom.cill.wider && (
+          <path d={`M ${X(-50)} ${Y(fh - g.cillVisible)} H ${X(fw + 50)} V ${Y(fh)} H ${X(-50)} Z`}
+            fill={COLORS.frameFill} stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
+        )}
 
         {/* ── MULLIONS (through) + axes ── */}
         {geom.mullions.map((mu, i) => (
