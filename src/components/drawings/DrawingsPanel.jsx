@@ -75,17 +75,22 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
     if (busy || !derived) return;
     setBusy(true);
     try {
-      // Cill section is no longer part of the per-window grid — it goes to a
-      // de-duplicated closing page (Piotr 02.08). Portrait drawings therefore
-      // get a full-height cell instead of being squeezed by a flat section.
+      // Casement: frame detail goes on its own sheet (hero), leaves stay in the
+      // 3-per-row grid. Sash keeps the single-page 3-drawing layout unchanged.
       const types = isCasement
-        ? [['frame', 'Frame Detail'], ...leafGroups.map((gp, k) => [`leaf${k}`, paneTitle(gp)])]
+        ? leafGroups.map((gp, k) => [`leaf${k}`, paneTitle(gp)])
         : [['box', 'Box Detail'], ['upper', 'Upper Sash'], ['lower', 'Lower Sash']];
       const drawings = [];
       for (const [t, label] of types) {
         const svg = refs.current[t]?.querySelector('svg');
         const png = svg ? await svgNodeToPng(svg, { scale: 3, printMode: true }) : null;
         drawings.push({ image: png?.url || null, w: png?.w, h: png?.h, label });
+      }
+      let hero = null;
+      if (isCasement) {
+        const fd = refs.current['frame']?.querySelector('svg');
+        const fpng = fd ? await svgNodeToPng(fd, { scale: 3, printMode: true }) : null;
+        if (fpng?.url) hero = { image: fpng.url, w: fpng.w, h: fpng.h, label: 'Frame Detail' };
       }
       let cill = null;
       if (isCasement) {
@@ -109,6 +114,7 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
           tag: item?.name || '',
           caption: `${item?.name || ''} — ${winW}×${winH} mm`,
           drawings,
+          hero,
           cill,
         }],
       });

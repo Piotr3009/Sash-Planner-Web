@@ -181,11 +181,17 @@ export function exportElementsPDF(info) {
   }
 
   // Pre-split into pages so the header can show a true page total.
+  // A window may carry a "hero" drawing (casement frame detail): it gets a sheet
+  // of its own because at 3-per-row a 4-pane frame is unreadable (Piotr 02.08).
+  // Landscape caps it by height, so the hero grows ~1.56x, not by full width.
   const pages = [];
   windows.forEach((win) => {
+    if (win.hero && win.hero.image) pages.push({ win, hero: win.hero, drawings: [] });
     const ds = win.drawings || [];
+    const hadHero = !!(win.hero && win.hero.image);
+    if (!ds.length && hadHero) return;    // hero only — no empty grid sheet
     for (let i = 0; i < Math.max(1, ds.length); i += perPage) {
-      pages.push({ win, drawings: ds.slice(i, i + perPage), cont: i > 0 });
+      pages.push({ win, drawings: ds.slice(i, i + perPage), cont: i > 0 || hadHero });
     }
   });
   const total = Math.max(1, pages.length + cillPages.length);
@@ -196,6 +202,14 @@ export function exportElementsPDF(info) {
     compactHeader(doc, PG, hdr,
       `${pg.win.no}. ${pg.win.caption || ''}${pg.cont ? ' (cont.)' : ''}`, pi + 1, total);
     drawReportFooter(doc, PG, hdr);
+
+    if (pg.hero) {
+      const heroH = bottom - top - labelH;
+      placeImg(doc, pg.hero, x0, top, contentW, heroH);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(26, 26, 26);
+      doc.text(String(pg.hero.label || ''), x0 + contentW / 2, top + heroH + 4.5, { align: 'center' });
+      return;
+    }
 
     pg.drawings.forEach((d, di) => {
       const col = di % COLS;
