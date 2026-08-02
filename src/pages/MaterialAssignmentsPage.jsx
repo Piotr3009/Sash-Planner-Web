@@ -438,10 +438,9 @@ export default function MaterialAssignmentsPage() {
     c_frame_head: 'head', c_frame_jamb: 'frameJamb', c_frame_cill: 'cill',
     c_mullion: 'mullion', c_transom: 'transom',
     c_sash_stile: 'leafStile', c_sash_top_rail: 'leafTopRail', c_sash_bottom_rail: 'leafBottomRail',
-    c_sill_ext_35: 'sillExtension', c_sill_ext_60: 'sillExtension', c_sill_ext_85: 'sillExtension',
+    c_sill_ext_35: 'sillExt35', c_sill_ext_60: 'sillExt60', c_sill_ext_85: 'sillExt85',
   };
   const CAS_KEY_TO_PART = Object.fromEntries(Object.entries(CAS_PART_TO_KEY).map(([p, k]) => [k, p]));
-  CAS_KEY_TO_PART.sillExtension = 'c_sill_ext_60'; // the sample draws the 60mm board
   const casSel = selectedPart ? (CAS_PART_TO_KEY[selectedPart] || null) : null;
   const pickCasFromDrawing = (dk) => { const pid = CAS_KEY_TO_PART[dk]; if (pid) setSelectedPart(pid); };
 
@@ -757,21 +756,21 @@ export default function MaterialAssignmentsPage() {
         </div>
         <div className="hidden xl:block w-1/3 shrink-0 sticky top-4">
           <div className="text-[10px] text-ink-400 mb-2">Sample 1000 × 1500 · 022 · click a part row or a drawing element</div>
-          <div className="grid grid-cols-[1.38fr_1fr] gap-2 items-start">
-            <div className="h-[340px] flex justify-center [&_svg]:h-full [&_svg]:w-auto">
+          <div className="grid grid-cols-[1.55fr_1fr] gap-2 items-start">
+            <div className="w-full min-w-0">
               <CasementFrameDetail2D windowSpec={casDrawSpec} derived={casDrawDerived}
                 selectedElement={casSel} onElementClick={pickCasFromDrawing} />
             </div>
             {casLeafGroup && (
-              <div className="h-[340px] flex justify-center [&_svg]:h-full [&_svg]:w-auto">
+              <div className="w-full min-w-0">
                 <CasementLeafDetail2D windowSpec={casDrawSpec} derived={casDrawDerived} group={casLeafGroup}
                   selectedElement={casSel} onElementClick={pickCasFromDrawing} />
               </div>
             )}
           </div>
-          <div className="mt-2">
+          <div className="mt-2 w-1/2">
             <CasementSection2D windowSpec={casDrawSpec} derived={casDrawDerived}
-              selectedElement={casSel} onElementClick={pickCasFromDrawing} fullWidth />
+              selectedElement={casSel} onElementClick={pickCasFromDrawing} fullWidth showAllExtensions />
           </div>
         </div>
         </div>}
