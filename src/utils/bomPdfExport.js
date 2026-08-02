@@ -76,6 +76,31 @@ export function exportBomPDF(info) {
     title: 'MATERIALS', columns, rows, tableWidth,
   });
 
+  // ── Hardware — engine selection (Piotr 02.08.2026, PDF audit item 1) ──
+  // The merged material rows above lose the engine's hardware DETAIL (LH/RH
+  // hand split, sizes, kit contents, "verify limits" flags). This section
+  // prints buildHardwareList's lines verbatim so production/ordering sees the
+  // real hand and size decisions, not just summed quantities.
+  if (Array.isArray(info.hardware) && info.hardware.length) {
+    const hwColumns = [
+      { label: 'No.',    dx: 0,   auto: true, mono: true },
+      { label: 'Item',   dx: 10 },
+      { label: 'Detail', dx: 95 },
+      { label: 'Qty',    dx: 250, align: 'right', mono: true },
+    ];
+    const hwRows = info.hardware.map((h) => ({
+      cells: [
+        `${h.item}${h.assigned === false ? ' — unassigned' : ''}`,
+        h.detail || '—',
+        String(h.qty ?? ''),
+      ],
+    }));
+    y = drawReportTable(doc, PG, {
+      info: hdr, startY: y + 6,
+      title: 'HARDWARE — ENGINE SELECTION', columns: hwColumns, rows: hwRows, tableWidth,
+    });
+  }
+
   // Est. total line — only when prices are shown
   if (!hidePrices) {
     const x = PG.bx + 3;

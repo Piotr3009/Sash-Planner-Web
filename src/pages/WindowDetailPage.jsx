@@ -435,6 +435,14 @@ function BOMPanel({ item, windowSpec, settings, derived, batch }) {
         assigned: r._assigned,
       })),
       total: `£${windowCost.toFixed(2)}`,
+      // Engine hardware picks with hands/sizes/kit detail — the merged rows
+      // above only carry summed quantities (PDF audit item 1).
+      hardware: hardwareGroups.map(({ line, product }) => ({
+        item: product?.name || line.item,
+        detail: line.detail || '',
+        qty: line.quantity,
+        assigned: !!product,
+      })),
     });
   };
 
