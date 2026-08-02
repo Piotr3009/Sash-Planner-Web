@@ -117,3 +117,5 @@ src/
 | 7 | SaaS multi-tenant | not started — out of scope per brief |
 
 See `BUILD-LOG.md` for verdicts per phase and `BLOCKERS.md` for open questions.
+
+
