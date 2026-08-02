@@ -78,7 +78,7 @@ export default function CasementSection2D({ windowSpec, derived, projectNumber, 
         <defs>
           <pattern id="cillHatch" width="6" height="6" patternTransform="rotate(45)"
             patternUnits="userSpaceOnUse">
-            <line x1="0" y1="0" x2="0" y2="6" stroke={COLORS.frameLight} strokeWidth="0.5" />
+            <line x1="0" y1="0" x2="0" y2="6" stroke={COLORS.section} strokeWidth="0.5" />
           </pattern>
         </defs>
 

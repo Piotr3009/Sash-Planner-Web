@@ -234,3 +234,42 @@ export function summariseHinges(picks) {
   });
   return out;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ASSIGNMENT ROWS (Assign Materials) — one row per PURCHASABLE code.
+//
+// Side hung friction stays are handed: LH and RH are two different SKUs with
+// separate stock (Nico 8431L / 8431R etc.), so each side slot expands into two
+// assignment rows. Top hung stays ship as one unhanded pair per pack, so those
+// slots stay a single row.
+//
+// Handing convention, confirmed against the Mighton/Nico ordering card:
+//   sash hinged LEFT viewed from OUTSIDE  = RH pair
+//     (the supplier lists the same product as "hinged on right, viewed from
+//      inside" — same sash, opposite viewpoint)
+// Our drawings are exterior view, the supplier card is interior view; the
+// hints below spell out both so nobody has to convert in their head.
+// ─────────────────────────────────────────────────────────────────────────────
+const HAND_NOTE = {
+  LH: 'LH pair — sash hinged RIGHT viewed from OUTSIDE (supplier card: "hinged on left, viewed from inside"). ',
+  RH: 'RH pair — sash hinged LEFT viewed from OUTSIDE (supplier card: "hinged on right, viewed from inside"). ',
+};
+
+/** Assignment part id for a slot + handing ('LH' | 'RH' | null for top hung). */
+export function hingePartId(slotId, handing) {
+  if (!slotId) return null;
+  if (!handing || String(slotId).startsWith('c_hinge_top')) return slotId;
+  return `${slotId}_${String(handing).toLowerCase()}`;
+}
+
+export const CASEMENT_HINGE_PARTS = CASEMENT_HINGE_SLOTS.flatMap((s) => (
+  s.hung === 'top'
+    ? [{ id: s.id, name: s.name, hint: s.hint, hand: null, slotId: s.id }]
+    : ['LH', 'RH'].map((hand) => ({
+      id: hingePartId(s.id, hand),
+      name: `${s.name} · ${hand}`,
+      hint: `${HAND_NOTE[hand]}${s.hint}`,
+      hand,
+      slotId: s.id,
+    }))
+));

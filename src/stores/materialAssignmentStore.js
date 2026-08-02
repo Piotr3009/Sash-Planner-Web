@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import * as cloud from '../services/cloudSync.js';
 import { normalizeAssignments, expandAssignments, legacyToCanonical } from '../engine/partRegistry.js';
-import { CASEMENT_HINGE_SLOTS, CASEMENT_LOCK_SLOTS } from '../engine/casementHardware.js';
+import { CASEMENT_HINGE_PARTS, CASEMENT_LOCK_SLOTS } from '../engine/casementHardware.js';
 
 // ─── Sash Window Parts (hardcoded — structural, used by calculations engine) ───
 // section = pre-cut (raw) section that needs to be matched to a stock material
@@ -96,7 +96,7 @@ export const CASEMENT_PARTS = {
   // for labels + width/weight limits). The engine picks the slot per opener;
   // the user assigns ANY material to any slot — `hint` is only the "?" tooltip
   // recommendation (Piotr 02.08.2026).
-  ironmongeryHinges: CASEMENT_HINGE_SLOTS.map((s) => ({
+  ironmongeryHinges: CASEMENT_HINGE_PARTS.map((s) => ({
     id: s.id, name: s.name, hint: s.hint,
     section: '\u2014', pcs: 2, materialType: 'ironmongery', unit: 'pcs',
   })),

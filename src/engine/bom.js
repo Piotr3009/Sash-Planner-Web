@@ -16,6 +16,7 @@
 
 import { buildPrecutForWindow, buildHardwareList } from './lists.js';
 import { assignmentFor, legacyToCanonical } from './partRegistry.js';
+import { hingePartId } from './casementHardware.js';
 
 /** Normalise a material catalog size ('150 x 38mm') to a raw-section key ('150x38'). */
 export function materialSizeToRaw(size) {
@@ -221,8 +222,15 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
     let sidePairs = 0;
     let unrestrictedPairs = 0;
     Object.entries(hingeSummary).forEach(([slotId, e]) => {
-      setQty(slotId, e.pairs, 'pairs');
-      if (!slotId.startsWith('c_hinge_top')) sidePairs += e.pairs;
+      const top = slotId.startsWith('c_hinge_top');
+      if (top) {
+        setQty(slotId, e.pairs, 'pairs');
+      } else {
+        // Side hung: LH and RH are separate SKUs → separate assignment rows.
+        setQty(hingePartId(slotId, 'LH'), e.LH, 'pairs');
+        setQty(hingePartId(slotId, 'RH'), e.RH, 'pairs');
+        sidePairs += e.pairs;
+      }
       if (slotId === 'c_hinge_xl' || slotId === 'c_hinge_small') unrestrictedPairs += e.pairs;
     });
     // Separate restrictor only when the window requests child restriction
