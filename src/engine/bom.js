@@ -226,10 +226,11 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
       setQty('c_child_restrictor', unrestrictedPairs, 'pcs');
     }
     if (sidePairs > 0) setQty('c_wedge_packer', sidePairs, 'pcs');
-    if (sideOpeners > 0) {
-      setQty('c_window_lock', sideOpeners, 'pcs');
-      setQty('c_shootbolt', sideOpeners, 'pcs');
-    }
+    // Espag lock kits: one kit per opener from the engine lock ladder
+    // (the Excalibur kit already includes the shootbolts).
+    Object.entries(cw.hardware.lockSummary || {}).forEach(([slotId, e]) => {
+      setQty(slotId, e.count, 'pcs');
+    });
     const panes = Array.isArray(derived.customGlassUnits) ? derived.customGlassUnits : [];
     if (panes.length > 0) {
       setQty('c_glazing_packer', panes.length * 8, 'pcs');

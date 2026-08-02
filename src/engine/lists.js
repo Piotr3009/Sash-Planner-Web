@@ -7,7 +7,7 @@
  */
 
 import { CONSTANTS, deriveWindowData } from './calculations.js';
-import { CASEMENT_HINGE_SLOTS } from './casementHardware.js';
+import { CASEMENT_HINGE_SLOTS, CASEMENT_LOCK_SLOTS } from './casementHardware.js';
 import { GLASS_MAKEUP, glassGas } from './specification.js';
 import { profileRawForSection, getWindowProfile } from './profile.js';
 
@@ -343,10 +343,15 @@ export function buildHardwareList(windowSpec, derived = null) {
     if (sidePairs > 0) {
       list.push({ item: 'Wedge packers', detail: '1 set per hinge pair (verify)', quantity: sidePairs });
     }
-    if (hw.sideOpeners > 0) {
-      list.push({ item: 'Window lock', detail: 'per side-hung opener', quantity: hw.sideOpeners });
-      list.push({ item: 'Shootbolt set', detail: 'per side-hung opener', quantity: hw.sideOpeners });
-    }
+    Object.entries(hw.lockSummary || {}).forEach(([slotId, e]) => {
+      const nm = CASEMENT_LOCK_SLOTS.find((r) => r.id === slotId)?.name || slotId;
+      const parts = [];
+      if (e.LH) parts.push(`${e.LH} LH`);
+      if (e.RH) parts.push(`${e.RH} RH`);
+      if (e.unhanded) parts.push(`${e.unhanded} top (unhanded)`);
+      if (e.overLimit) parts.push('! verify size');
+      list.push({ item: nm, detail: parts.join(' / '), quantity: e.count });
+    });
     // Client-facing items — resolved to products via per-window ironmongery
     // slots (casementHandles / casementStays / casementVents).
     const totalOpeners = Object.values(hw.hingeSummary).reduce((a, e) => a + e.pairs, 0);

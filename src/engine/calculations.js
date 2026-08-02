@@ -1,5 +1,5 @@
 import { resolveCasementLayout, fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from './casementLayouts.js';
-import { selectCasementHinges, summariseHinges } from './casementHardware.js';
+import { selectCasementHinges, summariseHinges, selectCasementLocks, summariseLocks } from './casementHardware.js';
 import { getWindowProfile, getCasementProfile, profileSashDepth, profileBoardWidth, boardWidthForDepth, kgPerM } from './profile.js';
 
 /**
@@ -838,6 +838,8 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
     const hingePicks = selectCasementHinges(layoutDef.panels, leafSizes, leafWeights);
     const hingeSummary = summariseHinges(hingePicks);
     const sideOpeners = hingePicks.filter((h) => h && h.hung === 'side').length;
+    const lockPicks = selectCasementLocks(layoutDef.panels, leafSizes);
+    const lockSummary = summariseLocks(lockPicks);
 
     void r1;
     return {
@@ -852,7 +854,7 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
         casement: {
             layout, layoutDef, openers, panes: layoutDef.panels.length,
             leafWeights,
-            hardware: { hingePicks, hingeSummary, sideOpeners },
+            hardware: { hingePicks, hingeSummary, sideOpeners, lockPicks, lockSummary },
             leaves: leafSizes, paneBounds, leafRects, transomRuns, mullionRuns,
             geometry: geo,
             cill: {

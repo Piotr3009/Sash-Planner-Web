@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import * as cloud from '../services/cloudSync.js';
 import { normalizeAssignments, expandAssignments, legacyToCanonical } from '../engine/partRegistry.js';
-import { CASEMENT_HINGE_SLOTS } from '../engine/casementHardware.js';
+import { CASEMENT_HINGE_SLOTS, CASEMENT_LOCK_SLOTS } from '../engine/casementHardware.js';
 
 // ─── Sash Window Parts (hardcoded — structural, used by calculations engine) ───
 // section = pre-cut (raw) section that needs to be matched to a stock material
@@ -98,8 +98,10 @@ export const CASEMENT_PARTS = {
     { id: 'c_child_restrictor', name: 'Child Restrictor (releasable)', sub: 'fitted where the hinge has no built-in restriction (XL + small slots)', section: '—', pcs: 1, materialType: 'ironmongery', unit: 'pcs',
       hint: 'Recommended: Nico Window Restrictor Safety Catch, stainless steel — BJ Waller SKU RST42012A. Concealed in the window cavity, releasable to 100mm, auto-reset on closing. LH/RH + 13mm stud ordered as separate parts (1 stud per restrictor); hinged-left sash = RH restrictor.' },
     { id: 'c_wedge_packer', name: 'Wedge Packers', sub: '1 set per hinge pair (verify with workshop)', section: '—', pcs: 1, materialType: 'consumable', unit: 'pcs' },
-    { id: 'c_window_lock', name: 'Window Lock / Handle keep', sub: 'per side-hung opener', section: '—', pcs: 1, materialType: 'ironmongery', unit: 'pcs' },
-    { id: 'c_shootbolt', name: 'Shootbolts', sub: 'set per side-hung opener', section: '—', pcs: 1, materialType: 'ironmongery', unit: 'pcs' },
+    ...CASEMENT_LOCK_SLOTS.map((l) => ({
+      id: l.id, name: l.name, sub: l.sub, hint: l.hint,
+      section: '—', pcs: 1, materialType: 'ironmongery', unit: 'pcs',
+    })),
   ],
   glazing: [
     { id: 'c_glazing_beading', name: 'Glazing Beading (casement profile)', sub: 'per m — from engine glass runs', section: 'profile', pcs: 1, materialType: 'beading', unit: 'm' },

@@ -102,6 +102,67 @@ export const CASEMENT_HINGE_SLOTS = [
 
 const TOP_LADDER = ['c_hinge_top_8', 'c_hinge_top_12', 'c_hinge_top_16', 'c_hinge_top_20'];
 
+
+// ── Espag lock kits (Kenrick Excalibur PAS 24, Suits Lignum — BJ Waller) ──
+// One kit per opener: claw lock + steel shootbolts in a single kit, 22mm
+// backset, night-vent keeps, SBD. Sizing per the BJ Waller card:
+// "To Suit Sash Rebate Size — HEIGHT for side hung / WIDTH for top hung".
+// Side-hung kits are handed; the card states LH/RH viewed from the INSIDE,
+// which maps onto the same letters as the hinge rule (hinged-left outside →
+// RH) — verify on the first order. Top hung kits are unhanded.
+export const CASEMENT_LOCK_SLOTS = [
+  { id: 'c_lock_312', lo: 312, hi: 448 },
+  { id: 'c_lock_372', lo: 372, hi: 508 },
+  { id: 'c_lock_502', lo: 502, hi: 702 },
+  { id: 'c_lock_702', lo: 702, hi: 962 },
+  { id: 'c_lock_958', lo: 958, hi: 1218 },
+  { id: 'c_lock_1218', lo: 1218, hi: 1482 },
+].map((r) => ({
+  ...r,
+  name: `Espag Lock Kit \u2014 sash ${r.lo}\u2013${r.hi}mm`,
+  sub: 'PAS24 claw + shootbolt kit \u00b7 side: sash height / top: sash width',
+  hint: `Recommended: Kenrick Excalibur PAS 24 Kit (Suits Lignum), BJ Waller \u2014 rebate size ${r.lo}\u2013${r.hi}mm. Pick LH/RH (side hung) and packer colour when ordering; SKU shows after size selection on the BJ Waller card.`,
+}));
+
+/**
+ * Pick a lock kit per opener. Side hung sizes by sash HEIGHT, top hung by
+ * sash WIDTH (per the Excalibur card). Overlapping bands resolve to the
+ * smallest kit that covers the dimension. Out-of-range picks are flagged,
+ * never hidden.
+ */
+export function selectCasementLocks(panels, leafSizes) {
+  return panels.map((pn, i) => {
+    if (pn.hinge === 'fixed') return null;
+    const sz = leafSizes[i] || {};
+    const top = pn.hinge === 'top';
+    const dim = top ? (sz.leafW || 0) : (sz.leafH || 0);
+    const handing = top ? null : (pn.hinge === 'left' ? 'RH' : 'LH');
+    const slot = CASEMENT_LOCK_SLOTS.find((r) => dim >= r.lo && dim <= r.hi);
+    if (slot) {
+      return { panel: i + 1, hung: top ? 'top' : 'side', handing, slotId: slot.id, dim };
+    }
+    const fallback = dim < CASEMENT_LOCK_SLOTS[0].lo
+      ? CASEMENT_LOCK_SLOTS[0]
+      : CASEMENT_LOCK_SLOTS[CASEMENT_LOCK_SLOTS.length - 1];
+    return { panel: i + 1, hung: top ? 'top' : 'side', handing, slotId: fallback.id, dim, overLimit: true };
+  });
+}
+
+/** Aggregate lock picks: { slotId: { LH, RH, unhanded, count, overLimit } }. */
+export function summariseLocks(picks) {
+  const out = {};
+  (picks || []).forEach((p) => {
+    if (!p) return;
+    const e = (out[p.slotId] ||= { LH: 0, RH: 0, unhanded: 0, count: 0, overLimit: false });
+    e.count += 1;
+    if (p.handing === 'LH') e.LH += 1;
+    else if (p.handing === 'RH') e.RH += 1;
+    else e.unhanded += 1;
+    if (p.overLimit) e.overLimit = true;
+  });
+  return out;
+}
+
 const SIDE_LADDER = ['c_hinge_600', 'c_hinge_700', 'c_hinge_hd', 'c_hinge_xl'];
 const slotById = Object.fromEntries(CASEMENT_HINGE_SLOTS.map((s) => [s.id, s]));
 
