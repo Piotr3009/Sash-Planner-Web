@@ -50,6 +50,7 @@ import { groupCasementGlass } from '../components/drawings/casementDrawUtils.js'
 import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 import Window3DCaptureRig from '../components/viewer/Window3DCaptureRig.jsx';
 import ImageLightbox from '../components/ImageLightbox.jsx';
+import { exportCncJambsMerged } from '../utils/cncExport.js';
 
 // ─── Tab config ───
 const TABS = [
@@ -462,6 +463,22 @@ export default function ProductionPackPage() {
             >
               📖 Export Book
             </button>
+            {(pp?.type || batch?.type || 'sash') === 'sash' && (
+              <button
+                onClick={() => {
+                  const r = exportCncJambsMerged(
+                    (windowsData || []).map((wd) => ({ windowSpec: wd.windowSpec, name: wd.win?.name })),
+                    pp?.name || batch?.label || 'pack',
+                  );
+                  if (r.error) alert(`CNC export: ${r.error}`);
+                  else if (r.skipped?.length) alert(`CNC DXF exported (${r.exported} windows). Skipped ${r.skipped.length}: ${r.skipped.map((s) => `${s.name} (${s.reason})`).join(', ')}`);
+                }}
+                title="One DXF with every window's jamb set, stacked 300mm apart (VCarve)"
+                className="btn btn-secondary text-xs px-4"
+              >
+                🛠 CNC Jamb DXF (all)
+              </button>
+            )}
           </div>
         </div>
       </header>

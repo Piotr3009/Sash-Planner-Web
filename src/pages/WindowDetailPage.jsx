@@ -24,6 +24,7 @@ import ThreeDPanel from '../components/dashboard/ThreeDPanel.jsx';
 import ExportControls from '../components/export/ExportControls.jsx';
 import { exportGlassPDF } from '../utils/glassPdfExport.js';
 import { exportBomPDF } from '../utils/bomPdfExport.js';
+import { exportCncJambsForWindow, canExportCncJambs } from '../utils/cncExport.js';
 
 
 const TABS = [
@@ -97,7 +98,24 @@ export default function WindowDetailPage() {
             {currentBatch && <span> · {currentBatch.label}</span>}
           </p>
         </div>
-        <Link to={editUrl} className="btn btn-primary text-sm">✏️ Edit Configuration</Link>
+        <div className="flex items-center gap-2">
+          {(windowSpec?.category || 'sash') === 'sash' && (
+            <button
+              onClick={() => {
+                const r = exportCncJambsForWindow(windowSpec, item.name);
+                if (r.error) alert(`CNC export unavailable: ${r.error}`);
+              }}
+              disabled={!canExportCncJambs(windowSpec)}
+              title={canExportCncJambs(windowSpec)
+                ? 'Download the CNC jamb drawing (DXF for VCarve)'
+                : 'No CNC variant for heritage frames'}
+              className={`btn text-sm bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 ${!canExportCncJambs(windowSpec) ? 'opacity-40 cursor-not-allowed' : ''}`}
+            >
+              🛠 CNC Jamb DXF
+            </button>
+          )}
+          <Link to={editUrl} className="btn btn-primary text-sm">✏️ Edit Configuration</Link>
+        </div>
       </div>
 
       {/* Main Tabs */}
