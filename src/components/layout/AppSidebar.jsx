@@ -110,6 +110,22 @@ export default function AppSidebar() {
           </div>
         )}
 
+        {/* Material Weights — per-material weight data for total window weight */}
+        <NavLink to="/material-weights"
+          className={({ isActive }) =>
+            `flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] mb-0.5 transition-colors ${
+              isActive
+                ? 'bg-accent-500/12 text-accent-400 font-medium'
+                : 'text-ink-200 hover:bg-surface-700 hover:text-ink-50'
+            }`
+          }>
+          <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 7h12l3 13H3L6 7z" />
+            <path d="M9 7a3 3 0 016 0" />
+          </svg>
+          Material Weights
+        </NavLink>
+
         {/* Clients */}
         <NavLink to="/clients"
           className={({ isActive }) =>
@@ -126,6 +142,23 @@ export default function AppSidebar() {
             <path d="M16 3.13a4 4 0 010 7.75" />
           </svg>
           Clients
+        </NavLink>
+
+        {/* Archive — completed projects (placeholder until the tables land) */}
+        <NavLink to="/archive"
+          className={({ isActive }) =>
+            `flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] mb-0.5 transition-colors ${
+              isActive
+                ? 'bg-accent-500/12 text-accent-400 font-medium'
+                : 'text-ink-200 hover:bg-surface-700 hover:text-ink-50'
+            }`
+          }>
+          <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="3" width="20" height="5" rx="1" />
+            <path d="M4 8v11a2 2 0 002 2h12a2 2 0 002-2V8" />
+            <path d="M10 12h4" />
+          </svg>
+          Archive
         </NavLink>
 
         {/* ─── Separator + Setup section ─── */}

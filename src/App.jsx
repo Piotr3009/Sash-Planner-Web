@@ -11,6 +11,8 @@ import IronmongeryPage from './pages/IronmongeryPage.jsx';
 import ClientsPage from './pages/ClientsPage.jsx';
 import EstimatesPage from './pages/EstimatesPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
+import MaterialWeightsPage from './pages/MaterialWeightsPage.jsx';
+import ArchivePage from './pages/ArchivePage.jsx';
 import { useAuthStore } from './stores/authStore.js';
 
 // ── Lazy-load pages that import 3D dependencies (THREE.js, R3F, ParametricSashWindow).
@@ -79,6 +81,8 @@ export default function App() {
           <Suspense fallback={<PageLoading />}><EstimateConfiguratorPage /></Suspense>
         } />
         <Route path="clients" element={<ClientsPage />} />
+        <Route path="material-weights" element={<MaterialWeightsPage />} />
+        <Route path="archive" element={<ArchivePage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="materials" element={<MaterialsPage />} />
         <Route path="materials/assignments" element={<Navigate to="/materials/assignments/sash" replace />} />
