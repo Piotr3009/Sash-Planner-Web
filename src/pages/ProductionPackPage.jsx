@@ -1981,6 +1981,9 @@ function SprayingTab({ windowsData, batch, pp, registerExport }) {
 function BOMTab({ batch, pp, isPPMode, windowsData, registerExport }) {
   const materials = useMaterialStore((s) => s.materials);
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
+  // Canonical schema-2 data (base + per-variant overrides) — mergeWindowMaterials
+  // needs it for frame-variant raws; missing since 19.07 = the tab's ReferenceError.
+  const assignmentsData = useMaterialAssignmentStore((s) => s.data);
   const ironmongeryItems = useIronmongeryStore((s) => s.items);
   const settings = useProjectStore((s) => s.settings);
   const [zoomSrc, setZoomSrc] = useState(null);
@@ -1990,7 +1993,7 @@ function BOMTab({ batch, pp, isPPMode, windowsData, registerExport }) {
   const rows = useMemo(() => {
     const windows = (windowsData || [])
       .filter((wd) => wd.derived && wd.windowSpec)
-      .map((wd) => ({ derived: wd.derived, windowSpec: wd.windowSpec, batch: wd.win?._batch }));
+      .map((wd) => ({ derived: wd.derived, windowSpec: wd.windowSpec, batch: wd.win?._batch || batch }));
     if (!windows.length) return [];
     return mergeWindowMaterials(windows, { assignments, assignmentsData, materials, ALL_PARTS, ironmongeryItems, settings });
   }, [windowsData, assignments, assignmentsData, materials, ironmongeryItems, settings]);
