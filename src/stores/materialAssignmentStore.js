@@ -90,19 +90,21 @@ export const CASEMENT_PARTS = {
   // for labels + width/weight limits). The engine picks the slot per opener;
   // the user assigns ANY material to any slot — `hint` is only the "?" tooltip
   // recommendation (Piotr 02.08.2026).
-  ironmongery: [
-    ...CASEMENT_HINGE_SLOTS.map((s) => ({
-      id: s.id, name: s.name, sub: s.sub, hint: s.hint,
-      section: '—', pcs: 2, materialType: 'ironmongery', unit: 'pcs',
-    })),
-    { id: 'c_child_restrictor', name: 'Child Restrictor (releasable)', sub: 'fitted where the hinge has no built-in restriction (XL + small slots)', section: '—', pcs: 1, materialType: 'ironmongery', unit: 'pcs',
-      hint: 'Recommended: Nico Window Restrictor Safety Catch, stainless steel — BJ Waller SKU RST42012A. Concealed in the window cavity, releasable to 100mm, auto-reset on closing. LH/RH + 13mm stud ordered as separate parts (1 stud per restrictor); hinged-left sash = RH restrictor.' },
-    { id: 'c_wedge_packer', name: 'Wedge Packers', sub: '1 set per hinge pair (verify with workshop)', section: '—', pcs: 1, materialType: 'consumable', unit: 'pcs' },
-    ...CASEMENT_LOCK_SLOTS.map((l) => ({
-      id: l.id, name: l.name, sub: l.sub, hint: l.hint,
-      section: '—', pcs: 1, materialType: 'ironmongery', unit: 'pcs',
-    })),
+  ironmongeryHinges: CASEMENT_HINGE_SLOTS.map((s) => ({
+    id: s.id, name: s.name, hint: s.hint,
+    section: '\u2014', pcs: 2, materialType: 'ironmongery', unit: 'pcs',
+  })),
+  ironmongeryLocks: CASEMENT_LOCK_SLOTS.map((l) => ({
+    id: l.id, name: l.name, hint: l.hint,
+    section: '\u2014', pcs: 1, materialType: 'ironmongery', unit: 'pcs',
+  })),
+  ironmongeryOthers: [
+    { id: 'c_child_restrictor', name: 'Child Restrictor (releasable)', section: '\u2014', pcs: 1, materialType: 'ironmongery', unit: 'pcs',
+      hint: 'Recommended: Nico Window Restrictor Safety Catch, stainless steel \u2014 BJ Waller SKU RST42012A. Concealed in the window cavity, releasable to 100mm, auto-reset on closing. LH/RH + 13mm stud ordered as separate parts (1 stud per restrictor); hinged-left sash = RH restrictor.' },
+    { id: 'c_wedge_packer', name: 'Wedge Packers', section: '\u2014', pcs: 1, materialType: 'consumable', unit: 'pcs',
+      hint: '1 set per hinge pair \u2014 verify the set contents with the workshop.' },
   ],
+
   beading: [
     { id: 'c_glazing_beading', name: 'Glazing Beading', section: 'profile', pcs: 1, materialType: 'beading', unit: 'm',
       hint: 'Casement glazing bead profile. Length = pane perimeters + 15% waste, computed by the engine.' },
@@ -117,6 +119,11 @@ export const CASEMENT_PARTS = {
     { id: 'c_glazing_packer', name: 'Glazing Packers', sub: '8 pcs × pane — engine counts panes', section: '—', pcs: 8, materialType: 'consumable', unit: 'pcs' },
   ],
 };
+CASEMENT_PARTS.ironmongery = [
+  ...CASEMENT_PARTS.ironmongeryHinges,
+  ...CASEMENT_PARTS.ironmongeryLocks,
+  ...CASEMENT_PARTS.ironmongeryOthers,
+];
 export const CASEMENT_ALL_PARTS = [
   ...CASEMENT_PARTS.frame, ...CASEMENT_PARTS.sash,
   ...CASEMENT_PARTS.ironmongery, ...CASEMENT_PARTS.beading, ...CASEMENT_PARTS.glazing,
