@@ -66,6 +66,7 @@ export const CNC_LAYERS = Object.freeze([
   { name: 'SJ-PULLEY-DRILL',     color: 1 },
   { name: 'SJ-HEAD-VENT',        color: 4 },
   { name: 'SJ-HEAD-VENT-POCKET', color: 3 },  // lisp used truecolor 88,186,72
+  { name: 'SJ-PARTING-SLIP',     color: 140 }, // kerf for the weights divider (light cyan)
   { name: 'SJ-TEXT',             color: 94 },
 ]);
 
@@ -217,6 +218,18 @@ export function buildJambEntities(p, ox = 0, oy = 0) {
   E.push(rect('SJ-MORTISE', ox, oy + fw - C.mortiseOff - C.mortiseH, rxEdge, oy + fw - C.mortiseOff));
   if (ventCount >= 1) E.push(slot('SJ-POCKET', pocketL, V.s1Bot, pocketR, V.s1Top));
   if (ventCount === 2) E.push(slot('SJ-POCKET', pocketL, V.s2Bot, pocketR, V.s2Top));
+  // Parting-slip kerf (divider between the sash weights) — Piotr 02.08.2026:
+  // a single saw line on the stile centreline at BOTH ends of the top jamb,
+  // from the stile start (7mm past the edge) to 5.5mm past the mortise's NEAR
+  // edge (58.5 + 5.5 = 64mm in). Not in the reference lisp — PC addition.
+  {
+    const psX = ox + T.stileX + C.stileW / 2;
+    const psDepth = C.mortiseOff + 5.5;
+    E.push({ type: 'poly', layer: 'SJ-PARTING-SLIP', closed: false,
+      pts: [[psX, oy - C.stileExt, 0], [psX, oy + psDepth, 0]] });
+    E.push({ type: 'poly', layer: 'SJ-PARTING-SLIP', closed: false,
+      pts: [[psX, oy + fw + C.stileExt, 0], [psX, oy + fw - psDepth, 0]] });
+  }
   // Labels sit INSIDE the piece: rotated 90°, head-text height (Piotr 02.08 —
   // the lisp's horizontal 22.5 label overhung the 141mm jamb width).
   if (winNum) E.push(text('SJ-TEXT', ox + jW / 2, oy + fw / 4, C.headTextH, `${winNum} - TOP`, 90, 1));
