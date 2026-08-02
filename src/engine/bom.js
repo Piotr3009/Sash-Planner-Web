@@ -205,8 +205,7 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
 
   // ── Casement ironmongery + glazing (engine hinge picks → slot quantities) ──
   // Hinges are ordered in handed PAIRS; LH/RH split lives in
-  // derived.casement.hardware for the production pass. Glass clip counts wait
-  // for the workshop numbers (no guessing) — the slots exist, qty comes later.
+  // derived.casement.hardware for the production pass.
   const cw = derived.casement;
   if (derived.category === 'casement' && cw?.hardware) {
     const { hingeSummary, sideOpeners } = cw.hardware;
@@ -228,6 +227,15 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
       setQty('c_glazing_packer', panes.length * 8, 'pcs');
       const beadingMm = panes.reduce((a, g) => a + 2 * ((g.width || 0) + (g.height || 0)), 0);
       addMm('c_glazing_beading', beadingMm);
+      // Glass clips (Piotr 02.08.2026): fans always 6 (never more); main panes
+      // 8 when the pane is taller than 500mm, otherwise 6. Slot by glazing type.
+      const clipsQty = panes.reduce((a, g) => {
+        const isFan = String(g.role || '').startsWith('fan');
+        return a + (isFan ? 6 : ((g.height || 0) > 500 ? 8 : 6));
+      }, 0);
+      const clipsPid = (windowSpec.glazing?.type === 'triple')
+        ? 'c_glass_clips_triple' : 'c_glass_clips_double';
+      setQty(clipsPid, clipsQty, 'pcs');
     }
   }
 

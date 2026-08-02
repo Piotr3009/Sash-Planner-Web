@@ -6,37 +6,19 @@
  * from windowSpec.cill.extension). No head, rails or glass — full technical
  * drawings live in the cut list. Large dimensions on purpose.
  *
- * Extension board is procedural: its top continues the cill weathering
- * slope, the nose drops CILL_BASE.boardDrop with a drip groove underneath,
- * and the back sits flat against the cill face (no tongue — confirm with
- * the workshop if a real hook exists before adding one).
+ * Extension board (v2, mockup approved 02.08.2026): constant 34mm thickness
+ * at the cill face, top continues the weathering slope, radiused nose, R4 arc
+ * drip, and a 10×10 TONGUE hooking into a groove cut in the cill face —
+ * geometry measured from the OTD assembly DXF. The groove is drawn only when
+ * an extension is present (it is an optional machining on the cill).
  */
 import { useMemo } from 'react';
 import { DimH, DimV, TitleBlock } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, STROKES } from './drawingTheme.js';
-import { CILL_BASE, CILL_PATH } from './casementSectionAssets.js';
+import { CILL_BASE, CILL_PATH, CILL_PATH_GROOVED, buildExtensionPath } from './casementSectionAssets.js';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
 
-export function buildExtensionPath(proj) {
-  const B = CILL_BASE;
-  const yTop = B.faceY;
-  const yNose = B.faceY + B.slope * proj;
-  const yBot = yNose + B.boardDrop;
-  const nX = -proj;
-  const r2 = (v) => Math.round(v * 100) / 100;
-  return [
-    `M 0 ${r2(yTop)}`,
-    `L ${r2(nX)} ${r2(yNose)}`,
-    `L ${r2(nX)} ${r2(yBot)}`,
-    `L ${r2(nX + B.dripInset)} ${r2(yBot)}`,
-    `L ${r2(nX + B.dripInset)} ${r2(yBot - B.dripH)}`,
-    `L ${r2(nX + B.dripInset + B.dripW)} ${r2(yBot - B.dripH)}`,
-    `L ${r2(nX + B.dripInset + B.dripW)} ${r2(yBot)}`,
-    'L 0 ' + r2(yBot),
-    'Z',
-  ].join(' ');
-}
 
 export default function CasementSection2D({ windowSpec, derived, projectNumber }) {
   const geom = useMemo(() => {
@@ -54,7 +36,7 @@ export default function CasementSection2D({ windowSpec, derived, projectNumber }
   const DIM_RIGHT = 34;
   const DIM_BOT = ext > 0 ? 34 : 12;
   const TITLE_AREA = 26;
-  const boardBottom = ext > 0 ? B.faceY + B.slope * ext + B.boardDrop : B.height;
+  const boardBottom = B.boardBottomY; // board bottom is flush with the cill
   const drawH = Math.max(B.height, boardBottom);
   const totalW = M + ext + B.width + DIM_RIGHT + M;
   const svgH = DIM_TOP + drawH + DIM_BOT + TITLE_AREA + 16;
@@ -68,7 +50,7 @@ export default function CasementSection2D({ windowSpec, derived, projectNumber }
       <div className="mb-1 px-1">
         <div className="text-[11px] font-semibold text-ink-100">Cill Section</div>
         <div className="text-[9px] text-ink-400">
-          {`${B.width} × ${B.height}`}{ext > 0 ? ` · extension ${ext}mm` : ' · no extension'}
+          {`${B.width} × ${B.height}`}{ext > 0 ? ` · extension ${ext}mm · board 34×${ext + B.tongue} raw` : ' · no extension'}
         </div>
       </div>
       <svg viewBox={`0 0 ${totalW} ${svgH}`} className="w-full h-auto select-none">
@@ -81,7 +63,7 @@ export default function CasementSection2D({ windowSpec, derived, projectNumber }
         </defs>
 
         <g transform={`translate(${ox} ${oy})`}>
-          <path d={CILL_PATH} fill="url(#cillHatch)" stroke={COLORS.frame}
+          <path d={ext > 0 ? CILL_PATH_GROOVED : CILL_PATH} fill="url(#cillHatch)" stroke={COLORS.frame}
             strokeWidth={STROKES.sash} strokeLinejoin="round" {...NS} />
           {extPath && (
             <path d={extPath} fill="url(#cillHatch)" stroke={COLORS.frame}
@@ -93,6 +75,9 @@ export default function CasementSection2D({ windowSpec, derived, projectNumber }
         <DimV x={X(B.width) + 18} y1={Y(0)} y2={Y(B.height)} label={`${B.height}`} vbw={totalW} />
         {ext > 0 && (
           <DimH x1={X(-ext)} x2={X(0)} y={Y(boardBottom) + 16} label={`${ext}`} vbw={totalW} />
+        )}
+        {ext > 0 && (
+          <DimV x={X(-ext) - 14} y1={Y(B.boardTopY)} y2={Y(B.boardBottomY)} label="34" vbw={totalW} />
         )}
 
         <TitleBlock x={totalW / 2} y={svgH - 14} title="CILL SECTION"
