@@ -293,20 +293,22 @@ export default function ProductionPackPage() {
         totalPaint.topcoat += derived.paint.topcoat;
       }
 
-      // Consumables
+      // Consumables — optional-chained: casement windows carry a different
+      // consumables shape (silicone/beadTapeSide/seals), so every sash key
+      // must be null-safe or a casement-only PP crashes on mount (Piotr 02.08).
       if (derived.consumables) {
         const c = derived.consumables;
-        totalConsumables.glassSqm += c.glass.sqm;
-        totalConsumables.cordM += c.cord.meters;
-        totalConsumables.clips += c.clips.qty;
-        totalConsumables.spacer1mm += c.spacer1mm.qty;
-        totalConsumables.spacer2mm += c.spacer2mm.qty;
-        totalConsumables.beadTapeM += c.beadTape.meters;
-        totalConsumables.siliconeTubes += c.silicone.tubes;
+        totalConsumables.glassSqm += c.glass?.sqm || 0;
+        totalConsumables.cordM += c.cord?.meters || 0;
+        totalConsumables.clips += c.clips?.qty || 0;
+        totalConsumables.spacer1mm += c.spacer1mm?.qty || 0;
+        totalConsumables.spacer2mm += c.spacer2mm?.qty || 0;
+        totalConsumables.beadTapeM += c.beadTape?.meters || 0;
+        totalConsumables.siliconeTubes += c.silicone?.tubes || 0;
         totalConsumables.seal6070M += c.seal6070?.meters || 0;
         totalConsumables.seal6009M += c.seal6009?.meters || 0;
-        glassType = c.glass.type;
-        clipSize = c.clips.size;
+        if (c.glass?.type) glassType = c.glass.type;
+        if (c.clips?.size) clipSize = c.clips.size;
       }
     });
 
