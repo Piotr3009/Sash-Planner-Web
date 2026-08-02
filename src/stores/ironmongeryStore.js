@@ -18,18 +18,31 @@ const nextItemNumber = (items) => {
   return `IRN-${String(max + 1).padStart(3, '0')}`;
 };
 
+// windowType: 'sash' | 'casement' | 'all' (shared categories, e.g. trickle
+// vents are the same physical product on both window types).
 export const IRONMONGERY_CATEGORIES = [
   { key: 'pulleys', label: 'Pulleys', windowType: 'sash' },
   { key: 'fingerLifts', label: 'Finger Lifts', windowType: 'sash' },
   { key: 'locks', label: 'Sash Locks', windowType: 'sash' },
   { key: 'pullHandles', label: 'Pull Handles', windowType: 'sash' },
   { key: 'stoppers', label: 'Stoppers', windowType: 'sash' },
-  { key: 'trickleVents', label: 'Trickle Vents', windowType: 'sash' },
-  { key: 'other', label: 'Others', windowType: 'sash' },
+  { key: 'trickleVents', label: 'Trickle Vents', windowType: 'all' },
   { key: 'casementHandles', label: 'Casement Handles', windowType: 'casement' },
-  { key: 'casementStays', label: 'Casement Stays', windowType: 'casement' },
-  { key: 'casementVents', label: 'Trickle Vents', windowType: 'casement' },
+  // slot:false → catalogue tab only, no configurator/batch slot: the engine
+  // selects hinge and lock sizes itself (casementHardware ladders).
+  { key: 'casementHinges', label: 'Casement Hinges', windowType: 'casement', slot: false },
+  { key: 'casementLocks', label: 'Casement Locks', windowType: 'casement', slot: false },
+  { key: 'other', label: 'Others', windowType: 'sash' },
 ];
+
+// Retired category keys → their new home. Applied wherever items enter the
+// store (cloud load, CSV import, add) so old data keeps surfacing.
+export const LEGACY_IRONMONGERY_CATEGORY = {
+  casementVents: 'trickleVents', // duplicate tab, same physical product
+  casementStays: 'other',        // friction stays are engine-selected hinges now
+};
+export const migrateIronCategory = (cat) =>
+  LEGACY_IRONMONGERY_CATEGORY[cat] || cat || 'other';
 
 // Ironmongery finishes — single source of truth, matching PSW exactly so
 // Materials, the estimate matrix and PSW all line up. (Bespoke lives only in
@@ -63,7 +76,7 @@ export const useIronmongeryStore = create((set, get) => ({
           id: uid(),
           item_number: nextItemNumber(items),
           name: data.name || 'New Item',
-          category: data.category || 'other',
+          category: migrateIronCategory(data.category),
           subcategory: data.subcategory || '',
           finish: data.finish || '',
           size: data.size || '',
@@ -128,7 +141,7 @@ export const useIronmongeryStore = create((set, get) => ({
 
         const normalize = (row) => ({
           name: row.name || '',
-          category: row.category || 'other',
+          category: migrateIronCategory(row.category),
           subcategory: row.subcategory || '',
           finish: row.finish || row.color || '',
           size: row.size || '',
@@ -166,7 +179,12 @@ export const useIronmongeryStore = create((set, get) => ({
       // ─── CLOUD ───
       loadFromCloud: async () => {
         const data = await cloud.loadIronmongery();
-        if (data) set({ items: data, loaded: true });
+        if (data) {
+          // Retired categories (casementVents / casementStays) fold into their
+          // new tabs so existing items keep showing up.
+          const items = data.map((m) => ({ ...m, category: migrateIronCategory(m.category) }));
+          set({ items, loaded: true });
+        }
         else set({ loaded: true });
       },
       clearAll: () => set({ items: [], loaded: false }),

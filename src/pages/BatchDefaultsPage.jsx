@@ -102,7 +102,7 @@ export default function BatchDefaultsPage() {
           {/* 7. IRONMONGERY SLOTS */}
           <Sec title="Ironmongery — Assign Products">
             <div className="space-y-2">
-              {IRONMONGERY_CATEGORIES.filter(c => c.windowType === (batch.type || 'sash')).map(cat => {
+              {IRONMONGERY_CATEGORIES.filter(c => (c.windowType === (batch.type || 'sash') || c.windowType === 'all') && c.slot !== false).map(cat => {
                 const item = getSlotItem(cat.key);
                 return (
                   <div key={cat.key}

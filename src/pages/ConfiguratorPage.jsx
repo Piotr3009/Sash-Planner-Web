@@ -32,6 +32,14 @@ const OPENINGS = [{ value: 'both', label: 'Both Open' }, { value: 'bottom', labe
 const CAS_BAR_COUNTS = [0, 1, 2, 3, 4].map(n => ({ value: n, label: String(n) }));
 const CAS_FAN_BAR_COUNTS = [0, 1, 2].map(n => ({ value: n, label: String(n) }));
 const ROOM_TYPES = [{ value: 'habitable', label: 'Habitable' }, { value: 'kitchen', label: 'Kitchen' }, { value: 'bathroom', label: 'Bathroom' }, { value: 'other', label: 'No vent' }];
+// Vent-category merge: windows saved before it keep their product under the
+// retired casementVents key — surface it as trickleVents on prefill.
+const migrateSlots = (slots) => {
+  const s = { ...(slots || {}) };
+  if (s.casementVents && !s.trickleVents) s.trickleVents = s.casementVents;
+  delete s.casementVents;
+  return s;
+};
 const SOLE_OPTIONS = [{ value: true, label: 'Only window' }, { value: false, label: 'More than one' }];
 const IRON_OPTIONS = [{ value: 'brass', label: 'Brass' }, { value: 'chrome', label: 'Chrome' }, { value: 'stainless', label: 'Stainless' }, { value: 'antique_brass', label: 'Antique Brass' }, { value: 'black', label: 'Black' }, { value: 'white', label: 'White' }];
 const SEAL_OPTIONS = [{ value: 'black', label: 'Black' }, { value: 'white', label: 'White' }];
@@ -198,7 +206,7 @@ export default function ConfiguratorPage() {
     setFrostLoc(w.frostedLocation || 'bottom');
     // Specification (windows store effective values, incl. legacy override-era windows)
     setIron(w.ironmongery || def.ironmongery || 'brass');
-    setIronSlots(w.ironmongerySlots || def.ironmongerySlots || {});
+    setIronSlots(migrateSlots(w.ironmongerySlots || def.ironmongerySlots || {}));
     setHorn(w.hornType || def.hornType || 'A');
     setFrameType(frameFromWindow(w));
     setColourMode(w.colourMode || def.colourMode || 'single');
@@ -251,7 +259,7 @@ export default function ConfiguratorPage() {
         setPrefillSource(last.name || 'previous window');
       } else {
         setIron(def.ironmongery || 'brass');
-        setIronSlots(def.ironmongerySlots || {});
+        setIronSlots(migrateSlots(def.ironmongerySlots || {}));
         setHorn(def.hornType || 'A');
         const ft = (def.frameType === 'slim') ? 'slim' : 'standard';
         setFrameType(ft);
@@ -466,7 +474,7 @@ export default function ConfiguratorPage() {
 
   if (!batch) return <div className="p-8 text-ink-400">Batch not found.</div>;
   const isSash = batch.type === 'sash';
-  const slotCategories = IRONMONGERY_CATEGORIES.filter(c => c.windowType === (batch.type || 'sash'));
+  const slotCategories = IRONMONGERY_CATEGORIES.filter(c => (c.windowType === (batch.type || 'sash') || c.windowType === 'all') && c.slot !== false);
   const getSlotItem = (key) => ironItems.find(m => m.id === ironSlots[key]) || null;
 
   // Format custom bars for spec panel

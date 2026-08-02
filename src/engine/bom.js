@@ -115,10 +115,11 @@ export const HARDWARE_TO_SLOT_KEY = {
   'Pulley wheels': 'pulleys',
   'Window stopper': 'stoppers',
   'Trickle vent': 'trickleVents',
-  // Casement (plural 'Trickle vents' keeps the sash 'Trickle vent' key intact)
+  // Casement — vents share the sash category (one physical product, merged
+  // tab); 'Casement stay' was retired: friction stays are engine-selected
+  // hinge slots now, not a client product.
   'Casement handle': 'casementHandles',
-  'Casement stay': 'casementStays',
-  'Trickle vents': 'casementVents',
+  'Trickle vents': 'trickleVents',
 };
 
 // Format a quantity for display by unit (pcs are whole; tubes/m/L/etc. keep 2dp)
@@ -303,6 +304,9 @@ export function buildWindowHardware(windowSpec, batch, ironmongeryItems = [], de
     ...(batch?.defaults?.ironmongerySlots || {}),
     ...(windowSpec?.hardware?.slots || {}),
   };
+  // Legacy slot key: windows saved before the vent-category merge stored the
+  // product under casementVents — honour it unless the new key is set.
+  if (slots.casementVents && !slots.trickleVents) slots.trickleVents = slots.casementVents;
   return lines.map((h) => {
     const slotKey = HARDWARE_TO_SLOT_KEY[h.item];
     const itemId = slotKey ? slots[slotKey] : null;

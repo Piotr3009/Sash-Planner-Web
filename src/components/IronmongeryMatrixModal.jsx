@@ -14,7 +14,7 @@ import { useIronmongeryStore, IRONMONGERY_CATEGORIES, IRONMONGERY_FINISHES, FINI
 //   onClose()
 export default function IronmongeryMatrixModal({ currentSlots = {}, currentBespoke = false, onApply, onClose }) {
   const items = useIronmongeryStore((s) => s.items);
-  const cats = useMemo(() => IRONMONGERY_CATEGORIES.filter((c) => c.windowType === 'sash'), []);
+  const cats = useMemo(() => IRONMONGERY_CATEGORIES.filter((c) => c.windowType === 'sash' || c.windowType === 'all'), []);
 
   const [slots, setSlots] = useState({ ...currentSlots });
   const [bespoke, setBespoke] = useState(currentBespoke);

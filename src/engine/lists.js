@@ -353,11 +353,11 @@ export function buildHardwareList(windowSpec, derived = null) {
       list.push({ item: nm, detail: parts.join(' / '), quantity: e.count });
     });
     // Client-facing items — resolved to products via per-window ironmongery
-    // slots (casementHandles / casementStays / casementVents).
+    // slots (casementHandles / trickleVents). No stay line: friction stays
+    // ARE the hinge slots above, engine-selected.
     const totalOpeners = Object.values(hw.hingeSummary).reduce((a, e) => a + e.pairs, 0);
     if (totalOpeners > 0) {
       list.push({ item: 'Casement handle', detail: 'per opener', quantity: totalOpeners });
-      list.push({ item: 'Casement stay', detail: 'per opener', quantity: totalOpeners });
     }
     const vents = buildVentGrilles(windowSpec);
     if (vents > 0) {
