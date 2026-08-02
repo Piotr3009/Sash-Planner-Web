@@ -8,7 +8,8 @@
 // constant 34mm thickness at the cill face for all three projections
 // (35 / 60 / 85 → raw board widths 45 / 70 / 95 incl. tongue), top plane
 // continues the cill weathering slope, ~r3 nose radius, shared bottom with
-// the cill (y 68), R4 arc drip starting 10mm from the nose.
+// the cill (y 68), R4 drip NOTCH cut up into the underside 10mm from the nose
+// (water break — Piotr 02.08.2026: wcięcie, nie wypustka).
 export const CILL_BASE = Object.freeze({
   width: 93,
   height: 68,
@@ -61,7 +62,7 @@ export function buildExtensionPath(proj) {
     `Q ${nX} ${r2(yRad + 0.7)} ${nX} ${yNose}`,
     `L ${nX} ${yBot}`,
     `L ${r2(dripA)} ${yBot}`,
-    `A ${B.dripR} ${B.dripR} 0 0 0 ${r2(dripB)} ${yBot}`,
+    `A ${B.dripR} ${B.dripR} 0 0 1 ${r2(dripB)} ${yBot}`,
     `L 0 ${yBot}`,
     `L 0 ${yGrvBot}`,
     `L ${B.tongue} ${yGrvBot}`,

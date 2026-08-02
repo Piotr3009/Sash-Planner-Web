@@ -201,7 +201,9 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
           value={assignment?.material_id || ''}
           disabled={disabled}
           allowClear
-          onSelect={(m) => (m ? onAssign(part.id, m.id, assignment?.yield || 1.0, selCat, selSub) : onRemove(part.id))}
+          onSelect={(m) => (m
+            ? onAssign(part.id, m.id, assignment?.yield || 1.0, m.category || selCat, m.subcategory || selSub)
+            : onRemove(part.id))}
           className="w-full"
         />
         {assignedMat && (
@@ -297,7 +299,7 @@ function VariantRow({ part, vk, materials, categories, subcategoriesByCategory, 
           materials={filteredMaterials}
           value={eff?.material_id || ''}
           disabled={disabled}
-          onSelect={(m) => m && onAssign(targetId, m.id, eff?.yield ?? 1.0, selCat, selSub, explicitVk)}
+          onSelect={(m) => m && onAssign(targetId, m.id, eff?.yield ?? 1.0, m.category || selCat, m.subcategory || selSub, explicitVk)}
           className="w-full max-w-[370px]"
         />
       </td>
