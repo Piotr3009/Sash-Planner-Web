@@ -437,6 +437,9 @@ export const MIRROR_PAIRS = {
   'EXTERNAL JAMB LINER (L)':  { right: 'EXTERNAL JAMB LINER (R)',  symbol: 'EL-L/R',  label: 'External Jamb Liner (pair)' },
   'STILES TOP (L)':           { right: 'STILES TOP (R)',           symbol: 'ST-L/R',  label: 'Stiles Top (pair)' },
   'STILES BOTTOM SASH (L)':   { right: 'STILES BOTTOM SASH (R)',   symbol: 'SBS-L/R', label: 'Stiles Bottom Sash (pair)' },
+  // ── Casement (Piotr 02.08.2026, PDF audit item 0 — grouping never knew C-*) ──
+  'C-FRAME JAMB (L)':         { right: 'C-FRAME JAMB (R)',         symbol: 'C-J-L/R', label: 'Frame Jambs (pair)' },
+  'C-STILE (L)':              { right: 'C-STILE (R)',              symbol: 'C-ST-L/R', label: 'Leaf Stiles (pair)' },
 };
 
 /**
@@ -463,6 +466,15 @@ export const CUT_LIST_ORDER = [
   { match: 'TOP MEET RAIL',             symbol: 'TMR',     label: 'Top Meet Rail' },
   { match: 'BOTTOM MEET RAIL',          symbol: 'BMR',     label: 'Bottom Meet Rail' },
   { match: 'BOTTOM RAIL',               symbol: 'BR',      label: 'Bottom Rail' },
+  // ── CASEMENT (frame first, then dividers, then leaves) ──
+  { match: 'C-FRAME HEAD',              symbol: 'C-FH',    label: 'Frame Head' },
+  { match: 'C-FRAME JAMB (L)',          symbol: 'C-J-L/R', label: 'Frame Jambs (pair)',          isPair: true },
+  { match: 'C-FRAME CILL',              symbol: 'C-CILL',  label: 'Frame Cill' },
+  { match: 'C-MULLION',                 symbol: 'C-M',     label: 'Mullion' },
+  { match: 'C-TRANSOM',                 symbol: 'C-T',     label: 'Transom' },
+  { match: 'C-STILE (L)',               symbol: 'C-ST-L/R', label: 'Leaf Stiles (pair)',         isPair: true },
+  { match: 'C-TOP RAIL',                symbol: 'C-TR',    label: 'Leaf Top Rail' },
+  { match: 'C-BOTTOM RAIL',             symbol: 'C-BR',    label: 'Leaf Bottom Rail' },
 ];
 
 /**
@@ -522,9 +534,11 @@ export function buildGroupedCutList(rawCutList) {
 
   CUT_LIST_ORDER.forEach((def) => {
     const leftRows = byElement.get(def.match) || [];
+    byElement.delete(def.match);
     if (def.isPair) {
       const pair = MIRROR_PAIRS[def.match];
       const rightRows = [...(byElement.get(pair.right) || [])];
+      byElement.delete(pair.right);
       const rows = [];
       leftRows.forEach((L) => {
         // Find the right partner from the SAME window with the SAME length.
@@ -567,6 +581,18 @@ export function buildGroupedCutList(rawCutList) {
         groups.push({ symbol: def.symbol, label: def.label, mirror: false, section: consolidated[0].section || '', rows: consolidated });
       }
     }
+  });
+
+  // Safety net (lesson from the casement gap): any element name the order
+  // table does not know still gets a group — visible with its raw name —
+  // instead of silently vanishing from the cut list.
+  [...byElement.keys()].sort().forEach((name) => {
+    const rows = byElement.get(name).map((r) => ({
+      window: win(r), projectNum: proj(r), length: r.length, qty: r.quantity || 1, section: r.section,
+    }));
+    const consolidated = consolidate(rows);
+    consolidated.sort((a, b) => (b.length - a.length) || (a.window || '').localeCompare(b.window || ''));
+    groups.push({ symbol: '?', label: name, mirror: false, section: consolidated[0].section || '', rows: consolidated });
   });
 
   return groups;
