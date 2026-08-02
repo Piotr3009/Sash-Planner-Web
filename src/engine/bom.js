@@ -49,6 +49,8 @@ export const ELEMENT_TO_PART_ID = {
   'TOP MEET RAIL': 'top_meet_rail', 'BOTTOM MEET RAIL': 'bottom_meet_rail',
   'GLAZING BEADING': 'glazing_beading', 'TRIANGLE BEADING (EXT)': 'triangle_beading_ext',
   'GEORGIAN MIDDLE BEADING': 'georgian_middle_beading',
+  'C-GLAZING BEADING': 'c_glazing_beading', 'C-TRIANGLE BEADING (EXT)': 'c_triangle_beading_ext',
+  'C-GEORGIAN MIDDLE BEADING': 'c_georgian_middle_beading',
   'PARTING BEADING': 'parting_beading', 'STAFF BEADING': 'staff_beading',
   'MEETING BEADING A': 'meeting_beading_a', 'MEETING BEADING B': 'meeting_beading_b',
 };
@@ -234,8 +236,8 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
     const panes = Array.isArray(derived.customGlassUnits) ? derived.customGlassUnits : [];
     if (panes.length > 0) {
       setQty('c_glazing_packer', panes.length * 8, 'pcs');
-      const beadingMm = panes.reduce((a, g) => a + 2 * ((g.width || 0) + (g.height || 0)), 0);
-      addMm('c_glazing_beading', beadingMm);
+      // Beading lengths now come from derived.components.beading (C- names)
+      // through the shared component mapping above.
       // Glass clips (Piotr 02.08.2026): fans always 6 (never more); main panes
       // 8 when the pane is taller than 500mm, otherwise 6. Slot by glazing type.
       const clipsQty = panes.reduce((a, g) => {

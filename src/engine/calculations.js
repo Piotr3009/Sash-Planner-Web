@@ -841,6 +841,40 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
     const lockPicks = selectCasementLocks(layoutDef.panels, leafSizes);
     const lockSummary = summariseLocks(lockPicks);
 
+    // ── Beading components (sash semantics, C- names = casement profiles) ──
+    // Glazing bead: pane perimeters +15%. Astragal bars: same run glued on
+    // BOTH glass faces — Triangle (Ext) outside, Georgian Middle inside.
+    // Between-glass (internal georgian) bars live inside the IGU: no material.
+    const casBars = cas.bars || {
+        h: Number(windowSpec.casementHBars) || 0,
+        v: Number(windowSpec.casementVBars) || 0,
+        fanH: Number(windowSpec.casementFanHBars) || 0,
+        fanV: Number(windowSpec.casementFanVBars) || 0,
+        fan2H: Number(windowSpec.casementFan2HBars) || 0,
+        fan2V: Number(windowSpec.casementFan2VBars) || 0,
+    };
+    const barCountsFor = (role) => (role === 'fan'
+        ? { h: casBars.fanH, v: casBars.fanV }
+        : role === 'fan2'
+            ? { h: casBars.fan2H, v: casBars.fan2V }
+            : { h: casBars.h, v: casBars.v });
+    const BEAD_WASTE = 1.15;
+    const recBead = (name, mm, notes) =>
+        createComponentRecord(windowSpec, 'beading', name, 'profile', mm, 1, notes);
+    const perimMm = paneGlass.reduce((a, g) => a + 2 * ((g.width || 0) + (g.height || 0)), 0);
+    const casBarType = cas.barType || windowSpec.casementBarType || 'astragal';
+    const barMm = casBarType === 'astragal'
+        ? paneGlass.reduce((a, g) => {
+            const c = barCountsFor(g.role);
+            return a + c.h * (g.width || 0) + c.v * (g.height || 0);
+        }, 0)
+        : 0;
+    const beading = [recBead('C-GLAZING BEADING', Math.round(perimMm * BEAD_WASTE), 'Pane perimeters + 15%')];
+    if (barMm > 0) {
+        beading.push(recBead('C-TRIANGLE BEADING (EXT)', Math.round(barMm * BEAD_WASTE), 'Astragal bars ext + 15%'));
+        beading.push(recBead('C-GEORGIAN MIDDLE BEADING', Math.round(barMm * BEAD_WASTE), 'Astragal bars int + 15%'));
+    }
+
     void r1;
     return {
         category: 'casement',
@@ -848,7 +882,7 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
         sashHeight: leafSizes[0]?.leafH || 0,
         topSashHeight: 0, bottomSashHeight: 0,
         config: { key: 'none', rows: 0, cols: 0 },
-        components: { sash, box, beading: [] },
+        components: { sash, box, beading },
         glazingItems: [],
         customGlassUnits: paneGlass,
         casement: {

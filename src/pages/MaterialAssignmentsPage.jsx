@@ -120,7 +120,7 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
       {/* Part name */}
       <td className="px-3 py-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-ink-100 font-medium">{part.name}</span>
+          <span className="text-ink-100 font-medium text-[15px]">{part.name}</span>
           {part.hint && (
             <span
               title={part.hint}
@@ -145,9 +145,6 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
             <span className="text-[8px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 border border-blue-500/25 uppercase tracking-wider">mirror</span>
           )}
         </div>
-        {part.sub && (
-          <div className="text-[10px] text-ink-400 mt-0.5">{part.sub}</div>
-        )}
         {(live?.finishedSection || part.finishedSection) && (
           <div className="text-[10px] text-ink-400 mt-0.5">finished: {live?.finishedSection ?? part.finishedSection}</div>
         )}
@@ -630,6 +627,22 @@ export default function MaterialAssignmentsPage() {
               onSelect={toggleSelect}
             />
             <PartGroupSection
+              title="📏 Casement Beading"
+              subtitle={`${CASEMENT_PARTS.beading.length} profiles · glazing bead + astragal ext/int — lengths from the engine`}
+              parts={CASEMENT_PARTS.beading}
+              assignments={assignments}
+              materials={materials}
+              categories={categories}
+              subcategoriesByCategory={subcategoriesByCategory}
+              onAssign={setAssignment}
+              onFilter={setFilter}
+              onYieldChange={setYield}
+              onRemove={removeAssignment}
+              disabled={locked}
+              selectedPart={selectedPart}
+              onSelect={toggleSelect}
+            />
+            <PartGroupSection
               title="🔩 Casement Ironmongery"
               subtitle={`${CASEMENT_PARTS.ironmongery.length} slots · engine picks the hinge slot per opener from leaf width + weight; you assign the product (see ? hints)`}
               parts={CASEMENT_PARTS.ironmongery}
@@ -647,7 +660,7 @@ export default function MaterialAssignmentsPage() {
             />
             <PartGroupSection
               title="🧊 Casement Glazing"
-              subtitle={`${CASEMENT_PARTS.glazing.length} parts · beading, clips, packers — silicone/tapes/glass/paint are shared with sash`}
+              subtitle={`${CASEMENT_PARTS.glazing.length} parts · clips, packers — silicone/tapes/glass/paint are shared with sash`}
               parts={CASEMENT_PARTS.glazing}
               assignments={assignments}
               materials={materials}

@@ -103,8 +103,15 @@ export const CASEMENT_PARTS = {
       section: '—', pcs: 1, materialType: 'ironmongery', unit: 'pcs',
     })),
   ],
+  beading: [
+    { id: 'c_glazing_beading', name: 'Glazing Beading', section: 'profile', pcs: 1, materialType: 'beading', unit: 'm',
+      hint: 'Casement glazing bead profile. Length = pane perimeters + 15% waste, computed by the engine.' },
+    { id: 'c_triangle_beading_ext', name: 'Triangle Beading (Ext)', section: 'profile', pcs: 1, materialType: 'beading', unit: 'm',
+      hint: 'Astragal bar profile glued on the OUTSIDE glass face. Length = bar runs + 15%, only when bar type is astragal.' },
+    { id: 'c_georgian_middle_beading', name: 'Georgian Middle Beading', section: 'profile', pcs: 1, materialType: 'beading', unit: 'm',
+      hint: 'Astragal bar profile glued on the INSIDE glass face \u2014 same runs as the external one + 15%.' },
+  ],
   glazing: [
-    { id: 'c_glazing_beading', name: 'Glazing Beading (casement profile)', sub: 'per m — from engine glass runs', section: 'profile', pcs: 1, materialType: 'beading', unit: 'm' },
     { id: 'c_glass_clips_double', name: 'Glass Clips — Double', sub: 'double glazed units', section: '—', pcs: 1, materialType: 'consumable', unit: 'pcs' },
     { id: 'c_glass_clips_triple', name: 'Glass Clips — Triple', sub: 'triple glazed units', section: '—', pcs: 1, materialType: 'consumable', unit: 'pcs' },
     { id: 'c_glazing_packer', name: 'Glazing Packers', sub: '8 pcs × pane — engine counts panes', section: '—', pcs: 8, materialType: 'consumable', unit: 'pcs' },
@@ -112,7 +119,7 @@ export const CASEMENT_PARTS = {
 };
 export const CASEMENT_ALL_PARTS = [
   ...CASEMENT_PARTS.frame, ...CASEMENT_PARTS.sash,
-  ...CASEMENT_PARTS.ironmongery, ...CASEMENT_PARTS.glazing,
+  ...CASEMENT_PARTS.ironmongery, ...CASEMENT_PARTS.beading, ...CASEMENT_PARTS.glazing,
 ];
 
 // Flat list for lookups — includes casement parts: mergeWindowMaterials and
