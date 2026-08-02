@@ -64,9 +64,11 @@ export const WEIGHTS = {
 // ─── Stroke widths (screen px, via vectorEffect) ───
 // Change these → line thickness changes everywhere, identically.
 export const STROKES = {
-  frame:       1.5,
+  frame:       2,
   boardIndicator: 3,   // head/jamb board mounting indicator (board is 28 mm)
-  frameLight:  0.5,
+  // Mullions and transoms are structural members, not helper lines — at 0.5 they
+  // rasterised to a grey smear on paper (Piotr 02.08). Now 0.65 of the frame.
+  frameLight:  1.3,
   sash:        1,
   sashLight:   0.3,
   meeting:     0.8,
@@ -84,7 +86,7 @@ export const STROKES = {
   notchCircle: 0.5,
 
   horn:        2,
-  center:      0.3,
+  center:      0.5,
   section:     1,
 };
 
