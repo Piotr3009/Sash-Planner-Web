@@ -4,6 +4,9 @@ import * as cloud from '../services/cloudSync.js';
 
 // ─── Production settings (preserved from original — used by calculations engine) ───
 const defaultSettings = {
+  // Casement production knobs (Settings → Production, per tenant)
+  weightMarginPct: 5,          // hardware/seals/paint allowance on leaf weights
+  childRestrictorDefault: true, // configurator checkbox default for new windows
   kerf: 3,
   endTrim: 10,
   minimumPiece: 200,

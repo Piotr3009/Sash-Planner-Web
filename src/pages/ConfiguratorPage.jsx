@@ -83,6 +83,7 @@ export default function ConfiguratorPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const addWindow = useProjectStore((s) => s.addWindowToBatch);
+  const tenantSettings = useProjectStore((s) => s.settings);
   const updateWindow = useProjectStore((s) => s.updateWindowInBatch);
 
   const project = useProjectStore((s) => s.projects.find(p => p.id === projectId));
@@ -215,7 +216,7 @@ export default function ConfiguratorPage() {
     setSpacerColor(w.spacerColor || def.spacerColor || 'white');
     setSpacerType(w.spacerType || def.spacerType || 'warm');
     setPas24(w.pas24 !== undefined ? !!w.pas24 : (def.pas24 || false));
-    setChildRestrictor(w.childRestrictor !== undefined ? !!w.childRestrictor : (def.childRestrictor ?? true));
+    setChildRestrictor(w.childRestrictor !== undefined ? !!w.childRestrictor : (def.childRestrictor ?? tenantSettings?.childRestrictorDefault ?? true));
     // Casement fields (harmless no-ops for sash windows)
     setCasLayout(w.casementLayout || '040L');
     setCasHinges(Array.isArray(w.casementHinges) ? w.casementHinges : null);
@@ -269,7 +270,7 @@ export default function ConfiguratorPage() {
         setSpacerColor(def.spacerColor || 'white');
         setSpacerType(def.spacerType || 'warm');
         setPas24(def.pas24 || false);
-        setChildRestrictor(def.childRestrictor ?? true);
+        setChildRestrictor(def.childRestrictor ?? tenantSettings?.childRestrictorDefault ?? true);
       }
       setPrefilled(true);
     }

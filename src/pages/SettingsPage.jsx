@@ -30,6 +30,7 @@ const TABS = [
   { id: 'pricing', label: 'Pricing', admin: true },
   { id: 'estimate_pdf', label: 'Estimate PDF', admin: true },
   { id: 'glassrefs', label: 'Glass references', admin: true },
+  { id: 'production', label: 'Production', admin: true },
   { id: 'billing', label: 'Billing' },
   { id: 'data',    label: 'Your Data' },
   { id: 'about',   label: 'About' },
@@ -70,6 +71,7 @@ export default function SettingsPage() {
         {tab === 'company' && <CompanyTab />}
         {tab === 'pricing' && <PricingTab />}
         {tab === 'estimate_pdf' && <EstimatePdfTab />}
+        {tab === 'production' && <ProductionTab />}
         {tab === 'glassrefs' && (
           <div className="card p-5">
             <p className="text-xs text-ink-400 mb-4">
@@ -674,4 +676,50 @@ function fileToResizedDataURL(file, maxDim) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+
+// ─── Production tab: per-tenant engine knobs ───
+function ProductionTab() {
+  const settings = useProjectStore((s) => s.settings);
+  const updateSettings = useProjectStore((s) => s.updateSettings);
+  const [margin, setMargin] = useState(
+    Number.isFinite(Number(settings?.weightMarginPct)) ? Number(settings.weightMarginPct) : 5
+  );
+  const [restrictor, setRestrictor] = useState(settings?.childRestrictorDefault ?? true);
+  const save = () => updateSettings({
+    weightMarginPct: Number.isFinite(Number(margin)) ? Number(margin) : 5,
+    childRestrictorDefault: !!restrictor,
+  });
+  return (
+    <div className="max-w-[560px]">
+      <div className="card p-5 space-y-5">
+        <div>
+          <div className="text-[15px] font-semibold text-ink-50 mb-1">Weight margin</div>
+          <div className="text-xs text-ink-400 mb-2">
+            Allowance added on top of timber + glass leaf weights (hardware, seals, paint).
+            Used by the hinge selector and the whole-window transport weight.
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="number" min="0" max="30" step="0.5" value={margin}
+              onChange={(e) => setMargin(e.target.value)}
+              onBlur={save}
+              className="input w-[90px] text-[13px] text-center" />
+            <span className="text-sm text-ink-300">%</span>
+          </div>
+        </div>
+        <div className="border-t border-surface-500 pt-5">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" checked={restrictor}
+              onChange={(e) => { setRestrictor(e.target.checked); updateSettings({ childRestrictorDefault: e.target.checked, weightMarginPct: Number.isFinite(Number(margin)) ? Number(margin) : 5 }); }}
+              className="accent-accent-500 mt-0.5" />
+            <span>
+              <span className="text-[15px] font-semibold text-ink-50 block">Child restrictor by default</span>
+              <span className="text-xs text-ink-400">New casement windows start with the Child restrictor checkbox ticked. Each window can still override it in the configurator.</span>
+            </span>
+          </label>
+        </div>
+      </div>
+    </div>
+  );
 }

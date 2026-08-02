@@ -568,7 +568,7 @@ function emptyDerived(category, frameWidth, frameHeight) {
     };
 }
 
-function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
+function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}) {
     // ── Casement engine v1 — every number from the casement profile
     //    (casement-dimensioning-v1.md); no bare constants in formulas. ──
     const p = getCasementProfile();
@@ -819,7 +819,10 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
         const [sf, sd2] = String(sec).split('x').map(Number);
         return kgPerM(sf || 0, sd2 || 0);
     };
-    const wMargin = 1 + (CONSTANTS.WEIGHT_MARGIN_PCT || 0) / 100;
+    const marginPct = Number.isFinite(Number(settings?.weightMarginPct))
+        ? Number(settings.weightMarginPct)
+        : CONSTANTS.WEIGHT_MARGIN_PCT;
+    const wMargin = 1 + (marginPct || 0) / 100;
     const timberKg = [...box, ...sash].reduce(
         (a, cpt) => a + secKgPerM(cpt.section) * ((Number(cpt.length) || 0) / 1000) * (Number(cpt.quantity) || 1),
         0
@@ -930,7 +933,7 @@ export function deriveWindowData(windowSpec, settings = {}) {
     const frameWidth = Number(windowSpec.frame?.width ?? 0);
     const frameHeight = Number(windowSpec.frame?.height ?? 0);
     const category = windowSpec.category || 'sash';
-    if (category === 'casement') return deriveCasementWindow(windowSpec, frameWidth, frameHeight);
+    if (category === 'casement') return deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings);
     if (category !== 'sash') return emptyDerived(category, frameWidth, frameHeight);
     const isTripleSash = windowSpec.sash?.type === 'triple';
     const gridMode = windowSpec.sash?.grid?.mode ?? 'none';

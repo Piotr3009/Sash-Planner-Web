@@ -20,7 +20,9 @@ import { CILL_BASE, CILL_PATH, CILL_PATH_GROOVED, buildExtensionPath } from './c
 const NS = { vectorEffect: 'non-scaling-stroke' };
 
 
-export default function CasementSection2D({ windowSpec, derived, projectNumber }) {
+export default function CasementSection2D({ windowSpec, derived, projectNumber, selectedElement, onElementClick, fullWidth = false }) {
+  const clickable = typeof onElementClick === 'function';
+  const hl = (key) => clickable && selectedElement === key;
   const geom = useMemo(() => {
     if (!windowSpec || !derived?.casement) return null;
     const ext = Number(windowSpec.cill?.extension) || 0;
@@ -46,7 +48,7 @@ export default function CasementSection2D({ windowSpec, derived, projectNumber }
   const Y = (y) => oy + y;
 
   return (
-    <div className="card p-3 max-w-[80%] mx-auto">
+    <div className={`card p-3 ${fullWidth ? '' : 'max-w-[80%] mx-auto'}`}>
       <div className="mb-1 px-1">
         <div className="text-[11px] font-semibold text-ink-100">Cill Section</div>
         <div className="text-[9px] text-ink-400">
@@ -63,11 +65,19 @@ export default function CasementSection2D({ windowSpec, derived, projectNumber }
         </defs>
 
         <g transform={`translate(${ox} ${oy})`}>
-          <path d={ext > 0 ? CILL_PATH_GROOVED : CILL_PATH} fill="url(#cillHatch)" stroke={COLORS.frame}
-            strokeWidth={STROKES.sash} strokeLinejoin="round" {...NS} />
+          <path d={ext > 0 ? CILL_PATH_GROOVED : CILL_PATH}
+            fill={hl('cill') ? COLORS.highlightFill : 'url(#cillHatch)'}
+            stroke={hl('cill') ? COLORS.highlight : COLORS.frame}
+            strokeWidth={STROKES.sash} strokeLinejoin="round" {...NS}
+            style={clickable ? { cursor: 'pointer' } : undefined}
+            onClick={clickable ? (e) => { e.stopPropagation(); onElementClick('cill'); } : undefined} />
           {extPath && (
-            <path d={extPath} fill="url(#cillHatch)" stroke={COLORS.frame}
-              strokeWidth={STROKES.sash} strokeLinejoin="round" {...NS} />
+            <path d={extPath}
+              fill={hl('sillExtension') ? COLORS.highlightFill : 'url(#cillHatch)'}
+              stroke={hl('sillExtension') ? COLORS.highlight : COLORS.frame}
+              strokeWidth={STROKES.sash} strokeLinejoin="round" {...NS}
+              style={clickable ? { cursor: 'pointer' } : undefined}
+              onClick={clickable ? (e) => { e.stopPropagation(); onElementClick('sillExtension'); } : undefined} />
           )}
         </g>
 

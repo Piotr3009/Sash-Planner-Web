@@ -11,6 +11,7 @@ import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
 import SashDetail2D from '../components/drawings/SashDetail2D.jsx';
 import CasementFrameDetail2D from '../components/drawings/CasementFrameDetail2D.jsx';
 import CasementLeafDetail2D from '../components/drawings/CasementLeafDetail2D.jsx';
+import CasementSection2D from '../components/drawings/CasementSection2D.jsx';
 import { groupCasementLeaves } from '../components/drawings/casementDrawUtils.js';
 import JambDetail2D from '../components/drawings/JambDetail2D.jsx';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
@@ -323,15 +324,23 @@ function VariantRow({ part, vk, materials, categories, subcategoriesByCategory, 
 }
 
 // ─── Part Group Section ───
-function PartGroupSection({ title, subtitle, parts, assignments, materials, categories, subcategoriesByCategory, onAssign, onFilter, onYieldChange, onRemove, disabled, selectedPart, onSelect }) {
+function PartGroupSection({ title, subtitle, parts, assignments, materials, categories, subcategoriesByCategory, onAssign, onFilter, onYieldChange, onRemove, disabled, selectedPart, onSelect, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const assigned = parts.filter((p) => assignments?.[p.id]).length;
   return (
     <div className="mb-6">
-      <div className="flex items-center gap-3 mb-3">
-        <h2 className="text-sm font-semibold text-ink-50">{title}</h2>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center gap-3 mb-3 text-left"
+      >
+        <span className={`text-accent-400 text-[11px] transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>
+        <h2 className="text-[15.5px] font-semibold text-accent-400">{title}</h2>
+        <span className="text-[11px] text-ink-300 font-medium">{assigned}/{parts.length} assigned</span>
         <span className="text-[10px] text-ink-400">{subtitle}</span>
-      </div>
+      </button>
 
-      <div className="card overflow-hidden">
+      {open && <div className="card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
@@ -367,7 +376,7 @@ function PartGroupSection({ title, subtitle, parts, assignments, materials, cate
             </tbody>
           </table>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -416,6 +425,7 @@ export default function MaterialAssignmentsPage() {
     name: 'SAMPLE', window_type: 'casement', windowCategory: 'casement',
     width: 1000, height: 1500, casementLayout: '022', fanlightAxis: 500,
     casementHinges: ['top', 'top', 'left', 'right'], glassType: 'double',
+    sillExtension: 60,
   }), []);
   const casDrawDerived = useMemo(() => {
     try { return deriveWindowData(casDrawSpec); } catch { return null; }
@@ -428,8 +438,10 @@ export default function MaterialAssignmentsPage() {
     c_frame_head: 'head', c_frame_jamb: 'frameJamb', c_frame_cill: 'cill',
     c_mullion: 'mullion', c_transom: 'transom',
     c_sash_stile: 'leafStile', c_sash_top_rail: 'leafTopRail', c_sash_bottom_rail: 'leafBottomRail',
+    c_sill_ext_35: 'sillExtension', c_sill_ext_60: 'sillExtension', c_sill_ext_85: 'sillExtension',
   };
   const CAS_KEY_TO_PART = Object.fromEntries(Object.entries(CAS_PART_TO_KEY).map(([p, k]) => [k, p]));
+  CAS_KEY_TO_PART.sillExtension = 'c_sill_ext_60'; // the sample draws the 60mm board
   const casSel = selectedPart ? (CAS_PART_TO_KEY[selectedPart] || null) : null;
   const pickCasFromDrawing = (dk) => { const pid = CAS_KEY_TO_PART[dk]; if (pid) setSelectedPart(pid); };
 
@@ -595,6 +607,7 @@ export default function MaterialAssignmentsPage() {
         {isCasement && <div className="flex gap-5 items-start">
         <div className="w-2/3 min-w-0">
             <PartGroupSection
+              defaultOpen
               title="🪵 Frame"
               subtitle={`${CASEMENT_PARTS.frame.length} parts · head, jambs, cill, mullion, transom`}
               parts={CASEMENT_PARTS.frame}
@@ -614,6 +627,22 @@ export default function MaterialAssignmentsPage() {
               title="🪵 Leaf (sash)"
               subtitle={`${CASEMENT_PARTS.sash.length} parts · stiles, rails — one section all round (vertogen)`}
               parts={CASEMENT_PARTS.sash}
+              assignments={assignments}
+              materials={materials}
+              categories={categories}
+              subcategoriesByCategory={subcategoriesByCategory}
+              onAssign={setAssignment}
+              onFilter={setFilter}
+              onYieldChange={setYield}
+              onRemove={removeAssignment}
+              disabled={locked}
+              selectedPart={selectedPart}
+              onSelect={toggleSelect}
+            />
+            <PartGroupSection
+              title="🔩 Ironmongery — Hinges"
+              subtitle={`${CASEMENT_PARTS.ironmongeryHinges.length} slots · engine picks the slot per opener from leaf size + weight`}
+              parts={CASEMENT_PARTS.ironmongeryHinges}
               assignments={assignments}
               materials={materials}
               categories={categories}
@@ -659,41 +688,28 @@ export default function MaterialAssignmentsPage() {
               onSelect={toggleSelect}
             />
             <PartGroupSection
+              title="🧊 Casement Glazing"
+              subtitle={`${CASEMENT_PARTS.glazing.length + 2} parts · glass rows are shared with sash (assign once); silicone/tapes/paint shared too`}
+              parts={[
+                ...SASH_WINDOW_PARTS.glass.filter((g) => g.id === 'glass_double' || g.id === 'glass_triple'),
+                ...CASEMENT_PARTS.glazing,
+              ]}
+              assignments={assignments}
+              materials={materials}
+              categories={categories}
+              subcategoriesByCategory={subcategoriesByCategory}
+              onAssign={setAssignment}
+              onFilter={setFilter}
+              onYieldChange={setYield}
+              onRemove={removeAssignment}
+              disabled={locked}
+              selectedPart={selectedPart}
+              onSelect={toggleSelect}
+            />
+            <PartGroupSection
               title="📏 Casement Beading"
               subtitle={`${CASEMENT_PARTS.beading.length} profiles · glazing bead + astragal ext/int — lengths from the engine`}
               parts={CASEMENT_PARTS.beading}
-              assignments={assignments}
-              materials={materials}
-              categories={categories}
-              subcategoriesByCategory={subcategoriesByCategory}
-              onAssign={setAssignment}
-              onFilter={setFilter}
-              onYieldChange={setYield}
-              onRemove={removeAssignment}
-              disabled={locked}
-              selectedPart={selectedPart}
-              onSelect={toggleSelect}
-            />
-            <PartGroupSection
-              title="🔩 Ironmongery — Hinges"
-              subtitle={`${CASEMENT_PARTS.ironmongeryHinges.length} slots · engine picks the slot per opener from leaf size + weight`}
-              parts={CASEMENT_PARTS.ironmongeryHinges}
-              assignments={assignments}
-              materials={materials}
-              categories={categories}
-              subcategoriesByCategory={subcategoriesByCategory}
-              onAssign={setAssignment}
-              onFilter={setFilter}
-              onYieldChange={setYield}
-              onRemove={removeAssignment}
-              disabled={locked}
-              selectedPart={selectedPart}
-              onSelect={toggleSelect}
-            />
-            <PartGroupSection
-              title="🧴 Casement Consumables"
-              subtitle={`${CASEMENT_PARTS.consumables.length} parts · silicone, astragal tape, weather seals — colour pair auto-picked per window`}
-              parts={CASEMENT_PARTS.consumables}
               assignments={assignments}
               materials={materials}
               categories={categories}
@@ -723,12 +739,9 @@ export default function MaterialAssignmentsPage() {
               onSelect={toggleSelect}
             />
             <PartGroupSection
-              title="🧊 Casement Glazing"
-              subtitle={`${CASEMENT_PARTS.glazing.length + 2} parts · glass rows are shared with sash (assign once); silicone/tapes/paint shared too`}
-              parts={[
-                ...SASH_WINDOW_PARTS.glass.filter((g) => g.id === 'glass_double' || g.id === 'glass_triple'),
-                ...CASEMENT_PARTS.glazing,
-              ]}
+              title="🧴 Casement Consumables"
+              subtitle={`${CASEMENT_PARTS.consumables.length} parts · silicone, astragal tape, weather seals — colour pair auto-picked per window`}
+              parts={CASEMENT_PARTS.consumables}
               assignments={assignments}
               materials={materials}
               categories={categories}
@@ -744,13 +757,21 @@ export default function MaterialAssignmentsPage() {
         </div>
         <div className="hidden xl:block w-1/3 shrink-0 sticky top-4">
           <div className="text-[10px] text-ink-400 mb-2">Sample 1000 × 1500 · 022 · click a part row or a drawing element</div>
-          <div className="grid grid-cols-2 gap-2 items-start">
-            <CasementFrameDetail2D windowSpec={casDrawSpec} derived={casDrawDerived}
-              selectedElement={casSel} onElementClick={pickCasFromDrawing} />
-            {casLeafGroup && (
-              <CasementLeafDetail2D windowSpec={casDrawSpec} derived={casDrawDerived} group={casLeafGroup}
+          <div className="grid grid-cols-[1.38fr_1fr] gap-2 items-start">
+            <div className="h-[340px] flex justify-center [&_svg]:h-full [&_svg]:w-auto">
+              <CasementFrameDetail2D windowSpec={casDrawSpec} derived={casDrawDerived}
                 selectedElement={casSel} onElementClick={pickCasFromDrawing} />
+            </div>
+            {casLeafGroup && (
+              <div className="h-[340px] flex justify-center [&_svg]:h-full [&_svg]:w-auto">
+                <CasementLeafDetail2D windowSpec={casDrawSpec} derived={casDrawDerived} group={casLeafGroup}
+                  selectedElement={casSel} onElementClick={pickCasFromDrawing} />
+              </div>
             )}
+          </div>
+          <div className="mt-2">
+            <CasementSection2D windowSpec={casDrawSpec} derived={casDrawDerived}
+              selectedElement={casSel} onElementClick={pickCasFromDrawing} fullWidth />
           </div>
         </div>
         </div>}
@@ -759,6 +780,7 @@ export default function MaterialAssignmentsPage() {
         <div className="flex-1 min-w-0">
         {/* Box Frame */}
         <PartGroupSection
+          defaultOpen
           title="🪵 Box Frame"
           subtitle={`${REG_BOX_PARTS.length} parts · one material per part covers every frame variant · ▸ = per-variant override`}
           parts={REG_BOX_PARTS}
