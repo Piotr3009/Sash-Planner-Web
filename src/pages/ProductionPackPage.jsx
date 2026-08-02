@@ -28,7 +28,7 @@ import {
   buildVentGrilles,
 } from '../engine/lists.js';
 import { optimisePrecut } from '../engine/optimizer.js';
-import { exportGlassPDF } from '../utils/glassPdfExport.js';
+import { exportGlassPDF, prepGlassRefImages } from '../utils/glassPdfExport.js';
 import { exportPreCutPDF } from '../utils/precutPdfExport.js';
 import { exportSprayingPDF } from '../utils/sprayingPdfExport.js';
 import { exportCutListPDF } from '../utils/cutListPdfExport.js';
@@ -1060,7 +1060,7 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) 
   // Group identical glass panes
   const grouped = groupGlassItems(merged.glass);
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     // Project numbers live on the window rows (same source as every other tab);
     // pp.assignments carries no _projectNumber, which printed raw UUIDs.
     const projects = isPPMode
@@ -1068,11 +1068,14 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) 
           .map((number) => ({ number, name: '', id: number }))
       : batch ? [{ number: batch.projectNumber || '', name: batch.projectName || '', id: batch.id }] : [];
 
+    const settingsNow = useProjectStore.getState().settings || {};
+    const refImages = await prepGlassRefImages(settingsNow.glassReferences);
     exportGlassPDF({
       batch: batch || pp,
       windowsData,
       projects,
-      companySettings: useProjectStore.getState().settings.company || {},
+      refImages,
+      companySettings: settingsNow.company || {},
     });
   };
   registerExport('glass', handleExportPDF);

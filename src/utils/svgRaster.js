@@ -38,6 +38,15 @@ function applyPrintPalette(xml) {
   for (const [from, to] of Object.entries(PRINT_MAP)) {
     if (from && from !== to) out = out.split(from).join(to);
   }
+  // Root cause of "thin, pale" prints (Piotr 02.08): the drawings use
+  // vector-effect: non-scaling-stroke, so a ×3 raster still renders 1px
+  // hairlines. Stripping it in print lets strokes scale with the raster.
+  out = out.split(' vector-effect="non-scaling-stroke"').join('');
+  out = out.split('vector-effect:non-scaling-stroke;').join('');
+  out = out.split('vector-effect: non-scaling-stroke;').join('');
+  // Belt-and-braces: also boost declared widths ×1.5 so paper output is bold
+  // even where a renderer treats strokes conservatively.
+  out = out.replace(/stroke-width="([0-9.]+)"/g, (_, v) => `stroke-width="${(parseFloat(v) * 1.5).toFixed(2)}"`);
   return out;
 }
 

@@ -93,6 +93,34 @@ const dc = (d, c) => d.setDrawColor(...c);
 const fc = (d, c) => d.setFillColor(...c);
 const tc = (d, c) => d.setTextColor(...c);
 
+// ─── GLASS REFERENCE THUMBNAILS ───
+// Fetch up to three tenant reference images (settings.glassReferences,
+// Supabase URLs) as data URLs so they embed physically in the PDF header.
+// Never throws — a failed fetch just drops that thumbnail.
+export async function prepGlassRefImages(refs, max = 3) {
+  const out = [];
+  for (const r of (refs || []).slice(0, max)) {
+    if (!r?.url) continue;
+    try {
+      const blob = await (await fetch(r.url)).blob();
+      const dataUrl = await new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = () => res(fr.result);
+        fr.onerror = rej;
+        fr.readAsDataURL(blob);
+      });
+      const dims = await new Promise((res) => {
+        const im = new Image();
+        im.onload = () => res({ w: im.naturalWidth, h: im.naturalHeight });
+        im.onerror = () => res({ w: 1, h: 1 });
+        im.src = dataUrl;
+      });
+      out.push({ dataUrl, ...dims });
+    } catch { /* skip */ }
+  }
+  return out;
+}
+
 // ─── PAGE BORDER ───
 
 function drawPageBorder(doc) {
@@ -148,6 +176,26 @@ function drawHeader(doc, info, pageNum, totalPages) {
   tc(doc, C.black);
   const projStr = (info.projects || []).join(' · ') || '—';
   doc.text(projStr.substring(0, 90), x + col1 + 22, y + h / 2 + 7);
+
+  // Tenant glass-reference thumbnails (settings, Supabase) — fill the empty
+  // band between the Batch block and the Date/Units boxes (Piotr 02.08).
+  const refs = Array.isArray(info.refImages) ? info.refImages : [];
+  if (refs.length) {
+    const imH = h - 4;
+    let ix = x + col2 - 4;
+    for (let i = Math.min(refs.length, 3) - 1; i >= 0; i--) {
+      const r = refs[i];
+      if (!r?.dataUrl) continue;
+      const ar = r.w > 0 && r.h > 0 ? r.w / r.h : 1;
+      const iw = Math.min(imH * ar, 34);
+      ix -= iw + 3;
+      try {
+        doc.addImage(r.dataUrl, 'JPEG', ix, y + 2, iw, imH);
+        doc.setDrawColor(150, 150, 150); doc.setLineWidth(0.15);
+        doc.rect(ix, y + 2, iw, imH);
+      } catch { /* bad image — skip, never break the export */ }
+    }
+  }
 
   // Date / Units
   doc.setFontSize(4.5);
@@ -245,10 +293,14 @@ function drawTable(doc, items, startY) {
     doc.text(g.finish || '', x + COL.finish, y);
     doc.setFontSize(5.5);
     doc.text(spacerLabel(g), x + COL.spacer, y);
-    // Bars: right-aligned to the table edge so long labels ("2H × 1V georgian")
-    // can never escape the border (Piotr 02.08).
+    // Bars: compact form in the TABLE ("2H×1V geo") so it clears the Spacer
+    // column; the full wording travels on the drawing spec line (Piotr 02.08).
     doc.setFontSize(5.5);
-    doc.text(g.bars || 'none', x + 269, y, { align: 'right' });
+    const barsCell = String(g.bars || 'none')
+      .replace(/\s*×\s*/g, '×')
+      .replace('georgian', 'geo')
+      .replace('astragal', 'ast');
+    doc.text(barsCell, x + 269, y, { align: 'right' });
     doc.setFontSize(6.5);
 
     y += TABLE_ROW_H;
@@ -282,6 +334,7 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
     gasLabel(g.gas),
     g.finish,
     `spacer: ${g.spacer} (${g.spacerType === 'alu' ? 'aluminium' : 'warm edge'})`,
+    g.bars && g.bars !== 'none' ? `bars: ${g.bars}` : '',
   ].filter(Boolean).join(' · ');
   doc.text(specLine, cx + cw - 2, cy + 4, { align: 'right' });
   dc(doc, C.black);
@@ -503,7 +556,7 @@ function drawFooter(doc, info, pageNum, totalPages) {
 
 // ─── MAIN EXPORT ───
 
-export function exportGlassPDF({ batch, windowsData, projects = [], companySettings = {}, returnDoc = false }) {
+export function exportGlassPDF({ batch, windowsData, projects = [], companySettings = {}, refImages = [], returnDoc = false }) {
   const glassItems = [];
   let idx = 1;
 
@@ -584,6 +637,7 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
       .filter(Boolean),
     date: new Date().toLocaleDateString('en-GB'),
     totalUnits: glassItems.length,
+    refImages,
     revision: 'A',
   };
 

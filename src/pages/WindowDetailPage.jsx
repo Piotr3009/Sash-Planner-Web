@@ -23,7 +23,7 @@ import CutListPanel from '../components/dashboard/CutListPanel.jsx';
 import PreCutPanel from '../components/dashboard/PreCutPanel.jsx';
 import ThreeDPanel from '../components/dashboard/ThreeDPanel.jsx';
 import ExportControls from '../components/export/ExportControls.jsx';
-import { exportGlassPDF } from '../utils/glassPdfExport.js';
+import { exportGlassPDF, prepGlassRefImages } from '../utils/glassPdfExport.js';
 import { exportBomPDF } from '../utils/bomPdfExport.js';
 import { exportCncJambsForWindow, canExportCncJambs } from '../utils/cncExport.js';
 
@@ -234,16 +234,18 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
     [derived, windowSpec]
   );
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!derived || !windowSpec) return;
     const company = settings?.company || {};
     const projects = projectEntity
       ? [{ number: projectEntity.project_number || '', name: projectEntity.name || '', id: projectEntity.id }]
       : [];
+    const refImages = await prepGlassRefImages(settings?.glassReferences);
     exportGlassPDF({
       batch,
       windowsData: [{ win: { ...item, _projectNumber: projectEntity?.project_number || '' }, windowSpec, derived }],
       projects,
+      refImages,
       companySettings: company,
     });
   };
