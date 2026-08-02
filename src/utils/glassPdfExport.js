@@ -340,16 +340,36 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
     if (hasGS) doc.restoreGraphicsState();
   }
 
-  // Bars — only double-hung rows carry the sash frame context needed to place
-  // them. Casement / triple panes have no sash W/H here, so they draw plain.
-  const pat = BAR_PATTERNS[g.bars] || BAR_PATTERNS['none'];
-  const canDrawBars = (pat.v > 0 || pat.h > 0) && g.sashW > 0 && g.sashH > 0;
-  const bars = canDrawBars
-    ? computeGlassBarPositions({
-        sashW: g.sashW, sashH: g.sashH, isUpper: !!g.isUpper,
-        vCount: pat.v, hCount: pat.h, faces: g.faces,
-      })
-    : { vBars: [], hBars: [] };
+  // Bars — two sources, one drawing path:
+  //  · casement/triple rows carry engine counts (barsV/barsH) → equal splits
+  //    across the GLASS with an 18mm duplex spacer at each bar centre (matches
+  //    CasementGlassDrawing2D). Piotr 02.08 — the sketch used to draw plain.
+  //  · double-hung rows keep the sash-frame placement (BAR_PATTERNS + faces).
+  const cbV = Number(g.barsV) || 0;
+  const cbH = Number(g.barsH) || 0;
+  let bars;
+  if (cbV > 0 || cbH > 0) {
+    const BW = 18; // duplex spacer bar width (mm) — same as the factory drawing
+    bars = {
+      vBars: Array.from({ length: cbV }, (_, i) => {
+        const c = g.glassW * (i + 1) / (cbV + 1);
+        return { left: c - BW / 2, right: c + BW / 2 };
+      }),
+      hBars: Array.from({ length: cbH }, (_, i) => {
+        const c = g.glassH * (i + 1) / (cbH + 1);
+        return { top: c - BW / 2, bot: c + BW / 2 };
+      }),
+    };
+  } else {
+    const pat = BAR_PATTERNS[g.bars] || BAR_PATTERNS['none'];
+    const canDrawBars = (pat.v > 0 || pat.h > 0) && g.sashW > 0 && g.sashH > 0;
+    bars = canDrawBars
+      ? computeGlassBarPositions({
+          sashW: g.sashW, sashH: g.sashH, isUpper: !!g.isUpper,
+          vCount: pat.v, hCount: pat.h, faces: g.faces,
+        })
+      : { vBars: [], hBars: [] };
+  }
 
   doc.setLineWidth(LW.seal);
 
@@ -532,6 +552,8 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
           spacer: r.spacer,
           spacerType: r.spacerType,
           bars: r.bars || 'none',
+          barsV: r.barsV,
+          barsH: r.barsH,
           sashW,
           sashH,
           faces: derived?.sashDims,

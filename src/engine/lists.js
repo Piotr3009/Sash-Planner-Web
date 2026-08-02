@@ -10,6 +10,9 @@ import { CONSTANTS, deriveWindowData } from './calculations.js';
 import { CASEMENT_HINGE_SLOTS, CASEMENT_LOCK_SLOTS } from './casementHardware.js';
 import { GLASS_MAKEUP, glassGas } from './specification.js';
 import { profileRawForSection, getWindowProfile } from './profile.js';
+// Pure helper (no React) — shared with the 2D drawings so panel, PDF and
+// sketch all count bars the same way.
+import { casementBarCounts } from '../components/drawings/casementDrawUtils.js';
 
 const DEFAULT_SETTINGS = {
   kerf: 3,
@@ -190,6 +193,7 @@ export function buildGlassListForWindow(derived, windowSpec) {
 
   // Non-double-hung sources (casement, triple sections) supply units directly
   if (Array.isArray(derived.customGlassUnits) && derived.customGlassUnits.length > 0) {
+    const barType = windowSpec?.casement?.barType === 'georgian' ? 'georgian' : 'astragal';
     return derived.customGlassUnits.map((u) => {
       // Casement frosted scope: 'bottom' = main lights only (fans stay clear),
       // 'both' = every pane. Uniform finish for all other custom-unit sources.
@@ -199,7 +203,19 @@ export function buildGlassListForWindow(derived, windowSpec) {
           && (gz.frostedLocation || 'bottom') === 'bottom') {
         finishOverride = 'clear';
       }
-      return buildGlassRow(windowSpec, u.width, u.height, u.location, u.qty || 1, finishOverride, u.role);
+      const row = buildGlassRow(windowSpec, u.width, u.height, u.location, u.qty || 1, finishOverride, u.role);
+      // Bars belong on the ROW (Piotr 02.08, PDF audit item 5): the screen used
+      // to recompute them locally while the PDF printed nothing — one engine
+      // field now feeds the panel text, the PDF column AND the PDF sketch.
+      if (derived.category === 'casement') {
+        const { v, h } = casementBarCounts(windowSpec?.casement?.bars, u.role || 'main');
+        if (v > 0 || h > 0) {
+          row.barsV = v;
+          row.barsH = h;
+          row.bars = `${h}H × ${v}V ${barType}`;
+        }
+      }
+      return row;
     });
   }
   // Triple sash: two panes per section, same heights as double-hung

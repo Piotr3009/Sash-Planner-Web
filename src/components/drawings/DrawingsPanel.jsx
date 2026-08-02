@@ -68,7 +68,7 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
     setBusy(true);
     try {
       const types = isCasement
-        ? [['frame', 'Frame Detail'], ...leafGroups.map((gp, k) => [`leaf${k}`, paneTitle(gp)])]
+        ? [['vsection', 'Cill Section'], ['frame', 'Frame Detail'], ...leafGroups.map((gp, k) => [`leaf${k}`, paneTitle(gp)])]
         : [['box', 'Box Detail'], ['upper', 'Upper Sash'], ['lower', 'Lower Sash']];
       const drawings = [];
       for (const [t, label] of types) {
@@ -163,6 +163,9 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
               : <FrontElevation2D windowSpec={windowSpec} derived={derived} />}
           </div>
           {isCasement && (<>
+          <div ref={(el) => { refs.current['vsection'] = el; }}>
+            <CasementSection2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
+          </div>
           <div ref={(el) => { refs.current['frame'] = el; }}>
             <CasementFrameDetail2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
           </div>

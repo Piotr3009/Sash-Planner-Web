@@ -1,5 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { svgNodeToPng } from '../utils/svgRaster.js';
+import { exportElementsPDF } from '../utils/drawingsPdfExport.js';
 import { useProjectStore } from '../stores/projectStore.js';
 import { useMaterialStore } from '../stores/materialStore.js';
 import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignmentStore.js';
@@ -9,7 +11,6 @@ import { deriveWindowData } from '../engine/calculations.js';
 import { withProfiles } from '../engine/profile.js';
 import { buildGlassListForWindow, buildVentGrilles } from '../engine/lists.js';
 import GlassReferences from '../components/settings/GlassReferences.jsx';
-import { casementBarCounts } from '../components/drawings/casementDrawUtils.js';
 import { effectiveAssignment, buildWindowPartQtys, buildWindowHardware, resolvePartTotal, formatQty, mergeWindowMaterials } from '../engine/bom.js';
 import { liveSectionsFor } from '../engine/partRegistry.js';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
@@ -211,10 +212,8 @@ export default function WindowDetailPage() {
 function GlassPanel({ item, windowSpec, derived, batch, settings }) {
   const barsText = (spec, g) => {
     if ((spec?.category || 'sash') === 'casement') {
-      const { v, h } = casementBarCounts(spec?.casement?.bars, g.role);
-      if (!v && !h) return '—';
-      const t = spec?.casement?.barType === 'georgian' ? 'georgian' : 'astragal';
-      return `${h}H × ${v}V ${t}`;
+      // Single source: the engine row carries the label (barsV/barsH + type).
+      return g.bars || '—';
     }
     const pat = g.sash === 'upper' ? (spec?.upperBars || spec?.bars?.upper)
       : g.sash === 'lower' ? (spec?.lowerBars || spec?.bars?.lower) : null;
@@ -238,6 +237,36 @@ function GlassPanel({ item, windowSpec, derived, batch, settings }) {
       projects,
       companySettings: company,
     });
+  };
+
+  // Factory glass drawings (casement): capture each per-size drawing card and
+  // ship them as a clean standalone PDF for the glass supplier — no costs, no
+  // schedule, just the drawings (Piotr 02.08, PDF audit item 4).
+  const glassDrawRefs = useRef({});
+  const [glassBusy, setGlassBusy] = useState(false);
+  const handleExportGlassDrawings = async () => {
+    if (glassBusy || !derived) return;
+    setGlassBusy(true);
+    try {
+      const groups = groupCasementGlass(derived);
+      const drawings = [];
+      for (const gp of groups) {
+        const svg = glassDrawRefs.current[gp.key]?.querySelector('svg');
+        const png = svg ? await svgNodeToPng(svg, { scale: 3, printMode: true }) : null;
+        drawings.push({ image: png?.url || null, w: png?.w, h: png?.h, label: `Glass ${gp.w} × ${gp.h} · ×${gp.panes.length}` });
+      }
+      const company = settings?.company || {};
+      exportElementsPDF({
+        subtitle: 'GLASS DRAWINGS',
+        title: item?.name || 'Window',
+        projects: batch?.projectNumber ? [batch.projectNumber] : [],
+        date: new Date().toLocaleDateString('en-GB'),
+        companyName: company.companyName || 'COMPANY NAME',
+        companyAddress: company.companyAddress || '',
+        logo: company.logo || '',
+        windows: [{ no: 1, caption: `${item?.name || ''} — glass units`, drawings }],
+      });
+    } finally { setGlassBusy(false); }
   };
 
   if (!glassList.length) {
@@ -311,15 +340,23 @@ function GlassPanel({ item, windowSpec, derived, batch, settings }) {
 
       {/* Glass drawings — per sash (upper/lower) or per unique casement unit */}
       {(windowSpec?.category || 'sash') === 'casement' ? (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div>
+          <div className="flex items-center justify-end mb-2">
+            <button onClick={handleExportGlassDrawings} disabled={glassBusy}
+              className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              📐 Glass Drawings PDF
+            </button>
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           {groupCasementGlass(derived).map((gp) => (
-            <div key={gp.key} className="card p-4">
+            <div key={gp.key} className="card p-4" ref={(el) => { glassDrawRefs.current[gp.key] = el; }}>
               <div className="text-xs font-semibold text-ink-200 mb-2">
                 Glass {gp.w} × {gp.h} · ×{gp.panes.length}
               </div>
               <CasementGlassDrawing2D windowSpec={windowSpec} derived={derived} group={gp} />
             </div>
           ))}
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">

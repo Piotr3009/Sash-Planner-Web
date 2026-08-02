@@ -100,7 +100,7 @@ function compactHeader(doc, PG, hdr, caption, pageNum, total) {
   doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(26, 26, 26);
   doc.text(hdr.companyName || 'COMPANY NAME', x + 2, y + 7);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 120, 120);
-  doc.text('2D ELEMENTS', x + 2, y + 12);
+  doc.text(hdr.subtitle || '2D ELEMENTS', x + 2, y + 12);
   doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(26, 26, 26);
   doc.text(String(caption || '').substring(0, 70), x + 70, y + 9);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120, 120, 120);
@@ -114,7 +114,7 @@ function compactHeader(doc, PG, hdr, caption, pageNum, total) {
 export function exportElementsPDF(info) {
   const PG = getReportPage('a4');
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  const hdr = mkHeader(info, '2D ELEMENTS');
+  const hdr = mkHeader(info, info.subtitle || '2D ELEMENTS');
 
   const windows = info.windows || [];
   const total = Math.max(1, windows.length);
