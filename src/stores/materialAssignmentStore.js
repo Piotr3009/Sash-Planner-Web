@@ -80,6 +80,12 @@ export const CASEMENT_PARTS = {
     { id: 'c_frame_cill', name: 'Frame Cill',   section: '68×93', pcs: 1, materialType: 'hardwood', note: 'profiled section' },
     { id: 'c_mullion',    name: 'Mullion',      section: '68×93', pcs: 1, materialType: 'hardwood' },
     { id: 'c_transom',    name: 'Transom',      section: '68×93', pcs: 1, materialType: 'hardwood' },
+    { id: 'c_sill_ext_35', name: 'Sill Extension 35mm', section: '34×45', pcs: 1, materialType: 'hardwood', unit: 'm',
+      hint: 'External cill extension board, 35mm projection. Raw 34×45 incl. the 10×10 tongue. Length = cill length, engine-fed when the window has this extension.' },
+    { id: 'c_sill_ext_60', name: 'Sill Extension 60mm', section: '34×70', pcs: 1, materialType: 'hardwood', unit: 'm',
+      hint: 'External cill extension board, 60mm projection. Raw 34×70 incl. the 10×10 tongue.' },
+    { id: 'c_sill_ext_85', name: 'Sill Extension 85mm', section: '34×95', pcs: 1, materialType: 'hardwood', unit: 'm',
+      hint: 'External cill extension board, 85mm projection. Raw 34×95 incl. the 10×10 tongue.' },
   ],
   sash: [
     { id: 'c_sash_stile',       name: 'Leaf Stiles',      section: '67×57', pcs: 2, materialType: 'hardwood' },
@@ -113,6 +119,30 @@ export const CASEMENT_PARTS = {
     { id: 'c_georgian_middle_beading', name: 'Georgian Middle Beading', section: 'profile', pcs: 1, materialType: 'beading', unit: 'm',
       hint: 'Astragal bar profile glued on the INSIDE glass face \u2014 same runs as the external one + 15%.' },
   ],
+  consumables: [
+    { id: 'c_silicone', name: 'Silicone', section: '—', pcs: 1, materialType: 'consumable', unit: 'tubes',
+      hint: 'Casement glazing silicone. Engine: 0.1 tube per metre of pane perimeters + astragal runs.' },
+    { id: 'c_bead_tape_1mm', name: 'Bead Tape 1mm', section: '—', pcs: 1, materialType: 'consumable', unit: 'm',
+      hint: 'Astragal fixing tape, one glass face (sash convention: 1mm outside). Engine feeds bar runs when bar type is astragal.' },
+    { id: 'c_bead_tape_2mm', name: 'Bead Tape 2mm', section: '—', pcs: 1, materialType: 'consumable', unit: 'm',
+      hint: 'Astragal fixing tape, the other glass face (sash convention: 2mm inside).' },
+    { id: 'c_seal_frame_black', name: 'Frame Seal — Black', section: '—', pcs: 1, materialType: 'consumable', unit: 'm',
+      hint: 'Perimeter frame seal: 2×H + 2×W + 10%. The BOM picks Black or White from the window Seal colour.' },
+    { id: 'c_seal_frame_white', name: 'Frame Seal — White', section: '—', pcs: 1, materialType: 'consumable', unit: 'm',
+      hint: 'Perimeter frame seal, white — same length rule as the black one.' },
+    { id: 'c_seal_hj_black', name: 'Head & Jambs Seal — Black', section: '—', pcs: 1, materialType: 'consumable', unit: 'm',
+      hint: 'Second seal line: 2×H + 1×W + 10%. Colour follows the window Seal colour.' },
+    { id: 'c_seal_hj_white', name: 'Head & Jambs Seal — White', section: '—', pcs: 1, materialType: 'consumable', unit: 'm',
+      hint: 'Second seal line, white — same length rule as the black one.' },
+  ],
+  paint: [
+    { id: 'c_paint_primer', name: 'Primer', section: '—', pcs: 1, materialType: 'paint', unit: 'L',
+      hint: 'Casement primer — litres from the engine paint model.' },
+    { id: 'c_paint_white_9016', name: 'White Standard 9016', section: '—', pcs: 1, materialType: 'paint', unit: 'L',
+      hint: 'Topcoat when the window colour is RAL 9016 / default white.' },
+    { id: 'c_paint_bespoke', name: 'Bespoke Colour', section: '—', pcs: 1, materialType: 'paint', unit: 'L',
+      hint: 'Topcoat for any non-9016 colour.' },
+  ],
   glazing: [
     { id: 'c_glass_clips_double', name: 'Glass Clips — Double', sub: 'double glazed units', section: '—', pcs: 1, materialType: 'consumable', unit: 'pcs' },
     { id: 'c_glass_clips_triple', name: 'Glass Clips — Triple', sub: 'triple glazed units', section: '—', pcs: 1, materialType: 'consumable', unit: 'pcs' },
@@ -126,7 +156,8 @@ CASEMENT_PARTS.ironmongery = [
 ];
 export const CASEMENT_ALL_PARTS = [
   ...CASEMENT_PARTS.frame, ...CASEMENT_PARTS.sash,
-  ...CASEMENT_PARTS.ironmongery, ...CASEMENT_PARTS.beading, ...CASEMENT_PARTS.glazing,
+  ...CASEMENT_PARTS.ironmongery, ...CASEMENT_PARTS.beading,
+  ...CASEMENT_PARTS.consumables, ...CASEMENT_PARTS.paint, ...CASEMENT_PARTS.glazing,
 ];
 
 // Flat list for lookups — includes casement parts: mergeWindowMaterials and

@@ -875,6 +875,17 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
         beading.push(recBead('C-GEORGIAN MIDDLE BEADING', Math.round(barMm * BEAD_WASTE), 'Astragal bars int + 15%'));
     }
 
+    // ── Consumables (sash formulas adapted): silicone 0.1 tube/m of
+    // perimeters + bar runs; astragal tape split 1mm/2mm one side each;
+    // weather seals per Piotr 02.08.2026: frame seal 2H+2W, head&jambs seal
+    // 2H+1W, both +10%, colour pair picked by sealColour in the BOM.
+    const casSiliconeTubes = Math.round(0.1 * ((perimMm + barMm) / 1000) * 10) / 10;
+    const casBeadTapeSideM = Math.round((barMm / 1000) * 100) / 100;
+    const SEAL_F = 1.10;
+    const casSealFrameM = Math.round(((2 * frameHeight + 2 * frameWidth) * SEAL_F / 1000) * 100) / 100;
+    const casSealHjM = Math.round(((2 * frameHeight + 1 * frameWidth) * SEAL_F / 1000) * 100) / 100;
+    const casSealColour = (cas.sealColour || windowSpec.sealColour || 'black').toLowerCase();
+
     void r1;
     return {
         category: 'casement',
@@ -903,7 +914,14 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
             total: R((timberKg + glassKg) * wMargin),
         },
         paint: calculatePaint(frameWidth, frameHeight),
-        consumables: { glass: { type: windowSpec.glazing?.type || 'double', sqm: Math.round(glassSqm * 100) / 100 } },
+        consumables: {
+            glass: { type: windowSpec.glazing?.type || 'double', sqm: Math.round(glassSqm * 100) / 100 },
+            silicone: { tubes: casSiliconeTubes },
+            beadTapeSide: { meters: casBeadTapeSideM },
+            sealFrame: { meters: casSealFrameM },
+            sealHeadJambs: { meters: casSealHjM },
+            sealColour: casSealColour,
+        },
         frame: { width: frameWidth, height: frameHeight },
     };
 }

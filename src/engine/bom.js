@@ -202,11 +202,14 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
   // any other colour → bespoke. Quantity (litres) is the same either way.
   const p = derived.paint;
   if (p) {
-    setQty('paint_primer', p.primer, 'L');
+    const isCas = derived.category === 'casement';
+    setQty(isCas ? 'c_paint_primer' : 'paint_primer', p.primer, 'L');
     const hex = (windowSpec.color?.single || '').toUpperCase();
     const ral = String(windowSpec.color?.ral || '').replace(/[^0-9]/g, '');
     const isWhite9016 = ral === '9016' || hex === '#F6F6F6' || (!hex && !ral);
-    setQty(isWhite9016 ? 'paint_white_9016' : 'paint_bespoke', p.topcoat, 'L');
+    setQty(isWhite9016
+      ? (isCas ? 'c_paint_white_9016' : 'paint_white_9016')
+      : (isCas ? 'c_paint_bespoke' : 'paint_bespoke'), p.topcoat, 'L');
   }
 
   // ── Casement ironmongery + glazing (engine hinge picks → slot quantities) ──
@@ -248,6 +251,19 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
         ? 'c_glass_clips_triple' : 'c_glass_clips_double';
       setQty(clipsPid, clipsQty, 'pcs');
     }
+    // ── Consumables: silicone, astragal tape (1mm/2mm one side each), seals ──
+    const cc = derived.consumables || {};
+    setQty('c_silicone', cc.silicone?.tubes, 'tubes');
+    if (cc.beadTapeSide?.meters > 0) {
+      setQty('c_bead_tape_1mm', cc.beadTapeSide.meters, 'm');
+      setQty('c_bead_tape_2mm', cc.beadTapeSide.meters, 'm');
+    }
+    const white = cc.sealColour === 'white';
+    setQty(white ? 'c_seal_frame_white' : 'c_seal_frame_black', cc.sealFrame?.meters, 'm');
+    setQty(white ? 'c_seal_hj_white' : 'c_seal_hj_black', cc.sealHeadJambs?.meters, 'm');
+    // ── Sill extension board: metres of the cill length for the fitted size ──
+    const extPid = { 35: 'c_sill_ext_35', 60: 'c_sill_ext_60', 85: 'c_sill_ext_85' }[cw.cill?.extension];
+    if (extPid) addMm(extPid, cw.cill.length || 0);
   }
 
   return map;
@@ -260,7 +276,9 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
 export function resolvePartTotal(entry, yieldCoeff = 1.0) {
   if (!entry) return { total: 0, unit: 'm' };
   if (entry.mm != null) return { total: (entry.mm / 1000) * yieldCoeff, unit: entry.unit };
-  return { total: entry.qty, unit: entry.unit };
+  // Yield applies to every unit (pcs/tubes/m/L/m²) so the row multiplier the
+  // user sets actually does something on non-length parts too (Piotr 02.08.2026).
+  return { total: (Number(entry.qty) || 0) * yieldCoeff, unit: entry.unit };
 }
 
 /**

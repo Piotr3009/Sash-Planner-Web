@@ -691,6 +691,38 @@ export default function MaterialAssignmentsPage() {
               onSelect={toggleSelect}
             />
             <PartGroupSection
+              title="🧴 Casement Consumables"
+              subtitle={`${CASEMENT_PARTS.consumables.length} parts · silicone, astragal tape, weather seals — colour pair auto-picked per window`}
+              parts={CASEMENT_PARTS.consumables}
+              assignments={assignments}
+              materials={materials}
+              categories={categories}
+              subcategoriesByCategory={subcategoriesByCategory}
+              onAssign={setAssignment}
+              onFilter={setFilter}
+              onYieldChange={setYield}
+              onRemove={removeAssignment}
+              disabled={locked}
+              selectedPart={selectedPart}
+              onSelect={toggleSelect}
+            />
+            <PartGroupSection
+              title="🎨 Casement Paint"
+              subtitle={`${CASEMENT_PARTS.paint.length} parts · litres from the engine, topcoat picked by window colour`}
+              parts={CASEMENT_PARTS.paint}
+              assignments={assignments}
+              materials={materials}
+              categories={categories}
+              subcategoriesByCategory={subcategoriesByCategory}
+              onAssign={setAssignment}
+              onFilter={setFilter}
+              onYieldChange={setYield}
+              onRemove={removeAssignment}
+              disabled={locked}
+              selectedPart={selectedPart}
+              onSelect={toggleSelect}
+            />
+            <PartGroupSection
               title="🧊 Casement Glazing"
               subtitle={`${CASEMENT_PARTS.glazing.length + 2} parts · glass rows are shared with sash (assign once); silicone/tapes/paint shared too`}
               parts={[
