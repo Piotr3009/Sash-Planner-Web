@@ -203,6 +203,34 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
     setQty(isWhite9016 ? 'paint_white_9016' : 'paint_bespoke', p.topcoat, 'L');
   }
 
+  // ── Casement ironmongery + glazing (engine hinge picks → slot quantities) ──
+  // Hinges are ordered in handed PAIRS; LH/RH split lives in
+  // derived.casement.hardware for the production pass. Glass clip counts wait
+  // for the workshop numbers (no guessing) — the slots exist, qty comes later.
+  const cw = derived.casement;
+  if (derived.category === 'casement' && cw?.hardware) {
+    const { hingeSummary, sideOpeners } = cw.hardware;
+    let sidePairs = 0;
+    let unrestrictedPairs = 0;
+    Object.entries(hingeSummary).forEach(([slotId, e]) => {
+      setQty(slotId, e.pairs, 'pairs');
+      if (slotId !== 'c_hinge_top') sidePairs += e.pairs;
+      if (slotId === 'c_hinge_xl' || slotId === 'c_hinge_small') unrestrictedPairs += e.pairs;
+    });
+    if (unrestrictedPairs > 0) setQty('c_restrictor_cable', unrestrictedPairs, 'pcs');
+    if (sidePairs > 0) setQty('c_wedge_packer', sidePairs, 'pcs');
+    if (sideOpeners > 0) {
+      setQty('c_window_lock', sideOpeners, 'pcs');
+      setQty('c_shootbolt', sideOpeners, 'pcs');
+    }
+    const panes = Array.isArray(derived.customGlassUnits) ? derived.customGlassUnits : [];
+    if (panes.length > 0) {
+      setQty('c_glazing_packer', panes.length * 8, 'pcs');
+      const beadingMm = panes.reduce((a, g) => a + 2 * ((g.width || 0) + (g.height || 0)), 0);
+      addMm('c_glazing_beading', beadingMm);
+    }
+  }
+
   return map;
 }
 

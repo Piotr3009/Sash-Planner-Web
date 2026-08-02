@@ -1,4 +1,5 @@
 import { resolveCasementLayout, fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from './casementLayouts.js';
+import { selectCasementHinges, summariseHinges } from './casementHardware.js';
 import { getWindowProfile, getCasementProfile, profileSashDepth, profileBoardWidth, boardWidthForDepth, kgPerM } from './profile.js';
 
 /**
@@ -832,6 +833,11 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
         const paneKg = ((paneGlass[i].width * paneGlass[i].height) / 1e6) * glassKgPerSqm;
         return { panel: i + 1, hinge: pn.hinge, weightKg: R((frameKg + paneKg) * wMargin) };
     });
+    // Hinge selection per opener (slot ladder by leaf width + weight); the
+    // material behind each slot comes from Assign Materials.
+    const hingePicks = selectCasementHinges(layoutDef.panels, leafSizes, leafWeights);
+    const hingeSummary = summariseHinges(hingePicks);
+    const sideOpeners = hingePicks.filter((h) => h && h.hung === 'side').length;
 
     void r1;
     return {
@@ -846,6 +852,7 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight) {
         casement: {
             layout, layoutDef, openers, panes: layoutDef.panels.length,
             leafWeights,
+            hardware: { hingePicks, hingeSummary, sideOpeners },
             leaves: leafSizes, paneBounds, leafRects, transomRuns, mullionRuns,
             geometry: geo,
             cill: {

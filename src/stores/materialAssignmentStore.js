@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import * as cloud from '../services/cloudSync.js';
 import { normalizeAssignments, expandAssignments, legacyToCanonical } from '../engine/partRegistry.js';
+import { CASEMENT_HINGE_SLOTS } from '../engine/casementHardware.js';
 
 // ─── Sash Window Parts (hardcoded — structural, used by calculations engine) ───
 // section = pre-cut (raw) section that needs to be matched to a stock material
@@ -71,6 +72,7 @@ export const SASH_WINDOW_PARTS = {
 };
 
 // ─── Casement (simple: outer frame + sash all round; mullions/transoms later) ───
+
 export const CASEMENT_PARTS = {
   frame: [
     { id: 'c_frame_head', name: 'Frame Head',   section: '57×93', pcs: 1, materialType: 'hardwood' },
@@ -84,8 +86,33 @@ export const CASEMENT_PARTS = {
     { id: 'c_sash_top_rail',    name: 'Leaf Top Rail',    section: '67×57', pcs: 1, materialType: 'hardwood' },
     { id: 'c_sash_bottom_rail', name: 'Leaf Bottom Rail', section: '67×57', pcs: 1, materialType: 'hardwood' },
   ],
+  // Hinge slots: rows come from the engine catalogue (single source of truth
+  // for labels + width/weight limits). The engine picks the slot per opener;
+  // the user assigns ANY material to any slot — `hint` is only the "?" tooltip
+  // recommendation (Piotr 02.08.2026).
+  ironmongery: [
+    ...CASEMENT_HINGE_SLOTS.map((s) => ({
+      id: s.id, name: s.name, sub: s.sub, hint: s.hint,
+      section: '—', pcs: 2, materialType: 'ironmongery', unit: 'pcs',
+    })),
+    { id: 'c_restrictor_cable', name: 'Child Restrictor — cable (releasable)', sub: 'fitted where the hinge has no restriction (XL + small slots)', section: '—', pcs: 1, materialType: 'ironmongery', unit: 'pcs',
+      hint: 'Releasable cable restrictor, opening limited to 100mm (BS 8213-1). Required on escape windows whenever the hinge itself is unrestricted.' },
+    { id: 'c_wedge_packer', name: 'Wedge Packers', sub: '1 set per hinge pair (verify with workshop)', section: '—', pcs: 1, materialType: 'consumable', unit: 'pcs' },
+    { id: 'c_window_lock', name: 'Window Lock / Handle keep', sub: 'per side-hung opener', section: '—', pcs: 1, materialType: 'ironmongery', unit: 'pcs' },
+    { id: 'c_shootbolt', name: 'Shootbolts', sub: 'set per side-hung opener', section: '—', pcs: 1, materialType: 'ironmongery', unit: 'pcs' },
+    { id: 'c_trickle_vent', name: 'Trickle Vents', sub: 'quantity from batch option (yes/no/1/2) — later pass', section: '—', pcs: 1, materialType: 'ironmongery', unit: 'pcs' },
+  ],
+  glazing: [
+    { id: 'c_glazing_beading', name: 'Glazing Beading (casement profile)', sub: 'per m — from engine glass runs', section: 'profile', pcs: 1, materialType: 'beading', unit: 'm' },
+    { id: 'c_glass_clips_double', name: 'Glass Clips — Double', sub: 'double glazed units', section: '—', pcs: 1, materialType: 'consumable', unit: 'pcs' },
+    { id: 'c_glass_clips_triple', name: 'Glass Clips — Triple', sub: 'triple glazed units', section: '—', pcs: 1, materialType: 'consumable', unit: 'pcs' },
+    { id: 'c_glazing_packer', name: 'Glazing Packers', sub: '8 pcs × pane — engine counts panes', section: '—', pcs: 8, materialType: 'consumable', unit: 'pcs' },
+  ],
 };
-export const CASEMENT_ALL_PARTS = [...CASEMENT_PARTS.frame, ...CASEMENT_PARTS.sash];
+export const CASEMENT_ALL_PARTS = [
+  ...CASEMENT_PARTS.frame, ...CASEMENT_PARTS.sash,
+  ...CASEMENT_PARTS.ironmongery, ...CASEMENT_PARTS.glazing,
+];
 
 // Flat list for lookups — includes casement parts: mergeWindowMaterials and
 // the per-window material table iterate THIS list, so anything missing here

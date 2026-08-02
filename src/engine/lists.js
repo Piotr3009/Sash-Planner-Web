@@ -7,6 +7,7 @@
  */
 
 import { CONSTANTS, deriveWindowData } from './calculations.js';
+import { CASEMENT_HINGE_SLOTS } from './casementHardware.js';
 import { GLASS_MAKEUP, glassGas } from './specification.js';
 import { profileRawForSection, getWindowProfile } from './profile.js';
 
@@ -317,9 +318,38 @@ export function buildVentGrilles(windowSpec) {
   }
 }
 
-export function buildHardwareList(windowSpec) {
+export function buildHardwareList(windowSpec, derived = null) {
   const cat = windowSpec?.category || 'sash';
-  if (cat !== 'sash') return []; // casement/door hardware comes later
+  if (cat === 'casement') {
+    // Needs engine picks — callers without `derived` get [] exactly as before.
+    const hw = derived?.casement?.hardware;
+    if (!hw) return [];
+    const list = [];
+    const slotName = (id) => CASEMENT_HINGE_SLOTS.find((s) => s.id === id)?.name || id;
+    Object.entries(hw.hingeSummary).forEach(([slotId, e]) => {
+      const handed = slotId === 'c_hinge_top'
+        ? 'pairs'
+        : `${e.LH} LH / ${e.RH} RH${e.overLimit ? ' · ! verify limits' : ''}`;
+      list.push({ item: slotName(slotId), detail: handed, quantity: e.pairs });
+    });
+    const unrestricted = (hw.hingeSummary.c_hinge_xl?.pairs || 0)
+      + (hw.hingeSummary.c_hinge_small?.pairs || 0);
+    if (unrestricted > 0) {
+      list.push({ item: 'Child restrictor — cable', detail: 'releasable · unrestricted hinges', quantity: unrestricted });
+    }
+    const sidePairs = Object.entries(hw.hingeSummary)
+      .filter(([id]) => id !== 'c_hinge_top')
+      .reduce((a, [, e]) => a + e.pairs, 0);
+    if (sidePairs > 0) {
+      list.push({ item: 'Wedge packers', detail: '1 set per hinge pair (verify)', quantity: sidePairs });
+    }
+    if (hw.sideOpeners > 0) {
+      list.push({ item: 'Window lock', detail: 'per side-hung opener', quantity: hw.sideOpeners });
+      list.push({ item: 'Shootbolt set', detail: 'per side-hung opener', quantity: hw.sideOpeners });
+    }
+    return list;
+  }
+  if (cat !== 'sash') return []; // door hardware comes later
   const finish = windowSpec?.hardware?.finish || 'brass';
   const isPas24 = windowSpec?.hardware?.catches === 'PAS24';
   const openingType = windowSpec?.sash?.openingType || 'both';
