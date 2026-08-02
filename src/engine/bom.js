@@ -112,6 +112,10 @@ export const HARDWARE_TO_SLOT_KEY = {
   'Pulley wheels': 'pulleys',
   'Window stopper': 'stoppers',
   'Trickle vent': 'trickleVents',
+  // Casement (plural 'Trickle vents' keeps the sash 'Trickle vent' key intact)
+  'Casement handle': 'casementHandles',
+  'Casement stay': 'casementStays',
+  'Trickle vents': 'casementVents',
 };
 
 // Format a quantity for display by unit (pcs are whole; tubes/m/L/etc. keep 2dp)
@@ -213,10 +217,14 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
     let unrestrictedPairs = 0;
     Object.entries(hingeSummary).forEach(([slotId, e]) => {
       setQty(slotId, e.pairs, 'pairs');
-      if (slotId !== 'c_hinge_top') sidePairs += e.pairs;
+      if (!slotId.startsWith('c_hinge_top')) sidePairs += e.pairs;
       if (slotId === 'c_hinge_xl' || slotId === 'c_hinge_small') unrestrictedPairs += e.pairs;
     });
-    if (unrestrictedPairs > 0) setQty('c_child_restrictor', unrestrictedPairs, 'pcs');
+    // Separate restrictor only when the window requests child restriction
+    // (configurator checkbox; undefined = legacy windows = ON).
+    if (unrestrictedPairs > 0 && windowSpec.childRestrictor !== false) {
+      setQty('c_child_restrictor', unrestrictedPairs, 'pcs');
+    }
     if (sidePairs > 0) setQty('c_wedge_packer', sidePairs, 'pcs');
     if (sideOpeners > 0) {
       setQty('c_window_lock', sideOpeners, 'pcs');
@@ -257,10 +265,11 @@ export function resolvePartTotal(entry, yieldCoeff = 1.0) {
  * Per-window slots (windowSpec.hardware.slots) take precedence, category by
  * category, over legacy batch-level defaults. qty comes from buildHardwareList.
  */
-export function buildWindowHardware(windowSpec, batch, ironmongeryItems = []) {
+export function buildWindowHardware(windowSpec, batch, ironmongeryItems = [], derived = null) {
   if (!windowSpec) return [];
-  if ((windowSpec.category || 'sash') !== 'sash') return [];
-  const lines = buildHardwareList(windowSpec);
+  const cat = windowSpec.category || 'sash';
+  if (cat !== 'sash' && cat !== 'casement') return []; // door hardware later
+  const lines = buildHardwareList(windowSpec, derived);
   const slots = {
     ...(batch?.defaults?.ironmongerySlots || {}),
     ...(windowSpec?.hardware?.slots || {}),
@@ -353,7 +362,7 @@ export function mergeWindowMaterials(windows, { assignments, assignmentsData, ma
     });
 
     // ── ironmongeryStore products (via batch slots) ──
-    buildWindowHardware(windowSpec, batch, ironmongeryItems).forEach(({ line, product }) => {
+    buildWindowHardware(windowSpec, batch, ironmongeryItems, derived).forEach(({ line, product }) => {
       const qty = Number(line.quantity) || 0;
       if (!qty) return;
       if (product) {

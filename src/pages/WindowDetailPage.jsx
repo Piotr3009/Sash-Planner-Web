@@ -375,8 +375,8 @@ function BOMPanel({ item, windowSpec, settings, derived, batch }) {
 
   // Ironmongery (hardware) as card-A groups — shared single source (bom.js)
   const hardwareGroups = useMemo(
-    () => buildWindowHardware(windowSpec, batch, ironmongeryItems),
-    [windowSpec, batch, ironmongeryItems]
+    () => buildWindowHardware(windowSpec, batch, ironmongeryItems, derived),
+    [windowSpec, batch, ironmongeryItems, derived]
   );
 
   // Total material + ironmongery for this one window — same source as Project

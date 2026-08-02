@@ -327,18 +327,18 @@ export function buildHardwareList(windowSpec, derived = null) {
     const list = [];
     const slotName = (id) => CASEMENT_HINGE_SLOTS.find((s) => s.id === id)?.name || id;
     Object.entries(hw.hingeSummary).forEach(([slotId, e]) => {
-      const handed = slotId === 'c_hinge_top'
+      const handed = slotId.startsWith('c_hinge_top')
         ? 'pairs'
         : `${e.LH} LH / ${e.RH} RH${e.overLimit ? ' · ! verify limits' : ''}`;
       list.push({ item: slotName(slotId), detail: handed, quantity: e.pairs });
     });
     const unrestricted = (hw.hingeSummary.c_hinge_xl?.pairs || 0)
       + (hw.hingeSummary.c_hinge_small?.pairs || 0);
-    if (unrestricted > 0) {
+    if (unrestricted > 0 && windowSpec.childRestrictor !== false) {
       list.push({ item: 'Child restrictor', detail: 'releasable · for unrestricted hinges', quantity: unrestricted });
     }
     const sidePairs = Object.entries(hw.hingeSummary)
-      .filter(([id]) => id !== 'c_hinge_top')
+      .filter(([id]) => !id.startsWith('c_hinge_top'))
       .reduce((a, [, e]) => a + e.pairs, 0);
     if (sidePairs > 0) {
       list.push({ item: 'Wedge packers', detail: '1 set per hinge pair (verify)', quantity: sidePairs });
@@ -346,6 +346,17 @@ export function buildHardwareList(windowSpec, derived = null) {
     if (hw.sideOpeners > 0) {
       list.push({ item: 'Window lock', detail: 'per side-hung opener', quantity: hw.sideOpeners });
       list.push({ item: 'Shootbolt set', detail: 'per side-hung opener', quantity: hw.sideOpeners });
+    }
+    // Client-facing items — resolved to products via per-window ironmongery
+    // slots (casementHandles / casementStays / casementVents).
+    const totalOpeners = Object.values(hw.hingeSummary).reduce((a, e) => a + e.pairs, 0);
+    if (totalOpeners > 0) {
+      list.push({ item: 'Casement handle', detail: 'per opener', quantity: totalOpeners });
+      list.push({ item: 'Casement stay', detail: 'per opener', quantity: totalOpeners });
+    }
+    const vents = buildVentGrilles(windowSpec);
+    if (vents > 0) {
+      list.push({ item: 'Trickle vents', detail: 'from Ventilation section', quantity: vents });
     }
     return list;
   }

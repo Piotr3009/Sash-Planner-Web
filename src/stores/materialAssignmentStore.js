@@ -100,7 +100,6 @@ export const CASEMENT_PARTS = {
     { id: 'c_wedge_packer', name: 'Wedge Packers', sub: '1 set per hinge pair (verify with workshop)', section: '—', pcs: 1, materialType: 'consumable', unit: 'pcs' },
     { id: 'c_window_lock', name: 'Window Lock / Handle keep', sub: 'per side-hung opener', section: '—', pcs: 1, materialType: 'ironmongery', unit: 'pcs' },
     { id: 'c_shootbolt', name: 'Shootbolts', sub: 'set per side-hung opener', section: '—', pcs: 1, materialType: 'ironmongery', unit: 'pcs' },
-    { id: 'c_trickle_vent', name: 'Trickle Vents', sub: 'quantity from batch option (yes/no/1/2) — later pass', section: '—', pcs: 1, materialType: 'ironmongery', unit: 'pcs' },
   ],
   glazing: [
     { id: 'c_glazing_beading', name: 'Glazing Beading (casement profile)', sub: 'per m — from engine glass runs', section: 'profile', pcs: 1, materialType: 'beading', unit: 'm' },

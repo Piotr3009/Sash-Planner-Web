@@ -28,6 +28,7 @@ export const IRONMONGERY_CATEGORIES = [
   { key: 'other', label: 'Others', windowType: 'sash' },
   { key: 'casementHandles', label: 'Casement Handles', windowType: 'casement' },
   { key: 'casementStays', label: 'Casement Stays', windowType: 'casement' },
+  { key: 'casementVents', label: 'Trickle Vents', windowType: 'casement' },
 ];
 
 // Ironmongery finishes — single source of truth, matching PSW exactly so

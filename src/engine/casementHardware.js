@@ -61,15 +61,46 @@ export const CASEMENT_HINGE_SLOTS = [
     limits: { minW: 450, maxW: 1000, maxKg: 50, maxH: Infinity }, // height limit TBC from Nico datasheet
     hint: 'Recommended: Nico Atlas HD Egress 16″ (BJ Waller — confirm SKU when ordering). No built-in restriction — the engine adds the Child Restrictor slot item (Nico Safety Catch RST42012A) for this slot.',
   },
+  // Top hung ladder: the stay sits on the SIDES of the sash, so hinge length
+  // must fit the sash HEIGHT (length + ~50mm fitting clearance). Whole-window
+  // top hung sashes can be tall, hence four lengths (Nico range 8–24").
+  // maxKg 60 is the Nico HD headline figure — per-size limits TBC from the
+  // datasheet. No child restriction on top hung (Piotr 02.08.2026).
   {
-    id: 'c_hinge_top',
-    name: 'Top Hung Hinges — fans',
-    sub: 'friction pair · length by fan height · no restriction (fans sit high)',
+    id: 'c_hinge_top_8',
+    name: 'Top Hung Hinges — sash ≤360mm',
+    sub: 'friction pair · 8″ (203mm) · fans and small vents',
     hung: 'top', restricted: false,
-    limits: { minW: 0, maxW: Infinity, maxKg: 60 },
-    hint: 'Recommended: Nico HD Top Hung friction stays (≤60kg, confirm SKU when ordering). Pick length to suit the fan height. Fans need no child restriction (Piotr 02.08.2026).',
+    limits: { minH: 253, maxH: 360, maxKg: 60 },
+    hint: 'Recommended: Nico HD Top Hung 8″ (confirm SKU when ordering). Sash height 253–360mm.',
+  },
+  {
+    id: 'c_hinge_top_12',
+    name: 'Top Hung Hinges — sash 360–660mm',
+    sub: 'friction pair · 12″ (305mm)',
+    hung: 'top', restricted: false,
+    limits: { minH: 355, maxH: 660, maxKg: 60 },
+    hint: 'Recommended: Nico HD Top Hung 12″ (confirm SKU when ordering). Sash height 360–660mm.',
+  },
+  {
+    id: 'c_hinge_top_16',
+    name: 'Top Hung Hinges — sash 660–1060mm',
+    sub: 'friction pair · 16″ (406mm)',
+    hung: 'top', restricted: false,
+    limits: { minH: 456, maxH: 1060, maxKg: 60 },
+    hint: 'Recommended: Nico HD Top Hung 16″ (confirm SKU when ordering). Sash height 660–1060mm.',
+  },
+  {
+    id: 'c_hinge_top_20',
+    name: 'Top Hung Hinges — sash >1060mm',
+    sub: 'friction pair · 20″ (508mm) · whole-window top hung',
+    hung: 'top', restricted: false,
+    limits: { minH: 558, maxH: Infinity, maxKg: 60 },
+    hint: 'Recommended: Nico HD Top Hung 20″ (confirm SKU when ordering). Sash height above 1060mm.',
   },
 ];
+
+const TOP_LADDER = ['c_hinge_top_8', 'c_hinge_top_12', 'c_hinge_top_16', 'c_hinge_top_20'];
 
 const SIDE_LADDER = ['c_hinge_600', 'c_hinge_700', 'c_hinge_hd', 'c_hinge_xl'];
 const slotById = Object.fromEntries(CASEMENT_HINGE_SLOTS.map((s) => [s.id, s]));
@@ -92,10 +123,17 @@ export function selectCasementHinges(panels, leafSizes, leafWeights) {
     const s = leafSizes[i] || {};
     const kg = leafWeights?.[i]?.weightKg ?? 0;
     if (pn.hinge === 'top') {
-      const top = slotById.c_hinge_top;
+      const H = s.leafH || 0;
+      // Longest stay that physically fits the sash height wins.
+      let pick = null;
+      for (const id of TOP_LADDER) {
+        const L = slotById[id].limits;
+        if (H >= L.minH && H <= L.maxH) pick = id;
+      }
+      const over = !pick || kg > slotById[pick || 'c_hinge_top_8'].limits.maxKg;
       return {
-        panel: i + 1, hung: 'top', handing: null, slotId: top.id,
-        leafH: s.leafH, weightKg: kg, overLimit: kg > top.limits.maxKg,
+        panel: i + 1, hung: 'top', handing: null, slotId: pick || 'c_hinge_top_8',
+        leafH: H, weightKg: kg, overLimit: over || undefined,
       };
     }
     const w = s.leafW || 0;

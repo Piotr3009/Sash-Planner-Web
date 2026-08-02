@@ -148,6 +148,7 @@ export default function ConfiguratorPage() {
   const [spacerColor, setSpacerColor] = useState('white');
   const [spacerType, setSpacerType] = useState('warm');
   const [pas24, setPas24] = useState(false);
+  const [childRestrictor, setChildRestrictor] = useState(true);
 
   // Casement state — field names match PSW payload 1:1 (import/export contract)
   const [casLayout, setCasLayout] = useState('040L');
@@ -214,6 +215,7 @@ export default function ConfiguratorPage() {
     setSpacerColor(w.spacerColor || def.spacerColor || 'white');
     setSpacerType(w.spacerType || def.spacerType || 'warm');
     setPas24(w.pas24 !== undefined ? !!w.pas24 : (def.pas24 || false));
+    setChildRestrictor(w.childRestrictor !== undefined ? !!w.childRestrictor : (def.childRestrictor ?? true));
     // Casement fields (harmless no-ops for sash windows)
     setCasLayout(w.casementLayout || '040L');
     setCasHinges(Array.isArray(w.casementHinges) ? w.casementHinges : null);
@@ -267,6 +269,7 @@ export default function ConfiguratorPage() {
         setSpacerColor(def.spacerColor || 'white');
         setSpacerType(def.spacerType || 'warm');
         setPas24(def.pas24 || false);
+        setChildRestrictor(def.childRestrictor ?? true);
       }
       setPrefilled(true);
     }
@@ -420,7 +423,7 @@ export default function ConfiguratorPage() {
       glassType, glassSpec, glassCoating, glassGas, casementBarType: casBarType, sealColour, sillExtension: sillExt, sillWider, glassFinish: gFin, frostedLocation: frostLoc,
       spacerColor, spacerType, sashType, splitRatio, headType, openingType: opening,
       ventRoomType, ventSoleWindow,
-      frameType, frameDepth, pas24,
+      frameType, frameDepth, pas24, childRestrictor,
       ...(isCasement ? {
         casementLayout: casLayout,
         casementHinges: casHinges ? [...casHinges] : null,
@@ -630,6 +633,17 @@ export default function ConfiguratorPage() {
               <Lbl>Extend cill 50mm each side?</Lbl><HChips o={SILL_WIDER_OPTIONS} v={sillWider} c={setSillWider} />
             </>}
             <label className="flex items-center gap-2 text-xs text-ink-400 mt-1.5 cursor-pointer"><input type="checkbox" checked={pas24} onChange={e => setPas24(e.target.checked)} className="accent-accent-500" />PAS24 security</label>
+            {isCasement && (
+              <label className="flex items-center gap-2 text-xs text-ink-400 mt-1.5 cursor-pointer">
+                <input type="checkbox" checked={childRestrictor} onChange={e => setChildRestrictor(e.target.checked)} className="accent-accent-500" />
+                Child restrictor
+                <span
+                  title="Building Regs AD K: an openable window below 800mm floor level with an external drop of 600mm or more must restrict initial opening to 100mm. On escape (egress) windows the restrictor must be releasable without tools (AD B). Hinge slots 350\u2013700mm have the restriction built in; XL / small sashes get a separate releasable restrictor added automatically (Nico Safety Catch, BJ Waller RST42012A)."
+                  onClick={(e) => e.preventDefault()}
+                  className="w-4 h-4 flex items-center justify-center rounded-full bg-surface-600 text-accent-400 text-[9px] font-bold cursor-help shrink-0"
+                >?</span>
+              </label>
+            )}
           </Sec>
 
           <Sec t="Colour">
