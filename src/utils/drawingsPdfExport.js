@@ -35,11 +35,14 @@ function chrome(doc, PG, hdr) {
   drawReportFooter(doc, PG, hdr);
 }
 
-// Aspect-fit an image inside box (bx,by,bw,bh), centered. Draws a light border.
+// Aspect-fit an image inside box (bx,by,bw,bh), centered. The border hugs the
+// drawing itself, not the cell (Piotr 02.08): a portrait drawing in a wide cell
+// used to sit inside a frame full of blank paper, which exaggerated the empty
+// margins visually. Empty cells still get a full-cell frame as a placeholder.
 function placeImg(doc, item, bx, by, bw, bh) {
   doc.setDrawColor(220, 220, 220); doc.setLineWidth(0.2);
-  doc.rect(bx, by, bw, bh);
   if (!item || !item.image) {
+    doc.rect(bx, by, bw, bh);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(180, 180, 180);
     doc.text('no image', bx + bw / 2, by + bh / 2, { align: 'center' });
     return;
@@ -49,6 +52,7 @@ function placeImg(doc, item, bx, by, bw, bh) {
   if (dh > bh) { dh = bh; dw = bh * ar; }
   const dx = bx + (bw - dw) / 2;
   const dy = by + (bh - dh) / 2;
+  doc.rect(dx, dy, dw, dh);
   const fmt = /^data:image\/jpe?g/i.test(item.image) ? 'JPEG' : 'PNG';
   try { doc.addImage(item.image, fmt, dx, dy, dw, dh, undefined, 'FAST'); } catch (e) { /* skip */ }
 }
@@ -138,15 +142,43 @@ export function exportElementsPDF(info) {
   const COLS = Math.max(1, Math.min(3, Number(info.cols) || 3));
   const ROWS = COLS >= 3 ? 1 : 2;         // sash keeps 3-in-a-row; 2-col mode stacks 2 rows
   const perPage = COLS * ROWS;
-  const gap = 6, labelH = 6;
+  // Margins pared to the minimum so drawings get every millimetre (Piotr 02.08).
+  // BOT_PAD keeps the caption clear of the footer rule (measured: 5mm left only
+  // 0.5mm of clearance). Width, not height, drives portrait drawings here, so
+  // the extra 3mm costs nothing in drawing size.
+  const gap = 3, labelH = 6, PAD = 2, BOT_PAD = 8;
   const HDR_H = 15;
-  const x0 = PG.bx + 4;
-  const contentW = PG.w - 2 * PG.bx - 8;
+  const x0 = PG.bx + PAD;
+  const contentW = PG.w - 2 * PG.bx - 2 * PAD;
   const cellW = (contentW - gap * (COLS - 1)) / COLS;
   const top = PG.by + 0.7 + HDR_H + 5;
-  const bottom = PG.h - PG.by - 10;       // above footer
+  const bottom = PG.h - PG.by - BOT_PAD;  // above footer
   const rowH = (bottom - top - gap * (ROWS - 1)) / ROWS;
   const imgH = rowH - labelH;
+
+  // ── Cill sections are pulled OUT of the per-window grid (Piotr 02.08).
+  // The section depends only on the extension projection, never on window size,
+  // so N windows produced N identical drawings. They are de-duplicated by ext
+  // and printed once, on a closing page — which also matches the workshop order
+  // (the extension board is fitted last). No cills → no page at all.
+  const cillGroups = [];
+  windows.forEach((win) => {
+    const c = win.cill;
+    if (!c || !c.image) return;
+    const ext = Number(c.ext) || 0;
+    const tag = String(win.tag || win.no || '').trim();
+    const found = cillGroups.find((g) => g.ext === ext);
+    if (found) { if (tag) found.tags.push(tag); }
+    else cillGroups.push({ ext, image: c.image, w: c.w, h: c.h, tags: tag ? [tag] : [] });
+  });
+  cillGroups.sort((a, b) => a.ext - b.ext);
+  const CILL_COLS = 3;
+  const cillCellW = (contentW - gap * (CILL_COLS - 1)) / CILL_COLS;
+  const cillLabelH = 12;                  // two lines: variant + window list
+  const cillPages = [];
+  for (let i = 0; i < cillGroups.length; i += CILL_COLS) {
+    cillPages.push({ groups: cillGroups.slice(i, i + CILL_COLS), cont: i > 0 });
+  }
 
   // Pre-split into pages so the header can show a true page total.
   const pages = [];
@@ -156,7 +188,7 @@ export function exportElementsPDF(info) {
       pages.push({ win, drawings: ds.slice(i, i + perPage), cont: i > 0 });
     }
   });
-  const total = Math.max(1, pages.length);
+  const total = Math.max(1, pages.length + cillPages.length);
 
   pages.forEach((pg, pi) => {
     if (pi > 0) doc.addPage();
@@ -173,6 +205,40 @@ export function exportElementsPDF(info) {
       placeImg(doc, d, cx, cy, cellW, imgH);
       doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(26, 26, 26);
       doc.text(String(d.label || ''), cx + cellW / 2, cy + imgH + 4.5, { align: 'center' });
+    });
+  });
+
+  // Height fitted to the drawing itself, not to the page: a cill section is
+  // ~3:1, so a full-height cell left the caption stranded 64mm below its own
+  // drawing (measured on sample, Piotr 02.08). Capped by available space.
+  const cillAvailH = bottom - top - cillLabelH;
+  const cillNatH = cillGroups.reduce((mx, g) => {
+    const ar = (g.w && g.h) ? g.w / g.h : 3;
+    return Math.max(mx, cillCellW / ar);
+  }, 0);
+  const cillImgH = Math.min(cillAvailH, cillNatH || cillAvailH);
+  cillPages.forEach((pg, pi) => {
+    doc.addPage();
+    drawReportBorder(doc, PG);
+    compactHeader(doc, PG, hdr,
+      `CILL SECTIONS${pg.cont ? ' (cont.)' : ''}`, pages.length + pi + 1, total);
+    drawReportFooter(doc, PG, hdr);
+
+    pg.groups.forEach((g, di) => {
+      const cx = x0 + di * (cillCellW + gap);
+      placeImg(doc, g, cx, top, cillCellW, cillImgH);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(26, 26, 26);
+      doc.text(g.ext > 0 ? `Cill ext ${g.ext} mm` : 'Cill — no extension',
+        cx + cillCellW / 2, top + cillImgH + 4.5, { align: 'center' });
+      if (g.tags.length) {
+        // Wrap instead of truncating — a silently cut list ("W1 … W20") is worse
+        // than none, because the joiner cannot tell that anything is missing.
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(90, 90, 90);
+        const lines = doc.splitTextToSize(g.tags.join(', '), cillCellW - 4);
+        lines.forEach((ln, li) => {
+          doc.text(ln, cx + cillCellW / 2, top + cillImgH + 9 + li * 3.6, { align: 'center' });
+        });
+      }
     });
   });
 

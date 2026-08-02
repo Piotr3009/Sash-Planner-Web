@@ -75,8 +75,11 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
     if (busy || !derived) return;
     setBusy(true);
     try {
+      // Cill section is no longer part of the per-window grid — it goes to a
+      // de-duplicated closing page (Piotr 02.08). Portrait drawings therefore
+      // get a full-height cell instead of being squeezed by a flat section.
       const types = isCasement
-        ? [['vsection', 'Cill Section'], ['frame', 'Frame Detail'], ...leafGroups.map((gp, k) => [`leaf${k}`, paneTitle(gp)])]
+        ? [['frame', 'Frame Detail'], ...leafGroups.map((gp, k) => [`leaf${k}`, paneTitle(gp)])]
         : [['box', 'Box Detail'], ['upper', 'Upper Sash'], ['lower', 'Lower Sash']];
       const drawings = [];
       for (const [t, label] of types) {
@@ -84,16 +87,30 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
         const png = svg ? await svgNodeToPng(svg, { scale: 3, printMode: true }) : null;
         drawings.push({ image: png?.url || null, w: png?.w, h: png?.h, label });
       }
+      let cill = null;
+      if (isCasement) {
+        const vs = refs.current['vsection']?.querySelector('svg');
+        const vpng = vs ? await svgNodeToPng(vs, { scale: 3, printMode: true }) : null;
+        if (vpng?.url) {
+          cill = { image: vpng.url, w: vpng.w, h: vpng.h, ext: Number(windowSpec?.cill?.extension) || 0 };
+        }
+      }
       const company = useProjectStore.getState().settings.company || {};
       exportElementsPDF({
-        cols: isCasement ? 2 : 3,
+        cols: 3,
         title: item?.name || batch?.name || 'Window',
         projects: projectLabel ? [projectLabel] : [],
         date: new Date().toLocaleDateString('en-GB'),
         companyName: company.companyName || 'COMPANY NAME',
         companyAddress: company.companyAddress || '',
         logo: company.logo || '',
-        windows: [{ no: 1, caption: `${item?.name || ''} — ${winW}×${winH} mm`, drawings }],
+        windows: [{
+          no: 1,
+          tag: item?.name || '',
+          caption: `${item?.name || ''} — ${winW}×${winH} mm`,
+          drawings,
+          cill,
+        }],
       });
     } finally { setBusy(false); }
   };
