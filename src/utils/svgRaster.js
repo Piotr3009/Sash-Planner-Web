@@ -25,11 +25,12 @@ import { COLORS } from '../components/drawings/drawingTheme.js';
 // and are left untouched.
 const PRINT_MAP = {
   [COLORS.bg]:      '#FFFFFF', // dark page bg → white (also neutralises CSS background)
-  [COLORS.frame]:   '#334155', // light frame → dark slate
-  [COLORS.sash]:    '#475569', // light sash (also title/subtitle) → dark
-  [COLORS.bar]:     '#475569', // mid (also sillDetail/sectionFill) → darker
-  [COLORS.section]: '#475569',
-  [COLORS.dim]:     '#0F766E', // dimension teal → darker teal (readable on white)
+  [COLORS.frame]:   '#1A1A1A', // structure goes near-black — slate read pale on print (Piotr 02.08)
+  [COLORS.sash]:    '#1A1A1A', // light sash (also title/subtitle) → near-black
+  [COLORS.bar]:     '#333333', // mid (also sillDetail/sectionFill) → dark gray
+  [COLORS.section]: '#333333',
+  [COLORS.meeting]: '#333333', // was unmapped — meeting-rail lines printed light
+  [COLORS.dim]:     '#00695C', // dimension teal, darker for white paper
 };
 
 function applyPrintPalette(xml) {

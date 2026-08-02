@@ -80,15 +80,31 @@ export function exportElevationsPDF(info) {
     if (col === 0 && i > 0) { doc.addPage(); chrome(doc, PG, hdr); }
     const cx = x0 + col * (cellW + gap);
     placeImg(doc, it, cx, top, cellW, imgH);
+    // Optional small inset (casement cill section) — sash sheets carry the
+    // cill on the elevation, casement now matches (Piotr 02.08, audit 5).
+    if (it.inset?.image) {
+      const insW = cellW * 0.34;
+      const insH = imgH * 0.30;
+      const ix = cx + cellW - insW;
+      const iy = top + imgH - insH;
+      doc.setFillColor(255, 255, 255);
+      doc.rect(ix - 1, iy - 1, insW + 1, insH + 1, 'F');
+      doc.setDrawColor(120, 120, 120); doc.setLineWidth(0.2);
+      doc.rect(ix - 1, iy - 1, insW + 1, insH + 1);
+      placeImg(doc, it.inset, ix, iy, insW, insH - 3);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(6); doc.setTextColor(26, 26, 26);
+      doc.text('CILL SECTION', ix + insW / 2, iy + insH - 3.2, { align: 'center' });
+    }
     const nameLine = `${it.no}. ${it.projectNum ? `${it.projectNum} · ` : ''}${it.name || ''}`;
     caption(doc, nameLine, cx, top + imgH + 5, 40);
     if (it.dims) {
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(136, 136, 136);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(60, 60, 60);
       doc.text(String(it.dims), cx, top + imgH + 9);
     }
   });
 
   stampReportPages(doc, PG);
+  if (info.returnDoc) return doc.output('arraybuffer');
   doc.save(`Elevations_${String(info.title || 'pack').replace(/[^a-z0-9]+/gi, '_')}.pdf`);
 }
 
@@ -110,37 +126,57 @@ function compactHeader(doc, PG, hdr, caption, pageNum, total) {
   return h;
 }
 
-// ─── ELEMENTS: ONE window per page — Box / Upper / Lower large, in a row ───
+// ─── ELEMENTS: per-window pages — drawings in a cols×rows grid; windows with
+// more drawings than one page holds continue on "(cont.)" pages (Piotr 02.08:
+// a 7-leaf casement must stay readable, never squeezed onto one sheet). ───
 export function exportElementsPDF(info) {
   const PG = getReportPage('a4');
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const hdr = mkHeader(info, info.subtitle || '2D ELEMENTS');
 
   const windows = info.windows || [];
-  const total = Math.max(1, windows.length);
-  const COLS = 3, gap = 6, labelH = 6;
+  const COLS = Math.max(1, Math.min(3, Number(info.cols) || 3));
+  const ROWS = COLS >= 3 ? 1 : 2;         // sash keeps 3-in-a-row; 2-col mode stacks 2 rows
+  const perPage = COLS * ROWS;
+  const gap = 6, labelH = 6;
   const HDR_H = 15;
   const x0 = PG.bx + 4;
   const contentW = PG.w - 2 * PG.bx - 8;
   const cellW = (contentW - gap * (COLS - 1)) / COLS;
   const top = PG.by + 0.7 + HDR_H + 5;
   const bottom = PG.h - PG.by - 10;       // above footer
-  const imgH = bottom - top - labelH;
+  const rowH = (bottom - top - gap * (ROWS - 1)) / ROWS;
+  const imgH = rowH - labelH;
 
-  windows.forEach((win, wi) => {
-    if (wi > 0) doc.addPage();
+  // Pre-split into pages so the header can show a true page total.
+  const pages = [];
+  windows.forEach((win) => {
+    const ds = win.drawings || [];
+    for (let i = 0; i < Math.max(1, ds.length); i += perPage) {
+      pages.push({ win, drawings: ds.slice(i, i + perPage), cont: i > 0 });
+    }
+  });
+  const total = Math.max(1, pages.length);
+
+  pages.forEach((pg, pi) => {
+    if (pi > 0) doc.addPage();
     drawReportBorder(doc, PG);
-    compactHeader(doc, PG, hdr, `${win.no}. ${win.caption || ''}`, wi + 1, total);
+    compactHeader(doc, PG, hdr,
+      `${pg.win.no}. ${pg.win.caption || ''}${pg.cont ? ' (cont.)' : ''}`, pi + 1, total);
     drawReportFooter(doc, PG, hdr);
 
-    (win.drawings || []).slice(0, COLS).forEach((d, di) => {
-      const cx = x0 + di * (cellW + gap);
-      placeImg(doc, d, cx, top, cellW, imgH);
+    pg.drawings.forEach((d, di) => {
+      const col = di % COLS;
+      const row = Math.floor(di / COLS);
+      const cx = x0 + col * (cellW + gap);
+      const cy = top + row * (rowH + gap);
+      placeImg(doc, d, cx, cy, cellW, imgH);
       doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(26, 26, 26);
-      doc.text(String(d.label || ''), cx + cellW / 2, top + imgH + 4.5, { align: 'center' });
+      doc.text(String(d.label || ''), cx + cellW / 2, cy + imgH + 4.5, { align: 'center' });
     });
   });
 
+  if (info.returnDoc) return doc.output('arraybuffer');
   doc.save(`Elements_${String(info.title || 'pack').replace(/[^a-z0-9]+/gi, '_')}.pdf`);
 }
 

@@ -205,10 +205,10 @@ function drawTable(doc, items, startY) {
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
-  tc(doc, C.dark);
+  tc(doc, C.black);
   cols.forEach(c => doc.text(c.l, x + c.dx, y));
 
-  dc(doc, C.grayXL);
+  dc(doc, C.grayL);
   doc.setLineWidth(LW.tableLine);
   doc.line(x, y + 1.5, x + 270, y + 1.5);
   y += TABLE_ROW_H;
@@ -220,14 +220,15 @@ function drawTable(doc, items, startY) {
       doc.rect(x - 1, y - 3.5, 272, TABLE_ROW_H, 'F');
     }
 
-    const clr = i % 2 === 0 ? C.black : C.dark;
-    tc(doc, clr);
+    // Solid black on every row (Piotr 02.08 — the alternating C.dark read
+    // pale on print; zebra fill alone separates the rows).
+    tc(doc, C.black);
     doc.setFont('courier', 'bold');
-    doc.setFontSize(6);
+    doc.setFontSize(6.5);
     doc.text(String(i + 1), x + 0, y);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6);
+    doc.setFontSize(6.5);
     doc.text(g.windowName || '', x + COL.window, y);
     doc.text(g.sash || '', x + COL.sash, y);
 
@@ -244,8 +245,11 @@ function drawTable(doc, items, startY) {
     doc.text(g.finish || '', x + COL.finish, y);
     doc.setFontSize(5.5);
     doc.text(spacerLabel(g), x + COL.spacer, y);
-    doc.setFontSize(6);
-    doc.text(g.bars || 'none', x + COL.bars, y);
+    // Bars: right-aligned to the table edge so long labels ("2H × 1V georgian")
+    // can never escape the border (Piotr 02.08).
+    doc.setFontSize(5.5);
+    doc.text(g.bars || 'none', x + 269, y, { align: 'right' });
+    doc.setFontSize(6.5);
 
     y += TABLE_ROW_H;
   });
@@ -572,7 +576,7 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
     companyName: companySettings.companyName || 'COMPANY NAME',
     companyAddress: companySettings.companyAddress || '',
     companyEmail: companySettings.companyEmail || '',
-    batchName: batch?.name || batch?.id || 'Batch',
+    batchName: batch?.label || batch?.name || 'Batch',   // never the DB id (Piotr 02.08)
     // Never fall back to a raw record id — an order sheet must show the project
     // number the workshop and the glass supplier recognise.
     projects: projects

@@ -24,7 +24,7 @@ const SUB_TABS = [
   { id: 'vsection', label: '2D Sections' },
 ];
 
-export default function DrawingsPanel({ item, windowSpec, settings, derived, batch }) {
+export default function DrawingsPanel({ item, windowSpec, settings, derived, batch, projectLabel }) {
   const [subTab, setSubTab] = useState('elevation');
   const [busy, setBusy] = useState(false);
   const refs = useRef({});
@@ -50,15 +50,23 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
     try {
       const svg = refs.current['elevation']?.querySelector('svg');
       const png = svg ? await svgNodeToPng(svg, { scale: 3, printMode: true }) : null;
+      // Casement: small cill-section inset on the elevation sheet, sash-style
+      // (Piotr 02.08, audit item 5).
+      let inset = null;
+      if (isCasement) {
+        const vs = refs.current['vsection']?.querySelector('svg');
+        const vpng = vs ? await svgNodeToPng(vs, { scale: 3, printMode: true }) : null;
+        if (vpng?.url) inset = { image: vpng.url, w: vpng.w, h: vpng.h };
+      }
       const company = useProjectStore.getState().settings.company || {};
       exportElevationsPDF({
         title: item?.name || batch?.name || 'Window',
-        projects: batch?.projectNumber ? [batch.projectNumber] : [],
+        projects: projectLabel ? [projectLabel] : [],
         date: new Date().toLocaleDateString('en-GB'),
         companyName: company.companyName || 'COMPANY NAME',
         companyAddress: company.companyAddress || '',
         logo: company.logo || '',
-        items: [{ image: png?.url || null, w: png?.w, h: png?.h, no: 1, projectNum: batch?.projectNumber || '', name: item?.name || '', dims: `${winW}×${winH} mm` }],
+        items: [{ image: png?.url || null, w: png?.w, h: png?.h, no: 1, projectNum: projectLabel || '', name: item?.name || '', dims: `${winW}×${winH} mm`, inset }],
       });
     } finally { setBusy(false); }
   };
@@ -78,8 +86,9 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
       }
       const company = useProjectStore.getState().settings.company || {};
       exportElementsPDF({
+        cols: isCasement ? 2 : 3,
         title: item?.name || batch?.name || 'Window',
-        projects: batch?.projectNumber ? [batch.projectNumber] : [],
+        projects: projectLabel ? [projectLabel] : [],
         date: new Date().toLocaleDateString('en-GB'),
         companyName: company.companyName || 'COMPANY NAME',
         companyAddress: company.companyAddress || '',

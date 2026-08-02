@@ -12,10 +12,11 @@ import { useMaterialAssignmentStore } from '../../stores/materialAssignmentStore
 import { useMaterialStore } from '../../stores/materialStore.js';
 import { exportPreCutPDF } from '../../utils/precutPdfExport.js';
 
-export default function PreCutPanel({ item, windowSpec, settings, derived, batch }) {
+export default function PreCutPanel({ item, windowSpec, settings, derived, batch, projectLabel }) {
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const materials = useMaterialStore((s) => s.materials);
   const [exportFormat, setExportFormat] = useState('a3');
+  const [exportModalOpen, setExportModalOpen] = useState(false);
   const [stockLengths, setStockLengths] = useState({});
   const [offcutsMap, setOffcutsMap] = useState({});
   const [offcutInput, setOffcutInput] = useState({});
@@ -157,17 +158,18 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
     return null;
   };
 
-  const handleExport = () => {
+  // Same content choice as the Production Pack export (Piotr 02.08 — the
+  // single-window button used to fire blind with 'both').
+  const handleExport = (content = 'both') => {
     if (!localOptimization || !allGroups.length) return;
+    setExportModalOpen(false);
     const company = settings?.company || {};
     const exportGroups = allGroups.map((g) => ({
       ...g,
       stockLength: stockLengths[g.key] || g.defaultStock,
       materialInfo: getMaterialForGroup(g.items),
     }));
-    const projList = batch
-      ? [{ number: batch.projectNumber || batch.label || '', name: batch.projectName || '' }]
-      : [];
+    const projList = projectLabel ? [{ number: projectLabel, name: '' }] : [];
     exportPreCutPDF({
       groups: exportGroups,
       optimization: localOptimization,
@@ -176,6 +178,7 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
       projects: projList,
       isPPMode: false,
       format: exportFormat,
+      content,
       companySettings: company,
     });
   };
@@ -197,7 +200,7 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
             <option value="a3">A3 Landscape</option>
             <option value="a4">A4 Landscape</option>
           </select>
-          <button onClick={handleExport} className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors">
+          <button onClick={() => setExportModalOpen(true)} className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors">
             📄 Export PDF
           </button>
         </div>
@@ -380,6 +383,41 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
           </div>
         );
       })}
+
+      {/* Export choice — same options as the Production Pack modal */}
+      {exportModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+          onClick={() => setExportModalOpen(false)}>
+          <div className="bg-surface-800 border border-surface-500 rounded-xl w-full max-w-sm shadow-2xl"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 py-3 border-b border-surface-600">
+              <h3 className="text-sm font-semibold text-ink-50">Export Pre-Cut List</h3>
+              <p className="text-xs text-ink-400 mt-0.5">Choose what to include in the PDF.</p>
+            </div>
+            <div className="p-4 space-y-2">
+              <button type="button" onClick={() => handleExport('both')}
+                className="w-full text-left px-4 py-3 rounded-lg bg-surface-700 hover:bg-surface-600 border border-surface-500 hover:border-accent-500 transition-colors">
+                <div className="text-sm font-medium text-ink-50">Graphics + List</div>
+                <div className="text-[11px] text-ink-400">Bar layout optimizer and the full element table.</div>
+              </button>
+              <button type="button" onClick={() => handleExport('graphics')}
+                className="w-full text-left px-4 py-3 rounded-lg bg-surface-700 hover:bg-surface-600 border border-surface-500 hover:border-accent-500 transition-colors">
+                <div className="text-sm font-medium text-ink-50">Graphics only</div>
+                <div className="text-[11px] text-ink-400">Bar layout optimizer (cutting diagram) only.</div>
+              </button>
+              <button type="button" onClick={() => handleExport('list')}
+                className="w-full text-left px-4 py-3 rounded-lg bg-surface-700 hover:bg-surface-600 border border-surface-500 hover:border-accent-500 transition-colors">
+                <div className="text-sm font-medium text-ink-50">List only</div>
+                <div className="text-[11px] text-ink-400">Element table only, no diagram.</div>
+              </button>
+            </div>
+            <div className="px-4 py-3 border-t border-surface-600 flex justify-end">
+              <button type="button" onClick={() => setExportModalOpen(false)}
+                className="text-xs px-3 py-1.5 rounded-lg text-ink-300 hover:text-ink-100 hover:bg-surface-700 transition-colors">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

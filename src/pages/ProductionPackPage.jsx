@@ -140,10 +140,10 @@ export default function ProductionPackPage() {
     };
 
     // Overview section bytes
-    const ovWindows = windowsData.map(({ win }) => ({
-      projectNum: win._projectNumber, name: win.name, type: win.sashType || 'double',
-      width: win.width, height: win.height, bars: win.upperBars || 'none',
-      head: win.headType || 'flat', glass: win.glassFinish || 'clear', opening: win.openingType || 'both',
+    const ovWindows = windowsData.map((wd) => ({
+      projectNum: wd.win._projectNumber, name: wd.win.name, type: wd.win.sashType || 'double',
+      width: wd.win.width, height: wd.win.height, bars: winBarsLabel(wd),
+      head: wd.win.headType || 'flat', glass: wd.win.glassFinish || 'clear', opening: wd.win.openingType || 'both',
     }));
     const overviewBytes = exportOverviewPDF({ ...baseInfo, isPPMode, windows: ovWindows, returnDoc: true });
 
@@ -552,6 +552,20 @@ export default function ProductionPackPage() {
   );
 }
 
+
+// Bars label for one window — SINGLE SOURCE (engine glass rows). Casement rows
+// carry "2H×1V georgian" per pane; sash keeps the pattern string. Screens and
+// PDFs used win.upperBars here, which is a sash-only field → casement always
+// showed "none" while the Glass PDF was right (Piotr 02.08).
+function winBarsLabel(wd) {
+  if ((wd?.windowSpec?.category || 'sash') === 'casement') {
+    const rows = buildGlassListForWindow(wd.derived, wd.windowSpec) || [];
+    const uniq = [...new Set(rows.map((r) => r.bars).filter(Boolean))];
+    return uniq.length ? uniq.join(' / ') : 'none';
+  }
+  return wd?.win?.upperBars || 'none';
+}
+
 // ═══════════════════════════════════════════════════════════════
 // TAB: Overview
 // ═══════════════════════════════════════════════════════════════
@@ -559,10 +573,10 @@ function OverviewTab({ batch, pp, isPPMode, windowsData, registerExport }) {
   const handleExport = () => {
     const company = useProjectStore.getState().settings.company || {};
     const projects = [...new Set(windowsData.map(({ win }) => win._projectNumber).filter(Boolean))];
-    const windows = windowsData.map(({ win }) => ({
-      projectNum: win._projectNumber, name: win.name, type: win.sashType || 'double',
-      width: win.width, height: win.height, bars: win.upperBars || 'none',
-      head: win.headType || 'flat', glass: win.glassFinish || 'clear', opening: win.openingType || 'both',
+    const windows = windowsData.map((wd) => ({
+      projectNum: wd.win._projectNumber, name: wd.win.name, type: wd.win.sashType || 'double',
+      width: wd.win.width, height: wd.win.height, bars: winBarsLabel(wd),
+      head: wd.win.headType || 'flat', glass: wd.win.glassFinish || 'clear', opening: wd.win.openingType || 'both',
     }));
     exportOverviewPDF({
       companyName: company.companyName || 'COMPANY NAME',
@@ -630,7 +644,7 @@ function OverviewTab({ batch, pp, isPPMode, windowsData, registerExport }) {
               </tr>
             </thead>
             <tbody>
-              {windowsData.map(({ win, windowSpec }) => (
+              {windowsData.map((wd) => { const { win, windowSpec } = wd; return (
                 <tr key={win.id} className="border-b border-surface-500/50 hover:bg-surface-700/30">
                   {isPPMode && <td className="px-4 py-2.5 text-accent-400 font-medium">{win._projectNumber}</td>}
                   <td className="px-4 py-2.5 text-ink-100 font-medium">{win.name}</td>
@@ -638,7 +652,7 @@ function OverviewTab({ batch, pp, isPPMode, windowsData, registerExport }) {
                   <td className="px-4 py-2.5 text-right text-ink-200">{win.width} mm</td>
                   <td className="px-4 py-2.5 text-right text-ink-200">{win.height} mm</td>
                   <td className="px-4 py-2.5 text-right text-ink-200">{win.frameDepth || (win.glassType === 'triple' ? 172 : win.frameType === 'slim' ? 144 : 164)} mm</td>
-                  <td className="px-4 py-2.5 text-ink-300">{win.upperBars || 'none'}</td>
+                  <td className="px-4 py-2.5 text-ink-300">{winBarsLabel(wd)}</td>
                   <td className="px-4 py-2.5 text-ink-300">{win.headType || 'flat'}</td>
                   <td className="px-4 py-2.5 text-ink-300">{win.glassFinish || 'clear'}</td>
                   <td className="px-4 py-2.5 text-ink-300">{win.openingType || 'both'}</td>
@@ -648,7 +662,7 @@ function OverviewTab({ batch, pp, isPPMode, windowsData, registerExport }) {
                       className="text-accent-400 hover:text-accent-300 transition-colors">View →</Link>
                   </td>
                 </tr>
-              ))}
+              ); })}
             </tbody>
           </table>
         </div>

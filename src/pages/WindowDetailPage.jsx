@@ -66,6 +66,13 @@ export default function WindowDetailPage() {
     return found || null;
   }, [currentWindows, projects, projectId, batchId, windowId]);
 
+  // Real project entity — exports print "064 (Wandsworth)", never a DB id
+  // (Piotr 02.08). Batches do not carry project fields.
+  const projectEntity = useMemo(() => projects.find((p) => p.id === projectId) || null, [projects, projectId]);
+  const projectLabel = projectEntity
+    ? `${projectEntity.project_number || ''}${projectEntity.name ? ` (${projectEntity.name})` : ''}`.trim()
+    : '';
+
   const spec = useMemo(() => (item ? parseSpecification(item.specification) : null), [item]);
   const windowSpec = useMemo(() => (item ? normaliseToWindowSpec(item, spec) : null), [item, spec]);
   const derived = useMemo(() => {
@@ -142,7 +149,7 @@ export default function WindowDetailPage() {
           )}
 
           {tab === '2d' && (
-            <DrawingsPanel item={item} windowSpec={windowSpec} settings={settings} derived={derived} batch={currentBatch} />
+            <DrawingsPanel item={item} windowSpec={windowSpec} settings={settings} derived={derived} batch={currentBatch} projectLabel={projectLabel} />
           )}
 
           {tab === 'cutlist' && (
@@ -150,15 +157,15 @@ export default function WindowDetailPage() {
           )}
 
           {tab === 'precut' && (
-            <PreCutPanel item={item} windowSpec={windowSpec} settings={settings} derived={derived} batch={currentBatch} />
+            <PreCutPanel item={item} windowSpec={windowSpec} settings={settings} derived={derived} batch={currentBatch} projectLabel={projectLabel} />
           )}
 
           {tab === 'glass' && (
-            <GlassPanel item={item} windowSpec={windowSpec} derived={derived} batch={currentBatch} settings={settings} />
+            <GlassPanel item={item} windowSpec={windowSpec} derived={derived} batch={currentBatch} settings={settings} projectEntity={projectEntity} projectLabel={projectLabel} />
           )}
 
           {tab === 'bom' && (
-            <BOMPanel item={item} windowSpec={windowSpec} settings={settings} derived={derived} batch={currentBatch} />
+            <BOMPanel item={item} windowSpec={windowSpec} settings={settings} derived={derived} batch={currentBatch} projectLabel={projectLabel} />
           )}
         </div>
 
@@ -209,7 +216,7 @@ export default function WindowDetailPage() {
 }
 
 // ─── Glass Panel — same source as Production Pack ───
-function GlassPanel({ item, windowSpec, derived, batch, settings }) {
+function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity, projectLabel }) {
   const barsText = (spec, g) => {
     if ((spec?.category || 'sash') === 'casement') {
       // Single source: the engine row carries the label (barsV/barsH + type).
@@ -230,10 +237,12 @@ function GlassPanel({ item, windowSpec, derived, batch, settings }) {
   const handleExport = () => {
     if (!derived || !windowSpec) return;
     const company = settings?.company || {};
-    const projects = batch ? [{ number: batch.projectNumber || '', name: batch.projectName || '', id: batch.id }] : [];
+    const projects = projectEntity
+      ? [{ number: projectEntity.project_number || '', name: projectEntity.name || '', id: projectEntity.id }]
+      : [];
     exportGlassPDF({
       batch,
-      windowsData: [{ win: { ...item, _projectNumber: batch?.projectNumber || '' }, windowSpec, derived }],
+      windowsData: [{ win: { ...item, _projectNumber: projectEntity?.project_number || '' }, windowSpec, derived }],
       projects,
       companySettings: company,
     });
@@ -258,8 +267,9 @@ function GlassPanel({ item, windowSpec, derived, batch, settings }) {
       const company = settings?.company || {};
       exportElementsPDF({
         subtitle: 'GLASS DRAWINGS',
+        cols: 2,
         title: item?.name || 'Window',
-        projects: batch?.projectNumber ? [batch.projectNumber] : [],
+        projects: projectLabel ? [projectLabel] : [],
         date: new Date().toLocaleDateString('en-GB'),
         companyName: company.companyName || 'COMPANY NAME',
         companyAddress: company.companyAddress || '',
@@ -375,7 +385,7 @@ function GlassPanel({ item, windowSpec, derived, batch, settings }) {
 }
 
 // ─── BOM Panel — Purchase list matching Project Materials layout ───
-function BOMPanel({ item, windowSpec, settings, derived, batch }) {
+function BOMPanel({ item, windowSpec, settings, derived, batch, projectLabel }) {
   const materials = useMaterialStore((s) => s.materials);
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const assignmentsData = useMaterialAssignmentStore((s) => s.data);
@@ -455,7 +465,7 @@ function BOMPanel({ item, windowSpec, settings, derived, batch }) {
     const company = settings?.company || {};
     exportBomPDF({
       title: item?.name || item?.window_number || 'Window',
-      projects: batch?.projectNumber ? [batch.projectNumber] : [],
+      projects: projectLabel ? [projectLabel] : [],
       date: new Date().toLocaleDateString('en-GB'),
       companyName: company.companyName || 'COMPANY NAME',
       companyAddress: company.companyAddress || '',
