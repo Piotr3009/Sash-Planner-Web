@@ -26,40 +26,40 @@ export const CASEMENT_HINGE_SLOTS = [
     name: 'Side Hinges — sash <350mm',
     sub: 'friction pair · standard stay + cable restrictor',
     hung: 'side', restricted: false,
-    limits: { minW: 0, maxW: 350, maxKg: 18 },
-    hint: 'Recommended: short standard friction stay (8") + releasable cable child restrictor. No restricted-egress hinge fits below ~350mm.',
+    limits: { minW: 0, maxW: 350, maxKg: 18, maxH: Infinity },
+    hint: 'Recommended: short standard friction stay (8", confirm SKU when ordering) + the Child Restrictor slot (Nico Safety Catch, BJ Waller RST42012A). No restricted-egress hinge fits below ~350mm.',
   },
   {
     id: 'c_hinge_600',
     name: 'Side Hinges — sash 350–600mm · ≤22kg',
     sub: 'friction pair · restricted egress',
     hung: 'side', restricted: true,
-    limits: { minW: 350, maxW: 600, maxKg: 22 },
-    hint: 'Recommended: Nico Restricted Egress 300mm — 8431L/R (13mm stack) or 8436L/R (17mm). BJ Waller. Max vent 600mm / 22kg.',
+    limits: { minW: 350, maxW: 600, maxKg: 22, maxH: 1300 },
+    hint: 'Recommended: Nico Restricted Egress 300mm — SKU 8431L/8431R (13mm stack) or 8436L/8436R (17mm). BJ Waller. Max vent 600mm wide / 1300mm high / 22kg.',
   },
   {
     id: 'c_hinge_700',
     name: 'Side Hinges — sash 600–700mm · ≤26kg',
     sub: 'friction pair · restricted egress',
     hung: 'side', restricted: true,
-    limits: { minW: 350, maxW: 700, maxKg: 26 },
-    hint: 'Recommended: Nico Restricted Egress 400mm — 8441L/R (13mm stack) or 8446L/R (17mm). BJ Waller. Max vent 700mm / 26kg.',
+    limits: { minW: 350, maxW: 700, maxKg: 26, maxH: 1300 },
+    hint: 'Recommended: Nico Restricted Egress 400mm — SKU 8441L/8441R (13mm stack) or 8446L/8446R (17mm). BJ Waller. Max vent 700mm wide / 1300mm high / 26kg.',
   },
   {
     id: 'c_hinge_hd',
     name: 'Side Hinges HD — sash ≤700mm · ≤45kg',
     sub: 'friction pair · Quad: restricted + egress + easy clean + heavy duty',
     hung: 'side', restricted: true,
-    limits: { minW: 400, maxW: 700, maxKg: 45 },
-    hint: 'Recommended: Nico Atlas Quad 14″ — 8470/8471 L/R. Confirm max vent width (700 vs 750mm) on the Nico datasheet when ordering.',
+    limits: { minW: 400, maxW: 700, maxKg: 45, maxH: Infinity }, // height limit TBC from Nico datasheet
+    hint: 'Recommended: Nico Atlas Quad 14″ — SKU 8470L/8470R (13mm) or 8471L/8471R (17mm), Mighton part numbers. Confirm the Nico code and max vent width (700 vs 750mm) on the datasheet when ordering.',
   },
   {
     id: 'c_hinge_xl',
     name: 'Side Hinges XL — sash 700–1000mm · ≤50kg',
     sub: 'friction pair · egress only, no restriction — add cable restrictor',
     hung: 'side', restricted: false,
-    limits: { minW: 450, maxW: 1000, maxKg: 50 },
-    hint: 'Recommended: Nico Atlas HD Egress 16″ (BJ Waller). No built-in restriction — the engine adds a releasable cable restrictor for this slot.',
+    limits: { minW: 450, maxW: 1000, maxKg: 50, maxH: Infinity }, // height limit TBC from Nico datasheet
+    hint: 'Recommended: Nico Atlas HD Egress 16″ (BJ Waller — confirm SKU when ordering). No built-in restriction — the engine adds the Child Restrictor slot item (Nico Safety Catch RST42012A) for this slot.',
   },
   {
     id: 'c_hinge_top',
@@ -67,7 +67,7 @@ export const CASEMENT_HINGE_SLOTS = [
     sub: 'friction pair · length by fan height · no restriction (fans sit high)',
     hung: 'top', restricted: false,
     limits: { minW: 0, maxW: Infinity, maxKg: 60 },
-    hint: 'Recommended: Nico HD Top Hung friction stays (≤60kg). Pick length to suit the fan height. Fans need no child restriction (Piotr 02.08.2026).',
+    hint: 'Recommended: Nico HD Top Hung friction stays (≤60kg, confirm SKU when ordering). Pick length to suit the fan height. Fans need no child restriction (Piotr 02.08.2026).',
   },
 ];
 
@@ -109,7 +109,8 @@ export function selectCasementHinges(panels, leafSizes, leafWeights) {
     }
     for (const id of SIDE_LADDER) {
       const L = slotById[id].limits;
-      if (w >= L.minW && w <= L.maxW && kg <= L.maxKg) {
+      const h = s.leafH || 0;
+      if (w >= L.minW && w <= L.maxW && kg <= L.maxKg && h <= L.maxH) {
         return { panel: i + 1, hung: 'side', handing, slotId: id, leafW: w, weightKg: kg };
       }
     }

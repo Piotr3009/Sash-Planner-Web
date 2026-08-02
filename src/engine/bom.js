@@ -216,7 +216,7 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
       if (slotId !== 'c_hinge_top') sidePairs += e.pairs;
       if (slotId === 'c_hinge_xl' || slotId === 'c_hinge_small') unrestrictedPairs += e.pairs;
     });
-    if (unrestrictedPairs > 0) setQty('c_restrictor_cable', unrestrictedPairs, 'pcs');
+    if (unrestrictedPairs > 0) setQty('c_child_restrictor', unrestrictedPairs, 'pcs');
     if (sidePairs > 0) setQty('c_wedge_packer', sidePairs, 'pcs');
     if (sideOpeners > 0) {
       setQty('c_window_lock', sideOpeners, 'pcs');

@@ -335,7 +335,7 @@ export function buildHardwareList(windowSpec, derived = null) {
     const unrestricted = (hw.hingeSummary.c_hinge_xl?.pairs || 0)
       + (hw.hingeSummary.c_hinge_small?.pairs || 0);
     if (unrestricted > 0) {
-      list.push({ item: 'Child restrictor — cable', detail: 'releasable · unrestricted hinges', quantity: unrestricted });
+      list.push({ item: 'Child restrictor', detail: 'releasable · for unrestricted hinges', quantity: unrestricted });
     }
     const sidePairs = Object.entries(hw.hingeSummary)
       .filter(([id]) => id !== 'c_hinge_top')
