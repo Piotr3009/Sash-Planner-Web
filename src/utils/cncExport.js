@@ -37,7 +37,9 @@ function downloadDxf(filename, content) {
 
 /**
  * Map one PC window onto generator params.
- * Returns { params } or { skip: reason }.
+ * Returns { params, warning? } or { skip: reason }.
+ * `warning` = the spec asked for more vents than the jamb width allows
+ * (drawn clamped, but NEVER silently — callers must show it).
  */
 export function cncParamsForWindow(windowSpec, name) {
   if (!windowSpec) return { skip: 'no data' };
@@ -47,12 +49,16 @@ export function cncParamsForWindow(windowSpec, name) {
   const fw = Number(windowSpec.frame?.width) || 0;
   const wh = Number(windowSpec.frame?.height) || 0;
   if (!(fw > 250) || !(wh > 250)) return { skip: 'size out of range' };
+  const vent = jambVentCount(fw, buildVentGrilles(windowSpec));
   return {
     params: {
       fw, wh, frameType,
-      ventCount: jambVentCount(fw, buildVentGrilles(windowSpec)),
+      ventCount: vent.count,
       winNum: String(name || windowSpec.name || ''),
     },
+    warning: vent.clamped
+      ? `spec 2 vents, width ${fw}mm allows 1 — drawn with 1, verify`
+      : null,
   };
 }
 
@@ -61,30 +67,35 @@ export function canExportCncJambs(windowSpec) {
   return !cncParamsForWindow(windowSpec, '').skip;
 }
 
-/** Single window → download. Returns { ok } or { error }. */
+/** Single window → download. Returns { ok, warning? } or { error }. */
 export function exportCncJambsForWindow(windowSpec, name) {
   const r = cncParamsForWindow(windowSpec, name);
   if (r.skip) return { error: r.skip };
   const ents = buildJambEntities(r.params, 0, 0);
   downloadDxf(`${safeName(r.params.winNum)}_jambs.dxf`, writeDxf(ents, CNC_LAYERS));
-  return { ok: true };
+  return { ok: true, warning: r.warning || null };
 }
 
 /**
  * Many windows (PP or batch) → one merged download.
  * windows: [{ windowSpec, name }]
- * Returns { ok, exported, skipped: [{name, reason}] } or { error }.
+ * Returns { ok, exported, skipped: [{name, reason}], warnings: [string] }
+ * or { error }.
  */
 export function exportCncJambsMerged(windows, fileLabel) {
   const params = [];
   const skipped = [];
+  const warnings = [];
   for (const w of windows || []) {
     const r = cncParamsForWindow(w.windowSpec, w.name);
     if (r.skip) skipped.push({ name: w.name || '?', reason: r.skip });
-    else params.push(r.params);
+    else {
+      params.push(r.params);
+      if (r.warning) warnings.push(`${w.name || '?'}: ${r.warning}`);
+    }
   }
   if (!params.length) return { error: 'No CNC-capable sash windows in this pack', skipped };
   const ents = buildMergedJambEntities(params);
   downloadDxf(`${safeName(fileLabel || 'pack')}_jambs.dxf`, writeDxf(ents, CNC_LAYERS));
-  return { ok: true, exported: params.length, skipped };
+  return { ok: true, exported: params.length, skipped, warnings };
 }

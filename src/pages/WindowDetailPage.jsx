@@ -104,6 +104,7 @@ export default function WindowDetailPage() {
               onClick={() => {
                 const r = exportCncJambsForWindow(windowSpec, item.name);
                 if (r.error) alert(`CNC export unavailable: ${r.error}`);
+                else if (r.warning) alert(`CNC DXF exported — VERIFY: ${r.warning}`);
               }}
               disabled={!canExportCncJambs(windowSpec)}
               title={canExportCncJambs(windowSpec)

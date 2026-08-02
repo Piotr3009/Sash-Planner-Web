@@ -470,8 +470,11 @@ export default function ProductionPackPage() {
                     (windowsData || []).map((wd) => ({ windowSpec: wd.windowSpec, name: wd.win?.name })),
                     pp?.name || batch?.label || 'pack',
                   );
-                  if (r.error) alert(`CNC export: ${r.error}`);
-                  else if (r.skipped?.length) alert(`CNC DXF exported (${r.exported} windows). Skipped ${r.skipped.length}: ${r.skipped.map((s) => `${s.name} (${s.reason})`).join(', ')}`);
+                  if (r.error) { alert(`CNC export: ${r.error}`); return; }
+                  const notes = [];
+                  if (r.skipped?.length) notes.push(`Skipped ${r.skipped.length}: ${r.skipped.map((s) => `${s.name} (${s.reason})`).join(', ')}`);
+                  if (r.warnings?.length) notes.push(`VERIFY vents:\n${r.warnings.join('\n')}`);
+                  if (notes.length) alert(`CNC DXF exported (${r.exported} windows).\n${notes.join('\n')}`);
                 }}
                 title="One DXF with every window's jamb set, stacked 300mm apart (VCarve)"
                 className="btn btn-secondary text-xs px-4"

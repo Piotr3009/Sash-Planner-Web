@@ -40,7 +40,9 @@ export const JAMB_CNC = Object.freeze({
   pulleyW: 27,
   pulleyInner: 4,
   pulleyInnerW: 19,
-  minWidthFor2Vents: 1050, // lisp: (if (>= fw 1050) ...) — below it, always 1
+  minWidthFor2Vents: 990,  // lisp: (if (>= fw 990) ...) — below it, always max 1
+                           // (was 1050 in the older lisp revision; workshop
+                           // lowered it — ~15mm clearance to the mortises at 990)
   textH: 22.5,
   headTextH: 15,
 });
@@ -155,12 +157,21 @@ function frameWithNotches(ox, oy, fw, jW, ventCount, V, C) {
 
 /**
  * Trickle-vent count for a sash window's CNC drawing.
- * The lisp only ever draws 1 or 2 and asks for 2 only when fw >= 1050;
- * PC answers from the window's Ventilation section instead of asking.
+ * 0 is legitimate (windowSpec ventilation says "no vent") — the lisp never
+ * knew it, but the drawing must follow the spec, not the tool's old limits.
+ * The 2-vent gate stays: below minWidthFor2Vents the jamb physically takes
+ * one slot, so a spec of 2 is CLAMPED to 1 — callers should surface
+ * `clamped` loudly instead of downgrading silently.
+ * Returns { count: 0|1|2, clamped: boolean }.
  */
 export function jambVentCount(fw, grilles) {
-  if (!(fw >= JAMB_CNC.minWidthFor2Vents)) return 1;
-  return (Number(grilles) || 0) >= 2 ? 2 : 1;
+  const g = Number(grilles) || 0;
+  if (g <= 0) return { count: 0, clamped: false };
+  if (g >= 2) {
+    if (fw >= JAMB_CNC.minWidthFor2Vents) return { count: 2, clamped: false };
+    return { count: 1, clamped: true };
+  }
+  return { count: 1, clamped: false };
 }
 
 /**
@@ -175,7 +186,7 @@ export function buildJambEntities(p, ox = 0, oy = 0) {
   if (!T) throw new Error(`No CNC jamb variant for frame type "${p.frameType}" (heritage is not machined from this program)`);
   const fw = Number(p.fw), wh = Number(p.wh);
   if (!(fw > 250) || !(wh > 250)) throw new Error('Window width/height must be > 250mm');
-  const ventCount = p.ventCount === 2 ? 2 : 1;
+  const ventCount = p.ventCount === 2 ? 2 : (p.ventCount === 0 ? 0 : 1);
   const winNum = p.winNum ? String(p.winNum) : '';
 
   const jW = T.jambW;
@@ -204,9 +215,11 @@ export function buildJambEntities(p, ox = 0, oy = 0) {
   E.push(rect('SJ-STILE', ox + T.stileX, oy - C.stileExt, ox + T.stileX + C.stileW, oy + fw + C.stileExt));
   E.push(rect('SJ-MORTISE', ox, oy + C.mortiseOff, rxEdge, oy + C.mortiseOff + C.mortiseH));
   E.push(rect('SJ-MORTISE', ox, oy + fw - C.mortiseOff - C.mortiseH, rxEdge, oy + fw - C.mortiseOff));
-  E.push(slot('SJ-POCKET', pocketL, V.s1Bot, pocketR, V.s1Top));
+  if (ventCount >= 1) E.push(slot('SJ-POCKET', pocketL, V.s1Bot, pocketR, V.s1Top));
   if (ventCount === 2) E.push(slot('SJ-POCKET', pocketL, V.s2Bot, pocketR, V.s2Top));
-  if (winNum) E.push(text('SJ-TEXT', ox + jW / 2, oy + fw / 4, C.textH, `${winNum} - TOP`));
+  // Labels sit INSIDE the piece: rotated 90°, head-text height (Piotr 02.08 —
+  // the lisp's horizontal 22.5 label overhung the 141mm jamb width).
+  if (winNum) E.push(text('SJ-TEXT', ox + jW / 2, oy + fw / 4, C.headTextH, `${winNum} - TOP`, 90, 1));
 
   // ── LEFT / RIGHT JAMB — shared body, mirrored machining ──
   const sideJamb = (o, stX, pl1, pl2, label) => {
@@ -220,14 +233,17 @@ export function buildJambEntities(p, ox = 0, oy = 0) {
       E.push(circle('SJ-PULLEY-DRILL', cx, oy + rjLen - 70, 1.5));
       E.push(circle('SJ-PULLEY-DRILL', cx, oy + rjLen - 170, 1.5));
     }
-    if (winNum) E.push(text('SJ-TEXT', o + jW / 2, oy + rjLen / 4, C.textH, `${winNum} - ${label}`));
+    if (winNum) E.push(text('SJ-TEXT', o + jW / 2, oy + rjLen / 4, C.headTextH, `${winNum} - ${label}`, 90, 1));
   };
   sideJamb(ox2, T.stileX, T.pulleyL1, T.pulleyL2, 'L');
   E.push(rect('SJ-GROOVE', ox2 - 5.5, oy - 5.5, ox2 + C.grooveW, oy + rjLen + 5.5));
   sideJamb(ox3, stileRX, pulleyR1, pulleyR2, 'R');
   E.push(rect('SJ-GROOVE', ox3 + grooveR, oy - 5.5, ox3 + jW + 5.5, oy + rjLen + 5.5));
 
-  // ── TOP HEAD (always 102mm wide) — vent cutouts + pocket overlays ──
+  // ── TOP HEAD — exists ONLY to machine the vent cutouts; with 0 vents the
+  // head is a plain saw-cut board, so the CNC file has no fourth piece at all
+  // (Piotr 02.08.2026). ──
+  if (ventCount > 0) {
   E.push(rect('SJ-FRAME', ox4, headBot, ox4 + C.headW, headTop));
   const hx1 = ox4 + C.headW - C.cutoutW;
   const hx2 = ox4 + C.headW + 10;
@@ -253,6 +269,7 @@ export function buildJambEntities(p, ox = 0, oy = 0) {
   if (winNum) {
     E.push(text('SJ-TEXT', ox4 + C.headW / 2, headBot + (headTop - headBot) / 4,
       C.headTextH, `${winNum} - HEAD`, 90, 1));  // rotated, bottom-center (lisp 73=1)
+  }
   }
   return E;
 }
