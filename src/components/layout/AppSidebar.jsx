@@ -146,7 +146,9 @@ export default function AppSidebar() {
         </NavLink>
 
         {/* ─── Separator + Setup section ─── */}
-        <div className="h-px bg-surface-500 mt-4 mb-1 mx-2" />
+        {/* 60px gap (not the 4-unit scale step) — the distance is what tells the
+            user Setup is workshop configuration, not part of the daily menu. */}
+        <div className="h-px bg-surface-500 mt-[60px] mb-1 mx-2" />
         <div className="px-3 pt-2 pb-1.5 text-[13px] font-medium uppercase tracking-wide text-ink-50 underline underline-offset-4 decoration-surface-500">Setup</div>
 
         {/* Assign Materials — top-level with own icon */}
