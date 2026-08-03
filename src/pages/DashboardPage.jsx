@@ -483,12 +483,13 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Column headers */}
-        <div className="flex mb-2">
-          <div style={{ width: 160 }} className="text-[10px] uppercase tracking-widest text-ink-400 font-semibold">Projects</div>
-          <div style={{ width: 200, marginLeft: 16 }} className="text-[10px] uppercase tracking-widest text-ink-400 font-semibold">Batches</div>
-          <div style={{ width: 500, marginLeft: 100 }} className="text-[10px] uppercase tracking-widest text-ink-400 font-semibold">Production packs</div>
-          <div style={{ marginLeft: 100 }} className="text-[10px] uppercase tracking-widest text-ink-400 font-semibold">Project complete</div>
+        {/* Column headers — these name the four stages of the board, so they
+            must read as headings, not as hint text under the page subtitle. */}
+        <div className="flex mb-3">
+          <div style={{ width: 160 }} className="text-[13px] uppercase tracking-wide text-ink-50 font-semibold underline underline-offset-4 decoration-surface-500">Projects</div>
+          <div style={{ width: 200, marginLeft: 16 }} className="text-[13px] uppercase tracking-wide text-ink-50 font-semibold underline underline-offset-4 decoration-surface-500">Batches</div>
+          <div style={{ width: 500, marginLeft: 100 }} className="text-[13px] uppercase tracking-wide text-ink-50 font-semibold underline underline-offset-4 decoration-surface-500">Production packs</div>
+          <div style={{ marginLeft: 100 }} className="text-[13px] uppercase tracking-wide text-ink-50 font-semibold underline underline-offset-4 decoration-surface-500">Project complete</div>
         </div>
 
         {/* Main content with connections */}

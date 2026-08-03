@@ -67,7 +67,7 @@ export default function AppSidebar() {
             <rect x="3" y="14" width="7" height="7" rx="1" />
             <rect x="14" y="14" width="7" height="7" rx="1" />
           </svg>
-          Dashboard
+          Production Dashboard
         </NavLink>
 
         {/* Materials (expandable) — Production Materials + Ironmongery */}
@@ -110,22 +110,6 @@ export default function AppSidebar() {
           </div>
         )}
 
-        {/* Material Weights — per-material weight data for total window weight */}
-        <NavLink to="/material-weights"
-          className={({ isActive }) =>
-            `flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] mb-0.5 transition-colors ${
-              isActive
-                ? 'bg-accent-500/12 text-accent-400 font-medium'
-                : 'text-ink-200 hover:bg-surface-700 hover:text-ink-50'
-            }`
-          }>
-          <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M6 7h12l3 13H3L6 7z" />
-            <path d="M9 7a3 3 0 016 0" />
-          </svg>
-          Material Weights
-        </NavLink>
-
         {/* Clients */}
         <NavLink to="/clients"
           className={({ isActive }) =>
@@ -162,8 +146,8 @@ export default function AppSidebar() {
         </NavLink>
 
         {/* ─── Separator + Setup section ─── */}
-        <div className="h-px bg-surface-500/50 my-2 mx-2" />
-        <div className="px-3 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-500">Setup</div>
+        <div className="h-px bg-surface-500 mt-4 mb-1 mx-2" />
+        <div className="px-3 pt-2 pb-1.5 text-[13px] font-medium uppercase tracking-wide text-ink-50 underline underline-offset-4 decoration-surface-500">Setup</div>
 
         {/* Assign Materials — top-level with own icon */}
         <button
@@ -243,6 +227,23 @@ export default function AppSidebar() {
             </div>
           </div>
         )}
+
+        {/* Material Weights — per-material weight data for total window weight.
+            Lives in Setup: it is workshop configuration, not day-to-day work. */}
+        <NavLink to="/material-weights"
+          className={({ isActive }) =>
+            `flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] mb-0.5 transition-colors ${
+              isActive
+                ? 'bg-accent-500/12 text-accent-400 font-medium'
+                : 'text-ink-200 hover:bg-surface-700 hover:text-ink-50'
+            }`
+          }>
+          <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 7h12l3 13H3L6 7z" />
+            <path d="M9 7a3 3 0 016 0" />
+          </svg>
+          Material Weights
+        </NavLink>
 
       </nav>
 
