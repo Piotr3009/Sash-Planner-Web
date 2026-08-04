@@ -29,6 +29,7 @@ import {
 } from '../engine/lists.js';
 import { optimisePrecut } from '../engine/optimizer.js';
 import { exportGlassPDF, prepGlassRefImages } from '../utils/glassPdfExport.js';
+import { uploadGlassRef } from '../services/glassRefs.js';
 import { exportPreCutPDF } from '../utils/precutPdfExport.js';
 import { exportSprayingPDF } from '../utils/sprayingPdfExport.js';
 import { exportCutListPDF } from '../utils/cutListPdfExport.js';
@@ -1138,9 +1139,33 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) 
   // for its Glass PDF header. Selection persists on the pack itself.
   const glassRefs = useProjectStore((s) => s.settings?.glassReferences) || [];
   const updateProductionPack = useProjectStore((s) => s.updateProductionPack);
+  const updateSettings = useProjectStore((s) => s.updateSettings);
   const [selHint, setSelHint] = useState('');
+  const [refBusy, setRefBusy] = useState(false);
+  const refInput = useRef(null);
+  const LIBRARY_MAX = 6;
   // Ignore selections pointing at images since deleted from the library.
   const selection = (pp?.glassRefSelection || []).filter((p) => glassRefs.some((r) => r.path === p));
+
+  // Upload straight from the pack into the shared tenant library (Piotr 04.08:
+  // the "+" belongs HERE). Deletion stays in Settings only — removing an image
+  // from one pack's view would silently strip it from every other pack's PDF.
+  const handleAddRefs = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (!files.length || refBusy) return;
+    const room = LIBRARY_MAX - glassRefs.length;
+    if (room <= 0) { setSelHint(`Library is full (max ${LIBRARY_MAX}) — delete in Settings first.`); return; }
+    setRefBusy(true); setSelHint('');
+    const added = [];
+    for (const f of files.slice(0, room)) {
+      try { added.push(await uploadGlassRef(f)); }
+      catch (err) { setSelHint(err?.message || 'Upload failed'); }
+    }
+    if (files.length > room) setSelHint(`Only ${room} slot(s) left — extra files were skipped.`);
+    if (added.length) updateSettings({ glassReferences: [...glassRefs, ...added] });
+    setRefBusy(false);
+  };
 
   const toggleRef = (path) => {
     if (!isPPMode || !pp) return;
@@ -1186,13 +1211,13 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) 
 
   return (
     <div className="space-y-4">
-      {isPPMode && glassRefs.length > 0 && (
+      {isPPMode && (
         <div className="card p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="text-xs font-semibold text-ink-200">
               PDF references <span className="text-ink-500 font-normal">tick up to 3 for this pack's Glass PDF</span>
             </div>
-            <div className="text-[10px] text-ink-500">library: Settings — Glass references</div>
+            <div className="text-[10px] text-ink-500">shared library · delete in Settings</div>
           </div>
           {selHint && <div className="text-[11px] text-amber-400 mb-2">{selHint}</div>}
           <div className="flex flex-wrap gap-3">
@@ -1211,6 +1236,14 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) 
                 </button>
               );
             })}
+            {Array.from({ length: Math.max(0, LIBRARY_MAX - glassRefs.length) }).map((_, i) => (
+              <button key={`empty-${i}`} type="button" onClick={() => refInput.current?.click()} disabled={refBusy}
+                className="w-[96px] h-[85px] rounded-lg border border-dashed border-surface-400 text-ink-400 hover:text-ink-200 hover:border-surface-300 flex flex-col items-center justify-center text-[11px] disabled:opacity-50">
+                <span className="text-lg leading-none">＋</span>
+                <span className="mt-1">{refBusy && i === 0 ? 'Uploading…' : 'Add'}</span>
+              </button>
+            ))}
+            <input ref={refInput} type="file" accept="image/*" multiple hidden onChange={handleAddRefs} />
           </div>
         </div>
       )}
