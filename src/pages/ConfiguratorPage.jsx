@@ -64,7 +64,8 @@ const SIDE_PANEL_STYLES = [{ value: 'full-glass', label: 'Full Glass' }, { value
 const BAR_COUNTS = [0, 1, 2, 3, 4, 5].map((n) => ({ value: n, label: n === 0 ? 'None' : String(n) }));
 const HINGE_SIDES = [{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }];
 const OPEN_DIRECTIONS = [{ value: 'outward', label: 'Outward' }, { value: 'inward', label: 'Inward' }];
-const LOCK_TYPES = [{ value: 'multipoint', label: 'Multipoint' }, { value: 'standard', label: 'Standard' }];
+// Multipoint is a given — the choice is one handle or two (Piotr 04.08).
+const LOCK_TYPES = [{ value: 'single', label: 'Single (1 handle)' }, { value: 'double', label: 'Double (2 handles)' }];
 const THRESHOLDS = [{ value: 'standard', label: 'Standard Hardwood' }, { value: 'aluminium', label: 'Aluminium' }, { value: 'low-profile', label: 'Low Profile' }];
 const TRANSOM_TYPES = [{ value: 'none', label: 'None' }, { value: 'fixed', label: 'Fixed' }, { value: 'opening', label: 'Opening' }];
 const TRANSOM_BARS = [{ value: 'none', label: 'None' }, { value: 'match', label: 'Match door' }];
@@ -215,7 +216,8 @@ export default function ConfiguratorPage() {
   const [transomBars, setTransomBars] = useState('none');
   const [hingeSide, setHingeSide] = useState('left');
   const [openDirection, setOpenDirection] = useState('outward');
-  const [lockType, setLockType] = useState('multipoint');
+  const [lockType, setLockType] = useState('single');
+  const [doorBarType, setDoorBarType] = useState('astragal');
   const [threshold, setThreshold] = useState('standard');
   const [thresholdExt, setThresholdExt] = useState(0);
 
@@ -305,7 +307,8 @@ export default function ConfiguratorPage() {
     setTransomBars(w.transomBars || 'none');
     setHingeSide(w.doorHinge || 'left');
     setOpenDirection(w.doorOpenDirection || 'outward');
-    setLockType(w.lockType || 'multipoint');
+    setLockType(w.lockType === 'double' ? 'double' : 'single');
+    setDoorBarType(w.doorBarType || 'astragal');
     setThreshold(w.thresholdType || 'standard');
     setThresholdExt(Number(w.thresholdExtension) || 0);
   }, [def]);
@@ -502,7 +505,7 @@ export default function ConfiguratorPage() {
       spacerColor, sashType, splitRatio, headType, openingType: opening,
       boxType: frameType === 'slim' ? 'slim' : 'standard', boxDepth: frameDepth,
     });
-  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, centerMullion, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt]);
+  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, centerMullion, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType]);
   useEffect(() => { sync(); }, [sync]);
 
   // ─── B4: Listen for 3D ready event and re-sync ───
@@ -541,7 +544,7 @@ export default function ConfiguratorPage() {
       } : {}),
       ...(isDoor ? {
         doorType, doorShape, doorStyle, doorPaneling, centerMullion,
-        doorHinge: hingeSide, doorOpenDirection: openDirection, lockType,
+        doorHinge: hingeSide, doorOpenDirection: openDirection, lockType, doorBarType,
         doorHBars: doorHB, doorVBars: doorVB,
         sidePanels, sideLeftWidth: sideLeftW, sideRightWidth: sideRightW,
         sideStyle, sideHBars: sideHB, sideVBars: sideVB,
@@ -580,7 +583,10 @@ export default function ConfiguratorPage() {
 
   if (!batch) return <div className="p-8 text-ink-400">Batch not found.</div>;
   const isSash = batch.type === 'sash';
-  const slotCategories = IRONMONGERY_CATEGORIES.filter(c => (c.windowType === (batch.type || 'sash') || c.windowType === 'all') && c.slot !== false);
+  // Batch type may be 'door' or 'doors' depending on how it was created —
+  // normalise so door slots surface either way.
+  const slotType = (batch.type === 'doors' ? 'door' : (batch.type || 'sash'));
+  const slotCategories = IRONMONGERY_CATEGORIES.filter(c => (c.windowType === slotType || c.windowType === 'all') && c.slot !== false);
   const getSlotItem = (key) => ironItems.find(m => m.id === ironSlots[key]) || null;
 
   // Format custom bars for spec panel
@@ -731,6 +737,9 @@ export default function ConfiguratorPage() {
               {isFrench && <><Lbl>Centre mullion</Lbl><HChips o={DOOR_MULLION} v={centerMullion} c={setCenterMullion} /></>}
               <Lbl>Bars — horizontal</Lbl><HChips o={BAR_COUNTS} v={doorHB} c={setDoorHB} />
               <Lbl>Bars — vertical</Lbl><HChips o={BAR_COUNTS} v={doorVB} c={setDoorVB} />
+              {(doorHB > 0 || doorVB > 0) && (
+                <><Lbl>Bar type</Lbl><HChips o={BAR_TYPE_OPTIONS} v={doorBarType} c={setDoorBarType} /></>
+              )}
             </Sec>
 
             <Sec t="Side Panels">

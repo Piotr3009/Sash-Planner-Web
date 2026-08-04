@@ -32,6 +32,13 @@ export const IRONMONGERY_CATEGORIES = [
   // selects hinge and lock sizes itself (casementHardware ladders).
   { key: 'casementHinges', label: 'Casement Hinges', windowType: 'casement', slot: false },
   { key: 'casementLocks', label: 'Casement Locks', windowType: 'casement', slot: false },
+  // Doors (Piotr 04.08). Multipoint is standard on our doors, so the lock slot
+  // is about the product, not the mechanism type.
+  { key: 'doorHandles', label: 'Door Handles', windowType: 'door' },
+  { key: 'doorHinges', label: 'Door Hinges', windowType: 'door' },
+  { key: 'multipointLocks', label: 'Multipoint Locks', windowType: 'door' },
+  { key: 'thresholds', label: 'Thresholds', windowType: 'door' },
+  { key: 'bolts', label: 'Bolts', windowType: 'door' },
   { key: 'other', label: 'Others', windowType: 'sash' },
 ];
 

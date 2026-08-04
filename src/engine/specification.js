@@ -32,6 +32,14 @@ function detectGridMode(spec, item) {
 // Passive (vacuum) and single have no unit makeup; gas fill only applies to sealed units.
 export const GLASS_MAKEUP = { double: '4x16x4', double_slim: '4x8x4', triple: '4x8x4x8x4', passive: '', single: '' };
 export const GLASS_THICKNESS = { double: 24, double_slim: 16, triple: 28 };
+
+// Doors take THICKER panes than windows (Piotr 04.08): minimum 6mm glass, and
+// double/triple deliberately land on the SAME 28mm unit, so one rebate depth
+// serves both. Leaf member 61mm, frame 93mm with a deeper rebate.
+export const DOOR_GLASS_MAKEUP = { double: '6x16x6', triple: '4x8x4x8x4' };
+export const DOOR_GLASS_THICKNESS = 28;
+export const DOOR_LEAF_DEPTH = 61;
+export const DOOR_FRAME_DEPTH = 93;
 export const glassGas = (type) => (type === 'single' || type === 'passive') ? '' : 'argon';
 import { FAN_AXIS_OFFSET_TOP, FAN_AXIS_OFFSET_BOTTOM } from './casementLayouts.js';
 import { profileBoxDepth } from './profile.js';
@@ -104,8 +112,11 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
   // so slim-specific consumables silently fell back to standard.
   const frameType = item?.frameType || item?.frame_type || fc.frameType || 'standard';
   // Frame depth — stored on the window; legacy windows fall back to the profile
+  const isDoorCategory = (item?.windowCategory || fc.windowCategory) === 'door'
+    || (item?.windowCategory || fc.windowCategory) === 'doors';
   const frameDepth = item?.frameDepth
-    || profileBoxDepth(glassType === 'triple' ? 'triple' : frameType);
+    || (isDoorCategory ? DOOR_FRAME_DEPTH
+      : profileBoxDepth(glassType === 'triple' ? 'triple' : frameType));
 
   // Opening type — new: item.openingType
   const openingType = item?.openingType || item?.opening_type || fc.openingType || 'both';
@@ -188,7 +199,17 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       centerMullion: !!(item?.centerMullion ?? fc.centerMullion),
       hingeSide: item?.doorHinge || fc.doorHinge || 'left',
       openDirection: item?.doorOpenDirection || fc.doorOpenDirection || 'outward',
-      lockType: item?.lockType || fc.lockType || 'multipoint',
+      // Multipoint is a given on our doors — the choice is ONE handle or TWO
+      // (Piotr 04.08). PSW still offers multipoint/standard; noted for a later
+      // PSW fix. Legacy values map onto the new vocabulary.
+      lockType: (() => {
+        const v = item?.lockType || fc.lockType || 'single';
+        if (v === 'double') return 'double';
+        if (v === 'single') return 'single';
+        return 'single';   // 'multipoint' / 'standard' legacy → single handle
+      })(),
+      barType: item?.doorBarType || fc.doorBarType || 'astragal',
+      leafDepth: DOOR_LEAF_DEPTH,
       threshold: item?.thresholdType || fc.thresholdType || 'standard',
       thresholdExtension: Number(item?.thresholdExtension ?? fc.thresholdExtension) || 0,
       bars: {
@@ -238,10 +259,11 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       frostedLocation,
       coating: item?.glassCoating || fc.glassCoating || 'standard',
       gas: item?.glassGas ?? fc.glassGas ?? glassGas(glassType),
-      thickness: GLASS_THICKNESS[glassType] ?? 24,
+      thickness: isDoorCategory ? DOOR_GLASS_THICKNESS : (GLASS_THICKNESS[glassType] ?? 24),
       // Explicit per-window override only; otherwise undefined so consumers
       // fall back to the workshop profile's glassMakeup (live, snapshot-aware).
-      makeup: item?.makeup ?? item?.glazing?.makeup ?? undefined,
+      makeup: item?.makeup ?? item?.glazing?.makeup
+        ?? (isDoorCategory ? (DOOR_GLASS_MAKEUP[glassType] || DOOR_GLASS_MAKEUP.double) : undefined),
       toughened: glassSpec === 'toughened',
       frosted: glassFinish === 'frosted',
       spacerColour: spacerColor,
