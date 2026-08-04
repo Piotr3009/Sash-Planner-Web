@@ -354,6 +354,15 @@ export default function ConfiguratorPage() {
         setSpacerType(def.spacerType || 'warm');
         setPas24(def.pas24 || false);
         setChildRestrictor(def.childRestrictor ?? tenantSettings?.childRestrictorDefault ?? true);
+        // First window in a DOOR batch: start at the door default size rather
+        // than the generic 1000×1500 (Piotr 04.08). Only in this branch —
+        // copying a previous window must keep that window's size.
+        if (batch.type === 'door' || batch.type === 'doors') {
+          const dims = DOOR_DIMS[def.doorType] || DOOR_DIMS['single-external'];
+          setDoorType(def.doorType || 'single-external');
+          setInW(dims.defW);
+          setInH(dims.defH);
+        }
       }
       setPrefilled(true);
     }
