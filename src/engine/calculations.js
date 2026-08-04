@@ -878,12 +878,16 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
         beading.push(recBead('C-GEORGIAN MIDDLE BEADING', Math.round(barMm * BEAD_WASTE), 'Astragal bars int + 15%'));
     }
 
-    // ── Consumables (sash formulas adapted): silicone 0.1 tube/m of
-    // perimeters + bar runs; astragal tape split 1mm/2mm one side each;
+    // ── Consumables: casement is GLAZED THE SAME WAY AS SASH (Piotr 04.08).
+    // Bead tape PER THICKNESS = beading perimeter ×1 + middle glazing bars ×2
+    // (bars are glued on BOTH glass faces — duplex, same as the 18mm duplex
+    // the glass drawings show). BOM assigns this length to the 2mm (outside)
+    // and 1mm (inside) slots equally. Silicone stays 0.1 tube/m of
+    // perimeter + single bar run (sash rule — bedding, not both faces);
     // weather seals per Piotr 02.08.2026: frame seal 2H+2W, head&jambs seal
     // 2H+1W, both +10%, colour pair picked by sealColour in the BOM.
     const casSiliconeTubes = Math.round(0.1 * ((perimMm + barMm) / 1000) * 10) / 10;
-    const casBeadTapeSideM = Math.round((barMm / 1000) * 100) / 100;
+    const casBeadTapeSideM = Math.round(((perimMm + 2 * barMm) / 1000) * 100) / 100;
     const SEAL_F = 1.10;
     const casSealFrameM = Math.round(((2 * frameHeight + 2 * frameWidth) * SEAL_F / 1000) * 100) / 100;
     const casSealHjM = Math.round(((2 * frameHeight + 1 * frameWidth) * SEAL_F / 1000) * 100) / 100;
