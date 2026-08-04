@@ -720,6 +720,8 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
   const [selected, setSelected] = useState('leaf');
   const [depthLock, setDepthLock] = useState(true);
   const [elementLock, setElementLock] = useState(true);
+  const [frameLock, setFrameLock] = useState(true);
+  const [leafLock, setLeafLock] = useState(true);
   const [rulesLock, setRulesLock] = useState(true);
   const [advLock, setAdvLock] = useState(true);
 
@@ -782,7 +784,7 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
   const pickFromDrawing = (k) => setSelected(CAS_DRAW_TO_ROW[k] || k);
   const drawSel = sel.drawKey;
 
-  const Card = ({ r }) => {
+  const Card = ({ r, locked }) => {
     const active = selected === r.key;
     const face = r.depth === 'leaf' ? p.elements.leafStile.face : p.elements[r.key].face;
     const ded = p.lengths[r.lenKey] || 0;
@@ -800,8 +802,8 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
         <div className="flex items-center gap-1.5 mt-1 text-[11px] font-mono text-ink-300">
           <span>L = {r.base} {sign}</span>
           <span onClick={(e) => e.stopPropagation()}>
-            <NumInput value={ded} onCommit={(v) => setLen(r.lenKey, v)}
-              className="w-14 px-1 py-0.5 bg-surface-800 border border-surface-500 text-ink-50 rounded text-[11px] text-center" />
+            <NumInput value={ded} onCommit={(v) => setLen(r.lenKey, v)} disabled={locked}
+              className={`w-14 px-1 py-0.5 bg-surface-800 border border-surface-500 text-ink-50 rounded text-[11px] text-center ${locked ? 'opacity-50 cursor-not-allowed' : ''}`} />
           </span>
           <span className="text-ink-500">→ {smp}</span>
         </div>
@@ -873,14 +875,20 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
             </fieldset>
           </div>
 
-          <div className="text-sm font-semibold text-ink-50 mb-2">Frame</div>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(168px,1fr))] gap-1.5 mb-4">
-            {CAS_FRAME_ROWS.map((r) => <Card key={r.key} r={r} />)}
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm font-semibold text-ink-50">Frame</div>
+            <LockToggle locked={frameLock} onToggle={() => setFrameLock((x) => !x)} />
+          </div>
+          <div className={`grid grid-cols-[repeat(auto-fit,minmax(168px,1fr))] gap-1.5 mb-4 ${frameLock ? '' : 'ring-1 ring-amber-500/40 rounded-lg p-1'}`}>
+            {CAS_FRAME_ROWS.map((r) => <Card key={r.key} r={r} locked={frameLock} />)}
           </div>
 
-          <div className="text-sm font-semibold text-ink-50 mb-2">Leaf</div>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(168px,1fr))] gap-1.5 mb-4">
-            {CAS_LEAF_ROWS.map((r) => <Card key={r.key} r={r} />)}
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm font-semibold text-ink-50">Leaf</div>
+            <LockToggle locked={leafLock} onToggle={() => setLeafLock((x) => !x)} />
+          </div>
+          <div className={`grid grid-cols-[repeat(auto-fit,minmax(168px,1fr))] gap-1.5 mb-4 ${leafLock ? '' : 'ring-1 ring-amber-500/40 rounded-lg p-1'}`}>
+            {CAS_LEAF_ROWS.map((r) => <Card key={r.key} r={r} locked={leafLock} />)}
           </div>
 
           <div className={`card p-4 mb-4 ${elementLock ? '' : 'ring-1 ring-amber-500/40'}`}>
