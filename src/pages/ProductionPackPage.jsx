@@ -1133,6 +1133,26 @@ function ElementsTab({ windowsData, pp, batch, registerExport }) {
 // TAB: Glass Schedule
 // ═══════════════════════════════════════════════════════════════
 function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) {
+  // Per-pack PDF reference selection (Piotr 04.08): the tenant LIBRARY lives in
+  // Settings (up to 6 images, uploaded once); each pack TICKS up to 3 of them
+  // for its Glass PDF header. Selection persists on the pack itself.
+  const glassRefs = useProjectStore((s) => s.settings?.glassReferences) || [];
+  const updateProductionPack = useProjectStore((s) => s.updateProductionPack);
+  const [selHint, setSelHint] = useState('');
+  // Ignore selections pointing at images since deleted from the library.
+  const selection = (pp?.glassRefSelection || []).filter((p) => glassRefs.some((r) => r.path === p));
+
+  const toggleRef = (path) => {
+    if (!isPPMode || !pp) return;
+    setSelHint('');
+    if (selection.includes(path)) {
+      updateProductionPack(pp.id, { glassRefSelection: selection.filter((p) => p !== path) });
+      return;
+    }
+    if (selection.length >= 3) { setSelHint('The PDF header fits 3 images — untick one first.'); return; }
+    updateProductionPack(pp.id, { glassRefSelection: [...selection, path] });
+  };
+
   if (!merged?.glass?.length) {
     return <div className="card p-8 text-center text-ink-400">No glass data available.</div>;
   }
@@ -1149,7 +1169,11 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) 
       : batch ? [{ number: batch.projectNumber || '', name: batch.projectName || '', id: batch.id }] : [];
 
     const settingsNow = useProjectStore.getState().settings || {};
-    const refImages = await prepGlassRefImages(settingsNow.glassReferences);
+    // Only the pack's ticked references print; a pack with nothing ticked
+    // prints a clean header. Batch mode has no pack → no images (selection is
+    // a pack concept).
+    const chosen = (settingsNow.glassReferences || []).filter((r) => selection.includes(r.path));
+    const refImages = await prepGlassRefImages(chosen);
     exportGlassPDF({
       batch: batch || pp,
       windowsData,
@@ -1162,6 +1186,34 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) 
 
   return (
     <div className="space-y-4">
+      {isPPMode && glassRefs.length > 0 && (
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-semibold text-ink-200">
+              PDF references <span className="text-ink-500 font-normal">tick up to 3 for this pack's Glass PDF</span>
+            </div>
+            <div className="text-[10px] text-ink-500">library: Settings — Glass references</div>
+          </div>
+          {selHint && <div className="text-[11px] text-amber-400 mb-2">{selHint}</div>}
+          <div className="flex flex-wrap gap-3">
+            {glassRefs.map((r) => {
+              const on = selection.includes(r.path);
+              return (
+                <button key={r.path} type="button" onClick={() => toggleRef(r.path)}
+                  className={`w-[96px] text-left group relative rounded-lg border transition-colors ${
+                    on ? 'border-accent-500' : 'border-surface-500 hover:border-surface-400'}`}>
+                  <div className="h-[64px] rounded-t-lg overflow-hidden bg-surface-700">
+                    <img src={r.url} alt={r.name} className="w-full h-full object-cover" loading="lazy" />
+                  </div>
+                  <div className={`absolute top-1 left-1 w-4 h-4 rounded border flex items-center justify-center text-[10px] ${
+                    on ? 'bg-accent-500 border-accent-500 text-white' : 'bg-surface-800/80 border-surface-400 text-transparent'}`}>✓</div>
+                  <div className="px-1 py-0.5 text-[10px] text-ink-400 truncate">{r.name}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b border-surface-500 flex items-center justify-between">
           <div className="text-sm font-semibold text-ink-50">Glass Order — All Windows</div>

@@ -10,7 +10,6 @@ import { parseSpecification, normaliseToWindowSpec } from '../engine/specificati
 import { deriveWindowData } from '../engine/calculations.js';
 import { withProfiles } from '../engine/profile.js';
 import { buildGlassListForWindow, buildVentGrilles } from '../engine/lists.js';
-import GlassReferences from '../components/settings/GlassReferences.jsx';
 import { effectiveAssignment, buildWindowPartQtys, buildWindowHardware, resolvePartTotal, formatQty, mergeWindowMaterials } from '../engine/bom.js';
 import { liveSectionsFor } from '../engine/partRegistry.js';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
@@ -23,7 +22,7 @@ import CutListPanel from '../components/dashboard/CutListPanel.jsx';
 import PreCutPanel from '../components/dashboard/PreCutPanel.jsx';
 import ThreeDPanel from '../components/dashboard/ThreeDPanel.jsx';
 import ExportControls from '../components/export/ExportControls.jsx';
-import { exportGlassPDF, prepGlassRefImages } from '../utils/glassPdfExport.js';
+import { exportGlassPDF } from '../utils/glassPdfExport.js';
 import { exportBomPDF } from '../utils/bomPdfExport.js';
 import { exportCncJambsForWindow, canExportCncJambs } from '../utils/cncExport.js';
 
@@ -240,12 +239,12 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
     const projects = projectEntity
       ? [{ number: projectEntity.project_number || '', name: projectEntity.name || '', id: projectEntity.id }]
       : [];
-    const refImages = await prepGlassRefImages(settings?.glassReferences);
+    // Reference images are a PACK concept (per-pack checkbox selection,
+    // Piotr 04.08) — the single-window glass PDF prints without them.
     exportGlassPDF({
       batch,
       windowsData: [{ win: { ...item, _projectNumber: projectEntity?.project_number || '' }, windowSpec, derived }],
       projects,
-      refImages,
       companySettings: company,
     });
   };
@@ -345,10 +344,6 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
         </div>
       </div>
 
-      {/* Tenant technical references (bar sections, spacer details) */}
-      <div className="card p-4">
-        <GlassReferences variant="inline" />
-      </div>
 
       {/* Glass drawings — per sash (upper/lower) or per unique casement unit */}
       {(windowSpec?.category || 'sash') === 'casement' ? (

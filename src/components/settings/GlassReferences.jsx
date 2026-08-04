@@ -17,16 +17,21 @@ export default function GlassReferences({ variant = 'inline' }) {
   const [error, setError] = useState('');
   const [lightbox, setLightbox] = useState(null);
 
+  const LIBRARY_MAX = 6; // header of the Glass PDF fits 3; the library holds twice that
+
   const handleFiles = async (e) => {
     const files = Array.from(e.target.files || []);
     e.target.value = '';
     if (!files.length) return;
+    const room = LIBRARY_MAX - refs.length;
+    if (room <= 0) { setError(`Library is full (max ${LIBRARY_MAX}). Delete an image first.`); return; }
     setBusy(true); setError('');
     const added = [];
-    for (const f of files) {
+    for (const f of files.slice(0, room)) {
       try { added.push(await uploadGlassRef(f)); }
       catch (err) { setError(err?.message || 'Upload failed'); }
     }
+    if (files.length > room) setError(`Only ${room} slot(s) left — extra files were skipped (max ${LIBRARY_MAX}).`);
     if (added.length) updateSettings({ glassReferences: [...refs, ...added] });
     setBusy(false);
   };
@@ -61,11 +66,13 @@ export default function GlassReferences({ variant = 'inline' }) {
             <div className="mt-1 text-[10px] text-ink-400 text-center truncate">{r.name}</div>
           </div>
         ))}
+        {refs.length < LIBRARY_MAX && (
         <button type="button" onClick={() => fileInput.current?.click()} disabled={busy}
           className="w-[120px] h-[80px] rounded-lg border border-dashed border-surface-400 text-ink-400 hover:text-ink-200 hover:border-surface-300 flex flex-col items-center justify-center text-xs disabled:opacity-50">
           <span className="text-lg leading-none">＋</span>
           <span className="mt-1">{busy ? 'Uploading…' : 'Add image'}</span>
         </button>
+        )}
         <input ref={fileInput} type="file" accept="image/*" multiple hidden onChange={handleFiles} />
       </div>
 

@@ -159,6 +159,7 @@ function dbPackToMem(pp) {
     status: pp.status,
     assignments: pp.assignments || [],
     precutSettings: pp.precut_settings || undefined,
+    glassRefSelection: pp.glass_ref_selection || [],
     created_at: pp.created_at,
   };
 }
@@ -326,6 +327,7 @@ export async function savePack(pp) {
     responsible: pp.responsible || null,
     assignments: pp.assignments || [],
     precut_settings: pp.precutSettings || {},
+    glass_ref_selection: pp.glassRefSelection || [],
   }), 'savePack');
 }
 
