@@ -609,6 +609,13 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     const secMull = `${els.mullion.face}x${fd}`;
     const secTrans = `${els.transom.face}x${fd}`;
     const secLeaf = `${els.leafStile.face}x${ld}`;
+    // Glass follows the leaf member face: a wider member eats into the light
+    // on BOTH sides (Piotr 04.08). glassInset = how deep the pane sits in the
+    // rebate, per side. Falls back to the stored deduction for old profiles.
+    const glassInset = p.geometry?.glassInset;
+    const glassDed = (glassInset == null)
+      ? ded.glass
+      : R(2 * (els.leafStile.face - glassInset));
 
     // Record helper: profile rounding (0.1) + element letter code on top of
     // the shared record shape (createComponentRecord rounds to integers).
@@ -621,13 +628,13 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
 
     // ── Frame: full external dimensions (comb / finger / T&G joints) ──
     const cillWider = !!windowSpec.cill?.wider;
-    const cillLength = frameWidth + (cillWider ? 100 : 0);
+    const cillLength = R(frameWidth + (cillWider ? 100 : 0) - (p.lengths.cillDeduct || 0));
     const box = [
-        mk('box', 'C-FRAME HEAD', secFrame, frameWidth, 1, 'C-H'),
+        mk('box', 'C-FRAME HEAD', secFrame, R(frameWidth - (p.lengths.headDeduct || 0)), 1, 'C-H'),
         mk('box', 'C-FRAME CILL', secCill, cillLength, 1, 'C-CILL',
             cillWider ? 'wider +50mm each side' : ''),
-        mk('box', 'C-FRAME JAMB (L)', secFrame, frameHeight, 1, 'C-J/L'),
-        mk('box', 'C-FRAME JAMB (R)', secFrame, frameHeight, 1, 'C-J/R'),
+        mk('box', 'C-FRAME JAMB (L)', secFrame, R(frameHeight - (p.lengths.jambDeduct || 0)), 1, 'C-J/L'),
+        mk('box', 'C-FRAME JAMB (R)', secFrame, R(frameHeight - (p.lengths.jambDeduct || 0)), 1, 'C-J/R'),
     ];
 
     // ── Panel bounds in absolute frame coordinates ──
@@ -790,20 +797,20 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
         const dummy = pn.hinge === 'fixed' ? 'dummy sash' : '';
         const noteBase = [dummy, s.heightNote].filter(Boolean).join(' · ');
         const fnL = hingeFn(pn.hinge, 'L'), fnR = hingeFn(pn.hinge, 'R');
-        sash.push(mk('sash', 'C-STILE (L)', secLeaf, s.leafH, 1, `C-ST/L-${pcode}`,
+        sash.push(mk('sash', 'C-STILE (L)', secLeaf, R(s.leafH - (p.lengths.stileDeduct || 0)), 1, `C-ST/L-${pcode}`,
             [fnL, noteBase].filter(Boolean).join(' · ')));
-        sash.push(mk('sash', 'C-STILE (R)', secLeaf, s.leafH, 1, `C-ST/R-${pcode}`,
+        sash.push(mk('sash', 'C-STILE (R)', secLeaf, R(s.leafH - (p.lengths.stileDeduct || 0)), 1, `C-ST/R-${pcode}`,
             [fnR, noteBase].filter(Boolean).join(' · ')));
-        sash.push(mk('sash', 'C-TOP RAIL', secLeaf, s.leafW, 1, `C-TR-${pcode}`,
+        sash.push(mk('sash', 'C-TOP RAIL', secLeaf, R(s.leafW - (p.lengths.topRailDeduct || 0)), 1, `C-TR-${pcode}`,
             [pn.hinge === 'top' ? 'hinge' : '', noteBase].filter(Boolean).join(' · ')));
-        sash.push(mk('sash', 'C-BOTTOM RAIL', secLeaf, s.leafW, 1, `C-BR-${pcode}`,
+        sash.push(mk('sash', 'C-BOTTOM RAIL', secLeaf, R(s.leafW - (p.lengths.bottomRailDeduct || 0)), 1, `C-BR-${pcode}`,
             [pn.hinge === 'top' ? 'lock' : '', noteBase].filter(Boolean).join(' · ')));
     });
 
     // ── Glass: one 24 mm unit per pane (fixed = dummy sash, same math) ──
     const paneGlass = layoutDef.panels.map((pn, i) => ({
-        width: Math.max(0, R(leafSizes[i].leafW - ded.glass)),
-        height: Math.max(0, R(leafSizes[i].leafH - ded.glass)),
+        width: Math.max(0, R(leafSizes[i].leafW - glassDed)),
+        height: Math.max(0, R(leafSizes[i].leafH - glassDed)),
         location: `${layout} P${i + 1} ${pn.hinge === 'fixed' ? 'fixed' : pn.hinge}`,
         role: pn._role || 'main',
         qty: 1,

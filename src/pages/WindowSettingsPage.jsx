@@ -656,27 +656,34 @@ export default function WindowSettingsPage() {
 // on the left, LIVE technical drawings on the right (built from the engine, so
 // every field below reshapes them instantly). Raw stock is NOT set here — it
 // comes exclusively from Part Registry.
+// Every member carries its own cut deduction, exactly like the sash page:
+// `L = <base> − [field]`. Defaults are 0 (T&G runs the full dimension), so
+// nothing changes until a workshop types its own number.
 const CAS_FRAME_ROWS = [
-  { key: 'frameHead', drawKey: 'head',       name: 'Frame head',    depth: 'frame',
-    rule: () => '= frame W', sample: (W) => W },
-  { key: 'frameJamb', drawKey: 'frameJamb',  name: 'Frame jamb', qty: '×2', depth: 'frame',
-    rule: () => '= frame H', sample: (W, H) => H },
-  { key: 'frameCill', drawKey: 'cill',       name: 'Frame cill',    depth: 'frame',
-    rule: () => '= frame W (+ ext)', sample: (W) => W },
-  { key: 'mullion',   drawKey: 'mullion',    name: 'Mullion',       depth: 'frame',
-    rule: (p) => `frame H − ${p.lengths.mullion}`, sample: (W, H, p) => H - p.lengths.mullion },
-  { key: 'transom',   drawKey: 'transom',    name: 'Transom',       depth: 'frame',
-    rule: (p) => `field leaf W + ${p.lengths.transomSeat}`, sample: () => null },
+  { key: 'frameHead', drawKey: 'head',      name: 'Frame head', depth: 'frame',
+    base: 'frame W', lenKey: 'headDeduct', sample: (W, H, p) => W - p.lengths.headDeduct },
+  { key: 'frameJamb', drawKey: 'frameJamb', name: 'Frame jamb', qty: '×2', depth: 'frame',
+    base: 'frame H', lenKey: 'jambDeduct', sample: (W, H, p) => H - p.lengths.jambDeduct },
+  { key: 'frameCill', drawKey: 'cill',      name: 'Frame cill', depth: 'frame',
+    base: 'frame W + ext', lenKey: 'cillDeduct', sample: (W, H, p) => W - p.lengths.cillDeduct },
+  { key: 'mullion',   drawKey: 'mullion',   name: 'Mullion', depth: 'frame',
+    base: 'frame H', lenKey: 'mullion', sample: (W, H, p) => H - p.lengths.mullion },
+  { key: 'transom',   drawKey: 'transom',   name: 'Transom', depth: 'frame',
+    base: 'field leaf W', lenKey: 'transomSeat', sign: '+', sample: () => null },
 ];
 const CAS_LEAF_ROWS = [
-  { key: 'leaf', drawKey: 'leafStile', name: 'Leaf members', qty: '×4', depth: 'leaf',
-    badge: 'vertogen', rule: () => 'cut to FULL leaf dim' },
+  { key: 'leafStile', drawKey: 'leafStile', name: 'Stiles', qty: '×2', depth: 'leaf',
+    base: 'leaf H', lenKey: 'stileDeduct', sampleLeaf: 'H' },
+  { key: 'leafTop', drawKey: 'leafTopRail', name: 'Top rail', depth: 'leaf',
+    base: 'leaf W', lenKey: 'topRailDeduct', sampleLeaf: 'W' },
+  { key: 'leafBottom', drawKey: 'leafBottomRail', name: 'Bottom rail', depth: 'leaf',
+    base: 'leaf W', lenKey: 'bottomRailDeduct', sampleLeaf: 'W' },
 ];
 // Drawing element key → settings row key (click a drawing, select the card).
 const CAS_DRAW_TO_ROW = {
   head: 'frameHead', frameJamb: 'frameJamb', cill: 'frameCill',
   mullion: 'mullion', transom: 'transom',
-  leafStile: 'leaf', leafTopRail: 'leaf', leafBottomRail: 'leaf',
+  leafStile: 'leafStile', leafTopRail: 'leafTop', leafBottomRail: 'leafBottom',
 };
 
 // One rule row: value input + live composition hint (✓ when the geometry adds
@@ -753,8 +760,10 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
   // Live samples for a single-leaf window of the sample size.
   const leafW = W - 2 * d.leafAtJamb;
   const leafH = H - d.leafFullHeight;
-  const glassW = leafW - d.glass;
-  const glassH = leafH - d.glass;
+  // Glass follows the leaf member face — same formula as the engine.
+  const glassDed = Math.round(2 * (p.elements.leafStile.face - g.glassInset) * 10) / 10;
+  const glassW = leafW - glassDed;
+  const glassH = leafH - glassDed;
 
   // Composition hints (geometry → expected rule value):
   const hJ = g.land + g.gap;
@@ -765,8 +774,9 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
 
   const allRows = [...CAS_FRAME_ROWS, ...CAS_LEAF_ROWS];
   const sel = allRows.find((r) => r.key === selected) || allRows[0];
-  const selFace = sel.key === 'leaf' ? p.elements.leafStile.face : p.elements[sel.key].face;
-  const commitFace = (v) => (sel.key === 'leaf' ? setLeafFace(v) : setEl(sel.key, 'face', v));
+  const isLeafRow = sel.depth === 'leaf';
+  const selFace = isLeafRow ? p.elements.leafStile.face : p.elements[sel.key].face;
+  const commitFace = (v) => (isLeafRow ? setLeafFace(v) : setEl(sel.key, 'face', v));
   const depthOf = (r) => (r.depth === 'leaf' ? p.leafDepth : p.frameDepth);
   // Drawings report their own element keys — translate to the selected card.
   const pickFromDrawing = (k) => setSelected(CAS_DRAW_TO_ROW[k] || k);
@@ -774,17 +784,27 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
 
   const Card = ({ r }) => {
     const active = selected === r.key;
-    const face = r.key === 'leaf' ? p.elements.leafStile.face : p.elements[r.key].face;
-    const smp = r.key === 'leaf' ? `${leafW}×${leafH}` : (r.sample(W, H, p) ?? 'per field');
+    const face = r.depth === 'leaf' ? p.elements.leafStile.face : p.elements[r.key].face;
+    const ded = p.lengths[r.lenKey] || 0;
+    const sign = r.sign || '−';
+    const smp = r.sampleLeaf
+      ? (r.sampleLeaf === 'H' ? leafH - ded : leafW - ded)
+      : (r.sample(W, H, p) ?? 'per field');
     return (
       <div onClick={() => setSelected(r.key)}
         className={`p-2 rounded-lg border cursor-pointer transition-all ${active ? 'border-accent-500 bg-accent-500/10' : 'border-surface-500 bg-surface-700/30 hover:bg-surface-700/60'}`}>
         <div className="flex items-center justify-between gap-1">
           <span className={`text-[12px] font-medium truncate ${active ? 'text-accent-400' : 'text-ink-100'}`}>{r.name} {r.qty || ''}</span>
-          {r.badge && <span className="text-[9px] px-1.5 rounded bg-surface-600 text-ink-300">{r.badge}</span>}
+          <span className="text-[10px] text-ink-400">{face} × {depthOf(r)}</span>
         </div>
-        <div className="text-[11px] text-ink-400">{face} × {depthOf(r)}</div>
-        <div className="text-[11px] font-mono text-ink-300">{r.rule(p)} <span className="text-ink-500">→ {smp}</span></div>
+        <div className="flex items-center gap-1.5 mt-1 text-[11px] font-mono text-ink-300">
+          <span>L = {r.base} {sign}</span>
+          <span onClick={(e) => e.stopPropagation()}>
+            <NumInput value={ded} onCommit={(v) => setLen(r.lenKey, v)}
+              className="w-14 px-1 py-0.5 bg-surface-800 border border-surface-500 text-ink-50 rounded text-[11px] text-center" />
+          </span>
+          <span className="text-ink-500">→ {smp}</span>
+        </div>
       </div>
     );
   };
@@ -840,12 +860,14 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
                   className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
               </div>
               <div>
-                <div className="text-ink-400 mb-1">Glass = leaf −</div>
-                <NumInput value={d.glass} onCommit={(v) => setDed('glass', v)}
+                <div className="text-ink-400 mb-1">Glass into rebate / side</div>
+                <NumInput value={g.glassInset} onCommit={(v) => setGeo('glassInset', v)}
                   className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
               </div>
               <div className="text-ink-300 pb-1.5 text-[11px]">
-                sample glass <span className="text-accent-400 font-medium">{glassW} × {glassH}</span>
+                glass = leaf − <span className="text-accent-400 font-medium">{glassDed}</span>
+                <span className="text-ink-500"> = 2 × ({p.elements.leafStile.face} − {g.glassInset}) · sample </span>
+                <span className="text-accent-400 font-medium">{glassW} × {glassH}</span>
                 <span className="text-ink-500"> · triple deepens the LEAF rebate only — frame stays {p.frameDepth}</span>
               </div>
             </fieldset>
@@ -874,8 +896,8 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
                 <div className="text-[10px] text-ink-500 pb-2">
-                  {sel.key === 'leaf'
-                    ? 'One section for all four leaf members (vertogen) — this writes stile + both rails.'
+                  {isLeafRow
+                    ? 'One section for all four leaf members — editing it writes stiles and both rails (windows have equal members all round).'
                     : `Depth follows Frame depth (${p.frameDepth}).`}
                 </div>
               </div>
@@ -900,9 +922,9 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
                 hint={`${g.land}+${g.gap} + ${g.gapFanTransom}+${g.transomLandAbove}`} hintVal={hFan} />
               <RuleField label="Lower H: H − T −" value={d.lowerFromAxis} onCommit={(v) => setDed('lowerFromAxis', v)}
                 hint={`${g.transomLandBelow}+${g.gap} + ${g.gapCill}+${g.cillVisible}`} hintVal={hLow} />
-              <RuleField label="Mullion length: H −" value={L.mullion} onCommit={(v) => setLen('mullion', v)}
-                sample={H - L.mullion} />
-              <RuleField label="Transom seat: field +" value={L.transomSeat} onCommit={(v) => setLen('transomSeat', v)} />
+              <div className="col-span-2 text-[10px] text-ink-500">
+                Member cut deductions (head, jamb, cill, stiles, rails, mullion, transom) are edited on the cards above.
+              </div>
             </fieldset>
           </div>
 

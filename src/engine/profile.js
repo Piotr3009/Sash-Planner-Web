@@ -103,6 +103,7 @@ export const DEFAULT_CASEMENT_PROFILE = {
     gapBelowTransom: 4,   // gap between transom land and lower top rail
     gapCill: 6,           // gap between bottom rail and cill
     cillVisible: 41,      // cill front height seen from outside
+    glassInset: 12.5,     // glass enters the leaf rebate this deep, per side
     // Layer closure: 36+4 + leafH + 6+41 = extH  (full = extH − 87)
     //                top 36+4 + fan + 6+8 = T    (fan  = T − 54)
     //                13+4 + lower + 6+41 = extH − T (lower = extH − T − 64)
@@ -118,12 +119,25 @@ export const DEFAULT_CASEMENT_PROFILE = {
     // Middle tier (transom above AND below, 3-tier 013/023):
     // UNCONFIRMED — awaiting Piotr; provisional symmetric 2×17 like mullions.
     middleTierFromAxes: 34,
-    // Glass: enters 12.5 into the leaf rebate on every side:
-    glass: 109,            // leaf − 109 = 2×67 − 2×12.5
+    // Glass: DERIVED from the leaf member face — glass = leaf − 2×(face −
+    // glassInset). Kept here as the resolved value for display/back-compat;
+    // the engine computes it so changing the leaf face resizes the glass
+    // (Piotr 04.08). 109 = 2×(67 − 12.5).
+    glass: 109,
   },
   lengths: {
     mullion: 77,       // C-M = extH − 77 (full height, runs through)
     transomSeat: 8,    // C-T segment = leaf width of its field + 8
+    // Per-element cut deductions (Piotr 04.08) — every member runs the FULL
+    // dimension by default (T&G joint), so these are 0 and today's cut lists
+    // are unchanged. A workshop without T&G subtracts its own numbers here;
+    // cut list AND pre-cut both read them, exactly like the sash page.
+    headDeduct: 0,       // C-H  = frame W − this
+    jambDeduct: 0,       // C-J  = frame H − this
+    cillDeduct: 0,       // C-CILL = frame W (+ ext) − this
+    stileDeduct: 0,      // C-ST = leaf H − this
+    topRailDeduct: 0,    // C-TR = leaf W − this
+    bottomRailDeduct: 0, // C-BR = leaf W − this
     // Partial mullion (031/032 tier divider) — UNCONFIRMED, provisional
     // transom-style rule: adjacent tier leafH + partialMullionSeat.
     partialMullionSeat: 8,
