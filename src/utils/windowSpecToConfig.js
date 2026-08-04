@@ -89,6 +89,55 @@ export function windowSpecToConfig(windowSpec) {
     };
   }
 
+  // Doors: the 3D App reads FLAT door fields (it was ported from PSW that way),
+  // so translate the nested windowSpec.door block into those exact keys.
+  if ((windowSpec.category || 'sash') === 'door') {
+    const d = windowSpec.door || {};
+    const sp = d.sidePanels || {};
+    const tr = d.transom || {};
+    const gz = windowSpec.glazing || {};
+    const col = windowSpec.color || {};
+    const dual = col.type === 'dual';
+    return {
+      windowCategory: 'door',
+      width: windowSpec.frame?.width || 900,
+      height: windowSpec.frame?.height || 2100,
+      extWidth: windowSpec.frame?.width || 900,
+      extHeight: windowSpec.frame?.height || 2100,
+      doorType: d.type || 'single-external',
+      doorShape: d.shape || 'standard',
+      doorStyle: d.style || 'full-glass',
+      paneling: d.paneling || 'flat',
+      centerMullion: !!d.centerMullion,
+      doorHinge: d.hingeSide || 'left',
+      doorOpenDirection: d.openDirection || 'outward',
+      doorHBars: d.bars?.h || 0,
+      doorVBars: d.bars?.v || 0,
+      sidePanels: sp.mode || 'none',
+      sideLeftWidth: sp.leftWidth || 500,
+      sideRightWidth: sp.rightWidth || 500,
+      sideStyle: sp.style || 'full-glass',
+      sideHBars: sp.barsH || 0,
+      sideVBars: sp.barsV || 0,
+      transomType: tr.type || 'none',
+      transomHeight: tr.height || 450,
+      transomBars: tr.bars || 'none',
+      thresholdType: d.threshold || 'standard',
+      thresholdExtension: d.thresholdExtension || 0,
+      doubleGlazing: gz.type !== 'triple',
+      glassType: gz.type === 'triple' ? 'triple' : 'double',
+      glassFinish: gz.finish || 'clear',
+      spacerColor: gz.spacerColour || 'white',
+      sealColour: windowSpec.casement?.sealColour || 'black',
+      sillExtension: windowSpec.cill?.extension || 0,
+      sillWider: !!windowSpec.cill?.wider,
+      sameColor: !dual,
+      woodColor: col.single || col.outside || '#F6F6F6',
+      woodColorExt: col.outside || col.single || '#F6F6F6',
+      woodColorInt: col.inside || col.single || '#F6F6F6',
+    };
+  }
+
   const w = windowSpec.frame?.width || 1200;
   const h = windowSpec.frame?.height || 1800;
 

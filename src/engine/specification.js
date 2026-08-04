@@ -174,6 +174,42 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
         fan2V: Number(item?.casementFan2VBars ?? fc.casementFan2VBars) || 0,
       },
     },
+    // ── Doors (PSW parity, Piotr 04.08) ─────────────────────────────────
+    // Field names and value vocabularies match the PSW door-controller 1:1 so
+    // a future PSW→PC import maps straight across. Two known PSW bugs are NOT
+    // copied: hinge-side and open-direction labels were swapped there; here
+    // value and meaning agree. Single and french share ONE set of fields —
+    // PSW duplicates them behind an `fd-` prefix, which we deliberately drop.
+    door: {
+      type: item?.doorType || fc.doorType || 'single-external',
+      shape: item?.doorShape || fc.doorShape || 'standard',
+      style: item?.doorStyle || fc.doorStyle || 'full-glass',
+      paneling: item?.doorPaneling || fc.doorPaneling || item?.paneling || fc.paneling || 'flat',
+      centerMullion: !!(item?.centerMullion ?? fc.centerMullion),
+      hingeSide: item?.doorHinge || fc.doorHinge || 'left',
+      openDirection: item?.doorOpenDirection || fc.doorOpenDirection || 'outward',
+      lockType: item?.lockType || fc.lockType || 'multipoint',
+      threshold: item?.thresholdType || fc.thresholdType || 'standard',
+      thresholdExtension: Number(item?.thresholdExtension ?? fc.thresholdExtension) || 0,
+      bars: {
+        h: Number(item?.doorHBars ?? fc.doorHBars) || 0,
+        v: Number(item?.doorVBars ?? fc.doorVBars) || 0,
+      },
+      sidePanels: {
+        mode: item?.sidePanels || fc.sidePanels || 'none',
+        leftWidth: Number(item?.sideLeftWidth ?? fc.sideLeftWidth) || 500,
+        rightWidth: Number(item?.sideRightWidth ?? fc.sideRightWidth) || 500,
+        style: item?.sideStyle || fc.sideStyle || 'full-glass',
+        barsH: Number(item?.sideHBars ?? fc.sideHBars) || 0,
+        barsV: Number(item?.sideVBars ?? fc.sideVBars) || 0,
+      },
+      // Coupled transom — french only; the engine/3D ignore it otherwise.
+      transom: {
+        type: item?.transomType || fc.transomType || 'none',
+        height: Number(item?.transomHeight ?? fc.transomHeight) || 450,
+        bars: item?.transomBars || fc.transomBars || 'none',
+      },
+    },
     color: {
       ral: fc.ralCode || '',
       inside: colorInside,

@@ -8,6 +8,7 @@ import { useWindowProfileStore } from '../stores/windowProfileStore.js';
 import { buildVentGrilles } from '../engine/lists.js';
 import { FAN_AXIS_OFFSET_TOP, FAN_AXIS_OFFSET_BOTTOM } from '../engine/casementLayouts.js';
 import CasementLayoutPicker from '../components/configurator/CasementLayoutPicker.jsx';
+import NumInput from '../components/NumInput.jsx';
 import {
   LAYOUT_DEFAULTS as CAS_LAYOUT_DEFAULTS,
   FANLIGHT_LAYOUTS, FAN2_LAYOUTS, TRIPLE_LAYOUTS,
@@ -49,6 +50,29 @@ const GAS_OPTIONS = [{ value: 'argon', label: 'Argon' }, { value: 'air', label: 
 const BAR_TYPE_OPTIONS = [{ value: 'astragal', label: 'External astragal (stick-on)' }, { value: 'georgian', label: 'Internal georgian' }];
 const HORN_OPTIONS = [{ value: 'none', label: 'No Horns' }, { value: 'A', label: 'Richmond' }, { value: 'D', label: 'Type D' }];
 const COLOUR_MODES = [{ value: 'single', label: 'Single' }, { value: 'dual', label: 'Dual (Ext/Int)' }];
+
+// ── Door options — values match the PSW door-controller vocabulary 1:1 so a
+// future PSW→PC import maps across without translation. Labels are corrected
+// where PSW had them swapped (hinge side, open direction).
+const DOOR_TYPES = [{ value: 'single-external', label: 'Single Patio' }, { value: 'french', label: 'French' }];
+const DOOR_SHAPES = [{ value: 'standard', label: 'Standard' }];
+const DOOR_STYLES = [{ value: 'full-glass', label: 'Full Glass' }, { value: 'three-quarter', label: '3/4 Glazed' }, { value: 'half-glazed', label: 'Half Glazed' }];
+const DOOR_PANELING = [{ value: 'flat', label: 'Flat' }, { value: 'panel', label: 'Panel' }, { value: 'beading', label: 'Beading' }, { value: 'bespoke', label: 'Bespoke' }];
+const DOOR_MULLION = [{ value: false, label: 'No' }, { value: true, label: 'Yes' }];
+const SIDE_PANEL_MODES = [{ value: 'none', label: 'None' }, { value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }, { value: 'both', label: 'Both' }];
+const SIDE_PANEL_STYLES = [{ value: 'full-glass', label: 'Full Glass' }, { value: 'same', label: 'Same as door' }];
+const BAR_COUNTS = [0, 1, 2, 3, 4, 5].map((n) => ({ value: n, label: n === 0 ? 'None' : String(n) }));
+const HINGE_SIDES = [{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }];
+const OPEN_DIRECTIONS = [{ value: 'outward', label: 'Outward' }, { value: 'inward', label: 'Inward' }];
+const LOCK_TYPES = [{ value: 'multipoint', label: 'Multipoint' }, { value: 'standard', label: 'Standard' }];
+const THRESHOLDS = [{ value: 'standard', label: 'Standard Hardwood' }, { value: 'aluminium', label: 'Aluminium' }, { value: 'low-profile', label: 'Low Profile' }];
+const TRANSOM_TYPES = [{ value: 'none', label: 'None' }, { value: 'fixed', label: 'Fixed' }, { value: 'opening', label: 'Opening' }];
+const TRANSOM_BARS = [{ value: 'none', label: 'None' }, { value: 'match', label: 'Match door' }];
+// Dimension limits per door type — straight from PSW DOOR_DIMS.
+const DOOR_DIMS = {
+  'single-external': { wMin: 600, wMax: 1100, hMin: 1900, hMax: 3000 },
+  french: { wMin: 1000, wMax: 2000, hMin: 1900, hMax: 3000 },
+};
 
 // ─── Frame drives the glass type (box depth + glazing are one decision) ───
 // Depths come from the workshop Window Settings profile (live).
@@ -172,6 +196,29 @@ export default function ConfiguratorPage() {
   const [casFan2HB, setCasFan2HB] = useState(0);
   const [casFan2VB, setCasFan2VB] = useState(0);
 
+  // Door state — field names match the PSW payload 1:1 (import/export contract)
+  const [doorType, setDoorType] = useState('single-external');
+  const [doorShape, setDoorShape] = useState('standard');
+  const [doorStyle, setDoorStyle] = useState('full-glass');
+  const [doorPaneling, setDoorPaneling] = useState('flat');
+  const [centerMullion, setCenterMullion] = useState(false);
+  const [doorHB, setDoorHB] = useState(0);
+  const [doorVB, setDoorVB] = useState(0);
+  const [sidePanels, setSidePanels] = useState('none');
+  const [sideLeftW, setSideLeftW] = useState(500);
+  const [sideRightW, setSideRightW] = useState(500);
+  const [sideStyle, setSideStyle] = useState('full-glass');
+  const [sideHB, setSideHB] = useState(0);
+  const [sideVB, setSideVB] = useState(0);
+  const [transomType, setTransomType] = useState('none');
+  const [transomHeight, setTransomHeight] = useState(450);
+  const [transomBars, setTransomBars] = useState('none');
+  const [hingeSide, setHingeSide] = useState('left');
+  const [openDirection, setOpenDirection] = useState('outward');
+  const [lockType, setLockType] = useState('multipoint');
+  const [threshold, setThreshold] = useState('standard');
+  const [thresholdExt, setThresholdExt] = useState(0);
+
   // Frame choice drives glass type; heritage opens a passive/single choice instead.
   const changeFrame = (v) => {
     setFrameType(v);
@@ -239,6 +286,28 @@ export default function ConfiguratorPage() {
     setCasFanVB(w.casementFanVBars || 0);
     setCasFan2HB(w.casementFan2HBars || 0);
     setCasFan2VB(w.casementFan2VBars || 0);
+    // Door fields (harmless no-ops for sash/casement windows)
+    setDoorType(w.doorType || 'single-external');
+    setDoorShape(w.doorShape || 'standard');
+    setDoorStyle(w.doorStyle || 'full-glass');
+    setDoorPaneling(w.paneling || 'flat');
+    setCenterMullion(!!w.centerMullion);
+    setDoorHB(w.doorHBars || 0);
+    setDoorVB(w.doorVBars || 0);
+    setSidePanels(w.sidePanels || 'none');
+    setSideLeftW(Number(w.sideLeftWidth) || 500);
+    setSideRightW(Number(w.sideRightWidth) || 500);
+    setSideStyle(w.sideStyle || 'full-glass');
+    setSideHB(w.sideHBars || 0);
+    setSideVB(w.sideVBars || 0);
+    setTransomType(w.transomType || 'none');
+    setTransomHeight(Number(w.transomHeight) || 450);
+    setTransomBars(w.transomBars || 'none');
+    setHingeSide(w.doorHinge || 'left');
+    setOpenDirection(w.doorOpenDirection || 'outward');
+    setLockType(w.lockType || 'multipoint');
+    setThreshold(w.thresholdType || 'standard');
+    setThresholdExt(Number(w.thresholdExtension) || 0);
   }, [def]);
 
   // Prefill form when editing an existing window
@@ -319,6 +388,9 @@ export default function ConfiguratorPage() {
   const extH = Number(inH) || 400;
   const effectiveLBars = sameBars ? uBars : lBars;
   const isCasement = batch?.type === 'casement';
+  const isDoor = batch?.type === 'door' || batch?.type === 'doors';
+  const isFrench = isDoor && doorType === 'french';
+  const doorLimits = DOOR_DIMS[doorType] || DOOR_DIMS['single-external'];
 
   // Casement effective values — PSW clamps 1:1: fanlight 15–50% innerH step 10,
   // fan2 shares a 70% guard with fanlight, middle 300..(W-600) step 10.
@@ -368,6 +440,29 @@ export default function ConfiguratorPage() {
   // ─── 3D sync ───
   const sync = useCallback(() => {
     if (typeof window.update3D !== 'function') return;
+    if (isDoor) {
+      // Flat door keys — the 3D App was ported from PSW and reads them directly.
+      window.update3D({
+        windowCategory: 'door', extWidth: extW, extHeight: extH,
+        doorType, doorShape, doorStyle, paneling: doorPaneling, centerMullion,
+        doorHinge: hingeSide, doorOpenDirection: openDirection,
+        doorHBars: doorHB, doorVBars: doorVB,
+        sidePanels, sideLeftWidth: sideLeftW, sideRightWidth: sideRightW,
+        sideStyle, sideHBars: sideHB, sideVBars: sideVB,
+        // Transom is a french-only feature; force it off for single doors so a
+        // leftover value cannot silently render a fanlight.
+        transomType: isFrench ? transomType : 'none',
+        transomHeight, transomBars: isFrench ? transomBars : 'none',
+        thresholdType: threshold, thresholdExtension: thresholdExt,
+        doorOpening: 0,
+        woodColor, woodColorExt: isSingle ? woodColor : woodColorExt,
+        woodColorInt: isSingle ? woodColor : woodColorInt, sameColor: isSingle,
+        doubleGlazing: glassType !== 'triple', spacerColor,
+        glassFinish: gFin,
+        sealColour, sillExtension: sillExt, sillWider, ironmongery: iron,
+      });
+      return;
+    }
     if (isCasement) {
       window.update3D({
         windowCategory: 'casement', extWidth: extW, extHeight: extH,
@@ -407,7 +502,7 @@ export default function ConfiguratorPage() {
       spacerColor, sashType, splitRatio, headType, openingType: opening,
       boxType: frameType === 'slim' ? 'slim' : 'standard', boxDepth: frameDepth,
     });
-  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow]);
+  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, centerMullion, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt]);
   useEffect(() => { sync(); }, [sync]);
 
   // ─── B4: Listen for 3D ready event and re-sync ───
@@ -443,6 +538,16 @@ export default function ConfiguratorPage() {
         casementHBars: casHB, casementVBars: casVB,
         casementFanHBars: Math.min(2, casFanHB), casementFanVBars: Math.min(2, casFanVB),
         casementFan2HBars: Math.min(2, casFan2HB), casementFan2VBars: Math.min(2, casFan2VB),
+      } : {}),
+      ...(isDoor ? {
+        doorType, doorShape, doorStyle, doorPaneling, centerMullion,
+        doorHinge: hingeSide, doorOpenDirection: openDirection, lockType,
+        doorHBars: doorHB, doorVBars: doorVB,
+        sidePanels, sideLeftWidth: sideLeftW, sideRightWidth: sideRightW,
+        sideStyle, sideHBars: sideHB, sideVBars: sideVB,
+        transomType: isFrench ? transomType : 'none',
+        transomHeight, transomBars: isFrench ? transomBars : 'none',
+        thresholdType: threshold, thresholdExtension: thresholdExt,
       } : {}),
     };
 
@@ -605,6 +710,68 @@ export default function ConfiguratorPage() {
           </Sec>}
 
           {isSash && <Sec t="Opening"><HChips o={OPENINGS} v={opening} c={setOpening} /></Sec>}
+
+          {/* ── Doors — every PSW choice, one shared set for single and french.
+               Transom is french-only; PSW hides it the same way. ── */}
+          {isDoor && <>
+            <Sec t="Door Type">
+              <HChips o={DOOR_TYPES} v={doorType} c={setDoorType} />
+              <div className="text-[11px] text-ink-500 mt-1.5">
+                Width {doorLimits.wMin}–{doorLimits.wMax} · Height {doorLimits.hMin}–{doorLimits.hMax} mm
+                {(extW < doorLimits.wMin || extW > doorLimits.wMax || extH < doorLimits.hMin || extH > doorLimits.hMax) && (
+                  <span className="text-amber-400"> · current size is outside this range</span>
+                )}
+              </div>
+            </Sec>
+
+            <Sec t="Door Design">
+              <Lbl>Shape</Lbl><HChips o={DOOR_SHAPES} v={doorShape} c={setDoorShape} />
+              <Lbl>Style</Lbl><HChips o={DOOR_STYLES} v={doorStyle} c={setDoorStyle} />
+              <Lbl>Paneling</Lbl><HChips o={DOOR_PANELING} v={doorPaneling} c={setDoorPaneling} />
+              {isFrench && <><Lbl>Centre mullion</Lbl><HChips o={DOOR_MULLION} v={centerMullion} c={setCenterMullion} /></>}
+              <Lbl>Bars — horizontal</Lbl><HChips o={BAR_COUNTS} v={doorHB} c={setDoorHB} />
+              <Lbl>Bars — vertical</Lbl><HChips o={BAR_COUNTS} v={doorVB} c={setDoorVB} />
+            </Sec>
+
+            <Sec t="Side Panels">
+              <HChips o={SIDE_PANEL_MODES} v={sidePanels} c={setSidePanels} />
+              {sidePanels !== 'none' && <>
+                {(sidePanels === 'left' || sidePanels === 'both') && <>
+                  <Lbl>Left width (mm)</Lbl>
+                  <NumInput value={sideLeftW} onCommit={(v) => setSideLeftW(Math.min(800, Math.max(200, Number(v) || 500)))}
+                    className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm mb-2" />
+                </>}
+                {(sidePanels === 'right' || sidePanels === 'both') && <>
+                  <Lbl>Right width (mm)</Lbl>
+                  <NumInput value={sideRightW} onCommit={(v) => setSideRightW(Math.min(800, Math.max(200, Number(v) || 500)))}
+                    className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm mb-2" />
+                </>}
+                <Lbl>Panel style</Lbl><HChips o={SIDE_PANEL_STYLES} v={sideStyle} c={setSideStyle} />
+                <Lbl>Panel bars — horizontal</Lbl><HChips o={BAR_COUNTS} v={sideHB} c={setSideHB} />
+                <Lbl>Panel bars — vertical</Lbl><HChips o={BAR_COUNTS} v={sideVB} c={setSideVB} />
+              </>}
+            </Sec>
+
+            {isFrench && <Sec t="Transom / Fanlight">
+              <HChips o={TRANSOM_TYPES} v={transomType} c={setTransomType} />
+              {transomType !== 'none' && <>
+                <Lbl>Transom height (mm)</Lbl>
+                <NumInput value={transomHeight} onCommit={(v) => setTransomHeight(Math.min(750, Math.max(250, Number(v) || 450)))}
+                  className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm mb-2" />
+                <Lbl>Transom bars</Lbl><HChips o={TRANSOM_BARS} v={transomBars} c={setTransomBars} />
+              </>}
+            </Sec>}
+
+            <Sec t="Hardware & Threshold">
+              <Lbl>Hinge side</Lbl><HChips o={HINGE_SIDES} v={hingeSide} c={setHingeSide} />
+              <Lbl>Opening direction</Lbl><HChips o={OPEN_DIRECTIONS} v={openDirection} c={setOpenDirection} />
+              <Lbl>Lock</Lbl><HChips o={LOCK_TYPES} v={lockType} c={setLockType} />
+              <Lbl>Threshold</Lbl><HChips o={THRESHOLDS} v={threshold} c={setThreshold} />
+              <Lbl>Threshold extension (mm)</Lbl>
+              <NumInput value={thresholdExt} onCommit={(v) => setThresholdExt(Math.min(100, Math.max(0, Number(v) || 0)))}
+                className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+            </Sec>
+          </>}
 
           <Sec t="Ventilation">
             <Lbl>Room type</Lbl>
