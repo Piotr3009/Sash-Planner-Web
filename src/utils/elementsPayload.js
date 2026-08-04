@@ -68,6 +68,18 @@ export function elementsPlan(windowSpec, derived) {
 }
 
 /**
+ * Cill-section inset for the ELEVATION sheet (casement only). Reuses the same
+ * plan key as the Elements cill page, so the elevation inset and the closing
+ * cill page can never rasterize different drawings. Sash → null.
+ */
+export async function buildCillInset(plan, getSvg) {
+  if (!plan.cill) return null;
+  const svg = getSvg(plan.cill.key);
+  const png = svg ? await svgNodeToPng(svg, { scale: 3, printMode: true }) : null;
+  return png?.url ? { image: png.url, w: png.w, h: png.h } : null;
+}
+
+/**
  * Rasterize a plan into the exportElementsPDF window payload.
  * @param {object} plan      result of elementsPlan()
  * @param {function} getSvg  (key) => mounted <svg> DOM node or null

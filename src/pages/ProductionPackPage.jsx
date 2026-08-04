@@ -47,7 +47,8 @@ import SashDetail2D from '../components/drawings/SashDetail2D.jsx';
 import CasementFrameDetail2D from '../components/drawings/CasementFrameDetail2D.jsx';
 import CasementLeafDetail2D from '../components/drawings/CasementLeafDetail2D.jsx';
 import CasementSection2D from '../components/drawings/CasementSection2D.jsx';
-import { elementsPlan, buildElementsPayload } from '../utils/elementsPayload.js';
+import CasementElevation2D from '../components/drawings/CasementElevation2D.jsx';
+import { elementsPlan, buildElementsPayload, buildCillInset } from '../utils/elementsPayload.js';
 import GlassDrawing2D from '../components/drawings/GlassDrawing2D.jsx';
 import CasementGlassDrawing2D from '../components/drawings/CasementGlassDrawing2D.jsx';
 import { groupCasementGlass } from '../components/drawings/casementDrawUtils.js';
@@ -772,13 +773,20 @@ function ElevationsTab({ windowsData, pp, batch, registerExport }) {
       const items = [];
       let no = 0;
       for (const d of windowsData) {
+        const plan = elementsPlan(d.windowSpec, d.derived);
+        // fix/door: engine pending — exclude rather than print a fake drawing.
+        if (!plan.supported || !d.derived) continue;
         no += 1;
         const svg = refs.current[d.win.id]?.querySelector('svg');
         const png = svg ? await svgNodeToPng(svg, { scale: 3, printMode: true }) : null;
+        // Casement: cill-section inset, same shared source as the single window.
+        const inset = await buildCillInset(
+          plan, (k) => refs.current[`${d.win.id}-${k}`]?.querySelector('svg'));
         items.push({
           image: png?.url || null, w: png?.w, h: png?.h,
           no, projectNum: d.win._projectNumber || '', name: d.win.name || '',
           dims: `${d.win.width}×${d.win.height} mm`,
+          inset,
         });
       }
       const company = useProjectStore.getState().settings.company || {};
@@ -796,20 +804,37 @@ function ElevationsTab({ windowsData, pp, batch, registerExport }) {
   return (
     <>
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {windowsData.map(({ win, windowSpec, derived }) => (
+        {windowsData.map(({ win, windowSpec, derived }) => {
+          const plan = elementsPlan(windowSpec, derived);
+          return (
           <div key={win.id} className="card p-4">
             <div className="text-xs font-semibold text-ink-200 mb-2">
               {win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — {win.width}×{win.height} mm
             </div>
-            {derived ? (
-              <div ref={(el) => { refs.current[win.id] = el; }}>
-                <FrontElevation2D windowSpec={windowSpec} derived={derived} />
+            {!plan.supported || !derived ? (
+              <div className="text-xs text-ink-400 py-8 text-center">
+                {derived ? `Elevation for “${plan.category}” not yet calculated — engine pending.` : 'Calculations not available for this window.'}
               </div>
             ) : (
-              <div className="text-xs text-ink-400 py-8 text-center">Calculations not available for this window.</div>
+              <>
+                <div ref={(el) => { refs.current[win.id] = el; }}>
+                  {plan.category === 'casement'
+                    ? <CasementElevation2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} />
+                    : <FrontElevation2D windowSpec={windowSpec} derived={derived} />}
+                </div>
+                {/* Off-screen rig: cill section feeds the elevation-PDF inset. */}
+                {plan.cill && (
+                  <div aria-hidden="true" style={{ position: 'absolute', left: '-99999px', top: 0, width: '1200px' }}>
+                    <div ref={(el) => { refs.current[`${win.id}-${plan.cill.key}`] = el; }}>
+                      <CasementSection2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} />
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
       {busy && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">

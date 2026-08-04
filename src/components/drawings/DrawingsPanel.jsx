@@ -14,7 +14,7 @@ import CasementLeafDetail2D from './CasementLeafDetail2D.jsx';
 import { groupCasementLeaves, paneTitle } from './casementDrawUtils.js';
 import { useProjectStore } from '../../stores/projectStore.js';
 import { exportElevationsPDF, exportElementsPDF } from '../../utils/drawingsPdfExport.js';
-import { elementsPlan, buildElementsPayload } from '../../utils/elementsPayload.js';
+import { elementsPlan, buildElementsPayload, buildCillInset } from '../../utils/elementsPayload.js';
 import { svgNodeToPng } from '../../utils/svgRaster.js';
 
 const SUB_TABS = [
@@ -51,14 +51,10 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
     try {
       const svg = refs.current['elevation']?.querySelector('svg');
       const png = svg ? await svgNodeToPng(svg, { scale: 3, printMode: true }) : null;
-      // Casement: small cill-section inset on the elevation sheet, sash-style
-      // (Piotr 02.08, audit item 5).
-      let inset = null;
-      if (isCasement) {
-        const vs = refs.current['vsection']?.querySelector('svg');
-        const vpng = vs ? await svgNodeToPng(vs, { scale: 3, printMode: true }) : null;
-        if (vpng?.url) inset = { image: vpng.url, w: vpng.w, h: vpng.h };
-      }
+      // Casement: cill-section inset on the elevation sheet — same shared
+      // source as Production Pack (buildCillInset), so they cannot drift.
+      const inset = await buildCillInset(
+        elementsPlan(windowSpec, derived), (k) => refs.current[k]?.querySelector('svg'));
       const company = useProjectStore.getState().settings.company || {};
       exportElevationsPDF({
         title: item?.name || batch?.name || 'Window',
