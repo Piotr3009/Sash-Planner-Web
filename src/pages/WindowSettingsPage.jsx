@@ -647,43 +647,126 @@ export default function WindowSettingsPage() {
 }
 
 // ─── Casement profile (simple: outer frame + sash all round) ───
-const CASEMENT_ELEMENT_DEFS = [
-  { key: 'frameHead',  name: 'Frame head',       group: 'Frame', lenRule: (W, H) => ({ rule: 'frame W', val: W }) },
-  { key: 'frameJamb',  name: 'Frame jambs ×2',   group: 'Frame', lenRule: (W, H, p) => ({ rule: `frame H − 2×${p.elements.frameHead.face}`, val: H - 2 * p.elements.frameHead.face }) },
-  { key: 'frameCill',  name: 'Frame cill',       group: 'Frame', lenRule: (W) => ({ rule: 'frame W', val: W }) },
-  { key: 'sashStile',  name: 'Sash stiles ×2',   group: 'Sash',  lenRule: (W, H, p) => ({ rule: `frame H − ${p.deductions.sashHeight}`, val: H - p.deductions.sashHeight }) },
-  { key: 'sashTop',    name: 'Sash top rail',    group: 'Sash',  lenRule: (W, H, p) => ({ rule: `frame W − ${p.deductions.sashWidth}`, val: W - p.deductions.sashWidth }) },
-  { key: 'sashBottom', name: 'Sash bottom rail', group: 'Sash',  lenRule: (W, H, p) => ({ rule: `frame W − ${p.deductions.sashWidth}`, val: W - p.deductions.sashWidth }) },
+// ─── Casement v1.1: element rows drive the LIVE profile (engine schema).
+// Raw stock is NOT set here — it comes exclusively from Part Registry.
+const CAS_ROWS = [
+  { key: 'frameHead',  name: 'Frame head',   depthOf: (p) => p.frameDepth,
+    rule: () => '= frame W', sample: (W) => W },
+  { key: 'frameJamb',  name: 'Frame jamb ×2', depthOf: (p) => p.frameDepth,
+    rule: () => '= frame H', sample: (W, H) => H },
+  { key: 'frameCill',  name: 'Frame cill',   depthOf: (p) => p.frameDepth,
+    rule: () => '= frame W (+ ext board)', sample: (W) => W },
+  { key: 'mullion',    name: 'Mullion',      depthOf: (p) => p.frameDepth,
+    rule: (p) => `frame H − ${p.lengths.mullion}`, sample: (W, H, p) => H - p.lengths.mullion },
+  { key: 'transom',    name: 'Transom',      depthOf: (p) => p.frameDepth,
+    rule: (p) => `field leaf W + ${p.lengths.transomSeat}`, sample: () => null },
+  { key: 'leaf',       name: 'Leaf members (×4, vertogen)', depthOf: (p) => p.leafDepth,
+    rule: () => 'cut to FULL leaf dim', sample: () => null },
 ];
+
+function CasDiagram({ p }) {
+  // Horizontal section through jamb | leaf | mullion | leaf | jamb — live numbers.
+  const g = p.geometry;
+  const jamb = p.elements.frameJamb.face, leaf = p.elements.leafStile.face, mul = p.elements.mullion.face;
+  const gapJ = g.land + g.gap, gapM = g.mullionLand / 2 + g.gap;
+  const runs = [
+    { w: jamb, h: 46, y: 12, c: '#3b4664', top: `jamb ${jamb}` },
+    { w: gapJ, h: 26, y: 22, c: '#2a3350', bot: `${g.land}+${g.gap}` },
+    { w: leaf, h: 40, y: 15, c: '#5468a0', top: `leaf ${leaf}` },
+    { w: gapM, h: 26, y: 22, c: '#2a3350' },
+    { w: mul,  h: 50, y: 10, c: '#3b4664', top: `mullion ${mul}` },
+    { w: gapM, h: 26, y: 22, c: '#2a3350', bot: `${g.mullionLand / 2}+${g.gap}` },
+    { w: leaf, h: 40, y: 15, c: '#5468a0', top: `leaf ${leaf}` },
+    { w: gapJ, h: 26, y: 22, c: '#2a3350' },
+    { w: jamb, h: 46, y: 12, c: '#3b4664', top: `jamb ${jamb}` },
+  ];
+  const total = runs.reduce((a, r) => a + r.w, 0);
+  const sc = 360 / total;
+  let x = 8;
+  return (
+    <svg viewBox="0 0 400 96" className="w-full h-auto">
+      {runs.map((r, i) => {
+        const rw = r.w * sc, rx = x; x += rw;
+        return (
+          <g key={i}>
+            <rect x={rx} y={r.y + 8} width={rw} height={r.h} fill={r.c} />
+            {r.top && <text x={rx + rw / 2} y={r.y + 2} fill="#9aa0b4" fontSize="8.5" textAnchor="middle">{r.top}</text>}
+            {r.bot && <text x={rx + rw / 2} y={84} fill="#6b7080" fontSize="7.5" textAnchor="middle">{r.bot}</text>}
+          </g>
+        );
+      })}
+      <text x={392} y={30} fill="#8ea0ff" fontSize="8.5" textAnchor="end">frame depth {p.frameDepth}</text>
+      <text x={392} y={42} fill="#8ea0ff" fontSize="8.5" textAnchor="end">leaf {p.leafDepth} · triple {p.leafDepthTriple}</text>
+    </svg>
+  );
+}
+
+// One rule row: value input + live composition hint (✓ when geometry adds up,
+// ✗ when a land/gap changed in Advanced and this rule no longer matches —
+// nothing shifts silently; the workshop decides which number wins.
+function RuleField({ label, value, onCommit, hint, hintVal, sample }) {
+  const ok = hintVal === value;
+  return (
+    <div>
+      <div className="text-ink-400 mb-1">{label}</div>
+      <div className="flex items-center gap-2">
+        <NumInput value={value} onCommit={onCommit}
+          className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+        {hint && (
+          <span className={`text-[10px] ${ok ? 'text-emerald-400' : 'text-amber-400'}`}>
+            = {hint} = {hintVal} {ok ? '✓' : '✗'}
+          </span>
+        )}
+        {sample != null && <span className="text-[10px] text-ink-500">sample {sample}</span>}
+      </div>
+    </div>
+  );
+}
 
 function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
   const casement = useWindowProfileStore((s) => s.casement);
   const setEl = useWindowProfileStore((s) => s.setCasementElementField);
   const setDed = useWindowProfileStore((s) => s.setCasementDeduction);
-  const setDepth = useWindowProfileStore((s) => s.setCasementDepth);
+  const setTop = useWindowProfileStore((s) => s.setCasementTopField);
+  const setGeo = useWindowProfileStore((s) => s.setCasementGeometry);
+  const setLen = useWindowProfileStore((s) => s.setCasementLength);
+  const setLeafFace = useWindowProfileStore((s) => s.setCasementLeafFace);
   const resetToDefaults = useWindowProfileStore((s) => s.resetToDefaults);
-  const [selected, setSelected] = useState('sashBottom');
-
-  // Section locks — default locked on every page open
-  const [fieldsLock, setFieldsLock] = useState(true);
+  const [selected, setSelected] = useState('leaf');
+  const [depthLock, setDepthLock] = useState(true);
   const [elementLock, setElementLock] = useState(true);
+  const [rulesLock, setRulesLock] = useState(true);
+  const [advLock, setAdvLock] = useState(true);
 
+  const p = casement;
+  const g = p.geometry, d = p.deductions, L = p.lengths;
   const W = Number(sampleW) || 1000;
   const H = Number(sampleH) || 1200;
-  const sashW = W - casement.deductions.sashWidth;
-  const sashH = H - casement.deductions.sashHeight;
-  const glassW = sashW - casement.deductions.glassWidth;
-  const glassH = sashH - casement.deductions.glassHeight;
-  const sel = CASEMENT_ELEMENT_DEFS.find((e) => e.key === selected) || CASEMENT_ELEMENT_DEFS[0];
-  const selData = casement.elements[sel.key];
   const num = (v, fb = 0) => (v === '' ? '' : Number(v) || fb);
+
+  // Live samples for a SINGLE-leaf window of the sample size.
+  const leafW = W - 2 * d.leafAtJamb;
+  const leafH = H - d.leafFullHeight;
+  const glassW = leafW - d.glass;
+  const glassH = leafH - d.glass;
+
+  // Composition hints (geometry → expected rule value):
+  const hJ = g.land + g.gap;
+  const hMA = g.mullionLand / 2 + g.gap;
+  const hFull = g.land + g.gap + g.gapCill + g.cillVisible;
+  const hFan = g.land + g.gap + g.gapFanTransom + g.transomLandAbove;
+  const hLow = g.transomLandBelow + g.gap + g.gapCill + g.cillVisible;
+
+  const sel = CAS_ROWS.find((r) => r.key === selected) || CAS_ROWS[0];
+  const selFace = sel.key === 'leaf' ? p.elements.leafStile.face : p.elements[sel.key].face;
+  const commitFace = (v) => (sel.key === 'leaf' ? setLeafFace(v) : setEl(sel.key, 'face', v));
 
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <div>
           <h1 className="text-lg font-semibold text-ink-50">Window Settings — Casement</h1>
-          <div className="text-xs text-ink-400">Simple construction: outer frame + sash all round · mullions and transoms coming later</div>
+          <div className="text-xs text-ink-400">v1.1 construction profile · feeds cut lists, drawings, BOM and weights · per-tenant</div>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 text-xs text-ink-400">
@@ -703,41 +786,42 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
         </div>
       </div>
 
-      <div className={`card p-4 mb-4 ${fieldsLock ? '' : 'ring-1 ring-amber-500/40'}`}>
-        <div className="flex justify-end mb-2"><LockToggle locked={fieldsLock} onToggle={() => setFieldsLock((x) => !x)} /></div>
-        <fieldset disabled={fieldsLock} className={`flex flex-wrap gap-x-6 gap-y-2 items-end text-xs border-0 p-0 m-0 min-w-0 ${fieldsLock ? 'opacity-60' : ''}`}>
-        <div>
-          <div className="text-ink-400 mb-1">Finished depth (mm) · all members</div>
-          <NumInput value={casement.depth} onCommit={(v) => setDepth(v)}
-            className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+      {/* ── Depths & glazing ── */}
+      <div className={`card p-4 mb-4 ${depthLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-xs font-semibold text-ink-200">Depths & glazing</div>
+          <LockToggle locked={depthLock} onToggle={() => setDepthLock((x) => !x)} />
         </div>
-        <div>
-          <div className="text-ink-400 mb-1">Sash W = frame W −</div>
-          <NumInput value={casement.deductions.sashWidth} onCommit={(v) => setDed('sashWidth', v)}
-            className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
-        </div>
-        <div>
-          <div className="text-ink-400 mb-1">Sash H = frame H −</div>
-          <NumInput value={casement.deductions.sashHeight} onCommit={(v) => setDed('sashHeight', v)}
-            className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
-        </div>
-        <div>
-          <div className="text-ink-400 mb-1">Glass W = sash W −</div>
-          <NumInput value={casement.deductions.glassWidth} onCommit={(v) => setDed('glassWidth', v)}
-            className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
-        </div>
-        <div>
-          <div className="text-ink-400 mb-1">Glass H = sash H −</div>
-          <NumInput value={casement.deductions.glassHeight} onCommit={(v) => setDed('glassHeight', v)}
-            className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
-        </div>
-        <div className="text-ink-300 pb-1.5">
-          Sample: sash <span className="text-accent-400 font-medium">{sashW} × {sashH}</span> · glass <span className="text-accent-400 font-medium">{glassW} × {glassH}</span>
-        </div>
+        <fieldset disabled={depthLock} className={`flex flex-wrap gap-x-6 gap-y-2 items-end text-xs border-0 p-0 m-0 min-w-0 ${depthLock ? 'opacity-60' : ''}`}>
+          <div>
+            <div className="text-ink-400 mb-1">Frame depth (mm)</div>
+            <NumInput value={p.frameDepth} onCommit={(v) => setTop('frameDepth', v)}
+              className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+          </div>
+          <div>
+            <div className="text-ink-400 mb-1">Leaf depth (mm)</div>
+            <NumInput value={p.leafDepth} onCommit={(v) => setTop('leafDepth', v)}
+              className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+          </div>
+          <div>
+            <div className="text-ink-400 mb-1">Leaf depth — triple (mm)</div>
+            <NumInput value={p.leafDepthTriple} onCommit={(v) => setTop('leafDepthTriple', v)}
+              className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+          </div>
+          <div>
+            <div className="text-ink-400 mb-1">Glass = leaf −</div>
+            <NumInput value={d.glass} onCommit={(v) => setDed('glass', v)}
+              className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+          </div>
+          <div className="text-ink-300 pb-1.5">
+            sample glass <span className="text-accent-400 font-medium">{glassW} × {glassH}</span>
+            <span className="text-ink-500"> · triple deepens the LEAF rebate only — frame stays {p.frameDepth} (Piotr 04.08)</span>
+          </div>
         </fieldset>
       </div>
 
-      <div className="flex gap-3 items-start flex-wrap">
+      {/* ── Elements + right column ── */}
+      <div className="flex gap-3 items-start flex-wrap mb-4">
         <div className="card overflow-hidden flex-1 min-w-[420px]">
           <table className="w-full text-xs">
             <thead>
@@ -749,49 +833,103 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
               </tr>
             </thead>
             <tbody>
-              {CASEMENT_ELEMENT_DEFS.map((el) => {
-                const L = el.lenRule(W, H, casement);
-                const active = selected === el.key;
-                const e = casement.elements[el.key];
+              {CAS_ROWS.map((r) => {
+                const active = selected === r.key;
+                const face = r.key === 'leaf' ? p.elements.leafStile.face : p.elements[r.key].face;
+                const smp = r.key === 'leaf' ? `${leafW}×${leafH}` : (r.sample(W, H, p) ?? 'per field');
                 return (
-                  <tr key={el.key} onClick={() => setSelected(el.key)}
+                  <tr key={r.key} onClick={() => setSelected(r.key)}
                     className={`cursor-pointer border-t border-surface-500 ${active ? 'bg-accent-500/10 text-accent-400' : 'text-ink-200 hover:bg-surface-700/40'}`}>
-                    <td className="px-4 py-1.5 font-medium">{el.name} <span className="text-ink-500 font-normal">({el.group})</span></td>
-                    <td className="px-4 py-1.5">{casement.depth} × {e.face}</td>
-                    <td className="px-4 py-1.5 font-mono text-[11px]">{L.rule}</td>
-                    <td className="px-4 py-1.5 text-right font-mono">{L.val}</td>
+                    <td className="px-4 py-1.5 font-medium">{r.name}</td>
+                    <td className="px-4 py-1.5">{face} × {r.depthOf(p)}</td>
+                    <td className="px-4 py-1.5 font-mono text-[11px]">{r.rule(p)}</td>
+                    <td className="px-4 py-1.5 text-right font-mono">{smp}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+          <div className="px-4 py-2 text-[10px] text-ink-500 border-t border-surface-500">
+            Raw stock comes from Part Registry — not set here.
+          </div>
         </div>
 
-        <div className={`card p-4 w-[300px] shrink-0 ${elementLock ? '' : 'ring-1 ring-amber-500/40'}`}>
-          <div className="mb-3 flex items-center justify-between">
-            <div><span className="text-[11px] text-ink-400">Selected: </span><span className="text-sm font-semibold text-ink-50">{sel.name}</span></div>
-            <LockToggle locked={elementLock} onToggle={() => setElementLock((x) => !x)} />
-          </div>
-          <fieldset disabled={elementLock} className={`flex flex-wrap gap-3 text-xs border-0 p-0 m-0 min-w-0 ${elementLock ? 'opacity-60' : ''}`}>
-            <div>
+        <div className="w-[340px] shrink-0 space-y-3">
+          <div className={`card p-4 ${elementLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+            <div className="mb-3 flex items-center justify-between">
+              <div><span className="text-[11px] text-ink-400">Selected: </span><span className="text-sm font-semibold text-ink-50">{sel.name}</span></div>
+              <LockToggle locked={elementLock} onToggle={() => setElementLock((x) => !x)} />
+            </div>
+            <fieldset disabled={elementLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${elementLock ? 'opacity-60' : ''}`}>
               <div className="text-ink-400 mb-1">Face (mm)</div>
-              <NumInput value={selData.face} onCommit={(v) => setEl(sel.key, 'face', v)}
+              <NumInput value={selFace} onCommit={commitFace}
                 className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
-            </div>
-            <div>
-              <div className="text-ink-400 mb-1">Raw stock</div>
-              <select value={selData.raw} onChange={(e) => setEl(sel.key, 'raw', e.target.value)}
-                className="px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm">
-                {RAW_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-          </fieldset>
-          <div className="text-[11px] text-ink-500 mt-3 pt-2 border-t border-surface-500">
-            Feeds cut list, pre-cut and BOM for casement batches. Defaults are provisional — verify before production.
+              <div className="text-[10px] text-ink-500 mt-2">
+                {sel.key === 'leaf'
+                  ? 'One section for all four leaf members (vertogen) — this writes stile + both rails.'
+                  : `Depth follows ${sel.key === 'leaf' ? 'Leaf' : 'Frame'} depth (${sel.depthOf(p)}).`}
+              </div>
+            </fieldset>
+          </div>
+          <div className="card p-4">
+            <div className="text-[11px] font-semibold text-ink-200 mb-2">Section diagram · horizontal cut</div>
+            <CasDiagram p={p} />
           </div>
         </div>
+      </div>
+
+      {/* ── Length & deduction rules ── */}
+      <div className={`card p-4 mb-4 ${rulesLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-xs font-semibold text-ink-200">Length & deduction rules
+            <span className="text-ink-500 font-normal"> · every minus is a field; the hint shows what it is built from</span>
+          </div>
+          <LockToggle locked={rulesLock} onToggle={() => setRulesLock((x) => !x)} />
+        </div>
+        <fieldset disabled={rulesLock} className={`grid grid-cols-2 xl:grid-cols-4 gap-x-6 gap-y-3 text-xs border-0 p-0 m-0 min-w-0 ${rulesLock ? 'opacity-60' : ''}`}>
+          <RuleField label="Leaf W at jamb: −" value={d.leafAtJamb} onCommit={(v) => setDed('leafAtJamb', v)}
+            hint={`land ${g.land} + gap ${g.gap}`} hintVal={hJ} />
+          <RuleField label="Leaf W at mullion axis: −" value={d.leafAtMullionAxis} onCommit={(v) => setDed('leafAtMullionAxis', v)}
+            hint={`${g.mullionLand}/2 + ${g.gap}`} hintVal={hMA} />
+          <RuleField label="Leaf H (no transom): H −" value={d.leafFullHeight} onCommit={(v) => setDed('leafFullHeight', v)}
+            hint={`${g.land}+${g.gap} + ${g.gapCill}+${g.cillVisible}`} hintVal={hFull} sample={H - d.leafFullHeight} />
+          <RuleField label="Fan H: T −" value={d.fanFromAxis} onCommit={(v) => setDed('fanFromAxis', v)}
+            hint={`${g.land}+${g.gap} + ${g.gapFanTransom}+${g.transomLandAbove}`} hintVal={hFan} />
+          <RuleField label="Lower H: H − T −" value={d.lowerFromAxis} onCommit={(v) => setDed('lowerFromAxis', v)}
+            hint={`${g.transomLandBelow}+${g.gap} + ${g.gapCill}+${g.cillVisible}`} hintVal={hLow} />
+          <RuleField label="Mullion length: H −" value={L.mullion} onCommit={(v) => setLen('mullion', v)}
+            sample={H - L.mullion} />
+          <RuleField label="Transom seat: field +" value={L.transomSeat} onCommit={(v) => setLen('transomSeat', v)} />
+        </fieldset>
+      </div>
+
+      {/* ── Advanced construction ── */}
+      <div className={`card p-4 ${advLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-xs font-semibold text-ink-200">Advanced construction
+            <span className="text-ink-500 font-normal"> · lands & fitting gaps — change these and the rule hints above flag any mismatch</span>
+          </div>
+          <LockToggle locked={advLock} onToggle={() => setAdvLock((x) => !x)} />
+        </div>
+        <fieldset disabled={advLock} className={`flex flex-wrap gap-x-6 gap-y-3 items-end text-xs border-0 p-0 m-0 min-w-0 ${advLock ? 'opacity-60' : ''}`}>
+          {[
+            ['land', 'Frame land'], ['rebate', 'Rebate'], ['gap', 'Leaf gap'],
+            ['mullionLand', 'Mullion land'], ['transomLandAbove', 'Transom land ↑'], ['transomLandBelow', 'Transom land ↓'],
+            ['gapFanTransom', 'Gap fan↔transom'], ['gapBelowTransom', 'Gap below transom'],
+            ['gapCill', 'Gap at cill'], ['cillVisible', 'Cill visible'],
+          ].map(([k, label]) => (
+            <div key={k}>
+              <div className="text-ink-400 mb-1">{label}</div>
+              <NumInput value={g[k]} onCommit={(v) => setGeo(k, v)}
+                className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+            </div>
+          ))}
+          <div className="text-[10px] text-ink-500 pb-1.5 border border-surface-500 rounded-lg px-3 py-2">
+            OTD — unconfirmed, left as-is (Piotr 04.08):<br />
+            middle tier 2×{d.middleTierFromAxes / 2} · partial mullion +{L.partialMullionSeat}
+          </div>
+        </fieldset>
       </div>
     </div>
   );
 }
-

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { normalizeSashProfile, DEFAULT_SASH_PROFILE, DEFAULT_CASEMENT_PROFILE, setActiveWindowProfile, setActiveCasementProfile } from '../engine/profile.js';
+import { normalizeSashProfile, migrateCasementProfile, DEFAULT_SASH_PROFILE, DEFAULT_CASEMENT_PROFILE, setActiveWindowProfile, setActiveCasementProfile } from '../engine/profile.js';
 import { loadWindowProfiles, saveWindowProfiles } from '../services/cloudSync.js';
 
 let cloudSaveTimer = null;
@@ -103,6 +103,46 @@ export const useWindowProfileStore = create(
         get()._sync();
       },
 
+      // ── v1.1 profile setters (Window Settings — Casement rebuild, 04.08) ──
+      setCasementTopField: (key, value) => {
+        if (!['frameDepth', 'leafDepth', 'leafDepthTriple'].includes(key)) return;
+        set((s) => ({ casement: { ...clone(s.casement), [key]: Number(value) || 0 } }));
+        get()._sync();
+      },
+
+      setCasementGeometry: (key, value) => {
+        set((s) => {
+          const casement = clone(s.casement);
+          if (!casement.geometry || !(key in casement.geometry)) return {};
+          casement.geometry[key] = Number(value) || 0;
+          return { casement };
+        });
+        get()._sync();
+      },
+
+      setCasementLength: (key, value) => {
+        set((s) => {
+          const casement = clone(s.casement);
+          if (!casement.lengths || !(key in casement.lengths)) return {};
+          casement.lengths[key] = Number(value) || 0;
+          return { casement };
+        });
+        get()._sync();
+      },
+
+      // Vertogen: all four leaf members share ONE section — one input, three writes.
+      setCasementLeafFace: (value) => {
+        set((s) => {
+          const casement = clone(s.casement);
+          const v = Number(value) || 0;
+          ['leafStile', 'leafTop', 'leafBottom'].forEach((k) => {
+            if (casement.elements[k]) casement.elements[k].face = v;
+          });
+          return { casement };
+        });
+        get()._sync();
+      },
+
       resetToDefaults: () => {
         set({ sash: clone(DEFAULT_SASH_PROFILE), casement: clone(DEFAULT_CASEMENT_PROFILE) });
         get()._sync();
@@ -119,9 +159,12 @@ export const useWindowProfileStore = create(
         try {
           const cloud = await loadWindowProfiles();
           if (cloud?.sash || cloud?.casement) {
+            const migratedCas = cloud.casement
+              ? (migrateCasementProfile(cloud.casement) || clone(DEFAULT_CASEMENT_PROFILE))
+              : null;
             set({
               ...(cloud.sash ? { sash: normalizeSashProfile(cloud.sash) } : {}),
-              ...(cloud.casement ? { casement: cloud.casement } : {}),
+              ...(migratedCas ? { casement: migratedCas } : {}),
             });
             setActiveWindowProfile(get().sash);
             setActiveCasementProfile(get().casement);
@@ -134,9 +177,16 @@ export const useWindowProfileStore = create(
     {
       name: 'pc-window-profile',
       onRehydrateStorage: () => (state) => {
-        // Push the persisted profile into the engine on app start
+        // Push the persisted profile into the engine on app start.
         if (state?.sash) setActiveWindowProfile(normalizeSashProfile(state.sash));
-        if (state?.casement) setActiveCasementProfile(state.casement);
+        // Old localStorage may still hold the pre-v1 casement prototype; the
+        // NEW settings UI reads v1.1 keys (geometry/lengths), so the store
+        // itself must be migrated — engine-only migration is not enough.
+        if (state?.casement) {
+          const m = migrateCasementProfile(state.casement) || clone(DEFAULT_CASEMENT_PROFILE);
+          setActiveCasementProfile(m);
+          setTimeout(() => useWindowProfileStore.setState({ casement: m }), 0);
+        }
         // Tenant profile from Supabase wins over the local cache
         setTimeout(() => useWindowProfileStore.getState().loadFromCloud(), 0);
       },
