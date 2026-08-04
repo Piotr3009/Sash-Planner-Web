@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, ContactShadows, Environment } from '@react-three/drei';
 import ParametricSashWindow from '../../3d/components/ParametricSashWindow.jsx';
 import CasementWindow from '../../3d/components/casement/CasementWindow.jsx';
+import DoorWindow from '../../3d/components/door/DoorWindow.jsx';
 import { windowSpecToConfig, windowSpecToCasementProps } from '../../utils/windowSpecToConfig.js';
 
 function Scene({ config, side }) {
@@ -20,9 +21,48 @@ function Scene({ config, side }) {
       <directionalLight position={[-2, 3, -3]} intensity={0.4} />
 
       <group rotation={groupRotation}>
-        {config.windowCategory === 'casement'
-          ? <CasementWindow {...config.casementProps} />
-          : <ParametricSashWindow {...config} />}
+        {config.windowCategory === 'casement' ? (
+          <CasementWindow {...config.casementProps} />
+        ) : config.windowCategory === 'door' ? (
+          // Layout code mirrors the 3D App: french = 040F, otherwise hinge side.
+          <DoorWindow
+            width={config.width}
+            height={config.height}
+            layout={config.doorType === 'french' ? '040F' : (config.doorHinge === 'right' ? '040R' : '040L')}
+            opening={0}
+            primaryLeaf={config.doorHinge || 'left'}
+            openDirection={config.doorOpenDirection || 'outward'}
+            doorStyle={config.doorStyle}
+            centerMullion={config.centerMullion}
+            paneling={config.paneling}
+            sidePanels={config.sidePanels}
+            sideLeftWidth={config.sideLeftWidth}
+            sideRightWidth={config.sideRightWidth}
+            sideHBars={config.sideHBars}
+            sideVBars={config.sideVBars}
+            sideStyle={config.sideStyle}
+            transomType={config.transomType}
+            transomHeight={config.transomHeight}
+            transomBars={config.transomBars}
+            thresholdType={config.thresholdType}
+            thresholdExtension={config.thresholdExtension}
+            hBars={config.doorHBars || 0}
+            vBars={config.doorVBars || 0}
+            woodColor={config.woodColor}
+            woodColorExt={config.woodColorExt}
+            woodColorInt={config.woodColorInt}
+            sameColor={config.sameColor}
+            glassType={config.glassType}
+            spacerColor={config.spacerColor}
+            glassFinish={config.glassFinish}
+            sillExtension={config.sillExtension || 0}
+            sillWider={config.sillWider || false}
+            sealColour={config.sealColour || 'black'}
+            showGuides={false}
+          />
+        ) : (
+          <ParametricSashWindow {...config} />
+        )}
       </group>
 
       <ContactShadows

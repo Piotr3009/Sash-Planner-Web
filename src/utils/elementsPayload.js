@@ -63,7 +63,11 @@ export function elementsPlan(windowSpec, derived) {
     return { category, supported: true, leafGroups: [], rig: drawings.map((d) => d.key), hero: null, drawings, cill: null };
   }
 
-  // fix / door: deriveWindowData returns emptyDerived (calculations.js:937).
+  // Doors DO derive now (engine v1: frame + leaf + glass), but they have no
+  // element detail drawings yet — only the elevation. Keeping supported:false
+  // here means the Elements tab still says "engine pending" instead of
+  // printing empty frames; revisit when DoorFrameDetail2D / DoorLeafDetail2D
+  // land. Fix frame has no engine at all.
   return { category, supported: false, leafGroups: [], rig: [], hero: null, drawings: [], cill: null };
 }
 

@@ -24,6 +24,7 @@ import { useState, useRef, useMemo, useEffect, useCallback, useLayoutEffect } fr
 import { Canvas, useThree } from '@react-three/fiber';
 import ParametricSashWindow from '../../3d/components/ParametricSashWindow.jsx';
 import CasementWindow from '../../3d/components/casement/CasementWindow.jsx';
+import DoorWindow from '../../3d/components/door/DoorWindow.jsx';
 import { windowSpecToConfig, windowSpecToCasementProps } from '../../utils/windowSpecToConfig.js';
 
 const FOV = 45;          // vertical field of view (deg)
@@ -77,9 +78,47 @@ function CaptureScene({ config, side, onCaptured }) {
       <directionalLight position={[-3, 2, 4]} intensity={0.45} />
       <directionalLight position={[0, -3, 4]} intensity={0.25} />
       <group rotation={groupRotation}>
-        {config.windowCategory === 'casement'
-          ? <CasementWindow {...config.casementProps} />
-          : <ParametricSashWindow {...config} />}
+        {config.windowCategory === 'casement' ? (
+          <CasementWindow {...config.casementProps} />
+        ) : config.windowCategory === 'door' ? (
+          <DoorWindow
+            width={config.width}
+            height={config.height}
+            layout={config.doorType === 'french' ? '040F' : (config.doorHinge === 'right' ? '040R' : '040L')}
+            opening={0}
+            primaryLeaf={config.doorHinge || 'left'}
+            openDirection={config.doorOpenDirection || 'outward'}
+            doorStyle={config.doorStyle}
+            centerMullion={config.centerMullion}
+            paneling={config.paneling}
+            sidePanels={config.sidePanels}
+            sideLeftWidth={config.sideLeftWidth}
+            sideRightWidth={config.sideRightWidth}
+            sideHBars={config.sideHBars}
+            sideVBars={config.sideVBars}
+            sideStyle={config.sideStyle}
+            transomType={config.transomType}
+            transomHeight={config.transomHeight}
+            transomBars={config.transomBars}
+            thresholdType={config.thresholdType}
+            thresholdExtension={config.thresholdExtension}
+            hBars={config.doorHBars || 0}
+            vBars={config.doorVBars || 0}
+            woodColor={config.woodColor}
+            woodColorExt={config.woodColorExt}
+            woodColorInt={config.woodColorInt}
+            sameColor={config.sameColor}
+            glassType={config.glassType}
+            spacerColor={config.spacerColor}
+            glassFinish={config.glassFinish}
+            sillExtension={config.sillExtension || 0}
+            sillWider={config.sillWider || false}
+            sealColour={config.sealColour || 'black'}
+            showGuides={false}
+          />
+        ) : (
+          <ParametricSashWindow {...config} />
+        )}
       </group>
     </>
   );
