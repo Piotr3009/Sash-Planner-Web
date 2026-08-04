@@ -728,7 +728,10 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
     try {
       const item = {
         name: 'SAMPLE', width: W, height: H,
-        windowCategory: 'casement', casementLayout: '021',
+        // 022 "2 Lights + Fanlights" (Piotr 04.08): the only sample that shows
+        // mullion, transom, fans AND main leaves at once, so every settings
+        // card has something to highlight on the drawings.
+        windowCategory: 'casement', casementLayout: '022',
         glassType: 'double', frameType: 'standard',
       };
       const ws = normaliseToWindowSpec(item);
@@ -739,8 +742,13 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
     }
   }, [W, H, p]);
 
+  // Leaf Detail must show the MAIN leaf, not the fan (groups[0] is the fan in
+  // fanlight layouts) — the main light is what the settings describe.
   const leafGroups = sample?.derived ? groupCasementLeaves(sample.derived) : [];
-  const leafGroup = leafGroups[0] || null;
+  const leafGroup = leafGroups.find((g) => g.role === 'Main')
+    || leafGroups.find((g) => g.role === 'Leaf')
+    || leafGroups.find((g) => !String(g.role).startsWith('Fan'))
+    || leafGroups[0] || null;
 
   // Live samples for a single-leaf window of the sample size.
   const leafW = W - 2 * d.leafAtJamb;
@@ -931,7 +939,7 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
           {sample?.derived ? (
             <>
               <div className="text-sm font-semibold text-ink-50 mb-2">
-                Drawings <span className="text-ink-500 font-normal text-xs">— {W} × {H} · 1 Light + Fanlight</span>
+                Drawings <span className="text-ink-500 font-normal text-xs">— {W} × {H} · 2 Lights + Fanlights</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="card p-2"><CasementElevation2D windowSpec={sample.ws} derived={sample.derived} /></div>
