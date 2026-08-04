@@ -1,6 +1,6 @@
 import { resolveCasementLayout, fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from './casementLayouts.js';
 import { selectCasementHinges, summariseHinges, selectCasementLocks, summariseLocks } from './casementHardware.js';
-import { getWindowProfile, getCasementProfile, profileSashDepth, profileBoardWidth, boardWidthForDepth, kgPerM } from './profile.js';
+import { getWindowProfile, getCasementProfile, getDoorProfile, profileSashDepth, profileBoardWidth, boardWidthForDepth, kgPerM } from './profile.js';
 
 /**
  * calculations.js - ETAP 3
@@ -940,11 +940,116 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     };
 }
 
+/**
+ * DOOR ENGINE v1 (Piotr 04.08) — scope: single leaf, full-glass, no side
+ * panels, no transom. Those arrive as later layers; french/mullion, paneling
+ * and half-glazed rails are deliberately NOT guessed here.
+ *
+ * Construction:
+ *   frame  = casement frame, rebate 4mm deeper (leaf 61 instead of 57)
+ *   leaf   = 94mm all round, bottom rail 180mm (stiffness, not decoration)
+ *   glass  = leaf − 2×(member face − rebate inset), per member
+ *   cill   = outward-opening: casement cill · inward-opening: 40mm internal
+ *            face falling to 35mm (no rebate — the leaf must swing in)
+ *            · threshold 'none' / aluminium: NO bottom timber member at all
+ */
+function deriveDoorWindow(windowSpec, frameWidth, frameHeight) {
+    const p = getDoorProfile();
+    const els = p.elements;
+    const ded = p.deductions;
+    const geo = p.geometry;
+    const L = p.lengths;
+    const d = windowSpec.door || {};
+    const R = (v) => Math.round(v * 10) / 10;
+
+    const fd = p.frameDepth;
+    const ld = p.leafDepth;                    // 61 for double AND triple
+    const secFrame = `${els.frameHead.face}x${fd}`;
+    const secCill = `${els.frameCill.face}x${fd}`;
+    const secLeafStile = `${els.leafStile.face}x${ld}`;
+    const secLeafBottom = `${els.leafBottom.face}x${ld}`;
+
+    const mk = (group, name, section, length, qty, code, notes = '') => {
+        const rec = createComponentRecord(windowSpec, group, name, section, length, qty, notes);
+        rec.length = R(length);
+        rec.code = code;
+        return rec;
+    };
+
+    // Threshold: 'standard' timber cill, 'aluminium' (bought-in section, no
+    // timber member), 'low-profile' (wheelchair — also no timber member).
+    const threshold = d.threshold || 'standard';
+    const inward = (d.openDirection || 'outward') === 'inward';
+    const hasTimberCill = threshold === 'standard';
+    const cillWider = !!windowSpec.cill?.wider;
+    const cillExt = Number(windowSpec.cill?.extension) || 0;
+
+    const box = [
+        mk('box', 'D-FRAME HEAD', secFrame, R(frameWidth - (L.headDeduct || 0)), 1, 'D-H'),
+        mk('box', 'D-FRAME JAMB (L)', secFrame, R(frameHeight - (L.jambDeduct || 0)), 1, 'D-J/L'),
+        mk('box', 'D-FRAME JAMB (R)', secFrame, R(frameHeight - (L.jambDeduct || 0)), 1, 'D-J/R'),
+    ];
+    if (hasTimberCill) {
+        // Inward-opening cill is a different section: unrebated, 40 → 35mm fall.
+        const cillFace = inward ? p.cillInward.faceInternal : els.frameCill.face;
+        box.push(mk('box', 'D-FRAME CILL', `${cillFace}x${fd}`,
+            R(frameWidth + (cillWider ? 100 : 0) + cillExt - (L.cillDeduct || 0)), 1, 'D-CILL',
+            [inward ? `inward: ${p.cillInward.faceInternal}→${p.cillInward.faceExternal}mm fall` : '',
+             cillWider ? 'wider +50mm each side' : '',
+             cillExt ? `ext ${cillExt}mm` : ''].filter(Boolean).join(' · ')));
+    }
+
+    // Leaf size. Height deduction differs: with a cill the leaf stops on it;
+    // with an aluminium/no threshold there is no bottom member to sit on.
+    const leafW = R(frameWidth - 2 * ded.leafAtJamb);
+    const leafH = R(frameHeight - (hasTimberCill ? ded.leafFullHeight : ded.leafNoThreshold));
+
+    const sash = [
+        mk('sash', 'D-STILE (L)', secLeafStile, R(leafH - (L.stileDeduct || 0)), 1, 'D-ST/L', 'hinge'),
+        mk('sash', 'D-STILE (R)', secLeafStile, R(leafH - (L.stileDeduct || 0)), 1, 'D-ST/R', 'lock'),
+        mk('sash', 'D-TOP RAIL', secLeafStile, R(leafW - (L.topRailDeduct || 0)), 1, 'D-TR'),
+        mk('sash', 'D-BOTTOM RAIL', secLeafBottom, R(leafW - (L.bottomRailDeduct || 0)), 1, 'D-BR'),
+    ];
+
+    // Glass: each member eats its face minus the rebate inset, per side.
+    const glassW = R(leafW - 2 * (els.leafStile.face - geo.glassInset));
+    const glassH = R(leafH - (els.leafTop.face - geo.glassInset)
+                           - (els.leafBottom.face - geo.glassInset));
+    const glassUnits = (glassW > 0 && glassH > 0) ? [{
+        width: glassW, height: glassH, qty: 1, role: 'main',
+        location: `${d.type || 'single-external'} P1 ${d.hingeSide || 'left'}`,
+    }] : [];
+
+    return {
+        category: 'door',
+        door: {
+            type: d.type || 'single-external',
+            leafW, leafH,
+            threshold, inward,
+            hasTimberCill,
+            bottomRailFace: els.leafBottom.face,
+        },
+        components: { sash, box, beading: [] },
+        customGlassUnits: glassUnits,
+        glazingItems: [],
+        weights: { total: 0 },
+        paint: calculatePaint(frameWidth, frameHeight),
+        consumables: {
+            glass: {
+                type: windowSpec.glazing?.type || 'double',
+                sqm: Math.round((glassW * glassH) / 1e6 * 100) / 100,
+            },
+        },
+        frame: { width: frameWidth, height: frameHeight },
+    };
+}
+
 export function deriveWindowData(windowSpec, settings = {}) {
     const frameWidth = Number(windowSpec.frame?.width ?? 0);
     const frameHeight = Number(windowSpec.frame?.height ?? 0);
     const category = windowSpec.category || 'sash';
     if (category === 'casement') return deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings);
+    if (category === 'door' || category === 'doors') return deriveDoorWindow(windowSpec, frameWidth, frameHeight);
     if (category !== 'sash') return emptyDerived(category, frameWidth, frameHeight);
     const isTripleSash = windowSpec.sash?.type === 'triple';
     const gridMode = windowSpec.sash?.grid?.mode ?? 'none';

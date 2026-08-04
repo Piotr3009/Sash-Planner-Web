@@ -179,6 +179,65 @@ export function getCasementProfile() {
   return activeCasementProfile || DEFAULT_CASEMENT_PROFILE;
 }
 
+// ─── DOOR PROFILE v1 ────────────────────────────────────────────────────────
+// Piotr 04.08: the door FRAME is the casement frame with a 4mm deeper rebate
+// (61 instead of 57). The LEAF is different: 94mm all round INCLUDING internal
+// members, except the bottom rail at 180mm — the height is what keeps a door
+// rigid. Threshold has three variants; with 'none' there is NO bottom frame
+// member at all, so it must never appear in the cut list.
+export const DEFAULT_DOOR_PROFILE = Object.freeze({
+  schema: 1,
+  frameDepth: 93,
+  leafDepth: 61,          // = casement 57 + 4mm deeper rebate
+  elements: {
+    frameHead:  { face: 57 },
+    frameJamb:  { face: 57 },
+    frameCill:  { face: 68 },   // outward-opening: same as casement cill
+    mullion:    { face: 68 },   // french centre mullion
+    leafStile:  { face: 94 },
+    leafTop:    { face: 94 },
+    leafBottom: { face: 180 },  // deliberately taller — door stiffness
+    leafMid:    { face: 94 },   // internal rail (half-glazed / three-quarter)
+  },
+  // Inward-opening doors cannot have a rebated cill (the leaf must swing in):
+  // the internal face is 40mm and falls to 35mm across the leaf depth, so rain
+  // runs out. Outward-opening doors reuse the casement cill unchanged.
+  cillInward: { faceInternal: 40, faceExternal: 35, runDepth: 61 },
+  geometry: {
+    land: 36,
+    rebate: 25,           // casement 21 + 4mm deeper
+    gap: 4,
+    mullionLand: 26,
+    gapCill: 6,
+    cillVisible: 41,
+    glassInset: 12.5,
+  },
+  deductions: {
+    leafAtJamb: 40,          // land 36 + gap 4
+    leafAtMullionAxis: 17,   // half-land 13 + gap 4
+    leafFullHeight: 87,      // with a cill/threshold present
+    leafNoThreshold: 46,     // threshold 'none': no bottom member to deduct
+  },
+  lengths: {
+    headDeduct: 0,
+    jambDeduct: 0,
+    cillDeduct: 0,
+    stileDeduct: 0,
+    topRailDeduct: 0,
+    bottomRailDeduct: 0,
+    midRailDeduct: 0,
+    mullion: 77,
+  },
+});
+
+let activeDoorProfile = null;
+export function setActiveDoorProfile(profile) {
+  activeDoorProfile = profile ? { ...DEFAULT_DOOR_PROFILE, ...profile } : null;
+}
+export function getDoorProfile() {
+  return activeDoorProfile || DEFAULT_DOOR_PROFILE;
+}
+
 
 /**
  * Schema migration for stored sash profiles (Supabase, localStorage cache,
