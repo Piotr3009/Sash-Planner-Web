@@ -44,6 +44,10 @@ import { getPartSymbol } from '../engine/partSymbols.js';
 import FrontElevation2D from '../components/drawings/FrontElevation2D.jsx';
 import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
 import SashDetail2D from '../components/drawings/SashDetail2D.jsx';
+import CasementFrameDetail2D from '../components/drawings/CasementFrameDetail2D.jsx';
+import CasementLeafDetail2D from '../components/drawings/CasementLeafDetail2D.jsx';
+import CasementSection2D from '../components/drawings/CasementSection2D.jsx';
+import { elementsPlan, buildElementsPayload } from '../utils/elementsPayload.js';
 import GlassDrawing2D from '../components/drawings/GlassDrawing2D.jsx';
 import CasementGlassDrawing2D from '../components/drawings/CasementGlassDrawing2D.jsx';
 import { groupCasementGlass } from '../components/drawings/casementDrawUtils.js';
@@ -923,7 +927,9 @@ function SectionsTab({ windowsData, pp, batch, registerExport }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// TAB: 2D Elements (per window: Box + Upper Sash + Lower Sash)
+// TAB: 2D Elements — per window, cards by category via elementsPlan():
+// sash = Box + Upper + Lower · casement = Frame + leaf groups (+ hidden cill
+// rig for the de-duplicated closing PDF page) · fix/door = "engine pending"
 // ═══════════════════════════════════════════════════════════════
 function ElementsTab({ windowsData, pp, batch, registerExport }) {
   const [expandedDrawing, setExpandedDrawing] = useState(null); // { windowSpec, derived, type: 'box'|'upper'|'lower', title }
@@ -937,23 +943,27 @@ function ElementsTab({ windowsData, pp, batch, registerExport }) {
       const windows = [];
       let no = 0;
       for (const d of windowsData) {
+        // Same plan/builder as the single-window DrawingsPanel — one source.
+        const plan = elementsPlan(d.windowSpec, d.derived);
+        // fix/door: engine has no data yet — skip rather than print empty
+        // frames pretending to be drawings (decision 02.08).
+        if (!plan.supported || !d.derived) continue;
         no += 1;
-        const types = [['box', 'Box Detail'], ['upper', 'Upper Sash'], ['lower', 'Lower Sash']];
-        const drawings = [];
-        for (const [t, label] of types) {
-          const svg = refs.current[`${d.win.id}-${t}`]?.querySelector('svg');
-          const png = svg ? await svgNodeToPng(svg, { scale: 3, printMode: true }) : null;
-          drawings.push({ image: png?.url || null, w: png?.w, h: png?.h, label });
-        }
+        const { hero, drawings, cill } = await buildElementsPayload(
+          plan, (k) => refs.current[`${d.win.id}-${k}`]?.querySelector('svg'));
         windows.push({
           no,
+          tag: d.win.name || '',
           caption: `${d.win._projectNumber ? `${d.win._projectNumber} · ` : ''}${d.win.name} — ${d.win.width}×${d.win.height} mm`,
           drawings,
+          hero,
+          cill,
         });
       }
       const company = useProjectStore.getState().settings.company || {};
       const projects = [...new Set(windowsData.map((d) => d.win._projectNumber).filter(Boolean))];
       exportElementsPDF({
+        cols: 3,
         title: pp?.name || batch?.name || 'Pack', projects,
         date: new Date().toLocaleDateString('en-GB'), deadline: pp?.deadline || '',
         companyName: company.companyName || 'COMPANY NAME', companyAddress: company.companyAddress || '',
@@ -965,7 +975,9 @@ function ElementsTab({ windowsData, pp, batch, registerExport }) {
 
   return (
     <div className="space-y-8">
-      {windowsData.map(({ win, windowSpec, derived }) => (
+      {windowsData.map(({ win, windowSpec, derived }) => {
+        const plan = elementsPlan(windowSpec, derived);
+        return (
         <div key={win.id} className="space-y-4">
           <div className="flex items-center justify-between border-b border-surface-500 pb-2">
             <div className="text-sm font-bold text-ink-50">
@@ -977,6 +989,41 @@ function ElementsTab({ windowsData, pp, batch, registerExport }) {
             </Link>
           </div>
 
+          {!plan.supported || !derived ? (
+            /* fix / door: engine pending — mark clearly, never fake zeros. */
+            <div className="card p-6 text-center text-xs text-ink-400">
+              Elements for “{plan.category}” are not yet calculated — engine pending. This window is excluded from the Elements PDF.
+            </div>
+          ) : plan.category === 'casement' ? (
+            <>
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                <div className="card p-4">
+                  <div className="text-xs font-semibold text-ink-200 mb-2">Frame Detail</div>
+                  <div ref={(el) => { refs.current[`${win.id}-frame`] = el; }}>
+                    <CasementFrameDetail2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber}
+                      onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'frame', title: `${win.name} — Frame Detail`, projectNumber: win._projectNumber })} />
+                  </div>
+                </div>
+                {plan.leafGroups.map((gp, k) => (
+                  <div key={gp.key} className="card p-4">
+                    <div className="text-xs font-semibold text-ink-200 mb-2">{plan.drawings[k].label}</div>
+                    <div ref={(el) => { refs.current[`${win.id}-leaf${k}`] = el; }}>
+                      <CasementLeafDetail2D windowSpec={windowSpec} derived={derived} group={gp} projectNumber={win._projectNumber}
+                        onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'leaf', group: gp, title: `${win.name} — ${plan.drawings[k].label}`, projectNumber: win._projectNumber })} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Off-screen rig: the cill section is not a per-window card (it is
+                  de-duplicated onto the closing PDF page) but must be mounted to
+                  be rasterised. Same technique as DrawingsPanel. */}
+              <div aria-hidden="true" style={{ position: 'absolute', left: '-99999px', top: 0, width: '1200px' }}>
+                <div ref={(el) => { refs.current[`${win.id}-vsection`] = el; }}>
+                  <CasementSection2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} />
+                </div>
+              </div>
+            </>
+          ) : (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="card p-4">
               <div className="text-xs font-semibold text-ink-200 mb-2">Box Detail</div>
@@ -1012,8 +1059,10 @@ function ElementsTab({ windowsData, pp, batch, registerExport }) {
               )}
             </div>
           </div>
+          )}
         </div>
-      ))}
+        );
+      })}
 
       {busy && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
@@ -1040,6 +1089,12 @@ function ElementsTab({ windowsData, pp, batch, registerExport }) {
               )}
               {expandedDrawing.type === 'lower' && (
                 <SashDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} type="lower" projectNumber={expandedDrawing.projectNumber} />
+              )}
+              {expandedDrawing.type === 'frame' && (
+                <CasementFrameDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} projectNumber={expandedDrawing.projectNumber} />
+              )}
+              {expandedDrawing.type === 'leaf' && (
+                <CasementLeafDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} group={expandedDrawing.group} projectNumber={expandedDrawing.projectNumber} />
               )}
             </div>
           </div>

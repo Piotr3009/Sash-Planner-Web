@@ -14,6 +14,7 @@ import CasementLeafDetail2D from './CasementLeafDetail2D.jsx';
 import { groupCasementLeaves, paneTitle } from './casementDrawUtils.js';
 import { useProjectStore } from '../../stores/projectStore.js';
 import { exportElevationsPDF, exportElementsPDF } from '../../utils/drawingsPdfExport.js';
+import { elementsPlan, buildElementsPayload } from '../../utils/elementsPayload.js';
 import { svgNodeToPng } from '../../utils/svgRaster.js';
 
 const SUB_TABS = [
@@ -75,31 +76,11 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
     if (busy || !derived) return;
     setBusy(true);
     try {
-      // Casement: frame detail goes on its own sheet (hero), leaves stay in the
-      // 3-per-row grid. Sash keeps the single-page 3-drawing layout unchanged.
-      const types = isCasement
-        ? leafGroups.map((gp, k) => [`leaf${k}`, paneTitle(gp)])
-        : [['box', 'Box Detail'], ['upper', 'Upper Sash'], ['lower', 'Lower Sash']];
-      const drawings = [];
-      for (const [t, label] of types) {
-        const svg = refs.current[t]?.querySelector('svg');
-        const png = svg ? await svgNodeToPng(svg, { scale: 3, printMode: true }) : null;
-        drawings.push({ image: png?.url || null, w: png?.w, h: png?.h, label });
-      }
-      let hero = null;
-      if (isCasement) {
-        const fd = refs.current['frame']?.querySelector('svg');
-        const fpng = fd ? await svgNodeToPng(fd, { scale: 3, printMode: true }) : null;
-        if (fpng?.url) hero = { image: fpng.url, w: fpng.w, h: fpng.h, label: 'Frame Detail' };
-      }
-      let cill = null;
-      if (isCasement) {
-        const vs = refs.current['vsection']?.querySelector('svg');
-        const vpng = vs ? await svgNodeToPng(vs, { scale: 3, printMode: true }) : null;
-        if (vpng?.url) {
-          cill = { image: vpng.url, w: vpng.w, h: vpng.h, ext: Number(windowSpec?.cill?.extension) || 0 };
-        }
-      }
+      // Layout decisions (hero sheet / grid / cill page) live in elementsPlan —
+      // the same plan Production Pack uses, so the two exports cannot drift.
+      const plan = elementsPlan(windowSpec, derived);
+      const { hero, drawings, cill } = await buildElementsPayload(
+        plan, (k) => refs.current[k]?.querySelector('svg'));
       const company = useProjectStore.getState().settings.company || {};
       exportElementsPDF({
         cols: 3,
