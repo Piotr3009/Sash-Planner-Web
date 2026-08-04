@@ -111,9 +111,14 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
   // Frame type — feeds engine's isSlim (clip size, weight type). Was never set before,
   // so slim-specific consumables silently fell back to standard.
   const frameType = item?.frameType || item?.frame_type || fc.frameType || 'standard';
+  // Batches exist with BOTH 'door' and 'doors' as their type. Normalise here,
+  // once, so every consumer downstream (drawings, 3D, engine, PP) sees exactly
+  // one value. Without this the engine derived doors while the drawings fell
+  // through to the sash component and rendered NaN coordinates (Piotr 05.08).
+  const rawCategory = item?.windowCategory || fc.windowCategory || 'sash';
+  const category = rawCategory === 'doors' ? 'door' : rawCategory;
+  const isDoorCategory = category === 'door';
   // Frame depth — stored on the window; legacy windows fall back to the profile
-  const isDoorCategory = (item?.windowCategory || fc.windowCategory) === 'door'
-    || (item?.windowCategory || fc.windowCategory) === 'doors';
   const frameDepth = item?.frameDepth
     || (isDoorCategory ? DOOR_FRAME_DEPTH
       : profileBoxDepth(glassType === 'triple' ? 'triple' : frameType));
@@ -135,7 +140,7 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
     type: item?.window_type || spec.windowType || 'sash',
     quantity: Number(item?.quantity || 1),
     frame: { width, height, depth: frameDepth, type: frameType },
-    category: item?.windowCategory || fc.windowCategory || 'sash',
+    category,
     sash: {
       type: item?.sashType || fc.sashType || 'double',
       splitRatio: item?.splitRatio || fc.splitRatio || '1/4-1/2-1/4',

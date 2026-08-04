@@ -91,7 +91,7 @@ export function windowSpecToConfig(windowSpec) {
 
   // Doors: the 3D App reads FLAT door fields (it was ported from PSW that way),
   // so translate the nested windowSpec.door block into those exact keys.
-  if ((windowSpec.category || 'sash') === 'door') {
+  if (['door', 'doors'].includes(windowSpec.category || 'sash')) {
     const d = windowSpec.door || {};
     const sp = d.sidePanels || {};
     const tr = d.transom || {};

@@ -31,7 +31,9 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
   const [busy, setBusy] = useState(false);
   const refs = useRef({});
   const isCasement = (windowSpec?.category || 'sash') === 'casement';
-  const isDoor = (windowSpec?.category || 'sash') === 'door';
+  // Tolerate the legacy 'doors' spelling as well — a door must NEVER fall
+  // through to the sash drawing, which renders NaN on door data.
+  const isDoor = ['door', 'doors'].includes(windowSpec?.category || 'sash');
   const leafGroups = isCasement ? groupCasementLeaves(derived) : [];
   const visibleTabs = isDoor
     ? [{ id: 'elevation', label: 'Front Elevation' }]
