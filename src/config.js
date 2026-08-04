@@ -94,18 +94,34 @@ export const FB_GROUPS = [
 
 // ═══════════════════════════════════════════════════════════════
 // QUICK SWATCHES (colour grid)
-// ═══════════════════════════════════════════════════════════════
+// Each swatch is a SHORTCUT INTO the catalogue: hex + label are copied
+// verbatim from RAL_GROUPS / FB_GROUPS above, so getColorName resolves them
+// to the full coded name everywhere (spraying, PDFs). Approved by Piotr
+// 04.08. 'Oak' is a stain, not a paint — deliberate named exception.
 export const SWATCHES = [
-  { name: 'Pure White', hex: '#F4F4F2' },
-  { name: 'Jet Black', hex: '#1C1C1C' },
-  { name: 'Anthracite', hex: '#2E3A3F' },
-  { name: 'Olive Green', hex: '#4A4F3B' },
-  { name: 'Off-White', hex: '#F0EEE8' },
-  { name: 'Cream', hex: '#EDE8D8' },
-  { name: 'Burgundy', hex: '#6B1A2A' },
-  { name: 'Royal Blue', hex: '#1A3060' },
+  { name: '9010 Pure White', hex: '#FFFFFF' },
+  { name: '9005 Jet Black', hex: '#0A0A0A' },
+  { name: '7016 Anthracite Grey', hex: '#293133' },
+  { name: '6003 Olive Green', hex: '#4A4F3B' },
+  { name: 'Off-White 3', hex: '#e4dcca' },
+  { name: '9001 Cream White', hex: '#FDF4E3' },
+  { name: '3005 Wine Red', hex: '#5E2129' },
+  { name: '5002 Ultramarine Blue', hex: '#1E2460' },
   { name: 'Oak', hex: '#C8853A' },
 ];
+
+// Windows saved BEFORE the swatch fix above still carry the old decorative
+// hexes in their spec. Map them to the same canonical labels so old orders
+// print correct paint codes too. Never reuse these hexes for new colours.
+const LEGACY_SWATCH_ALIASES = {
+  '#f4f4f2': '9010 Pure White',
+  '#1c1c1c': '9005 Jet Black',
+  '#2e3a3f': '7016 Anthracite Grey',
+  '#f0eee8': 'Off-White 3',
+  '#ede8d8': '9001 Cream White',
+  '#6b1a2a': '3005 Wine Red',
+  '#1a3060': '5002 Ultramarine Blue',
+};
 
 // Reverse lookup: hex → human colour name (RAL + Farrow&Ball + swatches). Case-insensitive.
 const COLOR_NAME_MAP = (() => {
@@ -116,6 +132,9 @@ const COLOR_NAME_MAP = (() => {
   SWATCHES.forEach(({ hex, name }) => {
     const k = String(hex).toLowerCase();
     if (!m[k]) m[k] = name;
+  });
+  Object.entries(LEGACY_SWATCH_ALIASES).forEach(([hex, label]) => {
+    if (!m[hex]) m[hex] = label;
   });
   return m;
 })();

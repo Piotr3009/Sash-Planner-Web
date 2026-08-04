@@ -1211,7 +1211,7 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) 
       {/* Glass drawings per window — upper + lower */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {windowsData.flatMap(({ win, windowSpec, derived }) => (windowSpec?.category || 'sash') === 'casement'
-          ? groupCasementGlass(derived).map((gp) => (
+          ? groupCasementGlass(derived, windowSpec).map((gp) => (
             <div key={`${win.id}-${gp.key}`} className="card p-4">
               <div className="text-xs font-semibold text-ink-200 mb-2">
                 {isPPMode && win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — Glass {gp.w} × {gp.h} · ×{gp.panes.length}

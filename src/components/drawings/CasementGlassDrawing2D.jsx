@@ -85,10 +85,13 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
   const Y = (y) => oy + y;
 
   const g = windowSpec?.glazing || {};
+  const isFrosted = group.finish === 'frosted';
+  const patternId = `frost-cas-${String(group.key).replace(/[^a-zA-Z0-9]/g, '_')}`;
   const spec = [
     `×${group.panes.length} (${group.panes.join(', ')})`,
     g.makeup || '4x16x4',
     g.spec || 'toughened',
+    ...(isFrosted ? ['frosted'] : []),
     `spacer ${g.spacerColour || 'silver'}`,
   ].join(' · ');
 
@@ -105,6 +108,15 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
       <svg viewBox={`0 0 ${totalW} ${totalH}`} xmlns="http://www.w3.org/2000/svg"
         className="w-full h-auto" style={{ background: COLORS.bg }}>
 
+        {/* Frosted hatch pattern — same fine diagonals as the sash drawing */}
+        <defs>
+          <pattern id={patternId} width={14 * layoutSc} height={14 * layoutSc}
+            patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2={14 * layoutSc}
+              stroke={COLORS.glass} strokeWidth={0.5} {...NS} strokeOpacity={0.45} />
+          </pattern>
+        </defs>
+
         {/* Glass unit */}
         <rect x={X(0)} y={Y(0)} width={glassW} height={glassH}
           fill={COLORS.glass} fillOpacity={COLORS.glassOpacity}
@@ -115,6 +127,13 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
           width={glassW - 2 * EDGE_SEAL} height={glassH - 2 * EDGE_SEAL}
           fill="none" stroke={COLORS.glass} strokeWidth={STROKES.glassLight} {...NS}
           strokeOpacity={0.6} strokeDasharray={`${sw(5)},${sw(4)}`} />
+
+        {/* Frosted hatch overlay — inside edge seal, drawn under bars */}
+        {isFrosted && (
+          <rect x={X(EDGE_SEAL)} y={Y(EDGE_SEAL)}
+            width={glassW - 2 * EDGE_SEAL} height={glassH - 2 * EDGE_SEAL}
+            fill={`url(#${patternId})`} stroke="none" />
+        )}
 
         {/* Spacer bars (18mm on wood-bar centres) */}
         {geom.vBars.map((vb, i) => (

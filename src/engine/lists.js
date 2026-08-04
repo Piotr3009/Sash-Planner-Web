@@ -12,7 +12,7 @@ import { GLASS_MAKEUP, glassGas } from './specification.js';
 import { profileRawForSection, getWindowProfile } from './profile.js';
 // Pure helper (no React) — shared with the 2D drawings so panel, PDF and
 // sketch all count bars the same way.
-import { casementBarCounts } from '../components/drawings/casementDrawUtils.js';
+import { casementBarCounts, casementPaneFinish } from '../components/drawings/casementDrawUtils.js';
 
 const DEFAULT_SETTINGS = {
   kerf: 3,
@@ -195,13 +195,14 @@ export function buildGlassListForWindow(derived, windowSpec) {
   if (Array.isArray(derived.customGlassUnits) && derived.customGlassUnits.length > 0) {
     const barType = windowSpec?.casement?.barType === 'georgian' ? 'georgian' : 'astragal';
     return derived.customGlassUnits.map((u) => {
-      // Casement frosted scope: 'bottom' = main lights only (fans stay clear),
-      // 'both' = every pane. Uniform finish for all other custom-unit sources.
-      let finishOverride;
+      // Casement frosted scope lives in ONE place: casementPaneFinish
+      // ('bottom' = main lights only, 'both' = every pane). Screen drawings
+      // and 3D call the same helper, so they cannot drift from these rows.
       const gz = windowSpec?.glazing || {};
-      if (gz.finish === 'frosted' && (u.role === 'fan' || u.role === 'fan2')
-          && (gz.frostedLocation || 'bottom') === 'bottom') {
-        finishOverride = 'clear';
+      let finishOverride;
+      if (gz.finish === 'frosted') {
+        const eff = casementPaneFinish(u.role, gz);
+        if (eff !== gz.finish) finishOverride = eff;
       }
       const row = buildGlassRow(windowSpec, u.width, u.height, u.location, u.qty || 1, finishOverride, u.role);
       // Bars belong on the ROW (Piotr 02.08, PDF audit item 5): the screen used

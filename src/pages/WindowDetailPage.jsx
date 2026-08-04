@@ -259,7 +259,7 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
     if (glassBusy || !derived) return;
     setGlassBusy(true);
     try {
-      const groups = groupCasementGlass(derived);
+      const groups = groupCasementGlass(derived, windowSpec);
       const drawings = [];
       for (const gp of groups) {
         const svg = glassDrawRefs.current[gp.key]?.querySelector('svg');
@@ -360,7 +360,7 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
             </button>
           </div>
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {groupCasementGlass(derived).map((gp) => (
+          {groupCasementGlass(derived, windowSpec).map((gp) => (
             <div key={gp.key} className="card p-4" ref={(el) => { glassDrawRefs.current[gp.key] = el; }}>
               <div className="text-xs font-semibold text-ink-200 mb-2">
                 Glass {gp.w} × {gp.h} · ×{gp.panes.length}

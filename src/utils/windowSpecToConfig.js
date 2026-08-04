@@ -210,6 +210,7 @@ export function windowSpecToCasementProps(windowSpec) {
     glassType: glazing.type === 'triple' ? 'triple' : 'double',
     spacerColor: glazing.spacerColour || 'silver',
     glassFinish: glazing.finish || 'clear',
+    frostedLocation: glazing.frostedLocation || 'bottom',
     trickleVent: buildVentGrilles(windowSpec) > 0 ? 'frame' : 'none',
     trickleColour: 'white',
     sealColour: windowSpec.casement?.sealColour || 'black',

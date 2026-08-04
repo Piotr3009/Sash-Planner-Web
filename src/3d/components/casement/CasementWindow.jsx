@@ -34,6 +34,7 @@ import {
   casementLayoutDef,
   resolveCasementLayout,
 } from '../../../engine/casementLayouts';
+import { casementPaneFinish } from '../../../components/drawings/casementDrawUtils.js';
 
 // Layout geometry lives in src/engine/casementLayouts.js — the single
 // source of truth shared by the engine, 2D drawings and this 3D preview.
@@ -58,6 +59,7 @@ export default function CasementWindow({
   glassType = 'double',
   spacerColor = 'silver',
   glassFinish = 'clear',
+  frostedLocation = 'bottom',
   trickleVent = 'none',
   trickleColour = 'white',
   sillExtension = 0,
@@ -142,7 +144,7 @@ export default function CasementWindow({
             material={extMaterial}
             materialInt={intMaterial}
             spacerColor={spacerColor}
-            glassFinish={glassFinish}
+            glassFinish={casementPaneFinish(p._role, { finish: glassFinish, frostedLocation })}
             hBars={p._role === 'fan' ? fanHBars : p._role === 'fan2' ? fan2HBars : hBars}
             vBars={p._role === 'fan' ? fanVBars : p._role === 'fan2' ? fan2VBars : vBars}
             ironmongery={ironmongery}

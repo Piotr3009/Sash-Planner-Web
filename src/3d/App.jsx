@@ -490,6 +490,7 @@ function Scene({ config, isMobile }) {
                 glassType={config.doubleGlazing ? 'double' : 'triple'}
                 spacerColor={config.spacerColor}
                 glassFinish={config.glassFinish || 'clear'}
+                frostedLocation={config.frostedLocation || 'bottom'}
                 trickleVent={config.trickleVent || 'none'}
                 trickleColour={config.trickleColour || 'white'}
                 sillExtension={config.sillExtension || 0}
