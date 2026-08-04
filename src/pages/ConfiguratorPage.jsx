@@ -70,10 +70,13 @@ const THRESHOLDS = [{ value: 'standard', label: 'Standard Hardwood' }, { value: 
 const TRANSOM_TYPES = [{ value: 'none', label: 'None' }, { value: 'fixed', label: 'Fixed' }, { value: 'opening', label: 'Opening' }];
 const TRANSOM_BARS = [{ value: 'none', label: 'None' }, { value: 'match', label: 'Match door' }];
 // Dimension limits per door type — straight from PSW DOOR_DIMS.
+// Default (starting) sizes per door type — Piotr 04.08. The wider PSW limits
+// stay as the allowed range; these are what a fresh door starts at.
 const DOOR_DIMS = {
-  'single-external': { wMin: 600, wMax: 1100, hMin: 1900, hMax: 3000 },
-  french: { wMin: 1000, wMax: 2000, hMin: 1900, hMax: 3000 },
+  'single-external': { wMin: 600, wMax: 1100, hMin: 1900, hMax: 3000, defW: 900, defH: 2000 },
+  french: { wMin: 1000, wMax: 2000, hMin: 1900, hMax: 3000, defW: 1600, defH: 2000 },
 };
+const DOOR_DEFAULT_SIZES = Object.values(DOOR_DIMS).map((x) => `${x.defW}x${x.defH}`);
 
 // ─── Frame drives the glass type (box depth + glazing are one decision) ───
 // Depths come from the workshop Window Settings profile (live).
@@ -392,6 +395,20 @@ export default function ConfiguratorPage() {
   const effectiveLBars = sameBars ? uBars : lBars;
   const isCasement = batch?.type === 'casement';
   const isDoor = batch?.type === 'door' || batch?.type === 'doors';
+
+  // Switching door type loads that type's default size — but only while the
+  // size is still untouched (equal to some door default or the generic 1000×1500
+  // the page starts with). A size the user has typed is never overwritten.
+  const applyDoorType = (t) => {
+    setDoorType(t);
+    const dims = DOOR_DIMS[t];
+    if (!dims) return;
+    const cur = `${Number(inW) || 0}x${Number(inH) || 0}`;
+    if (cur === '1000x1500' || DOOR_DEFAULT_SIZES.includes(cur)) {
+      setInW(dims.defW);
+      setInH(dims.defH);
+    }
+  };
   const isFrench = isDoor && doorType === 'french';
   const doorLimits = DOOR_DIMS[doorType] || DOOR_DIMS['single-external'];
 
@@ -721,7 +738,7 @@ export default function ConfiguratorPage() {
                Transom is french-only; PSW hides it the same way. ── */}
           {isDoor && <>
             <Sec t="Door Type">
-              <HChips o={DOOR_TYPES} v={doorType} c={setDoorType} />
+              <HChips o={DOOR_TYPES} v={doorType} c={applyDoorType} />
               <div className="text-[11px] text-ink-500 mt-1.5">
                 Width {doorLimits.wMin}–{doorLimits.wMax} · Height {doorLimits.hMin}–{doorLimits.hMax} mm
                 {(extW < doorLimits.wMin || extW > doorLimits.wMax || extH < doorLimits.hMin || extH > doorLimits.hMax) && (
