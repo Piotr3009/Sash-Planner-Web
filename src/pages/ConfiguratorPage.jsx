@@ -386,6 +386,7 @@ export default function ConfiguratorPage() {
         woodColorInt: isSingle ? woodColor : woodColorInt, sameColor: isSingle,
         doubleGlazing: glassType !== 'triple', spacerColor,
         glassFinish: gFin,
+        frostedLocation: frostLoc,
         trickleVent: buildVentGrilles({ vent: { roomType: ventRoomType, soleWindow: ventSoleWindow } }) > 0 ? 'frame' : 'none',
         trickleColour: 'white',
         sealColour, sillExtension: sillExt, sillWider, ironmongery: iron,
@@ -406,7 +407,7 @@ export default function ConfiguratorPage() {
       spacerColor, sashType, splitRatio, headType, openingType: opening,
       boxType: frameType === 'slim' ? 'slim' : 'standard', boxDepth: frameDepth,
     });
-  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB]);
+  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow]);
   useEffect(() => { sync(); }, [sync]);
 
   // ─── B4: Listen for 3D ready event and re-sync ───
