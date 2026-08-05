@@ -20,21 +20,32 @@ import { COLORS, STROKES } from './drawingTheme.js';
 const NS = { vectorEffect: 'non-scaling-stroke' };
 const BAR_WIDTH = 22;
 const HANDLE_FLOOR_MM = 1000;   // constant, matches the 3D door panel
-const HINGE_LENGTH = 100;       // drawn hinge blade length
+// Hinge barrel as modelled in 3D (DoorWindow.jsx:1072) — 10mm diameter,
+// 100mm tall, sitting ON the leaf edge, not a square inside the stile.
+const HINGE_H = 100;
+const HINGE_W = 10;
 
 function fmt(n) {
   const r = Math.round(n * 2) / 2;
   return Number.isInteger(r) ? r.toString() : r.toFixed(1);
 }
 
-/** 3 hinges, 4 above 2100mm leaf height (Piotr 05.08 — threshold lowered from 2400). */
+/**
+ * Hinge centres — identical spacing to the 3D model (DoorWindow.jsx:1096-1105),
+ * converted to 2D where y grows downwards:
+ *   top    200mm below the leaf top
+ *   middle 100mm ABOVE the leaf centre
+ *   bottom 150mm above the leaf bottom
+ * A 4th hinge goes between top and middle. Threshold is 2100mm leaf height
+ * (Piotr 05.08 — lowered from the 2400 still used by the 3D preview).
+ */
 function hingePositions(leafY, leafH) {
-  const n = leafH > 2100 ? 4 : 3;
   const top = leafY + 200;
-  const bottom = leafY + leafH - 250;
-  if (n === 3) return [top, (top + bottom) / 2, bottom];
-  const step = (bottom - top) / 3;
-  return [top, top + step, top + 2 * step, bottom];
+  const middle = leafY + leafH / 2 - 100;
+  const bottom = leafY + leafH - 150;
+  return leafH > 2100
+    ? [top, (top + middle) / 2, middle, bottom]
+    : [top, middle, bottom];
 }
 
 export default function DoorElevation2D({ windowSpec, derived, projectNumber }) {
@@ -134,9 +145,7 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber }) 
   const handleX = geom.hinge === 'left'
     ? geom.doorX + geom.leafW - geom.stile / 2
     : geom.doorX + geom.stile / 2;
-  const hingeX = geom.hinge === 'left'
-    ? geom.doorX + geom.stile / 2
-    : geom.doorX + geom.leafW - geom.stile / 2;
+  const hingeEdgeX = geom.hinge === 'left' ? geom.doorX : geom.doorX + geom.leafW;
 
   const winName = windowSpec?.name || 'Door';
   const projNum = projectNumber || '';
@@ -208,17 +217,15 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber }) 
         {/* ── LEAF ── */}
         <rect x={X(geom.doorX)} y={Y(geom.leafY)} width={geom.leafW} height={geom.leafH}
           fill="none" stroke={COLORS.sash} strokeWidth={STROKES.sash} {...NS} />
-        {/* 180mm bottom rail — the member that defines a door */}
-        <rect x={X(geom.doorX)} y={Y(geom.leafY + geom.leafH - geom.bottomRail)}
-          width={geom.leafW} height={geom.bottomRail}
-          fill={COLORS.frameFill} stroke={COLORS.sash}
-          strokeWidth={STROKES.frameLight} {...NS} />
-        {/* Style split: mid rail for three-quarter / half-glazed */}
+        {/* Rails run BETWEEN the stiles — stiles are the through members, so a
+            rail must not be drawn edge to edge across the leaf (Piotr 05.08). */}
+        <rect x={X(geom.doorX + geom.stile)} y={Y(geom.leafY + geom.leafH - geom.bottomRail)}
+          width={Math.max(0, geom.leafW - 2 * geom.stile)} height={geom.bottomRail}
+          fill="none" stroke={COLORS.sash} strokeWidth={STROKES.frameLight} {...NS} />
         {geom.midRailY != null && (
-          <rect x={X(geom.doorX)} y={Y(geom.midRailY)}
-            width={geom.leafW} height={geom.midFace}
-            fill={COLORS.frameFill} stroke={COLORS.sash}
-            strokeWidth={STROKES.frameLight} {...NS} />
+          <rect x={X(geom.doorX + geom.stile)} y={Y(geom.midRailY)}
+            width={Math.max(0, geom.leafW - 2 * geom.stile)} height={geom.midFace}
+            fill="none" stroke={COLORS.sash} strokeWidth={STROKES.frameLight} {...NS} />
         )}
 
         {/* ── GLASS + bars (no glass dimensions — the schedule owns them) ── */}
@@ -253,15 +260,13 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber }) 
             strokeDasharray={`${sw(6)},${sw(4)}`} />
         )}
 
-        {/* ── HINGES ── */}
+        {/* ── HINGES — barrels on the hinge-side leaf edge, as in 3D ── */}
         {hinges.map((hy, i) => (
-          <rect key={`hg-${i}`} x={X(hingeX - geom.stile / 2)} y={Y(hy)}
-            width={geom.stile} height={HINGE_LENGTH}
-            fill={COLORS.frameFill} stroke={COLORS.sillDetail}
-            strokeWidth={STROKES.sash} {...NS} />
+          <rect key={`hg-${i}`} x={X(hingeEdgeX - HINGE_W / 2)} y={Y(hy - HINGE_H / 2)}
+            width={HINGE_W} height={HINGE_H} rx={HINGE_W / 2}
+            fill={COLORS.sillDetail} stroke={COLORS.sillDetail}
+            strokeWidth={STROKES.sashLight} {...NS} />
         ))}
-        <DimV x={ox - DM * 0.35} y1={Y(geom.leafY)} y2={Y(hinges[0])}
-          extFrom={X(0)} label={`H1 ${fmt(hinges[0] - geom.leafY)}`} small vbw={totalW} />
 
         {/* ── HANDLE — 1000mm off the floor, constant ── */}
         <circle cx={X(handleX)} cy={Y(handleY)} r={geom.stile * 0.3}
@@ -269,15 +274,16 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber }) 
         <DimV x={ox + fw + DM * 0.35} y1={Y(handleY)} y2={Y(fh)}
           extFrom={X(fw)} label={`handle ${HANDLE_FLOOR_MM}`} small vbw={totalW} />
 
-        {/* ── LAYER CHAIN across the leaf: frame · gap · member ── */}
-        <DimChainH y={oy - DM * 0.4}
-          cuts={geom.inward
-            ? [X(0), X(g.land), X(geom.doorX), X(geom.doorX + geom.stile)]
-            : [X(0), X(g.land), X(geom.doorX), X(geom.doorX + geom.stile)]}
+        {/* ── LAYER CHAIN: frame · gap · leaf member. One band, above the
+             overall width dim, so nothing overlaps (Piotr 05.08). ── */}
+        <DimChainH y={oy - DM * 0.55}
+          cuts={[X(0), X(g.land), X(geom.doorX), X(geom.doorX + geom.stile)]}
           extFrom={Y(0)} vbw={totalW} fmt={fmt} />
-        <Label x={X(g.land / 2)} y={oy - DM * 0.62}
-          text={geom.inward ? `frame ${geom.els.frameHead.face} (lap ${geom.overlap})` : `frame ${g.land}`}
-          vbw={totalW} />
+        <Label x={X(0) + sw(4)} y={oy - DM * 0.95}
+          text={geom.inward
+            ? `inward · frame ${geom.els.frameHead.face} laps leaf ${geom.overlap} (${geom.overlap}+${g.gap}+${g.land})`
+            : `outward · frame ${g.land} · gap ${g.gap} · member ${geom.stile}`}
+          anchor="start" vbw={totalW} />
 
         {/* ── BOTTOM GAP + bottom rail ── */}
         <DimV x={ox + fw + DM * 0.7}
