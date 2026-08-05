@@ -10,6 +10,8 @@ import SectionsUpload from './SectionsUpload.jsx';
 import CasementSection2D from './CasementSection2D.jsx';
 import CasementElevation2D from './CasementElevation2D.jsx';
 import DoorElevation2D from './DoorElevation2D.jsx';
+import DoorFrameDetail2D from './DoorFrameDetail2D.jsx';
+import DoorLeafDetail2D from './DoorLeafDetail2D.jsx';
 import CasementFrameDetail2D from './CasementFrameDetail2D.jsx';
 import CasementLeafDetail2D from './CasementLeafDetail2D.jsx';
 import { groupCasementLeaves, paneTitle } from './casementDrawUtils.js';
@@ -36,7 +38,11 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
   const isDoor = ['door', 'doors'].includes(windowSpec?.category || 'sash');
   const leafGroups = isCasement ? groupCasementLeaves(derived) : [];
   const visibleTabs = isDoor
-    ? [{ id: 'elevation', label: 'Front Elevation' }]
+    ? [
+        { id: 'elevation', label: 'Front Elevation' },
+        { id: 'doorframe', label: 'Frame' },
+        { id: 'doorleaf', label: 'Leaf' },
+      ]
     : isCasement
     ? [
         { id: 'elevation', label: 'Front Elevation' },
@@ -143,6 +149,12 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
             </button>
           </div>
           <div className="card p-4 min-h-[400px]">
+            {isDoor && subTab === 'doorframe' && (
+              <DoorFrameDetail2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
+            )}
+            {isDoor && subTab === 'doorleaf' && (
+              <DoorLeafDetail2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
+            )}
             {subTab === 'elevation' && (
               isDoor
                 ? <DoorElevation2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />

@@ -14,7 +14,7 @@
  */
 import { useMemo } from 'react';
 import { getDoorProfile } from '../../engine/profile.js';
-import { computeBarPositions, DimH, DimV, DimChainH, TitleBlock, Label } from './drawingUtils.jsx';
+import { computeBarPositions, DimH, DimV, TitleBlock, Label } from './drawingUtils.jsx';
 import { COLORS, STROKES } from './drawingTheme.js';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
@@ -273,26 +273,6 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber }) 
           fill="none" stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} />
         <DimV x={ox + fw + DM * 0.35} y1={Y(handleY)} y2={Y(fh)}
           extFrom={X(fw)} label={`handle ${HANDLE_FLOOR_MM}`} small vbw={totalW} />
-
-        {/* ── LAYER CHAIN: frame · gap · leaf member. One band, above the
-             overall width dim, so nothing overlaps (Piotr 05.08). ── */}
-        <DimChainH y={oy - DM * 0.55}
-          cuts={[X(0), X(g.land), X(geom.doorX), X(geom.doorX + geom.stile)]}
-          extFrom={Y(0)} vbw={totalW} fmt={fmt} />
-        <Label x={X(0) + sw(4)} y={oy - DM * 0.95}
-          text={geom.inward
-            ? `inward · frame ${geom.els.frameHead.face} laps leaf ${geom.overlap} (${geom.overlap}+${g.gap}+${g.land})`
-            : `outward · frame ${g.land} · gap ${g.gap} · member ${geom.stile}`}
-          anchor="start" vbw={totalW} />
-
-        {/* ── BOTTOM GAP + bottom rail ── */}
-        <DimV x={ox + fw + DM * 0.7}
-          y1={Y(geom.leafY + geom.leafH)} y2={Y(fh - bottomLand)}
-          extFrom={X(fw)} label={`gap ${fmt(fh - bottomLand - geom.leafY - geom.leafH)}`}
-          small vbw={totalW} />
-        <DimV x={ox + fw + DM * 0.35}
-          y1={Y(geom.leafY + geom.leafH - geom.bottomRail)} y2={Y(geom.leafY + geom.leafH)}
-          extFrom={X(geom.doorX + geom.leafW)} label={fmt(geom.bottomRail)} small vbw={totalW} />
 
         {/* ── OVERALL DIMS ── */}
         <DimH y={oy + fh + DM * 0.8} x1={X(0)} x2={X(fw)} extFrom={Y(fh)}
