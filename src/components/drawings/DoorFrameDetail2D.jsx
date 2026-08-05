@@ -150,19 +150,25 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
         <Label x={X((doorX + doorRight) / 2)} y={Y(geom.leafY + geom.leafH / 2)}
           text="LEAF (ref)" vbw={totalW} />
 
-        {/* ── MEMBER SECTIONS ── */}
+        {/* ── MEMBER SECTIONS — head left, cill right, jamb on top, so no two
+             dimensions share a line (Piotr 05.08) ── */}
         <DimV x={ox - DM * 0.4} y1={Y(0)} y2={Y(g.land)} extFrom={X(0)}
           label={`head ${fmt(geom.frameFace)}`} small vbw={totalW} />
         <DimH y={oy - DM * 0.35} x1={X(0)} x2={X(g.land)} extFrom={Y(0)}
           label={`jamb ${fmt(geom.frameFace)}`} small vbw={totalW} />
+        {/* Cill height — was missing entirely (Piotr 05.08) */}
+        {geom.hasTimberCill && (
+          <DimV x={ox + fw + DM * 0.35} y1={Y(fh - g.cillVisible)} y2={Y(fh)}
+            extFrom={X(fw)} label={`cill ${fmt(g.cillVisible)}`} small vbw={totalW} />
+        )}
         {geom.inward && (
-          <Label x={X(g.land) + sw(6)} y={oy - DM * 0.62}
-            text={`lap ${fmt(geom.overlap)} over leaf (${fmt(geom.overlap)}+${g.gap}+${g.land})`}
+          <Label x={X(0)} y={oy - DM * 1.15}
+            text={`inward · lap ${fmt(geom.overlap)} over leaf (${fmt(geom.overlap)}+${g.gap}+${g.land})`}
             anchor="start" vbw={totalW} />
         )}
 
         {/* Layer chain: frame land · gap · leaf edge */}
-        <DimChainH y={oy - DM * 0.85}
+        <DimChainH y={oy - DM * 0.75}
           cuts={[X(0), X(g.land), X(doorX)]} extFrom={Y(0)} vbw={totalW} fmt={fmt} />
 
         {/* Side-panel widths */}
@@ -179,7 +185,7 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
         {/* ── OVERALL ── */}
         <DimH y={oy + fh + DM * 0.75} x1={X(0)} x2={X(fw)} extFrom={Y(fh)}
           label={fmt(fw)} vbw={totalW} />
-        <DimV x={ox + fw + DM * 0.5} y1={Y(0)} y2={Y(fh)} extFrom={X(fw)}
+        <DimV x={ox + fw + DM * 0.85} y1={Y(0)} y2={Y(fh)} extFrom={X(fw)}
           label={fmt(fh)} vbw={totalW} />
 
         <TitleBlock x={totalW / 2} y={oy + fh + DM + TITLE_AREA * 0.5}

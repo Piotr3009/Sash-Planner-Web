@@ -22,7 +22,7 @@ const BAR_WIDTH = 22;
 const HANDLE_FLOOR_MM = 1000;   // constant, matches the 3D door panel
 // Hinge barrel as modelled in 3D (DoorWindow.jsx:1072) — 10mm diameter,
 // 100mm tall, sitting ON the leaf edge, not a square inside the stile.
-const HINGE_H = 100;
+const HINGE_H = 102;   // Piotr 05.08 — drawn red on the leaf edge
 const HINGE_W = 10;
 
 function fmt(n) {
@@ -217,16 +217,10 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber }) 
         {/* ── LEAF ── */}
         <rect x={X(geom.doorX)} y={Y(geom.leafY)} width={geom.leafW} height={geom.leafH}
           fill="none" stroke={COLORS.sash} strokeWidth={STROKES.sash} {...NS} />
-        {/* Rails run BETWEEN the stiles — stiles are the through members, so a
-            rail must not be drawn edge to edge across the leaf (Piotr 05.08). */}
-        <rect x={X(geom.doorX + geom.stile)} y={Y(geom.leafY + geom.leafH - geom.bottomRail)}
-          width={Math.max(0, geom.leafW - 2 * geom.stile)} height={geom.bottomRail}
-          fill="none" stroke={COLORS.sash} strokeWidth={STROKES.frameLight} {...NS} />
-        {geom.midRailY != null && (
-          <rect x={X(geom.doorX + geom.stile)} y={Y(geom.midRailY)}
-            width={Math.max(0, geom.leafW - 2 * geom.stile)} height={geom.midFace}
-            fill="none" stroke={COLORS.sash} strokeWidth={STROKES.frameLight} {...NS} />
-        )}
+        {/* Leaf MEMBERS are deliberately not drawn here (Piotr 05.08): the
+            elevation must not suggest how the leaf is jointed — a workshop may
+            build it the other way round. Member geometry lives on the Leaf
+            sheet; the glass edge already shows where the members end. */}
 
         {/* ── GLASS + bars (no glass dimensions — the schedule owns them) ── */}
         <rect x={X(geom.glassX)} y={Y(geom.glassY)} width={geom.glassW}
@@ -264,7 +258,7 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber }) 
         {hinges.map((hy, i) => (
           <rect key={`hg-${i}`} x={X(hingeEdgeX - HINGE_W / 2)} y={Y(hy - HINGE_H / 2)}
             width={HINGE_W} height={HINGE_H} rx={HINGE_W / 2}
-            fill={COLORS.sillDetail} stroke={COLORS.sillDetail}
+            fill={COLORS.label} stroke={COLORS.label}
             strokeWidth={STROKES.sashLight} {...NS} />
         ))}
 

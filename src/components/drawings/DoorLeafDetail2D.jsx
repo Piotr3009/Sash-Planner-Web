@@ -15,6 +15,18 @@ import { COLORS, STROKES } from './drawingTheme.js';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
 const BAR_WIDTH = 22;
+// Hinge barrels, drawn red on the hinge stile (Piotr 05.08). Spacing matches
+// the 3D model: 200 below the top, 100 above centre, 150 above the bottom;
+// a 4th goes between the top two above 2100mm leaf height.
+const HINGE_H = 102;
+const HINGE_W = 10;
+
+function hingePositions(leafH) {
+  const top = 200;
+  const middle = leafH / 2 - 100;
+  const bottom = leafH - 150;
+  return leafH > 2100 ? [top, (top + middle) / 2, middle, bottom] : [top, middle, bottom];
+}
 
 function fmt(n) {
   const r = Math.round(n * 2) / 2;
@@ -86,6 +98,10 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber })
   const railW = Math.max(0, leafW - 2 * geom.stile);
   const bottomRailY = leafH - geom.bottomRail;
 
+  const hinges = hingePositions(leafH);
+  const hingeSideLeft = geom.hinge === 'left';
+  const hingeEdgeX = hingeSideLeft ? 0 : leafW;
+
   const winName = windowSpec?.name || 'Door';
   const projNum = projectNumber || '';
   const codes = [
@@ -144,6 +160,19 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber })
         <Label x={X(leafW - geom.stile / 2)} y={Y(leafH / 2)}
           text={geom.hinge === 'left' ? 'LOCK' : 'HINGE'} vbw={totalW} />
 
+        {/* ── HINGES — red, on the hinge edge, with their setting-out ── */}
+        {hinges.map((hy, i) => (
+          <rect key={`hg-${i}`} x={X(hingeEdgeX - HINGE_W / 2)} y={Y(hy - HINGE_H / 2)}
+            width={HINGE_W} height={HINGE_H} rx={HINGE_W / 2}
+            fill={COLORS.label} stroke={COLORS.label}
+            strokeWidth={STROKES.sashLight} {...NS} />
+        ))}
+        {hinges.map((hy, i) => (
+          <DimV key={`hgd-${i}`} x={hingeSideLeft ? ox - DM * 0.9 : ox + leafW + DM * 0.9}
+            y1={Y(0)} y2={Y(hy)} extFrom={X(hingeEdgeX)}
+            label={`H${i + 1} ${fmt(hy)}`} small vbw={totalW} />
+        ))}
+
         {/* ── MEMBER FACES ── */}
         <DimH y={oy - DM * 0.35} x1={X(0)} x2={X(geom.stile)} extFrom={Y(0)}
           label={fmt(geom.stile)} small vbw={totalW} />
@@ -165,7 +194,7 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber })
 
         <TitleBlock x={totalW / 2} y={oy + leafH + DM + TITLE_AREA * 0.5}
           title={`Leaf Detail${projNum ? ` — ${projNum}` : ''} — ${winName}`}
-          subtitle={`${codes} · section ${geom.stile}×${geom.leafDepth} · bottom rail ${geom.bottomRail} · glass into rebate ${geom.glassInset}/side · exterior view`}
+          subtitle={`${codes} · section ${geom.stile}×${geom.leafDepth} · bottom rail ${geom.bottomRail} · ${hinges.length} hinges ${HINGE_H}×${HINGE_W} · glass into rebate ${geom.glassInset}/side · exterior view`}
           vbw={totalW} />
       </svg>
     </div>
