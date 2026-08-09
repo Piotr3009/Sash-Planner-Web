@@ -561,6 +561,34 @@ export const useProjectStore = create((set, get) => ({
       casementFanVBars: windowConfig.casementFanVBars || 0,
       casementFan2HBars: windowConfig.casementFan2HBars || 0,
       casementFan2VBars: windowConfig.casementFan2VBars || 0,
+
+      // ── Door fields (Piotr 05.08) ──────────────────────────────────────
+      // This builder copies window fields BY NAME, so anything not listed here
+      // is silently dropped on save. Doors were missing entirely, which is why
+      // hinge side and door type always reverted to their defaults after
+      // saving while the live 3D (which bypasses the store) looked correct.
+      doorType: windowConfig.doorType || 'single-external',
+      doorShape: windowConfig.doorShape || 'standard',
+      doorStyle: windowConfig.doorStyle || 'full-glass',
+      doorPaneling: windowConfig.doorPaneling || 'flat',
+      centerMullion: !!windowConfig.centerMullion,
+      doorHinge: windowConfig.doorHinge || 'left',
+      doorOpenDirection: windowConfig.doorOpenDirection || 'outward',
+      lockType: windowConfig.lockType || 'single',
+      doorBarType: windowConfig.doorBarType || 'astragal',
+      doorHBars: windowConfig.doorHBars || 0,
+      doorVBars: windowConfig.doorVBars || 0,
+      sidePanels: windowConfig.sidePanels || 'none',
+      sideLeftWidth: windowConfig.sideLeftWidth || 500,
+      sideRightWidth: windowConfig.sideRightWidth || 500,
+      sideStyle: windowConfig.sideStyle || 'full-glass',
+      sideHBars: windowConfig.sideHBars || 0,
+      sideVBars: windowConfig.sideVBars || 0,
+      transomType: windowConfig.transomType || 'none',
+      transomHeight: windowConfig.transomHeight || 450,
+      transomBars: windowConfig.transomBars || 'none',
+      thresholdType: windowConfig.thresholdType || 'standard',
+      thresholdExtension: windowConfig.thresholdExtension || 0,
       // Full specification JSON for calculations engine
       specification: JSON.stringify({
         windowType: batch.type,
@@ -680,6 +708,34 @@ export const useProjectStore = create((set, get) => ({
       casementFanVBars: windowConfig.casementFanVBars || 0,
       casementFan2HBars: windowConfig.casementFan2HBars || 0,
       casementFan2VBars: windowConfig.casementFan2VBars || 0,
+
+      // ── Door fields (Piotr 05.08) ──────────────────────────────────────
+      // This builder copies window fields BY NAME, so anything not listed here
+      // is silently dropped on save. Doors were missing entirely, which is why
+      // hinge side and door type always reverted to their defaults after
+      // saving while the live 3D (which bypasses the store) looked correct.
+      doorType: windowConfig.doorType || 'single-external',
+      doorShape: windowConfig.doorShape || 'standard',
+      doorStyle: windowConfig.doorStyle || 'full-glass',
+      doorPaneling: windowConfig.doorPaneling || 'flat',
+      centerMullion: !!windowConfig.centerMullion,
+      doorHinge: windowConfig.doorHinge || 'left',
+      doorOpenDirection: windowConfig.doorOpenDirection || 'outward',
+      lockType: windowConfig.lockType || 'single',
+      doorBarType: windowConfig.doorBarType || 'astragal',
+      doorHBars: windowConfig.doorHBars || 0,
+      doorVBars: windowConfig.doorVBars || 0,
+      sidePanels: windowConfig.sidePanels || 'none',
+      sideLeftWidth: windowConfig.sideLeftWidth || 500,
+      sideRightWidth: windowConfig.sideRightWidth || 500,
+      sideStyle: windowConfig.sideStyle || 'full-glass',
+      sideHBars: windowConfig.sideHBars || 0,
+      sideVBars: windowConfig.sideVBars || 0,
+      transomType: windowConfig.transomType || 'none',
+      transomHeight: windowConfig.transomHeight || 450,
+      transomBars: windowConfig.transomBars || 'none',
+      thresholdType: windowConfig.thresholdType || 'standard',
+      thresholdExtension: windowConfig.thresholdExtension || 0,
       specification: JSON.stringify({
         windowType: batch.type,
         width: (windowConfig.extWidth || existing.width) - 104,
