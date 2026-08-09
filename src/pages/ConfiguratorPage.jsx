@@ -58,7 +58,6 @@ const DOOR_TYPES = [{ value: 'single-external', label: 'Single Patio' }, { value
 const DOOR_SHAPES = [{ value: 'standard', label: 'Standard' }];
 const DOOR_STYLES = [{ value: 'full-glass', label: 'Full Glass' }, { value: 'three-quarter', label: '3/4 Glazed' }, { value: 'half-glazed', label: 'Half Glazed' }];
 const DOOR_PANELING = [{ value: 'flat', label: 'Flat' }, { value: 'panel', label: 'Panel' }, { value: 'beading', label: 'Beading' }, { value: 'bespoke', label: 'Bespoke' }];
-const DOOR_MULLION = [{ value: false, label: 'No' }, { value: true, label: 'Yes' }];
 const SIDE_PANEL_MODES = [{ value: 'none', label: 'None' }, { value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }, { value: 'both', label: 'Both' }];
 const SIDE_PANEL_STYLES = [{ value: 'full-glass', label: 'Full Glass' }, { value: 'same', label: 'Same as door' }];
 const BAR_COUNTS = [0, 1, 2, 3, 4, 5].map((n) => ({ value: n, label: n === 0 ? 'None' : String(n) }));
@@ -209,7 +208,6 @@ export default function ConfiguratorPage() {
   const [doorShape, setDoorShape] = useState('standard');
   const [doorStyle, setDoorStyle] = useState('full-glass');
   const [doorPaneling, setDoorPaneling] = useState('flat');
-  const [centerMullion, setCenterMullion] = useState(false);
   const [doorHB, setDoorHB] = useState(0);
   const [doorVB, setDoorVB] = useState(0);
   const [sidePanels, setSidePanels] = useState('none');
@@ -300,7 +298,6 @@ export default function ConfiguratorPage() {
     setDoorShape(w.doorShape || 'standard');
     setDoorStyle(w.doorStyle || 'full-glass');
     setDoorPaneling(w.paneling || 'flat');
-    setCenterMullion(!!w.centerMullion);
     setDoorHB(w.doorHBars || 0);
     setDoorVB(w.doorVBars || 0);
     setSidePanels(w.sidePanels || 'none');
@@ -477,7 +474,10 @@ export default function ConfiguratorPage() {
       // Flat door keys — the 3D App was ported from PSW and reads them directly.
       window.update3D({
         windowCategory: 'door', extWidth: extW, extHeight: extH,
-        doorType, doorShape, doorStyle, paneling: doorPaneling, centerMullion,
+        doorType, doorShape, doorStyle, paneling: doorPaneling,
+        // French leaves ALWAYS meet on a rebate — never a centre mullion
+        // (Piotr 09.08). Field kept false for PSW import parity.
+        centerMullion: false,
         doorHinge: hingeSide, doorOpenDirection: openDirection,
         doorHBars: doorHB, doorVBars: doorVB,
         sidePanels, sideLeftWidth: sideLeftW, sideRightWidth: sideRightW,
@@ -535,7 +535,7 @@ export default function ConfiguratorPage() {
       spacerColor, sashType, splitRatio, headType, openingType: opening,
       boxType: frameType === 'slim' ? 'slim' : 'standard', boxDepth: frameDepth,
     });
-  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, centerMullion, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType]);
+  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType]);
   useEffect(() => { sync(); }, [sync]);
 
   // ─── B4: Listen for 3D ready event and re-sync ───
@@ -573,7 +573,7 @@ export default function ConfiguratorPage() {
         casementFan2HBars: Math.min(2, casFan2HB), casementFan2VBars: Math.min(2, casFan2VB),
       } : {}),
       ...(isDoor ? {
-        doorType, doorShape, doorStyle, doorPaneling, centerMullion,
+        doorType, doorShape, doorStyle, doorPaneling, centerMullion: false,
         doorHinge: hingeSide, doorOpenDirection: openDirection, lockType, doorBarType,
         doorHBars: doorHB, doorVBars: doorVB,
         sidePanels, sideLeftWidth: sideLeftW, sideRightWidth: sideRightW,
@@ -764,7 +764,6 @@ export default function ConfiguratorPage() {
               <Lbl>Shape</Lbl><HChips o={DOOR_SHAPES} v={doorShape} c={setDoorShape} />
               <Lbl>Style</Lbl><HChips o={DOOR_STYLES} v={doorStyle} c={setDoorStyle} />
               <Lbl>Paneling</Lbl><HChips o={DOOR_PANELING} v={doorPaneling} c={setDoorPaneling} />
-              {isFrench && <><Lbl>Centre mullion</Lbl><HChips o={DOOR_MULLION} v={centerMullion} c={setCenterMullion} /></>}
               <Lbl>Bars — horizontal</Lbl><HChips o={BAR_COUNTS} v={doorHB} c={setDoorHB} />
               <Lbl>Bars — vertical</Lbl><HChips o={BAR_COUNTS} v={doorVB} c={setDoorVB} />
               {(doorHB > 0 || doorVB > 0) && (
@@ -803,6 +802,7 @@ export default function ConfiguratorPage() {
 
             <Sec t="Hardware & Threshold">
               <Lbl>Open side</Lbl><HChips o={HINGE_SIDES} v={hingeSide} c={setHingeSide} />
+              <div className="text-[11px] text-ink-500 mb-2">Seen from inside — the door opens towards your left / right{isFrench ? '; the active leaf sits on that side' : ''}.</div>
               <Lbl>Opening direction</Lbl><HChips o={OPEN_DIRECTIONS} v={openDirection} c={setOpenDirection} />
               <Lbl>Lock</Lbl><HChips o={LOCK_TYPES} v={lockType} c={setLockType} />
               <Lbl>Threshold</Lbl><HChips o={THRESHOLDS} v={threshold} c={setThreshold} />

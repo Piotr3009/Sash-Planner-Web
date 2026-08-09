@@ -46,15 +46,18 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
     const parts = [].concat(...Object.values(derived.components || {}).filter(Array.isArray));
     const byCode = (c) => parts.find((x) => x.code === c);
 
+    const totalH = Number(dr.totalHeight) || fh;
     return {
-      fw, fh, g, els, inward, mullion, leftW, rightW, mode,
+      fw, fh, totalH, dy: totalH - fh, g, els, inward, mullion, leftW, rightW, mode,
+      zones: dr.zones || {}, leaves: dr.leaves || [],
       frameFace: els.frameHead.face,
       cillFace: inward ? p.cillInward.faceInternal : els.frameCill.face,
       hasTimberCill: !!dr.hasTimberCill,
       threshold: dr.threshold || 'standard',
       frameDepth: p.frameDepth,
       head: byCode('D-H'), jambL: byCode('D-J/L'), cill: byCode('D-CILL'),
-      leafY: g.land + g.gap,
+      mullionP: byCode('D-M'), transomP: byCode('D-T'),
+      leafY: (totalH - fh) + g.land + g.gap,
       leafH: dr.leafH,
       overlap: inward ? els.frameHead.face - g.land - g.gap : 0,
     };
@@ -62,13 +65,14 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
 
   if (!geom) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
 
-  const { fw, fh, g } = geom;
-  const layoutSc = Math.max(fw, fh) / 500;
+  const { fw, fh, g, dy } = geom;
+  const frameH = geom.totalH;                 // full frame incl. fan zone
+  const layoutSc = Math.max(fw, frameH) / 500;
   const DM = 80 * layoutSc;
   const M = 90 * layoutSc;
   const TITLE_AREA = 55 * layoutSc;
   const totalW = M + fw + DM * 2 + M;
-  const totalH = M + fh + DM + TITLE_AREA;
+  const totalH = M + frameH + DM + TITLE_AREA;
   const ox = M, oy = M;
   const X = (x) => ox + x;
   const Y = (y) => oy + y;
@@ -76,11 +80,12 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
 
   const bottomLand = geom.hasTimberCill ? g.cillVisible : 0;
   const openTop = g.land;
-  const openBottom = fh - bottomLand;
+  const openBottom = frameH - bottomLand;
 
-  // Door opening x-range (between side panels, if any)
-  const doorX = g.land + g.gap + (geom.leftW ? geom.leftW + geom.mullion : 0);
-  const doorRight = fw - g.land - g.gap - (geom.rightW ? geom.rightW + geom.mullion : 0);
+  // Door opening x-range straight from the ENGINE zones — this sheet does
+  // no width math of its own (v1 recomputed it and could drift).
+  const doorX = geom.zones.doorX ?? (g.land + g.gap);
+  const doorRight = doorX + (geom.zones.doorW ?? (fw - 2 * (g.land + g.gap)));
 
   const winName = windowSpec?.name || 'Door';
   const projNum = projectNumber || '';
@@ -88,6 +93,8 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
     geom.head && `${geom.head.code} ${fmt(geom.head.length)}`,
     geom.jambL && `${geom.jambL.code.replace('/L', '')} ×2 ${fmt(geom.jambL.length)}`,
     geom.cill ? `${geom.cill.code} ${fmt(geom.cill.length)}` : `${geom.threshold} threshold — no timber cill`,
+    geom.mullionP && `${geom.mullionP.code} ×${geom.mullionP.quantity || 1} ${fmt(geom.mullionP.length)}`,
+    geom.transomP && `${geom.transomP.code} ${fmt(geom.transomP.length)}`,
   ].filter(Boolean).join(' · ');
 
   return (
@@ -97,58 +104,67 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
 
         {/* ── FRAME body ── */}
         <path
-          d={`M ${X(0)} ${Y(0)} H ${X(fw)} V ${Y(fh)} H ${X(0)} Z
+          d={`M ${X(0)} ${Y(0)} H ${X(fw)} V ${Y(frameH)} H ${X(0)} Z
               M ${X(g.land)} ${Y(openTop)} H ${X(fw - g.land)}
               V ${Y(openBottom)} H ${X(g.land)} Z`}
           fillRule="evenodd" fill={COLORS.frameFill} stroke="none" />
-        <rect x={X(0)} y={Y(0)} width={fw} height={fh}
+        <rect x={X(0)} y={Y(0)} width={fw} height={frameH}
           fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frame} {...NS} />
         <rect x={X(g.land)} y={Y(openTop)} width={fw - 2 * g.land} height={openBottom - openTop}
           fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
 
         {/* Rebate line — inward frames lap over the leaf */}
         {geom.inward && (
-          <rect x={X(geom.frameFace)} y={Y(geom.frameFace)}
+          <rect x={X(geom.frameFace)} y={Y(dy + geom.frameFace)}
             width={fw - 2 * geom.frameFace} height={fh - geom.frameFace - bottomLand}
             fill="none" stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS}
             strokeDasharray={`${sw(5)},${sw(3)}`} />
         )}
 
-        {/* ── SIDE-PANEL MULLIONS (same frame, same stock) ── */}
-        {geom.leftW > 0 && (
-          <rect x={X(g.land + g.gap + geom.leftW)} y={Y(openTop)}
-            width={geom.mullion} height={openBottom - openTop}
+        {/* ── SIDE-PANEL MULLIONS — full 68 face centred on the engine axis
+             (v1 placed them 17 off; axis = panel edge + 17), door zone only ── */}
+        {(geom.zones.mullions || []).map((mu, i) => (
+          <rect key={i} x={X(mu.axis - geom.mullion / 2)} y={Y(dy + g.land)}
+            width={geom.mullion} height={fh - g.land - bottomLand}
             fill={COLORS.frameFill} stroke={COLORS.frame}
             strokeWidth={STROKES.frameLight} {...NS} />
-        )}
-        {geom.rightW > 0 && (
-          <rect x={X(fw - g.land - g.gap - geom.rightW - geom.mullion)} y={Y(openTop)}
-            width={geom.mullion} height={openBottom - openTop}
+        ))}
+
+        {/* ── TRANSOM RAIL — bottom flush with the door-opening top (3D) ── */}
+        {geom.zones.transom && <>
+          <rect x={X(g.land)} y={Y(dy - (geom.zones.transom.railH - geom.frameFace))}
+            width={fw - 2 * g.land}
+            height={(geom.zones.transom.railH - geom.frameFace) + g.land + g.gap}
             fill={COLORS.frameFill} stroke={COLORS.frame}
             strokeWidth={STROKES.frameLight} {...NS} />
-        )}
+          <Label x={X(fw / 2)} y={Y(dy + (g.land + g.gap) / 2) + sw(3)}
+            text={`${geom.transomP ? `${geom.transomP.code} ${fmt(geom.transomP.length)}` : 'D-T'} · rail ${geom.zones.transom.railH} · fan cavity ${fmt(geom.zones.transom.cavity)}`}
+            vbw={totalW} />
+        </>}
 
         {/* ── CILL / THRESHOLD ── */}
         {geom.hasTimberCill ? (
           <>
-            <rect x={X(0)} y={Y(fh - g.cillVisible)} width={fw} height={g.cillVisible}
+            <rect x={X(0)} y={Y(frameH - g.cillVisible)} width={fw} height={g.cillVisible}
               fill={COLORS.frameFill} stroke={COLORS.sillDetail}
               strokeWidth={STROKES.sash} {...NS} />
-            <Label x={X(fw / 2)} y={Y(fh - g.cillVisible / 2) + sw(3)}
+            <Label x={X(fw / 2)} y={Y(frameH - g.cillVisible / 2) + sw(3)}
               text={geom.inward ? `CILL ${geom.cillFace} unrebated · 40→35 fall` : `CILL ${geom.cillFace}`}
               vbw={totalW} />
           </>
         ) : (
-          <Label x={X(fw / 2)} y={Y(fh) - sw(6)}
+          <Label x={X(fw / 2)} y={Y(frameH) - sw(6)}
             text={`${geom.threshold.toUpperCase()} THRESHOLD — no timber member`} vbw={totalW} />
         )}
 
-        {/* ── LEAF ghost — where the door lands ── */}
-        <rect x={X(doorX)} y={Y(geom.leafY)} width={Math.max(0, doorRight - doorX)} height={geom.leafH}
-          fill="none" stroke={COLORS.sash} strokeWidth={STROKES.sashLight} {...NS}
-          strokeDasharray={`${sw(8)},${sw(5)}`} />
+        {/* ── LEAF ghosts straight from the engine (french = two) ── */}
+        {geom.leaves.map((leaf, i) => (
+          <rect key={i} x={X(leaf.x)} y={Y(geom.leafY)} width={leaf.w} height={leaf.h}
+            fill="none" stroke={COLORS.sash} strokeWidth={STROKES.sashLight} {...NS}
+            strokeDasharray={`${sw(8)},${sw(5)}`} />
+        ))}
         <Label x={X((doorX + doorRight) / 2)} y={Y(geom.leafY + geom.leafH / 2)}
-          text="LEAF (ref)" vbw={totalW} />
+          text={geom.leaves.length === 2 ? 'LEAVES ×2 (ref)' : 'LEAF (ref)'} vbw={totalW} />
 
         {/* ── MEMBER SECTIONS — head left, cill right, jamb on top, so no two
              dimensions share a line (Piotr 05.08) ── */}
@@ -171,24 +187,29 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
         <DimChainH y={oy - DM * 0.75}
           cuts={[X(0), X(g.land), X(doorX)]} extFrom={Y(0)} vbw={totalW} fmt={fmt} />
 
-        {/* Side-panel widths */}
-        {geom.leftW > 0 && (
-          <DimH y={oy + fh + DM * 0.35} x1={X(g.land + g.gap)} x2={X(g.land + g.gap + geom.leftW)}
-            extFrom={Y(fh)} label={`side ${fmt(geom.leftW)}`} small vbw={totalW} />
+        {/* Side-panel widths — engine zones */}
+        {geom.zones.leftPanel && (
+          <DimH y={oy + frameH + DM * 0.35} x1={X(geom.zones.leftPanel.x)}
+            x2={X(geom.zones.leftPanel.x + geom.zones.leftPanel.w)}
+            extFrom={Y(frameH)} label={`side ${fmt(geom.zones.leftPanel.w)}`} small vbw={totalW} />
         )}
-        {geom.rightW > 0 && (
-          <DimH y={oy + fh + DM * 0.35}
-            x1={X(fw - g.land - g.gap - geom.rightW)} x2={X(fw - g.land - g.gap)}
-            extFrom={Y(fh)} label={`side ${fmt(geom.rightW)}`} small vbw={totalW} />
+        {geom.zones.rightPanel && (
+          <DimH y={oy + frameH + DM * 0.35} x1={X(geom.zones.rightPanel.x)}
+            x2={X(geom.zones.rightPanel.x + geom.zones.rightPanel.w)}
+            extFrom={Y(frameH)} label={`side ${fmt(geom.zones.rightPanel.w)}`} small vbw={totalW} />
         )}
 
         {/* ── OVERALL ── */}
-        <DimH y={oy + fh + DM * 0.75} x1={X(0)} x2={X(fw)} extFrom={Y(fh)}
+        <DimH y={oy + frameH + DM * 0.75} x1={X(0)} x2={X(fw)} extFrom={Y(frameH)}
           label={fmt(fw)} vbw={totalW} />
-        <DimV x={ox + fw + DM * 0.85} y1={Y(0)} y2={Y(fh)} extFrom={X(fw)}
-          label={fmt(fh)} vbw={totalW} />
+        {geom.zones.transom && (
+          <DimV x={ox + fw + DM * 0.4} y1={Y(0)} y2={Y(dy)} extFrom={X(fw)}
+            label={`fan ${fmt(geom.zones.transom.h)}`} small vbw={totalW} />
+        )}
+        <DimV x={ox + fw + DM * 0.85} y1={Y(0)} y2={Y(frameH)} extFrom={X(fw)}
+          label={fmt(frameH)} vbw={totalW} />
 
-        <TitleBlock x={totalW / 2} y={oy + fh + DM + TITLE_AREA * 0.5}
+        <TitleBlock x={totalW / 2} y={oy + frameH + DM + TITLE_AREA * 0.5}
           title={`Frame Detail${projNum ? ` — ${projNum}` : ''} — ${winName}`}
           subtitle={`${codes} · section ${geom.frameFace}×${geom.frameDepth} · ${geom.inward ? 'inward' : 'outward'} · exterior view`}
           vbw={totalW} />

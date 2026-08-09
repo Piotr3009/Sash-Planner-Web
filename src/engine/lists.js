@@ -441,6 +441,10 @@ export const MIRROR_PAIRS = {
   // ── Casement (Piotr 02.08.2026, PDF audit item 0 — grouping never knew C-*) ──
   'C-FRAME JAMB (L)':         { right: 'C-FRAME JAMB (R)',         symbol: 'C-J-L/R', label: 'Frame Jambs (pair)' },
   'C-STILE (L)':              { right: 'C-STILE (R)',              symbol: 'C-ST-L/R', label: 'Leaf Stiles (pair)' },
+  // ── Doors (Piotr 09.08 — the D-* vocabulary never reached the grouping,
+  //    exactly the casement gap repeated; parts fell into the '?' safety net) ──
+  'D-FRAME JAMB (L)':         { right: 'D-FRAME JAMB (R)',         symbol: 'D-J-L/R', label: 'Door Frame Jambs (pair)' },
+  'D-STILE (L)':              { right: 'D-STILE (R)',              symbol: 'D-ST-L/R', label: 'Door Leaf Stiles (pair)' },
 };
 
 /**
@@ -476,6 +480,20 @@ export const CUT_LIST_ORDER = [
   { match: 'C-STILE (L)',               symbol: 'C-ST-L/R', label: 'Leaf Stiles (pair)',         isPair: true },
   { match: 'C-TOP RAIL',                symbol: 'C-TR',    label: 'Leaf Top Rail' },
   { match: 'C-BOTTOM RAIL',             symbol: 'C-BR',    label: 'Leaf Bottom Rail' },
+  // ── DOOR (frame first, then dividers, then leaves, then side panels).
+  //    French leaves share the single-leaf element names: identical lengths
+  //    consolidate into one row (qty summed), pairs merge per window. ──
+  { match: 'D-FRAME HEAD',              symbol: 'D-FH',    label: 'Door Frame Head' },
+  { match: 'D-FRAME JAMB (L)',          symbol: 'D-J-L/R', label: 'Door Frame Jambs (pair)',    isPair: true },
+  { match: 'D-FRAME CILL',              symbol: 'D-CILL',  label: 'Door Frame Cill' },
+  { match: 'D-MULLION',                 symbol: 'D-M',     label: 'Door Mullion' },
+  { match: 'D-TRANSOM',                 symbol: 'D-T',     label: 'Door Transom Rail' },
+  { match: 'D-STILE (L)',               symbol: 'D-ST-L/R', label: 'Door Leaf Stiles (pair)',   isPair: true },
+  { match: 'D-TOP RAIL',                symbol: 'D-TR',    label: 'Door Leaf Top Rail' },
+  { match: 'D-BOTTOM RAIL',             symbol: 'D-BR',    label: 'Door Leaf Bottom Rail' },
+  { match: 'D-SIDE STILE',              symbol: 'D-SP-ST', label: 'Side Panel Stiles' },
+  { match: 'D-SIDE TOP RAIL',           symbol: 'D-SP-TR', label: 'Side Panel Top Rail' },
+  { match: 'D-SIDE BOTTOM RAIL',        symbol: 'D-SP-BR', label: 'Side Panel Bottom Rail' },
 ];
 
 /**

@@ -203,6 +203,20 @@ export const DEFAULT_DOOR_PROFILE = Object.freeze({
   // the internal face is 40mm and falls to 35mm across the leaf depth, so rain
   // runs out. Outward-opening doors reuse the casement cill unchanged.
   cillInward: { faceInternal: 40, faceExternal: 35, runDepth: 61 },
+  // French doors NEVER have a centre mullion (Piotr 09.08) — the leaves meet
+  // on a rebate: each meeting stile is rebated 6mm with a 3mm clearance. For
+  // sizing, only the 6mm overlap matters: combined meeting band seen from
+  // outside = 94 + 94 − 6 = 182, and each leaf = (door clear width + 6) / 2.
+  frenchOverlap: 6,
+  // Side panels are FIXED leaves in the same frame, all members 57mm — matches
+  // the 3D model (DoorSidePanel stileWidthMm=57), confirmed by Piotr 09.08.
+  sidePanel: { member: 57, depth: 57 },
+  // Coupled transom (PSW/3D convention): the frame gets TALLER by the transom
+  // height — frame.height stays the DOOR zone height. Internal rail 68 (same
+  // stock as the mullion), its bottom edge flush with the door opening top;
+  // fan cavity above the rail = transomHeight − 68. Opening fanlights carry a
+  // 64mm sash (3D TRANSOM_SASH_STILE) — engine support for that sash pending.
+  transom: { rail: 68, fanStile: 64 },
   geometry: {
     land: 36,
     rebate: 25,           // casement 21 + 4mm deeper
@@ -227,6 +241,11 @@ export const DEFAULT_DOOR_PROFILE = Object.freeze({
     bottomRailDeduct: 0,
     midRailDeduct: 0,
     mullion: 77,
+    // Transom rail runs between the jambs: default deduct = 2 × jamb face.
+    transomDeduct: 114,
+    // Side-panel members follow the door-leaf convention: full outer lengths.
+    sideStileDeduct: 0,
+    sideRailDeduct: 0,
   },
 });
 

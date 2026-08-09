@@ -70,12 +70,17 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber })
     const parts = [].concat(...Object.values(derived.components || {}).filter(Array.isArray));
     const byCode = (c) => parts.find((x) => x.code === c);
 
+    // French: draw the ACTIVE leaf, once — both leaves are 94 all round and
+    // mirror each other (Piotr: one leaf on 2D), noted "×2" in the title.
+    const isFrench = (dr.type || '') === 'french';
+    const active = (dr.leaves || []).find((l) => l.role !== 'passive');
     return {
       leafW, leafH, stile, topRail, bottomRail, midFace, midRailY, style,
       glassX, glassY, glassW, glassH, barPos,
       glassInset: g.glassInset,
       leafDepth: p.leafDepth,
-      hinge: d.hingeSide || 'left',
+      isFrench,
+      hinge: isFrench ? (active?.hinge === 'right' ? 'left' : 'right') : (d.hingeSide || 'left'),
       stileP: byCode('D-ST/L'), topP: byCode('D-TR'), botP: byCode('D-BR'),
     };
   }, [windowSpec, derived]);
@@ -157,9 +162,9 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber })
         ))}
 
         <Label x={X(geom.stile / 2)} y={Y(leafH / 2)}
-          text={hingeOnRight ? 'LOCK' : 'HINGE'} vbw={totalW} />
+          text={hingeOnRight ? (geom.isFrench ? 'MEETING' : 'LOCK') : 'HINGE'} vbw={totalW} />
         <Label x={X(leafW - geom.stile / 2)} y={Y(leafH / 2)}
-          text={hingeOnRight ? 'HINGE' : 'LOCK'} vbw={totalW} />
+          text={hingeOnRight ? 'HINGE' : (geom.isFrench ? 'MEETING' : 'LOCK')} vbw={totalW} />
 
         {/* ── HINGES — red, on the hinge edge, with their setting-out ── */}
         {hinges.map((hy, i) => (
@@ -196,8 +201,8 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber })
           label={fmt(leafH)} vbw={totalW} />
 
         <TitleBlock x={totalW / 2} y={oy + leafH + DM + TITLE_AREA * 0.5}
-          title={`Leaf Detail${projNum ? ` — ${projNum}` : ''} — ${winName}`}
-          subtitle={`${codes} · section ${geom.stile}×${geom.leafDepth} · bottom rail ${geom.bottomRail} · ${hinges.length} hinges ${HINGE_H}×${HINGE_W} · glass into rebate ${geom.glassInset}/side · exterior view`}
+          title={`Leaf Detail${geom.isFrench ? ' ×2 (mirrored pair)' : ''}${projNum ? ` — ${projNum}` : ''} — ${winName}`}
+          subtitle={`${codes} · section ${geom.stile}×${geom.leafDepth} · bottom rail ${geom.bottomRail}${geom.isFrench ? ' · meeting stile rebated 6, 3 clearance' : ''} · ${hinges.length} hinges ${HINGE_H}×${HINGE_W} · glass into rebate ${geom.glassInset}/side · exterior view`}
           vbw={totalW} />
       </svg>
     </div>
