@@ -486,7 +486,7 @@ export const CUT_LIST_ORDER = [
   { match: 'D-FRAME HEAD',              symbol: 'D-FH',    label: 'Door Frame Head' },
   { match: 'D-FRAME JAMB (L)',          symbol: 'D-J-L/R', label: 'Door Frame Jambs (pair)',    isPair: true },
   { match: 'D-FRAME CILL',              symbol: 'D-CILL',  label: 'Door Frame Cill' },
-  { match: 'D-MULLION',                 symbol: 'D-M',     label: 'Door Mullion' },
+  { match: 'D-JAMB (COUPLING)',         symbol: 'D-JC',    label: 'Door Coupling Jambs' },
   { match: 'D-TRANSOM',                 symbol: 'D-T',     label: 'Door Transom Rail' },
   { match: 'D-STILE (L)',               symbol: 'D-ST-L/R', label: 'Door Leaf Stiles (pair)',   isPair: true },
   { match: 'D-TOP RAIL',                symbol: 'D-TR',    label: 'Door Leaf Top Rail' },

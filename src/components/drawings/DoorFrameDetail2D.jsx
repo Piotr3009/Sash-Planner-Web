@@ -46,17 +46,19 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
     const parts = [].concat(...Object.values(derived.components || {}).filter(Array.isArray));
     const byCode = (c) => parts.find((x) => x.code === c);
 
-    const totalH = Number(dr.totalHeight) || fh;
+    const z = dr.zones || {};
+    const totalH = Number(z.totalHeight) || fh;
+    const totalWidth = Number(z.totalWidth) || fw;
     return {
-      fw, fh, totalH, dy: totalH - fh, g, els, inward, mullion, leftW, rightW, mode,
-      zones: dr.zones || {}, leaves: dr.leaves || [],
+      fw, fh, totalH, totalWidth, dy: totalH - fh, g, els, inward, mullion, leftW, rightW, mode,
+      zones: z, leaves: dr.leaves || [], panelLeaves: dr.panelLeaves || [],
       frameFace: els.frameHead.face,
       cillFace: inward ? p.cillInward.faceInternal : els.frameCill.face,
       hasTimberCill: !!dr.hasTimberCill,
       threshold: dr.threshold || 'standard',
       frameDepth: p.frameDepth,
       head: byCode('D-H'), jambL: byCode('D-J/L'), cill: byCode('D-CILL'),
-      mullionP: byCode('D-M'), transomP: byCode('D-T'),
+      couplingP: byCode('D-JC'), transomP: byCode('D-T'),
       leafY: (totalH - fh) + g.land + g.gap,
       leafH: dr.leafH,
       overlap: inward ? els.frameHead.face - g.land - g.gap : 0,
@@ -65,7 +67,8 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
 
   if (!geom) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
 
-  const { fw, fh, g, dy } = geom;
+  const { fh, g, dy } = geom;
+  const fw = geom.totalWidth;                 // whole assembly: panels + door
   const frameH = geom.totalH;                 // full frame incl. fan zone
   const layoutSc = Math.max(fw, frameH) / 500;
   const DM = 80 * layoutSc;
@@ -84,8 +87,8 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
 
   // Door opening x-range straight from the ENGINE zones — this sheet does
   // no width math of its own (v1 recomputed it and could drift).
-  const doorX = geom.zones.doorX ?? (g.land + g.gap);
-  const doorRight = doorX + (geom.zones.doorW ?? (fw - 2 * (g.land + g.gap)));
+  const doorX = geom.zones.doorX ?? 0;
+  const doorRight = doorX + (geom.zones.doorW ?? fw);
 
   const winName = windowSpec?.name || 'Door';
   const projNum = projectNumber || '';
@@ -93,7 +96,7 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
     geom.head && `${geom.head.code} ${fmt(geom.head.length)}`,
     geom.jambL && `${geom.jambL.code.replace('/L', '')} ×2 ${fmt(geom.jambL.length)}`,
     geom.cill ? `${geom.cill.code} ${fmt(geom.cill.length)}` : `${geom.threshold} threshold — no timber cill`,
-    geom.mullionP && `${geom.mullionP.code} ×${geom.mullionP.quantity || 1} ${fmt(geom.mullionP.length)}`,
+    geom.couplingP && `${geom.couplingP.code} ×${geom.couplingP.quantity || 1} ${fmt(geom.couplingP.length)}`,
     geom.transomP && `${geom.transomP.code} ${fmt(geom.transomP.length)}`,
   ].filter(Boolean).join(' · ');
 
@@ -121,13 +124,19 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
             strokeDasharray={`${sw(5)},${sw(3)}`} />
         )}
 
-        {/* ── SIDE-PANEL MULLIONS — full 68 face centred on the engine axis
-             (v1 placed them 17 off; axis = panel edge + 17), door zone only ── */}
-        {(geom.zones.mullions || []).map((mu, i) => (
-          <rect key={i} x={X(mu.axis - geom.mullion / 2)} y={Y(dy + g.land)}
-            width={geom.mullion} height={fh - g.land - bottomLand}
-            fill={COLORS.frameFill} stroke={COLORS.frame}
-            strokeWidth={STROKES.frameLight} {...NS} />
+        {/* ── COUPLING JAMBS — panel jamb + door jamb back to back (57+57),
+             running the FULL assembly height, joint line on the boundary ── */}
+        {(geom.zones.joints || []).map((jx, i) => (
+          <g key={i}>
+            <rect x={X(jx - geom.frameFace)} y={Y(g.land)}
+              width={geom.frameFace * 2} height={frameH - g.land - bottomLand}
+              fill={COLORS.frameFill} stroke={COLORS.frame}
+              strokeWidth={STROKES.frameLight} {...NS} />
+            <line x1={X(jx)} y1={Y(g.land)} x2={X(jx)} y2={Y(frameH - bottomLand)}
+              stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
+            <Label x={X(jx)} y={Y(frameH * 0.28)}
+              text={`D-JC ${geom.frameFace}+${geom.frameFace}`} vbw={totalW} />
+          </g>
         ))}
 
         {/* ── TRANSOM RAIL — bottom flush with the door-opening top (3D) ── */}
@@ -157,8 +166,9 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
             text={`${geom.threshold.toUpperCase()} THRESHOLD — no timber member`} vbw={totalW} />
         )}
 
-        {/* ── LEAF ghosts straight from the engine (french = two) ── */}
-        {geom.leaves.map((leaf, i) => (
+        {/* ── LEAF ghosts straight from the engine (french = two, plus fixed
+             panel leaves so the joiner sees what lands in each opening) ── */}
+        {[...geom.leaves, ...geom.panelLeaves].map((leaf, i) => (
           <rect key={i} x={X(leaf.x)} y={Y(geom.leafY)} width={leaf.w} height={leaf.h}
             fill="none" stroke={COLORS.sash} strokeWidth={STROKES.sashLight} {...NS}
             strokeDasharray={`${sw(8)},${sw(5)}`} />
@@ -187,17 +197,13 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
         <DimChainH y={oy - DM * 0.75}
           cuts={[X(0), X(g.land), X(doorX)]} extFrom={Y(0)} vbw={totalW} fmt={fmt} />
 
-        {/* Side-panel widths — engine zones */}
-        {geom.zones.leftPanel && (
-          <DimH y={oy + frameH + DM * 0.35} x1={X(geom.zones.leftPanel.x)}
-            x2={X(geom.zones.leftPanel.x + geom.zones.leftPanel.w)}
-            extFrom={Y(frameH)} label={`side ${fmt(geom.zones.leftPanel.w)}`} small vbw={totalW} />
-        )}
-        {geom.zones.rightPanel && (
-          <DimH y={oy + frameH + DM * 0.35} x1={X(geom.zones.rightPanel.x)}
-            x2={X(geom.zones.rightPanel.x + geom.zones.rightPanel.w)}
-            extFrom={Y(frameH)} label={`side ${fmt(geom.zones.rightPanel.w)}`} small vbw={totalW} />
-        )}
+        {/* Frame widths — panels and door, straight from the engine */}
+        {(geom.zones.frames || []).length > 1 && (geom.zones.frames || []).map((f, i) => (
+          <DimH key={i} y={oy + frameH + DM * 0.35} x1={X(f.x)} x2={X(f.x + f.w)}
+            extFrom={Y(frameH)}
+            label={`${f.kind === 'door' ? 'door' : `${f.side} panel`} ${fmt(f.w)}`}
+            small vbw={totalW} />
+        ))}
 
         {/* ── OVERALL ── */}
         <DimH y={oy + frameH + DM * 0.75} x1={X(0)} x2={X(fw)} extFrom={Y(frameH)}
