@@ -142,14 +142,17 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber }) 
 
   const hinges = hingePositions(geom.leafY, geom.leafH);
   const handleY = geom.leafY + geom.leafH - HANDLE_FLOOR_MM;
-  const handleX = geom.hinge === 'left'
-    ? geom.doorX + geom.leafW - geom.stile / 2
-    : geom.doorX + geom.stile / 2;
-  const hingeEdgeX = geom.hinge === 'left' ? geom.doorX : geom.doorX + geom.leafW;
+  // Open side LEFT = hinges on the RIGHT when viewed from outside (Piotr
+  // 05.08), matching the 3D layout mapping 040L → panel hinge 'right'.
+  const hingeOnRight = geom.hinge === 'left';
+  const hingeEdgeX = hingeOnRight ? geom.doorX + geom.leafW : geom.doorX;
+  const handleX = hingeOnRight
+    ? geom.doorX + geom.stile / 2
+    : geom.doorX + geom.leafW - geom.stile / 2;
 
   const winName = windowSpec?.name || 'Door';
   const projNum = projectNumber || '';
-  const swingLabel = `${geom.inward ? 'inward' : 'outward'} · hinge ${geom.hinge}`;
+  const swingLabel = `${geom.inward ? 'inward' : 'outward'} · open ${geom.hinge} (hinges ${hingeOnRight ? 'right' : 'left'} from outside)`;
   const thresholdLabel = geom.hasTimberCill
     ? (geom.inward ? 'inward cill 40→35' : 'timber cill')
     : `${geom.threshold} threshold — no timber cill`;
@@ -240,7 +243,7 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber }) 
         ))}
 
         {/* ── OPENING SYMBOL — apex on the hinge side ── */}
-        {geom.hinge === 'left' ? (
+        {!hingeOnRight ? (
           <path d={`M ${X(geom.doorX + geom.leafW)} ${Y(geom.leafY)}
                     L ${X(geom.doorX)} ${Y(geom.leafY + geom.leafH / 2)}
                     L ${X(geom.doorX + geom.leafW)} ${Y(geom.leafY + geom.leafH)}`}

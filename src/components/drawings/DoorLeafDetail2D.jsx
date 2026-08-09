@@ -99,8 +99,9 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber })
   const bottomRailY = leafH - geom.bottomRail;
 
   const hinges = hingePositions(leafH);
-  const hingeSideLeft = geom.hinge === 'left';
-  const hingeEdgeX = hingeSideLeft ? 0 : leafW;
+  // Open side LEFT = hinges on the RIGHT seen from outside (Piotr 05.08).
+  const hingeOnRight = geom.hinge === 'left';
+  const hingeEdgeX = hingeOnRight ? leafW : 0;
 
   const winName = windowSpec?.name || 'Door';
   const projNum = projectNumber || '';
@@ -156,9 +157,9 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber })
         ))}
 
         <Label x={X(geom.stile / 2)} y={Y(leafH / 2)}
-          text={geom.hinge === 'left' ? 'HINGE' : 'LOCK'} vbw={totalW} />
+          text={hingeOnRight ? 'LOCK' : 'HINGE'} vbw={totalW} />
         <Label x={X(leafW - geom.stile / 2)} y={Y(leafH / 2)}
-          text={geom.hinge === 'left' ? 'LOCK' : 'HINGE'} vbw={totalW} />
+          text={hingeOnRight ? 'HINGE' : 'LOCK'} vbw={totalW} />
 
         {/* ── HINGES — red, on the hinge edge, with their setting-out ── */}
         {hinges.map((hy, i) => (
@@ -167,10 +168,12 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber })
             fill={COLORS.label} stroke={COLORS.label}
             strokeWidth={STROKES.sashLight} {...NS} />
         ))}
+        {/* Dimensioned to the TOP EDGE of the barrel, not its centre — that is
+            the line the joiner marks out (Piotr 05.08). */}
         {hinges.map((hy, i) => (
-          <DimV key={`hgd-${i}`} x={hingeSideLeft ? ox - DM * 0.9 : ox + leafW + DM * 0.9}
-            y1={Y(0)} y2={Y(hy)} extFrom={X(hingeEdgeX)}
-            label={`H${i + 1} ${fmt(hy)}`} small vbw={totalW} />
+          <DimV key={`hgd-${i}`} x={hingeOnRight ? ox + leafW + DM * 0.9 : ox - DM * 0.9}
+            y1={Y(0)} y2={Y(hy - HINGE_H / 2)} extFrom={X(hingeEdgeX)}
+            label={`H${i + 1} ${fmt(hy - HINGE_H / 2)}`} small vbw={totalW} />
         ))}
 
         {/* ── MEMBER FACES ── */}

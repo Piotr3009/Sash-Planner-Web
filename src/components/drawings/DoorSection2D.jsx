@@ -16,7 +16,7 @@ export default function DoorSection2D({ windowSpec, derived }) {
   const d = windowSpec?.door || {};
   const dr = derived?.door;
   const swing = dr ? (dr.inward ? 'inward' : 'outward') : '—';
-  const hinge = d.hingeSide || '—';
+  const openSide = d.hingeSide || '—';
 
   return (
     <div className="card p-8 text-center">
@@ -27,7 +27,7 @@ export default function DoorSection2D({ windowSpec, derived }) {
         single doors the swing direction.
       </div>
       <div className="text-[11px] text-ink-500 mt-3">
-        Current door: {d.type || 'single-external'} · {swing} · hinge {hinge}
+        Current door: {d.type || 'single-external'} · {swing} · open {openSide}
       </div>
     </div>
   );

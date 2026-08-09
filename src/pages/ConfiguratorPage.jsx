@@ -62,6 +62,10 @@ const DOOR_MULLION = [{ value: false, label: 'No' }, { value: true, label: 'Yes'
 const SIDE_PANEL_MODES = [{ value: 'none', label: 'None' }, { value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }, { value: 'both', label: 'Both' }];
 const SIDE_PANEL_STYLES = [{ value: 'full-glass', label: 'Full Glass' }, { value: 'same', label: 'Same as door' }];
 const BAR_COUNTS = [0, 1, 2, 3, 4, 5].map((n) => ({ value: n, label: n === 0 ? 'None' : String(n) }));
+// "Open side", not "hinge side" (Piotr 05.08; PSW calls it "Open First").
+// Convention: LEFT = the door opens to YOUR left as you walk through it, so
+// seen from OUTSIDE its hinges are on the RIGHT. The 3D model already follows
+// this (layout 040L → panel hinge 'right').
 const HINGE_SIDES = [{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }];
 const OPEN_DIRECTIONS = [{ value: 'outward', label: 'Outward' }, { value: 'inward', label: 'Inward' }];
 // Multipoint is a given — the choice is one handle or two (Piotr 04.08).
@@ -798,7 +802,7 @@ export default function ConfiguratorPage() {
             </Sec>}
 
             <Sec t="Hardware & Threshold">
-              <Lbl>Hinge side</Lbl><HChips o={HINGE_SIDES} v={hingeSide} c={setHingeSide} />
+              <Lbl>Open side</Lbl><HChips o={HINGE_SIDES} v={hingeSide} c={setHingeSide} />
               <Lbl>Opening direction</Lbl><HChips o={OPEN_DIRECTIONS} v={openDirection} c={setOpenDirection} />
               <Lbl>Lock</Lbl><HChips o={LOCK_TYPES} v={lockType} c={setLockType} />
               <Lbl>Threshold</Lbl><HChips o={THRESHOLDS} v={threshold} c={setThreshold} />
