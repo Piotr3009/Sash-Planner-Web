@@ -92,10 +92,12 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
 
   const winName = windowSpec?.name || 'Door';
   const projNum = projectNumber || '';
+  // Kept short so it cannot overflow the viewBox (Piotr 09.08): codes only,
+  // no section / swing / view repetition — those live on the drawing.
   const codes = [
     geom.head && `${geom.head.code} ${fmt(geom.head.length)}`,
     geom.jambL && `${geom.jambL.code.replace('/L', '')} ×2 ${fmt(geom.jambL.length)}`,
-    geom.cill ? `${geom.cill.code} ${fmt(geom.cill.length)}` : `${geom.threshold} threshold — no timber cill`,
+    geom.cill ? `${geom.cill.code} ${fmt(geom.cill.length)}` : `${geom.threshold} threshold`,
     geom.couplingP && `${geom.couplingP.code} ×${geom.couplingP.quantity || 1} ${fmt(geom.couplingP.length)}`,
     geom.transomP && `${geom.transomP.code} ${fmt(geom.transomP.length)}`,
   ].filter(Boolean).join(' · ');
@@ -124,18 +126,17 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
             strokeDasharray={`${sw(5)},${sw(3)}`} />
         )}
 
-        {/* ── COUPLING JAMBS — panel jamb + door jamb back to back (57+57),
-             running the FULL assembly height, joint line on the boundary ── */}
-        {(geom.zones.joints || []).map((jx, i) => (
+        {/* ── COUPLING POST — ONE member 114 with two rebates. This is the
+             frame sheet, so the full member face is drawn (the elevation shows
+             only the band the leaves leave visible) ── */}
+        {(geom.zones.posts || []).map((po, i) => (
           <g key={i}>
-            <rect x={X(jx - geom.frameFace)} y={Y(g.land)}
-              width={geom.frameFace * 2} height={frameH - g.land - bottomLand}
+            <rect x={X(po.x)} y={Y(g.land)}
+              width={po.w} height={frameH - g.land - bottomLand}
               fill={COLORS.frameFill} stroke={COLORS.frame}
               strokeWidth={STROKES.frameLight} {...NS} />
-            <line x1={X(jx)} y1={Y(g.land)} x2={X(jx)} y2={Y(frameH - bottomLand)}
-              stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
-            <Label x={X(jx)} y={Y(frameH * 0.28)}
-              text={`D-JC ${geom.frameFace}+${geom.frameFace}`} vbw={totalW} />
+            <Label x={X(po.axis)} y={Y(frameH * 0.28)}
+              text={`D-JC ${po.w}`} vbw={totalW} />
           </g>
         ))}
 
@@ -217,7 +218,7 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
 
         <TitleBlock x={totalW / 2} y={oy + frameH + DM + TITLE_AREA * 0.5}
           title={`Frame Detail${projNum ? ` — ${projNum}` : ''} — ${winName}`}
-          subtitle={`${codes} · section ${geom.frameFace}×${geom.frameDepth} · ${geom.inward ? 'inward' : 'outward'} · exterior view`}
+          subtitle={codes}
           vbw={totalW} />
       </svg>
     </div>

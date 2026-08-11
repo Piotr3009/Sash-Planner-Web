@@ -7,15 +7,18 @@
  * derived.door.zones (engine single source) — this sheet computes no widths
  * itself, so it can never disagree with the cut list or the Leaf sheet.
  *
- * ASSEMBLY (v3, Piotr 09.08): side panels are coupled OUTSIDE the door frame,
+ * ASSEMBLY (v4, Piotr 09.08): side panels are coupled OUTSIDE the door frame,
  * each with its own width, so the drawing spans leftPanel + door + rightPanel.
  * Head and cill are single pieces across the whole assembly; between a panel
- * and the door stand two 57 jambs back to back (joint line drawn).
+ * and the door stands ONE coupling post 114 with two rebates — only its
+ * visible band is drawn (72 outward · 93 inward, engine zones.posts), never
+ * the full member, because from outside the leaves cover the rebates.
  *
- * Leaf members ARE drawn, hairline-light (Piotr 09.08 — reverses the earlier
- * "never draw members" rule: "narysuj, ale mega delikatnie"). Glass sizes are
- * deliberately NOT dimensioned here — the glass schedule owns them. Handle
- * sits 1000mm off the floor, constant, matching DoorPanel.jsx:929.
+ * Members are read from the gap between the leaf outline and the glass, same
+ * as the sash and casement sheets (Piotr 09.08 — "patrz sash or casement,
+ * dokładnie tak narysuj"); no separate hairlines over the glass. Glass sizes
+ * are deliberately NOT dimensioned here — the glass schedule owns them.
+ * Handle sits 1000mm off the floor, constant, matching DoorPanel.jsx:929.
  *
  * FRENCH: two leaves, NO centre mullion ever — the meeting stiles are rebated
  * 6mm with a 3mm clearance (94 + 94 − 6 = 182 meeting band). The passive leaf
@@ -137,17 +140,10 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber }) 
   const winName = windowSpec?.name || 'Door';
   const projNum = projectNumber || '';
   const activeLeaf = geom.leaves.find((l) => l.role !== 'passive') || geom.leaves[0];
-  const swingLabel = geom.isFrench
-    ? `open ${geom.hinge} · active ${activeLeaf?.hinge === 'right' ? 'right' : 'left'} leaf (from outside)`
-    : `${geom.inward ? 'inward' : 'outward'} · open ${geom.hinge} (hinges ${activeLeaf?.hinge} from outside)`;
-  const thresholdLabel = geom.hasTimberCill
-    ? (geom.inward ? 'inward cill 40→35' : 'timber cill')
-    : `${geom.threshold} threshold — no timber cill`;
-  const panelNote = geom.panelLeaves.length
-    ? ` + ${geom.panelLeaves.map((pn) => `${pn.side} panel`).join(' + ')}`
-    : '';
+  // Subtitle stays as short as the sash sheet — the long version overflowed
+  // the viewBox and got clipped (Piotr 09.08). Detail lives on the drawing.
   const titleText = `Front Elevation${projNum ? ` — ${projNum}` : ''} — ${winName}`;
-  const subtitleText = `Door ${windowSpec.door?.type || 'single-external'} · door frame ${doorW} × ${doorH}${panelNote} · assembly ${totalW} × ${totalH} mm · ${swingLabel} · ${thresholdLabel} · exterior view`;
+  const subtitleText = `${windowSpec.door?.type || 'single-external'} · ${totalW} × ${totalH} · ${geom.inward ? 'inward' : 'outward'} · open ${geom.hinge} · exterior`;
 
   const renderLeaf = (leaf, i, passive, showFurniture) => {
     const hinges = showFurniture ? hingePositions(leaf.y, leaf.h) : [];
@@ -162,13 +158,6 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber }) 
         <rect x={X(leaf.x)} y={Y(leaf.y)} width={leaf.w} height={leaf.h}
           fill="none" stroke={COLORS.sash}
           strokeWidth={passive || !showFurniture ? STROKES.sashLight : STROKES.sash} {...NS} />
-        {/* Members hairline (Piotr 09.08 — "mega delikatnie") */}
-        <line x1={X(leaf.x + leaf.member)} y1={Y(leaf.y)}
-          x2={X(leaf.x + leaf.member)} y2={Y(leaf.y + leaf.h)}
-          stroke={COLORS.sash} strokeWidth={STROKES.glassLight} {...NS} />
-        <line x1={X(leaf.x + leaf.w - leaf.member)} y1={Y(leaf.y)}
-          x2={X(leaf.x + leaf.w - leaf.member)} y2={Y(leaf.y + leaf.h)}
-          stroke={COLORS.sash} strokeWidth={STROKES.glassLight} {...NS} />
         <rect x={X(leaf.glassX)} y={Y(leaf.glassY)} width={leaf.glassW} height={leaf.glassH}
           fill={COLORS.glass} fillOpacity={COLORS.glassOpacity}
           stroke={COLORS.glass} strokeWidth={STROKES.glassLight} {...NS} />
@@ -238,16 +227,13 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber }) 
           height={totalH - g.land - bottomLand}
           fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
 
-        {/* ── COUPLING: two 57 jambs back to back, joint line on the boundary ── */}
-        {(zones.joints || []).map((jx, i) => (
-          <g key={`j${i}`}>
-            <rect x={X(jx - geom.els.frameHead.face)} y={Y(g.land)}
-              width={geom.els.frameHead.face * 2} height={totalH - g.land - bottomLand}
-              fill={COLORS.frameFill} stroke={COLORS.frame}
-              strokeWidth={STROKES.frameLight} {...NS} />
-            <line x1={X(jx)} y1={Y(g.land)} x2={X(jx)} y2={Y(totalH - bottomLand)}
-              stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
-          </g>
+        {/* ── COUPLING POST — one 114 member, only the band the leaves do NOT
+             cover is visible from outside (72 outward · 93 inward) ── */}
+        {(zones.posts || []).map((po, i) => (
+          <rect key={`po${i}`} x={X(po.visX)} y={Y(g.land)}
+            width={po.visW} height={totalH - g.land - bottomLand}
+            fill={COLORS.frameFill} stroke={COLORS.frame}
+            strokeWidth={STROKES.frameLight} {...NS} />
         ))}
 
         {/* ── TRANSOM: one rail across the assembly, one fan pane per frame ── */}
@@ -292,13 +278,9 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber }) 
         )}
 
         {/* ── DIMENSIONS ── */}
-        {geom.panelLeaves.map((pn, i) => (
-          <DimH key={`pd${i}`} y={oy + totalH + DM * 0.3} x1={X(pn.x)} x2={X(pn.x + pn.w)}
-            extFrom={Y(totalH)} label={`panel leaf ${fmt(pn.w)}`} small vbw={svgW} />
-        ))}
-        {geom.leaves.map((leaf, i) => (
-          <DimH key={`ld${i}`} y={oy + totalH + DM * 0.3} x1={X(leaf.x)} x2={X(leaf.x + leaf.w)}
-            extFrom={Y(totalH)} label={`leaf ${fmt(leaf.w)}`} small vbw={svgW} />
+        {[...geom.panelLeaves, ...geom.leaves].map((lf, i) => (
+          <DimH key={`ld${i}`} y={oy + totalH + DM * 0.3} x1={X(lf.x)} x2={X(lf.x + lf.w)}
+            extFrom={Y(totalH)} label={fmt(lf.w)} small vbw={svgW} />
         ))}
         {(zones.frames || []).length > 1 && (zones.frames || []).map((f, i) => (
           <DimH key={`fd${i}`} y={oy + totalH + DM * 0.65} x1={X(f.x)} x2={X(f.x + f.w)}
@@ -307,6 +289,10 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber }) 
         ))}
         <DimH y={oy + totalH + DM} x1={X(0)} x2={X(totalW)} extFrom={Y(totalH)}
           label={fmt(totalW)} vbw={svgW} />
+        {(zones.posts || []).length > 0 && (
+          <Label x={X(zones.posts[0].axis)} y={Y(totalH) + DM * 1.25}
+            text={`post ${zones.posts[0].w} · ${fmt(zones.posts[0].visW)} visible`} vbw={svgW} />
+        )}
         {tz && (
           <DimV x={ox + totalW + DM * 0.8} y1={Y(0)} y2={Y(dy)} extFrom={X(totalW)}
             label={`fan ${fmt(tz.h)}`} small vbw={svgW} />

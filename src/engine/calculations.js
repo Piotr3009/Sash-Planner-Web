@@ -962,7 +962,10 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
  *             with 3mm clearance. Only the 6mm overlap matters for sizing:
  *             each leaf = (door clear width + frenchOverlap) / 2, so a 1200
  *             door gives 2 x 563 (clear 1120, meeting band 94+94-6 = 182).
- *   panel   = FIXED leaf, all members 57 (as 3D), inside its own frame
+ *   panel   = FIXED leaf, all members 57 (as 3D). Between panel and door
+ *             stands ONE coupling post 114 with two rebates (Piotr 09.08):
+ *             72 shows from outside when the door opens outward, 93 when it
+ *             opens inward (the door rebate flips to the interior).
  *   transom = frame grows TALLER by transomHeight; frame.height stays the DOOR
  *             zone height. Rail 68 runs the full assembly with its bottom edge
  *             flush with the door opening top; fan cavity = transomHeight - 68.
@@ -986,6 +989,7 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight) {
     const secLeafStile = `${els.leafStile.face}x${ld}`;
     const secLeafBottom = `${els.leafBottom.face}x${ld}`;
     const spMember = p.sidePanel?.member ?? 57;
+    const postW = p.couplingPost?.width ?? 114;
     const secSide = `${spMember}x${p.sidePanel?.depth ?? 57}`;
     const frameFace = els.frameHead.face;
     const inset = geo.glassInset;
@@ -1024,11 +1028,26 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight) {
         { x: doorX, w: frameWidth, kind: 'door' },
         rightW ? { x: doorX + frameWidth, w: rightW, kind: 'panel', side: 'right' } : null,
     ].filter(Boolean);
-    // Coupling joints — where two 57 jambs meet back to back
-    const joints = [
-        leftW ? R(leftW) : null,
-        rightW ? R(doorX + frameWidth) : null,
-    ].filter((v) => v !== null);
+    // Coupling posts — ONE member per panel, 114 wide, two rebates. The band
+    // seen from OUTSIDE is not symmetric when the door opens inward: the panel
+    // side always shows its 36 land, the door side shows 36 outward but its
+    // full 57 face inward (that rebate has flipped to the interior).
+    const halfPost = postW / 2;
+    const doorFace = els.frameHead.face;
+    const posts = [
+        leftW ? { axis: R(leftW), doorSide: 'right' } : null,
+        rightW ? { axis: R(doorX + frameWidth), doorSide: 'left' } : null,
+    ].filter(Boolean).map((po) => {
+        const panelVis = geo.land;                       // 36 always
+        const doorVis = inward ? doorFace : geo.land;    // 57 inward · 36 outward
+        const visX = po.doorSide === 'right' ? po.axis - panelVis : po.axis - doorVis;
+        return {
+            axis: po.axis, doorSide: po.doorSide,
+            x: R(po.axis - halfPost), w: postW,
+            visX: R(visX), visW: R(panelVis + doorVis),
+        };
+    });
+    const joints = posts.map((po) => po.axis);
 
     // ── Door leaves ──
     const leafH = R(frameHeight - (hasTimberCill ? ded.leafFullHeight : ded.leafNoThreshold));
@@ -1059,10 +1078,10 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight) {
         mk('box', 'D-FRAME JAMB (L)', secFrame, R(totalHeight - (L.jambDeduct || 0)), 1, 'D-J/L'),
         mk('box', 'D-FRAME JAMB (R)', secFrame, R(totalHeight - (L.jambDeduct || 0)), 1, 'D-J/R'),
     ];
-    if (panelLeaves.length) {
-        box.push(mk('box', 'D-JAMB (COUPLING)', secFrame,
-            R(totalHeight - (L.jambDeduct || 0)), 2 * panelLeaves.length, 'D-JC',
-            'panel jamb + door jamb, back to back'));
+    if (posts.length) {
+        box.push(mk('box', 'D-COUPLING POST', `${postW}x${fd}`,
+            R(totalHeight - (L.jambDeduct || 0)), posts.length, 'D-JC',
+            'one member, two rebates (panel + door)'));
     }
     if (hasTimberCill) {
         // Inward-opening cill is a different section: unrebated, 40 -> 35mm fall.
@@ -1155,7 +1174,7 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight) {
             zones: {
                 totalWidth, totalHeight,
                 doorX: R(doorX), doorW: R(frameWidth),
-                frames, joints,
+                frames, joints, posts,
                 leftPanel: leftW ? { x: 0, w: leftW } : null,
                 rightPanel: rightW ? { x: R(doorX + frameWidth), w: rightW } : null,
                 transom: transomH ? {

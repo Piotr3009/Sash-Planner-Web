@@ -202,7 +202,7 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber })
 
         <TitleBlock x={totalW / 2} y={oy + leafH + DM + TITLE_AREA * 0.5}
           title={`Leaf Detail${geom.isFrench ? ' ×2 (mirrored pair)' : ''}${projNum ? ` — ${projNum}` : ''} — ${winName}`}
-          subtitle={`${codes} · section ${geom.stile}×${geom.leafDepth} · bottom rail ${geom.bottomRail}${geom.isFrench ? ' · meeting stile rebated 6, 3 clearance' : ''} · ${hinges.length} hinges ${HINGE_H}×${HINGE_W} · glass into rebate ${geom.glassInset}/side · exterior view`}
+          subtitle={`${codes} · ${geom.stile}×${geom.leafDepth} · ${hinges.length} hinges`}
           vbw={totalW} />
       </svg>
     </div>

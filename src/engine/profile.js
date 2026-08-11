@@ -211,6 +211,14 @@ export const DEFAULT_DOOR_PROFILE = Object.freeze({
   // Side panels are FIXED leaves in the same frame, all members 57mm — matches
   // the 3D model (DoorSidePanel stileWidthMm=57), confirmed by Piotr 09.08.
   sidePanel: { member: 57, depth: 57 },
+  // Coupling post between a side panel and the door: ONE member 114 wide with
+  // TWO rebates — the panel leaf laps one side, the door leaf the other
+  // (Piotr 09.08; replaces the two abutting 57 jambs the 3D instantiates).
+  // Outward: both rebates face the exterior, so 36 + 36 = 72 shows from
+  // outside. Inward: the door rebate flips to the interior (3D mirrors the
+  // door frame on Z, DoorWindow.jsx:615) so the door side shows its full 57
+  // face — visible band becomes 36 + 57 = 93, offset towards the door.
+  couplingPost: { width: 114 },
   // Coupled transom (PSW/3D convention): the frame gets TALLER by the transom
   // height — frame.height stays the DOOR zone height. Internal rail 68 (same
   // stock as the mullion), its bottom edge flush with the door opening top;
