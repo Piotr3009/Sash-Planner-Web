@@ -23,7 +23,11 @@
  *   faces later. Formulas and panel order are untouched.
  */
 
-export const CASEMENT_LAYOUTS_VERSION = 1;
+// v2 (Piotr 11.08): added the 4-light fanlight family 142 / 144. The 4-light
+// group previously offered a single structure (140L) while 3 lights had four
+// (130/131/132/133) — the gap was structural, not hinge-related, since panes
+// are already clickable in the picker.
+export const CASEMENT_LAYOUTS_VERSION = 2;
 
 // PSW hardcodes: FRAME_FACE = 57, BOTTOM_FACE = 68, MULLION_W = 68
 export const CASEMENT_GEO_DEFAULTS = Object.freeze({
@@ -103,6 +107,8 @@ export const LAYOUT_DEFAULTS = Object.freeze({
   '023':  { w: 1300, h: 2400 },
   '140L': { w: 2400, h: 1200 },
   '140R': { w: 2400, h: 1200 },
+  '142':  { w: 2400, h: 1500 },
+  '144':  { w: 2400, h: 1500 },
 });
 
 // Layouts with a top fanlight tier — PSW js/casement-controller.js.
@@ -111,6 +117,7 @@ export const LAYOUT_DEFAULTS = Object.freeze({
 // only drives UI visibility for picker-selectable codes.
 export const FANLIGHT_LAYOUTS = Object.freeze([
   '021', '031', '032', '052L', '052R', '022', '131', '132', '133', '013', '023',
+  '142', '144',
 ]);
 
 // 3-tier layouts with a second (bottom) fanlight tier
@@ -137,6 +144,7 @@ export const DISPLAY_NAMES = Object.freeze({
   '133': '3 Lights + Fanlights',
   '013': 'Single — 3 Tier', '023': '2 Lights — 3 Tier',
   '140L': '4 Lights',
+  '142': '4 Lights + Centre Fanlights', '144': '4 Lights + Fanlights',
 });
 
 export const CASEMENT_LAYOUT_CODES = Object.freeze(Object.keys(LAYOUT_DEFAULTS));
@@ -582,6 +590,79 @@ export function casementLayoutDef(
           { x:  off, y: (bottomH + MULLION_W) / 2, w: panelS, h: topH, hinge: 'top' },
           { x: -off, y: -(topH + MULLION_W) / 2, w: panelS, h: bottomH, hinge: 'left' },
           { x:  off, y: -(topH + MULLION_W) / 2, w: panelS, h: bottomH, hinge: 'right' },
+        ],
+      };
+    }
+
+    // ─── 142: Quad — fanlights over the TWO CENTRE lights ───
+    //   Mirrors 131 (fan over the middle only): the end lights run full
+    //   height and open, the centre pair carries a top-hung fan over a fixed
+    //   bottom pane. Panel order: L end, C1 top, C1 bottom, C2 top, C2 bottom,
+    //   R end — index-aligned to casementHinges, DO NOT reorder (PSW parity).
+    case '142': {
+      const panelW = (innerW - mullW * 3) / 4;
+      const m1 = FRAME_FACE + panelW + mullW / 2;
+      const m2 = FRAME_FACE + panelW * 2 + mullW + mullW / 2;
+      const m3 = FRAME_FACE + panelW * 3 + mullW * 2 + mullW / 2;
+      const xEndL = -(1.5 * panelW + 1.5 * mullW);
+      const xC1 = -(0.5 * panelW + 0.5 * mullW);
+      const xC2 = (0.5 * panelW + 0.5 * mullW);
+      const xEndR = (1.5 * panelW + 1.5 * mullW);
+      const topH = innerH * FR;
+      const bottomH = innerH - MULLION_W - topH;
+      const transomY = BOTTOM_FACE + bottomH + MULLION_W / 2;
+      return {
+        mullions: [m1, m2, m3],
+        transoms: [
+          { y: transomY, width: panelW, offsetX: xC1 },
+          { y: transomY, width: panelW, offsetX: xC2 },
+        ],
+        panels: [
+          { x: xEndL, y: 0, w: panelW, h: innerH, hinge: 'left' },
+          { x: xC1, y: (bottomH + MULLION_W) / 2, w: panelW, h: topH, hinge: 'top' },
+          { x: xC1, y: -(topH + MULLION_W) / 2, w: panelW, h: bottomH, hinge: 'fixed' },
+          { x: xC2, y: (bottomH + MULLION_W) / 2, w: panelW, h: topH, hinge: 'top' },
+          { x: xC2, y: -(topH + MULLION_W) / 2, w: panelW, h: bottomH, hinge: 'fixed' },
+          { x: xEndR, y: 0, w: panelW, h: innerH, hinge: 'right' },
+        ],
+      };
+    }
+
+    // ─── 144: Quad — fanlights over ALL FOUR lights ───
+    //   Mirrors 133: full fan row on top, bottom tier fixed by default; the
+    //   end bottoms open. Panel order: all four tops L->R, then all four
+    //   bottoms L->R (same top-row-first convention as 133).
+    case '144': {
+      const panelW = (innerW - mullW * 3) / 4;
+      const m1 = FRAME_FACE + panelW + mullW / 2;
+      const m2 = FRAME_FACE + panelW * 2 + mullW + mullW / 2;
+      const m3 = FRAME_FACE + panelW * 3 + mullW * 2 + mullW / 2;
+      const x0 = -(1.5 * panelW + 1.5 * mullW);
+      const x1 = -(0.5 * panelW + 0.5 * mullW);
+      const x2 = (0.5 * panelW + 0.5 * mullW);
+      const x3 = (1.5 * panelW + 1.5 * mullW);
+      const topH = innerH * FR;
+      const bottomH = innerH - MULLION_W - topH;
+      const transomY = BOTTOM_FACE + bottomH + MULLION_W / 2;
+      const topY = (bottomH + MULLION_W) / 2;
+      const botY = -(topH + MULLION_W) / 2;
+      return {
+        mullions: [m1, m2, m3],
+        transoms: [
+          { y: transomY, width: panelW, offsetX: x0 },
+          { y: transomY, width: panelW, offsetX: x1 },
+          { y: transomY, width: panelW, offsetX: x2 },
+          { y: transomY, width: panelW, offsetX: x3 },
+        ],
+        panels: [
+          { x: x0, y: topY, w: panelW, h: topH, hinge: 'top' },
+          { x: x1, y: topY, w: panelW, h: topH, hinge: 'top' },
+          { x: x2, y: topY, w: panelW, h: topH, hinge: 'top' },
+          { x: x3, y: topY, w: panelW, h: topH, hinge: 'top' },
+          { x: x0, y: botY, w: panelW, h: bottomH, hinge: 'left' },
+          { x: x1, y: botY, w: panelW, h: bottomH, hinge: 'fixed' },
+          { x: x2, y: botY, w: panelW, h: bottomH, hinge: 'fixed' },
+          { x: x3, y: botY, w: panelW, h: bottomH, hinge: 'right' },
         ],
       };
     }
