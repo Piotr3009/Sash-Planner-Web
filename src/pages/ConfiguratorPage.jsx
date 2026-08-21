@@ -100,6 +100,10 @@ const hexToName = (hex) => COLOR_NAME[(hex || '').toUpperCase()] || (hex || '—
 // ─── Triple sash dimension constraints (matching PSW) ───
 const TRIPLE_CONSTRAINTS = { minW: 1400, maxW: 3000, defaultW: 2000, minH: 1200, maxH: 2500 };
 const DOUBLE_CONSTRAINTS = { minW: 400, maxW: 3000, minH: 400, maxH: 3000 };
+// Casement runs wider than a sash box: four lights need more than 3000
+// (Piotr 21.08). Height stays at the sash limit. Note this is a FRAME limit
+// only — per-leaf hardware limits live in casementHardware.js and still apply.
+const CASEMENT_CONSTRAINTS = { minW: 400, maxW: 5000, minH: 400, maxH: 3000 };
 
 // Migrate old custom bar format (position → mm)
 function migrateBars(bars) {
@@ -393,7 +397,12 @@ export default function ConfiguratorPage() {
     }
   }, [sashType]);
 
-  const dimConstraints = sashType === 'triple' ? TRIPLE_CONSTRAINTS : DOUBLE_CONSTRAINTS;
+  // isCasement is also derived below with the other effective values; this
+  // early copy exists because the dimension inputs are constrained by it.
+  const isCasementBatch = batch?.type === 'casement';
+  const dimConstraints = isCasementBatch
+    ? CASEMENT_CONSTRAINTS
+    : (sashType === 'triple' ? TRIPLE_CONSTRAINTS : DOUBLE_CONSTRAINTS);
 
   // ─── Effective values ───
   const isSingle = colourMode === 'single';
