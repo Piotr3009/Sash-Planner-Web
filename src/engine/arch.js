@@ -310,3 +310,154 @@ export function buildArchGeometry({ shape, width, height, rise }, profile) {
     glass: { arcs: glassArcs, length: arcsLength(glassArcs), apex: arcsExtent(glassArcs, [0, 1]).max },
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SEGMENT PLANNER — a curved member is glued up from N straight boards
+// (finger-jointed on radial faces) and the ring contour is routed afterwards.
+//
+// Projection method: each piece is projected onto its own board axes — the
+// chord of its outer arc (length) and the arc's bisector (width). The board a
+// piece needs is that projected width plus the workshop allowance, matched to
+// the narrowest stock board that is at least as wide.
+//
+// D13 (BLOCKERS): the DEFAULT plan is the one with the FEWEST pieces that fit
+// a stock board; the ALTERNATIVE is the plan on the NARROWEST stock board.
+// Both are returned so the drawing can print the alternative.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const pieceEndType = (clip) => (clip === 'archStart' ? 'archStart' : clip === 'axis' ? 'axis' : 'tangent');
+
+/** Split arc i of a ring into n equal (by outer angle) pieces. */
+export function partitionArc(ring, arcIndex, n) {
+  const outer = ring.outer[arcIndex];
+  const inner = ring.inner[arcIndex];
+  const phi = arcSpan(outer) / n;
+  const pieces = [];
+  for (let k = 0; k < n; k++) {
+    const ao0 = outer.a0 + k * phi;
+    const ao1 = k === n - 1 ? outer.a1 : outer.a0 + (k + 1) * phi;
+    const ai0 = k === 0 ? inner.a0 : ao0;
+    const ai1 = k === n - 1 ? inner.a1 : ao1;
+    const oArc = { ...outer, a0: ao0, a1: ao1 };
+    const iArc = { ...inner, a0: ai0, a1: ai1 };
+    // Board axes: bisector b (width direction, pointing to the apex side) and
+    // the chord direction u (length direction, counter-clockwise tangent).
+    const m = (ao0 + ao1) / 2;
+    const b = [Math.cos(m), Math.sin(m)];
+    const u = [-Math.sin(m), Math.cos(m)];
+    const sO = arcExtent(oArc, u), sI = arcExtent(iArc, u);
+    const wO = arcExtent(oArc, b), wI = arcExtent(iArc, b);
+    const sMin = Math.min(sO.min, sI.min), sMax = Math.max(sO.max, sI.max);
+    const wMin = Math.min(wO.min, wI.min), wMax = Math.max(wO.max, wI.max);
+    pieces.push({
+      arc: arcIndex,
+      k,
+      n,
+      outer: oArc,
+      inner: iArc,
+      endStart: k === 0 ? pieceEndType(outer.clip0) : 'radial',
+      endEnd: k === n - 1 ? pieceEndType(outer.clip1) : 'radial',
+      axes: { bisector: m, b, u },
+      extents: { s: [sMin, sMax], w: [wMin, wMax] },
+      projectedWidth: wMax - wMin,
+      chordLength: sMax - sMin,
+    });
+  }
+  return pieces;
+}
+
+/** Closed bulge polyline of one piece: outer arc CCW, radial/clipped end, inner arc CW, other end. */
+export function piecePoly(piece) {
+  const { outer, inner } = piece;
+  return [
+    [...arcPoint(outer, outer.a0), arcBulge(outer)],
+    [...arcPoint(outer, outer.a1), 0],
+    [...arcPoint(inner, inner.a1), -arcBulge(inner)],
+    [...arcPoint(inner, inner.a0), 0],
+  ];
+}
+
+/** Joint faces of a piece (inner → outer point) — every end except the arch-start cut. */
+export function pieceJoints(piece) {
+  const { outer, inner } = piece;
+  const out = [];
+  if (piece.endStart !== 'archStart') out.push([arcPoint(inner, inner.a0), arcPoint(outer, outer.a0)]);
+  if (piece.endEnd !== 'archStart') out.push([arcPoint(inner, inner.a1), arcPoint(outer, outer.a1)]);
+  return out;
+}
+
+function stockFor(boardWidth, stockWidths) {
+  const sorted = [...stockWidths].map(Number).filter((w) => w > 0).sort((a, b) => a - b);
+  for (const w of sorted) if (w + 1e-9 >= boardWidth) return w;
+  return null;
+}
+
+/**
+ * Plan every arc of a ring.
+ * opts: { stockWidths: number[], widthAllowance: number, maxPieces: number }
+ * Returns { arcs: [{ index, radiusOuter, radiusInner, span, options, default, alternative }],
+ *           pieces (default plan, numbered 1..N across arcs), totalPieces, noStock }.
+ * Never throws for "no board fits": the options simply carry stock = null.
+ */
+export function planArchSegments(ring, opts) {
+  const stockWidths = Array.isArray(opts?.stockWidths) ? opts.stockWidths : [];
+  const allowance = Number(opts?.widthAllowance) || 0;
+  const maxPieces = Math.max(1, Math.floor(Number(opts?.maxPieces) || 8));
+  const arcs = ring.outer.map((outer, i) => {
+    const options = [];
+    for (let n = 1; n <= maxPieces; n++) {
+      const pieces = partitionArc(ring, i, n);
+      const projectedWidth = Math.max(...pieces.map((p) => p.projectedWidth));
+      const chordLength = Math.max(...pieces.map((p) => p.chordLength));
+      const boardWidth = projectedWidth + allowance;
+      options.push({ n, pieces, projectedWidth, chordLength, boardWidth, stock: stockFor(boardWidth, stockWidths) });
+    }
+    const feasible = options.filter((o) => o.stock != null);
+    const def = feasible[0] || null;                                  // fewest pieces
+    let alt = null;
+    for (const o of feasible) if (!alt || o.stock < alt.stock) alt = o; // narrowest board
+    if (alt && def && alt.n === def.n) alt = null;
+    return {
+      index: i,
+      radiusOuter: outer.r,
+      radiusInner: ring.inner[i].r,
+      span: arcSpan(outer),
+      options,
+      default: def,
+      alternative: alt,
+    };
+  });
+  const pieces = [];
+  for (const a of arcs) {
+    if (!a.default) continue;
+    for (const p of a.default.pieces) pieces.push({ ...p, no: pieces.length + 1, stock: a.default.stock });
+  }
+  return {
+    arcs,
+    pieces,
+    totalPieces: pieces.length,
+    noStock: arcs.some((a) => !a.default),
+    stockWidths: [...stockWidths],
+    widthAllowance: allowance,
+    maxPieces,
+  };
+}
+
+/**
+ * Whole-window plan: geometry + segment plans for the frame head and the
+ * leaf top rail, finger-joint profile — everything the DXF builder needs.
+ * Reads profile.arch: { finger, stockWidths, widthAllowance, maxPieces }.
+ */
+export function buildArchPlan(input, profile) {
+  if (!profile?.arch) throw new ArchError('Casement profile has no "arch" section (stock widths / finger joint)');
+  const geometry = buildArchGeometry(input, profile);
+  const frameHead = planArchSegments(geometry.frameHead, profile.arch);
+  const leafTop = planArchSegments(geometry.leafTop, profile.arch);
+  return {
+    ...geometry,
+    hinge: input.hinge === 'right' ? 'right' : 'left',
+    finger: { ...profile.arch.finger },
+    plans: { frameHead, leafTop },
+    noStock: frameHead.noStock || leafTop.noStock,
+  };
+}

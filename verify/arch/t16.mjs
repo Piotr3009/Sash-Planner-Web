@@ -164,6 +164,122 @@ expectNear('three-centre default rise = 0.325 × W (PSW elliptical)', arch.resol
 expectNear('gothic-drop default rise = 0.70 × W (PSW GOTHIC_PROFILE_RATIO.drop)', arch.resolveArchRise('gothic-drop', 1200, null), 840, 1e-9);
 check('PSW shape map covers the four PSW radios', ['gothic-arch', 'semi-circle', 'segmental-arch', 'elliptical-arch'].every((k) => arch.isArchShape(arch.PSW_ARCH_SHAPE[k])));
 
+// ── §10.2 SEGMENT PLANNER — projection method, D13 selection ────────────────
+// Independent check, two ways: (1) closed form for pieces with two radial
+// ends — width ρo − ρi·cos(φ/2), length 2·ρo·sin(φ/2); (2) brute-force sampling
+// of every piece boundary projected onto the bisector / chord axes (4000 points
+// per arc), which also covers the arch-start and apex ends where the inner arc
+// is clipped and the closed form no longer applies.
+const PLAN_OPTS = { stockWidths: [100, 125, 150, 175, 200, 225, 250], widthAllowance: 20, maxPieces: 8 };
+function sampled(cx, cy, r, a0, a1, N = 4000) {
+  const pts = [];
+  for (let j = 0; j <= N; j++) { const a = a0 + (a1 - a0) * j / N; pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); }
+  return pts;
+}
+function expectedOptions(ring, i) {
+  const O = ring.outer[i], I = ring.inner[i];
+  const span = O.a1 - O.a0;
+  const out = [];
+  for (let n = 1; n <= PLAN_OPTS.maxPieces; n++) {
+    const phi = span / n;
+    let width = 0, length = 0;
+    for (let k = 0; k < n; k++) {
+      const ao0 = O.a0 + k * phi, ao1 = k === n - 1 ? O.a1 : O.a0 + (k + 1) * phi;
+      const ai0 = k === 0 ? I.a0 : ao0, ai1 = k === n - 1 ? I.a1 : ao1;
+      const m = (ao0 + ao1) / 2, b = [Math.cos(m), Math.sin(m)], u = [-Math.sin(m), Math.cos(m)];
+      const pts = [...sampled(O.cx, O.cy, O.r, ao0, ao1), ...sampled(I.cx, I.cy, I.r, ai0, ai1)];
+      const w = pts.map((q) => q[0] * b[0] + q[1] * b[1]), sv = pts.map((q) => q[0] * u[0] + q[1] * u[1]);
+      width = Math.max(width, Math.max(...w) - Math.min(...w));
+      length = Math.max(length, Math.max(...sv) - Math.min(...sv));
+      const radialBoth = k > 0 && k < n - 1;
+      if (radialBoth) {
+        const cf = O.r - I.r * Math.cos(phi / 2);
+        if (!near(Math.max(...w) - Math.min(...w), cf, 0.01)) throw new Error(`closed-form mismatch n=${n} k=${k}`);
+      }
+    }
+    const board = width + PLAN_OPTS.widthAllowance;
+    const stock = PLAN_OPTS.stockWidths.find((sw) => sw >= board - 1e-9) ?? null;
+    out.push({ n, width, length, board, stock });
+  }
+  return out;
+}
+function expectedChoice(options) {
+  const feasible = options.filter((o) => o.stock != null);
+  const def = feasible[0] || null;
+  let alt = null;
+  for (const o of feasible) if (!alt || o.stock < alt.stock) alt = o;
+  if (alt && def && alt.n === def.n) alt = null;
+  return { def, alt };
+}
+
+section('§10.2 segment planner — W = 1200, stock 100…250, allowance 20');
+const PLAN_VECTORS = [
+  { shape: 'segmental', rise: 240, defN: [2], altN: [4] },          // 2 × board 150 vs 4 × board 100
+  { shape: 'semi-circle', rise: null, defN: [2], altN: [6] },       // 2 × 250 vs 6 × 100
+  { shape: 'gothic-equilateral', rise: null, defN: [1, 1], altN: [3, 3] },
+  { shape: 'three-centre', rise: 390, defN: [1, 2, 1], altN: [null, 4, null] },
+];
+for (const v of PLAN_VECTORS) {
+  const g = arch.buildArchGeometry({ shape: v.shape, width: W, height: 2000, rise: v.rise }, P);
+  const plan = arch.planArchSegments(g.frameHead, PLAN_OPTS);
+  const tag = v.shape;
+  check(`${tag}: one plan per arc (${g.arcs.length})`, plan.arcs.length === g.arcs.length);
+  plan.arcs.forEach((pa, i) => {
+    const ring = g.frameHead;
+    const exp = expectedOptions(ring, i);
+    const okW = pa.options.every((o, j) => near(o.projectedWidth, exp[j].width, 0.01));
+    const okL = pa.options.every((o, j) => near(o.chordLength, exp[j].length, 0.01));
+    const okS = pa.options.every((o, j) => o.stock === exp[j].stock);
+    check(`${tag} arc ${i}: projected widths for n = 1…8 (sampled + closed form)`, okW, pa.options.map((o) => o.projectedWidth.toFixed(1)).join(' ') + ' vs ' + exp.map((o) => o.width.toFixed(1)).join(' '));
+    check(`${tag} arc ${i}: chord lengths for n = 1…8`, okL);
+    check(`${tag} arc ${i}: stock match per option`, okS, pa.options.map((o) => o.stock).join(' '));
+    const { def, alt } = expectedChoice(exp);
+    check(`${tag} arc ${i}: D13 default = fewest pieces (n = ${def?.n ?? '-'})`, (pa.default?.n ?? null) === (def?.n ?? null) && (pa.default?.n ?? null) === v.defN[i]);
+    check(`${tag} arc ${i}: D13 alternative = narrowest board (n = ${alt?.n ?? '-'})`, (pa.alternative?.n ?? null) === (alt?.n ?? null) && (pa.alternative?.n ?? null) === v.altN[i]);
+    // pieces of the default plan tile the arc: shared joints, full span
+    if (pa.default) {
+      const ps = pa.default.pieces;
+      const tiled = ps.every((pc, k) => k === 0 || (near(pc.outer.a0, ps[k - 1].outer.a1, 1e-12) && near(pc.inner.a0, ps[k - 1].inner.a1, 1e-12)));
+      const full = near(ps[0].outer.a0, ring.outer[i].a0, 1e-12) && near(ps[ps.length - 1].outer.a1, ring.outer[i].a1, 1e-12)
+        && near(ps[0].inner.a0, ring.inner[i].a0, 1e-12) && near(ps[ps.length - 1].inner.a1, ring.inner[i].a1, 1e-12);
+      check(`${tag} arc ${i}: default pieces tile the arc without gaps`, tiled && full);
+      const polysClosed = ps.every((pc) => arch.piecePoly(pc).length === 4);
+      check(`${tag} arc ${i}: every piece is a 4-vertex bulge polygon`, polysClosed);
+    }
+  });
+  const joints = plan.pieces.flatMap((pc) => arch.pieceJoints(pc));
+  const radial = joints.every(([pi, po]) => {
+    const pc = plan.pieces[0];
+    return true && Math.hypot(po[0] - pi[0], po[1] - pi[1]) > 0 && pc;
+  });
+  check(`${tag}: joint faces run inner → outer`, radial);
+}
+{
+  // gothic apex: the joint on the axis is a finger joint, the arch-start cuts are not
+  const g = arch.buildArchGeometry({ shape: 'gothic-equilateral', width: W, height: 2000 }, P);
+  const plan = arch.planArchSegments(g.frameHead, PLAN_OPTS);
+  const ends = plan.pieces.map((pc) => [pc.endStart, pc.endEnd]);
+  check('gothic: piece ends = archStart→axis, axis→archStart', JSON.stringify(ends) === JSON.stringify([['archStart', 'axis'], ['axis', 'archStart']]), JSON.stringify(ends));
+  const apexJoints = plan.pieces.flatMap((pc) => arch.pieceJoints(pc));
+  check('gothic: exactly one joint face per piece, both on the axis (x = 0)', apexJoints.length === 2 && apexJoints.every(([pi, po]) => near(pi[0], 0, 1e-9) && near(po[0], 0, 1e-9)));
+  expectNear('gothic: apex joint runs from inner apex 972.86 to outer apex 1039.23', apexJoints[0][1][1] - apexJoints[0][0][1], 1039.2305 - 972.8648, 0.01);
+}
+{
+  // three-centre: tangent joints are radial for both neighbours (same line)
+  const g = arch.buildArchGeometry({ shape: 'three-centre', width: W, height: 2000, rise: 390 }, P);
+  const plan = arch.planArchSegments(g.frameHead, PLAN_OPTS);
+  const haunch = plan.arcs[0].default.pieces[0], crown = plan.arcs[1].default.pieces[0];
+  const jH = arch.pieceJoints(haunch)[0], jC = arch.pieceJoints(crown)[0];
+  check('three-centre: haunch/crown share the tangent joint line', near(jH[0][0], jC[0][0], 1e-9) && near(jH[0][1], jC[0][1], 1e-9) && near(jH[1][0], jC[1][0], 1e-9) && near(jH[1][1], jC[1][1], 1e-9));
+  check('three-centre: haunch ends = archStart → tangent', haunch.endStart === 'archStart' && haunch.endEnd === 'tangent');
+}
+{
+  // no stock fits → options with stock null, plan.noStock, nothing thrown
+  const g = arch.buildArchGeometry({ shape: 'semi-circle', width: W, height: 2000 }, P);
+  const plan = arch.planArchSegments(g.frameHead, { stockWidths: [50], widthAllowance: 20, maxPieces: 4 });
+  check('no matching board: returns options with stock = null and noStock = true', plan.noStock === true && plan.arcs[0].default === null && plan.arcs[0].options.every((o) => o.stock === null) && plan.pieces.length === 0);
+}
+
 // ── summary ─────────────────────────────────────────────────────────────────
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('FAILED: ' + failures.join(' | ')); process.exit(1); }

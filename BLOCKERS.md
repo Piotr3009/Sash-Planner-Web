@@ -55,6 +55,8 @@ tool does the profile).
 | 4.4 | PSW `elliptical-arch` | mapped to `three-centre` (routable from arcs; ellipse is not) | keep as unsupported → export disabled |
 | 4.5 | Rise vs height | only "straight part > 0" is enforced | PSW arched SASH uses ≥ 900 mm straight; casement has no rule in PSW |
 | 4.6 | Branch name | CLAUDE.md says `claude/arched-casement-v1`; the session harness mandates `claude/arched-casement-v1-m23u5x` — commits pushed to BOTH | delete the one you don't want |
+| 4.7 | Board stock for arch pieces | `profile.arch.stockWidths = [100, 125, 150, 175, 200, 225, 250]`, `widthAllowance = 20` (same idea as `boxRaw.widthAllowance`), `maxPieces = 8` | the real list belongs to the Part Registry / supplier; edit the profile |
+| 4.8 | Piece length limits | none — a piece may be as long as the outer chord (≤ 1500 mm) | add `maxPieceLength` to the profile if boards are shorter |
 
 ---
 

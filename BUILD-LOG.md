@@ -39,6 +39,32 @@ independently in the harness; concentricity; clipping; bulge polyline rebuilds e
 **Verdict: ⚠️** code verified against closed-form geometry only; NOT verified against spec §10.1
 (file missing). Not verified: rise limits per shape (my ratios), three-centre haunch ratio 0.5.
 
+### Step 2 — segment planner (`arch.js` §7, harness §10.2)
+
+**Understanding:** a curved member is glued from N straight boards on radial finger joints and
+routed afterwards. For each arc of a ring and each N = 1…maxPieces: split by equal outer angle,
+project every piece onto its board axes (bisector = width, chord = length), board = projected
+width + allowance, stock = narrowest board ≥ that. D13 default = fewest pieces that fit a stock
+board; alternative = plan on the narrowest board (returned, to be printed by the DXF).
+
+**Two approaches, one rejected:** (a) closed-form width ρo − ρi·cos(φ/2) for every piece —
+rejected because end pieces are clipped (arch-start line, gothic apex on the axis) and the inner
+corner is no longer the lowest point (segmental N = 1: 240 mm, not 281 mm); (b) exact projection
+of the actual piece boundary (arc extrema + corners) — chosen; the harness cross-checks it by
+brute-force sampling (4000 points per arc) AND by the closed form on radial-radial pieces.
+
+**Edge cases:** no stock fits → options keep `stock = null`, `noStock = true`, no throw; gothic
+apex = one joint on the axis (finger), arch-start cuts are not joints; three-centre tangent
+joints are one shared radial line for both neighbours.
+
+**Harness:** 140 checks ALL PASS. W = 1200, stock 100–250, allowance 20: segmental 2 pcs / 150
+board (alt 4 / 100), semi-circle 2 / 250 (alt 6 / 100), gothic 1 + 1 (alt 3 + 3), three-centre
+1 + 2 + 1 (alt crown 4).
+
+**Verdict: ⚠️** planner verified two independent ways; D13 default and the stock list are my
+assumptions (BLOCKERS 1, 4.7). Not verified: piece minimum length, board length limits (none in
+the code — a 1500 semi-circle N = 1 asks for a 750 mm board and is simply infeasible).
+
 ---
 
 ## Phase 0 — Project skeleton (React + Vite + layout)
