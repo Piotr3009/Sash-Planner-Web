@@ -154,9 +154,9 @@ karmi cut listę, PDF-y, rysunki, PP. Nigdy nie licz wymiarów okna w innym miej
 
 ---
 
-## STAN — arched-casement-v1 zamknięty (noce 1–2, na `main`), v2 noc 3 zrobiona (branch)
+## STAN — arched-casement-v1 zamknięty (noce 1–2), v2 noc 3 zmergowana do `main` (PR #4, 05.09 20:08)
 v1: geometria (`src/engine/arch.js`), planer desek, CNC DXF (`archDxf.js`), harnessy t16/t17.
-v2 noc 3 (branch `claude/arched-casement-v2-impl-0j27uw`, 06.09): model kształtów v2 (P1 reguła C,
+v2 noc 3 (na `main`): model kształtów v2 (P1 reguła C,
 `segmental` usunięty, Round → półkole / trójłuk z `minHaunchRadius` 150), konfigurator Round | Gothic
 z polem „Arch starts at", silnik z `C-ARCH HEAD` / `C-ARCH TOP RAIL`, szyba jako kształt, pręty
 (proste + wzory PSW), eksporty dla szklarza (DXF + PDF), harness `verify/arch/t18.mjs`.
@@ -172,6 +172,9 @@ i BLOCKERS §9. Zakres — TYLKO:
   `derived.arch.bars`) jako SVG `A`, nigdy Bézier; wymiary W, H, start, rise, każdy promień;
   okna proste bajt-w-bajt identyczne (snapshot).
 - **E** pręty: rysunek 2D + wymiary końców na łuku (silnik i eksporty już są z nocy 3).
+- **Warunek Piotra (06.09):** to, co rysuje ekran (Glass drawing, elevation), i to, co idzie do
+  `Glass DXF` / `Arch DXF`, ma być JEDNYM konturem — te same ArcChain z `derived.arch`. Harness t19
+  porównuje środki i promienie łuków w SVG (`A`) z bulge-polilinią w DXF tego samego okna (±0,01 mm).
 - **F** 3D: przepisanie `ArchedCasementWindow.jsx` na `arch.js` (nazwy propsów PSW + `archRise`,
   `archProfile`, `barPattern`), `windowSpecToConfig.js` i `update3D` przekazują nowe propsy;
   `docs/handover/PSW-3D-ARCH-PORT.md`.
