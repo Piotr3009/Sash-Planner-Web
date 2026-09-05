@@ -109,6 +109,42 @@ shape, alternative = other rule, unknown rule / missing settings throw; 236/236 
 
 **Verdict: ✅ T6** (D13 itself stays OPEN in BLOCKERS — the switch is Piotr's, not mine).
 
+### T3 — rough length, end cuts, piece labels, finger zones (`arch.js`, `archDxf.js`)
+
+**Understanding:** a piece is cut from a board `stock × rough`; rough = band length + finger length
+per JOINTED end (spec §7.7, conservative — the arch-start cut is not a joint). The operator needs,
+per piece: outer / inner length, the two end-cut angles, how many ends get fingers, and where the
+finger zone ends on the board.
+
+**Changes:** per piece `Lin` (band inner chord = `2·(Ri − a)·sin(φ/2)` for middle pieces),
+`jointedEnds`, `roughLength`, `endCuts` = `[start, end]` of `{ kind: 'joint' | 'spring' | 'apex',
+jointed, angleDeg, fromSquareDeg }` (`endCut()` documents both conventions: joint φ/2 from square;
+spring = piece axis to the horizontal as the spec asks, plus 90° − that from square; apex = axis to
+the vertical, from square = axis to horizontal). `planArchSegments` reads `finger.length` from the
+profile (throws readably when missing); options carry `roughLength` (max over pieces). DXF pieces
+row: the ASSEMBLY rectangle is now `stock × rough` with the band placed `finger.length` in from
+each jointed board end (END end drawn on the left — the flat rotation maps the tangent axis onto
+−x, noted in code); FINGER layer adds one zone line `finger.depth` (16) in from each jointed board
+end, full board height; labels: `W1 - FRAME HEAD P1 L358.1 x95` (rough, audit T3) plus a 10 mm
+note `OUT 343.1 IN 230.7 CUT J10.9/S32.7 FINGER ONE END`; the assembly text block prints
+`ROUGH` per arc and a cut-code legend. `dxfWriter` has no linetypes (all CONTINUOUS) → the zone
+lines are plain, not dashed (spec §7.7 says dashed; noted, not a functional loss).
+
+**Numbers (head segmental N = 3):** middle L 441.69 / L_in 403.04 / rough 471.69 (spec 441.71 /
+403.06 / 471.71, within 0.02); end pieces L 451.77 (the band's outer corner on the arch-start
+line projects 10 mm further than the finished corner) → rough 466.77 ≥ spec's 456.71 (which uses
+the middle L for the ends); joint cut 14.53°, arch-start cut 29.07° axis-to-horizontal (60.93°
+from square). Gothic apex pieces: A50.0 (axis to vertical) / 40.0 from square.
+
+**Verification:** esbuild OK · no Polish letters · harness: jointedEnds / rough / end-cut kinds and
+φ/2 on every option of every shape, spec literals for N = 3, DXF flat boards = rough, FINGER count
+5·(N − 1) per ring with zone lines 16 mm from a board end, label / note regexes, legend; 256/256
+ALL PASS · rendered `.audit/t3_segmental.dxf` to PNG (ezdxf + matplotlib) and looked at the head
+P1 board: joint face + zone line at the left, tilted arch-start cut at the right, both labels
+inside the board.
+
+**Verdict: ✅ T3.**
+
 ## 2026-09-05 — arched-casement-v1 (night run, branch `claude/arched-casement-v1`)
 
 **Blocking fact first:** `docs/handover/ARCHED-CASEMENT-v1.md` (the package spec) is NOT in the

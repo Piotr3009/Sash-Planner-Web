@@ -13,13 +13,17 @@
  *                   ASSEMBLY: the boards of the default plan in their glued
  *                   position; FINGER: joint faces; TEXT: plan summary
  *   2. FRAME HEAD — PIECES: every board laid flat (chord horizontal) with the
- *                   piece contour to rout, its stock rectangle (ASSEMBLY) and
- *                   its finger-joint faces (FINGER)
+ *                   piece contour to rout, its ROUGH stock rectangle
+ *                   (ASSEMBLY: stock width × rough length = band length +
+ *                   finger length per jointed end), its finger-joint faces
+ *                   and the finger zones (FINGER: finger depth in from each
+ *                   jointed board end)
  *   3./4. the same for LEAF TOP
  *
  * The finger profile is NOT drawn as teeth — the FINGER layer carries the
- * joint plane only; the Stark head cuts the profile. The profile numbers are
- * printed on the TEXT layer.
+ * joint plane and the zone line only; the Stark head cuts the profile. The
+ * profile numbers are printed on the TEXT layer. dxfWriter has no linetypes
+ * (every layer is CONTINUOUS), so the zone lines are plain short polylines.
  */
 import { ArchError, piecePoly, pieceJoints, ringPoly } from '../arch.js';
 import { entitiesBBox, MERGE_GAP } from './jambDxf.js';
@@ -36,6 +40,7 @@ export const ARCH_CNC = Object.freeze({
   rowGap: 200,       // between rows (jambDxf.jambGap)
   pieceGap: 200,     // between boards in a PIECES row
   textH: 15,         // jambDxf.headTextH
+  noteH: 10,         // second label line on a flat piece (lengths, end cuts, finger)
   lineH: 22,         // text line pitch
   textGap: 100,      // text block offset from the drawing on the right
   textBlockW: 900,   // reserved width for the text block
@@ -76,7 +81,7 @@ function planSummary(plan) {
     const arcTxt = `ARC ${i + 1} R${fmt1(a.radiusOuter)} L${fmt1(a.radiusOuter * a.span)} ${fmt1(a.spanDeg)}DEG`;
     if (!d) return `${arcTxt}: NO STOCK BOARD FITS (needs ${fmt1(a.options[a.options.length - 1].boardWidth)}+)`;
     const altTxt = alt ? ` (ALT ${alt.n} x board ${alt.stock})` : '';
-    return `${arcTxt}: ${d.n} x board ${d.stock} L${fmt1(d.chordLength)}${altTxt}`;
+    return `${arcTxt}: ${d.n} x board ${d.stock} L${fmt1(d.chordLength)} ROUGH ${fmt1(d.roughLength)}${altTxt}`;
   });
 }
 
@@ -116,6 +121,7 @@ function contourRow(ring, plan, ctx, ox, oy) {
     ...planSummary(plan),
     `FINGER ${ctx.finger.length}/${ctx.finger.depth}/${ctx.finger.pitch}`,
     `ALLOWANCE ${fmt1(plan.contourAllowance)} PER SIDE  MAX SEGMENT ${fmt1(plan.maxSegmentAngleDeg)} DEG  RULE ${String(plan.pieceRule).toUpperCase()}`,
+    'CUT CODES: J = JOINT FROM SQUARE  S = ARCH-START, AXIS TO HORIZONTAL  A = APEX FROM SQUARE',
   ];
   const blockH = lines.length * C.lineH;
   const height = Math.max(rowBB.maxY - rowBB.minY, blockH);
@@ -128,29 +134,47 @@ function contourRow(ring, plan, ctx, ox, oy) {
   };
 }
 
-/** Pieces row for one ring: every default piece laid flat on its stock board. */
+const cutCode = (c) => `${c.kind === 'joint' ? 'J' : c.kind === 'spring' ? 'S' : 'A'}${fmt1(c.angleDeg)}`;
+
+/**
+ * Pieces row for one ring: every default piece laid flat on its ROUGH stock
+ * board. In the flat frame the piece's END end (counter-clockwise end) is on
+ * the left and its START end on the right (the rotation maps the tangent
+ * axis u onto −x); jointed ends get the finger length outside the band.
+ */
 function piecesRow(ring, plan, ctx, ox, oy) {
   const C = ARCH_CNC;
   const E = [];
   let x = ox;
   let rowH = 0;
+  const f = ctx.finger;
   for (const pc of plan.pieces) {
     const theta = Math.PI / 2 - pc.axes.bisector;      // bisector → +y, chord → x
     const [sMin, sMax] = pc.extents.s;
     const pad = (pc.stock - pc.projectedWidth) / 2;
     const wLo = pc.extents.w[0] - pad;
-    // after rotation the chord axis u maps to −x, so s ∈ [sMin, sMax] → x ∈ [−sMax, −sMin]
-    const dx = x + sMax, dy = oy - wLo;
+    const [cutStart, cutEnd] = pc.endCuts;
+    const mLeft = cutEnd.jointed ? f.length : 0;       // END end is drawn on the left
+    const mRight = cutStart.jointed ? f.length : 0;    // START end on the right
     const L = sMax - sMin;
-    E.push(polyE('ASSEMBLY', [[x, oy, 0], [x + L, oy, 0], [x + L, oy + pc.stock, 0], [x, oy + pc.stock, 0]]));
+    const rough = mLeft + L + mRight;
+    // after rotation the chord axis u maps to −x, so s ∈ [sMin, sMax] → x ∈ [x + mLeft, x + mLeft + L]
+    const dx = x + mLeft + sMax, dy = oy - wLo;
+    E.push(polyE('ASSEMBLY', [[x, oy, 0], [x + rough, oy, 0], [x + rough, oy + pc.stock, 0], [x, oy + pc.stock, 0]]));
     E.push(polyE('PIECES', shift(rotate(piecePoly(pc), theta), dx, dy)));
     for (const [pi, po] of pieceJoints(pc)) {
       const [[ax, ay], [bx, by]] = rotate([[pi[0], pi[1], 0], [po[0], po[1], 0]], theta);
       E.push(lineE('FINGER', [ax + dx, ay + dy], [bx + dx, by + dy]));
     }
-    E.push(labelE('TEXT', x + L / 2, oy + pc.stock / 2, C.textH,
-      `${ctx.winNum ? ctx.winNum + ' - ' : ''}${ring.label} P${pc.no} ${fmt1(L)}x${pc.stock}`));
-    x += L + C.pieceGap;
+    // finger zones: finger depth in from each jointed board end, full board height
+    if (cutEnd.jointed) E.push(lineE('FINGER', [x + f.depth, oy], [x + f.depth, oy + pc.stock]));
+    if (cutStart.jointed) E.push(lineE('FINGER', [x + rough - f.depth, oy], [x + rough - f.depth, oy + pc.stock]));
+    const fingerTxt = pc.jointedEnds === 2 ? 'FINGER BOTH ENDS' : pc.jointedEnds === 1 ? 'FINGER ONE END' : 'NO FINGER';
+    E.push(labelE('TEXT', x + rough / 2, oy + pc.stock / 2 + C.noteH, C.textH,
+      `${ctx.winNum ? ctx.winNum + ' - ' : ''}${ring.label} P${pc.no} L${fmt1(rough)} x${pc.stock}`));
+    E.push(labelE('TEXT', x + rough / 2, oy + C.noteH, C.noteH,
+      `OUT ${fmt1(L)} IN ${fmt1(pc.Lin)} CUT ${cutCode(cutEnd)}/${cutCode(cutStart)} ${fingerTxt}`));
+    x += rough + C.pieceGap;
     rowH = Math.max(rowH, pc.stock);
   }
   return { entities: E, width: Math.max(0, x - C.pieceGap - ox), height: rowH };

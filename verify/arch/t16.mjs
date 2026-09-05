@@ -177,7 +177,7 @@ check('PSW shape map covers the four PSW radios', ['gothic-arch', 'semi-circle',
 // is clipped and the closed form no longer applies.
 // Stock list D7 (Piotr 05.09, spec §5) — the same list DEFAULT_CASEMENT_PROFILE.arch carries.
 // Allowance 10 mm per side (D6), max segment angle 36° (D8).
-const PLAN_OPTS = { stockWidths: [50, 63, 75, 95, 105, 180, 200], contourAllowance: 10, maxSegmentAngleDeg: 36, pieceRule: 'narrowest' };
+const PLAN_OPTS = { stockWidths: [50, 63, 75, 95, 105, 180, 200], contourAllowance: 10, maxSegmentAngleDeg: 36, pieceRule: 'narrowest', finger: { length: 15, depth: 16, pitch: 3.8 } };
 function sampled(cx, cy, r, a0, a1, N = 4000) {
   const pts = [];
   for (let j = 0; j <= N; j++) { const a = a0 + (a1 - a0) * j / N; pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); }
@@ -279,6 +279,16 @@ for (const v of PLAN_VECTORS) {
     check(`${tag} arc ${i}: every piece's own W_req / L match the sampled band`, okPieces);
     const endsGE = pa.options.every((o, j) => exp[j].midWidth == null || o.pieces.every((pc) => pc.wReq + 1e-9 >= exp[j].midWidth));
     check(`${tag} arc ${i}: end pieces W_req >= middle-piece closed form (spec §10.2)`, endsGE);
+    // T3: jointed ends (arch-start cuts are not joints), rough = L + finger × jointed ends, end-cut kinds
+    const jointedOk = pa.options.every((o) => o.pieces.every((pc) => {
+      const j = (pc.endStart === 'archStart' ? 0 : 1) + (pc.endEnd === 'archStart' ? 0 : 1);
+      return pc.jointedEnds === j && near(pc.roughLength, pc.L + PLAN_OPTS.finger.length * j, 1e-9)
+        && pc.endCuts[0].kind === (pc.endStart === 'archStart' ? 'spring' : pc.endStart === 'axis' ? 'apex' : 'joint')
+        && pc.endCuts[1].kind === (pc.endEnd === 'archStart' ? 'spring' : pc.endEnd === 'axis' ? 'apex' : 'joint')
+        && pc.endCuts.every((c) => c.kind !== 'joint' || near(c.angleDeg, pc.phiDeg / 2, 1e-9));
+    }));
+    check(`${tag} arc ${i}: jointedEnds / roughLength = L + 15 × jointed / end-cut kinds and joint angle φ/2`, jointedOk);
+    check(`${tag} arc ${i}: option roughLength = max piece rough`, pa.options.every((o) => near(o.roughLength, Math.max(...o.pieces.map((pc) => pc.roughLength)), 1e-9)));
     const { def, alt } = expectedChoice(exp);
     check(`${tag} arc ${i}: D13 default under '${PLAN_OPTS.pieceRule}' = ${def?.n ?? '-'} × ${def?.stock ?? '-'}`, (pa.default?.n ?? null) === (def?.n ?? null) && (pa.default?.n ?? null) === v.defN[i] && (pa.default?.stock ?? null) === (def?.stock ?? null));
     check(`${tag} arc ${i}: D13 alternative (the other rule) = ${alt?.n ?? '-'} × ${alt?.stock ?? '-'}`, (pa.alternative?.n ?? null) === (alt?.n ?? null) && (pa.alternative?.n ?? null) === v.altN[i]);
@@ -298,6 +308,16 @@ for (const v of PLAN_VECTORS) {
       check(`${tag} arc ${i}: every piece is a 4-vertex bulge polygon`, polysClosed);
     }
   });
+  if (v.shape === 'segmental') {
+    const o3 = plan.arcs[0].options[0];
+    check('segmental N=3 (spec §10.2): middle piece L_out 441.71 / L_in 403.06 / rough 471.71, end pieces rough >= 456.71, joint cut 14.53°',
+      o3.n === 3 && near(o3.pieces[1].L, 441.71, 0.05) && near(o3.pieces[1].Lin, 403.06, 0.05) && near(o3.pieces[1].roughLength, 471.71, 0.05)
+      && o3.pieces[0].roughLength >= 456.71 - 1e-9 && o3.pieces[2].roughLength >= 456.71 - 1e-9 && near(o3.pieces[1].endCuts[0].angleDeg, 14.53, 0.01),
+      `${o3.pieces.map((pc) => `${pc.L.toFixed(2)}/${pc.Lin.toFixed(2)}/${pc.roughLength.toFixed(2)}`).join(' ')}`);
+    check('segmental N=3: end pieces — arch-start cut = piece axis 29.07° to the horizontal (60.93° from square), other end joint 14.53°',
+      near(o3.pieces[0].endCuts[0].angleDeg, 29.07, 0.01) && near(o3.pieces[0].endCuts[0].fromSquareDeg, 60.93, 0.01) && o3.pieces[0].endCuts[0].kind === 'spring'
+      && near(o3.pieces[2].endCuts[1].angleDeg, 29.07, 0.01) && o3.pieces[0].jointedEnds === 1 && o3.pieces[1].jointedEnds === 2);
+  }
   const joints = plan.pieces.flatMap((pc) => arch.pieceJoints(pc));
   const radial = joints.every(([pi, po]) => {
     const pc = plan.pieces[0];
@@ -391,21 +411,31 @@ section('§10.3 DXF round-trip — sample_arch_1200_segmental.dxf (frame head + 
   check(`flat boards: one axis-aligned stock rectangle (${stockF} / ${stockL} high) around every flat piece`, flatBoards.length === nF + nL
     && flatBoards.every((bd) => near(bd.bbox[3] - bd.bbox[1], stockF, 1e-6) || near(bd.bbox[3] - bd.bbox[1], stockL, 1e-6)), String(flatBoards.length));
   const fingers = d.polys.filter((p) => p.layer === 'FINGER');
-  // per ring: N − 1 joints in the assembly + 2·(N − 1) radial ends in the pieces row
-  const nFingerExp = 3 * ((nF - 1) + (nL - 1));
-  check(`FINGER: ${nFingerExp} joint faces (assembled + flat, both rings), open polylines`, fingers.length === nFingerExp && fingers.every((p) => !p.closed && p.n === 2), String(fingers.length));
+  // per ring: N − 1 joints in the assembly + 2·(N − 1) radial ends + 2·(N − 1) finger-zone lines in the pieces row
+  const nFingerExp = 5 * ((nF - 1) + (nL - 1));
+  check(`FINGER: ${nFingerExp} lines (assembled joints + flat joint faces + finger zones, both rings), open polylines`, fingers.length === nFingerExp && fingers.every((p) => !p.closed && p.n === 2), String(fingers.length));
   const jointLen = fingers.map((p) => p.straight);
-  check(`FINGER faces are the member face long (${tF} mm frame × ${3 * (nF - 1)}, ${tL} mm leaf × ${3 * (nL - 1)}, radial)`,
-    jointLen.filter((l) => near(l, tF, 0.01)).length === 3 * (nF - 1) && jointLen.filter((l) => near(l, tL, 0.01)).length === 3 * (nL - 1), jointLen.map((l) => l.toFixed(2)).join(' '));
+  check(`FINGER: joint faces are the member face long (${tF} × ${3 * (nF - 1)}, ${tL} × ${3 * (nL - 1)}), zone lines are the board wide (${stockF} × ${2 * (nF - 1)}, ${stockL} × ${2 * (nL - 1)})`,
+    jointLen.filter((l) => near(l, tF, 0.01)).length === 3 * (nF - 1) && jointLen.filter((l) => near(l, tL, 0.01)).length === 3 * (nL - 1)
+    && jointLen.filter((l) => [...new Set([stockF, stockL])].some((sv) => near(l, sv, 0.01))).length === 2 * (nF - 1) + 2 * (nL - 1), jointLen.map((l) => l.toFixed(2)).join(' '));
+  // finger zones sit finger.depth (16) in from a board end: every zone line's x is 16 from a flat board edge
+  const zones = fingers.filter((p) => near(p.straight, stockF, 0.01) || near(p.straight, stockL, 0.01));
+  check('FINGER zones: each 16 mm in from a flat board end (finger.depth)', zones.every((z) => flatBoards.some((bd) => near(z.bbox[0], bd.bbox[0] + 16, 1e-6) || near(z.bbox[0], bd.bbox[2] - 16, 1e-6))), String(zones.length));
+  // flat boards are stock × rough: rough = band L + 15 per jointed end
+  const roughs = [...plan.plans.frameHead.pieces, ...plan.plans.leafTop.pieces].map((pc) => pc.roughLength).sort((a, b) => a - b);
+  const boardLens = flatBoards.map((bd) => bd.bbox[2] - bd.bbox[0]).sort((a, b) => a - b);
+  check('flat boards: length = piece rough length (band L + finger 15 per jointed end)', boardLens.length === roughs.length && boardLens.every((l, i) => near(l, roughs[i], 1e-6)), `${boardLens.map((l) => l.toFixed(1))} vs ${roughs.map((l) => l.toFixed(1))}`);
   const texts = d.texts.map((t) => t.text);
   check('TEXT: labels for both members', texts.some((t) => t === 'W1 - FRAME HEAD') && texts.some((t) => t === 'W1 - LEAF TOP'));
   check('TEXT: shape / size / hinge line', texts.some((t) => t === 'SEGMENTAL W1200 RISE240 H2000 HINGE L'), texts.join(' | '));
   check('TEXT: finger profile 15/16/3.8', texts.some((t) => t === 'FINGER 15/16/3.8'));
   check('TEXT: allowance 10 per side + max segment 36 deg + rule printed', texts.some((t) => t === 'ALLOWANCE 10 PER SIDE  MAX SEGMENT 36 DEG  RULE NARROWEST'), texts.filter((t) => t.startsWith('ALLOW')).join(' | '));
   const altTxt = expF.alt ? ` \\(ALT ${expF.alt.n} x board ${expF.alt.stock}\\)` : '';
-  const planRe = new RegExp(`^ARC 1 R870 L1324\\.2 87\\.2DEG: ${expF.def.n} x board ${expF.def.stock} L\\d+(\\.\\d)?${altTxt}$`);
+  const planRe = new RegExp(`^ARC 1 R870 L1324\\.2 87\\.2DEG: ${expF.def.n} x board ${expF.def.stock} L\\d+(\\.\\d)? ROUGH \\d+(\\.\\d)?${altTxt}$`);
   check(`TEXT: D13 default + alternative printed (${expF.def.n} × ${expF.def.stock}, ALT ${expF.alt?.n ?? '-'} × ${expF.alt?.stock ?? '-'})`, texts.some((t) => planRe.test(t)), texts.filter((t) => t.startsWith('ARC')).join(' | '));
-  check('TEXT: flat piece labels with board size', texts.some((t) => new RegExp(`^W1 - FRAME HEAD P1 \\d+(\\.\\d)?x${stockF}$`).test(t)) && texts.some((t) => new RegExp(`^W1 - LEAF TOP P1 \\d+(\\.\\d)?x${stockL}$`).test(t)));
+  check('TEXT: flat piece labels print L <rough> x <stock>', texts.some((t) => new RegExp(`^W1 - FRAME HEAD P1 L\\d+(\\.\\d)? x${stockF}$`).test(t)) && texts.some((t) => new RegExp(`^W1 - LEAF TOP P1 L\\d+(\\.\\d)? x${stockL}$`).test(t)), texts.filter((t) => / P1 /.test(t)).join(' | '));
+  check('TEXT: flat piece note prints OUT / IN / CUT codes / finger ends', texts.filter((t) => /^OUT \d+(\.\d)? IN \d+(\.\d)? CUT [JSA]\d+(\.\d)?\/[JSA]\d+(\.\d)? (FINGER BOTH ENDS|FINGER ONE END|NO FINGER)$/.test(t)).length === nF + nL, texts.filter((t) => t.startsWith('OUT')).join(' | '));
+  check('TEXT: cut-code legend line', texts.some((t) => t.startsWith('CUT CODES: J = JOINT FROM SQUARE')));
   const minX = Math.min(...d.polys.map((p) => p.bbox[0])), minY = Math.min(...d.polys.map((p) => p.bbox[1]));
   check('drawing origin: nothing left of / below (0, 0)', minX >= -1e-6 && minY >= -1e-6, `${minX.toFixed(3)}, ${minY.toFixed(3)}`);
   // polyLength (JS) agrees with ezdxf-side arithmetic on the frame contour

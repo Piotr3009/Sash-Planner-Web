@@ -390,6 +390,13 @@ export function partitionArc(ring, arcIndex, n, band = null) {
     // line) — the end cut the CNC needs for an arch-start end
     const axisAngle = Math.abs(Math.atan2(u[1], u[0]));
     const axisAngleDeg = (axisAngle > Math.PI / 2 ? Math.PI - axisAngle : axisAngle) * 180 / Math.PI;
+    const endStart = first ? pieceEndType(outer.clip0) : 'radial';
+    const endEnd = last ? pieceEndType(outer.clip1) : 'radial';
+    // band inner chord = L_in (spec: 2·(Ri − a)·sin(φ/2) for a middle piece)
+    const pi0 = arcPoint(bandInner, bandInner.a0), pi1 = arcPoint(bandInner, bandInner.a1);
+    const Lin = Math.hypot(pi1[0] - pi0[0], pi1[1] - pi0[1]);
+    const endCuts = [endCut(endStart, phi, axisAngleDeg), endCut(endEnd, phi, axisAngleDeg)];
+    const jointedEnds = endCuts.filter((c) => c.jointed).length;
     pieces.push({
       arc: arcIndex,
       k,
@@ -400,17 +407,36 @@ export function partitionArc(ring, arcIndex, n, band = null) {
       outer: oArc,
       inner: iArc,
       band: { outer: bandOuter, inner: bandInner },
-      endStart: first ? pieceEndType(outer.clip0) : 'radial',
-      endEnd: last ? pieceEndType(outer.clip1) : 'radial',
+      endStart,
+      endEnd,
+      endCuts,                       // [start end, end end] — see endCut()
+      jointedEnds,                   // 0, 1 or 2 finger-jointed ends (arch-start cuts are not joints)
       axes: { bisector: m, b, u },
       extents: { s: [sMin, sMax], w: [wMin, wMax] },
       wReq: wMax - wMin,
       projectedWidth: wMax - wMin,   // alias kept for the drawing (= W_req, band included)
       L: sMax - sMin,
       chordLength: sMax - sMin,      // alias kept for the drawing (= L_out of the band)
+      Lin,
     });
   }
   return pieces;
+}
+
+/**
+ * End cut of a piece (spec §7.8). `angleDeg` follows the spec's convention per
+ * kind, `fromSquareDeg` is always the mitre from a square cut:
+ *   joint  (radial / tangent plane) — φ/2 from square (= angleDeg)
+ *   spring (arch-start line)        — angleDeg = piece axis to the horizontal,
+ *                                     from square = 90° − that
+ *   apex   (gothic axis, vertical)  — angleDeg = piece axis to the vertical,
+ *                                     from square = axis to the horizontal
+ */
+export function endCut(endType, phi, axisAngleDeg) {
+  if (endType === 'archStart') return { kind: 'spring', jointed: false, angleDeg: axisAngleDeg, fromSquareDeg: 90 - axisAngleDeg };
+  if (endType === 'axis') return { kind: 'apex', jointed: true, angleDeg: 90 - axisAngleDeg, fromSquareDeg: axisAngleDeg };
+  const half = phi / 2 * 180 / Math.PI;
+  return { kind: 'joint', jointed: true, angleDeg: half, fromSquareDeg: half };
 }
 
 /** Closed bulge polyline of one piece: outer arc CCW, radial/clipped end, inner arc CW, other end. */
@@ -460,7 +486,9 @@ function readPlannerSettings(opts) {
   if (!(maxDeg > 0 && maxDeg <= 180)) throw new ArchError('Casement profile arch.maxSegmentAngleDeg is missing (degrees, 0 < angle <= 180)');
   const pieceRule = opts?.pieceRule;
   if (!PIECE_RULES.includes(pieceRule)) throw new ArchError(`Casement profile arch.pieceRule must be one of ${PIECE_RULES.join(' | ')}, got "${pieceRule}"`);
-  return { stockWidths, allowance, maxDeg, maxAngle: maxDeg * Math.PI / 180, pieceRule };
+  const fingerLength = Number(opts?.finger?.length);
+  if (!(fingerLength >= 0)) throw new ArchError('Casement profile arch.finger.length is missing (mm per jointed end)');
+  return { stockWidths, allowance, maxDeg, maxAngle: maxDeg * Math.PI / 180, pieceRule, fingerLength };
 }
 
 /** D13 selection among the feasible options of one arc (see banner, rule 7). */
@@ -487,9 +515,12 @@ export function planArchSegments(ring, opts) {
   const S = readPlannerSettings(opts);
   const band = allowanceBand(ring, S.allowance);
   const evaluate = (i, n) => {
-    const pieces = partitionArc(ring, i, n, band);
+    // rough length = band length + finger length per jointed end (spec §7.7,
+    // conservative: the whole finger is added at every joint — Piotr may lower it)
+    const pieces = partitionArc(ring, i, n, band).map((p) => ({ ...p, roughLength: p.L + S.fingerLength * p.jointedEnds }));
     const wReq = Math.max(...pieces.map((p) => p.wReq));
     const L = Math.max(...pieces.map((p) => p.L));
+    const roughLength = Math.max(...pieces.map((p) => p.roughLength));
     return {
       n, pieces,
       wReq,
@@ -497,6 +528,7 @@ export function planArchSegments(ring, opts) {
       boardWidth: wReq,         // alias (export messages)
       L,
       chordLength: L,           // alias (drawing)
+      roughLength,
       stock: stockFor(wReq, S.stockWidths),
     };
   };
@@ -539,6 +571,7 @@ export function planArchSegments(ring, opts) {
     contourAllowance: S.allowance,
     maxSegmentAngleDeg: S.maxDeg,
     pieceRule: S.pieceRule,
+    fingerLength: S.fingerLength,
   };
 }
 
