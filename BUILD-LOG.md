@@ -126,6 +126,72 @@ right-hand tracery ends unlabelled (the `to` end sits on the springing there) �
 sheet = 2 × outline arcs (unit + seal) + 2 × arc bars (checked by hand: 6 / 4 / 12 / 2 / 8).
 **Verdict: ✅ D4 + E** (2D part; E in 3D is part of F).
 
+### F — 3D (`archedCasementGeometry.js` new, `ArchedCasementWindow.jsx` rewritten, `windowSpecToConfig.js`, `ConfiguratorPage.jsx` update3D, `src/3d/App.jsx`, `docs/handover/PSW-3D-ARCH-PORT.md`)
+
+**Understanding:** the configurator's 3D must show the arch the joiner typed — rule C, concentric rings,
+the rise — instead of the PSW fixed ratios; the component keeps the PSW prop names so it can go back to PSW.
+
+**Two approaches, one rejected:** (a) keep delegating the leaf to `FixFrameWindow` and only fix the frame —
+rejected: the leaf shapes in FixFrameWindow are the PSW ratios (ellipse, 0.4 W segment) and a `fixArchRise`
+hack; the leaf top would never match the frame ring; (b) one pure helper that builds every contour from
+`arch.js` and a component that only turns contours into THREE shapes — chosen, and the helper is what t19 tests.
+
+**Built:**
+- `archedCasementGeometry.js` (pure, no React / THREE, importable in node): `resolveArchProps` (PSW + PC shape
+  names, `archRise` or the PSW ratio, gothic profile), `sampleArc` / `contourUnder` / `contourAt` (concentric
+  offset of a contour: `offsetArcs` + sides and bottom moved in), `archedCasementGeometry` → outer, inner (57),
+  rebated (36), gasket inner (36 + 19), leaf outer (40) / inner (104), glass outline + bars via `buildGlassOutline`
+  / `buildArchBars` on the 3D daylight, in mm around the window centre; `safeArchedCasementGeometry` falls back to
+  the ratio rise (reason kept) and never throws for a viewer. Dimensions come in as `dims` from the 3D constants
+  (`CasementFrame` / `CasementPanel`), never literals; the two profile rules the 3D cannot know arrive as props
+  (`archMinHaunchRadius`, `archPatterns`) with the PSW literals as the fallback (`PSW_BAR_PATTERN_SETTINGS`).
+  Two drawing floors found by the harness: a haunch must be deeper than the deepest ring drawn (leaf inner 104
+  + bead 10 → 114; production's 150 wins when passed) and the frame must leave the leaf's straight part below the
+  springing (rise + 125, PSW had rise + 50) — both derived from `dims`, logged in BLOCKERS §10.
+- `ArchedCasementWindow.jsx`: frame ext / int layers + gasket from the helper contours (the gasket inner edge is a
+  true offset, no centroid inset), the leaf drawn here (ring split ext / int, chamfer + ovolo contour beads as 32
+  concentric layered strips each, glass `ShapeGeometry` + 1 mm spacer ring, handle, pivot), bars: straight =
+  profiled trapezoid / ovolo extrusions rotated along the segment (18 mm overshoot; spokes inset 0.6 / 0.4 bar
+  widths as PSW), rings / tracery = 64 layered strips along the exact arc (PSW `intersectingData` /
+  `buildRingLayers`, reused). Props: PSW names kept + `archRise`, `archProfile`, `barPattern` (falls back to
+  `fixSemiBarPattern` / `fixGothicBars`; PSW `patternA` → none), `archMinHaunchRadius`, `archPatterns`. Guides
+  print the real rise.
+- Wiring: `windowSpecToConfig` emits `casArchShape` = PC name, `archRise`, `archProfile`, `barPattern`,
+  `archMinHaunchRadius`, `archPatterns` (profile); `ConfiguratorPage` `update3D` the same (`PC_TO_3D_ARCH` removed —
+  the component takes PC names now, justification: dead mapping); `src/3d/App.jsx` stores the five keys, hands them
+  to the component and keeps them in the category bucket (outside the spec's file list — without it the props
+  never reach the component; PSW's App needs the same five lines, see the port doc).
+- `docs/handover/PSW-3D-ARCH-PORT.md`: files, props, what changes visually, checks after the copy.
+
+**Verification:** esbuild OK on all six files · `npm run build` OK · helper in node: extents = W × H for
+semi-circle / three-centre / gothic × 2 and the four PSW names, rings nest (57 / 36 / 40 / 104), rule C at the
+springing, bar counts and roles = the engine list, tracery centred on the outer corners, fallback on an
+impossible rise, floors (t19 §4, 40 checks) · t19 §5 structural evidence of the wiring.
+NOT verified in a browser at the time of writing: the WebGL render itself (a headless SwiftShader screenshot of
+the component was attempted — see the end of this section) and the configurator click-through.
+**Verdict: ⚠️ F** (geometry proven in node; the rendered look needs Piotr's eye in the morning).
+
+### T19 — `verify/arch/t19.mjs` + closing checks
+
+**Built:** bundles the live `src/` (sheets + engine + archDxf + glassDxf + cncExport + the 3D helper +
+windowSpecToConfig) and asserts: §1 the four rectangular fixtures → 22 sheets byte-identical to the pre-night
+fixture (`rect-casement-sheets.json`, rendered from `5ba3661`); §2 six arched windows (semi-circle / three-centre
+1300 / gothic × plain and 2v/1h + pattern): no NaN, `A` count per sheet = 7n / 4n / 4n / 2n (+ 2 per arc bar), no
+Bezier command, head / leaf / glass radius labels, start / rise / stile / springing dims, C-AH / C-J cut-list
+lengths, E bar-end numbers (`V1 1297`, `K1 608.3 · 1249.7`, `R1 R 121.7`, tracery ends), clipPath + one band per
+bar, every `<text>` anchor inside the viewBox; §3 ONE CONTOUR — every SVG `A` converted to its circle with the
+W3C endpoint → centre formula (independent of `archDrawUtils`) and mapped into the arch frame through
+`data-arch-origin`; the arch CNC DXF rings (`cncExport.archParamsForWindow` → `buildArchEntities`, each row pinned
+by its ring's outer start point) and the glazier DXF (`GLASS_CONTOUR`, `GLASS_BARS`) converted from bulges: same
+centre set, every DXF ring / contour / bar arc has an SVG twin ±0.01 mm (bands r ± 11 / ± 9, seal r − 11, land
+r − 36), every SVG arc sits on a DXF centre; §4 the 3D helper (above); §5 wiring.
+**Result:** t19 **241 / 241 ALL PASS** · t16 504 / 504 · t17 72 / 72 · t18 178 / 178 (ezdxf installed in the
+session first — the DXF probes need it) · `npm run build` OK · esbuild on every touched file · no Polish
+letters (codepoint check) · `git diff origin/main --stat` = spec §5 night-4 files + `archDrawUtils.js`,
+`archedCasementGeometry.js`, `src/3d/App.jsx`, `ConfiguratorPage.jsx` (update3D block), verify / fixtures / docs /
+logs — `casementLayouts.js`, beading, `jambDxf.js`, `arch.js`, `calculations.js` untouched.
+**Verdict: ✅ T19**
+
 ## 2026-09-06 — arched-casement-v2 night 3: A + B + C + t18 (branch `claude/arched-casement-v2-impl-0j27uw`)
 
 Inputs read in full, in this order: `CLAUDE.md` → `ARCHED-CASEMENT-v2.md` (spec, P1–P10 override v1) →

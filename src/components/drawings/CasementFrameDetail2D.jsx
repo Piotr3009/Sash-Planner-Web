@@ -42,8 +42,8 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
     const A = derived.arch;
     if (A?.geometry) {
       const AG = A.geometry;
-      const headRec = (derived.components?.box || []).find((r) => r.name === 'C-ARCH HEAD');
-      const jambRec = (derived.components?.box || []).find((r) => r.name === 'C-FRAME JAMB (L)');
+      const headRec = (derived.components?.box || []).find((r) => r.elementName === 'C-ARCH HEAD');
+      const jambRec = (derived.components?.box || []).find((r) => r.elementName === 'C-FRAME JAMB (L)');
       arch = {
         AG, rise: AG.rise, start: AG.start,
         outer: AG.arcs,

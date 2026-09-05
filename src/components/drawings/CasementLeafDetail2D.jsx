@@ -90,7 +90,7 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
     const fw = Number(windowSpec.frame?.width ?? 0);
     if (A?.geometry && A.glassOutline && rect && fw && idx === 0) {
       const AG = A.geometry;
-      const railRec = (derived.components?.sash || []).find((r) => r.name === 'C-ARCH TOP RAIL');
+      const railRec = (derived.components?.sash || []).find((r) => r.elementName === 'C-ARCH TOP RAIL');
       const isH = (b) => b.kind === 'straight' && Math.abs(b.from[1] - b.to[1]) < 1e-6 && (b.role === 'h' || b.role === 'springing');
       const isV = (b) => b.kind === 'straight' && b.role === 'v' && Math.abs(b.from[0] - b.to[0]) < 1e-6;
       const bars = A.bars || [];

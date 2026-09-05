@@ -154,40 +154,32 @@ karmi cut listę, PDF-y, rysunki, PP. Nigdy nie licz wymiarów okna w innym miej
 
 ---
 
-## STAN — arched-casement-v1 zamknięty (noce 1–2), v2 noc 3 zmergowana do `main` (PR #4, 05.09 20:08)
+## STAN — arched-casement-v2 zamknięty: noc 3 (A+B+C) na `main` (PR #4), noc 4 (D+E+F+t19) na branchu sesji
 v1: geometria (`src/engine/arch.js`), planer desek, CNC DXF (`archDxf.js`), harnessy t16/t17.
-v2 noc 3 (na `main`): model kształtów v2 (P1 reguła C,
-`segmental` usunięty, Round → półkole / trójłuk z `minHaunchRadius` 150), konfigurator Round | Gothic
-z polem „Arch starts at", silnik z `C-ARCH HEAD` / `C-ARCH TOP RAIL`, szyba jako kształt, pręty
-(proste + wzory PSW), eksporty dla szklarza (DXF + PDF), harness `verify/arch/t18.mjs`.
-Werdykty w `BUILD-LOG.md` (sekcja 06.09 noc 3), otwarte pytania w `BLOCKERS.md §9`.
+v2 noc 3 (na `main`): model kształtów v2 (P1 reguła C, `segmental` usunięty, Round → półkole / trójłuk z
+`minHaunchRadius` 150), konfigurator Round | Gothic z polem „Arch starts at", silnik z `C-ARCH HEAD` /
+`C-ARCH TOP RAIL`, szyba jako kształt, pręty (proste + wzory PSW), eksporty dla szklarza (DXF + PDF), harness t18.
+v2 noc 4 (branch `claude/arched-casement-v2-def-enkyue`, do mergu rano): cztery arkusze 2D casement rysują
+łuki z ArcChain `derived.arch` przez `archDrawUtils.js` (SVG `A`, nigdy Bézier; okna proste bajt w bajt —
+fixture `verify/arch/fixtures/rect-casement-sheets.json`), pręty + liczby końców na łuku (E),
+`ArchedCasementWindow.jsx` przepisany na `arch.js` przez czysty helper `archedCasementGeometry.js`
+(propsy PSW + `archRise` / `archProfile` / `barPattern` / `archMinHaunchRadius` / `archPatterns`),
+`windowSpecToConfig` + `update3D` + `src/3d/App.jsx` przekazują nowe propsy, `docs/handover/PSW-3D-ARCH-PORT.md`,
+harness `verify/arch/t19.mjs` (snapshot, arkusze, JEDEN KONTUR SVG ↔ DXF ±0,01, helper 3D, okablowanie).
+Werdykty w `BUILD-LOG.md` (sekcja noc 4), otwarte pytania w `BLOCKERS.md §10` (+ §9 P9 / D13 / 9.3 / F2).
 Spec: `docs/handover/ARCHED-CASEMENT-v2.md` (+ v1, v1-AUDIT jako historia).
 
-## ZADANIE NOCNE 4 — arched-casement-v2, część D + E + F (po mergu nocy 3)
+## ZADANIE NOCNE — brak (noc 4 zamknięta; następny pakiet po przeglądzie Piotra)
 
-Spec: `@docs/handover/ARCHED-CASEMENT-v2.md` §4. Czytasz w całości, potem BUILD-LOG (noc 3)
-i BLOCKERS §9. Zakres — TYLKO:
-- **D** arkusze 2D (`CasementElevation2D`, `CasementFrameDetail2D`, `CasementLeafDetail2D`,
-  `CasementGlassDrawing2D`): łuki z ArcChain (`derived.arch.geometry`, `derived.arch.glassOutline`,
-  `derived.arch.bars`) jako SVG `A`, nigdy Bézier; wymiary W, H, start, rise, każdy promień;
-  okna proste bajt-w-bajt identyczne (snapshot).
-- **E** pręty: rysunek 2D + wymiary końców na łuku (silnik i eksporty już są z nocy 3).
-- **Warunek Piotra (06.09):** to, co rysuje ekran (Glass drawing, elevation), i to, co idzie do
-  `Glass DXF` / `Arch DXF`, ma być JEDNYM konturem — te same ArcChain z `derived.arch`. Harness t19
-  porównuje środki i promienie łuków w SVG (`A`) z bulge-polilinią w DXF tego samego okna (±0,01 mm).
-- **F** 3D: przepisanie `ArchedCasementWindow.jsx` na `arch.js` (nazwy propsów PSW + `archRise`,
-  `archProfile`, `barPattern`), `windowSpecToConfig.js` i `update3D` przekazują nowe propsy;
-  `docs/handover/PSW-3D-ARCH-PORT.md`.
-- harness `verify/arch/t19.mjs` (spec §4); t16/t17/t18 nadal ALL PASS.
-
-Nie ruszaj `casementLayouts.js`, beadingu, listy „NIE RÓB DZIŚ". Otwarte w BLOCKERS §9:
-P9 (900), D13, minimalna długość kawałka (9.3), F2 (rise > 150).
+Kandydaci z BLOCKERS §10 / §9 (Piotr decyduje): 10.1 podgląd 3D okna łukowego w `WindowPreview3D` /
+`Window3DCaptureRig` (sześć linii), 10.3 twarze 3D z profilu, 9.10 BOM z desek planera, P9 (900), D13,
+9.3 minimalna długość kawałka, F2 (rise > 150). Harnessy do utrzymania: t16 / t17 / t18 / t19 ALL PASS.
 
 ## NIE RÓB DZIŚ (zaplanowane, osobne pakiety)
 
 - Drzwi: ramiaki skrzydła 92 mm zamiast 94 (materiał 014); próg 4 zawiasów > 2100 mm.
 - Casement: jamby i head 68 mm zamiast 57 (razem z PSW + bump wersji layoutów).
-- Cut list / szyby / 2D / 3D dla łuków, sash i fix frame łukowe, nadświetla łukowe drzwi, wzory prętów w łukach.
+- Sash i fix frame łukowe, nadświetla łukowe drzwi (cut list / szyby / 2D / 3D / wzory prętów dla łukowego CASEMENT są zrobione — v2 noce 3–4).
 - Listwy przyszybowe: moduł beading SASH jest zamrożony; casement nie ma listew w silniku W OGÓLE (także proste) — nie wymyślaj rekordów beading dla casement, to osobny pakiet z przekrojem z profilu.
 - `EstimateConfiguratorPage.jsx` limit 3000 mm (nierozstrzygnięte).
 - Mullions/ślemienia casement nie trafiają do cut listy (`components.box`) — znana luka silnika, nie tego pakietu.
@@ -209,9 +201,10 @@ P9 (900), D13, minimalna długość kawałka (9.3), F2 (rise > 150).
 ## Checklist na koniec sesji
 
 - [ ] branch sesji wypchnięty, `main` nietknięty
-- [ ] `node verify/arch/t16.mjs`, `node verify/arch/t17_edges.mjs`, `node verify/arch/t18.mjs` → ALL PASS
+- [ ] `node verify/arch/t16.mjs`, `node verify/arch/t17_edges.mjs`, `node verify/arch/t18.mjs`, `node verify/arch/t19.mjs` → ALL PASS (t16 / t18 / t19 wymagają `pip install ezdxf --break-system-packages`)
 - [ ] `npm run build` przechodzi
 - [ ] esbuild OK na każdym dotkniętym pliku, zero polskiego w źródłach
 - [ ] `git diff main --stat` obejmuje TYLKO pliki ze spec §11 (+ verify, docs, BUILD-LOG, BLOCKERS, CLAUDE.md)
 - [ ] `docs/handover/samples/sample_arch_1200_*.dxf` (pięć: semi-circle, gothic ×2, three-centre 390 i 240) + `sample_glass_*.dxf` w repo
-- [ ] BUILD-LOG.md z werdyktami, BLOCKERS.md z D13 / D5 / d50 otwartymi + wszystkim, co wyszło w nocy
+- [ ] BUILD-LOG.md z werdyktami, BLOCKERS.md z D13 / D5 / d50 / P9 / F2 otwartymi + wszystkim, co wyszło w nocy
+- [ ] okna prostokątne: `verify/arch/t19.mjs §1` bajt w bajt z `rect-casement-sheets.json` (baza: `node verify/arch/t19_baseline.mjs <ref>` PRZED dotknięciem arkuszy)

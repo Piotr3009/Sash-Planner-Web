@@ -4,6 +4,28 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-09-06 — arched-casement-v2 night 4 (D + E + F + t19, branch `claude/arched-casement-v2-def-enkyue`)
+
+Status of the older entries: **§9.1 P9 (900) OPEN**, **§9.2 D13 OPEN**, **§9.3 minimum piece length OPEN**,
+**§9.4 F2 (rise > 150) OPEN**, §1 D13 / §2 D5 / §3 d50 unchanged. §9.14 (windowSpecToConfig) is closed by F below.
+
+### 10. Open after night 4 (for Piotr)
+
+| # | Item | What was built | Ask |
+|---|------|----------------|-----|
+| 10.1 | **Window detail / capture 3D still rectangular for arched windows** | `WindowPreview3D.jsx` and `Window3DCaptureRig.jsx` render `CasementWindow` for every casement. `windowSpecToConfig` now emits everything `ArchedCasementWindow` needs (`casementType`, `casArchShape`, `archRise`, `archProfile`, `barPattern`, `archMinHaunchRadius`, `archPatterns`), but the two viewers were outside the spec's file list and were not touched | A six-line switch in each viewer (`config.casementType === 'arched' ? <ArchedCasementWindow …> : <CasementWindow …>`) — say yes and it is a small package |
+| 10.2 | `src/3d/App.jsx` touched (shared with PSW) | five `update3D` keys stored, bucketed and handed to the component — without them F never reaches the configurator's 3D. PSW's own App needs the same lines (port doc §3) | FYI |
+| 10.3 | **3D bars sit on the 3D leaf face (64), production on the profile (67)** | the 3D builds from its own constants (`CasementFrame` / `CasementPanel`, PSW parity), so the 3D daylight is 104 in and the engine's glass outline 94.5 → a vertical bar at a third of the clear width lands ~2 mm from the production position. Only the preview | accept, or let the 3D read the casement profile faces (breaks byte parity of `CasementFrame.jsx` with PSW) |
+| 10.4 | **3D drawing floors** | a three-centre haunch must be deeper than the deepest ring drawn (leaf inner 104 + bead 10 = 114) and the frame must be at least `rise + 125` high (leaf straight part), else the rings cannot be offset. PC passes the profile minimum 150 which wins; a PSW copy without the prop draws segmental / elliptical arches with r = 114 where production has 150 | FYI — pass 150 in PSW if the previews should match |
+| 10.5 | PSW `fixGothicBars: 'patternA'` | no PC counterpart (a Bezier bar in PSW) → `ArchedCasementWindow` draws no pattern for it. `intersecting` maps | FYI |
+| 10.6 | Contour beads: 32 layered strips per bead (PSW 64), curved bars 64 as PSW | performance choice in the leaf; visually the same | FYI |
+| 10.7 | New files outside the spec's list | `src/components/drawings/archDrawUtils.js` (one arc → SVG serialiser for four sheets), `src/3d/components/casement/archedCasementGeometry.js` (pure helper the harness can load — the component itself imports drei), `verify/arch/lib/sheets.mjs`, `verify/arch/t19_baseline.mjs`, fixture `rect-casement-sheets.json` (204 KB, full SVG strings so a snapshot failure shows a diff) | FYI |
+| 10.8 | Spec §4 "text fits the viewBox (v1 guard)" | no such guard existed in t16–t18; t19 asserts every `<text>` anchor inside the viewBox (rotated text: the anchor point) | FYI |
+| 10.9 | Bars clipped with SVG `clipPath` on the elevation / leaf sheet | the engine axes run to the unit edge (12.5 under the wood); the daylight clip hides that. `svgNodeToPng` (drawings PDF) rasterises through an `<img>` — clipPath is standard SVG, but the PDF was not produced in a browser tonight | morning: open Drawings → Elements PDF on an arched window |
+| 10.10 | Label placement is a first pass | haunch / gothic radii outside near the corners, crown / semi-circle radii inside; glass sheet: `V1 1297` beside the bar 56 mm below its end, spokes set back along the bar, tracery ends outside the outline; frame sheet has no top member chain when arched (the head is curved) | Piotr's eye on the PNGs / screen |
+| 10.11 | Leaf sheet crosses / notches | only for the straight bars (v × h crossings, ends on straight edges); a ring / spoke / tracery has no notch symbol | FYI |
+| 10.12 | Frame sheet C-AH label | prints the cut-list length + planner notes (`R 150/1400/150 · 8 pieces · stock 95/95/95`) in the third title line; the first render used the fallback because the record field is `elementName` (fixed) | FYI |
+
 ## 2026-09-06 — arched-casement-v2 night 3 (A + B + C + t18, branch `claude/arched-casement-v2-impl-0j27uw`)
 
 Status of the older entries: **§1 D13 OPEN** (unchanged — `profile.arch.pieceRule` 'narrowest', ALT printed),
