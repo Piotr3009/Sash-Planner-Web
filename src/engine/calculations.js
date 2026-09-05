@@ -1,7 +1,7 @@
 import { resolveCasementLayout, fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from './casementLayouts.js';
 import { selectCasementHinges, summariseHinges, selectCasementLocks, summariseLocks } from './casementHardware.js';
-import { getWindowProfile, getCasementProfile, getDoorProfile, profileSashDepth, profileBoardWidth, boardWidthForDepth, kgPerM } from './profile.js';
-import { buildArchGeometry, planArchSegments, buildGlassOutline, buildArchBars, glassOutlinePoly, chainAreaAboveLine, ArchError } from './arch.js';
+import { getWindowProfile, getCasementProfile, getDoorProfile, profileSashDepth, profileBoardWidth, boardWidthForDepth, profileBoxDepth, kgPerM } from './profile.js';
+import { buildArchGeometry, buildSashArchGeometry, planArchSegments, buildGlassOutline, buildArchBars, glassOutlinePoly, chainAreaAboveLine, ArchError } from './arch.js';
 import { buildTraceryForDerived } from './cnc/traceryExport.js';
 
 /**
@@ -1365,9 +1365,116 @@ export function deriveWindowData(windowSpec, settings = {}) {
     );
 
     // Triple sash: counterweights balance only the centre (opening) section
-    const weights = calculateWeights(windowSpec, tripleSections ? tripleSections.center : sashWidth, topSashHeight, bottomSashHeight);
-    const paint = calculatePaint(frameWidth, frameHeight);
-    const consumables = calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight);
+    let weights = calculateWeights(windowSpec, tripleSections ? tripleSections.center : sashWidth, topSashHeight, bottomSashHeight);
+    let paint = calculatePaint(frameWidth, frameHeight);
+    let consumables = calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight);
+
+    // ── Arched sash (ARCHED-WINDOWS-v3 Block 1 C): the box head and the upper
+    //    sash's top rail become rings on the frame contour (arch.js, rule C);
+    //    stiles run to the springing, the meeting rail and the lower sash are
+    //    untouched. Everything below is conditional — a rectangular sash is
+    //    JSON-identical to before (verify/arch/t21.mjs).
+    const sashArchSpec = windowSpec.arch && windowSpec.arch.shape ? windowSpec.arch : null;
+    let sashArch = null;
+    if (sashArchSpec && !isTripleSash) {
+        const prof = getWindowProfile();
+        const cp = getCasementProfile();                     // blank planner + pattern numbers live once, here
+        const SA = buildSashArchGeometry({ shape: sashArchSpec.shape, width: frameWidth, height: frameHeight, rise: sashArchSpec.rise }, prof, CONSTANTS.GLASS_REBATE);
+        const plans = { head: planArchSegments(SA.head, cp.arch), topRail: planArchSegments(SA.topRail, cp.arch) };
+        const R = (v) => Math.round(v * 10) / 10;
+        const f = sashFaces();
+        // upper glass: bottom edge = meeting rail bottom + meeting rail face − rebate, springing at H − rise
+        const straightBelow = SA.upperStileClear - f.meet / 2 + CONSTANTS.GLASS_REBATE;
+        const outline = buildGlassOutline(SA.glass.arcs, SA.glass.halfWidth, straightBelow);
+        const bars = buildArchBars({
+            outline, shape: SA.shape, pattern: sashArchSpec.bars?.pattern || 'none',
+            h: sashArchSpec.bars?.h || 0, v: sashArchSpec.bars?.v || 0, frameHalfWidth: frameWidth / 2,
+            spokes: sashArchSpec.bars?.spokes, rings: sashArchSpec.bars?.rings,
+        }, cp.arch?.patterns);
+        // lower sash: straight horizontals only (PSW arch-lower-h-bars), equal divisions of the lower
+        // daylight height; the lower UNIT row keeps the double-hung rule (sash − 89, lower − 108)
+        const lowerGlassH = bottomSashHeight - f.meet - f.bottom;
+        const lowerGlassW = sashWidth - 2 * f.stile;
+        const lowerUnitW = sashWidth - (2 * f.stile - 2 * CONSTANTS.GLASS_REBATE);
+        const lowerUnitH = bottomSashHeight - (f.meet + f.bottom - 2 * CONSTANTS.GLASS_REBATE);
+        const nLower = Math.max(0, Math.floor(Number(sashArchSpec.lowerHBars) || 0));
+        const lowerBars = { h: nLower, positions: Array.from({ length: nLower }, (_, j) => R(lowerGlassH * (j + 1) / (nLower + 1))), glassW: R(lowerGlassW), glassH: R(lowerGlassH) };
+        const archNotes = (plan, ring) => {
+            const radii = ring.outer.map((a) => Math.round(a.r)).join('/');
+            if (plan.noStock) return `R ${radii} · no stock board fits`;
+            return `R ${radii} · ${plan.totalPieces} pieces · stock ${plan.arcs.map((a) => a.default.stock).join('/')}`;
+        };
+        const hornExtra = windowSpec.sash?.horns ? Number(windowSpec.sash?.hornExtension ?? prof.hornExtension ?? settings?.hornExtensionDefault ?? 70) : 0;
+        const sd = sashDepthFor(windowSpec.frame?.type);
+        const bw = windowSpec.frame?.type ? profileBoardWidth(windowSpec.frame.type) : boxBoardWidthFor(windowSpec.frame?.depth);
+        const boxDepth = profileBoxDepth(windowSpec.frame?.type);
+        const headFace = Number(prof.sashArch.headFace);
+        // records: the arched members replace their straight twins, the stiles / jambs stop at the springing
+        const rec = (group, name, section, length, qty, notes = '') => { const r = createComponentRecord(windowSpec, group, name, section, length, qty, notes); r.length = R(length); return r; };
+        const upperStile = SA.upperStraightStile + hornExtra;
+        const sashOut = [];
+        for (const c of sashComponents) {
+            if (c.elementName === 'TOP RAIL') sashOut.push(rec('sash', 'S-ARCH TOP RAIL', c.section, SA.topRail.lengths.centre, 1, archNotes(plans.topRail, SA.topRail)));
+            else if (c.elementName === 'STILES TOP (L)' || c.elementName === 'STILES TOP (R)') sashOut.push(rec('sash', c.elementName, c.section, upperStile, 1, 'to the springing'));
+            else sashOut.push(c);
+        }
+        // DEFAULT (open, BLOCKERS): jambs = start − (jambHeight − headFace) — the head zone of the rectangular
+        // deduction is the ring now; head liners are not generated on an arched head; jamb liners to the springing
+        const jambLen = SA.start - (prof.deductions.jambHeight - headFace);
+        const boxOut = [];
+        for (const c of boxComponents) {
+            if (c.elementName === 'HEAD') boxOut.push(rec('box', 'S-ARCH HEAD', `${headFace}x${boxDepth}`, SA.head.lengths.centre, 1, archNotes(plans.head, SA.head)));
+            else if (c.elementName === 'JAMB LEFT' || c.elementName === 'JAMB RIGHT') boxOut.push(rec('box', c.elementName, c.section, jambLen, 1, 'to the springing'));
+            else if (c.elementName === 'INTERNAL HEAD LINER' || c.elementName === 'EXTERNAL HEAD LINER') continue;
+            else if (c.elementName.includes('JAMB LINER')) boxOut.push(rec('box', c.elementName, c.section, SA.start - (c.elementName.startsWith('INTERNAL') ? prof.elements.intJambLiner.deduction : prof.elements.extJambLiner.deduction), 1, 'to the springing'));
+            else boxOut.push(c);
+        }
+        void bw;
+        // weights from the true outline (balance / cord): upper timber = stiles + arched top rail (centre line) + meeting rail, glass = outline area
+        const kg = { stile: kgPerM(f.stile, sd), topRail: kgPerM(f.top, sd), meet: kgPerM(f.meet, sd), bottom: kgPerM(f.bottom, sd) };
+        const glassType = windowSpec.glazing?.type || 'double';
+        const kgPerSqm = GLASS_KG_PER_SQM[glassType] || GLASS_KG_PER_SQM['double'];
+        const upperTimber = 2 * (SA.upperStraightStile / 1000) * kg.stile + (SA.topRail.lengths.centre / 1000) * kg.topRail + (sashWidth / 1000) * kg.meet;
+        const upperGlass = (outline.area / 1e6) * kgPerSqm;
+        const lowerTimber = 2 * (bottomSashHeight / 1000) * kg.stile + (sashWidth / 1000) * kg.bottom + (sashWidth / 1000) * kg.meet;
+        const lowerGlass = ((lowerGlassW * lowerGlassH) / 1e6) * kgPerSqm;
+        weights = {
+            timber: round(upperTimber + lowerTimber),
+            glass: round(upperGlass + lowerGlass),
+            total: round((upperTimber + lowerTimber + upperGlass + lowerGlass) * 1.05),
+            glassType, kgPerSqm,
+            upperKg: round((upperTimber + upperGlass) * 1.05),
+            lowerKg: round((lowerTimber + lowerGlass) * 1.05),
+            upperGlassArea: round(outline.area / 1e6),
+        };
+        // paint from the true frame outline; seal 6070 with the upper sash's true perimeter (equivalent height)
+        paint = paintFromAreaSqm(round((frameWidth * SA.start + chainAreaAboveLine(SA.arcs)) / 1_000_000));
+        const upperEquivH = (2 * SA.upperStraightStile + SA.topRail.lengths.centre - sashWidth) / 2;
+        consumables = { ...consumables, seal6070: { meters: round((sashWidth * 4 + upperEquivH * 4 + bottomSashHeight * 4) * 1.10 / 1000) } };
+        sashComponents.length = 0; sashComponents.push(...sashOut);
+        boxComponents.length = 0; boxComponents.push(...boxOut);
+        sashArch = {
+            shape: SA.shape,
+            geometry: SA,
+            plans,
+            bars: bars.bars,
+            barCounts: bars.counts,
+            barTotalLength: bars.totalLength,
+            pattern: bars.pattern,
+            lowerBars,
+            upperSash: { straightStile: R(SA.upperStraightStile), stileClear: R(SA.upperStileClear), topRailLength: R(SA.topRail.lengths.centre), width: sashWidth },
+            glassOutline: {
+                ...outline,
+                // glass-frame origin in FRAME coordinates (frame bottom-left, y up): unit bottom-left corner
+                origin: { x: R(frameWidth / 2 - SA.glass.halfWidth), y: R(SA.start - straightBelow) },
+            },
+            customGlassUnits: [
+                { width: R(outline.width), height: R(outline.height), location: 'upper', role: 'main', qty: 1,
+                  shape: { kind: 'arched', archShape: SA.shape, outline, poly: glassOutlinePoly(outline), springing: R(outline.springing), apex: R(outline.apex), rise: R(outline.rise), radii: outline.radii.map(R), area: outline.area, perimeter: outline.perimeter, bars: bars.bars, pattern: bars.pattern, barCounts: bars.counts } },
+                { width: R(lowerUnitW), height: R(lowerUnitH), location: 'lower', role: 'main', qty: 1 },
+            ],
+        };
+    }
 
     return {
         category: 'sash',
@@ -1403,6 +1510,8 @@ export function deriveWindowData(windowSpec, settings = {}) {
         weights,
         paint,
         consumables,
+        // arched sash (v3 Block 1): absent on a rectangular sash
+        ...(sashArch ? { arch: sashArch, customGlassUnits: sashArch.customGlassUnits } : {}),
     };
 }
 

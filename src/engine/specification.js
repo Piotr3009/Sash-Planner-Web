@@ -44,7 +44,7 @@ export const glassGas = (type) => (type === 'single' || type === 'passive') ? ''
 import { FAN_AXIS_OFFSET_TOP, FAN_AXIS_OFFSET_BOTTOM } from './casementLayouts.js';
 import { profileBoxDepth } from './profile.js';
 import {
-  PSW_ARCH_SHAPE, PSW_ARCH_RISE_RATIO, LEGACY_ARCH_SHAPES, ARCH_RISE_RATIO, GOTHIC_PROFILE_RATIO,
+  PSW_ARCH_SHAPE, PSW_ARCH_RISE_RATIO, PSW_SASH_RADIO_SHAPE, LEGACY_ARCH_SHAPES, ARCH_RISE_RATIO, GOTHIC_PROFILE_RATIO,
   ARCH_BAR_PATTERNS, isArchShape, isRoundShape, resolveRoundShape, ArchError,
 } from './arch.js';
 
@@ -108,6 +108,40 @@ export function archFromSpec(item, fc, width, height) {
   const pswShape = item?.casArchShape || fc.casArchShape;
   const isArched = (item?.casementType || fc.casementType) === 'arched' || !!pcShapeRaw;
   if (!isArched) return null;
+  return archFieldsFromSpec(item, fc, width, height, { pcShapeRaw, pswShape, category: 'casement' });
+}
+
+/**
+ * Arched SASH fields (ARCHED-WINDOWS-v3 Block 1 A). PSW: `sashType 'arched-group'`
+ * with `archShape` = the PSW shape id (semi-circle | gothic-arch | elliptical-arch
+ * | segmental-arch, price-calculator.js SHAPE_FROM_RADIO) or the raw radio value
+ * (semicircular | gothic | elliptical | segmental), `archRise`, `archProfile`,
+ * `archBarPattern`, `archHBars` / `archVBars` (upper straight bars), `lowerHBars`
+ * (estimate-manager.js 682–692). PC-native: `frameShape 'arched'` + the same PC
+ * fields as the casement (archShape in PC vocabulary, archStart, …). Returns the
+ * casement's arch object plus `lowerHBars`; no hinge. Null when not arched.
+ */
+export function sashArchFromSpec(item, fc, width, height) {
+  const sashType = item?.sashType || fc.sashType;
+  const frameShape = item?.frameShape || fc.frameShape;
+  const raw = item?.archShape || fc.archShape || null;
+  const isArched = sashType === 'arched-group' || frameShape === 'arched';
+  if (!isArched) return null;
+  let pcShapeRaw = null, pswShape = null;
+  if (raw) {
+    if (PSW_ARCH_SHAPE[raw]) pswShape = raw;
+    else if (PSW_SASH_RADIO_SHAPE[raw]) pswShape = PSW_SASH_RADIO_SHAPE[raw];
+    else pcShapeRaw = raw;
+  }
+  const a = archFieldsFromSpec(item, fc, width, height, { pcShapeRaw, pswShape, category: 'sash' });
+  a.hinge = null;
+  a.bars.h = Number(item?.archHBars ?? fc.archHBars ?? item?.casementHBars ?? fc.casementHBars) || 0;
+  a.bars.v = Number(item?.archVBars ?? fc.archVBars ?? item?.casementVBars ?? fc.casementVBars) || 0;
+  a.lowerHBars = Number(item?.lowerHBars ?? fc.lowerHBars) || 0;
+  return a;
+}
+
+function archFieldsFromSpec(item, fc, width, height, { pcShapeRaw, pswShape, category }) {
   const name = item?.name || item?.window_number || '?';
   const profileRaw = item?.archProfile || fc.archProfile || item?.casArchProfile || fc.casArchProfile || null;
   const legacy = pcShapeRaw ? LEGACY_ARCH_SHAPES[pcShapeRaw] : null;
@@ -149,6 +183,7 @@ export function archFromSpec(item, fc, width, height) {
   }
   if (isRoundShape(shape) && Number.isFinite(rise)) shape = resolveRoundShape(W, rise);   // v2 §2.2, may throw "use Gothic"
   const start = Number.isFinite(rise) && H > 0 ? H - rise : null;
+  void category;
   // Hinge (v3 0.4b, Piotr 07.09 "PSW–PC musi sie zgadzac 1 do 1"): the VALUE is
   // the contract — PSW's 3D passes casArchHinge straight to hingeDirection and
   // PC's 3D is the same component, so PC keeps it as is. (The PSW radio
@@ -290,8 +325,9 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
         fan2V: Number(item?.casementFan2VBars ?? fc.casementFan2VBars) || 0,
       },
     },
-    // ── Arched casement (arched-casement-v1) — null unless casementType 'arched'
-    arch: archFromSpec(item, fc, width, height),
+    // ── Arched casement (arched-casement-v1) — null unless casementType 'arched';
+    //    arched sash (arched-windows-v3 Block 1) — null unless sashType 'arched-group' / frameShape 'arched'
+    arch: category === 'sash' ? sashArchFromSpec(item, fc, width, height) : archFromSpec(item, fc, width, height),
     // ── Doors (PSW parity, Piotr 04.08) ─────────────────────────────────
     // Field names and value vocabularies match the PSW door-controller 1:1 so
     // a future PSW→PC import maps straight across. Two known PSW bugs are NOT

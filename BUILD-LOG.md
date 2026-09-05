@@ -153,6 +153,67 @@ bars): bands, dashed edge, ids beside the ends, table readable. Not verified: th
 (built in node, text asserted by string search only); the triple `edgeCover` value is a placeholder.
 **Verdict: ✅ 0.2 / 0.3** (t20 adds the SVG ↔ DXF band / edge arc comparison ±0.01).
 
+### STAGE 2 — Block 1 A–E: arched SASH, engine side (`profile.js`, `arch.js`, `specification.js`, `calculations.js`, `lists.js`, `bom.js`, `projectStore.js`, `ConfiguratorPage.jsx`, `verify/arch/t21.mjs`, fixture `rect-sash-base.json`)
+
+**Understanding:** PSW's flagship arched product is a double-hung sash whose box head and upper sash top rail are
+curved; the lower sash is square and stops at the arch start. PC needs the same object as the casement
+(`windowSpec.arch` + `lowerHBars`), the PSW import names, a configurator switch, an engine branch that keeps the
+rectangular sash byte-identical, the two curved members in the cut list, and the true-outline weights that feed
+the balance.
+
+**Baseline first:** `verify/arch/fixtures/rect-sash-base.json` — six rectangular sash windows (standard 2×2,
+slim + horns, triple 6×6, heritage single 4×4, triple-glazed 9×9 with a wider cill, glazing-arch head type)
+derived from HEAD before any sash edit: derived / cut / glass / precut JSON. t21 §6 re-derives them.
+
+**Two approaches, one rejected (vertical layout):** (a) re-derive PC's rectangular top / bottom gaps from the
+135 deduction and place the arch on top of them — rejected: the split of 135 is not written anywhere and the
+concentric ring must meet the stile line anyway; (b) PSW's explicit rule (price-calculator.js metricsFor: arch
+starts at H − rise, meeting line at H/2, `MIN_UPPER_STILE` on H/2 − rise) + the concentric rings at the profile
+offsets — chosen and logged as DEFAULT (open).
+
+**Built:**
+- Profile: `DEFAULT_SASH_PROFILE.sashArch { headFace 80, minHaunchRadius 150, limits { 400, 1500, 900,
+  minUpperStile 100 } }` (`normalizeSashProfile` fills stored copies). Blank planner / pattern numbers are read
+  from the casement `arch` block (one place for the CNC's numbers).
+- `buildSashArchGeometry` (arch.js): head ring 0 → 80; top rail ring `sashWidth/2` (89) → 89 + topRail.face
+  (57); glass line 89 + 57 − 12.5 = 133.5; rule C (all chains start vertical at the stile line); `upperStileClear
+  = H/2 − rise ≥ 100`, `upperStraightStile = clear + MR/2` (the STILES TOP piece to the meeting rail bottom).
+- Import (`specification.js`): `sashArchFromSpec` — `sashType 'arched-group'` or `frameShape 'arched'`; PSW ids
+  and the radio names (`PSW_SASH_RADIO_SHAPE`: semicircular / gothic / elliptical / segmental → P10 shapes),
+  `archRise`, `archProfile`, `archBarPattern`, `archHBars` / `archVBars`, `lowerHBars` (`lowerVBars` ignored:
+  lower straight h only). Shared `archFieldsFromSpec` with the casement; the arch object is null on every
+  rectangular sash; `arch.hinge` null.
+- Engine (sash branch of `deriveWindowData`, conditional on `arch.shape`, never for a triple): `S-ARCH HEAD`
+  (`80x164`, head ring centre-line length, planner notes) replaces HEAD; jambs = start − (jambHeight − 80);
+  head liners dropped, jamb liners to the springing; `S-ARCH TOP RAIL` (57x57, ring centre) replaces TOP RAIL;
+  STILES TOP = straight stile (+ horns); meeting rails, lower sash, cill untouched. Upper unit = arched outline
+  in the glass frame (springing = stile clear − MR/2 + rebate), bars = upper straight + pattern
+  (`buildArchBars`), lower h bars = equal divisions of the lower daylight; `customGlassUnits` = [upper arched,
+  lower rectangular (sash − 89 × lower − 108)]. Weights from the true outline: `upperKg` / `lowerKg` / `total`
+  (timber Σ length × kg/m of the finished section + glass area × kg/m²); paint from W × start + arch area; seal
+  6070 with the upper sash's equivalent height. `derived.arch` carries geometry, plans, bars, lowerBars,
+  upperSash, glassOutline (+ origin in frame coordinates).
+- Cut list: `S-AH` after HEAD, `S-ATR` after TR; BOM slots head / top_rail. Store whitelist: `frameShape`,
+  `archHBars`, `archVBars`, `lowerHBars`. Configurator: Sash Type → Frame shape Standard | Arched; the arch
+  shape / start controls extracted into `archControls` shared with the casement; Glazing Bars section for the
+  arched sash (upper h / v, pattern chips per shape, custom hub, lower h) replaces the Georgian grid chips; the
+  3D stays the rectangular sash until Stage 3 (I).
+
+**Verification (t21 120/120):** 9 vectors W 1000 / 1200 / 1500 × semi-circle / three-centre (start = H − 0.3 W)
+/ gothic: rings 0 → 80 / 89 → 146 / 133.5 concentric, rule C, semi-circle closed forms (S-AH π(R − 40), S-ATR
+π(R − 117.5)), stile rule; PSW parity: rise = ratio × W (±0.5, PSW rounds), `minHeightFor` = PC's own limits
+(derives at the minimum, throws 10 below with the 900 / 100 message); import mapping incl. radio names; cut
+list / BOM / grouped order; weights vs the closed-form area (π R²/2 + Wg × springing); rectangular fixture
+6/6 identical + a triple with an arched flag identical to the plain triple. Rendered nothing (no 2D yet).
+**Finding (sash F2):** PSW's segmental default (rise 0.20 W) cannot be built as a rule-C sash — the top rail
+ring at 146 with the 150 haunch floor leaves an inner radius 4 → readable ArchError; at W 1000 a Round sash needs
+rise > ~279 (BLOCKERS 12.4). Not verified: the configurator in a browser, the arched sash in any drawing / 3D /
+export (Stage 3). **Verdict: ✅ Stage 2 (A–E)** with the DEFAULT (open) entries 12.1–12.6.
+
+### STAGE 2 GATE — ✅ ALL PASS
+
+t16 504 · t17 72 · t18 178 · t19 244 · t20 112 · t20_bars 30 · t21 120 · `npm run build` OK.
+
 ### 0.1 — FIT view in the arch CNC DXF (`arch.js`, `archDxf.js`)
 
 **Understanding:** Piotr overlaid the frame ring and the leaf ring by hand and read the 17 mm rebate lap as an

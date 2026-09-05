@@ -563,6 +563,11 @@ export const useProjectStore = create((set, get) => ({
       // arched-windows-v3 0.4: custom hub (spoke count, ring fractions)
       archSpokes: windowConfig.archSpokes ?? null,
       archRings: Array.isArray(windowConfig.archRings) ? windowConfig.archRings : null,
+      // arched-windows-v3 Block 1: arched sash (frame shape, upper straight bars, lower h bars)
+      frameShape: windowConfig.frameShape || 'standard',
+      archHBars: windowConfig.archHBars ?? null,
+      archVBars: windowConfig.archVBars ?? null,
+      lowerHBars: windowConfig.lowerHBars ?? null,
       fanlightHeight: windowConfig.fanlightHeight ?? null,
       fanlightAxis: windowConfig.fanlightAxis ?? null,
       fan2Axis: windowConfig.fan2Axis ?? null,
@@ -723,6 +728,11 @@ export const useProjectStore = create((set, get) => ({
       // arched-windows-v3 0.4: custom hub (spoke count, ring fractions)
       archSpokes: windowConfig.archSpokes ?? null,
       archRings: Array.isArray(windowConfig.archRings) ? windowConfig.archRings : null,
+      // arched-windows-v3 Block 1: arched sash (frame shape, upper straight bars, lower h bars)
+      frameShape: windowConfig.frameShape || 'standard',
+      archHBars: windowConfig.archHBars ?? null,
+      archVBars: windowConfig.archVBars ?? null,
+      lowerHBars: windowConfig.lowerHBars ?? null,
       fanlightHeight: windowConfig.fanlightHeight ?? null,
       fanlightAxis: windowConfig.fanlightAxis ?? null,
       fan2Axis: windowConfig.fan2Axis ?? null,

@@ -10,6 +10,21 @@ Status of the older entries: **§9.1 P9 (900) OPEN → v3 0.6 keeps 900**, **§9
 **§9.3 minimum piece length → v3 0.6 `arch.minPieceLength` 150 (warn)**, **§9.4 F2 OPEN → `minHaunchRadius` 150 kept**,
 §1 D13 / §2 D5 / §3 d50 unchanged. §10.9 (rasteriser) verified in Chromium, §10.10 (R labels) partly fixed — see 11.9.
 
+### 12. Stage 2 — arched sash (Block 1 A–E): DEFAULT (open) values and questions
+
+| # | Item | Taken | Ask |
+|---|------|-------|-----|
+| 12.1 | **Rule C + concentric rings for the sash** | Head ring 0 → `sashArch.headFace` 80 (PSW HEAD_FACE); upper sash top rail ring at `deductions.sashWidth / 2` = 89 (the stile line) → 89 + `topRail.face` 57; glass line 133.5. The rectangular sash's head gap is ~84 (H/2 − 62.5 with the meeting line at H/2); the arched apex gap is 89 — 5 mm more clearance at the head so the ring is concentric | Confirm 80 for the curved box head (section 80 × box depth) and the 89 inset |
+| 12.2 | **Vertical layout (PSW rule)** | Arch starts at H − rise from the cill, meeting line at H/2 → upper straight stile clear = H/2 − rise ≥ `minUpperStile` 100; the STILES TOP piece = clear + 21.5 (to the meeting rail bottom) + horns | Confirm the meeting line at H/2 for the arched sash |
+| 12.3 | **Jambs and liners on the arched head** | Jamb = start − (`jambHeight` 108 − 80) = start − 28 (the head zone of the rectangular deduction is the ring now); head liners (int 17×86 / ext 17×102) are NOT generated — a curved liner is another curved member the spec does not name; jamb liners run to the springing | Say what the 108 is made of, whether the arched head takes liners (curved) and what the jamb really stops at |
+| 12.4 | **Sash F2 — Round sash needs a deep rise** | With the top rail ring at 146 and `minHaunchRadius` 150 the inner ring needs r ≥ 10 (allowance band) → haunch r > 156 → `rise²/(W/2) > 156`: at W 1000 rise > 279 (0.28 W), at W 1500 > 342. PSW's segmental default 0.20 W is rejected with a readable ArchError; elliptical 0.325 W builds | Accept (a 200 mm rise on a 1000 sash is not a product with a 57 top rail) or lower `sashArch.minHaunchRadius` |
+| 12.5 | **Beading (frozen)** | The rectangular beading records stay as they are on an arched sash (parting / staff from W and H, glazing bead from the rectangular glass). The curved parting bead along the head ring, the curved staff bead and the curved glazing bead of the upper sash are NOT generated | Separate package (beading module is frozen) |
+| 12.6 | **Blank planner numbers** | The sash reads `getCasementProfile().arch` (stock widths, finger, allowance, max angle, piece rule, minPieceLength) — one place for the CNC's numbers; a separate sash copy would drift | Confirm, or ask for a sash copy |
+| 12.7 | **Glass list rows for the arched sash** | `customGlassUnits` path (casement style): upper row with `shape.kind 'arched'` (bars from the engine), lower row rectangular (sash − 89 × lower − 108). The double-hung rows' pane / bars text (grid mode) does not apply — the arched sash has counts, not `2x2` grids | FYI — the Glass tab shows two rows named upper / lower |
+| 12.8 | **Cord / weights** | `weights.upperKg` / `lowerKg` (+5 %) from the true outline are new fields; the cord length rule (3 × H) is unchanged; no balance selector exists in PC yet | FYI |
+| 12.9 | **PSW `lowerVBars`, `upperMaxDrop`, `lowerMaxLift`, `straightHeight`, `upperSashHeight`** | Ignored on import: PC derives the straight height and the sash heights itself; PSW's `upperSashHeight = (H − 144)/2` is the 3D's own layout | FYI |
+| 12.10 | **Configurator not run in a browser** | Compiled (esbuild + build) and linted; the shared `archControls` fragment renders inside both the casement and the sash section; the 3D preview of an arched sash is still the rectangular sash (Stage 3 I) | Morning: open a sash batch → Frame shape Arched |
+
 ### 11. DEFAULT (open) values taken tonight and questions for Piotr
 
 | # | Item | Taken | Ask |

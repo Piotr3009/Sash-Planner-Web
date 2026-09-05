@@ -63,6 +63,15 @@ export const LEGACY_ARCH_SHAPES = Object.freeze({
   'segmental': { shape: 'three-centre', riseRatio: 0.20 },
 });
 
+// PSW sash form radio values (online-estimate.html 453–465: arch-style) → PSW shape ids
+// (price-calculator.js SHAPE_FROM_RADIO); the saved config carries the id, older rows the radio.
+export const PSW_SASH_RADIO_SHAPE = Object.freeze({
+  semicircular: 'semi-circle',
+  gothic: 'gothic-arch',
+  elliptical: 'elliptical-arch',
+  segmental: 'segmental-arch',
+});
+
 // PSW casArchShape → PC shape (P10). PSW "elliptical" is drawn as an ellipse
 // in the 3D preview; a workshop cannot rout an ellipse from concentric arcs,
 // so it is built as the classic three-centre approximation. PSW "segmental"
@@ -478,6 +487,67 @@ export function buildArchGeometry({ shape, width, height, rise }, profile) {
     rebateWall,                                 // arcs at R − land (the leaf outer sits gap mm inside it)
     fit: { gap, lap: tFrame - leafInset, land },
     glass: { arcs: glassArcs, length: arcsLength(glassArcs), apex: arcsExtent(glassArcs, [0, 1]).max, halfWidth: W / 2 - glassOffset },
+  };
+}
+
+/**
+ * Arched SASH geometry (ARCHED-WINDOWS-v3 Block 1 C, rule C — DEFAULT (open)):
+ * the box head is a ring 0 → sashArch.headFace (80) on the frame contour; the
+ * upper sash's arched top rail is a ring sashInset → sashInset + topRail.face,
+ * sashInset = deductions.sashWidth / 2 (89: the ring meets the stile line —
+ * concentric, rule C); the glass line = sashInset + topRail.face − glassRebate.
+ * Vertical layout (PSW price-calculator.js metricsFor, adopted): the arch
+ * starts at H − rise from the cill, the meeting line sits at H / 2, so the
+ * upper sash's straight stile above the meeting line = H/2 − rise (≥
+ * limits.minUpperStile); the STILES TOP piece runs to the meeting rail bottom:
+ * H/2 − rise + meetingRail / 2.
+ * Every number is read from the sash profile (sashArch, deductions.sashWidth,
+ * elements.topRail / meetingRail); `glassRebate` = the rebate depth per side.
+ */
+export function buildSashArchGeometry({ shape, width, height, rise }, sashProfile, glassRebate) {
+  const SA = sashProfile?.sashArch;
+  if (!SA?.limits || !(Number(SA.headFace) > 0)) throw new ArchError('Sash profile sashArch (headFace / limits) is missing');
+  const L = readArchLimits({ ...SA.limits, minLeafStraightStile: SA.limits.minUpperStile });
+  const minHaunchRadius = readMinHaunchRadius(SA);
+  const W = Number(width), H = Number(height);
+  const h = resolveArchRise(shape, W, rise, L);
+  const straightHeight = H - h;
+  if (!(straightHeight >= L.minStraightBelowRise)) {
+    throw new ArchError(`Arch rise ${r1(h)}mm in a ${r1(H)}mm high window leaves ${r1(straightHeight)}mm straight below the arch — minimum ${L.minStraightBelowRise}mm (height >= rise + ${L.minStraightBelowRise})`);
+  }
+  const meet = Number(sashProfile.elements?.meetingRail?.face);
+  const topFace = Number(sashProfile.elements?.topRail?.face);
+  const sashInset = Number(sashProfile.deductions?.sashWidth) / 2;
+  const rebate = Number(glassRebate);
+  if (!(meet > 0 && topFace > 0 && sashInset > 0 && rebate >= 0)) throw new ArchError('Sash profile elements.meetingRail / topRail, deductions.sashWidth or the glass rebate are missing');
+  const upperStileClear = H / 2 - h;                       // springing → meeting line (PSW rule)
+  if (!(upperStileClear >= L.minLeafStraightStile)) {
+    throw new ArchError(`Straight stile of the arched upper sash is ${r1(upperStileClear)}mm (H/2 − rise) — minimum ${L.minLeafStraightStile}mm`);
+  }
+  const base = archArcs(shape, W, h, { minHaunchRadius });
+  const head = buildRing(base, 0, Number(SA.headFace), 'S-ARCH HEAD');
+  const topRail = buildRing(base, sashInset, sashInset + topFace, 'S-ARCH TOP RAIL');
+  const glassOffset = sashInset + topFace - rebate;
+  const glassArcs = offsetArcs(base, glassOffset);
+  return {
+    shape,
+    label: ARCH_SHAPE_LABELS[shape],
+    width: W,
+    height: H,
+    rise: h,
+    start: straightHeight,
+    straightHeight,
+    limits: L,
+    minHaunchRadius,
+    radii: base.map((a) => a.r),
+    arcs: base,
+    offsets: { headInner: Number(SA.headFace), sashOuter: sashInset, sashInner: sashInset + topFace, glass: glassOffset },
+    head,
+    topRail,
+    glass: { arcs: glassArcs, length: arcsLength(glassArcs), apex: arcsExtent(glassArcs, [0, 1]).max, halfWidth: W / 2 - glassOffset },
+    upperStileClear,
+    upperStraightStile: upperStileClear + meet / 2,       // STILES TOP piece: springing → meeting rail bottom
+    meetingLine: H / 2,
   };
 }
 

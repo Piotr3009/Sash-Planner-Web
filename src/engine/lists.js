@@ -473,6 +473,8 @@ export const MIRROR_PAIRS = {
 export const CUT_LIST_ORDER = [
   // ── BOX ──
   { match: 'HEAD',                      symbol: 'HEAD',    label: 'Head' },
+  // Arched sash (arched-windows-v3 Block 1 D): curved box head, length = ring centre-line arc
+  { match: 'S-ARCH HEAD',               symbol: 'S-AH',    label: 'Arched Box Head' },
   { match: 'JAMB LEFT',                 symbol: 'JB-L/R',  label: 'Jambs (pair)',                isPair: true },
   { match: 'INTERNAL JAMB LINER (L)',   symbol: 'IL-L/R',  label: 'Internal Jamb Liner (pair)',  isPair: true },
   { match: 'EXTERNAL JAMB LINER (L)',   symbol: 'EL-L/R',  label: 'External Jamb Liner (pair)',  isPair: true },
@@ -484,6 +486,7 @@ export const CUT_LIST_ORDER = [
   { match: 'STILES TOP (L)',            symbol: 'ST-L/R',  label: 'Stiles Top (pair)',           isPair: true },
   { match: 'STILES BOTTOM SASH (L)',    symbol: 'SBS-L/R', label: 'Stiles Bottom Sash (pair)',   isPair: true },
   { match: 'TOP RAIL',                  symbol: 'TR',      label: 'Top Rail' },
+  { match: 'S-ARCH TOP RAIL',           symbol: 'S-ATR',   label: 'Arched Top Rail' },
   { match: 'TOP MEET RAIL',             symbol: 'TMR',     label: 'Top Meet Rail' },
   { match: 'BOTTOM MEET RAIL',          symbol: 'BMR',     label: 'Bottom Meet Rail' },
   { match: 'BOTTOM RAIL',               symbol: 'BR',      label: 'Bottom Rail' },

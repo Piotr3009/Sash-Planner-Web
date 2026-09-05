@@ -61,6 +61,19 @@ export const DEFAULT_SASH_PROFILE = {
     jambHeight: 108,  // jamb L = frame H − this
     headWidth: 0,     // head L = frame W − this
   },
+  // ── Arched sash (ARCHED-WINDOWS-v3 Block 1, night 5) ─────────────────────
+  // The box head is an arched RING headFace deep (PSW ArchedSashWindow.jsx
+  // HEAD_FACE 80 — DEFAULT (open), BLOCKERS); the upper sash's arched top rail
+  // sits deductions.sashWidth / 2 inside the frame contour (rule C: the ring
+  // meets the stile line) with the face of elements.topRail. Limits from PSW
+  // price-calculator.js (MIN_WIDTH / MAX_WIDTH / MIN_STRAIGHT / MIN_UPPER_STILE).
+  // The blank planner numbers (stock, finger, allowance) are the CNC's and live
+  // once, in the casement profile `arch` block.
+  sashArch: {
+    headFace: 80,
+    minHaunchRadius: 150,
+    limits: { minWidth: 400, maxWidth: 1500, minStraightBelowRise: 900, minUpperStile: 100 },
+  },
 };
 
 // Timber density calibrated from the legacy kg/m constants
@@ -379,6 +392,10 @@ export function normalizeSashProfile(p) {
   if (!p || !p.deductions) return p;
   if (!p.glassMakeup) {
     p.glassMakeup = { ...DEFAULT_SASH_PROFILE.glassMakeup };
+  }
+  // v3: arched-sash block for stored profiles (no UI edits it yet)
+  if (!p.sashArch) {
+    p.sashArch = { ...DEFAULT_SASH_PROFILE.sashArch, limits: { ...DEFAULT_SASH_PROFILE.sashArch.limits } };
   }
   if (p.dedSchema !== 2) {
     const mr = Number(p.elements?.meetingRail?.face) || DEFAULT_SASH_PROFILE.elements.meetingRail.face;
