@@ -330,7 +330,14 @@ export function buildArchGeometry({ shape, width, height, rise }, profile) {
 //     interior extrema): W_req = extent on the normal, L = extent on the axis.
 //     For a middle piece this equals the closed form
 //     W_req = (Ro + a) − (Ri − a)·cos(φ/2),  L = 2·(Ro + a)·sin(φ/2);
-//  6. stock = narrowest stock width ≥ W_req, none → that N is infeasible.
+//  6. stock = narrowest stock width ≥ W_req, none → that N is infeasible;
+//  7. D13 — which feasible N is the DEFAULT is a profile switch (`pieceRule`,
+//     BLOCKERS: Piotr has not decided):
+//       'narrowest' (spec default) — narrowest stock with N ≤ N_min + 2,
+//                                    tie → fewer pieces;
+//       'fewest'                  — fewest pieces that fit a stock board.
+//     The plan the OTHER rule would pick is returned as `alternative` and
+//     printed on the sheet as ALT.
 //
 // Every number (allowance, max angle, stock list, selection rule) comes from
 // profile.arch — nothing is defaulted here.
@@ -443,13 +450,29 @@ function stockFor(boardWidth, stockWidths) {
   return null;
 }
 
+export const PIECE_RULES = Object.freeze(['narrowest', 'fewest']);
+
 function readPlannerSettings(opts) {
   const stockWidths = Array.isArray(opts?.stockWidths) ? opts.stockWidths.map(Number).filter((w) => w > 0) : [];
   const allowance = Number(opts?.contourAllowance);
   if (!(allowance >= 0)) throw new ArchError('Casement profile arch.contourAllowance is missing (mm per side)');
   const maxDeg = Number(opts?.maxSegmentAngleDeg);
   if (!(maxDeg > 0 && maxDeg <= 180)) throw new ArchError('Casement profile arch.maxSegmentAngleDeg is missing (degrees, 0 < angle <= 180)');
-  return { stockWidths, allowance, maxDeg, maxAngle: maxDeg * Math.PI / 180 };
+  const pieceRule = opts?.pieceRule;
+  if (!PIECE_RULES.includes(pieceRule)) throw new ArchError(`Casement profile arch.pieceRule must be one of ${PIECE_RULES.join(' | ')}, got "${pieceRule}"`);
+  return { stockWidths, allowance, maxDeg, maxAngle: maxDeg * Math.PI / 180, pieceRule };
+}
+
+/** D13 selection among the feasible options of one arc (see banner, rule 7). */
+export function pickOption(options, nMin, rule) {
+  const feasible = options.filter((o) => o.stock != null);
+  if (!feasible.length) return null;
+  if (rule === 'fewest') return feasible[0];
+  const window = feasible.filter((o) => o.n <= nMin + 2);
+  const pool = window.length ? window : feasible;
+  let best = null;
+  for (const o of pool) if (!best || o.stock < best.stock) best = o;   // options are in ascending N → tie keeps fewer
+  return best;
 }
 
 /**
@@ -486,11 +509,9 @@ export function planArchSegments(ring, opts) {
     const nMax = nMin + 3;
     const options = [];
     for (let n = nMin; n <= nMax; n++) options.push(evaluate(i, n));
-    const feasible = options.filter((o) => o.stock != null);
-    const def = feasible[0] || null;                                   // fewest pieces
-    let alt = null;
-    for (const o of feasible) if (!alt || o.stock < alt.stock) alt = o;  // narrowest board
-    if (alt && def && alt.n === def.n) alt = null;
+    const def = pickOption(options, nMin, S.pieceRule);
+    const other = pickOption(options, nMin, S.pieceRule === 'fewest' ? 'narrowest' : 'fewest');
+    const alt = other && def && other.n !== def.n ? other : null;
     return {
       index: i,
       radiusOuter: outer.r,
@@ -517,13 +538,14 @@ export function planArchSegments(ring, opts) {
     stockWidths: [...S.stockWidths],
     contourAllowance: S.allowance,
     maxSegmentAngleDeg: S.maxDeg,
+    pieceRule: S.pieceRule,
   };
 }
 
 /**
  * Whole-window plan: geometry + segment plans for the frame head and the
  * leaf top rail, finger-joint profile — everything the DXF builder needs.
- * Reads profile.arch: { finger, stockWidths, contourAllowance, maxSegmentAngleDeg }.
+ * Reads profile.arch: { finger, stockWidths, contourAllowance, maxSegmentAngleDeg, pieceRule }.
  */
 export function buildArchPlan(input, profile) {
   if (!profile?.arch) throw new ArchError('Casement profile has no "arch" section (stock widths / finger joint)');
@@ -534,7 +556,7 @@ export function buildArchPlan(input, profile) {
     ...geometry,
     hinge: input.hinge === 'right' ? 'right' : 'left',
     finger: { ...profile.arch.finger },
-    blank: { contourAllowance: frameHead.contourAllowance, maxSegmentAngleDeg: frameHead.maxSegmentAngleDeg },
+    blank: { contourAllowance: frameHead.contourAllowance, maxSegmentAngleDeg: frameHead.maxSegmentAngleDeg, pieceRule: frameHead.pieceRule },
     plans: { frameHead, leafTop },
     noStock: frameHead.noStock || leafTop.noStock,
   };

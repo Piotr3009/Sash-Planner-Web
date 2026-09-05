@@ -177,7 +177,7 @@ check('PSW shape map covers the four PSW radios', ['gothic-arch', 'semi-circle',
 // is clipped and the closed form no longer applies.
 // Stock list D7 (Piotr 05.09, spec §5) — the same list DEFAULT_CASEMENT_PROFILE.arch carries.
 // Allowance 10 mm per side (D6), max segment angle 36° (D8).
-const PLAN_OPTS = { stockWidths: [50, 63, 75, 95, 105, 180, 200], contourAllowance: 10, maxSegmentAngleDeg: 36 };
+const PLAN_OPTS = { stockWidths: [50, 63, 75, 95, 105, 180, 200], contourAllowance: 10, maxSegmentAngleDeg: 36, pieceRule: 'narrowest' };
 function sampled(cx, cy, r, a0, a1, N = 4000) {
   const pts = [];
   for (let j = 0; j <= N; j++) { const a = a0 + (a1 - a0) * j / N; pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); }
@@ -235,21 +235,29 @@ function expectedOptions(ring, i) {
   for (let n = nMin; n <= nMin + 3; n++) out.push(evalN(n));
   return out;
 }
-function expectedChoice(options) {
+// D13: 'narrowest' = narrowest stock with N ≤ N_min + 2, tie → fewer pieces;
+// 'fewest' = first feasible N. The other rule's pick is the alternative.
+function pick(options, rule) {
   const feasible = options.filter((o) => o.stock != null);
-  const def = feasible[0] || null;
-  let alt = null;
-  for (const o of feasible) if (!alt || o.stock < alt.stock) alt = o;
-  if (alt && def && alt.n === def.n) alt = null;
-  return { def, alt };
+  if (!feasible.length) return null;
+  if (rule === 'fewest') return feasible[0];
+  const nMin = options[0].n;
+  const pool = feasible.filter((o) => o.n <= nMin + 2);
+  return (pool.length ? pool : feasible).reduce((best, o) => (!best || o.stock < best.stock ? o : best), null);
+}
+function expectedChoice(options, rule = PLAN_OPTS.pieceRule) {
+  const def = pick(options, rule);
+  const other = pick(options, rule === 'fewest' ? 'narrowest' : 'fewest');
+  return { def, alt: other && def && other.n !== def.n ? other : null };
 }
 
 section('§10.2 segment planner — W = 1200, stock D7 50…200, allowance 10 per side, max segment 36°');
 const PLAN_VECTORS = [
-  { shape: 'segmental', rise: 240, defN: [3], altN: [4] },          // 3 × board 105 vs 4 × board 95 (spec §10.2)
-  { shape: 'semi-circle', rise: null, defN: [5], altN: [7] },       // 5 × 105 vs 7 × 95 (spec §10.2)
-  { shape: 'gothic-equilateral', rise: null, defN: [2, 2], altN: [3, 3] },
-  { shape: 'three-centre', rise: 390, defN: [2, 3, 2], altN: [null, 4, null] },
+  // D13 'narrowest' (spec default): segmental 4 × 95 (ALT 3 × 105), semi-circle 7 × 95 (ALT 5 × 105) — spec §10.2
+  { shape: 'segmental', rise: 240, defN: [4], altN: [3] },
+  { shape: 'semi-circle', rise: null, defN: [7], altN: [5] },
+  { shape: 'gothic-equilateral', rise: null, defN: [3, 3], altN: [2, 2] },
+  { shape: 'three-centre', rise: 390, defN: [2, 4, 2], altN: [null, 3, null] },
 ];
 for (const v of PLAN_VECTORS) {
   const g = arch.buildArchGeometry({ shape: v.shape, width: W, height: 2000, rise: v.rise }, P);
@@ -272,8 +280,13 @@ for (const v of PLAN_VECTORS) {
     const endsGE = pa.options.every((o, j) => exp[j].midWidth == null || o.pieces.every((pc) => pc.wReq + 1e-9 >= exp[j].midWidth));
     check(`${tag} arc ${i}: end pieces W_req >= middle-piece closed form (spec §10.2)`, endsGE);
     const { def, alt } = expectedChoice(exp);
-    check(`${tag} arc ${i}: D13 default = fewest pieces (n = ${def?.n ?? '-'})`, (pa.default?.n ?? null) === (def?.n ?? null) && (pa.default?.n ?? null) === v.defN[i]);
-    check(`${tag} arc ${i}: D13 alternative = narrowest board (n = ${alt?.n ?? '-'})`, (pa.alternative?.n ?? null) === (alt?.n ?? null) && (pa.alternative?.n ?? null) === v.altN[i]);
+    check(`${tag} arc ${i}: D13 default under '${PLAN_OPTS.pieceRule}' = ${def?.n ?? '-'} × ${def?.stock ?? '-'}`, (pa.default?.n ?? null) === (def?.n ?? null) && (pa.default?.n ?? null) === v.defN[i] && (pa.default?.stock ?? null) === (def?.stock ?? null));
+    check(`${tag} arc ${i}: D13 alternative (the other rule) = ${alt?.n ?? '-'} × ${alt?.stock ?? '-'}`, (pa.alternative?.n ?? null) === (alt?.n ?? null) && (pa.alternative?.n ?? null) === v.altN[i]);
+    // the profile switch flips the two without touching the option table
+    const flipped = arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, pieceRule: 'fewest' }).arcs[i];
+    const fe = expectedChoice(exp, 'fewest');
+    check(`${tag} arc ${i}: pieceRule 'fewest' → ${fe.def?.n ?? '-'} × ${fe.def?.stock ?? '-'} (ALT ${fe.alt?.n ?? '-'}), same option table`,
+      (flipped.default?.n ?? null) === (fe.def?.n ?? null) && (flipped.alternative?.n ?? null) === (fe.alt?.n ?? null) && flipped.options.every((o, j) => o.n === pa.options[j].n && o.stock === pa.options[j].stock));
     // pieces of the default plan tile the arc: shared joints, full span
     if (pa.default) {
       const ps = pa.default.pieces;
@@ -320,6 +333,9 @@ for (const v of PLAN_VECTORS) {
   const g = arch.buildArchGeometry({ shape: 'semi-circle', width: W, height: 2000 }, P);
   const plan = arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, stockWidths: [50] });
   check('no matching board: returns options with stock = null and noStock = true', plan.noStock === true && plan.arcs[0].default === null && plan.arcs[0].options.every((o) => o.stock === null) && plan.pieces.length === 0);
+  expectThrows('unknown pieceRule throws a readable ArchError', () => arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, pieceRule: 'cheapest' }), /pieceRule must be one of narrowest \| fewest/);
+  expectThrows('missing maxSegmentAngleDeg throws (no defaults in the planner)', () => arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, maxSegmentAngleDeg: undefined }), /maxSegmentAngleDeg is missing/);
+  expectThrows('missing contourAllowance throws (no defaults in the planner)', () => arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, contourAllowance: undefined }), /contourAllowance is missing/);
 }
 
 // ── §10.3 DXF — archDxf.js → dxfWriter → ezdxf round-trip ───────────────────
@@ -359,7 +375,7 @@ section('§10.3 DXF round-trip — sample_arch_1200_segmental.dxf (frame head + 
   check('frame head contour sits above the leaf contour (reading order top-down)', frameC.bbox[1] > leafC.bbox[3]);
   // pieces: default plans — expected from the independent option table (same stock list as the profile)
   const nF = plan.plans.frameHead.totalPieces, nL = plan.plans.leafTop.totalPieces;
-  const expF = expectedChoice(expectedOptions(plan.frameHead, 0)), expL = expectedChoice(expectedOptions(plan.leafTop, 0));
+  const expF = expectedChoice(expectedOptions(plan.frameHead, 0), PA.arch.pieceRule), expL = expectedChoice(expectedOptions(plan.leafTop, 0), PA.arch.pieceRule);
   check(`default plans: frame head ${nF} × ${expF.def.stock}, leaf top ${nL} × ${expL.def.stock} (independent option table)`,
     nF === expF.def.n && nL === expL.def.n && plan.plans.frameHead.pieces.every((pc) => pc.stock === expF.def.stock) && plan.plans.leafTop.pieces.every((pc) => pc.stock === expL.def.stock),
     `${nF}/${nL} stock ${plan.plans.frameHead.pieces[0]?.stock}/${plan.plans.leafTop.pieces[0]?.stock} vs ${expF.def.n}/${expL.def.n} stock ${expF.def.stock}/${expL.def.stock}`);
@@ -385,7 +401,7 @@ section('§10.3 DXF round-trip — sample_arch_1200_segmental.dxf (frame head + 
   check('TEXT: labels for both members', texts.some((t) => t === 'W1 - FRAME HEAD') && texts.some((t) => t === 'W1 - LEAF TOP'));
   check('TEXT: shape / size / hinge line', texts.some((t) => t === 'SEGMENTAL W1200 RISE240 H2000 HINGE L'), texts.join(' | '));
   check('TEXT: finger profile 15/16/3.8', texts.some((t) => t === 'FINGER 15/16/3.8'));
-  check('TEXT: allowance 10 per side + max segment 36 deg printed', texts.some((t) => t === 'ALLOWANCE 10 PER SIDE  MAX SEGMENT 36 DEG'), texts.filter((t) => t.startsWith('ALLOW')).join(' | '));
+  check('TEXT: allowance 10 per side + max segment 36 deg + rule printed', texts.some((t) => t === 'ALLOWANCE 10 PER SIDE  MAX SEGMENT 36 DEG  RULE NARROWEST'), texts.filter((t) => t.startsWith('ALLOW')).join(' | '));
   const altTxt = expF.alt ? ` \\(ALT ${expF.alt.n} x board ${expF.alt.stock}\\)` : '';
   const planRe = new RegExp(`^ARC 1 R870 L1324\\.2 87\\.2DEG: ${expF.def.n} x board ${expF.def.stock} L\\d+(\\.\\d)?${altTxt}$`);
   check(`TEXT: D13 default + alternative printed (${expF.def.n} × ${expF.def.stock}, ALT ${expF.alt?.n ?? '-'} × ${expF.alt?.stock ?? '-'})`, texts.some((t) => planRe.test(t)), texts.filter((t) => t.startsWith('ARC')).join(' | '));
@@ -436,10 +452,10 @@ section('§10.3 DXF round-trip — sample_arch_1200_segmental.dxf (frame head + 
 // ── §10.3 pt 9 — profile section + PSW → windowSpec.arch mapping (real data path)
 section('§10.3 pt 9 — profile.arch, migration, PSW field mapping, deriveWindowData path');
 {
-  check('DEFAULT_CASEMENT_PROFILE.arch v2: finger 15/16/3.8, stock D7 [50, 63, 75, 95, 105, 180, 200], contourAllowance 10, maxSegmentAngleDeg 36',
+  check('DEFAULT_CASEMENT_PROFILE.arch v2: finger 15/16/3.8, stock D7 [50, 63, 75, 95, 105, 180, 200], contourAllowance 10, maxSegmentAngleDeg 36, pieceRule narrowest',
     P.arch && P.arch.version === 2 && P.arch.finger.length === 15 && P.arch.finger.depth === 16 && P.arch.finger.pitch === 3.8
     && JSON.stringify(P.arch.stockWidths) === JSON.stringify([50, 63, 75, 95, 105, 180, 200]) && P.arch.contourAllowance === 10 && P.arch.maxSegmentAngleDeg === 36
-    && !('widthAllowance' in P.arch) && !('maxPieces' in P.arch));
+    && P.arch.pieceRule === 'narrowest' && !('widthAllowance' in P.arch) && !('maxPieces' in P.arch));
   // stored v1.1 profile (no arch) → migration fills the section; partial finger merges
   const { arch: _drop, ...v11 } = JSON.parse(JSON.stringify(P));
   void _drop;

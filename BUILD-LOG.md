@@ -86,6 +86,29 @@ ALL PASS · sample DXF restored (regenerated later).
 
 **Verdict: ✅ T1.**
 
+### T6 — D13 piece rule switch (`arch.js` `pickOption`, `profile.js` `arch.pieceRule`)
+
+**Understanding:** when several N fit, which one is the DEFAULT is Piotr's open decision (D13).
+Spec default: narrowest stock with `N ≤ N_min + 2`, tie → fewer pieces; the other candidate is
+printed as ALT. Night 1 had the opposite (fewest pieces) hard-wired.
+
+**Change:** `profile.arch.pieceRule: 'narrowest' | 'fewest'` (default `'narrowest'`, comment says
+it is OPEN); `pickOption(options, nMin, rule)` implements both; `alternative` = the plan the OTHER
+rule picks (null when both agree), so the sheet always shows the trade-off. If nothing fits within
+`N_min + 2`, the narrowest rule falls back to the remaining feasible candidate (N_min + 3) rather
+than reporting no plan. Unknown rule → readable ArchError (no silent default). DXF TEXT line now
+ends with `RULE NARROWEST` / `RULE FEWEST`.
+
+**Results (W 1200, D7, narrowest):** head segmental 4 × 95 (ALT 3 × 105) and semi-circle 7 × 95
+(ALT 5 × 105) — exactly spec §10.2; gothic 3 + 3 × 95 (ALT 2 + 2 × 180); leaf segmental on its
+own span 5 × 95 (ALT 3 × 180) — the spec's "4 × 105" for the leaf comes from the head's θ
+(BLOCKERS §6, erratum). With `'fewest'` the plans flip back to 3 × 105 / 5 × 105.
+
+**Verification:** esbuild OK · harness: both rules asserted on the same option table for every
+shape, alternative = other rule, unknown rule / missing settings throw; 236/236 ALL PASS.
+
+**Verdict: ✅ T6** (D13 itself stays OPEN in BLOCKERS — the switch is Piotr's, not mine).
+
 ## 2026-09-05 — arched-casement-v1 (night run, branch `claude/arched-casement-v1`)
 
 **Blocking fact first:** `docs/handover/ARCHED-CASEMENT-v1.md` (the package spec) is NOT in the

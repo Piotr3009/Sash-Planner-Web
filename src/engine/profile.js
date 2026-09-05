@@ -165,6 +165,11 @@ export const DEFAULT_CASEMENT_PROFILE = {
     // Grain run-out limit: no board may span more than this angle of arc
     // (spec D8) — N_min = ceil(arc angle / this) pieces per arc.
     maxSegmentAngleDeg: 36,
+    // D13 (OPEN — Piotr has not decided): which feasible piece count is the
+    // default plan. 'narrowest' = narrowest stock board with N <= N_min + 2
+    // (tie -> fewer pieces); 'fewest' = fewest pieces that fit a board. The
+    // other rule's plan is printed on the sheet as ALT. Flip here, no code.
+    pieceRule: 'narrowest',
   },
   rounding: 0.1,       // mm — CNC-ready, one decimal
 };
