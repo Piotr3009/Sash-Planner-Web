@@ -45,6 +45,14 @@ the TEXT layer. The FINGER layer carries the joint faces only (no teeth drawn).
 Process decision for Piotr — the DXF is unchanged either way (joint faces are plain lines; the
 tool does the profile).
 
+### 5. Stage 2 not started (deliberate)
+
+Piotr's gate: Stage 2 only after a ✅ Stage 1. Without the spec the harness cannot reproduce §10,
+so Stage 1 is ⚠️ and Stage 2 (samples for every shape, edge-case harness, PSW parity report)
+was not begun. Each is small once the spec is in: the harness already round-trips every shape
+into `.audit/arch_1200_<shape>.dxf`, the limits already throw readable errors, and the PSW clone
+command works from this container (`git -c http.proxyAuthMethod=basic clone --depth 1 …`).
+
 ### 4. ASSUMPTIONS made because the spec is missing (each one is one edit away)
 
 | # | Item | Taken | Alternative / where |
@@ -57,6 +65,8 @@ tool does the profile).
 | 4.6 | Branch name | CLAUDE.md says `claude/arched-casement-v1`; the session harness mandates `claude/arched-casement-v1-m23u5x` — commits pushed to BOTH | delete the one you don't want |
 | 4.7 | Board stock for arch pieces | `profile.arch.stockWidths = [100, 125, 150, 175, 200, 225, 250]`, `widthAllowance = 20` (same idea as `boxRaw.widthAllowance`), `maxPieces = 8` | the real list belongs to the Part Registry / supplier; edit the profile |
 | 4.8 | Piece length limits | none — a piece may be as long as the outer chord (≤ 1500 mm) | add `maxPieceLength` to the profile if boards are shorter |
+| 4.9 | Profile snapshot in the pack export | single-window "Arch DXF" plans under the batch's `_profileSnapshot.casement` (like `derived`); "Arch DXF (all)" in the Production Pack plans under the ACTIVE profile (a pack spans batches) | pass per-window snapshots through `windowsData` if it ever matters |
+| 4.10 | How an arched casement gets INTO PC | only through window data carrying PSW fields (`casementType: 'arched'`, `casArchShape`, `casArchHinge`) or PC-native `archShape` / `archRise` / `archHinge`; the PC configurator has no arched option (spec: "no new configurator UI"), and PC's estimates are PC-made — there is no PSW→PC import path in the code today | the button is visible on every casement window, disabled with the reason; enabling it in the UI needs either a PSW import or an `archShape` field in the configurator (separate package) |
 
 ---
 

@@ -13,6 +13,55 @@ the PSW source (`js/price-calculator.js` `window.ArchedSash`, `js/casement-contr
 fixed is listed in BLOCKERS.md as an ASSUMPTION. The harness reproduces closed-form geometry, not
 the spec's §10 vectors — so no step in this section can honestly carry ✅. See the final verdict.
 
+### FINAL VERDICT — ⚠️ (built and machine-verified; not verified against the spec)
+
+**Delivered on `claude/arched-casement-v1` (and `claude/arched-casement-v1-m23u5x`, same
+commits):** all seven §11 files, harness (203 checks ALL PASS), `npm run build` ✓, sample DXF,
+as-built document, BLOCKERS with D13 / D5 / Stark d50 + ten assumptions. `main` untouched.
+
+**Why not ✅:** `docs/handover/ARCHED-CASEMENT-v1.md` does not exist anywhere I could reach.
+The harness reproduces closed-form geometry and my own D13 / stock / limit decisions — it
+cannot prove the spec's §10 vectors. Stage 2 was therefore not started (Piotr's gate).
+
+**NOT verified tonight (honest list):**
+1. Every number in BLOCKERS §4 (rise limits, three-centre haunch ratio, elliptical → three-centre,
+   stock widths, allowance 20, maxPieces 8, straight-part rule) — assumptions.
+2. D13 default direction ("fewest pieces") — assumption; alternative is printed.
+3. Finger profile 15/16/3.8 — read from CLAUDE.md, tool never seen.
+4. VCarve import of the DXF — only ezdxf 1.4.4 round-trip + a matplotlib render were checked.
+5. The UI click path in a browser (build passes, no arched casement exists in PC data — see
+   BLOCKERS 4.10).
+6. Merged "Arch DXF (all)" under a batch profile snapshot (uses the active profile, 4.9).
+7. Board LENGTH limits, piece minimum length (none implemented, 4.8).
+
+### Rano dla Piotra
+
+**Co otworzyć w VCarve:** `docs/handover/samples/sample_arch_1200_segmental.dxf` (mm). Cztery
+rzędy od góry: FRAME HEAD kontur (CONTOUR) z deskami w pozycji sklejenia (ASSEMBLY) i
+płaszczyznami palców (FINGER, czerwone); FRAME HEAD kawałki płasko na deskach (PIECES + ASSEMBLY);
+to samo dla LEAF TOP. Tekst po prawej każdego konturu: kształt, W, strzałka, zawias, promienie,
+plan (2 × deska 150, ALT 4 × deska 100), `FINGER 15/16/3.8`. Sprawdź: (a) łuki importują się jako
+łuki (bulge), nie łamane; (b) czy rysować deski w widoku złożenia (warstwę ASSEMBLY można wyłączyć);
+(c) czy czcionka/rozmiar tekstu 15 mm jest OK; (d) czy palec ma być na płaszczyźnie (tak jak
+teraz) czy z narysowanymi zębami.
+
+**Pozostałe kształty:** `node verify/arch/t16.mjs` zapisuje `.audit/arch_1200_semi-circle.dxf`,
+`…gothic-equilateral.dxf`, `…gothic-drop.dxf`, `…three-centre.dxf` (katalog `.audit` jest
+ignorowany przez git).
+
+**Co sprawdzić w UI:** okno casement → nagłówek strony: przycisk „🛠 Arch DXF" obok „✏️ Edit
+Configuration" (dla sash jest tam „🛠 CNC Jamb DXF"). Dla zwykłego casementu jest wyszarzony z
+tooltipem „not an arched casement". Production Pack typu casement → „🛠 Arch DXF (all)". Aktywny
+przycisk wymaga okna z polami PSW (`casementType: 'arched'`) — w PC nie ma dziś drogi, żeby takie
+okno powstało (BLOCKERS 4.10). To jest luka do decyzji, nie do naprawy „przy okazji".
+
+**Decyzje, które czekają:** (1) wgrać spec i podmienić wektory §10 w harnessie; (2) D13 — „mniej
+kawałków" czy „węższa deska" jako domyślne; (3) D5 — 15/16/3,8 potwierdzone?; (4) lista desek
+stockowych i zapas 20 mm (profil casement → `arch`); (5) PSW „elliptical" jako trzyśrodkowy;
+(6) limity strzałki per kształt; (7) skąd PC ma dostać łukowy casement (import z PSW czy pole w
+konfiguratorze — osobny pakiet); (8) Stark d50 / trzpień.
+
+
 ### Step 1 — geometry (`src/engine/arch.js`, harness §10.1)
 
 **Understanding:** one arched member = ring between two concentric contours of the window's outer
@@ -149,6 +198,19 @@ no-throw contract) → 203 ALL PASS; `npm run build` ✓ (20.7 s, same chunk-siz
 **Verdict: ⚠️** logic verified by harness and build; the click path itself NOT exercised in a
 browser tonight (no arched casement exists in PC data until one is imported from PSW — see
 "Rano dla Piotra").
+
+### Step 6 — sample DXF, docs, checklist
+
+- `docs/handover/samples/sample_arch_1200_segmental.dxf` — written by the harness on every run,
+  byte-identical between runs (md5 7129d427…), committed.
+- `docs/handover/ARCHED-CASEMENT-v1-AS-BUILT.md` — what was built, per section, for diffing
+  against the real spec. The spec itself was NOT fabricated.
+- CLAUDE.md „ZADANIE NOCNE" updated with the state and the next step; „NIE RÓB DZIŚ" untouched.
+- Checklist: esbuild ✓ on all 7 touched files · zero Polish characters in sources (UTF-8 grep) ·
+  `node verify/arch/t16.mjs` 203/203 ALL PASS · `npm run build` ✓ · `git diff main --stat` = the
+  seven §11 files + verify/ + docs/ + BUILD-LOG + BLOCKERS + .gitignore (`.audit`) · `main` untouched.
+
+**Verdict: ⚠️** — see FINAL VERDICT at the top of this section.
 
 ---
 
