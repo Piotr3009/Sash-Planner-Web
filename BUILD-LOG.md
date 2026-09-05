@@ -68,6 +68,72 @@ NOT verified: the configurator in a browser (no UI run in this session — Piotr
 
 **Verdict: ✅ A** (engine-side proven by harness; UI compiled and linted only).
 
+### B — engine (`arch.js` bars, `calculations.js`, `lists.js`, `bom.js`)
+
+**Understanding:** when `windowSpec.arch` is set the casement engine keeps the straight rules below
+the springing and swaps the head / leaf top rail for curved members, the glass for a shaped unit and
+the bar counts for a real bar list; paint, seals and weights follow the true outline.
+
+**Two approaches, one rejected:** (a) derive the arch in a separate `deriveArchedCasement` and merge
+— rejected: hardware picks, cill, beading, consumables and the record helper would be duplicated;
+(b) one guarded branch (`archSpec`) inside `deriveCasementWindow`, every rectangular line untouched —
+chosen; proven by the fixture (§ below).
+
+**Built:**
+- `arch.js` (glass outline + bars, v2 §2.3): `chainYAtX`, `chainAreaAboveLine` (Green's theorem, exact —
+  matches a 200 000-strip numeric integral on the gothic chain), `buildGlassOutline` (glass frame: origin
+  = unit bottom-left, y up; asserts rule C — the chain starts at x = xg), `glassOutlinePoly` (closed bulge
+  polyline, one vertex per arc end), `buildArchBars`: straight v (equal divisions of Wg, bottom → outline)
+  and h (equal divisions of the straight height below the springing, full width); hub patterns ported
+  from PSW `semiBarPattern` (rings 0.3 / 0.6 / 0.8 · xg, spokes at i/(n−1)·π segmented ring → ring →
+  outline, the two end spokes ON the springing line = the springing bar, ring-end verticals below the
+  line, half-hub = full springing bar + ring 1, v count ignored for hubs — PSW); `intersecting` ported from
+  `intersectingData` (n = clamp(round(Wg / 450), 2, 4) mullions to the springing, tracery arcs centred on
+  the OUTER frame corners ±W/2, stopped at the outline by exact circle–circle intersection, quarter turn
+  max, radius < 30 skipped). Roles v | h | springing | ring | spoke | tracery; ids V1…, H1…, S1…, R1…, K1…,
+  T1…; lengths rounded to 0.5. Pattern availability enforced (`PATTERNS_FOR_SHAPE`) — a hub on a
+  three-centre throws readably. PSW's spoke insets / bar-top clearance are 3D cosmetics and are not
+  ported: the axes meet the rings and the outline exactly.
+- `calculations.js` `deriveCasementWindow`: layout forced to `040L` / `040R` by the hinge, hinge array
+  ignored; `C-ARCH HEAD` (`C-AH`, `frameHead.face × frameDepth`, length = ring CENTRE-line arc length,
+  notes `R 150/1400/150 · 8 pieces · stock 95/95/95` from `planArchSegments`); jambs = `start` −
+  jambDeduct; `C-STILE` = `leafStraightStile` − stileDeduct (leaf bottom → springing); `C-ARCH TOP RAIL`
+  (`C-ATR`, leaf ring centre line); bottom rail unchanged; glass unit `{ width Wg, height apex, qty 1,
+  role main, location 'arched leaf', shape: { kind 'arched', archShape, outline, poly, springing, apex,
+  rise, radii, area, perimeter, bars, pattern, barCounts } }`; `glassSqm`, pane weight, bead perimeter
+  from the true area / perimeter; astragal bar run = Σ bar lengths; seals: 2·start + head outer arc
+  (+ cill); paint from `W·start + area under the outer chain` (`paintFromAreaSqm` shared with the
+  rectangular path — same numbers); leaf timber run = 2 straight stiles + bottom rail + curved top rail;
+  `derived.arch = { shape, geometry, plans, bars, barCounts, barTotalLength, pattern, glassOutline (+ origin
+  in frame coordinates: x = W/2 − xg = 94.5, y = 101.5) }` — spread in only when arched, so a rectangular
+  casement's output has no new key. Invalid arch numbers throw `ArchError` (every caller —
+  WindowCard, ProjectDetailPage, ProductionPackPage, WindowDetailPage, canvas renderer, Material
+  Assignments — already catches; never a silent rectangle).
+- `lists.js`: `C-ARCH HEAD` → `C-AH` right after `C-FRAME HEAD`, `C-ARCH TOP RAIL` → `C-ATR` right after
+  `C-TOP RAIL` (no `?` groups); glass rows carry `shape` and a bars label from the engine's counts +
+  pattern (`1H × 2V astragal`, `hub-spoke astragal`, `1H · intersecting astragal`).
+- `bom.js`: `C-ARCH HEAD` → `c_frame_head`, `C-ARCH TOP RAIL` → `c_sash_top_rail` — outside the spec's
+  file list, added because `buildWindowPartQtys` silently drops any element name it cannot map (the
+  arch timber would vanish from the BOM). The blank is really glued from `profile.arch.stockWidths`
+  boards — BLOCKERS §9.
+
+**Verification (node, real path `normaliseToWindowSpec → deriveWindowData → lists`):**
+- rectangular fixture (4 windows: 040L 1000×1500 1H×2V, 052L fanlight, 120 georgian triple frosted,
+  180L wider cill) dumped from `origin/main` before any change: `derived`, cut list and glass rows are
+  JSON-identical after B, no `arch` key.
+- three-centre 1000×1500 start 1300 (spec §3 vector): C-AH 1091.2 (centre line), jambs 1300, stiles 1253,
+  C-ATR 949.8, glass 811 × 1304 (springing 1198.5, apex 1304, radii 55.5 / 1305.5 / 55.5), bars H1 811 +
+  V1/V2 1297, seal frame 5.26 m, no `?` cut-list group.
+- semi-circle 1000×1500 (Half) hub-spoke: C-AH 1481.3 (π × 471.5), C-ATR 1339.9, 7 bars (ring R 121.65
+  L 382, 2 springing segments, 2 spokes at 60° / 120°, 2 ring-end verticals), v count dropped.
+- gothic 1000×1800 intersecting: 2 mullions + 4 tracery arcs; jambs 934, stiles 887.
+- t16 504/504, t17 72/72 ALL PASS after the engine change · esbuild + eslint clean on the four files ·
+  no Polish letters.
+NOT verified: the 2D sheets / 3D still draw the arched window as a rectangle (night 4, by design);
+hardware (hinge/lock) picks on the arched leaf use the bounding leaf height — unchanged from v1.
+
+**Verdict: ✅ B**
+
 ## 2026-09-06 — arched-casement-v1: audit fixes T1–T8, then Stage 2 (night run 2, branch `claude/arched-casement-audit-t1-t8-7d5fuk`)
 
 Inputs read in full, in this order: `ARCHED-CASEMENT-v1-AUDIT.md` → `ARCHED-CASEMENT-v1.md` (spec,

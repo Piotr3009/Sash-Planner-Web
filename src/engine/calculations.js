@@ -1,6 +1,7 @@
 import { resolveCasementLayout, fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from './casementLayouts.js';
 import { selectCasementHinges, summariseHinges, selectCasementLocks, summariseLocks } from './casementHardware.js';
 import { getWindowProfile, getCasementProfile, getDoorProfile, profileSashDepth, profileBoardWidth, boardWidthForDepth, kgPerM } from './profile.js';
+import { buildArchGeometry, planArchSegments, buildGlassOutline, buildArchBars, glassOutlinePoly, chainAreaAboveLine, ArchError } from './arch.js';
 
 /**
  * calculations.js - ETAP 3
@@ -430,8 +431,12 @@ function calculateWeights(windowSpec, sashWidth, topSashHeight, bottomSashHeight
 }
 
 function calculatePaint(frameWidth, frameHeight) {
-    const areaSqm = round((frameWidth * frameHeight) / 1_000_000);
-    // Per 1.5 m²: 2L primer + 1L topcoat
+    return paintFromAreaSqm(round((frameWidth * frameHeight) / 1_000_000));
+}
+
+// Per 1.5 m²: 2L primer + 1L topcoat. Shared by the rectangular path (W × H)
+// and the arched casement (true outline area, arched-casement-v2 B.6).
+function paintFromAreaSqm(areaSqm) {
     return {
         areaSqm,
         primer: round((areaSqm / 1.5) * 2),
@@ -584,7 +589,13 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     const R = (v) => Math.round(v * 10) / 10; // one decimal, CNC-ready
 
     const cas = windowSpec.casement || {};
-    const layout = cas.layout || '040L';
+    // ── Arched casement (arched-casement-v2): ONE leaf, geometry from arch.js.
+    //    The layout is forced to the single-leaf code of the hinge side and the
+    //    hinge array is ignored (spec v1 §4.1); everything below the springing
+    //    is the straight engine. Invalid arch numbers throw an ArchError —
+    //    never a silent rectangle (every caller catches and shows the reason).
+    const archSpec = windowSpec.arch && windowSpec.arch.shape ? windowSpec.arch : null;
+    const layout = archSpec ? (archSpec.hinge === 'right' ? '040R' : '040L') : (cas.layout || '040L');
 
     // Layout geometry driven by the PROFILE faces (57 / 68 / 68 defaults —
     // numerically identical to the PSW visual geometry, so 3D/2D/import agree).
@@ -600,7 +611,7 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
         fanlightRatio: fanAxisToRatio(cas.fanlightHeight, innerH),
         fan2Ratio: fan2AxisToRatio(cas.fan2Height, frameHeight, innerH),
         middleSectionMm: Number(cas.middleWidth) || 0,
-        casementHinges: cas.hinges,
+        casementHinges: archSpec ? null : cas.hinges,
         geo: GEO,
     });
 
@@ -617,6 +628,34 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
       ? ded.glass
       : R(2 * (els.leafStile.face - glassInset));
 
+    // Bar counts per pane role (straight bars; on an arched leaf they are the
+    // straight bars below the springing / across the clear width).
+    const casBars = cas.bars || {
+        h: Number(windowSpec.casementHBars) || 0,
+        v: Number(windowSpec.casementVBars) || 0,
+        fanH: Number(windowSpec.casementFanHBars) || 0,
+        fanV: Number(windowSpec.casementFanVBars) || 0,
+        fan2H: Number(windowSpec.casementFan2HBars) || 0,
+        fan2V: Number(windowSpec.casementFan2VBars) || 0,
+    };
+
+    // ── Arch geometry, blank plans, glass outline and bars — profile numbers only ──
+    let AG = null, archPlans = null, archOutline = null, archBars = null, glassBottomEdge = null;
+    if (archSpec) {
+        if (glassInset == null) throw new ArchError('Casement profile geometry.glassInset is missing — required for the arched glass outline');
+        AG = buildArchGeometry({ shape: archSpec.shape, width: frameWidth, height: frameHeight, rise: archSpec.rise }, p);
+        archPlans = { frameHead: planArchSegments(AG.frameHead, p.arch), leafTop: planArchSegments(AG.leafTop, p.arch) };
+        // Glass bottom edge from the frame bottom: cill side of the leaf
+        // (gap + cill land = leafFullHeight − leafAtJamb) + bottom rail face − glass inset.
+        const cillSide = ded.leafFullHeight - ded.leafAtJamb;
+        glassBottomEdge = cillSide + (els.leafBottom.face - glassInset);
+        archOutline = buildGlassOutline(AG.glass.arcs, AG.glass.halfWidth, AG.start - glassBottomEdge);
+        archBars = buildArchBars({
+            outline: archOutline, shape: AG.shape, pattern: archSpec.bars?.pattern || 'none',
+            h: casBars.h, v: casBars.v, frameHalfWidth: frameWidth / 2,
+        }, p.arch?.patterns);
+    }
+
     // Record helper: profile rounding (0.1) + element letter code on top of
     // the shared record shape (createComponentRecord rounds to integers).
     const mk = (group, name, section, length, qty, code, notes = '') => {
@@ -629,12 +668,23 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     // ── Frame: full external dimensions (comb / finger / T&G joints) ──
     const cillWider = !!windowSpec.cill?.wider;
     const cillLength = R(frameWidth + (cillWider ? 100 : 0) - (p.lengths.cillDeduct || 0));
+    // Arched: the head is a curved member — length = arc length at the ring
+    // CENTRE line, notes = radii / pieces / stock from the blank planner — and
+    // the jambs stop at the springing line (straight part only).
+    const archNotes = (plan, ring) => {
+        const radii = ring.outer.map((a) => Math.round(a.r)).join('/');
+        if (plan.noStock) return `R ${radii} · no stock board fits`;
+        return `R ${radii} · ${plan.totalPieces} pieces · stock ${plan.arcs.map((a) => a.default.stock).join('/')}`;
+    };
+    const jambLen = R((archSpec ? AG.start : frameHeight) - (p.lengths.jambDeduct || 0));
     const box = [
-        mk('box', 'C-FRAME HEAD', secFrame, R(frameWidth - (p.lengths.headDeduct || 0)), 1, 'C-H'),
+        archSpec
+            ? mk('box', 'C-ARCH HEAD', secFrame, AG.frameHead.lengths.centre, 1, 'C-AH', archNotes(archPlans.frameHead, AG.frameHead))
+            : mk('box', 'C-FRAME HEAD', secFrame, R(frameWidth - (p.lengths.headDeduct || 0)), 1, 'C-H'),
         mk('box', 'C-FRAME CILL', secCill, cillLength, 1, 'C-CILL',
             cillWider ? 'wider +50mm each side' : ''),
-        mk('box', 'C-FRAME JAMB (L)', secFrame, R(frameHeight - (p.lengths.jambDeduct || 0)), 1, 'C-J/L'),
-        mk('box', 'C-FRAME JAMB (R)', secFrame, R(frameHeight - (p.lengths.jambDeduct || 0)), 1, 'C-J/R'),
+        mk('box', 'C-FRAME JAMB (L)', secFrame, jambLen, 1, 'C-J/L'),
+        mk('box', 'C-FRAME JAMB (R)', secFrame, jambLen, 1, 'C-J/R'),
     ];
 
     // ── Panel bounds in absolute frame coordinates ──
@@ -797,25 +847,59 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
         const dummy = pn.hinge === 'fixed' ? 'dummy sash' : '';
         const noteBase = [dummy, s.heightNote].filter(Boolean).join(' · ');
         const fnL = hingeFn(pn.hinge, 'L'), fnR = hingeFn(pn.hinge, 'R');
-        sash.push(mk('sash', 'C-STILE (L)', secLeaf, R(s.leafH - (p.lengths.stileDeduct || 0)), 1, `C-ST/L-${pcode}`,
+        // Arched leaf: the stiles run from the leaf bottom to the springing line
+        // (straight part only) and the top rail is the curved member.
+        const stileLen = R((archSpec ? AG.leafStraightStile : s.leafH) - (p.lengths.stileDeduct || 0));
+        sash.push(mk('sash', 'C-STILE (L)', secLeaf, stileLen, 1, `C-ST/L-${pcode}`,
             [fnL, noteBase].filter(Boolean).join(' · ')));
-        sash.push(mk('sash', 'C-STILE (R)', secLeaf, R(s.leafH - (p.lengths.stileDeduct || 0)), 1, `C-ST/R-${pcode}`,
+        sash.push(mk('sash', 'C-STILE (R)', secLeaf, stileLen, 1, `C-ST/R-${pcode}`,
             [fnR, noteBase].filter(Boolean).join(' · ')));
-        sash.push(mk('sash', 'C-TOP RAIL', secLeaf, R(s.leafW - (p.lengths.topRailDeduct || 0)), 1, `C-TR-${pcode}`,
-            [pn.hinge === 'top' ? 'hinge' : '', noteBase].filter(Boolean).join(' · ')));
+        if (archSpec) {
+            sash.push(mk('sash', 'C-ARCH TOP RAIL', secLeaf, AG.leafTop.lengths.centre, 1, `C-ATR-${pcode}`,
+                [archNotes(archPlans.leafTop, AG.leafTop), noteBase].filter(Boolean).join(' · ')));
+        } else {
+            sash.push(mk('sash', 'C-TOP RAIL', secLeaf, R(s.leafW - (p.lengths.topRailDeduct || 0)), 1, `C-TR-${pcode}`,
+                [pn.hinge === 'top' ? 'hinge' : '', noteBase].filter(Boolean).join(' · ')));
+        }
         sash.push(mk('sash', 'C-BOTTOM RAIL', secLeaf, R(s.leafW - (p.lengths.bottomRailDeduct || 0)), 1, `C-BR-${pcode}`,
             [pn.hinge === 'top' ? 'lock' : '', noteBase].filter(Boolean).join(' · ')));
     });
 
     // ── Glass: one 24 mm unit per pane (fixed = dummy sash, same math) ──
-    const paneGlass = layoutDef.panels.map((pn, i) => ({
-        width: Math.max(0, R(leafSizes[i].leafW - glassDed)),
-        height: Math.max(0, R(leafSizes[i].leafH - glassDed)),
-        location: `${layout} P${i + 1} ${pn.hinge === 'fixed' ? 'fixed' : pn.hinge}`,
-        role: pn._role || 'main',
-        qty: 1,
-    }));
-    const glassSqm = paneGlass.reduce((a, g) => a + (g.width * g.height) / 1e6, 0);
+    const paneGlass = archSpec
+        ? [{
+            // Shaped unit: width × height = bounding box (rectangular consumers
+            // keep working); `shape` carries the true outline and the bars in
+            // the glass frame (origin = unit bottom-left, y up) for the glazier.
+            width: R(archOutline.width),
+            height: R(archOutline.height),
+            location: 'arched leaf',
+            role: 'main',
+            qty: 1,
+            shape: {
+                kind: 'arched',
+                archShape: AG.shape,
+                outline: archOutline,
+                poly: glassOutlinePoly(archOutline),
+                springing: R(archOutline.springing),
+                apex: R(archOutline.apex),
+                rise: R(archOutline.rise),
+                radii: archOutline.radii.map(R),
+                area: archOutline.area,
+                perimeter: archOutline.perimeter,
+                bars: archBars.bars,
+                pattern: archBars.pattern,
+                barCounts: archBars.counts,
+            },
+        }]
+        : layoutDef.panels.map((pn, i) => ({
+            width: Math.max(0, R(leafSizes[i].leafW - glassDed)),
+            height: Math.max(0, R(leafSizes[i].leafH - glassDed)),
+            location: `${layout} P${i + 1} ${pn.hinge === 'fixed' ? 'fixed' : pn.hinge}`,
+            role: pn._role || 'main',
+            qty: 1,
+        }));
+    const glassSqm = archSpec ? archOutline.area / 1e6 : paneGlass.reduce((a, g) => a + (g.width * g.height) / 1e6, 0);
     const openers = layoutDef.panels.filter((pn) => pn.hinge !== 'fixed').length;
 
     // ── Weights: timber from component sections × density (kgPerM), glass
@@ -839,8 +923,12 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     const leafWeights = layoutDef.panels.map((pn, i) => {
         if (pn.hinge === 'fixed') return null;
         const s = leafSizes[i];
-        const frameKg = kgPerM(els.leafStile.face, ld) * ((2 * s.leafH + 2 * s.leafW) / 1000);
-        const paneKg = ((paneGlass[i].width * paneGlass[i].height) / 1e6) * glassKgPerSqm;
+        // Arched leaf: the timber run is 2 straight stiles + bottom rail + the
+        // curved top rail at its centre line; the pane weight from the true area.
+        const leafRun = archSpec ? (2 * AG.leafStraightStile + s.leafW + AG.leafTop.lengths.centre) : (2 * s.leafH + 2 * s.leafW);
+        const frameKg = kgPerM(els.leafStile.face, ld) * (leafRun / 1000);
+        const paneArea = archSpec ? archOutline.area : paneGlass[i].width * paneGlass[i].height;
+        const paneKg = (paneArea / 1e6) * glassKgPerSqm;
         return { panel: i + 1, hinge: pn.hinge, weightKg: R((frameKg + paneKg) * wMargin) };
     });
     // Hinge selection per opener (slot ladder by leaf width + weight); the
@@ -855,14 +943,6 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     // Glazing bead: pane perimeters +15%. Astragal bars: same run glued on
     // BOTH glass faces — Triangle (Ext) outside, Georgian Middle inside.
     // Between-glass (internal georgian) bars live inside the IGU: no material.
-    const casBars = cas.bars || {
-        h: Number(windowSpec.casementHBars) || 0,
-        v: Number(windowSpec.casementVBars) || 0,
-        fanH: Number(windowSpec.casementFanHBars) || 0,
-        fanV: Number(windowSpec.casementFanVBars) || 0,
-        fan2H: Number(windowSpec.casementFan2HBars) || 0,
-        fan2V: Number(windowSpec.casementFan2VBars) || 0,
-    };
     const barCountsFor = (role) => (role === 'fan'
         ? { h: casBars.fanH, v: casBars.fanV }
         : role === 'fan2'
@@ -871,14 +951,15 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     const BEAD_WASTE = 1.15;
     const recBead = (name, mm, notes) =>
         createComponentRecord(windowSpec, 'beading', name, 'profile', mm, 1, notes);
-    const perimMm = paneGlass.reduce((a, g) => a + 2 * ((g.width || 0) + (g.height || 0)), 0);
+    // Arched: pane perimeter and bar run from the true outline / bar list.
+    const perimMm = archSpec ? archOutline.perimeter : paneGlass.reduce((a, g) => a + 2 * ((g.width || 0) + (g.height || 0)), 0);
     const casBarType = cas.barType || windowSpec.casementBarType || 'astragal';
-    const barMm = casBarType === 'astragal'
-        ? paneGlass.reduce((a, g) => {
+    const barMm = casBarType !== 'astragal' ? 0
+        : archSpec ? archBars.totalLength
+        : paneGlass.reduce((a, g) => {
             const c = barCountsFor(g.role);
             return a + c.h * (g.width || 0) + c.v * (g.height || 0);
-        }, 0)
-        : 0;
+        }, 0);
     const beading = [recBead('C-GLAZING BEADING', Math.round(perimMm * BEAD_WASTE), 'Pane perimeters + 15%')];
     if (barMm > 0) {
         beading.push(recBead('C-TRIANGLE BEADING (EXT)', Math.round(barMm * BEAD_WASTE), 'Astragal bars ext + 15%'));
@@ -896,8 +977,12 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     const casSiliconeTubes = Math.round(0.1 * ((perimMm + barMm) / 1000) * 10) / 10;
     const casBeadTapeSideM = Math.round(((perimMm + 2 * barMm) / 1000) * 100) / 100;
     const SEAL_F = 1.10;
-    const casSealFrameM = Math.round(((2 * frameHeight + 2 * frameWidth) * SEAL_F / 1000) * 100) / 100;
-    const casSealHjM = Math.round(((2 * frameHeight + 1 * frameWidth) * SEAL_F / 1000) * 100) / 100;
+    // Arched: the seal follows the true frame outline — two jambs to the
+    // springing + the head arc (outer edge), plus the cill for the frame seal.
+    const jambRun = archSpec ? 2 * AG.start : 2 * frameHeight;
+    const headRun = archSpec ? AG.frameHead.lengths.outer : frameWidth;
+    const casSealFrameM = Math.round(((jambRun + headRun + frameWidth) * SEAL_F / 1000) * 100) / 100;
+    const casSealHjM = Math.round(((jambRun + headRun) * SEAL_F / 1000) * 100) / 100;
     const casSealColour = (cas.sealColour || windowSpec.sealColour || 'black').toLowerCase();
 
     void r1;
@@ -921,13 +1006,35 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
                 extension: Number(windowSpec.cill?.extension) || 0,
             },
         },
+        // ── Arched casement (arched-casement-v2 B.8): geometry, blank plans,
+        //    bars and the glass outline for the drawings and the glazier exports.
+        //    Absent (not null) on a rectangular casement — its output is unchanged.
+        ...(archSpec ? {
+            arch: {
+                shape: AG.shape,
+                geometry: AG,
+                plans: archPlans,
+                bars: archBars.bars,
+                barCounts: archBars.counts,
+                barTotalLength: archBars.totalLength,
+                pattern: archBars.pattern,
+                glassOutline: {
+                    ...archOutline,
+                    // glass-frame origin in FRAME coordinates (mm from the frame's
+                    // outer bottom-left corner, y up) = the unit's bottom-left corner
+                    origin: { x: R(frameWidth / 2 - AG.glass.halfWidth), y: R(glassBottomEdge) },
+                },
+            },
+        } : {}),
         barPositions: { vertical: [], horizontal: [] },
         weights: {
             timber: R(timberKg),
             glass: R(glassKg),
             total: R((timberKg + glassKg) * wMargin),
         },
-        paint: calculatePaint(frameWidth, frameHeight),
+        paint: archSpec
+            ? paintFromAreaSqm(round((frameWidth * AG.start + chainAreaAboveLine(AG.arcs)) / 1_000_000))
+            : calculatePaint(frameWidth, frameHeight),
         consumables: {
             glass: { type: windowSpec.glazing?.type || 'double', sqm: Math.round(glassSqm * 100) / 100 },
             silicone: { tubes: casSiliconeTubes },

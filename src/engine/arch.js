@@ -733,3 +733,262 @@ export function buildArchPlan(input, profile) {
     noStock: frameHead.noStock || leafTop.noStock,
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GLASS OUTLINE + GLAZING BARS (arched-casement-v2 §2.3)
+//
+// The glazier's reference frame is the GLASS UNIT: origin at the unit's
+// bottom-left corner, y up. Clear width Wg = 2·xg, straight sides up to the
+// springing line y_s, then the glass arc chain (the leaf-top ring inner edge
+// offset by leafTop.face − glassInset, i.e. the geometry's `glass.arcs`).
+// Rule C guarantees the chain starts at x = ±xg, so the sides meet the arcs
+// vertically and the unit's bounding box is Wg × apex.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Upper y of an arc chain at x. The chains here are single-valued in x above
+ * the line they start on (every arc lies in the upper half of its circle), so
+ * the first arc whose angular range contains the crossing wins. null outside.
+ */
+export function chainYAtX(arcs, x) {
+  let best = null;
+  for (const a of arcs) {
+    const dx = x - a.cx;
+    const d2 = a.r * a.r - dx * dx;
+    if (d2 < 0) continue;
+    const dy = Math.sqrt(d2);
+    const ang = Math.atan2(dy, dx);
+    if (ang < a.a0 - 1e-9 || ang > a.a1 + 1e-9) continue;
+    const y = a.cy + dy;
+    if (best == null || y > best) best = y;
+  }
+  return best;
+}
+
+/**
+ * Area between an arc chain (counter-clockwise, right end → left end) and the
+ * line y = const through its two ends — Green's theorem on the closed loop
+ * chain + chord; the chord contributes nothing when the ends share their y,
+ * which every clipped chain here does. Exact, no sampling.
+ */
+export function chainAreaAboveLine(arcs) {
+  if (!arcs.length) return 0;
+  const y0 = arcPoint(arcs[0], arcs[0].a0)[1];
+  let s = 0;
+  for (const a of arcs) {
+    const d = a.a1 - a.a0;
+    // ∫ (x dy − y dx) over the arc, with y measured from the chord line
+    s += a.r * a.r * d + a.cx * a.r * (Math.sin(a.a1) - Math.sin(a.a0)) - (a.cy - y0) * a.r * (Math.cos(a.a1) - Math.cos(a.a0));
+  }
+  return s / 2;
+}
+
+/**
+ * Glass outline of the arched leaf in the glass frame.
+ * @param glassArcs   geometry.glass.arcs (arch frame: axis x = 0, springing y = 0)
+ * @param halfWidth   xg = clear half width (geometry.glass.halfWidth)
+ * @param straightBelow  y_s = glass bottom edge → springing line (mm)
+ */
+export function buildGlassOutline(glassArcs, halfWidth, straightBelow) {
+  const xg = Number(halfWidth), ys = Number(straightBelow);
+  if (!(xg > 0)) throw new ArchError(`Glass clear half width must be positive, got ${halfWidth}`);
+  if (!(ys >= 0)) throw new ArchError(`Glass straight height below the springing must be >= 0, got ${straightBelow}`);
+  const start = arcPoint(glassArcs[0], glassArcs[0].a0);
+  if (!(Math.abs(start[0] - xg) < 1e-6 && Math.abs(start[1]) < 1e-6)) {
+    throw new ArchError(`Glass arc chain must start vertical at the jamb (rule C): starts at (${r1(start[0])}, ${r1(start[1])}), expected (${r1(xg)}, 0)`);
+  }
+  const arcs = glassArcs.map((a) => ({ ...a, cx: a.cx + xg, cy: a.cy + ys }));
+  const apex = arcsExtent(arcs, [0, 1]).max;
+  const archLength = arcsLength(glassArcs);
+  const archArea = chainAreaAboveLine(glassArcs);
+  return {
+    width: 2 * xg,
+    height: apex,
+    springing: ys,
+    apex,
+    rise: apex - ys,
+    arcs,
+    radii: glassArcs.map((a) => a.r),
+    archLength,
+    archArea,
+    area: 2 * xg * ys + archArea,
+    perimeter: 2 * xg + 2 * ys + archLength,
+  };
+}
+
+/**
+ * Closed bulge polyline of a glass outline (glass frame): bottom-left →
+ * bottom-right → right springing → arcs counter-clockwise → left springing →
+ * close. One vertex per arc end point, exact arcs.
+ */
+export function glassOutlinePoly(outline) {
+  const { width: Wg, arcs } = outline;
+  const pts = [[0, 0, 0], [Wg, 0, 0]];
+  for (const a of arcs) pts.push([...arcPoint(a, a.a0), arcBulge(a)]);
+  const last = arcs[arcs.length - 1];
+  pts.push([...arcPoint(last, last.a1), 0]);
+  return pts;
+}
+
+const BAR_ID_PREFIX = Object.freeze({ v: 'V', h: 'H', springing: 'S', ring: 'R', spoke: 'K', tracery: 'T' });
+
+function readPatternSettings(opts) {
+  const ratios = Array.isArray(opts?.hubRingRatios) ? opts.hubRingRatios.map(Number) : [];
+  if (ratios.length < 3 || !ratios.every((k) => k > 0 && k < 1)) throw new ArchError('Casement profile arch.patterns.hubRingRatios is missing (three fractions of the clear half width)');
+  const I = opts?.intersecting || {};
+  const pitch = Number(I.pitch), minM = Number(I.minMullions), maxM = Number(I.maxMullions), minR = Number(I.minRadius);
+  if (!(pitch > 0 && minM >= 1 && maxM >= minM && minR >= 0)) throw new ArchError('Casement profile arch.patterns.intersecting is missing (pitch / minMullions / maxMullions / minRadius)');
+  return { ratios, pitch, minM, maxM, minR };
+}
+
+/** Intersection points of two circles (none, one or two). */
+function circleCircle(c1, r1, c2, r2) {
+  const dx = c2[0] - c1[0], dy = c2[1] - c1[1];
+  const d = Math.hypot(dx, dy);
+  if (!(d > 1e-9) || d > r1 + r2 + 1e-9 || d < Math.abs(r1 - r2) - 1e-9) return [];
+  const a = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
+  const h2 = r1 * r1 - a * a;
+  const h = h2 > 0 ? Math.sqrt(h2) : 0;
+  const px = c1[0] + a * dx / d, py = c1[1] + a * dy / d;
+  const ox = -dy / d * h, oy = dx / d * h;
+  return h > 0 ? [[px + ox, py + oy], [px - ox, py - oy]] : [[px, py]];
+}
+
+/**
+ * Where a tracery circle (centre c, radius r, starting on the springing line)
+ * first meets the outline chain when travelling upward from its start —
+ * `side` −1: start at angle 0 (centre left of the mullion), angle increases;
+ * `side` +1: start at angle π, angle decreases. Returns the angle on the
+ * tracery circle, or null (PSW: at most a quarter turn).
+ */
+function traceryHit(arcs, c, r, side) {
+  let best = null;
+  for (const a of arcs) {
+    for (const p of circleCircle(c, r, [a.cx, a.cy], a.r)) {
+      if (p[1] < c[1] - 1e-9) continue;                              // below the springing
+      const onArc = Math.atan2(p[1] - a.cy, p[0] - a.cx);
+      if (onArc < a.a0 - 1e-6 || onArc > a.a1 + 1e-6) continue;      // outside the outline arc's range
+      const phi = Math.atan2(p[1] - c[1], p[0] - c[0]);
+      const travel = side < 0 ? phi : Math.PI - phi;
+      if (travel < 1e-9 || travel > Math.PI / 2 + 1e-9) continue;
+      if (best == null || travel < best.travel) best = { travel, phi };
+    }
+  }
+  return best ? best.phi : null;
+}
+
+/**
+ * Glazing bars in the arched leaf (v2 §2.3), on the glass outline, glass frame.
+ * Straight bars: v — equal divisions of the clear width, bottom edge up to the
+ * outline; h — equal divisions of the straight height below the springing,
+ * full clear width (never across the arc).
+ * Patterns — PSW 3d-src FixFrameWindow.jsx `semiBarPattern` (lines 847–1030)
+ * and `intersectingData` (667–830) ported on the glass outline:
+ *   half-hub           springing bar + ring 1, nothing else
+ *   hub-spoke          ring 1 (0.3·xg), 4 spokes at i/3·π from the ring to the
+ *                      outline — the two end spokes lie ON the springing line and
+ *                      are the springing bar; ring-end verticals below the line;
+ *   double / triple    rings 0.3 / 0.6 (/ 0.8), 6 / 8 spokes segmented ring → ring
+ *                      → outline, one vertical per ring end below the line;
+ *                      the user's v count is ignored for every hub (PSW rule);
+ *   intersecting       n = clamp(round(Wg / pitch), min, max) mullions up to the
+ *                      springing; from each mullion top two tracery arcs centred on
+ *                      the OUTER frame corners (±W/2 on the springing line, as PSW),
+ *                      each stopped at the outline (quarter turn at most).
+ * Spoke insets (BAR_W·0.6 / 0.4) and the v-bar top clearance in PSW are 3D
+ * cosmetics — the axes here meet the rings and the outline exactly.
+ * Output: [{ id, kind: 'straight'|'arc', role, from, to, arc?, length }], lengths
+ * rounded to 0.5 mm; roles v | h | springing | ring | spoke | tracery.
+ */
+export function buildArchBars({ outline, shape, pattern = 'none', h = 0, v = 0, frameHalfWidth }, patternOpts) {
+  const pat = pattern || 'none';
+  if (!ARCH_BAR_PATTERNS.includes(pat)) throw new ArchError(`Unknown arch bar pattern "${pattern}"`);
+  const allowed = patternsForShape(shape);
+  if (!allowed.includes(pat)) throw new ArchError(`Bar pattern "${pat}" is not available on a ${ARCH_SHAPE_LABELS[shape] || shape} arch (allowed: ${allowed.join(', ')})`);
+  const { width: Wg, springing: ys, arcs } = outline;
+  const xg = Wg / 2;
+  const nH = Math.max(0, Math.floor(Number(h) || 0));
+  const nV = Math.max(0, Math.floor(Number(v) || 0));
+  const bars = [];
+  const r05 = (val) => Math.round(val * 2) / 2;
+  const straight = (role, x0, y0, x1, y1) => bars.push({ kind: 'straight', role, from: [x0, y0], to: [x1, y1], length: r05(Math.hypot(x1 - x0, y1 - y0)) });
+  const arcBar = (role, a) => bars.push({ kind: 'arc', role, arc: { cx: a.cx, cy: a.cy, r: a.r, a0: a.a0, a1: a.a1 }, from: arcPoint(a, a.a0), to: arcPoint(a, a.a1), length: r05(arcLen(a)) });
+  const hub = isHubPattern(pat);
+
+  for (let j = 1; j <= nH; j++) {
+    const y = ys * j / (nH + 1);
+    if (!(y > 0)) continue;
+    straight('h', 0, y, Wg, y);
+  }
+  if (!hub) {
+    for (let i = 1; i <= nV; i++) {
+      const x = Wg * i / (nV + 1);
+      const top = chainYAtX(arcs, x);
+      if (top == null) throw new ArchError(`Vertical bar at x = ${r1(x)} does not meet the glass outline`);
+      straight('v', x, 0, x, top);
+    }
+  }
+
+  if (hub) {
+    const S = readPatternSettings(patternOpts);
+    if (arcs.length !== 1) throw new ArchError(`Hub patterns need a semi-circle outline (one arc), got ${arcs.length} arcs`);
+    const nRings = pat === 'triple-hub-spoke' ? 3 : pat === 'double-hub-spoke' ? 2 : 1;
+    const rings = S.ratios.slice(0, nRings).map((k) => k * xg);
+    const c = [xg, ys];
+    if (pat === 'half-hub') {
+      straight('springing', 0, ys, Wg, ys);
+      arcBar('ring', { cx: c[0], cy: c[1], r: rings[0], a0: 0, a1: Math.PI });
+    } else {
+      for (const rk of rings) arcBar('ring', { cx: c[0], cy: c[1], r: rk, a0: 0, a1: Math.PI });
+      const spokeCount = nRings === 3 ? 8 : nRings === 2 ? 6 : 4;
+      const bounds = [...rings, arcs[0].r];                          // ring → ring → outline (semi-circle radius = xg)
+      for (let i = 0; i < spokeCount; i++) {
+        const ang = (i / (spokeCount - 1)) * Math.PI;
+        const onLine = i === 0 || i === spokeCount - 1;             // the end spokes lie on the springing line
+        const ca = Math.cos(ang), sa = Math.sin(ang);
+        for (let k = 0; k < bounds.length - 1; k++) {
+          const r0 = bounds[k], r1s = bounds[k + 1];
+          straight(onLine ? 'springing' : 'spoke', c[0] + r0 * ca, c[1] + r0 * sa, c[0] + r1s * ca, c[1] + r1s * sa);
+        }
+      }
+      // PSW 875–886: every ring end continues straight down to the glass bottom
+      for (const rk of rings) {
+        straight('v', xg - rk, 0, xg - rk, ys);
+        straight('v', xg + rk, 0, xg + rk, ys);
+      }
+    }
+  }
+
+  if (pat === 'intersecting') {
+    const S = readPatternSettings(patternOpts);
+    const hw = Number(frameHalfWidth);
+    if (!(hw > xg)) throw new ArchError(`Intersecting pattern needs the frame half width (> ${r1(xg)}), got ${frameHalfWidth}`);
+    const n = Math.max(S.minM, Math.min(S.maxM, Math.round(Wg / S.pitch)));
+    for (let i = 1; i <= n; i++) {
+      const x = Wg * i / (n + 1);
+      straight('v', x, 0, x, ys);                                    // mullion up to the springing
+      for (const side of [-1, 1]) {
+        const cx = xg + side * hw;                                   // outer frame corner on the springing line
+        const rM = Math.abs(x - cx);
+        if (rM < S.minR) continue;
+        const phi = traceryHit(arcs, [cx, ys], rM, side);
+        if (phi == null) continue;
+        arcBar('tracery', side < 0 ? { cx, cy: ys, r: rM, a0: 0, a1: phi } : { cx, cy: ys, r: rM, a0: phi, a1: Math.PI });
+      }
+    }
+  }
+
+  const counters = {};
+  for (const b of bars) {
+    const pfx = BAR_ID_PREFIX[b.role] || 'B';
+    counters[pfx] = (counters[pfx] || 0) + 1;
+    b.id = `${pfx}${counters[pfx]}`;
+  }
+  return {
+    pattern: pat,
+    counts: { h: nH, v: hub ? 0 : nV },
+    bars,
+    totalLength: bars.reduce((s, b) => s + b.length, 0),
+    byRole: bars.reduce((m, b) => { m[b.role] = (m[b.role] || 0) + 1; return m; }, {}),
+  };
+}
