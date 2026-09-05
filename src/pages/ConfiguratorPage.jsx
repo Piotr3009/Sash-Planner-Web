@@ -122,6 +122,9 @@ const pcArchToUi = (pc) => (pc === 'gothic-equilateral' || pc === 'gothic-drop')
 const archRatioFor = (ui, profile) => ui === 'gothic' ? (GOTHIC_PROFILE_RATIO[profile] || GOTHIC_PROFILE_RATIO.equilateral) : (ARCH_RISE_RATIO[ui] || 0);
 // Semi-circle and equilateral gothic have a rise fixed by geometry — no custom input.
 const archRiseIsFixed = (ui, profile) => ui === 'semi-circle' || (ui === 'gothic' && profile === 'equilateral');
+// The shared 3D (ArchedCasementWindow, identical to PSW) takes PSW shape names
+// and ignores the rise (its own fixed ratios). 'gothic-drop' has no 3D twin.
+const PC_TO_3D_ARCH = { 'segmental': 'segmental-arch', 'semi-circle': 'semi-circle', 'gothic-equilateral': 'gothic-arch', 'gothic-drop': 'gothic-arch', 'three-centre': 'elliptical-arch' };
 
 // Migrate old custom bar format (position → mm)
 function migrateBars(bars) {
@@ -478,9 +481,10 @@ export default function ConfiguratorPage() {
     const m = archPlan?.plans?.[member];
     const ring = archPlan?.[member];
     if (!m || !ring) return '—';
-    const r = Math.round(ring.outer?.[0]?.r || 0);
+    // every arc: one radius for a single-centre arch, three for a three-centre, two for a gothic
+    const radii = (ring.outer || []).map((a) => Math.round(a.r)).join(' / ');
     const parts = (m.arcs || []).map((a) => a.default ? `${a.default.n} × ${a.default.stock}` : '?').join(' + ');
-    return `R ${r} · ${parts}`;
+    return `R ${radii} · ${parts}`;
   };
   const isDoor = batch?.type === 'door' || batch?.type === 'doors';
 
@@ -577,6 +581,9 @@ export default function ConfiguratorPage() {
     if (isCasement) {
       window.update3D({
         windowCategory: 'casement', extWidth: extW, extHeight: extH,
+        // 3D reads PSW names: casArchShape / casArchHinge (archShape below is the PC field)
+        casArchShape: isArched ? (PC_TO_3D_ARCH[pcArchShape] || 'semi-circle') : 'semi-circle',
+        casArchHinge: isArched ? casArchHinge : 'left',
         casementLayout: isArched ? (casArchHinge === 'right' ? '040R' : '040L') : casLayout,
         casementHinges: isArched ? null : (casHinges ? [...casHinges] : null),
         // Arched casement (PC-native fields read by specification.js archFromSpec).

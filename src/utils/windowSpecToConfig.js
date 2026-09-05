@@ -100,6 +100,11 @@ export function windowSpecToConfig(windowSpec) {
       windowCategory: 'casement',
       width: casementProps.width,
       height: casementProps.height,
+      // ArchedCasementWindow sizes itself from extWidth/extHeight (the standard
+      // CasementWindow reads casementProps) — without these the arched preview
+      // stayed at the viewer's default 1000 × 1500.
+      extWidth: casementProps.width,
+      extHeight: casementProps.height,
       casementProps,
       ...archConfig,
     };
