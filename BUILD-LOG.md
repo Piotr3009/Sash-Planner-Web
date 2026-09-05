@@ -4,6 +4,47 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-09-07 — ARCHED-WINDOWS-v3 night 5 (branch `claude/arched-windows-v3-9v0sw7`)
+
+Inputs read in full: `CLAUDE.md` → `docs/handover/ARCHED-WINDOWS-v3.md` → `BLOCKERS.md` → `BUILD-LOG.md`
+(night 4) → `arka_CNC-piotr.dxf` through ezdxf (every entity dumped, see 0.4) → the `arka-lsp-package`
+README / JSON / LSP (offsets and section only) → `arch.js`, `archDxf.js`, `dxfWriter.js`, `glassDxfExport.js`,
+`glassPdfExport.js`, `CasementGlassDrawing2D.jsx`, `archDrawUtils.js`, `profile.js`, `calculations.js`
+(casement + sash branches), `specification.js`, `lists.js`, `cncExport.js`, the t18 / t19 harness conventions,
+PSW `price-calculator.js` 940–1075, `online-estimate.html` (arch radios, hinge radio, fix bars),
+`estimate-manager.js` 675–700, `ArchedSashWindow.jsx` 95–120 / 340–420. Baseline on the branch start
+(`origin/main`): t16 504/504, t17 72/72, t18 178/178, t19 241/241 ALL PASS (after `npm install` — the container
+had no `node_modules`; t18 / t19 need react-dom / jspdf resolvable).
+
+Stages tonight (Piotr 07.09, gate before each next stage): 1 = Block 0, 2 = Block 1 A–E, 3 = Block 1 F–J +
+Block 3, 4 = Block 4 + Block 6.
+
+### 0.1 — FIT view in the arch CNC DXF (`arch.js`, `archDxf.js`)
+
+**Understanding:** Piotr overlaid the frame ring and the leaf ring by hand and read the 17 mm rebate lap as an
+error. A row that draws frame ring, rebate wall, leaf ring and glass outline concentric in their assembly
+position makes the 4 mm running gap and the 17 mm lap readable without overlaying anything.
+
+**Two approaches, one rejected:** (a) draw the FIT view in `cncExport.js` from `getCasementProfile()` — rejected:
+a second place reading `geometry.land` / `gap`, and the harness could not reach it without the browser wrapper;
+(b) `buildArchGeometry` gains `rebateWall` (= `offsetArcs(base, geometry.land)`) and `fit { gap, lap, land }`,
+`archDxf.js` draws them — chosen (one contour source, rule 11 of CLAUDE.md: land / gap / faces from the profile).
+
+**Built:** layer `FIT` (colour 4) first in `ARCH_LAYERS`; `fitRow()` = `ringPoly(frameHead)`, `ringPoly(leafTop)`,
+closed glass chain, rebate wall as 20 / 10 mm dashes (`dashedChain`, 2-vertex bulge polylines — `dxfWriter` has
+no linetypes and adding them is on the "not today" list); text block `FIT (ASSEMBLY, NOT A TOOLPATH)` · `GAP 4
+LAP 17 (REBATE)` · frame / wall / leaf / glass radii. The row is the TOP row of the drawing (rows are stacked
+bottom-up, FIT pushed last); CONTOUR / PIECES rows untouched. `buildArchEntities` refuses a plan without the v3
+fields instead of drawing a partial FIT.
+
+**Verification:** esbuild OK (`arch.js`, `archDxf.js`) · W 1200 semi-circle: frame 600 / 543, rebate wall 564,
+leaf 560 / 493, glass 505.5, gap 4, lap 17 — the spec's verified numbers · `.audit/fit_1200.dxf` read back by
+ezdxf: layer `FIT` present, 63 FIT entities (3 closed rings + 60 dashes) · t16 504/504 still ALL PASS.
+Not verified: the DXF opened in VCarve / AutoCAD (no CAD in the container). **Verdict: ✅ 0.1** (t20 §1 asserts the
+numbers again through the export path).
+
+---
+
 ## 2026-09-06 — arched-casement-v2 night 4: D + E + F + t19 (branch `claude/arched-casement-v2-def-enkyue`)
 
 Inputs read in full, in this order: `CLAUDE.md` → `ARCHED-CASEMENT-v2.md` §4 (+ §0–2 for the data model) →

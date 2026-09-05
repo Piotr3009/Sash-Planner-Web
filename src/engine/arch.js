@@ -426,6 +426,13 @@ export function buildArchGeometry({ shape, width, height, rise }, profile) {
   const leafTop = buildRing(base, leafInset, leafInset + tLeaf, 'LEAF TOP');
   const glassOffset = leafInset + tLeaf - glassInset;
   const glassArcs = offsetArcs(base, glassOffset);
+  // Rebate wall (v3 0.1 FIT view): the frame land ends here; the leaf outer
+  // contour sits `geometry.gap` inside it and laps the frame timber by
+  // frameHead.face − leafAtJamb (57 − 40 = 17 on the default profile).
+  const land = Number(profile.geometry.land);
+  const gap = Number(profile.geometry.gap);
+  if (!(land > 0 && gap >= 0)) throw new ArchError('Casement profile geometry.land / geometry.gap are missing');
+  const rebateWall = offsetArcs(base, land);
   return {
     shape,
     label: ARCH_SHAPE_LABELS[shape],
@@ -438,9 +445,11 @@ export function buildArchGeometry({ shape, width, height, rise }, profile) {
     minHaunchRadius,
     radii: base.map((a) => a.r),                // outer radius per arc (1 / 2 / 3 values)
     arcs: base,
-    offsets: { frameInner: tFrame, leafOuter: leafInset, leafInner: leafInset + tLeaf, glass: glassOffset },
+    offsets: { frameInner: tFrame, leafOuter: leafInset, leafInner: leafInset + tLeaf, glass: glassOffset, land },
     frameHead,
     leafTop,
+    rebateWall,                                 // arcs at R − land (the leaf outer sits gap mm inside it)
+    fit: { gap, lap: tFrame - leafInset, land },
     glass: { arcs: glassArcs, length: arcsLength(glassArcs), apex: arcsExtent(glassArcs, [0, 1]).max, halfWidth: W / 2 - glassOffset },
   };
 }
