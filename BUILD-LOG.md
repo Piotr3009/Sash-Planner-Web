@@ -167,9 +167,13 @@ hack; the leaf top would never match the frame ring; (b) one pure helper that bu
 semi-circle / three-centre / gothic × 2 and the four PSW names, rings nest (57 / 36 / 40 / 104), rule C at the
 springing, bar counts and roles = the engine list, tracery centred on the outer corners, fallback on an
 impossible rise, floors (t19 §4, 40 checks) · t19 §5 structural evidence of the wiring.
-NOT verified in a browser at the time of writing: the WebGL render itself (a headless SwiftShader screenshot of
-the component was attempted — see the end of this section) and the configurator click-through.
-**Verdict: ⚠️ F** (geometry proven in node; the rendered look needs Piotr's eye in the morning).
+NOT verified in a browser: the WebGL render itself and the configurator click-through. A headless Chromium
+(SwiftShader) capture of a scratch page mounting `<Canvas><ArchedCasementWindow …/></Canvas>` was attempted five
+ways (screenshot with / without virtual time, `toDataURL` through `--dump-dom`, `localhost` vs `127.0.0.1`): the
+page mounts the canvas, but no rendered frame came back inside the time budget — so the 3D look (frame, gasket,
+leaf, beads, bars, handle, opening pivot) has ONLY the node-side geometry evidence behind it (t19 §4).
+**Verdict: ⚠️ F** (geometry proven in node; the rendered look needs Piotr's eye in the morning — Configurator →
+casement → Arched → Round / Gothic with bars, open the leaf).
 
 ### T19 — `verify/arch/t19.mjs` + closing checks
 
@@ -191,6 +195,15 @@ letters (codepoint check) · `git diff origin/main --stat` = spec §5 night-4 fi
 `archedCasementGeometry.js`, `src/3d/App.jsx`, `ConfiguratorPage.jsx` (update3D block), verify / fixtures / docs /
 logs — `casementLayouts.js`, beading, `jambDxf.js`, `arch.js`, `calculations.js` untouched.
 **Verdict: ✅ T19**
+
+### Rano dla Piotra — what to look at (5 minutes)
+1. Window (arched casement) → Drawings: Elevation, Frame, Leaf sheets; Glass tab → glass drawing. Every arc is an
+   SVG arc from `derived.arch`; look at the label placement (BLOCKERS 10.10) and press Elements PDF / Glass Drawings
+   PDF once (clipPath through the rasteriser, BLOCKERS 10.9).
+2. Configurator → casement → Arched: Round with a typed start (e.g. 1300 on 1000 × 1500), Half, Gothic; add 1H 2V
+   and a pattern; drag the opening — the 3D now follows the rise (F). This is the part no harness could see.
+3. `node verify/arch/t19.mjs` → 241 / 241; the rectangular sheets are byte-identical to `5ba3661`.
+4. Decide BLOCKERS 10.1 (arched 3D in the window detail preview — six lines) and 10.3 (3D faces from the profile).
 
 ## 2026-09-06 — arched-casement-v2 night 3: A + B + C + t18 (branch `claude/arched-casement-v2-impl-0j27uw`)
 
