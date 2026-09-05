@@ -123,10 +123,9 @@ const CAS_ARCH_HINGES = [{ value: 'left', label: 'Left' }, { value: 'right', lab
 const gothicPcShape = (profile) => (profile === 'equilateral' ? 'gothic-equilateral' : 'gothic-drop');
 // Saved PC shape → chip: gothic-* → Gothic; semi-circle / three-centre and the v1-era 'segmental' → Round.
 const pcArchToUi = (pc) => (isGothicShape(pc) ? 'gothic' : 'round');
-// The shared 3D (ArchedCasementWindow, identical to PSW) takes PSW shape names
-// and ignores the rise (its own fixed ratios) — night-4 work (spec v2 F).
-// 'gothic-drop' has no 3D twin; 'three-centre' is drawn as the PSW ellipse.
-const PC_TO_3D_ARCH = { 'semi-circle': 'semi-circle', 'gothic-equilateral': 'gothic-arch', 'gothic-drop': 'gothic-arch', 'three-centre': 'elliptical-arch' };
+// The shared 3D (ArchedCasementWindow) draws the arch from arch.js since
+// arched-casement-v2 night 4 (F): it takes the PC shape name, the typed rise,
+// the gothic profile, the bar pattern and the two profile arch rules.
 
 // Migrate old custom bar format (position → mm)
 function migrateBars(bars) {
@@ -622,9 +621,13 @@ export default function ConfiguratorPage() {
     if (isCasement) {
       window.update3D({
         windowCategory: 'casement', extWidth: extW, extHeight: extH,
-        // 3D reads PSW names: casArchShape / casArchHinge (archShape below is the PC field)
-        casArchShape: isArched ? (PC_TO_3D_ARCH[pcArchShape] || 'semi-circle') : 'semi-circle',
+        // 3D reads casArchShape / casArchHinge (archShape below is the PC field);
+        // the component accepts the PC shape names and draws the typed rise (F)
+        casArchShape: isArched ? pcArchShape : 'semi-circle',
         casArchHinge: isArched ? casArchHinge : 'left',
+        barPattern: isArched ? casArchPattern : 'none',
+        archMinHaunchRadius: getCasementProfile().arch.minHaunchRadius,
+        archPatterns: getCasementProfile().arch.patterns,
         casementLayout: isArched ? (casArchHinge === 'right' ? '040R' : '040L') : casLayout,
         casementHinges: isArched ? null : (casHinges ? [...casHinges] : null),
         // Arched casement (PC-native fields read by specification.js archFromSpec).

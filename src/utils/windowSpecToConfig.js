@@ -48,7 +48,7 @@ const COLOR_MAP = {
 import { buildVentGrilles } from '../engine/lists.js';
 import { RAL_LOOKUP as RAL_COLORS } from '../config.js';
 import { fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from '../engine/casementLayouts.js';
-import { profileBoxDepth } from '../engine/profile.js';
+import { profileBoxDepth, getCasementProfile } from '../engine/profile.js';
 
 function resolveColor(name, ral) {
   if (!name && !ral) return '#F4F4F2'; // default white
@@ -81,20 +81,21 @@ export function windowSpecToConfig(windowSpec) {
   // stay top-level for the shared camera auto-fit in the viewer Scenes.
   if ((windowSpec.category || 'sash') === 'casement') {
     const casementProps = windowSpecToCasementProps(windowSpec);
-    // Arched casement: the shared 3D (ArchedCasementWindow, PSW names) draws the
-    // arch from its own fixed ratios — it takes the shape and hinge only, so a
-    // custom rise is not visible in the preview (production geometry lives in
-    // arch.js). PC 'gothic-drop' has no 3D counterpart → drawn as gothic-arch;
-    // 'three-centre' → PSW 'elliptical-arch'.
+    // Arched casement (arched-casement-v2 night 4, F): ArchedCasementWindow now
+    // draws the arch from arch.js and accepts the PC shape names, the typed rise,
+    // the gothic profile and the bar pattern; the two arch RULES it cannot know
+    // (three-centre haunch minimum, bar-pattern ratios) come from the profile.
     const arch = windowSpec.arch || null;
+    const archProfileSettings = arch ? getCasementProfile().arch : null;
     const archConfig = arch ? {
       casementType: 'arched',
-      casArchShape: ({
-        'segmental': 'segmental-arch', 'semi-circle': 'semi-circle',
-        'gothic-equilateral': 'gothic-arch', 'gothic-drop': 'gothic-arch',
-        'three-centre': 'elliptical-arch',
-      })[arch.shape] || 'semi-circle',
+      casArchShape: arch.shape,
       casArchHinge: arch.hinge === 'right' ? 'right' : 'left',
+      archRise: Number(arch.rise) || null,
+      archProfile: arch.profile || null,
+      barPattern: arch.bars?.pattern || 'none',
+      archMinHaunchRadius: Number(archProfileSettings?.minHaunchRadius) || 0,
+      archPatterns: archProfileSettings?.patterns || null,
     } : { casementType: 'standard' };
     return {
       windowCategory: 'casement',
