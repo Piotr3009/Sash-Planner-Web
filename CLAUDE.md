@@ -1,364 +1,204 @@
-# CLAUDE.md — Sash Planner Web
+# CLAUDE.md — Production Core (Sash-Planner-Web)
 
 ## O projekcie
 
-Sash Planner Web to webowa aplikacja produkcyjna dla firm produkujących drewniane okna skrzynkowe (sash windows).
-Docelowo SaaS — każda firma ma swoje konto, profile okien, ceny.
+Production Core (PC) to webowy SaaS do planowania produkcji stolarki drewnianej: okna
+skrzynkowe (sash), casement, drzwi, fix frame. Repo: `Piotr3009/Sash-Planner-Web`.
+Aplikacja jest w aktywnym rozwoju przed startem. Silniki sash / casement / door działają;
+fix frame nie ma jeszcze silnika (`emptyDerived`).
 
-**Właściciel:** Piotr — NIE jest programistą. Ty (Claude) piszesz cały kod. Piotr testuje i recenzuje.
+**Właściciel:** Piotr — NIE jest programistą. Ty piszesz cały kod, Piotr testuje i ocenia rano.
+
+Trzy osobne produkty, nie duplikować logiki między nimi:
+- **PC** — to repo (planowanie produkcji)
+- **PSW** — `Prime-Sash-Windows`, konfigurator/wycena dla klienta (tylko do odczytu)
+- **JC** — `Joinery-Core-SaaS`, magazyn/dostawcy (osobna subskrypcja, nie ruszać)
 
 ---
 
 ## TRYB PRACY: AUTONOMIA NOCNA
 
-Piotr zlecił Ci wykonanie WSZYSTKICH faz od 0 do 5 w jednej sesji.
-**NIE czekaj na potwierdzenie** między fazami — pracuj ciągle, faza po fazie.
-Po zakończeniu każdej fazy:
-- Zrób commit z opisem co zostało zrobione
-- Pushuj branch
-- Przejdź do następnej fazy
+Zadanie na tę sesję: **pakiet `arched-casement-v1`** — pełna specyfikacja w
+`@docs/handover/ARCHED-CASEMENT-v1.md`. Piotr zatwierdził cały zakres z góry.
+**Nie czekaj na potwierdzenia** w obrębie tego zakresu. Poza zakresem — nie wychodź.
 
-Piotr oceni cały projekt rano. Jeśli napotkasz problem blokujący (np. brak kluczy Supabase, niejasna logika biznesowa), zanotuj go w pliku `BLOCKERS.md` i kontynuuj z tym co możesz zrobić.
+- Branch roboczy: `claude/arched-casement-v1` (od `main`). **Nigdy nie pushuj na `main`.**
+- Commit po każdym zamkniętym kroku (geometria → planer → DXF → eksport → UI), push brancha.
+- Problem blokujący albo niejasna logika biznesowa → wpis w `BLOCKERS.md`, jedź dalej z resztą.
+- Werdykty per krok → `BUILD-LOG.md` (nowa sekcja na górze, data 2026-09-05).
+- Harness musi przejść **ALL PASS przed każdym commitem** kroku, którego dotyczy.
 
-**Kolejność pracy:**
-1. Faza 0 — Szkielet projektu (React + Vite + struktura + layout)
-2. Faza 1 — Import estimate z Supabase (auth + lista estimates + parse specification + kalkulacje)
-3. Faza 2 — 3D Preview (embed window3d.js z Prime Sash Windows)
-4. Faza 3 — Rysunki techniczne 2D (Canvas renderer)
-5. Faza 4 — Cut List & Materiały (agregacja + optimizer + listy)
-6. Faza 5 — Export PDF/Excel/DXF (client-side)
-
-Fazy 6 i 7 (Manual Creator + SaaS) — NIE rób teraz.
+Rzeczy z listy „NIE RÓB DZIŚ" (§ niżej) są celowo poza zakresem, nawet jeśli wyglądają na
+łatwe do „przy okazji".
 
 ---
 
-## REPOZYTORIA (3 repo)
+## REPOZYTORIA
 
-### 1. Prime Sash Windows — TYLKO DO ODCZYTU (referencja)
-- **Repo:** `https://github.com/Piotr3009/Prime-Sash-Windows.git`
-- **Clone:** `git clone -c http.proxyAuthMethod=basic https://github.com/Piotr3009/Prime-Sash-Windows.git`
-- **⚠️ NIE EDYTUJ. NIE twórz branchy. NIE pushuj. Tylko czytaj i kopiuj.**
+### Sash-Planner-Web — TU PRACUJEMY
+```
+git -c http.proxyAuthMethod=basic clone --depth 1 https://github.com/Piotr3009/Sash-Planner-Web.git pc
+```
 
-#### Co wziąć z Prime-Sash-Windows:
-
-| Plik źródłowy | Docelowo w Sash-Planner-Web | Do czego |
-|---|---|---|
-| `js/estimate-renderer.js` | Referencja | Logika renderowania estimates, PDF, Excel |
-| `js/price-calculator.js` | Referencja | Logika cenowa, zrozumienie fullConfig |
-| `3d-src/` (cały folder) | `src/3d/` | React Three Fiber source — 3D preview |
-| `3d-src/package.json` | Referencja | Dependencje 3D |
-| `online-estimate.html` | Referencja | Główny konfigurator — struktura fullConfig |
-| `js/bars-unified.js` | Referencja | Logika szprosów |
-| `js/ironmongery-gallery.js` | Referencja | Galeria okuć |
-
-### 2. Windows App Electron — TYLKO DO ODCZYTU (źródło kalkulacji + 2D renderer)
-- **Repo:** `https://github.com/Piotr3009/Windows-App-electron-.git`
-- **Clone:** `git clone -c http.proxyAuthMethod=basic https://github.com/Piotr3009/Windows-App-electron-.git`
-- **⚠️ NIE EDYTUJ. Tylko czytaj i kopiuj.**
-
-#### Co wziąć z Windows-App-electron-:
-
-| Plik źródłowy | Docelowo w Sash-Planner-Web | Do czego |
-|---|---|---|
-| `calculations.js` (lub podobna nazwa) | `src/engine/calculations.js` | Kalkulacje sash window — wymiary, components, cut list |
-| `optimizer.js` (lub podobna nazwa) | `src/engine/optimizer.js` | Pre-cut optimizer (best-fit-decreasing) |
-| `renderer.js` (lub podobna nazwa) | `src/engine/canvas-renderer.js` | 2D Canvas renderer — rysunki techniczne |
-| `state.js` | Referencja | Stan aplikacji — przerobić na Zustand |
-| `app.js` | Referencja | DXF generator + ogólna logika |
-
-**WAŻNE:** Nazwy plików mogą się różnić. Przejrzyj strukturę repo i znajdź odpowiedniki. Kluczowe moduły to: kalkulacje wymiarów/cięć, optimizer prętów, renderer canvas 2D.
-
-### 3. Sash Planner Web — TU PRACUJEMY
-- **Repo:** `https://github.com/Piotr3009/Sash-Planner-Web.git`
-- **Clone:** `git clone -c http.proxyAuthMethod=basic https://github.com/Piotr3009/Sash-Planner-Web.git`
-- **Branch roboczy:** `claude/full-build` (od main)
+### Prime-Sash-Windows — TYLKO DO ODCZYTU, OPCJONALNE
+```
+git -c http.proxyAuthMethod=basic clone --depth 1 https://github.com/Piotr3009/Prime-Sash-Windows.git psw
+```
+**NIE edytuj, NIE twórz branchy, NIE pushuj.** Jeśli klon się nie uda (repo prywatne) —
+nie proś o token: wszystkie potrzebne liczby z PSW są zacytowane w specyfikacji z plikiem
+i linią. Geometrię łuków z PSW **nie portować** — patrz spec §3 (Bézier w 2D,
+niewspółśrodkowe łuki w 3D).
 
 ---
 
 ## KRYTYCZNE ZASADY
 
-1. **NIGDY nie usuwaj funkcji/kodu bez uzasadnienia.** Przy kopiowaniu z innych repo — nie wycinaj logiki którą nie rozumiesz.
-2. **Nie kłam.** Jeśli czegoś nie potrafisz zrobić — napisz w BLOCKERS.md.
-3. **Minimalne, działające rozwiązania.** Każda faza powinna dać coś co działa w przeglądarce.
-4. **Zawsze diffuj przed commit.**
-5. **Komentarze w kodzie po angielsku.** Commit messages po angielsku.
+1. **Kod, komentarze i copy po angielsku.** Zero polskiego w plikach źródłowych. Commity po angielsku.
+2. **Nie zmieniaj istniejących funkcji poza zakresem zadania.** Nowa metoda poza spec = wpis w BLOCKERS, nie kod.
+3. **Nigdy nie usuwaj kodu bez uzasadnienia** w BUILD-LOG.
+4. **Nie kłam.** Czego nie zrobiłeś — napisz. Werdykt ✅ tylko po harnessie.
+5. **Beading (listwy przyszybowe) jest zamrożony** — nie dotykać, także łukowych.
+6. **`casementLayouts.js`:** kolejność paneli w definicjach jest 1:1 z PSW (`casementHinges` jest indeksowane po tej kolejności). Nie zmieniać. Nowe kody wymagają tej samej zmiany w PSW i bumpa `CASEMENT_LAYOUTS_VERSION`.
+7. **Zustand:** nigdy `get xyz()` w store'ach (psuje hydratację persist).
+8. **Rysunki 2D:** wszystkie stałe wizualne z `drawingTheme.js`; mnożnik `sc` tylko do pozycji, nigdy do `fontSize` / `strokeWidth` / `strokeDasharray`. (W tym pakiecie nie ma 2D — zasada na przyszłość.)
+9. **Batch:** pole `label` (nie `name`); typ drzwi to `'door'` w liczbie pojedynczej.
+10. **Supabase PC:** projekt `teqkuumenoerphfuqijb`, multi-tenant przez `tenant_id`; `user_profiles.id` = `auth.uid()`. SQL nigdy w kodzie aplikacji bez osobnego pliku migracji. **W tym pakiecie nie ma zmian w bazie.**
+11. **Numery warsztatowe siedzą w profilu** (`src/engine/profile.js`), nie w kodzie. Łuki czytają `frameHead.face`, `leafTop.face`, `leafAtJamb`, `glassInset` z profilu — nigdy nie wpisuj 57 / 67 / 40 na sztywno (planowana zmiana ramy casement na 68 mm musi przejść bez dotykania modułu łuków).
 
 ---
 
-## ENGINEERING DISCIPLINE (wbudowany skill)
+## WERYFIKACJA — obowiązkowa
 
-Dla KAŻDEGO zadania/fazy stosuj tę kolejność:
+Każdy dotknięty plik:
+```
+npx esbuild@0.25.0 <plik.js>  --loader:.js=js   --format=esm --outfile=/dev/null
+npx esbuild@0.25.0 <plik.jsx> --loader:.jsx=jsx --jsx=automatic --format=esm --outfile=/dev/null
+```
+esbuild i Vite **nie łapią niezdefiniowanych identyfikatorów** — po dodaniu importu/hooka
+sprawdź `grep` przed commitem. Po każdym zapisie pliku `grep -F` na świeżo wpisany string
+(sed/python potrafią zawieść po cichu, a build i tak przejdzie).
 
-### 1. Understanding
-Co dokładnie robisz? Przeformułuj zadanie własnymi słowami.
+Harness (node, katalog `verify/` w repo — commituj go):
+```
+node verify/arch/t16.mjs
+```
+Bundluj moduły do `.audit/` przez esbuild (`--bundle --format=esm --external:react`),
+asercje na realnych danych z `normaliseToWindowSpec` → `deriveWindowData`. Grep-audyt
+to nie dowód. Do DXF round-trip: `pip install ezdxf --break-system-packages`.
 
-### 2. Context Linking
-Zidentyfikuj powiązania z innymi modułami, wcześniejszymi decyzjami, zależności upstream/downstream.
-
-### 3. Goal & Acceptance Criteria
-Co znaczy "gotowe"? Zdefiniuj konkretne kryteria akceptacji.
-
-### 4. Think Before You Code
-Opisz podejście ZANIM napiszesz kod. Dla nietrywialnych zadań — rozważ minimum 2 podejścia, odrzuć jedno z uzasadnieniem.
-
-### 5. Edge Cases & Dependencies
-Co może się zepsuć? Jakie są zależności (biblioteki, API, DB, config)?
-
-### 6. Plan
-Krótka, numerowana lista kroków. Oznacz ryzykowne kroki ⚠️.
-
-### 7. Implement
-Kod. Trzymaj się planu. Nie dodawaj niezleconych feature'ów. Prostota > spryt. Jawność > domysły.
-
-### 8. Self-Review
-Przejrzyj swój kod jak surowy reviewer:
-- Czy działa dla happy path?
-- Czy obsługuje edge cases?
-- Czy nie usunąłem czegoś czego nie powinienem?
-- Czy kod jest czytelny?
-
-### 9. Multi-Pass Verification
-- **Pass 1:** Logiczna poprawność — czy rozwiązuje problem?
-- **Pass 2:** Integracja — czy nie łamie innych modułów?
-- **Pass 3:** Edge cases — null, empty, zero, boundary values
-
-### 10. Risks & Verdict
-Co nie jest zweryfikowane? Bądź szczery.
-- ✅ gotowe
-- ⚠️ działa ale [problem]
-- ❌ nie działa
-
-### Code Preservation Rule
-NIGDY nie usuwaj istniejącego kodu chyba że:
-- jest bezpośrednim celem zmiany
-- usunięcie zostało uzasadnione
-
-**Zapisuj verdykty w pliku `BUILD-LOG.md` — po jednej sekcji na fazę.**
+Na koniec: `npm run build` przechodzi.
 
 ---
 
-## LOGIC THINKING (wbudowany skill)
+## ENGINEERING DISCIPLINE
 
-Przed każdą decyzją architektoniczną sprawdź:
+Dla każdego kroku, po kolei:
+1. **Understanding** — przeformułuj krok własnymi słowami.
+2. **Context linking** — które moduły to dotyka (engine / cnc / utils / pages).
+3. **Acceptance** — co znaczy „gotowe" (wektory testowe ze spec §10).
+4. **Think before code** — dwa podejścia, jedno odrzucone z uzasadnieniem. Najprostsze rozwiązanie pierwsze.
+5. **Edge cases** — null, 0, W poniżej minimum, rise > W/2, brak deski dopasowanej.
+6. **Plan** — numerowana lista, ryzykowne kroki ⚠️.
+7. **Implement** — bez niezleconych feature'ów. Jawność > domysły.
+8. **Self-review** — jak surowy reviewer.
+9. **Multi-pass** — logika → integracja → edge cases.
+10. **Verdict** — ✅ / ⚠️ / ❌ z tym, co NIE zostało zweryfikowane. Do BUILD-LOG.
 
-1. **Logika bytu** — Co to jest? Czy nazwa pasuje do roli? Czy nie ma sprzecznych ról?
-2. **Logika relacji** — Do czego należy? Co kontroluje? Co jest nadrzędne/podrzędne?
-3. **Logika zachowania** — Co po akcji użytkownika? Przy błędzie? W edge case?
-4. **Logika realnego świata** — Czy to ma sens dla firmy produkującej okna? Czy wynik jest realny fizycznie i biznesowo?
-5. **Konsekwencje** — Jak ta decyzja wpływa na inne części systemu?
+**LOGIC THINKING** przed każdą decyzją: co to jest → do czego należy → co się dzieje
+po akcji / błędzie / w edge case → czy ma sens fizycznie dla stolarni → co zmienia gdzie
+indziej. Brak sensu = **LOGIC FAILURE** w BLOCKERS, nie koduj tej części.
+**Zakaz fałszywej akceptacji**: bez „looks good" przed sprawdzeniem.
 
-Jeśli coś nie ma sensu — zanotuj jako **LOGIC FAILURE** w BLOCKERS.md i nie koduj tej części.
-
-**Zakaz fałszywej akceptacji:** Nie pisz "looks good", "great", "this works" dopóki nie sprawdzisz logiki.
-
----
-
-## PRECISION DIAGNOSER (wbudowany skill)
-
-Gdy napotkasz bug lub problem:
-
-1. **Problem map** — Prześledź flow: input → transformacja → kalkulacja → output
-2. **Diagnosis pass 1** — Perspektywa programisty (formuły, typy, nulle, async, zła zmienna)
-3. **Diagnosis pass 2** — Perspektywa biznesowa (czy wynik ma sens dla producenta okien?)
-4. **Diagnosis pass 3** — Weryfikacja własnego wniosku (czy coś innego mogło to spowodować?)
-5. **Simulation** — Przetestuj z realnymi danymi (np. sash window 1200×1800mm, casement 600×1000mm)
-6. **Fix** — Najmniejsza bezpieczna zmiana. Nie refaktoruj niezwiązanego kodu.
-
-**Priorytet napraw:** Złe wyniki > złamana logika biznesowa > zepsuty rendering > broken UX > runtime errors > edge cases > wydajność > styl kodu.
+**PRECISION DIAGNOSER** przy bugu: mapa flow → pass programisty → pass biznesowy →
+weryfikacja własnego wniosku → symulacja na realnych danych → najmniejsza bezpieczna zmiana.
+Priorytet: złe wyniki > złamana logika biznesowa > rendering > UX > runtime > edge > wydajność > styl.
 
 ---
 
-## Stack technologiczny
+## Stack
 
-- **Frontend:** React 18 + Vite
-- **3D:** React Three Fiber + Three.js + @react-three/drei
-- **2D:** Canvas API
-- **State:** Zustand
-- **Styling:** Tailwind CSS
-- **Backend:** Supabase (auth, DB, storage) — TEN SAM projekt co Prime Sash Windows
-- **Export:** jsPDF, SheetJS (xlsx), custom DXF generator
-- **Hosting:** Vercel
+React 19 + Vite · Zustand · Tailwind · React Three Fiber / Three.js (`src/3d`, dzielone
+z PSW) · Supabase · jsPDF + jspdf-autotable · SheetJS (xlsx) · własny DXF R12 writer
+(`src/engine/cnc/dxfWriter.js`, POLYLINE z bulge, sprawdzony na VCarve). esbuild 0.25.0 do
+sprawdzeń. Bez TypeScript.
 
----
+Skrypty: `npm run dev` · `npm run build` · `npm run preview`.
 
-## Struktura folderów (docelowa)
+## Struktura (stan faktyczny)
 
 ```
 src/
-├── components/
-│   ├── layout/          # Header, Sidebar, MainContent
-│   ├── dashboard/       # Project dashboard, window list, cards
-│   ├── viewer/          # 3D preview, 2D canvas viewer
-│   ├── export/          # Export controls (PDF/Excel/DXF)
-│   └── common/          # Buttons, modals, loaders
-├── engine/              # Logika kalkulacyjna (Z ELECTRON APP)
-│   ├── calculations.js  # Kalkulacje sash window
-│   ├── optimizer.js     # Pre-cut optimizer
-│   └── canvas-renderer.js # 2D Canvas renderer
-├── 3d/                  # React Three Fiber (Z PRIME-SASH-WINDOWS/3d-src/)
-├── stores/              # Zustand
-│   ├── projectStore.js
-│   └── authStore.js
-├── services/
-│   └── supabase.js
-├── mocks/               # Mock data gdy brak Supabase
-│   └── mockEstimates.js
-├── utils/
-├── App.jsx
-└── main.jsx
+├── engine/
+│   ├── calculations.js      # deriveWindowData → deriveSashWindow / deriveCasementWindow / deriveDoorWindow
+│   ├── specification.js     # normaliseToWindowSpec (PSW fullConfig → windowSpec)
+│   ├── profile.js           # DEFAULT_*_PROFILE — wszystkie numery warsztatowe
+│   ├── casementLayouts.js   # kody layoutów 1:1 z PSW (nie ruszać kolejności paneli)
+│   ├── casementHardware.js  # dobór okuć (limity per skrzydło)
+│   ├── lists.js             # cut list: CUT_LIST_ORDER, MIRROR_PAIRS, grupowanie
+│   ├── bom.js · pricing.js · partRegistry.js · partSymbols.js · optimizer.js
+│   └── cnc/
+│       ├── dxfWriter.js     # R12 serialiser: {poly|circle|text}, bulge
+│       └── jambDxf.js       # port 1:1 KIT_SASH_JAMB.lsp — WZORZEC dla archDxf.js
+├── components/drawings/     # arkusze 2D (SVG), drawingTheme.js, drawingUtils.jsx
+├── pages/                   # ConfiguratorPage, WindowDetailPage, ProductionPackPage, ...
+├── stores/                  # Zustand (projectStore, estimateStore, ...)
+├── utils/                   # eksporty: cncExport.js, *PdfExport.js, excelExport.js
+└── 3d/                      # R3F (identyczne z PSW/3d-src)
+docs/handover/               # specyfikacje pakietów
+verify/                      # harnessy node (commitowane)
 ```
 
----
-
-## Supabase — baza danych
-
-### Tabele do użycia (istniejące):
-
-**`estimates`** — główna tabela wycen
-- `id`, `user_id`, `estimate_number`, `status`, `created_at`
-- `total_price`, `additional_options`
-
-**`estimate_items`** — poszczególne okna/drzwi
-- `id`, `estimate_id`, `window_type`, `width`, `height`, `quantity`
-- `specification` — **JSON z pełnym configiem okna (fullConfig)**
-- `unit_price`, `total_price`
-
-### Klucze Supabase:
-```env
-VITE_SUPABASE_URL=https://xxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbG...
-```
-**Jeśli nie masz kluczy — stwórz mockowe dane i zaznacz w BLOCKERS.md.**
+Zasada architektury: **`deriveWindowData()` jest jedynym źródłem prawdy per okno** —
+karmi cut listę, PDF-y, rysunki, PP. Nigdy nie licz wymiarów okna w innym miejscu.
 
 ---
 
-## FAZY SZCZEGÓŁOWO
+## ZADANIE NOCNE — arched-casement-v1
 
-### FAZA 0 — Szkielet (React + Vite + Layout)
+Pełna spec: `@docs/handover/ARCHED-CASEMENT-v1.md`. W skrócie:
 
-**Cel:** Pusta apka z layoutem ładuje się w przeglądarce.
+1. `src/engine/arch.js` — geometria (1 / 2 / 3 środki, współśrodkowe offsety, clip do linii
+   startu łuku, długości, bulge) + planer segmentów (metoda rzutowania, D13 domyślny wybór).
+2. `src/engine/cnc/archDxf.js` — warstwy CONTOUR / ASSEMBLY / PIECES / FINGER / TEXT, rama
+   + skrzydło, styl 1:1 z `jambDxf.js`.
+3. `profile.js` — sekcja `arch` w profilu casement (spec §5).
+4. `specification.js` — `windowSpec.arch` + mapowanie pól PSW (uwaga na odwrócony
+   zawias w formularzu PSW, spec §4.2).
+5. `cncExport.js` + przycisk „Arch DXF" obok „Jambs DXF" (`WindowDetailPage.jsx`,
+   `ProductionPackPage.jsx`). Bez nowego UI konfiguratora.
+6. `verify/arch/t16.mjs` — musi odtworzyć wektory ze spec §10 (nie odwrotnie).
+7. Przykładowy `sample_arch_1200_segmental.dxf` wygenerowany harnessem → do repo w
+   `docs/handover/samples/` (Piotr otwiera w VCarve rano).
 
-1. `npm create vite@latest . -- --template react`
-2. Zainstaluj: `zustand`, `tailwindcss`, `@supabase/supabase-js`, `postcss`, `autoprefixer`, `react-router-dom`
-3. Skonfiguruj Tailwind
-4. Layout: Header (logo "Sash Planner" + nav) + Sidebar (lista projektów) + Main content
-5. Placeholder pages: Login, Dashboard, Window Detail
-6. Routing: Login → Dashboard → Window Detail
-7. Supabase client w `src/services/supabase.js`
-8. `.env.example` z placeholder kluczami
-9. `npm run dev` → ładuje się bez błędów
+Do BLOCKERS.md na start (znane, nierozstrzygnięte przez Piotra):
+- D13 — wybór N (mniej kawałków vs węższa deska): przyjęty domyślny, alternatywa drukowana.
+- D5 — Piotr mówił „palec 10–11", wybrane narzędzie to profil 15/16; przyjęto 15/16/3,8.
+- Głowica Stark d50 na 5-osiowym CNC wymaga trzpienia d50 — decyzja procesowa Piotra, DXF bez zmian.
 
-**Acceptance:** Apka startuje, routing działa, layout widoczny. Commit + push.
+## NIE RÓB DZIŚ (zaplanowane, osobne pakiety)
 
----
-
-### FAZA 1 — Import Estimate
-
-**Cel:** Logujesz się → widzisz estimates → klikasz → widzisz okna z kalkulacjami.
-
-1. Auth screen (email + password, Supabase auth)
-2. Dashboard: fetch `estimates`, wyświetl listę (numer, data, status, ilość okien)
-3. Estimate Detail: fetch `estimate_items` dla wybranego estimate
-4. Parse `specification` JSON → extract fullConfig
-5. Karty okien: typ, wymiary W×H, kolor, bars pattern, ilość
-6. Kalkulacje z `calculations.js` (z Electron app): components, cut lengths, glass sizes
-7. Summary: łączna ilość okien, łączna cena
-
-**Jeśli brak Supabase:** Stwórz `src/mocks/mockEstimates.js` z realistycznymi danymi.
-**Jeśli calculations.js wymaga adaptacji do ES modules:** Przeróbki minimalne, zachowaj oryginalną logikę.
-
-**Acceptance:** Lista estimates → klik → karty okien z danymi. Commit + push.
-
----
-
-### FAZA 2 — 3D Preview
-
-**Cel:** Klikasz okno → widzisz 3D preview.
-
-1. Skopiuj/adaptuj `3d-src/` z Prime-Sash-Windows
-2. Zainstaluj: `three`, `@react-three/fiber`, `@react-three/drei`
-3. Komponent `WindowPreview3D` — przyjmuje fullConfig, renderuje okno
-4. Window Detail: panel z 3D preview
-5. Toggle: Exterior / Interior
-
-**UWAGA:** Importuj source JSX components, nie skompilowany bundle.
-**Jeśli za skomplikowane:** Placeholder "3D Preview — coming soon" + BLOCKERS.md.
-
-**Acceptance:** 3D preview renderuje się (nawet basic). Commit + push.
-
----
-
-### FAZA 3 — Rysunki techniczne 2D
-
-**Cel:** Canvas-based rysunek techniczny.
-
-1. Skopiuj `renderer.js` z Electron app → `src/engine/canvas-renderer.js`
-2. Adaptuj do React (komponent `TechnicalDrawing2D` z Canvas ref)
-3. Rysuj: obrys ramy, skrzydła, szprosy, wymiary z strzałkami
-4. Styl CAD: czarne linie, białe tło
-5. Tab "2D Drawing" obok "3D Preview"
-
-**Minimum:** Rysunek elewacyjny z wymiarami ramy i szyb.
-
-**Acceptance:** Rysunek widoczny, wymiary poprawne. Commit + push.
-
----
-
-### FAZA 4 — Cut List & Materiały
-
-**Cel:** Listy cięć i materiałów.
-
-1. Cut list per okno (z calculations.js) + aggregated per projekt
-2. Pre-cut optimizer (optimizer.js z Electron app) — best-fit-decreasing
-3. Wizualizacja bar layout (Canvas lub SVG)
-4. Glass order list (wymiary, typ, ilości)
-5. Timber order list (sekcje, długości, materiał)
-6. Hardware/ironmongery list
-
-**Acceptance:** Tabelki z danymi, poprawne wartości. Commit + push.
-
----
-
-### FAZA 5 — Export
-
-**Cel:** PDF + Excel client-side.
-
-1. **PDF (jsPDF):** Rysunek per okno, cut list, materials, glass
-2. **Excel (SheetJS):** Cut list, materials, glass, summary worksheets
-3. Przyciski: "Export PDF", "Export Excel"
-
-**DXF:** Jeśli zdążysz — bonus.
-
-**Acceptance:** Klik → pobiera plik z poprawnymi danymi. Commit + push.
-
----
-
-## Konwencje
-
-- **Pliki:** kebab-case (`project-dashboard.jsx`)
-- **Komponenty:** PascalCase (`ProjectDashboard`)
-- **Stores:** camelCase (`useProjectStore`)
-- **Styling:** Tailwind
-- **Brak TypeScript** — JS/JSX
-- **Commits:** angielski, opisowe ("Phase 0: Initialize Vite + React project")
+- Drzwi: ramiaki skrzydła 92 mm zamiast 94 (materiał 014); próg 4 zawiasów > 2100 mm.
+- Casement: jamby i head 68 mm zamiast 57 (razem z PSW + bump wersji layoutów).
+- Cut list / szyby / 2D / 3D dla łuków, sash i fix frame łukowe, nadświetla łukowe drzwi, wzory prętów w łukach.
+- Listwy przyszybowe (zamrożone).
+- `EstimateConfiguratorPage.jsx` limit 3000 mm (nierozstrzygnięte).
+- Mullions/ślemienia casement nie trafiają do cut listy (`components.box`) — znana luka silnika, nie tego pakietu.
 
 ---
 
 ## Pliki do utrzymywania
 
-- **`CLAUDE.md`** — ten plik, nie edytuj
-- **`BUILD-LOG.md`** — log verdyktów per faza (twórz w trakcie pracy)
-- **`BLOCKERS.md`** — problemy, pytania do Piotra
-- **`.env.example`** — placeholder zmienne środowiskowe
-- **`README.md`** — instrukcja instalacji
-
----
+- `CLAUDE.md` — ten plik; aktualizuj sekcję „ZADANIE NOCNE" i „NIE RÓB DZIŚ" po każdym pakiecie
+- `docs/handover/*.md` — specyfikacje pakietów (nie kasować po wdrożeniu — to historia decyzji)
+- `BUILD-LOG.md` — werdykty per krok, najnowsze na górze
+- `BLOCKERS.md` — pytania do Piotra, LOGIC FAILURE, CRITICAL AMBIGUITY
 
 ## Checklist na koniec sesji
 
-- [ ] Każda faza ma commit + push na branch `claude/full-build`
-- [ ] BUILD-LOG.md aktualny
-- [ ] BLOCKERS.md z pytaniami
-- [ ] `npm run dev` startuje bez błędów
+- [ ] branch `claude/arched-casement-v1` wypchnięty, `main` nietknięty
+- [ ] `node verify/arch/t16.mjs` → ALL PASS
 - [ ] `npm run build` przechodzi
-- [ ] README.md z instrukcją (npm install, npm run dev)
+- [ ] esbuild OK na każdym dotkniętym pliku, zero polskiego w źródłach
+- [ ] `git diff main --stat` obejmuje TYLKO pliki ze spec §11 (+ verify, docs, BUILD-LOG, BLOCKERS)
+- [ ] `docs/handover/samples/sample_arch_1200_segmental.dxf` w repo
+- [ ] BUILD-LOG.md z werdyktami, BLOCKERS.md z trzema wpisami powyżej + wszystkim, co wyszło w nocy
