@@ -283,6 +283,99 @@ Polish in sources. Three spec-side inconsistencies (E1, E2, end-piece rough) are
 ways and listed for Piotr — none of them changes a stock pick except E2 (leaf 5 × 95 vs 4 × 105),
 which is a real decision, not a bug. Stage 2 follows below.
 
+### Stage 2a — sample DXF per shape (`docs/handover/samples/`)
+
+`node verify/arch/t16.mjs` now writes `sample_arch_1200_{segmental,semi-circle,gothic-equilateral,
+gothic-drop,three-centre}.dxf` (W 1200, H 2000, PSW default rise, hinge L for the segmental, R for
+the others) and probes each with ezdxf: CONTOUR arc length from vertices + bulges = `arcLength`
+of the chains within 0.01, one vertex per arc end point (4 / 6 / 8 per ring), PIECES tile the
+rings, every flat piece inside a stock × rough board, HINGE printed. Rendered all five to PNG and
+looked at them: semi-circle 7 + 7 boards, gothic 3 + 3 per side with the apex joint on the axis,
+three-centre 2 + 4 + 2 with the tangent joints shared by haunch and crown. CRLF byte-exact
+(`.gitattributes`). **✅**
+
+### Stage 2b — edge-case harness (`verify/arch/t17_edges.mjs`, 73 checks ALL PASS)
+
+W 400 / 1500 for every shape at the PSW default rise (plans build, every arc ≥ 2 pieces ≤ 36°,
+boards fit, no NaN, DXF round-trip), width just inside / outside 400–1500 (incl. NaN / 0), rise
+just inside / outside every physics rule and both fixed shapes, string / empty / negative rises,
+the 900 rule and the leaf-stile rule at their boundaries, no fitting board (empty list, junk
+entries, boards ≤ 75, only 300), exporter skip messages on the real `windowSpec` path, a merged
+export of mixed good / bad edge windows. **Finding F1 (BLOCKERS 8.1):** the leaf ring depth 107 +
+allowance 10 sets a hard minimum rise of 117 mm — at W 400 the PSW default segmental (80) and
+elliptical (r 84.5) are rejected readably. One code change came out of it: the planner now wraps
+an allowance-band failure with the ring name and the allowance (`LEAF TOP allowance band (10mm per
+side): …`) instead of the bare `Offset 10mm exceeds the arc radius 5.5mm`. **✅**
+
+### Stage 2c — PSW parity report (`verify/parity/psw-casement-layouts.mjs` → `docs/handover/PSW-PARITY-REPORT.md`)
+
+Read-only: PSW cloned with the mandated command into the session scratchpad (public repo,
+619703e of 02.09), never edited. The script parses `LAYOUT_DEFAULTS`, the fanlight / fan2 / triple
+lists, `CASEMENT_LAYOUTS_VERSION`, `HIDDEN_DUPLICATES`, `DISPLAY_NAMES`, the `ArchedSash` constants
+and the arch radios from the PSW source text, extracts the self-contained `static
+casementLayoutDef` body and executes it next to the PC port for 960 cases (30 codes × 4 sizes ×
+FR × FR2 × middle section) comparing panels IN ORDER (x, y, w, h, hinge), mullions and transoms.
+**Result: 24 PASS · 1 documented difference (PC hides the `010` card as an alias of `040L`;
+engine-side valid) · 0 HARD.** Version 2 = 2; the reversed hinge radio (`id cas-arch-open-left`
+→ `value="right"`) confirmed in the HTML and matched by the inversion in `specification.js`.
+`casementLayouts.js` untouched. **✅**
+
+### Stage 2d — see "Rano dla Piotra" below. **✅**
+
+### FINAL VERDICT (night 2) — ✅ with the open decisions listed
+
+Delivered on `claude/arched-casement-audit-t1-t8-7d5fuk` (10 commits, `main` untouched): T1–T8
+from the audit, Stage 2 a–d, harnesses `t16` (465) + `t17` (73) ALL PASS on the spec vectors,
+parity report 0 HARD, `npm run build` OK, five sample DXFs, BLOCKERS with D13 / D5 / d50 still
+OPEN plus §6 (spec errata, decisions) and §8 (edge findings).
+
+**NOT verified tonight (honest list):**
+1. VCarve import of any DXF — only ezdxf 1.4.4 round-trips and matplotlib renders were checked.
+2. The browser click path (WindowDetailPage / ProductionPackPage buttons) — `npm run build` passes
+   and the export functions run end-to-end in node with the download stubbed; no browser session.
+3. Stark 15/16 tool numbers (D5), the d50 arbor (§3), the workshop's reading of "straight stile"
+   (6.9) and the minimum sensible piece length (6.5) — decisions, not code.
+4. Whether the leaf should be planned on its own clipped span (built, spec §6.2) or on the head's
+   angular partition (E2) — the only spec discrepancy that changes a stock pick (5 × 95 vs 4 × 105).
+5. Persisted browser profiles: the v2 arch block replaces a night-1 block by version — tested in
+   node on the migration function, not in a browser with a real persisted store.
+6. PSW parity covers layouts + arch constants only; pricing, bar patterns and 3D were not compared.
+
+### Rano dla Piotra
+
+**Co jest zrobione:** wszystkie osiem zadań z audytu (T1–T8) i Etap 2 a–d. Harness `node
+verify/arch/t16.mjs` odtwarza wektory ze spec §10 (465 checków), `node verify/arch/t17_edges.mjs`
+sprawdza krawędzie (73), `node verify/parity/psw-casement-layouts.mjs <ścieżka-psw>` generuje
+raport parytetu (0 twardych różnic). `npm run build` przechodzi.
+
+**Co otworzyć w VCarve (`docs/handover/samples/`):** `sample_arch_1200_segmental.dxf` — głowica
+4 × 95 (ALT 3 × 105), skrzydło 5 × 95 (ALT 3 × 180); do tego cztery pozostałe kształty
+(`semi-circle`, `gothic-equilateral`, `gothic-drop`, `three-centre`). Każda deska płaska ma teraz
+długość surową (pas + 15 mm palca na złączonym końcu), etykietę `L<surowa> x<deska>`, drugą linię
+`OUT / IN / CUT J14.5/S29.1 / FINGER ONE END` i linię strefy palca 16 mm od złączonego końca.
+Kody cięć: J = złącze od kąta prostego, S = linia startu łuku (oś deski do poziomu), A = szczyt
+gotyku od kąta prostego. Sprawdź: (a) czy łuki importują się jako łuki; (b) czy kąty cięć są
+w konwencji, której używa operator; (c) czy 10 mm tekst drugiej linii jest czytelny.
+
+**Trzy decyzje, które zmieniają plan (BLOCKERS §6):**
+1. **E2 (6.3):** spec liczy skrzydło z kątem głowicy (87.21°) → 4 × 105; wg §6.2 skrzydło ma
+   własny kąt po przycięciu (81.24°) → 5 × 95. Zbudowane wg §6.2. Jeśli wolisz 4 × 105 — decyzja.
+2. **D13 (§1):** domyślnie `narrowest` (spec). Przełącznik w profilu: `arch.pieceRule: 'fewest'`.
+3. **6.5:** trzyśrodkowy daje na hausze 2 deski po ~107 mm surowej długości z palcem — czy taki
+   krótki kawałek jest OK, czy ma być minimalna długość?
+
+**Erraty spec (nie kod):** E1 — `arcLen_in 1237.41` w §10.1 to łuk nieprzycięty (813 × 87.21°);
+po przycięciu 1112.55. E2 — jak wyżej. „rough end 456.71" — końcówki wychodzą 466.77 (róg pasa
+na linii startu). Harness pokazuje obie liczby przy każdej z nich.
+
+**Znalezisko krawędziowe (BLOCKERS 8.1):** przy W 400 domyślne strzałki PSW dla segmentala (80)
+i eliptycznego (r 84.5) nie mieszczą pierścienia skrzydła 107 + 10 naddatku — eksport odmawia
+czytelnie. Minimalna strzałka segmentala to > 117 mm niezależnie od szerokości.
+
+**Otwarte bez zmian:** D5 palec 15/16 vs 10–11, głowica d50 na CNC.
+
+**Merge:** branch `claude/arched-casement-audit-t1-t8-7d5fuk` → `main`, `main` nietknięty.
+
 ## 2026-09-05 — arched-casement-v1 (night run, branch `claude/arched-casement-v1`)
 
 **Blocking fact first:** `docs/handover/ARCHED-CASEMENT-v1.md` (the package spec) is NOT in the

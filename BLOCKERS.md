@@ -31,6 +31,15 @@ tonight (BUILD-LOG). New items from night 2:
 the remote — they were merged into `main` (6b4203b) and deleted before this session; nothing to
 delete. This session's work: `claude/arched-casement-audit-t1-t8-7d5fuk`, to be merged by Piotr.
 
+### 8. Findings from the Stage-2 edge harness (`verify/arch/t17_edges.mjs`) and the PSW parity report
+
+| # | Finding | Evidence | Ask |
+|---|---------|----------|-----|
+| 8.1 | **F1 — minimum rise is set by the leaf ring depth + allowance, not by the PSW ratio.** The deepest contour (leaf inner = leafAtJamb 40 + leafTop.face 67 = 107) plus the 10 mm allowance band must stay above the arch-start line, so no segmental arch with rise ≤ 117 mm and no three-centre with haunch radius ≤ 117 mm can be planned, whatever the width. At **W 400 the PSW defaults are rejected**: segmental rise 80 (0.20 × W) and elliptical rise 130 (r = 130²/200 = 84.5). Segmental needs ≥ 0.30 × W there (rise 120 builds), three-centre rise > 153 (rise 160 builds). Semi-circle and both gothics build at 400. Errors are readable and name the ring (`LEAF TOP allowance band (10mm per side): …`). | t17 sections 1–2 | Either accept (a 400 mm segmental / elliptical arched casement is not a product) or let PC raise the default rise to the minimum for the width — a configurator-package decision, not done here |
+| 8.2 | The 900 mm straight rule dominates every other height rule; the leaf-stile rule (100) never binds at the defaults | t17 "height rules" | FYI (6.9) |
+| 8.3 | No-stock behaviour: planner never throws, exporter names both members and the widest board; with only a 300 mm board the angle rule still forces N_min pieces (the board never lowers N) | t17 "no fitting board" | FYI — matches spec §7 |
+| 8.4 | PSW parity (`docs/handover/PSW-PARITY-REPORT.md`, PSW 619703e): 24 PASS, 1 documented difference (PC hides the `010` picker card as an alias of `040L`), 0 HARD. `casementLayoutDef` identical in 960 cases (panel order, x/y/w/h, hinge, mullions, transoms); arch ratios, limits, radio values and the reversed hinge all in step | parity script | FYI — nothing to fix on either side |
+
 ---
 
 ## 2026-09-05 — arched-casement-v1

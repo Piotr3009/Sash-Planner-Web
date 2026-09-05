@@ -663,9 +663,10 @@ section('§10.3 pt 5 — DXF round-trip via ezdxf — sample_arch_1200_segmental
     { shape: 'gothic-drop', rise: 840, exp: (δ) => gothicExp(840, δ) },
     { shape: 'three-centre', rise: 390, exp: (δ) => threeExp(390, δ) },
   ];
+  // Stage 2a: one sample per shape next to the segmental one (docs/handover/samples), ezdxf-checked below
   for (const c of cases) {
     const plan = arch.buildArchPlan({ shape: c.shape, width: W, height: 2000, rise: c.rise, hinge: 'right' }, PA);
-    const path = resolve(AUDIT, `arch_1200_${c.shape}.dxf`);
+    const path = resolve(SAMPLES, `sample_arch_1200_${c.shape}.dxf`);
     writeFileSync(path, dxfWriter.writeDxf(archDxf.buildArchEntities(plan, 'T'), archDxf.ARCH_LAYERS));
     const d = probe(path);
     const contours = d.polys.filter((p) => p.layer === 'CONTOUR');

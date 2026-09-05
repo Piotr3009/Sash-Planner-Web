@@ -563,7 +563,12 @@ export function pickOption(options, nMin, rule) {
  */
 export function planArchSegments(ring, opts) {
   const S = readPlannerSettings(opts);
-  const band = allowanceBand(ring, S.allowance);
+  let band;
+  try { band = allowanceBand(ring, S.allowance); }
+  catch (e) {
+    if (!(e instanceof ArchError)) throw e;
+    throw new ArchError(`${ring.label || 'Ring'} allowance band (${S.allowance}mm per side): ${e.message} — rise too small for the member face plus allowance`);
+  }
   const evaluate = (i, n) => {
     // rough length = band length + finger length per jointed end (spec §7.7,
     // conservative: the whole finger is added at every joint — Piotr may lower it)

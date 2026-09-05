@@ -153,27 +153,29 @@ karmi cut listę, PDF-y, rysunki, PP. Nigdy nie licz wymiarów okna w innym miej
 
 ---
 
-## ZADANIE NOCNE 2 — arched-casement-v1: poprawki po audycie, potem Etap 2
+## STAN PO NOCY 2 — arched-casement-v1: audyt T1–T8 + Etap 2 zrobione
 
-Stan: pakiet z nocy 05.09 jest na `main` (zbudowany bez spec — spec nie był wtedy w repo).
-Teraz w repo są trzy dokumenty i czytasz je W TEJ KOLEJNOŚCI:
-1. `@docs/handover/ARCHED-CASEMENT-v1-AUDIT.md` — co jest dobre, co poprawić (T1–T8), potem Etap 2
-2. `@docs/handover/ARCHED-CASEMENT-v1.md` — spec referencyjny; przy rozbieżności spec wygrywa
-3. `docs/handover/ARCHED-CASEMENT-v1-AS-BUILT.md` — Twój własny opis z nocy 1 (do porównania)
+Branch `claude/arched-casement-audit-t1-t8-7d5fuk` (od `main` b801039) czeka na merge przez Piotra.
+Zrobione: T2 lista desek D7 → T1 kąt 36° / N_min / pas naddatku 10 mm na stronę → T6 `pieceRule`
+→ T3 długość surowa, cięcia, strefy palca → T4 `r = rise²/halfW` → T5 limity w
+`profile.arch.limits` + fizyka → T7 harness na wektorach spec → T8 próbka, BLOCKERS, branch →
+Etap 2 a–d. Werdykty w `BUILD-LOG.md` (sekcja 2026-09-06), pytania w `BLOCKERS.md` §6–§8.
 
-Pracujesz **bezpośrednio na `main`** (aplikacja nie jest live — decyzja Piotra 06.09).
-Commit po każdym zamkniętym zadaniu T1…T8, push. Harness `node verify/arch/t16.mjs`
-ALL PASS z wektorami ze spec §10 przed commitem T7 — bez tego brak ✅.
+Harnessy (wszystkie muszą być ALL PASS przed każdym commitem dotykającym `arch.js` / `archDxf.js` /
+`profile.arch` / `specification.js`):
+```
+node verify/arch/t16.mjs                                   # spec §10, 465 checków, pisze próbki DXF
+node verify/arch/t17_edges.mjs                             # krawędzie, 73 checki
+node verify/parity/psw-casement-layouts.mjs <klon-psw>     # raport PSW↔PC (read-only)
+```
 
-Kolejność: T2 (lista desek) → T1 (limit kąta) → T6 (reguła wyboru N) → T3 (długość surowa)
-→ T4 (trójśrodkowy) → T5 (limity) → T7 (harness ze spec) → T8 (próbka DXF, BLOCKERS, branch)
-→ dopiero potem Etap 2 z audytu §5.
+Wszystkie numery warsztatowe łuków siedzą w `DEFAULT_CASEMENT_PROFILE.arch` (v2): `finger`,
+`stockWidths`, `contourAllowance` (na stronę), `maxSegmentAngleDeg`, `pieceRule`, `limits`.
+Planer nie ma żadnych domyślnych liczb — brak ustawienia = czytelny `ArchError`.
 
-Wszystkie numery warsztatowe (deski, palec, naddatek, kąt, reguła) siedzą w
-`DEFAULT_CASEMENT_PROFILE.arch` — nigdy w planerze.
-
-Do BLOCKERS.md zostają otwarte (Piotr): D13 reguła domyślna, D5 palec 15/16 vs 10–11,
-głowica d50 na CNC. Nie zamykaj ich sam.
+Otwarte dla Piotra (nie zamykać w kodzie): D13 `pieceRule` (domyślnie `narrowest`), D5 palec
+15/16 vs 10–11, głowica d50 na CNC, erratum E2 (skrzydło na własnym kącie → 5 × 95, spec mówi
+4 × 105), minimalna długość kawałka (6.5), minimalna strzałka 117 mm (8.1).
 
 ## NIE RÓB DZIŚ (zaplanowane, osobne pakiety)
 
@@ -183,6 +185,9 @@ głowica d50 na CNC. Nie zamykaj ich sam.
 - Listwy przyszybowe: moduł beading SASH jest zamrożony; casement nie ma listew w silniku W OGÓLE (także proste) — nie wymyślaj rekordów beading dla casement, to osobny pakiet z przekrojem z profilu.
 - `EstimateConfiguratorPage.jsx` limit 3000 mm (nierozstrzygnięte).
 - Mullions/ślemienia casement nie trafiają do cut listy (`components.box`) — znana luka silnika, nie tego pakietu.
+- Łuki: zmiana nazw kształtów na `'gothic'` + `profile` (spec §3.4), typy linii (DASHED) w
+  `dxfWriter.js`, złącze głowica/ościeżnica i skrzydło/słupek na linii startu łuku (haunch),
+  konfigurator łuków (mockup najpierw) — osobne pakiety.
 
 ---
 
@@ -195,10 +200,10 @@ głowica d50 na CNC. Nie zamykaj ich sam.
 
 ## Checklist na koniec sesji
 
-- [ ] branch `claude/arched-casement-v1` wypchnięty, `main` nietknięty
-- [ ] `node verify/arch/t16.mjs` → ALL PASS
+- [ ] branch sesji wypchnięty, `main` nietknięty
+- [ ] `node verify/arch/t16.mjs` i `node verify/arch/t17_edges.mjs` → ALL PASS
 - [ ] `npm run build` przechodzi
 - [ ] esbuild OK na każdym dotkniętym pliku, zero polskiego w źródłach
-- [ ] `git diff main --stat` obejmuje TYLKO pliki ze spec §11 (+ verify, docs, BUILD-LOG, BLOCKERS)
-- [ ] `docs/handover/samples/sample_arch_1200_segmental.dxf` w repo
-- [ ] BUILD-LOG.md z werdyktami, BLOCKERS.md z trzema wpisami powyżej + wszystkim, co wyszło w nocy
+- [ ] `git diff main --stat` obejmuje TYLKO pliki ze spec §11 (+ verify, docs, BUILD-LOG, BLOCKERS, CLAUDE.md)
+- [ ] `docs/handover/samples/sample_arch_1200_*.dxf` w repo (pięć kształtów)
+- [ ] BUILD-LOG.md z werdyktami, BLOCKERS.md z D13 / D5 / d50 otwartymi + wszystkim, co wyszło w nocy
