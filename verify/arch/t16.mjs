@@ -27,12 +27,14 @@ const ENTRY = resolve(AUDIT, 'arch-entry.mjs');
 writeFileSync(ENTRY, [
   "export * as arch from '../src/engine/arch.js';",
   "export * as profile from '../src/engine/profile.js';",
+  "export * as archDxf from '../src/engine/cnc/archDxf.js';",
+  "export * as dxfWriter from '../src/engine/cnc/dxfWriter.js';",
 ].join('\n'));
 const BUNDLE = resolve(AUDIT, 'arch-bundle.mjs');
 execFileSync('npx', ['-y', 'esbuild@0.25.0', ENTRY, '--bundle', '--format=esm', '--external:react',
   '--platform=node', `--outfile=${BUNDLE}`], { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit'] });
 const M = await import(pathToFileURL(BUNDLE).href);
-const { arch, profile } = M;
+const { arch, profile, archDxf, dxfWriter } = M;
 const P = profile.DEFAULT_CASEMENT_PROFILE;
 
 // ── tiny assert framework ───────────────────────────────────────────────────
@@ -278,6 +280,109 @@ for (const v of PLAN_VECTORS) {
   const g = arch.buildArchGeometry({ shape: 'semi-circle', width: W, height: 2000 }, P);
   const plan = arch.planArchSegments(g.frameHead, { stockWidths: [50], widthAllowance: 20, maxPieces: 4 });
   check('no matching board: returns options with stock = null and noStock = true', plan.noStock === true && plan.arcs[0].default === null && plan.arcs[0].options.every((o) => o.stock === null) && plan.pieces.length === 0);
+}
+
+// ── §10.3 DXF — archDxf.js → dxfWriter → ezdxf round-trip ───────────────────
+// Profile arch section (step 4 moves it into DEFAULT_CASEMENT_PROFILE).
+const ARCH_SECTION = { finger: { length: 15, depth: 16, pitch: 3.8 }, ...PLAN_OPTS };
+const PA = P.arch ? P : { ...P, arch: ARCH_SECTION };
+const SAMPLES = resolve(ROOT, 'docs', 'handover', 'samples');
+mkdirSync(SAMPLES, { recursive: true });
+
+function probe(path) {
+  const out = execFileSync('python3', [resolve(ROOT, 'verify', 'arch', 'dxf_probe.py'), path], { cwd: ROOT, encoding: 'utf8' });
+  return JSON.parse(out);
+}
+const sumBy = (arr, f) => arr.reduce((s, x) => s + f(x), 0);
+
+section('§10.3 DXF round-trip — sample_arch_1200_segmental.dxf (frame head + leaf top)');
+{
+  const plan = arch.buildArchPlan({ shape: 'segmental', width: W, height: 2000, rise: null, hinge: 'left' }, PA);
+  const ents = archDxf.buildArchEntities(plan, 'W1');
+  const dxf = dxfWriter.writeDxf(ents, archDxf.ARCH_LAYERS);
+  const path = resolve(SAMPLES, 'sample_arch_1200_segmental.dxf');
+  writeFileSync(path, dxf);
+  const d = probe(path);
+  check('DXF is R12 (AC1009)', d.version === 'AC1009', d.version);
+  check('layers CONTOUR / ASSEMBLY / PIECES / FINGER / TEXT present', ['CONTOUR', 'ASSEMBLY', 'PIECES', 'FINGER', 'TEXT'].every((l) => d.layers.includes(l)), d.layers.join(','));
+  const contours = d.polys.filter((p) => p.layer === 'CONTOUR');
+  check('CONTOUR: two closed rings (frame head, leaf top), 4 vertices each', contours.length === 2 && contours.every((p) => p.closed && p.n === 4));
+  // frame head contour = outer + inner arcs and two arch-start cuts
+  const fo = segmentalExp(240, 0), fi = segmentalExp(240, tF);
+  const frameC = contours.reduce((m, p) => (p.arcs > m.arcs ? p : m), contours[0]);
+  const leafC = contours.find((p) => p !== frameC);
+  expectNear('frame head CONTOUR arc length = outer + inner (closed form)', frameC.arcs, fo.length + fi.length, 0.05);
+  expectNear('frame head CONTOUR straight length = two arch-start cuts', frameC.straight, 2 * (fo.xEnd - fi.xEnd), 0.05);
+  const lo = segmentalExp(240, oL), li = segmentalExp(240, oL + tL);
+  expectNear('leaf top CONTOUR arc length = outer + inner (closed form)', leafC.arcs, lo.length + li.length, 0.05);
+  expectNear('leaf top CONTOUR straight length = two arch-start cuts', leafC.straight, 2 * (lo.xEnd - li.xEnd), 0.05);
+  check('frame head contour sits above the leaf contour (reading order top-down)', frameC.bbox[1] > leafC.bbox[3]);
+  // pieces: default plans (frame 2 × 150, leaf 1 × 225 with this stock list)
+  const nF = plan.plans.frameHead.totalPieces, nL = plan.plans.leafTop.totalPieces;
+  check(`default plans: frame head ${nF} pcs, leaf top ${nL} pcs`, nF === 2 && nL === 1 && plan.plans.frameHead.pieces[0].stock === 150 && plan.plans.leafTop.pieces[0].stock === 225,
+    `${nF}/${nL} stock ${plan.plans.frameHead.pieces[0]?.stock}/${plan.plans.leafTop.pieces[0]?.stock}`);
+  const pieces = d.polys.filter((p) => p.layer === 'PIECES');
+  check(`PIECES: ${nF + nL} closed 4-vertex polylines`, pieces.length === nF + nL && pieces.every((p) => p.closed && p.n === 4), String(pieces.length));
+  expectNear('PIECES arc lengths tile both rings (outer + inner of frame and leaf)', sumBy(pieces, (p) => p.arcs), fo.length + fi.length + lo.length + li.length, 0.05);
+  const boards = d.polys.filter((p) => p.layer === 'ASSEMBLY');
+  check(`ASSEMBLY: one board per piece, assembled + flat = ${2 * (nF + nL)}`, boards.length === 2 * (nF + nL) && boards.every((p) => p.closed && p.n === 4 && p.straight > 0 && p.arcs === 0), String(boards.length));
+  // flat boards = the ones that contain a PIECES polyline; each is an axis-aligned stock rectangle
+  const inside = (a, b) => a[0] >= b[0] - 1e-6 && a[1] >= b[1] - 1e-6 && a[2] <= b[2] + 1e-6 && a[3] <= b[3] + 1e-6;
+  const flatBoards = boards.filter((bd) => pieces.some((pc) => inside(pc.bbox, bd.bbox)));
+  check('flat boards: one axis-aligned stock rectangle (150 / 225 high) around every flat piece', flatBoards.length === nF + nL
+    && flatBoards.every((bd) => near(bd.bbox[3] - bd.bbox[1], 150, 1e-6) || near(bd.bbox[3] - bd.bbox[1], 225, 1e-6)), String(flatBoards.length));
+  const fingers = d.polys.filter((p) => p.layer === 'FINGER');
+  // frame: 1 joint in the assembly + 2 radial ends in the pieces row; leaf: none
+  check('FINGER: 3 joint faces (1 assembled + 2 on the flat frame pieces), open polylines', fingers.length === 3 && fingers.every((p) => !p.closed && p.n === 2), String(fingers.length));
+  const jointLen = fingers.map((p) => p.straight);
+  check('FINGER faces are the member face long (57 mm, radial)', jointLen.every((l) => near(l, tF, 0.01)), jointLen.map((l) => l.toFixed(2)).join(' '));
+  const texts = d.texts.map((t) => t.text);
+  check('TEXT: labels for both members', texts.some((t) => t === 'W1 - FRAME HEAD') && texts.some((t) => t === 'W1 - LEAF TOP'));
+  check('TEXT: shape / size / hinge line', texts.some((t) => t === 'SEGMENTAL W1200 RISE240 H2000 HINGE L'), texts.join(' | '));
+  check('TEXT: finger profile 15/16/3.8', texts.some((t) => t === 'FINGER 15/16/3.8'));
+  check('TEXT: D13 default + alternative printed', texts.some((t) => /ARC 1 R870 L1324\.2: 2 x board 150 L\d+(\.\d)? \(ALT 4 x board 100\)/.test(t)), texts.filter((t) => t.startsWith('ARC')).join(' | '));
+  check('TEXT: flat piece labels with board size', texts.some((t) => /^W1 - FRAME HEAD P1 \d+(\.\d)?x150$/.test(t)) && texts.some((t) => /^W1 - LEAF TOP P1 \d+(\.\d)?x225$/.test(t)));
+  const minX = Math.min(...d.polys.map((p) => p.bbox[0])), minY = Math.min(...d.polys.map((p) => p.bbox[1]));
+  check('drawing origin: nothing left of / below (0, 0)', minX >= -1e-6 && minY >= -1e-6, `${minX.toFixed(3)}, ${minY.toFixed(3)}`);
+  // polyLength (JS) agrees with ezdxf-side arithmetic on the frame contour
+  const jsArcs = ents.filter((e) => e.layer === 'CONTOUR').map((e) => archDxf.polyLength(e.pts, true).arcs).sort((a, b) => a - b);
+  const pyArcs = contours.map((p) => p.arcs).sort((a, b) => a - b);
+  check('polyLength(js) = ezdxf arcs on both contours', jsArcs.length === 2 && jsArcs.every((v, i) => near(v, pyArcs[i], 1e-3)), `${jsArcs} vs ${pyArcs}`);
+}
+{
+  // every shape survives the round-trip with the right ring lengths
+  const cases = [
+    { shape: 'semi-circle', rise: null, exp: semiExp },
+    { shape: 'gothic-equilateral', rise: null, exp: (δ) => gothicExp(W * Math.sqrt(3) / 2, δ) },
+    { shape: 'gothic-drop', rise: 840, exp: (δ) => gothicExp(840, δ) },
+    { shape: 'three-centre', rise: 390, exp: (δ) => threeExp(390, δ) },
+  ];
+  for (const c of cases) {
+    const plan = arch.buildArchPlan({ shape: c.shape, width: W, height: 2000, rise: c.rise, hinge: 'right' }, PA);
+    const path = resolve(AUDIT, `arch_1200_${c.shape}.dxf`);
+    writeFileSync(path, dxfWriter.writeDxf(archDxf.buildArchEntities(plan, 'T'), archDxf.ARCH_LAYERS));
+    const d = probe(path);
+    const contours = d.polys.filter((p) => p.layer === 'CONTOUR');
+    const expArcs = c.exp(0).length + c.exp(tF).length + c.exp(oL).length + c.exp(oL + tL).length;
+    expectNear(`${c.shape}: CONTOUR arcs (frame + leaf, outer + inner) via ezdxf`, sumBy(contours, (p) => p.arcs), expArcs, 0.05);
+    const nPieces = plan.plans.frameHead.totalPieces + plan.plans.leafTop.totalPieces;
+    const pieces = d.polys.filter((p) => p.layer === 'PIECES');
+    check(`${c.shape}: PIECES count ${nPieces}, arcs tile the rings`, pieces.length === nPieces && near(sumBy(pieces, (p) => p.arcs), expArcs, 0.05), `${pieces.length} / ${sumBy(pieces, (p) => p.arcs).toFixed(2)} vs ${expArcs.toFixed(2)}`);
+    check(`${c.shape}: HINGE R printed`, d.texts.some((t) => t.text.endsWith('HINGE R')));
+  }
+}
+{
+  // merged export: two windows stacked, 300 mm clear
+  const p1 = arch.buildArchPlan({ shape: 'segmental', width: W, height: 2000 }, PA);
+  const p2 = arch.buildArchPlan({ shape: 'semi-circle', width: 1000, height: 1800 }, PA);
+  const one = archDxf.buildArchEntities(p1, 'A');
+  const merged = archDxf.buildMergedArchEntities([{ plan: p1, winNum: 'A' }, { plan: p2, winNum: 'B' }]);
+  const polysA = merged.filter((e) => e.type === 'poly').slice(0, one.filter((e) => e.type === 'poly').length);
+  const polysB = merged.filter((e) => e.type === 'poly').slice(one.filter((e) => e.type === 'poly').length);
+  const minYA = Math.min(...polysA.flatMap((e) => e.pts.map((p) => p[1])));
+  const maxYB = Math.max(...polysB.flatMap((e) => e.pts.map((p) => p[1])));
+  check('merged: second window sits ≥ 300 mm below the first', merged.length === one.length + archDxf.buildArchEntities(p2, 'B').length && minYA - maxYB >= 300 - 1e-6, `${(minYA - maxYB).toFixed(1)}`);
+  expectThrows('buildArchEntities refuses a plan with no stock', () => archDxf.buildArchEntities(arch.buildArchPlan({ shape: 'semi-circle', width: W, height: 2000 }, { ...PA, arch: { ...ARCH_SECTION, stockWidths: [50] } }), 'X'), /No stock board fits/);
 }
 
 // ── summary ─────────────────────────────────────────────────────────────────

@@ -65,6 +65,36 @@ board (alt 4 / 100), semi-circle 2 / 250 (alt 6 / 100), gothic 1 + 1 (alt 3 + 3)
 assumptions (BLOCKERS 1, 4.7). Not verified: piece minimum length, board length limits (none in
 the code — a 1500 semi-circle N = 1 asks for a 750 mm board and is simply infeasible).
 
+### Step 3 — CNC drawing (`src/engine/cnc/archDxf.js`, harness §10.3 round-trip)
+
+**Understanding:** one DXF per window with four rows (top-down): FRAME HEAD contour + assembly,
+FRAME HEAD pieces laid flat, LEAF TOP contour + assembly, LEAF TOP pieces. Layers: CONTOUR =
+finished member (routed after glue-up), ASSEMBLY = stock boards (assembled and flat), PIECES =
+piece contours to rout, FINGER = joint faces (planes only, the Stark head cuts the teeth), TEXT =
+labels + plan summary incl. the D13 alternative. Entity model, R12 writer, 200 mm gaps, 15 mm
+text and the merged-stack convention are 1:1 `jambDxf.js`.
+
+**Two approaches, one rejected:** drawing the finger teeth (pitch 3.8 → hundreds of vertices per
+joint, useless to a 5-axis operator) — rejected; joint planes + printed profile — chosen.
+
+**Bug found by the harness:** tilted stock boards in the assembled view overhang the ring's
+bounding box (−29.6 mm left of the origin) → rows are now placed by the bbox of ALL their
+entities. Three other failures were wrong assertions (a single-piece board is axis-aligned too;
+1324.2 not 1324.1; leaf contour picked instead of frame), fixed in the harness, not the code.
+
+**Harness:** `docs/handover/samples/sample_arch_1200_segmental.dxf` written and read back with
+ezdxf 1.4.4 (`verify/arch/dxf_probe.py`): AC1009, five layers, CONTOUR arc lengths = outer +
+inner of both rings (closed form), straight cuts = arch-start ends, PIECES arcs tile the rings,
+one board per piece assembled + flat, FINGER faces 57 mm long, TEXT lines (labels, shape line,
+`FINGER 15/16/3.8`, `ARC 1 R870 L1324.2: 2 x board 150 … (ALT 4 x board 100)`). Same round-trip
+for semi-circle, gothic equilateral, gothic drop, three-centre; merged export stacks 300 mm
+apart; a no-stock plan is refused with a readable ArchError. 176 checks ALL PASS. Rendered the
+three files to PNG via ezdxf/matplotlib and eyeballed the layout (rows, tilted boards, joints).
+
+**Verdict: ⚠️** DXF verified by round-trip and by eye in a renderer — NOT in VCarve (Piotr,
+morning). Not verified: text placement inside VCarve, whether the workshop wants the assembled
+boards drawn at all (ASSEMBLY layer can simply be switched off).
+
 ---
 
 ## Phase 0 — Project skeleton (React + Vite + layout)
