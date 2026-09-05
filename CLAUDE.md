@@ -160,32 +160,33 @@ elementami, pręty (proste + wzory PSW), eksporty dla szklarza, 2D z łuków, 3D
 Harnessy t16–t19 ALL PASS. Werdykty w `BUILD-LOG.md`, otwarte w `BLOCKERS.md`.
 Spec: `docs/handover/ARCHED-CASEMENT-v1.md`, `-v1-AUDIT.md`, `-v2.md` (historia decyzji).
 
-## ZADANIE NOCNE 5 — ARCHED-WINDOWS-v3: Blok 0 + Blok 1 (A–E)
+## ZADANIE NOCNE 5 — ARCHED-WINDOWS-v3: CAŁOŚĆ w jedną noc, w czterech bramkowanych etapach
 
 Spec: `@docs/handover/ARCHED-WINDOWS-v3.md`. Czytasz w całości; przy rozbieżności z v1/v2
-wygrywa v3. Rysunek warsztatowy: `docs/handover/workshop/arka_CNC-piotr.dxf` (przeczytaj
-`ezdxf`, nie zgaduj warstw).
+wygrywa v3. Rysunek warsztatowy `docs/handover/workshop/arka_CNC-piotr.dxf` czytasz `ezdxf` —
+to jest wzór; pakiet w `docs/handover/workshop/arka-lsp-package/` tylko tłumaczy offsety i
+przekrój (jego MITRE są odwrotnie — DWG wygrywa).
 
-Zakres tej nocy — TYLKO:
-- **Blok 0** (casement): 0.1 widok FIT w Arch DXF · 0.2 szklarz: pasy 18, oblamówka 11, osie ·
-  0.3 wymiarowanie końców prętów (od dołu / od wierzchołka po łuku, tabela > 4) · 0.4 eksport
-  **Tracery DXF + LSP** wg konwencji `arka` (pakiet w `docs/handover/workshop/arka-lsp-package/`
-  = książka reguł: warstwy `ARKA_*`, +2 / +10, narożniki 15 po krzywej, przekrój verbatim;
-  traceria = deska z JEDNEJ strony szyby, część `C-TRACERY`; wzory generyczne hub-spoke +
-  preset `quad-hub-spoke` z DWG) · **0.4b zawias 1:1 z PSW — usuń odwracanie wartości z nocy 3** · **0.4c audyt
-  logiki prętów per kształt (t20_bars)** · 0.5 drobne z BLOCKERS §10 · 0.6 decyzje profilu
-- **Blok 1 A–E** (sash łukowy, strona silnika): model + import PSW, konfigurator sash, silnik
-  z regułą C i głowicą 80, wagi z prawdziwego obrysu, cut list `S-AH` / `S-ATR`, harness t21
-- harnessy t20 (Blok 0) i t21 (Blok 1) ALL PASS; t16–t19 nadal ALL PASS; okna prostokątne
-  (sash i casement) snapshot-identyczne
+**Etapy — następny startuje TYLKO po ALL PASS poprzedniego i zielonym `npm run build`:**
+1. **Blok 0 + Blok 1 A–E** — traceria DXF+LSP, szklarz (pasy 18 / oblamówka 11 / osie),
+   wymiarowanie prętów od dołu i od wierzchołka, zawias 1:1 z PSW, audyt prętów per kształt,
+   drobne z BLOCKERS, profil; sash łukowy po stronie silnika (model, import PSW, konfigurator,
+   reguła C, głowica 80, wagi z obrysu, cut list `S-AH`/`S-ATR`). Bramka: t20, t20_bars, t21,
+   t16–t19.
+2. **Blok 1 F–J + Blok 3** — sash CNC/szklarz/2D/3D/port notes; okna stałe w batchu casement
+   (Kind Opening | Fixed, kształty Rectangle / Round / Gothic / Circle, wzory, koło jako
+   `circleChain`). Bramka: t22, t23, snapshoty okien prostych.
+3. **Blok 4** — PP „Curved members", Pre-Cut z blankami, BOM z klejonką, wycena, PDF-y,
+   merged DXF/LSP, raport parity, `PSW-3D-ARCH-PORT.md`. Bramka: t24.
+4. **Blok 6** — archiwum projektów (SQL osobnym plikiem w `docs/handover/sql/`).
 
-**Nie zaczynaj Bloku 1 F–J (2D/3D sash), Bloku 3 (okna stałe), 4, 6 (archiwum) — to noce 6–7.
-Drzwi, sliding, bifold, front door: poza zakresem (Piotr 07.09).**
-Nie ruszaj `casementLayouts.js`, modułu beading sash (dla łuku: zapisz lukę w BLOCKERS, nie
-generuj listew), listy „NIE RÓB DZIŚ".
+Jeśli etap nie przechodzi bramki — naprawiasz go, nie przeskakujesz. Jeśli kończą się
+możliwości (limit, błąd środowiska) — zamykasz etap czysto, werdykt, BLOCKERS, koniec.
 
-Sesja w chmurze, własny branch, commit + push po każdym zamkniętym punkcie (0.1 → 0.6 →
-1A → 1E). Każde **DEFAULT (open)** ze spec = wpis w BLOCKERS z przyjętą wartością.
+Beading sash zamrożony; casement nie ma listew w silniku — nie generuj rekordów listew.
+Drzwi, sliding, bifold, front door: poza zakresem. `casementLayouts.js` nietknięty.
+Sesja w chmurze, własny branch, commit + push po każdym zamkniętym punkcie. Każde
+**DEFAULT (open)** ze spec = wpis w BLOCKERS z przyjętą wartością.
 
 ## NIE RÓB DZIŚ (zaplanowane, osobne pakiety)
 

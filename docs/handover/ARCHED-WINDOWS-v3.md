@@ -5,16 +5,20 @@ records, glazier exports, 2D, bars, 3D). All of that is on `main` (PR #3, #4, #5
 below were taken with Piotr on 06–07.09.2026. Where Piotr did NOT answer, the item says
 **DEFAULT (open)** — implement the default, log it in `BLOCKERS.md`, never silently guess.
 
-Nights (Piotr 07.09: windows only — doors, sliding, bifold, front door are NOT in scope now):
-- **Night 5 = Block 0 + Block 1 (A–E)** — casement polish (incl. hinge 1:1 with PSW and the
-  per-shape bar audit) and the arched SASH engine side.
-- **Night 6 = Block 1 (F–J) + Block 3** — sash 2D/3D/exports, FIXED windows inside the casement batch.
-- **Night 7 = Block 4 + Block 6** — cross-cutting, project Archive.
-Block 2 (fix frame as a separate product) is REPLACED by Block 3. Block 5 items 1–3 and 7
-are dropped by Piotr (too early / not a measurement tool). Do not start a later block early.
-Each block ends with its harness ALL PASS and `npm run build`.
-
----
+**ONE NIGHT, FOUR GATED STAGES (Piotr 07.09: "w jednej nocy").** Windows only — doors,
+sliding, bifold, front door are NOT in scope. Each stage starts ONLY after the previous stage's
+harness is ALL PASS and `npm run build` is green; if a stage fails, fix it — never skip ahead.
+- **Stage 1 = Block 0 + Block 1 (A–E)** — casement polish (tracery export, glazier bands,
+  hinge 1:1, bar audit) + the arched SASH engine side. Gate: t20, t20_bars, t21, t16–t19.
+- **Stage 2 = Block 1 (F–J) + Block 3** — sash CNC/glazier/2D/3D, FIXED windows in the casement
+  batch incl. circles. Gate: t22, t23, rectangular snapshots.
+- **Stage 3 = Block 4** — Production Pack curved members, pre-cut blanks, BOM, pricing, PDFs,
+  parity report, port notes. Gate: t24 + all previous.
+- **Stage 4 = Block 6** — project Archive. Gate: store round-trip test.
+Block 2 (fix frame as a separate product) is REPLACED by Block 3. Block 5 items 1–3 and 7 are
+dropped by Piotr. Beading stays frozen (Piotr has not answered the three bead questions) — the
+tracery bead R8 in Block 0.4 is the only bead work, and it is shape-agnostic (semi-circle,
+three-centre, gothic, circle) because it runs on the bar list and the outline, not on the shape.
 
 ## 0. Rules — unchanged (v1 §0, v2 §0) plus
 
@@ -28,7 +32,7 @@ Each block ends with its harness ALL PASS and `npm run build`.
 
 ---
 
-## BLOCK 0 — arched casement: polish and the workshop exports (night 5)
+## BLOCK 0 — arched casement: polish and the workshop exports (Stage 1)
 
 ### 0.1 FIT view in the arch CNC DXF (`archDxf.js`)
 Piotr overlaid the frame ring and the leaf ring from our sheet by hand and read a 17 mm
@@ -173,7 +177,7 @@ new `arch.minPieceLength` **150** (warn, never block); `arch.minHaunchRadius` **
 
 ---
 
-## BLOCK 1 — arched SASH (PSW's flagship arched product) — nights 5–6
+## BLOCK 1 — arched SASH (PSW's flagship arched product) — A–E Stage 1, F–J Stage 2
 
 PSW reference: `3d-src/src/components/ArchedSashWindow.jsx` (metrics, `HEAD_FACE 80`,
 `SASH_ARCH_FACE 64`), `js/price-calculator.js` 985–1012 (patterns, limits), form fields
@@ -216,7 +220,7 @@ persisted `archShape, archRise, archBarPattern, archHBars, archVBars, archProfil
 
 ## BLOCK 2 — (replaced by Block 3, see Nights)
 
-## BLOCK 3 — FIXED windows inside the casement batch — night 6
+## BLOCK 3 — FIXED windows inside the casement batch — Stage 2
 
 Piotr 07.09: a fixed window "podchodzi pod casement batch, ale jednak nie casement" — it lives in
 the casement batch with its own kind, built as a **fixed leaf** ("czyli leaf tylko"): the casement
@@ -247,7 +251,7 @@ PC copy 1282 — raise it).
   94.5 offsets), rectangle fixed = casement 040L minus hardware, arched fixed = arched casement
   minus hardware (derived JSON identical apart from hardware/opening fields).
 
-## BLOCK 4 — cross-cutting — night 7
+## BLOCK 4 — cross-cutting — Stage 3
 
 - Production Pack: section **Curved members** (per pack, per type) + Pre-Cut with blank sizes
   (stock × rough length × pieces) + BOM: laminated blank as a raw-stock line (`makeRawResolver`
@@ -264,7 +268,7 @@ PC copy 1282 — raise it).
 
 ---
 
-## BLOCK 6 — project ARCHIVE — night 7 (Piotr 07.09: "wszystko mam na dashboardzie i to mi się miesza")
+## BLOCK 6 — project ARCHIVE — Stage 4 (Piotr 07.09: "wszystko mam na dashboardzie i to mi się miesza")
 `ArchivePage.jsx` is a placeholder. Deliver:
 - Data: `projects.status` gains `'archived'` (or `archived_at timestamptz null`) — **SQL as a
   separate migration file** in `docs/handover/sql/`, never inside app code; RLS unchanged
@@ -316,7 +320,7 @@ today but PC cannot produce.
 
 ---
 
-## Delivery per night
+## Delivery (one night, one branch, commits per stage)
 Night 5: Block 0 files (+ `specification.js` hinge identity, `verify/arch/t20_bars.mjs`) (`archDxf.js`, `glassDxfExport.js`, `glassPdfExport.js`,
 `CasementGlassDrawing2D.jsx`, `traceryLsp.js` new, `profile.js`, `cncExport.js`, pages
 buttons, `docs/handover/workshop/arka_CNC-piotr.dxf`) + Block 1 A–E (`specification.js`,
