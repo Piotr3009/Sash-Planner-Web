@@ -43,7 +43,8 @@ for e in msp:
         ys = [p[1] for p in pts]
         polys.append({'layer': layer, 'closed': closed, 'n': n, 'arcs': arcs, 'straight': straight,
                       'bbox': [min(xs), min(ys), max(xs), max(ys)],
-                      'bulges': [p[2] for p in pts]})
+                      'bulges': [p[2] for p in pts],
+                      'pts': [[p[0], p[1]] for p in pts]})
     elif t == 'TEXT':
         texts.append({'layer': layer, 'text': e.dxf.text, 'x': e.dxf.insert.x, 'y': e.dxf.insert.y})
 print(json.dumps({'version': doc.dxfversion, 'layers': layers, 'counts': counts, 'polys': polys, 'texts': texts}))

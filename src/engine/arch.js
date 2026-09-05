@@ -15,8 +15,8 @@
  *   segmental           1 centre, below the line; rise < W/2
  *   semi-circle         1 centre, R = W/2, rise = W/2 (fixed by the shape)
  *   gothic-equilateral  2 centres at the opposite arch-start points, R = W
- *   gothic-drop         2 centres inside the span, W/2 < rise < W·√3/2
- *   three-centre        2 haunch centres on the line + 1 crown centre below it
+ *   gothic-drop         2 centres inside the span, rise ≥ W/2 (free)
+ *   three-centre        2 haunch centres on the line (r = rise²/halfW) + 1 crown centre below it; rise < W/2
  *
  * Workshop numbers (member faces, leaf inset, glass inset, finger joint,
  * board stock) come from the casement profile — none are hard-coded here.
@@ -63,51 +63,81 @@ export const ARCH_RISE_RATIO = Object.freeze({
   'three-centre': 0.325,
 });
 
-// Validity limits. Width: PSW MIN_WIDTH / MAX_WIDTH (O5). Rise ratios bound
-// the shapes whose rise is free: a segmental at 0.5 IS a semi-circle, a drop
-// arch lives strictly between the semi-circle (0.5) and the equilateral
-// (0.866), a three-centre at 0.5 degenerates into a semi-circle.
-export const ARCH_LIMITS = Object.freeze({
-  minWidth: 400,
-  maxWidth: 1500,
-  riseRatio: Object.freeze({
-    'segmental': [0.10, 0.45],
-    'gothic-drop': [0.55, 0.85],
-    'three-centre': [0.15, 0.45],
-  }),
+// Gothic profile presets (PSW GOTHIC_PROFILE_RATIO, spec §3.2 / §5): rise as a
+// fraction of the external width. 'equilateral' is its own PC shape (fixed
+// rise); 'drop' and 'shallow' are the free-rise 'gothic-drop' shape with a
+// different default rise.
+export const GOTHIC_PROFILE_RATIO = Object.freeze({
+  equilateral: Math.sqrt(3) / 2,
+  drop: 0.70,
+  shallow: 0.60,
 });
 
-// Three-centre: haunch (side) radius as a fraction of the rise. The crown
-// radius follows from tangency, so this one ratio fixes the whole curve.
-export const THREE_CENTRE_HAUNCH_RATIO = 0.5;
+// Shapes whose rise is fixed by the geometry (no free rise).
+export const ARCH_FIXED_RISE = Object.freeze(['semi-circle', 'gothic-equilateral']);
 
 export function isArchShape(shape) { return ARCH_SHAPES.includes(shape); }
 
 const r1 = (v) => Math.round(v * 10) / 10;
 
 /**
+ * Limits live in the casement profile (profile.arch.limits, spec §5): width
+ * 400–1500 (PSW MIN_WIDTH / MAX_WIDTH), straight part below the arch ≥ 900,
+ * straight stile of the arched leaf ≥ 100 (PSW sash rules adopted for the
+ * casement, spec §3.3). Nothing is defaulted here.
+ */
+export function readArchLimits(limits) {
+  const L = {
+    minWidth: Number(limits?.minWidth),
+    maxWidth: Number(limits?.maxWidth),
+    minStraightBelowRise: Number(limits?.minStraightBelowRise),
+    minLeafStraightStile: Number(limits?.minLeafStraightStile),
+  };
+  if (!(L.minWidth > 0 && L.maxWidth >= L.minWidth && L.minStraightBelowRise >= 0 && L.minLeafStraightStile >= 0)) {
+    throw new ArchError('Casement profile arch.limits is missing (minWidth / maxWidth / minStraightBelowRise / minLeafStraightStile)');
+  }
+  return L;
+}
+
+/**
+ * Physical validity of a rise for a shape — these are geometry, not workshop
+ * choices, so they are not profile settings:
+ *   segmental     rise < W/2  (a single-centre arc with the centre below the
+ *                 springing line cannot rise more; W/2 is the semi-circle)
+ *   gothic-drop   rise ≥ W/2  (below that the two arcs cannot meet in a point)
+ *   three-centre  rise < W/2  (at W/2 the haunch radius reaches the rise and
+ *                 there is no crown circle — the shape is a semi-circle)
+ */
+export function assertRisePhysics(shape, width, rise) {
+  const W = Number(width), h = Number(rise), hw = W / 2;
+  const label = ARCH_SHAPE_LABELS[shape];
+  if (!(h > 0)) throw new ArchError(`${label} rise must be a positive number of mm, got "${rise}"`);
+  if (shape === 'segmental' && !(h < hw)) throw new ArchError(`${label} rise ${r1(h)}mm must be below half the width (${r1(hw)}mm) — a single-centre arc cannot rise more; use semi-circle or gothic`);
+  if (shape === 'gothic-drop' && !(h >= hw)) throw new ArchError(`${label} rise ${r1(h)}mm must be at least half the width (${r1(hw)}mm) — below that the two arcs cannot meet in a point`);
+  if (shape === 'three-centre' && !(h < hw)) throw new ArchError(`${label} rise ${r1(h)}mm must be below half the width (${r1(hw)}mm) — at W/2 the shape is a semi-circle`);
+}
+
+/**
  * Resolve the arch rise (mm). Explicit rise wins where the shape allows it;
  * shapes with a fixed rise (semi-circle, gothic equilateral) reject any other
- * value instead of silently overriding it.
+ * value instead of silently overriding it. `limits` = profile.arch.limits.
  */
-export function resolveArchRise(shape, width, rise) {
+export function resolveArchRise(shape, width, rise, limits) {
   if (!isArchShape(shape)) throw new ArchError(`Unknown arch shape "${shape}"`);
+  const L = readArchLimits(limits);
   const W = Number(width);
-  if (!(W >= ARCH_LIMITS.minWidth)) throw new ArchError(`Arch width ${W}mm is below the minimum ${ARCH_LIMITS.minWidth}mm`);
-  if (!(W <= ARCH_LIMITS.maxWidth)) throw new ArchError(`Arch width ${W}mm is above the maximum ${ARCH_LIMITS.maxWidth}mm`);
+  if (!(W >= L.minWidth)) throw new ArchError(`Arch width ${W}mm is below the minimum ${L.minWidth}mm`);
+  if (!(W <= L.maxWidth)) throw new ArchError(`Arch width ${W}mm is above the maximum ${L.maxWidth}mm`);
   const label = ARCH_SHAPE_LABELS[shape];
   const def = ARCH_RISE_RATIO[shape] * W;
   if (rise == null || rise === '') return def;
   const h = Number(rise);
   if (!(h > 0)) throw new ArchError(`Arch rise must be a positive number of mm, got "${rise}"`);
-  const bounds = ARCH_LIMITS.riseRatio[shape];
-  if (!bounds) {
+  if (ARCH_FIXED_RISE.includes(shape)) {
     if (Math.abs(h - def) > 0.5) throw new ArchError(`${label} rise is fixed by the shape at ${r1(def)}mm (got ${h}mm)`);
     return def;
   }
-  const [lo, hi] = bounds;
-  if (h / W < lo - 1e-9) throw new ArchError(`${label} rise ${h}mm is below the minimum ${r1(lo * W)}mm (${lo} × width)`);
-  if (h / W > hi + 1e-9) throw new ArchError(`${label} rise ${h}mm is above the maximum ${r1(hi * W)}mm (${hi} × width)`);
+  assertRisePhysics(shape, W, h);
   return h;
 }
 
@@ -121,6 +151,8 @@ export function resolveArchRise(shape, width, rise) {
  */
 export function archArcs(shape, width, rise) {
   const W = Number(width), h = Number(rise), hw = W / 2;
+  if (!isArchShape(shape)) throw new ArchError(`Unknown arch shape "${shape}"`);
+  assertRisePhysics(shape, W, h);
   switch (shape) {
     case 'segmental': {
       const R = (hw * hw + h * h) / (2 * h);
@@ -142,7 +174,10 @@ export function archArcs(shape, width, rise) {
       ];
     }
     case 'three-centre': {
-      const r = h * THREE_CENTRE_HAUNCH_RATIO;
+      // Basket-handle approximation of the half-ellipse (a = W/2, b = rise):
+      // haunch radius = the ellipse's radius of curvature at the springing,
+      // r = b²/a (spec §6.1); the crown radius follows from tangency.
+      const r = (h * h) / hw;
       const e = hw - r;                        // haunch centre x
       const R = (e * e + h * h - r * r) / (2 * (h - r));   // crown radius from tangency
       const t = Math.atan2(R - h, e);          // tangent point seen from the crown centre
@@ -282,11 +317,24 @@ export function buildArchGeometry({ shape, width, height, rise }, profile) {
   if (!profile?.elements?.frameHead || !profile?.elements?.leafTop || !profile?.deductions || !profile?.geometry) {
     throw new ArchError('Casement profile is missing the frameHead / leafTop / deductions / geometry sections');
   }
+  const L = readArchLimits(profile.arch?.limits);
   const W = Number(width);
-  const h = resolveArchRise(shape, W, rise);
+  const h = resolveArchRise(shape, W, rise, L);
+  let straightHeight = null, leafStraightStile = null;
   if (height != null && height !== '') {
     const H = Number(height);
-    if (!(H - h > 0)) throw new ArchError(`Arch rise ${r1(h)}mm leaves no straight part in a ${H}mm high window`);
+    straightHeight = H - h;
+    if (!(straightHeight >= L.minStraightBelowRise)) {
+      throw new ArchError(`Arch rise ${r1(h)}mm in a ${r1(H)}mm high window leaves ${r1(straightHeight)}mm straight below the arch — minimum ${L.minStraightBelowRise}mm (height >= rise + ${L.minStraightBelowRise})`);
+    }
+    // straight stile of the arched leaf = straight part minus the cill-side
+    // leaf deduction (leafFullHeight − leafAtJamb: gap + cill land)
+    const cillSide = Number(profile.deductions.leafFullHeight) - Number(profile.deductions.leafAtJamb);
+    if (!Number.isFinite(cillSide)) throw new ArchError('Casement profile deductions.leafFullHeight / leafAtJamb are missing');
+    leafStraightStile = straightHeight - cillSide;
+    if (!(leafStraightStile >= L.minLeafStraightStile)) {
+      throw new ArchError(`Straight stile of the arched leaf is ${r1(leafStraightStile)}mm — minimum ${L.minLeafStraightStile}mm`);
+    }
   }
   const base = archArcs(shape, W, h);
   const tFrame = Number(profile.elements.frameHead.face);
@@ -302,7 +350,9 @@ export function buildArchGeometry({ shape, width, height, rise }, profile) {
     label: ARCH_SHAPE_LABELS[shape],
     width: W,
     rise: h,
-    straightHeight: height != null && height !== '' ? Number(height) - h : null,
+    straightHeight,
+    leafStraightStile,
+    limits: L,
     arcs: base,
     offsets: { frameInner: tFrame, leafOuter: leafInset, leafInner: leafInset + tLeaf, glass: glassOffset },
     frameHead,
@@ -315,60 +365,144 @@ export function buildArchGeometry({ shape, width, height, rise }, profile) {
 // SEGMENT PLANNER — a curved member is glued up from N straight boards
 // (finger-jointed on radial faces) and the ring contour is routed afterwards.
 //
-// Projection method: each piece is projected onto its own board axes — the
-// chord of its outer arc (length) and the arc's bisector (width). The board a
-// piece needs is that projected width plus the workshop allowance, matched to
-// the narrowest stock board that is at least as wide.
+// Spec §7 (ARCHED-CASEMENT-v1.md):
+//  1. every arc of the ring is planned on its own — a joint is mandatory at
+//     every tangent point / apex;
+//  2. N_min = max(2, ceil(θ / maxSegmentAngle)) per arc (grain run-out); a
+//     single-centre arc shorter than maxSegmentAngle may be ONE board when a
+//     stock board fits it;
+//  3. candidates N = N_min … N_min + 3, equal angles φ = θ / N on the outer
+//     contour; piece axis = tangent at the mid-angle, normal = radial there;
+//  4. the ALLOWANCE BAND — outer contour + contourAllowance, inner contour −
+//     contourAllowance — bounded by the radial joint planes, and by the
+//     arch-start line / apex axis for the end pieces (that is the haunch);
+//  5. the band is projected onto the piece axes exactly (arc end points +
+//     interior extrema): W_req = extent on the normal, L = extent on the axis.
+//     For a middle piece this equals the closed form
+//     W_req = (Ro + a) − (Ri − a)·cos(φ/2),  L = 2·(Ro + a)·sin(φ/2);
+//  6. stock = narrowest stock width ≥ W_req, none → that N is infeasible;
+//  7. D13 — which feasible N is the DEFAULT is a profile switch (`pieceRule`,
+//     BLOCKERS: Piotr has not decided):
+//       'narrowest' (spec default) — narrowest stock with N ≤ N_min + 2,
+//                                    tie → fewer pieces;
+//       'fewest'                  — fewest pieces that fit a stock board.
+//     The plan the OTHER rule would pick is returned as `alternative` and
+//     printed on the sheet as ALT.
 //
-// D13 (BLOCKERS): the DEFAULT plan is the one with the FEWEST pieces that fit
-// a stock board; the ALTERNATIVE is the plan on the NARROWEST stock board.
-// Both are returned so the drawing can print the alternative.
+// Every number (allowance, max angle, stock list, selection rule) comes from
+// profile.arch — nothing is defaulted here.
 // ═══════════════════════════════════════════════════════════════════════════
 
 const pieceEndType = (clip) => (clip === 'archStart' ? 'archStart' : clip === 'axis' ? 'axis' : 'tangent');
 
-/** Split arc i of a ring into n equal (by outer angle) pieces. */
-export function partitionArc(ring, arcIndex, n) {
+/**
+ * Allowance band of a ring (spec §7.4): outer contour grown by `a`, inner
+ * contour shrunk by `a`, clipped ends recomputed on the band radii.
+ */
+export function allowanceBand(ring, a) {
+  const d = Number(a);
+  if (!(d >= 0)) throw new ArchError(`Contour allowance must be a number of mm >= 0, got "${a}"`);
+  return { outer: offsetArcs(ring.outer, -d), inner: offsetArcs(ring.inner, d) };
+}
+
+/**
+ * Split arc i of a ring into n equal (by outer angle) pieces.
+ * `band` (allowanceBand of the same ring) drives the board projection; the
+ * finished piece arcs (outer / inner) are kept for the drawing.
+ */
+export function partitionArc(ring, arcIndex, n, band = null) {
   const outer = ring.outer[arcIndex];
   const inner = ring.inner[arcIndex];
+  const bO = band ? band.outer[arcIndex] : outer;
+  const bI = band ? band.inner[arcIndex] : inner;
   const phi = arcSpan(outer) / n;
   const pieces = [];
   for (let k = 0; k < n; k++) {
+    const first = k === 0, last = k === n - 1;
     const ao0 = outer.a0 + k * phi;
-    const ao1 = k === n - 1 ? outer.a1 : outer.a0 + (k + 1) * phi;
-    const ai0 = k === 0 ? inner.a0 : ao0;
-    const ai1 = k === n - 1 ? inner.a1 : ao1;
+    const ao1 = last ? outer.a1 : outer.a0 + (k + 1) * phi;
     const oArc = { ...outer, a0: ao0, a1: ao1 };
-    const iArc = { ...inner, a0: ai0, a1: ai1 };
+    const iArc = { ...inner, a0: first ? inner.a0 : ao0, a1: last ? inner.a1 : ao1 };
+    // allowance band of this piece: joint planes are radial (same angles);
+    // the arch-start / apex ends use the band's own clipped angles
+    const bandOuter = { ...bO, a0: first ? bO.a0 : ao0, a1: last ? bO.a1 : ao1 };
+    const bandInner = { ...bI, a0: first ? bI.a0 : ao0, a1: last ? bI.a1 : ao1 };
     // Board axes: bisector b (width direction, pointing to the apex side) and
     // the chord direction u (length direction, counter-clockwise tangent).
     const m = (ao0 + ao1) / 2;
     const b = [Math.cos(m), Math.sin(m)];
     const u = [-Math.sin(m), Math.cos(m)];
-    const sO = arcExtent(oArc, u), sI = arcExtent(iArc, u);
-    const wO = arcExtent(oArc, b), wI = arcExtent(iArc, b);
+    const sO = arcExtent(bandOuter, u), sI = arcExtent(bandInner, u);
+    const wO = arcExtent(bandOuter, b), wI = arcExtent(bandInner, b);
     const sMin = Math.min(sO.min, sI.min), sMax = Math.max(sO.max, sI.max);
     const wMin = Math.min(wO.min, wI.min), wMax = Math.max(wO.max, wI.max);
+    // acute angle between the piece axis and the horizontal (the arch-start
+    // line) — the end cut the CNC needs for an arch-start end
+    const axisAngle = Math.abs(Math.atan2(u[1], u[0]));
+    const axisAngleDeg = (axisAngle > Math.PI / 2 ? Math.PI - axisAngle : axisAngle) * 180 / Math.PI;
+    const endStart = first ? pieceEndType(outer.clip0) : 'radial';
+    const endEnd = last ? pieceEndType(outer.clip1) : 'radial';
+    // band inner chord = L_in (spec: 2·(Ri − a)·sin(φ/2) for a middle piece)
+    const pi0 = arcPoint(bandInner, bandInner.a0), pi1 = arcPoint(bandInner, bandInner.a1);
+    const Lin = Math.hypot(pi1[0] - pi0[0], pi1[1] - pi0[1]);
+    const endCuts = [endCut(endStart, phi, axisAngleDeg), endCut(endEnd, phi, axisAngleDeg)];
+    const jointedEnds = endCuts.filter((c) => c.jointed).length;
     pieces.push({
       arc: arcIndex,
       k,
       n,
+      phi,
+      phiDeg: phi * 180 / Math.PI,
+      axisAngleDeg,
       outer: oArc,
       inner: iArc,
-      endStart: k === 0 ? pieceEndType(outer.clip0) : 'radial',
-      endEnd: k === n - 1 ? pieceEndType(outer.clip1) : 'radial',
+      band: { outer: bandOuter, inner: bandInner },
+      endStart,
+      endEnd,
+      endCuts,                       // [start end, end end] — see endCut()
+      jointedEnds,                   // 0, 1 or 2 finger-jointed ends (arch-start cuts are not joints)
       axes: { bisector: m, b, u },
       extents: { s: [sMin, sMax], w: [wMin, wMax] },
-      projectedWidth: wMax - wMin,
-      chordLength: sMax - sMin,
+      wReq: wMax - wMin,
+      projectedWidth: wMax - wMin,   // alias kept for the drawing (= W_req, band included)
+      L: sMax - sMin,
+      chordLength: sMax - sMin,      // alias kept for the drawing (= L_out of the band)
+      Lin,
     });
   }
   return pieces;
 }
 
+/**
+ * End cut of a piece (spec §7.8). `angleDeg` follows the spec's convention per
+ * kind, `fromSquareDeg` is always the mitre from a square cut:
+ *   joint  (radial / tangent plane) — φ/2 from square (= angleDeg)
+ *   spring (arch-start line)        — angleDeg = piece axis to the horizontal,
+ *                                     from square = 90° − that
+ *   apex   (gothic axis, vertical)  — angleDeg = piece axis to the vertical,
+ *                                     from square = axis to the horizontal
+ */
+export function endCut(endType, phi, axisAngleDeg) {
+  if (endType === 'archStart') return { kind: 'spring', jointed: false, angleDeg: axisAngleDeg, fromSquareDeg: 90 - axisAngleDeg };
+  if (endType === 'axis') return { kind: 'apex', jointed: true, angleDeg: 90 - axisAngleDeg, fromSquareDeg: axisAngleDeg };
+  const half = phi / 2 * 180 / Math.PI;
+  return { kind: 'joint', jointed: true, angleDeg: half, fromSquareDeg: half };
+}
+
 /** Closed bulge polyline of one piece: outer arc CCW, radial/clipped end, inner arc CW, other end. */
 export function piecePoly(piece) {
   const { outer, inner } = piece;
+  return [
+    [...arcPoint(outer, outer.a0), arcBulge(outer)],
+    [...arcPoint(outer, outer.a1), 0],
+    [...arcPoint(inner, inner.a1), -arcBulge(inner)],
+    [...arcPoint(inner, inner.a0), 0],
+  ];
+}
+
+/** Same polygon for the piece's allowance band (what the stock board must contain). */
+export function pieceBandPoly(piece) {
+  const { outer, inner } = piece.band;
   return [
     [...arcPoint(outer, outer.a0), arcBulge(outer)],
     [...arcPoint(outer, outer.a1), 0],
@@ -392,36 +526,87 @@ function stockFor(boardWidth, stockWidths) {
   return null;
 }
 
+export const PIECE_RULES = Object.freeze(['narrowest', 'fewest']);
+
+function readPlannerSettings(opts) {
+  const stockWidths = Array.isArray(opts?.stockWidths) ? opts.stockWidths.map(Number).filter((w) => w > 0) : [];
+  const allowance = Number(opts?.contourAllowance);
+  if (!(allowance >= 0)) throw new ArchError('Casement profile arch.contourAllowance is missing (mm per side)');
+  const maxDeg = Number(opts?.maxSegmentAngleDeg);
+  if (!(maxDeg > 0 && maxDeg <= 180)) throw new ArchError('Casement profile arch.maxSegmentAngleDeg is missing (degrees, 0 < angle <= 180)');
+  const pieceRule = opts?.pieceRule;
+  if (!PIECE_RULES.includes(pieceRule)) throw new ArchError(`Casement profile arch.pieceRule must be one of ${PIECE_RULES.join(' | ')}, got "${pieceRule}"`);
+  const fingerLength = Number(opts?.finger?.length);
+  if (!(fingerLength >= 0)) throw new ArchError('Casement profile arch.finger.length is missing (mm per jointed end)');
+  return { stockWidths, allowance, maxDeg, maxAngle: maxDeg * Math.PI / 180, pieceRule, fingerLength };
+}
+
+/** D13 selection among the feasible options of one arc (see banner, rule 7). */
+export function pickOption(options, nMin, rule) {
+  const feasible = options.filter((o) => o.stock != null);
+  if (!feasible.length) return null;
+  if (rule === 'fewest') return feasible[0];
+  const window = feasible.filter((o) => o.n <= nMin + 2);
+  const pool = window.length ? window : feasible;
+  let best = null;
+  for (const o of pool) if (!best || o.stock < best.stock) best = o;   // options are in ascending N → tie keeps fewer
+  return best;
+}
+
 /**
  * Plan every arc of a ring.
- * opts: { stockWidths: number[], widthAllowance: number, maxPieces: number }
- * Returns { arcs: [{ index, radiusOuter, radiusInner, span, options, default, alternative }],
+ * opts = profile.arch: { stockWidths, contourAllowance, maxSegmentAngleDeg }
+ * Returns { arcs: [{ index, radiusOuter, radiusInner, span, spanDeg, nMin, nMax,
+ *                    options, default, alternative }],
  *           pieces (default plan, numbered 1..N across arcs), totalPieces, noStock }.
  * Never throws for "no board fits": the options simply carry stock = null.
  */
 export function planArchSegments(ring, opts) {
-  const stockWidths = Array.isArray(opts?.stockWidths) ? opts.stockWidths : [];
-  const allowance = Number(opts?.widthAllowance) || 0;
-  const maxPieces = Math.max(1, Math.floor(Number(opts?.maxPieces) || 8));
+  const S = readPlannerSettings(opts);
+  let band;
+  try { band = allowanceBand(ring, S.allowance); }
+  catch (e) {
+    if (!(e instanceof ArchError)) throw e;
+    throw new ArchError(`${ring.label || 'Ring'} allowance band (${S.allowance}mm per side): ${e.message} — rise too small for the member face plus allowance`);
+  }
+  const evaluate = (i, n) => {
+    // rough length = band length + finger length per jointed end (spec §7.7,
+    // conservative: the whole finger is added at every joint — Piotr may lower it)
+    const pieces = partitionArc(ring, i, n, band).map((p) => ({ ...p, roughLength: p.L + S.fingerLength * p.jointedEnds }));
+    const wReq = Math.max(...pieces.map((p) => p.wReq));
+    const L = Math.max(...pieces.map((p) => p.L));
+    const roughLength = Math.max(...pieces.map((p) => p.roughLength));
+    return {
+      n, pieces,
+      wReq,
+      projectedWidth: wReq,     // alias (drawing)
+      boardWidth: wReq,         // alias (export messages)
+      L,
+      chordLength: L,           // alias (drawing)
+      roughLength,
+      stock: stockFor(wReq, S.stockWidths),
+    };
+  };
   const arcs = ring.outer.map((outer, i) => {
+    const theta = arcSpan(outer);
+    let nMin = Math.max(2, Math.ceil(theta / S.maxAngle - 1e-9));
+    // one short single-centre arc (segmental) may be a single board — only
+    // when a stock board actually fits it (spec §7.2)
+    if (ring.outer.length === 1 && theta < S.maxAngle && evaluate(i, 1).stock != null) nMin = 1;
+    const nMax = nMin + 3;
     const options = [];
-    for (let n = 1; n <= maxPieces; n++) {
-      const pieces = partitionArc(ring, i, n);
-      const projectedWidth = Math.max(...pieces.map((p) => p.projectedWidth));
-      const chordLength = Math.max(...pieces.map((p) => p.chordLength));
-      const boardWidth = projectedWidth + allowance;
-      options.push({ n, pieces, projectedWidth, chordLength, boardWidth, stock: stockFor(boardWidth, stockWidths) });
-    }
-    const feasible = options.filter((o) => o.stock != null);
-    const def = feasible[0] || null;                                  // fewest pieces
-    let alt = null;
-    for (const o of feasible) if (!alt || o.stock < alt.stock) alt = o; // narrowest board
-    if (alt && def && alt.n === def.n) alt = null;
+    for (let n = nMin; n <= nMax; n++) options.push(evaluate(i, n));
+    const def = pickOption(options, nMin, S.pieceRule);
+    const other = pickOption(options, nMin, S.pieceRule === 'fewest' ? 'narrowest' : 'fewest');
+    const alt = other && def && other.n !== def.n ? other : null;
     return {
       index: i,
       radiusOuter: outer.r,
       radiusInner: ring.inner[i].r,
-      span: arcSpan(outer),
+      span: theta,
+      spanDeg: theta * 180 / Math.PI,
+      nMin,
+      nMax,
       options,
       default: def,
       alternative: alt,
@@ -437,16 +622,18 @@ export function planArchSegments(ring, opts) {
     pieces,
     totalPieces: pieces.length,
     noStock: arcs.some((a) => !a.default),
-    stockWidths: [...stockWidths],
-    widthAllowance: allowance,
-    maxPieces,
+    stockWidths: [...S.stockWidths],
+    contourAllowance: S.allowance,
+    maxSegmentAngleDeg: S.maxDeg,
+    pieceRule: S.pieceRule,
+    fingerLength: S.fingerLength,
   };
 }
 
 /**
  * Whole-window plan: geometry + segment plans for the frame head and the
  * leaf top rail, finger-joint profile — everything the DXF builder needs.
- * Reads profile.arch: { finger, stockWidths, widthAllowance, maxPieces }.
+ * Reads profile.arch: { finger, stockWidths, contourAllowance, maxSegmentAngleDeg, pieceRule }.
  */
 export function buildArchPlan(input, profile) {
   if (!profile?.arch) throw new ArchError('Casement profile has no "arch" section (stock widths / finger joint)');
@@ -457,6 +644,7 @@ export function buildArchPlan(input, profile) {
     ...geometry,
     hinge: input.hinge === 'right' ? 'right' : 'left',
     finger: { ...profile.arch.finger },
+    blank: { contourAllowance: frameHead.contourAllowance, maxSegmentAngleDeg: frameHead.maxSegmentAngleDeg, pieceRule: frameHead.pieceRule },
     plans: { frameHead, leafTop },
     noStock: frameHead.noStock || leafTop.noStock,
   };

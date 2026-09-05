@@ -148,14 +148,34 @@ export const DEFAULT_CASEMENT_PROFILE = {
   // frameHead.face / leafTop.face / leafAtJamb / glassInset above; this block
   // holds only what the segment planner and the CNC drawing need.
   arch: {
+    // Schema version of this block. No UI edits it, so a stored copy with an
+    // older version is replaced by this default (migrateCasementProfile).
+    version: 2,
     // Finger-joint profile of the Stark d50 head (D5): finger length / joint
     // depth / pitch — printed on the drawing as FINGER 15/16/3.8.
     finger: { length: 15, depth: 16, pitch: 3.8 },
     // Board widths the planner may pick from (finished piece + allowance must
-    // fit). Workshop stock list — edit here, never in the planner.
-    stockWidths: [100, 125, 150, 175, 200, 225, 250],
-    widthAllowance: 20,  // mm added to the projected piece width before matching a board
-    maxPieces: 8,        // pieces per arc the planner will consider
+    // fit). Workshop stock list (Piotr 05.09, spec D7) — edit here, never in
+    // the planner.
+    stockWidths: [50, 63, 75, 95, 105, 180, 200],
+    // Contour allowance, mm PER SIDE (Piotr 05.09, spec D6): the blank is cut
+    // this much outside the finished contour on both edges; the board must
+    // contain that band.
+    contourAllowance: 10,
+    // Grain run-out limit: no board may span more than this angle of arc
+    // (spec D8) — N_min = ceil(arc angle / this) pieces per arc.
+    maxSegmentAngleDeg: 36,
+    // D13 (OPEN — Piotr has not decided): which feasible piece count is the
+    // default plan. 'narrowest' = narrowest stock board with N <= N_min + 2
+    // (tie -> fewer pieces); 'fewest' = fewest pieces that fit a board. The
+    // other rule's plan is printed on the sheet as ALT. Flip here, no code.
+    pieceRule: 'narrowest',
+    // Validity limits (spec §3.3 / §5): PSW MIN_WIDTH / MAX_WIDTH, and the PSW
+    // arched-sash rules adopted for the casement until Piotr says otherwise —
+    // straight part below the arch (height >= rise + this) and the straight
+    // stile of the arched leaf. Physical limits (rise vs width per shape) are
+    // geometry and live in arch.js.
+    limits: { minWidth: 400, maxWidth: 1500, minStraightBelowRise: 900, minLeafStraightStile: 100 },
   },
   rounding: 0.1,       // mm — CNC-ready, one decimal
 };
@@ -185,8 +205,12 @@ export function migrateCasementProfile(profile) {
     deductions: { ...D.deductions, ...profile.deductions },
     lengths: { ...D.lengths, ...profile.lengths },
     // v1.2: arched-head section (finger joint, board stock) — filled from the
-    // default for profiles stored before arched-casement-v1.
-    arch: { ...D.arch, ...profile.arch, finger: { ...D.arch.finger, ...profile.arch?.finger } },
+    // default for profiles stored before arched-casement-v1. v1.3: the block
+    // carries a schema version; an older stored block (night-1 keys
+    // widthAllowance / maxPieces, invented stock list) is replaced whole.
+    arch: profile.arch?.version === D.arch.version
+      ? { ...D.arch, ...profile.arch, finger: { ...D.arch.finger, ...profile.arch.finger }, limits: { ...D.arch.limits, ...profile.arch.limits } }
+      : D.arch,
   };
 }
 

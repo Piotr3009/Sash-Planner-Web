@@ -4,6 +4,378 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-09-06 — arched-casement-v1: audit fixes T1–T8, then Stage 2 (night run 2, branch `claude/arched-casement-audit-t1-t8-7d5fuk`)
+
+Inputs read in full, in this order: `ARCHED-CASEMENT-v1-AUDIT.md` → `ARCHED-CASEMENT-v1.md` (spec,
+wins on every discrepancy) → `ARCHED-CASEMENT-v1-AS-BUILT.md`. Baseline before any change:
+`node verify/arch/t16.mjs` 203 checks ALL PASS on `main` (b801039). Order of work per CLAUDE.md:
+T2 → T1 → T6 → T3 → T4 → T5 → T7 → T8 → Stage 2 a→d. One commit per closed task.
+
+Two spec-vs-audit conflicts settled up front by the rule "spec wins" (details in BLOCKERS.md §6):
+1. Audit T2 says keep `widthAllowance: 20` ("equivalent to 10 per side"); audit T7 demands
+   middle-piece `W_req` == spec §10.2 within ±0.05. Both cannot hold: "+20 after projection" gives
+   103.02 for N = 3, the spec's band formula `(Ro + a) − (Ri − a)·cos(φ/2)` gives 102.70. The
+   planner is moved to the spec §7.4 model (allowance band 10 mm per side, `contourAllowance`) in T1.
+2. Spec §10.2 "LEAF segmental (R 830/763, θ 87.21°)" reuses the HEAD's included angle. By spec §6.2
+   every chain is clipped at the arch-start line, so the leaf ring's own span at R 830 is 81.24°.
+   With 87.21° the closed formula reproduces the spec's 111.1 / 100.6 exactly; with the leaf's own
+   span it gives 107.9 / 98.8. The geometry follows §6.2; the leaf line is logged as a spec erratum.
+
+### T2 — stock list D7 (`src/engine/profile.js`)
+
+**Understanding:** the board widths the planner may pick from are workshop data; the night-1 list
+`[100 … 250]` was invented. Piotr's list (D7): `[50, 63, 75, 95, 105, 180, 200]`.
+
+**Change:** `DEFAULT_CASEMENT_PROFILE.arch.stockWidths` → D7. `widthAllowance: 20` and
+`maxPieces: 8` untouched in this step (T1 replaces both, see above). Harness: the local
+`PLAN_OPTS` copy now carries the same list; every plan literal in the DXF section (piece counts,
+board heights, FINGER count, `ALT` text, flat labels) is now derived from the harness's own
+independent option table instead of hard-coded `2 × 150 / 1 × 225`, so the checks stay structural
+until the spec vectors land in T7. Gothic piece-end checks generalised to N pieces per side.
+
+**Observed with D7 under the night-1 rule (fewest pieces):** head 2 × 180, leaf 2 × 180, semi-circle
+3 × 180, gothic 2 + 2 × 180 — all still too few pieces (43° per board); that is T1's job.
+
+**Verification:** esbuild `profile.js` OK · no Polish letters in touched files · harness 203/203
+ALL PASS · sample DXF NOT regenerated (restored via git; regenerated after T6/T8 as instructed).
+
+**Verdict: ✅ T2** (stock list is now Piotr's, verified in the profile and through the DXF path).
+
+### T1 — max segment angle, N_min, allowance band (`arch.js`, `profile.js`, `archDxf.js`)
+
+**Understanding:** a board may not span more than 36° of arc (grain run-out), so every arc needs
+`N_min = max(2, ceil(θ / 36°))` pieces; candidates run `N_min … N_min + 3`. A single-centre arc
+shorter than 36° may be one board only when a stock board really fits it. The board a piece needs
+is the projection of the ALLOWANCE BAND (outer + 10, inner − 10, spec §7.4) onto the piece axes —
+not "piece + 20".
+
+**Two approaches, one rejected:** (a) keep the night-1 projection of the finished piece and add
+`widthAllowance` afterwards — rejected: 103.02 vs the spec's 102.70 for N = 3 (the inner offset
+arc sags less than the finished inner arc), fails T7's ±0.05; (b) offset both contours by the
+allowance with the existing `offsetArcs` (clipped ends recomputed on the band radii) and project
+that band with the existing exact extent code — chosen, four lines of new geometry.
+
+**Changes:** `allowanceBand(ring, a)`, `partitionArc(ring, i, n, band)` (band-driven extents,
+finished arcs kept for the drawing, per piece `phi/phiDeg/axisAngleDeg/wReq/L/band`),
+`planArchSegments` reads `contourAllowance` + `maxSegmentAngleDeg` (throws a readable ArchError
+when a setting is missing — no defaults in the planner), N window per spec §7.2–7.3, `nMin/nMax/
+spanDeg` on every arc result. Profile: `arch.version 2`, `contourAllowance 10`,
+`maxSegmentAngleDeg 36`; `widthAllowance` and `maxPieces` removed (replaced by the spec model —
+justification above); `migrateCasementProfile` replaces a stored arch block whose version differs
+(no UI edits this block, so nothing user-set is lost; a night-1 block persisted in a browser would
+otherwise keep the invented list and lack the new keys). DXF: arc line now prints the span in
+degrees, new TEXT line `ALLOWANCE 10 PER SIDE  MAX SEGMENT 36 DEG`.
+
+**Edge cases:** allowance 0 accepted; `contourAllowance` ≥ inner radius → `offsetArcs` throws
+readably; θ < 36° single arc with no fitting board → N_min 2; three-centre haunch arcs (38.6° at the
+night-1 radius) get 2 pieces of 69 mm — the spec's rule, flagged in BLOCKERS §6 as a question
+(minimum piece length).
+
+**Results (W 1200, D7, rule still "fewest pieces" until T6):** head segmental N 3…6, W_req
+102.70 / 91.49 / 86.28 / 83.45 → stock 105 / 95 / 95 / 95, middle L 441.69 (spec 441.71),
+end pieces W_req = middle (not wider), default 3 × 105, alt 4 × 95; semi-circle N 5…8, W_req
+103.09 / 95.16 / 90.36 / 87.24, L 377.00 — every number equals spec §10.2 within 0.02;
+gothic 2 per side; leaf segmental (own span 81.24°) 107.93 / 98.80 / 94.56 / 92.25 → 180 / 105 /
+95 / 95.
+
+**Verification:** esbuild OK on the three files · no Polish letters · harness rewritten in this
+area: independent option table now builds the band with its own clip formulas, samples 4000 points
+per arc, cross-checks the closed forms for middle pieces, asserts N candidates / N_min, every
+piece's W_req and L, and end pieces ≥ middle; profile v2 + migration-replacement checks; 226/226
+ALL PASS · sample DXF restored (regenerated later).
+
+**Verdict: ✅ T1.**
+
+### T6 — D13 piece rule switch (`arch.js` `pickOption`, `profile.js` `arch.pieceRule`)
+
+**Understanding:** when several N fit, which one is the DEFAULT is Piotr's open decision (D13).
+Spec default: narrowest stock with `N ≤ N_min + 2`, tie → fewer pieces; the other candidate is
+printed as ALT. Night 1 had the opposite (fewest pieces) hard-wired.
+
+**Change:** `profile.arch.pieceRule: 'narrowest' | 'fewest'` (default `'narrowest'`, comment says
+it is OPEN); `pickOption(options, nMin, rule)` implements both; `alternative` = the plan the OTHER
+rule picks (null when both agree), so the sheet always shows the trade-off. If nothing fits within
+`N_min + 2`, the narrowest rule falls back to the remaining feasible candidate (N_min + 3) rather
+than reporting no plan. Unknown rule → readable ArchError (no silent default). DXF TEXT line now
+ends with `RULE NARROWEST` / `RULE FEWEST`.
+
+**Results (W 1200, D7, narrowest):** head segmental 4 × 95 (ALT 3 × 105) and semi-circle 7 × 95
+(ALT 5 × 105) — exactly spec §10.2; gothic 3 + 3 × 95 (ALT 2 + 2 × 180); leaf segmental on its
+own span 5 × 95 (ALT 3 × 180) — the spec's "4 × 105" for the leaf comes from the head's θ
+(BLOCKERS §6, erratum). With `'fewest'` the plans flip back to 3 × 105 / 5 × 105.
+
+**Verification:** esbuild OK · harness: both rules asserted on the same option table for every
+shape, alternative = other rule, unknown rule / missing settings throw; 236/236 ALL PASS.
+
+**Verdict: ✅ T6** (D13 itself stays OPEN in BLOCKERS — the switch is Piotr's, not mine).
+
+### T3 — rough length, end cuts, piece labels, finger zones (`arch.js`, `archDxf.js`)
+
+**Understanding:** a piece is cut from a board `stock × rough`; rough = band length + finger length
+per JOINTED end (spec §7.7, conservative — the arch-start cut is not a joint). The operator needs,
+per piece: outer / inner length, the two end-cut angles, how many ends get fingers, and where the
+finger zone ends on the board.
+
+**Changes:** per piece `Lin` (band inner chord = `2·(Ri − a)·sin(φ/2)` for middle pieces),
+`jointedEnds`, `roughLength`, `endCuts` = `[start, end]` of `{ kind: 'joint' | 'spring' | 'apex',
+jointed, angleDeg, fromSquareDeg }` (`endCut()` documents both conventions: joint φ/2 from square;
+spring = piece axis to the horizontal as the spec asks, plus 90° − that from square; apex = axis to
+the vertical, from square = axis to horizontal). `planArchSegments` reads `finger.length` from the
+profile (throws readably when missing); options carry `roughLength` (max over pieces). DXF pieces
+row: the ASSEMBLY rectangle is now `stock × rough` with the band placed `finger.length` in from
+each jointed board end (END end drawn on the left — the flat rotation maps the tangent axis onto
+−x, noted in code); FINGER layer adds one zone line `finger.depth` (16) in from each jointed board
+end, full board height; labels: `W1 - FRAME HEAD P1 L358.1 x95` (rough, audit T3) plus a 10 mm
+note `OUT 343.1 IN 230.7 CUT J10.9/S32.7 FINGER ONE END`; the assembly text block prints
+`ROUGH` per arc and a cut-code legend. `dxfWriter` has no linetypes (all CONTINUOUS) → the zone
+lines are plain, not dashed (spec §7.7 says dashed; noted, not a functional loss).
+
+**Numbers (head segmental N = 3):** middle L 441.69 / L_in 403.04 / rough 471.69 (spec 441.71 /
+403.06 / 471.71, within 0.02); end pieces L 451.77 (the band's outer corner on the arch-start
+line projects 10 mm further than the finished corner) → rough 466.77 ≥ spec's 456.71 (which uses
+the middle L for the ends); joint cut 14.53°, arch-start cut 29.07° axis-to-horizontal (60.93°
+from square). Gothic apex pieces: A50.0 (axis to vertical) / 40.0 from square.
+
+**Verification:** esbuild OK · no Polish letters · harness: jointedEnds / rough / end-cut kinds and
+φ/2 on every option of every shape, spec literals for N = 3, DXF flat boards = rough, FINGER count
+5·(N − 1) per ring with zone lines 16 mm from a board end, label / note regexes, legend; 256/256
+ALL PASS · rendered `.audit/t3_segmental.dxf` to PNG (ezdxf + matplotlib) and looked at the head
+P1 board: joint face + zone line at the left, tilted arch-start cut at the right, both labels
+inside the board.
+
+**Verdict: ✅ T3.**
+
+### T4 — three-centre haunch radius (`arch.js` `archArcs`)
+
+**Understanding:** the "elliptical" arch is a basket handle (D9): two haunch circles on the
+springing line + one crown circle below it, tangent-continuous. Night 1 fixed the haunch radius at
+`0.5 × rise` (invented); spec §6.1 sets it to the ellipse's radius of curvature at the springing,
+`r = rise² / halfW`, so the basket handle actually approximates the ellipse the customer saw.
+
+**Change:** `THREE_CENTRE_HAUNCH_RATIO` removed (it was the invented constant — justification:
+replaced by the spec formula, nothing else read it); `r = h²/hw`; the tangency solve kept as is
+(audit: correct). New guard: three-centre rise ≥ W/2 throws readably (r ≥ rise → no crown circle;
+at W/2 the shape is a semi-circle). Too small a rise still fails readably one step later
+(`rise 180 → r 54 < frame face 57 → "Offset 57mm exceeds the arc radius 54mm"`).
+
+**Numbers (W 1200, rise 390):** r 253.50, R 761.54, small centres ±346.50, crown centre 371.54
+below the arch-start line, tangent point (W/2 + 519.40, +185.39), spans 47.00° / 86.01°, arc
+lengths 207.93 each / 1143.13, |Cs − CL| = 508.04 = R − r — every spec §10.1 value within 0.01.
+Plans (narrowest): haunches 2 × 95 each (107 mm rough pieces), crown 4 × 95 (ALT 3 × 105).
+
+**Verification:** esbuild OK · harness: the independent three-centre formula now uses r = h²/(W/2);
+spec literals asserted explicitly (radii, tangent point on both circles, spans, lengths, tangency,
+mirror), two new error cases; 267/267 ALL PASS.
+
+**Verdict: ✅ T4.**
+
+### T5 — limits (`profile.js` `arch.limits`, `arch.js` `readArchLimits` / `assertRisePhysics`)
+
+**Understanding:** two kinds of limits were mixed in night 1. Workshop / product limits (width
+400–1500 from PSW, `H ≥ rise + 900`, straight leaf stile ≥ 100 — PSW arched-sash rules adopted
+for the casement, spec §3.3) belong in the profile like every other number. Physical limits (a
+single-centre arc cannot rise more than W/2; a pointed arch needs rise ≥ W/2; a three-centre needs
+rise < W/2) are geometry and stay in `arch.js`. The night-1 per-shape "windows" (segmental
+0.10–0.45, drop 0.55–0.85, three-centre 0.15–0.45) were invented — removed (audit T5).
+
+**Changes:** `profile.arch.limits = { minWidth 400, maxWidth 1500, minStraightBelowRise 900,
+minLeafStraightStile 100 }` (nested merge in the migration); `ARCH_LIMITS` export removed
+(justification: replaced by the profile block, single source — the harness asserts it is gone);
+`resolveArchRise(shape, W, rise, limits)` now requires the limits (readable throw when missing);
+`assertRisePhysics` shared by `resolveArchRise` and `archArcs`; `buildArchGeometry` enforces
+`H − rise ≥ minStraightBelowRise` and the leaf straight stile `(H − rise) − (leafFullHeight −
+leafAtJamb) ≥ minLeafStraightStile` (47 mm cill-side deduction read from the profile, never
+hard-coded) and exposes `straightHeight`, `leafStraightStile`, `limits`. The old "no straight
+part" message is replaced by the 900 rule.
+
+**Edge cases verified:** H = rise + 900 passes, 899 fails with the numbers in the message; the
+stile rule only bites when the 900 rule is relaxed (straight 140 → stile 93 < 100); rise ≤ 0,
+segmental ≥ W/2 (both entry points), gothic-drop < W/2, three-centre ≥ W/2 all throw readably;
+gothic-drop = W/2 degenerates into a semi-circle and is accepted; a tiny three-centre rise (120)
+passes the rise rules and fails on the member face (`Offset 57mm exceeds the arc radius 24mm`) —
+readable, not silent.
+
+**Verification:** esbuild OK · no Polish letters · harness 281/281 ALL PASS.
+
+**Verdict: ✅ T5.**
+
+### T7 — harness on the spec vectors (`verify/arch/t16.mjs`, `dxf_probe.py`, `specification.js`, `arch.js`)
+
+**Understanding:** the night-1 harness proved the build's own numbers (tautology). Now the
+EXPECTED values are the spec's §10.1 / §10.2 vectors typed in verbatim, the assertions follow
+§10.3 items 1–10, and the independent closed forms / sampling stay as cross-checks where the spec
+lists no number. Three spec numbers are internally inconsistent; each is asserted BOTH ways and
+labelled, never silently adjusted (BLOCKERS §6, E1–E2):
+- E1 §10.1 segmental `arcLen_in 1237.41` = R_in × θ_out (unclipped concentric arc). §6.2 and the
+  same line's `x = W/2 ± 513.88` require the clip at the arch-start line ⇒ 1112.55.
+- E2 §10.2 LEAF line uses the head's θ 87.21° (its 111.1 / 100.6 / "4 × 105" are reproduced from
+  that angle); the leaf ring's own clipped span is 81.24° ⇒ 107.93 / 98.80 / 94.56, D13 5 × 95.
+- (§10.2 "rough end 456.71" uses the middle L for the end pieces; asserted as `≥` — the band's
+  outer corner on the arch-start line projects 10 mm longer: 466.77.)
+
+**Code needed by §10.3 items 1 and 9 (spec §3.2 / §4.1 / §4.2):** `GOTHIC_PROFILE_RATIO`
+(equilateral / drop 0.70 / shallow 0.60) in `arch.js`; `archFromSpec(item, fc, width)` now
+resolves `rise = ratio × width` with `riseSource: 'ratio'` (`'custom'` when a rise is stored),
+carries `profile` (gothic only), reads the raw PSW form field `cas-arch-opening` as a hinge
+source, maps PSW `gothic-arch` + `archProfile` drop / shallow → `gothic-drop` with that
+profile's ratio, and **throws a readable ArchError for an unknown shape** (spec: a silent
+rectangle was the critical import bug). The exporter's "unknown shape" skip path is therefore
+unreachable from PSW data — kept as a guard. Risk noted in BLOCKERS §6: callers of
+`normaliseToWindowSpec` (window cards, project page) do not catch, so one corrupt shape value
+would blank that estimate page instead of one button — that is the spec's choice, flagged.
+`dxf_probe.py` now returns polyline vertices (point-in-polygon for item 7).
+
+**Harness sections:** pt 1 rise defaults (5 shapes + 3 gothic profiles) · pt 2–4 every §10.1
+number within 0.01 mm / 0.01° (radii, θ, centres, arc lengths, inner x, three-centre tangent
+point on both circles, spans, lengths, |Cs − CL| = R − r), offsets keep centres and reduce r by
+exactly the face, clipped ends analytic on y = 0, bulge = tan(Δ/4) · limits & physics (T5) ·
+pt 6 §10.2 HEAD segmental / semi-circle option tables (φ, W_req == ±0.05 middle, ≥ ends, L_out,
+L_in, joint cut φ/2, rough middle ==, rough end ≥, stock, D13 default + runner-up), LEAF with E2
+both ways, planner vs independent sampled band for all five shapes and both D13 rules, N_min /
+single-board rule (W 1500 rise 110 → θ 33.4°, N 1 with 180 mm stock, N 2 with 95 only), tiling,
+gothic apex / three-centre tangent joints, no-stock and missing-setting errors · pt 7 sampled
+band inside its board for every default piece and every feasible option (plan data) and, on the
+DXF, inside the assembled ASSEMBLY quads (point-in-polygon) and flat pieces inside stock × rough ·
+pt 5 ezdxf round-trip: CONTOUR arc length from vertices + bulges = `arcLength(chain)` within 0.01
+for all five shapes, one vertex per arc end, closed, plus the structural checks from night 1
+(layers, counts, FINGER lengths, labels, notes, legend, origin) · pt 8 `canExportArchDxf` false
+for rectangular casement / sash / door, `exportArchDxfMerged` run end-to-end with the browser
+download stubbed (Blob read back, ezdxf-probed: 2 exported, 2 skipped with reasons, name
+`Pack_1_arch.dxf`, 300 mm stacking) · pt 9 the spec vector verbatim (`elliptical-arch` +
+`cas-arch-opening: right` → three-centre / hinge left / rise 390 / ratio), unknown shape throws,
+profiles, custom rise, `deriveWindowData` path, profile v2 + migration · pt 10 `git diff` of
+`casementLayouts.js`, `lists.js`, `calculations.js`, `jambDxf.js` against the merge-base with
+main is empty, working tree clean.
+
+**Verification:** esbuild OK on `arch.js`, `specification.js` · no Polish letters · harness
+**465/465 ALL PASS** · `npm run build` passes (only the pre-existing chunk-size warning).
+
+**Verdict: ✅ T7 — the harness reproduces the spec (every §10 number is either matched within its
+tolerance or reproduced with its erratum shown).** Stage-1 ✅ is confirmed after T8's sample.
+
+### T8 — housekeeping: sample DXF, BLOCKERS §4, branches
+
+**Sample:** `docs/handover/samples/sample_arch_1200_segmental.dxf` regenerated by the harness
+after T1–T7 (not earlier — restored via git after every intermediate run). ezdxf: AC1009, layers
+CONTOUR / ASSEMBLY / PIECES / FINGER / TEXT, 2 CONTOUR rings, 9 PIECES, 18 ASSEMBLY (9 assembled +
+9 flat rough boards), 35 FINGER lines, 32 TEXT, CRLF byte-exact. Plan lines: head `4 x board 95
+L343.1 ROUGH 362.8 (ALT 3 x board 105)`, leaf `5 x board 95 L248.9 ROUGH 267.4 (ALT 3 x board
+180)`. Rendered to PNG (ezdxf + matplotlib) and inspected: head assembly = four 95 mm boards in
+the glued position with three radial joints, contour overlaid; flat rows with rough boards, zone
+lines and two-line labels. **Never a single solid board** (audit §6). The leaf is 5 × 95, not the
+audit's "4 × 105" — erratum E2 (BLOCKERS 6.3).
+
+**BLOCKERS:** new night-2 section (§6 spec errata / decisions 6.1–6.10, §7 branches); night-1 §4
+table rewritten with status per row: 4.1, 4.2, 4.3, 4.5, 4.7 resolved by spec, 4.4 confirmed, 4.6
+resolved; §0 resolved; **D13 (§1), D5 (§2), d50 arbor (§3) left OPEN** — not closed by me.
+
+**Branches:** `claude/arched-casement-v1-m23u5x` (and `claude/arched-casement-v1`) do not exist
+on the remote any more — merged into `main` (6b4203b) and deleted before this session. Nothing to
+delete; noted in BLOCKERS §7. This session's branch: `claude/arched-casement-audit-t1-t8-7d5fuk`.
+
+**Verdict: ✅ T8.**
+
+### STAGE 1 VERDICT after T1–T8 — ✅
+
+Harness `node verify/arch/t16.mjs` 465/465 ALL PASS on the spec §10.1 / §10.2 vectors and the
+§10.3 list 1–10; `npm run build` passes; frozen files untouched (asserted by the harness); no
+Polish in sources. Three spec-side inconsistencies (E1, E2, end-piece rough) are asserted both
+ways and listed for Piotr — none of them changes a stock pick except E2 (leaf 5 × 95 vs 4 × 105),
+which is a real decision, not a bug. Stage 2 follows below.
+
+### Stage 2a — sample DXF per shape (`docs/handover/samples/`)
+
+`node verify/arch/t16.mjs` now writes `sample_arch_1200_{segmental,semi-circle,gothic-equilateral,
+gothic-drop,three-centre}.dxf` (W 1200, H 2000, PSW default rise, hinge L for the segmental, R for
+the others) and probes each with ezdxf: CONTOUR arc length from vertices + bulges = `arcLength`
+of the chains within 0.01, one vertex per arc end point (4 / 6 / 8 per ring), PIECES tile the
+rings, every flat piece inside a stock × rough board, HINGE printed. Rendered all five to PNG and
+looked at them: semi-circle 7 + 7 boards, gothic 3 + 3 per side with the apex joint on the axis,
+three-centre 2 + 4 + 2 with the tangent joints shared by haunch and crown. CRLF byte-exact
+(`.gitattributes`). **✅**
+
+### Stage 2b — edge-case harness (`verify/arch/t17_edges.mjs`, 73 checks ALL PASS)
+
+W 400 / 1500 for every shape at the PSW default rise (plans build, every arc ≥ 2 pieces ≤ 36°,
+boards fit, no NaN, DXF round-trip), width just inside / outside 400–1500 (incl. NaN / 0), rise
+just inside / outside every physics rule and both fixed shapes, string / empty / negative rises,
+the 900 rule and the leaf-stile rule at their boundaries, no fitting board (empty list, junk
+entries, boards ≤ 75, only 300), exporter skip messages on the real `windowSpec` path, a merged
+export of mixed good / bad edge windows. **Finding F1 (BLOCKERS 8.1):** the leaf ring depth 107 +
+allowance 10 sets a hard minimum rise of 117 mm — at W 400 the PSW default segmental (80) and
+elliptical (r 84.5) are rejected readably. One code change came out of it: the planner now wraps
+an allowance-band failure with the ring name and the allowance (`LEAF TOP allowance band (10mm per
+side): …`) instead of the bare `Offset 10mm exceeds the arc radius 5.5mm`. **✅**
+
+### Stage 2c — PSW parity report (`verify/parity/psw-casement-layouts.mjs` → `docs/handover/PSW-PARITY-REPORT.md`)
+
+Read-only: PSW cloned with the mandated command into the session scratchpad (public repo,
+619703e of 02.09), never edited. The script parses `LAYOUT_DEFAULTS`, the fanlight / fan2 / triple
+lists, `CASEMENT_LAYOUTS_VERSION`, `HIDDEN_DUPLICATES`, `DISPLAY_NAMES`, the `ArchedSash` constants
+and the arch radios from the PSW source text, extracts the self-contained `static
+casementLayoutDef` body and executes it next to the PC port for 960 cases (30 codes × 4 sizes ×
+FR × FR2 × middle section) comparing panels IN ORDER (x, y, w, h, hinge), mullions and transoms.
+**Result: 24 PASS · 1 documented difference (PC hides the `010` card as an alias of `040L`;
+engine-side valid) · 0 HARD.** Version 2 = 2; the reversed hinge radio (`id cas-arch-open-left`
+→ `value="right"`) confirmed in the HTML and matched by the inversion in `specification.js`.
+`casementLayouts.js` untouched. **✅**
+
+### Stage 2d — see "Rano dla Piotra" below. **✅**
+
+### FINAL VERDICT (night 2) — ✅ with the open decisions listed
+
+Delivered on `claude/arched-casement-audit-t1-t8-7d5fuk` (10 commits, `main` untouched): T1–T8
+from the audit, Stage 2 a–d, harnesses `t16` (465) + `t17` (73) ALL PASS on the spec vectors,
+parity report 0 HARD, `npm run build` OK, five sample DXFs, BLOCKERS with D13 / D5 / d50 still
+OPEN plus §6 (spec errata, decisions) and §8 (edge findings).
+
+**NOT verified tonight (honest list):**
+1. VCarve import of any DXF — only ezdxf 1.4.4 round-trips and matplotlib renders were checked.
+2. The browser click path (WindowDetailPage / ProductionPackPage buttons) — `npm run build` passes
+   and the export functions run end-to-end in node with the download stubbed; no browser session.
+3. Stark 15/16 tool numbers (D5), the d50 arbor (§3), the workshop's reading of "straight stile"
+   (6.9) and the minimum sensible piece length (6.5) — decisions, not code.
+4. Whether the leaf should be planned on its own clipped span (built, spec §6.2) or on the head's
+   angular partition (E2) — the only spec discrepancy that changes a stock pick (5 × 95 vs 4 × 105).
+5. Persisted browser profiles: the v2 arch block replaces a night-1 block by version — tested in
+   node on the migration function, not in a browser with a real persisted store.
+6. PSW parity covers layouts + arch constants only; pricing, bar patterns and 3D were not compared.
+
+### Rano dla Piotra
+
+**Co jest zrobione:** wszystkie osiem zadań z audytu (T1–T8) i Etap 2 a–d. Harness `node
+verify/arch/t16.mjs` odtwarza wektory ze spec §10 (465 checków), `node verify/arch/t17_edges.mjs`
+sprawdza krawędzie (73), `node verify/parity/psw-casement-layouts.mjs <ścieżka-psw>` generuje
+raport parytetu (0 twardych różnic). `npm run build` przechodzi.
+
+**Co otworzyć w VCarve (`docs/handover/samples/`):** `sample_arch_1200_segmental.dxf` — głowica
+4 × 95 (ALT 3 × 105), skrzydło 5 × 95 (ALT 3 × 180); do tego cztery pozostałe kształty
+(`semi-circle`, `gothic-equilateral`, `gothic-drop`, `three-centre`). Każda deska płaska ma teraz
+długość surową (pas + 15 mm palca na złączonym końcu), etykietę `L<surowa> x<deska>`, drugą linię
+`OUT / IN / CUT J14.5/S29.1 / FINGER ONE END` i linię strefy palca 16 mm od złączonego końca.
+Kody cięć: J = złącze od kąta prostego, S = linia startu łuku (oś deski do poziomu), A = szczyt
+gotyku od kąta prostego. Sprawdź: (a) czy łuki importują się jako łuki; (b) czy kąty cięć są
+w konwencji, której używa operator; (c) czy 10 mm tekst drugiej linii jest czytelny.
+
+**Trzy decyzje, które zmieniają plan (BLOCKERS §6):**
+1. **E2 (6.3):** spec liczy skrzydło z kątem głowicy (87.21°) → 4 × 105; wg §6.2 skrzydło ma
+   własny kąt po przycięciu (81.24°) → 5 × 95. Zbudowane wg §6.2. Jeśli wolisz 4 × 105 — decyzja.
+2. **D13 (§1):** domyślnie `narrowest` (spec). Przełącznik w profilu: `arch.pieceRule: 'fewest'`.
+3. **6.5:** trzyśrodkowy daje na hausze 2 deski po ~107 mm surowej długości z palcem — czy taki
+   krótki kawałek jest OK, czy ma być minimalna długość?
+
+**Erraty spec (nie kod):** E1 — `arcLen_in 1237.41` w §10.1 to łuk nieprzycięty (813 × 87.21°);
+po przycięciu 1112.55. E2 — jak wyżej. „rough end 456.71" — końcówki wychodzą 466.77 (róg pasa
+na linii startu). Harness pokazuje obie liczby przy każdej z nich.
+
+**Znalezisko krawędziowe (BLOCKERS 8.1):** przy W 400 domyślne strzałki PSW dla segmentala (80)
+i eliptycznego (r 84.5) nie mieszczą pierścienia skrzydła 107 + 10 naddatku — eksport odmawia
+czytelnie. Minimalna strzałka segmentala to > 117 mm niezależnie od szerokości.
+
+**Otwarte bez zmian:** D5 palec 15/16 vs 10–11, głowica d50 na CNC.
+
+**Merge:** branch `claude/arched-casement-audit-t1-t8-7d5fuk` → `main`, `main` nietknięty.
+
 ## 2026-09-05 — arched-casement-v1 (night run, branch `claude/arched-casement-v1`)
 
 **Blocking fact first:** `docs/handover/ARCHED-CASEMENT-v1.md` (the package spec) is NOT in the

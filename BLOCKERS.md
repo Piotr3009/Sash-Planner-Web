@@ -4,9 +4,47 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-09-06 — arched-casement-v1: audit fixes T1–T8 (night run 2)
+
+Status of the night-1 entries below: **§0 resolved** (spec committed 06.09), **§1 D13 OPEN**,
+**§2 D5 OPEN**, **§3 d50 arbor OPEN**, §4 assumptions — see the updated table, §5 Stage 2 done
+tonight (BUILD-LOG). New items from night 2:
+
+### 6. Spec errata and decisions taken by the "spec wins" rule (for Piotr to confirm)
+
+| # | Item | What the spec says | What was built | Ask |
+|---|------|--------------------|----------------|-----|
+| 6.1 | Allowance model | §7.4 band: outer + 10, inner − 10 per side (`contourAllowance`); audit T2 said "keep `widthAllowance: 20`, equivalent" | Band model. "+20 after projection" gives 103.02, the spec formula 102.70 — T7's ±0.05 cannot hold with +20. Profile key is `arch.contourAllowance: 10` (per side) | Confirm 10 per side is the workshop number (D6 says so) |
+| 6.2 | **E1** §10.1 segmental `arcLen_in 1237.41` | Equals R_in × θ_out — the inner arc with the OUTER angle (unclipped) | §6.2 clips every chain at the arch-start line ⇒ inner arc 1112.55 (the same spec line's `x = ±513.88` needs the clip). Harness asserts both numbers, labelled | Fix the spec line; no code change |
+| 6.3 | **E2** §10.2 LEAF line "R 830/763, θ 87.21°", W_req 111.1 / 100.6, default 4 × 105 | Computed with the HEAD angle | The leaf ring clipped at the same line spans 81.24° (§6.2) ⇒ W_req 107.93 / 98.80 / 94.56 ⇒ stock 180 / 105 / 95 ⇒ D13 'narrowest' gives **5 × 95 (ALT 3 × 180)**, not 4 × 105. The sample DXF shows 5 × 95 for the leaf | Decide: leaf planned on its own span (built) or forced to the head's angular partition (joints aligned with the head — not what §7 says) |
+| 6.4 | Rough length of end pieces | §10.2 "rough end 456.71" = middle L_out + 15 | The band's outer corner on the arch-start line projects ~10 mm further than the finished corner ⇒ end L_out 451.77, rough 466.77 (asserted `≥` 456.71) | Cosmetic in the spec; the DXF board is the longer, safe one |
+| 6.5 | Minimum piece length | §7.2 `N_min = max(2, …)` per arc, no minimum length | Three-centre haunch arcs (r 253.5, 47°) get 2 pieces of ~107 mm rough with a 15 mm finger at one end; gothic 3 × 95 per side is fine | Is a 100 mm finger-jointed piece acceptable, or should short arcs (< some length) be one board? If yes: a `minPieceLength` profile setting, not decided in code |
+| 6.6 | Unknown shape throws in `normaliseToWindowSpec` | §4.1 "shape unknown ⇒ throw" | Implemented. Callers (window cards, project page, PDF builders) do not catch, so ONE corrupt `casArchShape` value would blank that estimate page rather than one button. PSW's radios only produce the four known values, so this needs corrupt data | Accept (spec) or ask for a guarded card render — separate small UI package |
+| 6.7 | Finger zone line style | §7.7 "dashed" | `dxfWriter` writes CONTINUOUS only (no LTYPE table) — plain short polylines on FINGER, 16 mm in from each jointed board end | Cosmetic; adding linetypes to the R12 writer is a separate change (jambs share it) |
+| 6.8 | Shape vocabulary | §3.4 canonical `'gothic'` + `profile` and `ARCH_SHAPE_ALIASES` | PC keeps the night-1 shapes `gothic-equilateral` / `gothic-drop` (audit §2 signed the geometry off) and `PSW_ARCH_SHAPE`; `arch.profile` ('equilateral' / 'drop' / 'shallow' / null) is carried as the spec asks, PSW `archProfile` drop / shallow map to `gothic-drop` with 0.70 / 0.60 × W | Rename only if the configurator package needs the spec's names — not done "by the way" |
+| 6.9 | Straight leaf stile rule | §3.3 "straight stile of the arched leaf ≥ 100" | Built as `(H − rise) − (leafFullHeight − leafAtJamb)` = straight part − 47 (gap + cill land from the profile). It never binds while `H ≥ rise + 900` holds | Confirm the 47 mm reading of "straight stile" |
+| 6.10 | Profile `arch` block version | — | `arch.version: 2`; a stored block with another version (night-1 keys, invented stock list) is replaced whole by the default — there is no UI for this block, so nothing user-set is lost | FYI |
+
+### 7. Branches
+
+`claude/arched-casement-v1` and `claude/arched-casement-v1-m23u5x` (night 1) no longer exist on
+the remote — they were merged into `main` (6b4203b) and deleted before this session; nothing to
+delete. This session's work: `claude/arched-casement-audit-t1-t8-7d5fuk`, to be merged by Piotr.
+
+### 8. Findings from the Stage-2 edge harness (`verify/arch/t17_edges.mjs`) and the PSW parity report
+
+| # | Finding | Evidence | Ask |
+|---|---------|----------|-----|
+| 8.1 | **F1 — minimum rise is set by the leaf ring depth + allowance, not by the PSW ratio.** The deepest contour (leaf inner = leafAtJamb 40 + leafTop.face 67 = 107) plus the 10 mm allowance band must stay above the arch-start line, so no segmental arch with rise ≤ 117 mm and no three-centre with haunch radius ≤ 117 mm can be planned, whatever the width. At **W 400 the PSW defaults are rejected**: segmental rise 80 (0.20 × W) and elliptical rise 130 (r = 130²/200 = 84.5). Segmental needs ≥ 0.30 × W there (rise 120 builds), three-centre rise > 153 (rise 160 builds). Semi-circle and both gothics build at 400. Errors are readable and name the ring (`LEAF TOP allowance band (10mm per side): …`). | t17 sections 1–2 | Either accept (a 400 mm segmental / elliptical arched casement is not a product) or let PC raise the default rise to the minimum for the width — a configurator-package decision, not done here |
+| 8.2 | The 900 mm straight rule dominates every other height rule; the leaf-stile rule (100) never binds at the defaults | t17 "height rules" | FYI (6.9) |
+| 8.3 | No-stock behaviour: planner never throws, exporter names both members and the widest board; with only a 300 mm board the angle rule still forces N_min pieces (the board never lowers N) | t17 "no fitting board" | FYI — matches spec §7 |
+| 8.4 | PSW parity (`docs/handover/PSW-PARITY-REPORT.md`, PSW 619703e): 24 PASS, 1 documented difference (PC hides the `010` picker card as an alias of `040L`), 0 HARD. `casementLayoutDef` identical in 960 cases (panel order, x/y/w/h, hinge, mullions, transoms); arch ratios, limits, radio values and the reversed hinge all in step | parity script | FYI — nothing to fix on either side |
+
+---
+
 ## 2026-09-05 — arched-casement-v1
 
-### 0. [CRITICAL] The package spec is missing from the repository
+### 0. [CRITICAL → RESOLVED 06.09] The package spec is missing from the repository
 
 `docs/handover/ARCHED-CASEMENT-v1.md` does not exist on `main`, on any remote branch, in the
 git history, in Petros (`software/*` cabinets), in Google Drive or in Gmail. CLAUDE.md (commit
@@ -28,24 +66,25 @@ What I did instead (per the night rules: simplest solution consistent with what 
 **Ask:** commit the spec (or paste it) — then one pass of the harness tells us which assumptions
 below differ from your decisions.
 
-### 1. D13 — number of pieces N (fewer pieces vs narrower board)
+### 1. D13 — number of pieces N (fewer pieces vs narrower board) — **OPEN**
 
-Default taken: **fewest pieces whose projected width (+ allowance) fits a stock board**.
-Alternative printed in the DXF TEXT block: the plan on the **narrowest** stock board (more pieces).
-Both plans come out of `planArchSegments`; only the default is drawn as PIECES.
+Night 2 (T6): the spec default is implemented — `profile.arch.pieceRule: 'narrowest'` (narrowest
+stock with `N ≤ N_min + 2`, tie → fewer pieces); `'fewest'` is the other value. The other rule's
+plan is always printed as ALT. **Piotr has not decided** — flip the profile value, no code.
+Night-1 text: default was "fewest pieces"; alternative "narrowest board".
 
-### 2. D5 — finger joint profile
+### 2. D5 — finger joint profile — **OPEN**
 
 Piotr said "finger 10–11"; the chosen tool is the 15/16 profile. Taken: **15 / 16 / 3.8**
 (`profile.arch.finger = { length: 15, depth: 16, pitch: 3.8 }`), printed as `FINGER 15/16/3.8` on
 the TEXT layer. The FINGER layer carries the joint faces only (no teeth drawn).
 
-### 3. Stark d50 head on the 5-axis CNC needs a d50 arbor
+### 3. Stark d50 head on the 5-axis CNC needs a d50 arbor — **OPEN**
 
 Process decision for Piotr — the DXF is unchanged either way (joint faces are plain lines; the
 tool does the profile).
 
-### 5. Stage 2 not started (deliberate)
+### 5. Stage 2 not started (deliberate) — done in night 2, see BUILD-LOG
 
 Piotr's gate: Stage 2 only after a ✅ Stage 1. Without the spec the harness cannot reproduce §10,
 so Stage 1 is ⚠️ and Stage 2 (samples for every shape, edge-case harness, PSW parity report)
@@ -53,18 +92,18 @@ was not begun. Each is small once the spec is in: the harness already round-trip
 into `.audit/arch_1200_<shape>.dxf`, the limits already throw readable errors, and the PSW clone
 command works from this container (`git -c http.proxyAuthMethod=basic clone --depth 1 …`).
 
-### 4. ASSUMPTIONS made because the spec is missing (each one is one edit away)
+### 4. ASSUMPTIONS made because the spec is missing — status after night 2
 
-| # | Item | Taken | Alternative / where |
-|---|------|-------|---------------------|
-| 4.1 | Rise limits for free-rise shapes | segmental 0.10–0.45 W, gothic drop 0.55–0.85 W, three-centre 0.15–0.45 W | `ARCH_LIMITS.riseRatio` in `arch.js` |
-| 4.2 | Gothic drop default rise | 0.70 W (PSW `GOTHIC_PROFILE_RATIO.drop`) | PSW also has `shallow` 0.60 |
-| 4.3 | Three-centre haunch radius | rise × 0.5, crown radius from tangency | `THREE_CENTRE_HAUNCH_RATIO` |
-| 4.4 | PSW `elliptical-arch` | mapped to `three-centre` (routable from arcs; ellipse is not) | keep as unsupported → export disabled |
-| 4.5 | Rise vs height | only "straight part > 0" is enforced | PSW arched SASH uses ≥ 900 mm straight; casement has no rule in PSW |
-| 4.6 | Branch name | CLAUDE.md says `claude/arched-casement-v1`; the session harness mandates `claude/arched-casement-v1-m23u5x` — commits pushed to BOTH | delete the one you don't want |
-| 4.7 | Board stock for arch pieces | `profile.arch.stockWidths = [100, 125, 150, 175, 200, 225, 250]`, `widthAllowance = 20` (same idea as `boxRaw.widthAllowance`), `maxPieces = 8` | the real list belongs to the Part Registry / supplier; edit the profile |
-| 4.8 | Piece length limits | none — a piece may be as long as the outer chord (≤ 1500 mm) | add `maxPieceLength` to the profile if boards are shorter |
+| # | Item | Taken (night 1) | Status 06.09 |
+|---|------|-----------------|--------------|
+| 4.1 | Rise limits for free-rise shapes | segmental 0.10–0.45 W, gothic drop 0.55–0.85 W, three-centre 0.15–0.45 W | **RESOLVED by spec (T5):** windows removed; only physics remains (segmental / three-centre rise < W/2, gothic-drop rise ≥ W/2) + `profile.arch.limits` |
+| 4.2 | Gothic drop default rise | 0.70 W | **RESOLVED by spec §3.2 (T7):** `GOTHIC_PROFILE_RATIO` drop 0.70 / shallow 0.60 / equilateral √3/2 |
+| 4.3 | Three-centre haunch radius | rise × 0.5 | **RESOLVED by spec §6.1 (T4):** r = rise² / halfW |
+| 4.4 | PSW `elliptical-arch` | mapped to `three-centre` | **CONFIRMED by spec D9** |
+| 4.5 | Rise vs height | only "straight part > 0" | **RESOLVED by spec §3.3 (T5):** H ≥ rise + 900, leaf straight stile ≥ 100 (`profile.arch.limits`) |
+| 4.6 | Branch name | commits pushed to both night-1 branches | **RESOLVED:** both merged to main and gone (§7 above) |
+| 4.7 | Board stock for arch pieces | `[100 … 250]`, `widthAllowance 20`, `maxPieces 8` | **RESOLVED by spec D7 / D6 / §7.3 (T2, T1):** `[50, 63, 75, 95, 105, 180, 200]`, `contourAllowance 10` per side, candidates N_min … N_min + 3 |
+| 4.8 | Piece length limits | none | still none (spec has none); see 6.5 for the opposite question (minimum) |
 | 4.9 | Profile snapshot in the pack export | single-window "Arch DXF" plans under the batch's `_profileSnapshot.casement` (like `derived`); "Arch DXF (all)" in the Production Pack plans under the ACTIVE profile (a pack spans batches) | pass per-window snapshots through `windowsData` if it ever matters |
 | 4.10 | How an arched casement gets INTO PC | only through window data carrying PSW fields (`casementType: 'arched'`, `casArchShape`, `casArchHinge`) or PC-native `archShape` / `archRise` / `archHinge`; the PC configurator has no arched option (spec: "no new configurator UI"), and PC's estimates are PC-made — there is no PSW→PC import path in the code today | the button is visible on every casement window, disabled with the reason; enabling it in the UI needs either a PSW import or an `archShape` field in the configurator (separate package) |
 
