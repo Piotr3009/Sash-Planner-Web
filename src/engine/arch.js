@@ -15,7 +15,7 @@
  *   segmental           1 centre, below the line; rise < W/2
  *   semi-circle         1 centre, R = W/2, rise = W/2 (fixed by the shape)
  *   gothic-equilateral  2 centres at the opposite arch-start points, R = W
- *   gothic-drop         2 centres inside the span, W/2 < rise < W·√3/2
+ *   gothic-drop         2 centres inside the span, rise ≥ W/2 (free)
  *   three-centre        2 haunch centres on the line (r = rise²/halfW) + 1 crown centre below it; rise < W/2
  *
  * Workshop numbers (member faces, leaf inset, glass inset, finger joint,
@@ -63,47 +63,71 @@ export const ARCH_RISE_RATIO = Object.freeze({
   'three-centre': 0.325,
 });
 
-// Validity limits. Width: PSW MIN_WIDTH / MAX_WIDTH (O5). Rise ratios bound
-// the shapes whose rise is free: a segmental at 0.5 IS a semi-circle, a drop
-// arch lives strictly between the semi-circle (0.5) and the equilateral
-// (0.866), a three-centre at 0.5 degenerates into a semi-circle.
-export const ARCH_LIMITS = Object.freeze({
-  minWidth: 400,
-  maxWidth: 1500,
-  riseRatio: Object.freeze({
-    'segmental': [0.10, 0.45],
-    'gothic-drop': [0.55, 0.85],
-    'three-centre': [0.15, 0.45],
-  }),
-});
+// Shapes whose rise is fixed by the geometry (no free rise).
+export const ARCH_FIXED_RISE = Object.freeze(['semi-circle', 'gothic-equilateral']);
 
 export function isArchShape(shape) { return ARCH_SHAPES.includes(shape); }
 
 const r1 = (v) => Math.round(v * 10) / 10;
 
 /**
+ * Limits live in the casement profile (profile.arch.limits, spec §5): width
+ * 400–1500 (PSW MIN_WIDTH / MAX_WIDTH), straight part below the arch ≥ 900,
+ * straight stile of the arched leaf ≥ 100 (PSW sash rules adopted for the
+ * casement, spec §3.3). Nothing is defaulted here.
+ */
+export function readArchLimits(limits) {
+  const L = {
+    minWidth: Number(limits?.minWidth),
+    maxWidth: Number(limits?.maxWidth),
+    minStraightBelowRise: Number(limits?.minStraightBelowRise),
+    minLeafStraightStile: Number(limits?.minLeafStraightStile),
+  };
+  if (!(L.minWidth > 0 && L.maxWidth >= L.minWidth && L.minStraightBelowRise >= 0 && L.minLeafStraightStile >= 0)) {
+    throw new ArchError('Casement profile arch.limits is missing (minWidth / maxWidth / minStraightBelowRise / minLeafStraightStile)');
+  }
+  return L;
+}
+
+/**
+ * Physical validity of a rise for a shape — these are geometry, not workshop
+ * choices, so they are not profile settings:
+ *   segmental     rise < W/2  (a single-centre arc with the centre below the
+ *                 springing line cannot rise more; W/2 is the semi-circle)
+ *   gothic-drop   rise ≥ W/2  (below that the two arcs cannot meet in a point)
+ *   three-centre  rise < W/2  (at W/2 the haunch radius reaches the rise and
+ *                 there is no crown circle — the shape is a semi-circle)
+ */
+export function assertRisePhysics(shape, width, rise) {
+  const W = Number(width), h = Number(rise), hw = W / 2;
+  const label = ARCH_SHAPE_LABELS[shape];
+  if (!(h > 0)) throw new ArchError(`${label} rise must be a positive number of mm, got "${rise}"`);
+  if (shape === 'segmental' && !(h < hw)) throw new ArchError(`${label} rise ${r1(h)}mm must be below half the width (${r1(hw)}mm) — a single-centre arc cannot rise more; use semi-circle or gothic`);
+  if (shape === 'gothic-drop' && !(h >= hw)) throw new ArchError(`${label} rise ${r1(h)}mm must be at least half the width (${r1(hw)}mm) — below that the two arcs cannot meet in a point`);
+  if (shape === 'three-centre' && !(h < hw)) throw new ArchError(`${label} rise ${r1(h)}mm must be below half the width (${r1(hw)}mm) — at W/2 the shape is a semi-circle`);
+}
+
+/**
  * Resolve the arch rise (mm). Explicit rise wins where the shape allows it;
  * shapes with a fixed rise (semi-circle, gothic equilateral) reject any other
- * value instead of silently overriding it.
+ * value instead of silently overriding it. `limits` = profile.arch.limits.
  */
-export function resolveArchRise(shape, width, rise) {
+export function resolveArchRise(shape, width, rise, limits) {
   if (!isArchShape(shape)) throw new ArchError(`Unknown arch shape "${shape}"`);
+  const L = readArchLimits(limits);
   const W = Number(width);
-  if (!(W >= ARCH_LIMITS.minWidth)) throw new ArchError(`Arch width ${W}mm is below the minimum ${ARCH_LIMITS.minWidth}mm`);
-  if (!(W <= ARCH_LIMITS.maxWidth)) throw new ArchError(`Arch width ${W}mm is above the maximum ${ARCH_LIMITS.maxWidth}mm`);
+  if (!(W >= L.minWidth)) throw new ArchError(`Arch width ${W}mm is below the minimum ${L.minWidth}mm`);
+  if (!(W <= L.maxWidth)) throw new ArchError(`Arch width ${W}mm is above the maximum ${L.maxWidth}mm`);
   const label = ARCH_SHAPE_LABELS[shape];
   const def = ARCH_RISE_RATIO[shape] * W;
   if (rise == null || rise === '') return def;
   const h = Number(rise);
   if (!(h > 0)) throw new ArchError(`Arch rise must be a positive number of mm, got "${rise}"`);
-  const bounds = ARCH_LIMITS.riseRatio[shape];
-  if (!bounds) {
+  if (ARCH_FIXED_RISE.includes(shape)) {
     if (Math.abs(h - def) > 0.5) throw new ArchError(`${label} rise is fixed by the shape at ${r1(def)}mm (got ${h}mm)`);
     return def;
   }
-  const [lo, hi] = bounds;
-  if (h / W < lo - 1e-9) throw new ArchError(`${label} rise ${h}mm is below the minimum ${r1(lo * W)}mm (${lo} × width)`);
-  if (h / W > hi + 1e-9) throw new ArchError(`${label} rise ${h}mm is above the maximum ${r1(hi * W)}mm (${hi} × width)`);
+  assertRisePhysics(shape, W, h);
   return h;
 }
 
@@ -117,6 +141,8 @@ export function resolveArchRise(shape, width, rise) {
  */
 export function archArcs(shape, width, rise) {
   const W = Number(width), h = Number(rise), hw = W / 2;
+  if (!isArchShape(shape)) throw new ArchError(`Unknown arch shape "${shape}"`);
+  assertRisePhysics(shape, W, h);
   switch (shape) {
     case 'segmental': {
       const R = (hw * hw + h * h) / (2 * h);
@@ -141,7 +167,6 @@ export function archArcs(shape, width, rise) {
       // Basket-handle approximation of the half-ellipse (a = W/2, b = rise):
       // haunch radius = the ellipse's radius of curvature at the springing,
       // r = b²/a (spec §6.1); the crown radius follows from tangency.
-      if (!(h < hw)) throw new ArchError(`Three-centre rise ${r1(h)}mm must be below half the width (${r1(hw)}mm) — at W/2 the shape is a semi-circle`);
       const r = (h * h) / hw;
       const e = hw - r;                        // haunch centre x
       const R = (e * e + h * h - r * r) / (2 * (h - r));   // crown radius from tangency
@@ -282,11 +307,24 @@ export function buildArchGeometry({ shape, width, height, rise }, profile) {
   if (!profile?.elements?.frameHead || !profile?.elements?.leafTop || !profile?.deductions || !profile?.geometry) {
     throw new ArchError('Casement profile is missing the frameHead / leafTop / deductions / geometry sections');
   }
+  const L = readArchLimits(profile.arch?.limits);
   const W = Number(width);
-  const h = resolveArchRise(shape, W, rise);
+  const h = resolveArchRise(shape, W, rise, L);
+  let straightHeight = null, leafStraightStile = null;
   if (height != null && height !== '') {
     const H = Number(height);
-    if (!(H - h > 0)) throw new ArchError(`Arch rise ${r1(h)}mm leaves no straight part in a ${H}mm high window`);
+    straightHeight = H - h;
+    if (!(straightHeight >= L.minStraightBelowRise)) {
+      throw new ArchError(`Arch rise ${r1(h)}mm in a ${r1(H)}mm high window leaves ${r1(straightHeight)}mm straight below the arch — minimum ${L.minStraightBelowRise}mm (height >= rise + ${L.minStraightBelowRise})`);
+    }
+    // straight stile of the arched leaf = straight part minus the cill-side
+    // leaf deduction (leafFullHeight − leafAtJamb: gap + cill land)
+    const cillSide = Number(profile.deductions.leafFullHeight) - Number(profile.deductions.leafAtJamb);
+    if (!Number.isFinite(cillSide)) throw new ArchError('Casement profile deductions.leafFullHeight / leafAtJamb are missing');
+    leafStraightStile = straightHeight - cillSide;
+    if (!(leafStraightStile >= L.minLeafStraightStile)) {
+      throw new ArchError(`Straight stile of the arched leaf is ${r1(leafStraightStile)}mm — minimum ${L.minLeafStraightStile}mm`);
+    }
   }
   const base = archArcs(shape, W, h);
   const tFrame = Number(profile.elements.frameHead.face);
@@ -302,7 +340,9 @@ export function buildArchGeometry({ shape, width, height, rise }, profile) {
     label: ARCH_SHAPE_LABELS[shape],
     width: W,
     rise: h,
-    straightHeight: height != null && height !== '' ? Number(height) - h : null,
+    straightHeight,
+    leafStraightStile,
+    limits: L,
     arcs: base,
     offsets: { frameInner: tFrame, leafOuter: leafInset, leafInner: leafInset + tLeaf, glass: glassOffset },
     frameHead,

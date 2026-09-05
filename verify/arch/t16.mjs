@@ -175,17 +175,36 @@ for (const v of EXPECTED) {
     poly.slice(0, g.frameHead.outer.length).every((p) => p[2] > 0) && poly.slice(g.frameHead.outer.length + 1, -1).every((p) => p[2] < 0));
 }
 
-section('§10.1 limits & errors (readable ArchError)');
-expectThrows('width below 400 throws', () => arch.resolveArchRise('segmental', 399, null), /below the minimum 400mm/);
-expectThrows('width above 1500 throws', () => arch.resolveArchRise('segmental', 1501, null), /above the maximum 1500mm/);
-expectThrows('semi-circle refuses a foreign rise', () => arch.resolveArchRise('semi-circle', 1200, 500), /fixed by the shape at 600mm/);
-expectThrows('unknown shape throws', () => arch.resolveArchRise('elliptical', 1200, null), /Unknown arch shape/);
-expectThrows('rise ≥ height throws', () => arch.buildArchGeometry({ shape: 'semi-circle', width: 1200, height: 600 }, P), /no straight part/);
+section('§10.1 limits & errors (readable ArchError) — profile.arch.limits, physics per shape');
+const LIM = P.arch.limits;
+check('profile.arch.limits = { 400, 1500, 900, 100 } (spec §3.3 / §5)', LIM.minWidth === 400 && LIM.maxWidth === 1500 && LIM.minStraightBelowRise === 900 && LIM.minLeafStraightStile === 100);
+check('no ARCH_LIMITS constant left in arch.js (limits come from the profile)', arch.ARCH_LIMITS === undefined);
+expectThrows('width below 400 throws', () => arch.resolveArchRise('segmental', 399, null, LIM), /below the minimum 400mm/);
+expectThrows('width above 1500 throws', () => arch.resolveArchRise('segmental', 1501, null, LIM), /above the maximum 1500mm/);
+expectThrows('semi-circle refuses a foreign rise', () => arch.resolveArchRise('semi-circle', 1200, 500, LIM), /fixed by the shape at 600mm/);
+expectThrows('unknown shape throws', () => arch.resolveArchRise('elliptical', 1200, null, LIM), /Unknown arch shape/);
+expectThrows('missing limits throw (no defaults in arch.js)', () => arch.resolveArchRise('segmental', 1200, null, undefined), /arch\.limits is missing/);
+expectThrows('H < rise + 900 throws (semi-circle 1200 in H 1499)', () => arch.buildArchGeometry({ shape: 'semi-circle', width: 1200, height: 1499 }, P), /leaves 899mm straight below the arch — minimum 900mm/);
+check('H = rise + 900 passes (straight 900, leaf straight stile 900 − 47 = 853)', (() => { const g = arch.buildArchGeometry({ shape: 'semi-circle', width: 1200, height: 1500 }, P); return g.straightHeight === 900 && near(g.leafStraightStile, 900 - (P.deductions.leafFullHeight - P.deductions.leafAtJamb), 1e-9); })());
+{
+  const loose = { ...P, arch: { ...P.arch, limits: { ...P.arch.limits, minStraightBelowRise: 0 } } };
+  expectThrows('leaf straight stile < 100 throws when the 900 rule is relaxed (straight 140 → stile 93)', () => arch.buildArchGeometry({ shape: 'segmental', width: 1200, height: 380, rise: 240 }, loose), /Straight stile of the arched leaf is 93mm — minimum 100mm/);
+  check('leaf straight stile = 100 passes (straight 147)', arch.buildArchGeometry({ shape: 'segmental', width: 1200, height: 387, rise: 240 }, loose).leafStraightStile === 100);
+}
+// invented per-shape rise windows are gone — only physics remains
+expectThrows('segmental rise ≥ W/2 is a hard error (single-centre arc)', () => arch.resolveArchRise('segmental', 1200, 600, LIM), /must be below half the width \(600mm\)/);
+expectThrows('segmental rise ≥ W/2 also refused by archArcs directly', () => arch.archArcs('segmental', 1200, 700), /must be below half the width/);
+expectThrows('gothic-drop rise < W/2 throws (arcs cannot meet in a point)', () => arch.resolveArchRise('gothic-drop', 1200, 599, LIM), /must be at least half the width \(600mm\)/);
+expectThrows('rise ≤ 0 throws', () => arch.resolveArchRise('segmental', 1200, 0, LIM), /must be a positive number/);
+check('segmental rise 0.05 × W (60 mm, below the old invented 0.10 window) is accepted: R 3030', near(arch.archArcs('segmental', 1200, 60)[0].r, 3030, 1e-9));
+check('gothic-drop rise 0.917 × W (1100 mm, above the old 0.85 window) is accepted', arch.archArcs('gothic-drop', 1200, 1100).length === 2);
+check('gothic-drop rise = W/2 degenerates into a semi-circle (c = 0) and is accepted', (() => { const a = arch.archArcs('gothic-drop', 1200, 600); return near(a[0].cx, 0, 1e-9) && near(a[0].r, 600, 1e-9); })());
+check('three-centre rise 0.10 × W (120 mm) passes the rise rules; the frame face then fails readably', (() => { try { arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 2000, rise: 120 }, P); return false; } catch (e) { return /Offset 57mm exceeds the arc radius 24mm/.test(e.message); } })());
 expectThrows('three-centre rise ≥ W/2 throws (semi-circle)', () => arch.archArcs('three-centre', 1200, 600), /must be below half the width/);
 expectThrows('three-centre haunch smaller than the frame face throws readably (rise 180 → r 54)', () => arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 2000, rise: 180 }, P), /Offset 57mm exceeds the arc radius 54mm/);
-expectNear('segmental default rise = 0.20 × W (PSW RISE_RATIO)', arch.resolveArchRise('segmental', 1200, null), 240, 1e-9);
-expectNear('three-centre default rise = 0.325 × W (PSW elliptical)', arch.resolveArchRise('three-centre', 1200, null), 390, 1e-9);
-expectNear('gothic-drop default rise = 0.70 × W (PSW GOTHIC_PROFILE_RATIO.drop)', arch.resolveArchRise('gothic-drop', 1200, null), 840, 1e-9);
+expectNear('segmental default rise = 0.20 × W (PSW RISE_RATIO)', arch.resolveArchRise('segmental', 1200, null, LIM), 240, 1e-9);
+expectNear('three-centre default rise = 0.325 × W (PSW elliptical)', arch.resolveArchRise('three-centre', 1200, null, LIM), 390, 1e-9);
+expectNear('gothic-drop default rise = 0.70 × W (PSW GOTHIC_PROFILE_RATIO.drop)', arch.resolveArchRise('gothic-drop', 1200, null, LIM), 840, 1e-9);
 check('PSW shape map covers the four PSW radios', ['gothic-arch', 'semi-circle', 'segmental-arch', 'elliptical-arch'].every((k) => arch.isArchShape(arch.PSW_ARCH_SHAPE[k])));
 
 // ── §10.2 SEGMENT PLANNER — projection method, D13 selection ────────────────
@@ -379,7 +398,7 @@ for (const v of PLAN_VECTORS) {
 
 // ── §10.3 DXF — archDxf.js → dxfWriter → ezdxf round-trip ───────────────────
 // Profile arch section (step 4 moves it into DEFAULT_CASEMENT_PROFILE).
-const ARCH_SECTION = { finger: { length: 15, depth: 16, pitch: 3.8 }, ...PLAN_OPTS };
+const ARCH_SECTION = { ...PLAN_OPTS, limits: { minWidth: 400, maxWidth: 1500, minStraightBelowRise: 900, minLeafStraightStile: 100 } };
 const PA = P.arch ? P : { ...P, arch: ARCH_SECTION };
 const SAMPLES = resolve(ROOT, 'docs', 'handover', 'samples');
 mkdirSync(SAMPLES, { recursive: true });
@@ -504,15 +523,17 @@ section('§10.3 pt 9 — profile.arch, migration, PSW field mapping, deriveWindo
   check('DEFAULT_CASEMENT_PROFILE.arch v2: finger 15/16/3.8, stock D7 [50, 63, 75, 95, 105, 180, 200], contourAllowance 10, maxSegmentAngleDeg 36, pieceRule narrowest',
     P.arch && P.arch.version === 2 && P.arch.finger.length === 15 && P.arch.finger.depth === 16 && P.arch.finger.pitch === 3.8
     && JSON.stringify(P.arch.stockWidths) === JSON.stringify([50, 63, 75, 95, 105, 180, 200]) && P.arch.contourAllowance === 10 && P.arch.maxSegmentAngleDeg === 36
-    && P.arch.pieceRule === 'narrowest' && !('widthAllowance' in P.arch) && !('maxPieces' in P.arch));
+    && P.arch.pieceRule === 'narrowest' && !('widthAllowance' in P.arch) && !('maxPieces' in P.arch)
+    && JSON.stringify(P.arch.limits) === JSON.stringify({ minWidth: 400, maxWidth: 1500, minStraightBelowRise: 900, minLeafStraightStile: 100 }));
   // stored v1.1 profile (no arch) → migration fills the section; partial finger merges
   const { arch: _drop, ...v11 } = JSON.parse(JSON.stringify(P));
   void _drop;
   const m1 = profile.migrateCasementProfile(v11);
   check('migrateCasementProfile: v1.1 profile without arch gets the default section', JSON.stringify(m1.arch) === JSON.stringify(P.arch));
-  const m2 = profile.migrateCasementProfile({ ...v11, arch: { version: 2, finger: { pitch: 4.2 }, stockWidths: [150] } });
-  check('migrateCasementProfile: partial v2 arch section merges (pitch 4.2, stock [150], rest default)',
-    m2.arch.finger.length === 15 && m2.arch.finger.pitch === 4.2 && JSON.stringify(m2.arch.stockWidths) === '[150]' && m2.arch.contourAllowance === 10 && m2.arch.maxSegmentAngleDeg === 36);
+  const m2 = profile.migrateCasementProfile({ ...v11, arch: { version: 2, finger: { pitch: 4.2 }, stockWidths: [150], limits: { maxWidth: 1800 } } });
+  check('migrateCasementProfile: partial v2 arch section merges (pitch 4.2, stock [150], maxWidth 1800, rest default)',
+    m2.arch.finger.length === 15 && m2.arch.finger.pitch === 4.2 && JSON.stringify(m2.arch.stockWidths) === '[150]' && m2.arch.contourAllowance === 10 && m2.arch.maxSegmentAngleDeg === 36
+    && m2.arch.limits.maxWidth === 1800 && m2.arch.limits.minWidth === 400 && m2.arch.limits.minStraightBelowRise === 900);
   const m3 = profile.migrateCasementProfile({ ...v11, arch: { finger: { length: 15, depth: 16, pitch: 3.8 }, stockWidths: [100, 125, 150, 175, 200, 225, 250], widthAllowance: 20, maxPieces: 8 } });
   check('migrateCasementProfile: night-1 arch block (no version, invented stock list) is replaced whole by the v2 default', JSON.stringify(m3.arch) === JSON.stringify(P.arch));
   check('migrateCasementProfile: pre-v1 shape still replaced by the default (arch included)', profile.migrateCasementProfile({ frameDepth: 93 }).arch === P.arch);

@@ -170,6 +170,12 @@ export const DEFAULT_CASEMENT_PROFILE = {
     // (tie -> fewer pieces); 'fewest' = fewest pieces that fit a board. The
     // other rule's plan is printed on the sheet as ALT. Flip here, no code.
     pieceRule: 'narrowest',
+    // Validity limits (spec §3.3 / §5): PSW MIN_WIDTH / MAX_WIDTH, and the PSW
+    // arched-sash rules adopted for the casement until Piotr says otherwise —
+    // straight part below the arch (height >= rise + this) and the straight
+    // stile of the arched leaf. Physical limits (rise vs width per shape) are
+    // geometry and live in arch.js.
+    limits: { minWidth: 400, maxWidth: 1500, minStraightBelowRise: 900, minLeafStraightStile: 100 },
   },
   rounding: 0.1,       // mm — CNC-ready, one decimal
 };
@@ -203,7 +209,7 @@ export function migrateCasementProfile(profile) {
     // carries a schema version; an older stored block (night-1 keys
     // widthAllowance / maxPieces, invented stock list) is replaced whole.
     arch: profile.arch?.version === D.arch.version
-      ? { ...D.arch, ...profile.arch, finger: { ...D.arch.finger, ...profile.arch.finger } }
+      ? { ...D.arch, ...profile.arch, finger: { ...D.arch.finger, ...profile.arch.finger }, limits: { ...D.arch.limits, ...profile.arch.limits } }
       : D.arch,
   };
 }

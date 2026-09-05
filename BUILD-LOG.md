@@ -169,6 +169,36 @@ mirror), two new error cases; 267/267 ALL PASS.
 
 **Verdict: ✅ T4.**
 
+### T5 — limits (`profile.js` `arch.limits`, `arch.js` `readArchLimits` / `assertRisePhysics`)
+
+**Understanding:** two kinds of limits were mixed in night 1. Workshop / product limits (width
+400–1500 from PSW, `H ≥ rise + 900`, straight leaf stile ≥ 100 — PSW arched-sash rules adopted
+for the casement, spec §3.3) belong in the profile like every other number. Physical limits (a
+single-centre arc cannot rise more than W/2; a pointed arch needs rise ≥ W/2; a three-centre needs
+rise < W/2) are geometry and stay in `arch.js`. The night-1 per-shape "windows" (segmental
+0.10–0.45, drop 0.55–0.85, three-centre 0.15–0.45) were invented — removed (audit T5).
+
+**Changes:** `profile.arch.limits = { minWidth 400, maxWidth 1500, minStraightBelowRise 900,
+minLeafStraightStile 100 }` (nested merge in the migration); `ARCH_LIMITS` export removed
+(justification: replaced by the profile block, single source — the harness asserts it is gone);
+`resolveArchRise(shape, W, rise, limits)` now requires the limits (readable throw when missing);
+`assertRisePhysics` shared by `resolveArchRise` and `archArcs`; `buildArchGeometry` enforces
+`H − rise ≥ minStraightBelowRise` and the leaf straight stile `(H − rise) − (leafFullHeight −
+leafAtJamb) ≥ minLeafStraightStile` (47 mm cill-side deduction read from the profile, never
+hard-coded) and exposes `straightHeight`, `leafStraightStile`, `limits`. The old "no straight
+part" message is replaced by the 900 rule.
+
+**Edge cases verified:** H = rise + 900 passes, 899 fails with the numbers in the message; the
+stile rule only bites when the 900 rule is relaxed (straight 140 → stile 93 < 100); rise ≤ 0,
+segmental ≥ W/2 (both entry points), gothic-drop < W/2, three-centre ≥ W/2 all throw readably;
+gothic-drop = W/2 degenerates into a semi-circle and is accepted; a tiny three-centre rise (120)
+passes the rise rules and fails on the member face (`Offset 57mm exceeds the arc radius 24mm`) —
+readable, not silent.
+
+**Verification:** esbuild OK · no Polish letters · harness 281/281 ALL PASS.
+
+**Verdict: ✅ T5.**
+
 ## 2026-09-05 — arched-casement-v1 (night run, branch `claude/arched-casement-v1`)
 
 **Blocking fact first:** `docs/handover/ARCHED-CASEMENT-v1.md` (the package spec) is NOT in the
