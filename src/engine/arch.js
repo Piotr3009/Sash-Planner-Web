@@ -63,6 +63,16 @@ export const ARCH_RISE_RATIO = Object.freeze({
   'three-centre': 0.325,
 });
 
+// Gothic profile presets (PSW GOTHIC_PROFILE_RATIO, spec §3.2 / §5): rise as a
+// fraction of the external width. 'equilateral' is its own PC shape (fixed
+// rise); 'drop' and 'shallow' are the free-rise 'gothic-drop' shape with a
+// different default rise.
+export const GOTHIC_PROFILE_RATIO = Object.freeze({
+  equilateral: Math.sqrt(3) / 2,
+  drop: 0.70,
+  shallow: 0.60,
+});
+
 // Shapes whose rise is fixed by the geometry (no free rise).
 export const ARCH_FIXED_RISE = Object.freeze(['semi-circle', 'gothic-equilateral']);
 

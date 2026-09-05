@@ -199,6 +199,60 @@ readable, not silent.
 
 **Verdict: ✅ T5.**
 
+### T7 — harness on the spec vectors (`verify/arch/t16.mjs`, `dxf_probe.py`, `specification.js`, `arch.js`)
+
+**Understanding:** the night-1 harness proved the build's own numbers (tautology). Now the
+EXPECTED values are the spec's §10.1 / §10.2 vectors typed in verbatim, the assertions follow
+§10.3 items 1–10, and the independent closed forms / sampling stay as cross-checks where the spec
+lists no number. Three spec numbers are internally inconsistent; each is asserted BOTH ways and
+labelled, never silently adjusted (BLOCKERS §6, E1–E2):
+- E1 §10.1 segmental `arcLen_in 1237.41` = R_in × θ_out (unclipped concentric arc). §6.2 and the
+  same line's `x = W/2 ± 513.88` require the clip at the arch-start line ⇒ 1112.55.
+- E2 §10.2 LEAF line uses the head's θ 87.21° (its 111.1 / 100.6 / "4 × 105" are reproduced from
+  that angle); the leaf ring's own clipped span is 81.24° ⇒ 107.93 / 98.80 / 94.56, D13 5 × 95.
+- (§10.2 "rough end 456.71" uses the middle L for the end pieces; asserted as `≥` — the band's
+  outer corner on the arch-start line projects 10 mm longer: 466.77.)
+
+**Code needed by §10.3 items 1 and 9 (spec §3.2 / §4.1 / §4.2):** `GOTHIC_PROFILE_RATIO`
+(equilateral / drop 0.70 / shallow 0.60) in `arch.js`; `archFromSpec(item, fc, width)` now
+resolves `rise = ratio × width` with `riseSource: 'ratio'` (`'custom'` when a rise is stored),
+carries `profile` (gothic only), reads the raw PSW form field `cas-arch-opening` as a hinge
+source, maps PSW `gothic-arch` + `archProfile` drop / shallow → `gothic-drop` with that
+profile's ratio, and **throws a readable ArchError for an unknown shape** (spec: a silent
+rectangle was the critical import bug). The exporter's "unknown shape" skip path is therefore
+unreachable from PSW data — kept as a guard. Risk noted in BLOCKERS §6: callers of
+`normaliseToWindowSpec` (window cards, project page) do not catch, so one corrupt shape value
+would blank that estimate page instead of one button — that is the spec's choice, flagged.
+`dxf_probe.py` now returns polyline vertices (point-in-polygon for item 7).
+
+**Harness sections:** pt 1 rise defaults (5 shapes + 3 gothic profiles) · pt 2–4 every §10.1
+number within 0.01 mm / 0.01° (radii, θ, centres, arc lengths, inner x, three-centre tangent
+point on both circles, spans, lengths, |Cs − CL| = R − r), offsets keep centres and reduce r by
+exactly the face, clipped ends analytic on y = 0, bulge = tan(Δ/4) · limits & physics (T5) ·
+pt 6 §10.2 HEAD segmental / semi-circle option tables (φ, W_req == ±0.05 middle, ≥ ends, L_out,
+L_in, joint cut φ/2, rough middle ==, rough end ≥, stock, D13 default + runner-up), LEAF with E2
+both ways, planner vs independent sampled band for all five shapes and both D13 rules, N_min /
+single-board rule (W 1500 rise 110 → θ 33.4°, N 1 with 180 mm stock, N 2 with 95 only), tiling,
+gothic apex / three-centre tangent joints, no-stock and missing-setting errors · pt 7 sampled
+band inside its board for every default piece and every feasible option (plan data) and, on the
+DXF, inside the assembled ASSEMBLY quads (point-in-polygon) and flat pieces inside stock × rough ·
+pt 5 ezdxf round-trip: CONTOUR arc length from vertices + bulges = `arcLength(chain)` within 0.01
+for all five shapes, one vertex per arc end, closed, plus the structural checks from night 1
+(layers, counts, FINGER lengths, labels, notes, legend, origin) · pt 8 `canExportArchDxf` false
+for rectangular casement / sash / door, `exportArchDxfMerged` run end-to-end with the browser
+download stubbed (Blob read back, ezdxf-probed: 2 exported, 2 skipped with reasons, name
+`Pack_1_arch.dxf`, 300 mm stacking) · pt 9 the spec vector verbatim (`elliptical-arch` +
+`cas-arch-opening: right` → three-centre / hinge left / rise 390 / ratio), unknown shape throws,
+profiles, custom rise, `deriveWindowData` path, profile v2 + migration · pt 10 `git diff` of
+`casementLayouts.js`, `lists.js`, `calculations.js`, `jambDxf.js` against the merge-base with
+main is empty, working tree clean.
+
+**Verification:** esbuild OK on `arch.js`, `specification.js` · no Polish letters · harness
+**465/465 ALL PASS** · `npm run build` passes (only the pre-existing chunk-size warning).
+
+**Verdict: ✅ T7 — the harness reproduces the spec (every §10 number is either matched within its
+tolerance or reproduced with its erratum shown).** Stage-1 ✅ is confirmed after T8's sample.
+
 ## 2026-09-05 — arched-casement-v1 (night run, branch `claude/arched-casement-v1`)
 
 **Blocking fact first:** `docs/handover/ARCHED-CASEMENT-v1.md` (the package spec) is NOT in the
