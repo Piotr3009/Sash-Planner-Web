@@ -4,6 +4,43 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-09-05 — arched-casement-v1 (night run, branch `claude/arched-casement-v1`)
+
+**Blocking fact first:** `docs/handover/ARCHED-CASEMENT-v1.md` (the package spec) is NOT in the
+repository, in any branch, in Petros, Drive or Gmail. Everything below is built from CLAUDE.md,
+the PSW source (`js/price-calculator.js` `window.ArchedSash`, `js/casement-controller.js`,
+`online-estimate.html`) and the existing PC engine conventions. Every number the spec would have
+fixed is listed in BLOCKERS.md as an ASSUMPTION. The harness reproduces closed-form geometry, not
+the spec's §10 vectors — so no step in this section can honestly carry ✅. See the final verdict.
+
+### Step 1 — geometry (`src/engine/arch.js`, harness §10.1)
+
+**Understanding:** one arched member = ring between two concentric contours of the window's outer
+arch, clipped at the arch-start line (y = 0). Shapes: segmental (1 centre below the line),
+semi-circle (1), gothic equilateral / gothic drop (2 centres on the line), three-centre (2 haunch
+centres + 1 crown centre). Rise defaults from PSW `RISE_RATIO` / `GOTHIC_PROFILE_RATIO.drop`.
+
+**Context:** engine only — `arch.js` reads `frameHead.face`, `leafAtJamb`, `leafTop.face`,
+`glassInset` from the casement profile passed in; nothing hard-coded (CLAUDE.md rule 11).
+
+**Two approaches, one rejected:** (a) port the PSW 3D point sampling (`arcPoints`, Bézier for the
+ellipse) — rejected: sampled polylines cannot carry bulges and the 3D "elliptical" is not
+routable from concentric arcs; (b) keep every arc as (centre, radius, a0, a1) with clip flags and
+offset by shrinking radii — chosen (matches the Petros "concentricity" patent and DXF bulge).
+
+**Edge cases handled:** rise smaller than a member face (contour never reaches y = 0 → ArchError),
+rise ≥ height, width outside 400–1500, foreign rise on a fixed-rise shape, unknown shape,
+`atan2(−0, −x)` returning −π on the left arch-start end (found by the harness, fixed).
+
+**Harness:** `node verify/arch/t16.mjs` — 77 checks, ALL PASS: radii, centres, outer / frame-inner
+/ leaf-outer / leaf-inner / glass lengths for all five shapes at W = 1200 against formulas written
+independently in the harness; concentricity; clipping; bulge polyline rebuilds every radius.
+
+**Verdict: ⚠️** code verified against closed-form geometry only; NOT verified against spec §10.1
+(file missing). Not verified: rise limits per shape (my ratios), three-centre haunch ratio 0.5.
+
+---
+
 ## Phase 0 — Project skeleton (React + Vite + layout)
 
 **Goal:** Empty app with layout loads in the browser.
