@@ -57,6 +57,7 @@ import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 import Window3DCaptureRig from '../components/viewer/Window3DCaptureRig.jsx';
 import ImageLightbox from '../components/ImageLightbox.jsx';
 import { exportCncJambsMerged, exportArchDxfMerged } from '../utils/cncExport.js';
+import { exportGlassDxfMerged } from '../utils/glassDxfExport.js';
 
 // ─── Tab config ───
 const TABS = [
@@ -455,6 +456,27 @@ export default function ProductionPackPage() {
                 <option value="a3">A3 Landscape</option>
                 <option value="a4">A4 Landscape</option>
               </select>
+            )}
+            {tab === 'glass' && (
+              <button
+                onClick={() => {
+                  // Glazier DXF (arched-casement-v2 C): every shaped unit of the
+                  // pack in one file, {label}_glass.dxf; rectangular-only windows
+                  // are listed as skipped, never guessed.
+                  const r = exportGlassDxfMerged(
+                    (windowsData || []).map((wd) => ({ windowSpec: wd.windowSpec, derived: wd.derived, name: wd.win?.name })),
+                    pp?.name || batch?.label || 'pack',
+                  );
+                  if (r.error) { alert(`Glass DXF: ${r.error}`); return; }
+                  if (r.skipped?.length) {
+                    alert(`Glass DXF exported (${r.exported} windows, ${r.units} units).\nSkipped ${r.skipped.length}: ${r.skipped.map((s) => `${s.name} (${s.reason})`).join(', ')}`);
+                  }
+                }}
+                title="One DXF with the exact contour + bar axes of every shaped (arched) glass unit, stacked 300mm apart"
+                className="btn btn-secondary text-xs px-4"
+              >
+                📐 Glass DXF (all)
+              </button>
             )}
             <button
               onClick={handleHeaderExport}

@@ -32,9 +32,11 @@ import { buildVentGrilles } from '../engine/lists.js';
 // PC frame type → lisp variant. heritage intentionally absent.
 const FRAME_TO_CNC = { standard: 'standard', slim: 'slim', triple: 'triple' };
 
-const safeName = (s) => String(s || 'window').replace(/[^\w.-]+/g, '_');
+// Shared with glassDxfExport.js (arched-casement-v2 C): one file-name rule,
+// one browser download path for every DXF the app writes.
+export const safeName = (s) => String(s || 'window').replace(/[^\w.-]+/g, '_');
 
-function downloadDxf(filename, content) {
+export function downloadDxf(filename, content) {
   const blob = new Blob([content], { type: 'application/dxf' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

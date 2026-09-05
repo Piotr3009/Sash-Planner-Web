@@ -134,6 +134,55 @@ hardware (hinge/lock) picks on the arched leaf use the bounding leaf height — 
 
 **Verdict: ✅ B**
 
+### C — glazier exports (`glassDxfExport.js` new, `glassPdfExport.js`, `cncExport.js`, `WindowDetailPage.jsx`, `ProductionPackPage.jsx`)
+
+**Understanding:** the glazier gets the exact contour + bar axes as a DXF (cutting reference) and the
+schedule PDF gains a Shape column, an outline drawing and the bar positions in mm and % (P6).
+
+**Two approaches, one rejected:** (a) thumbnails via SVG → canvas captured from the DOM (the "other
+thumbnails" of the glass-drawings PDF) — rejected: needs a browser, cannot run in the harness and the
+schedule PDF already draws its rectangles with jsPDF primitives; (b) draw the outline with jsPDF paths —
+exact arcs as cubic Béziers (≤ 90° per segment, the standard 4/3·tan(Δ/4) construction) — chosen; the
+DXF stays the exact reference.
+
+**Built:**
+- `glassDxfExport.js` (new, R12 via `dxfWriter.js`): layers `GLASS_CONTOUR` (7, closed bulge polyline,
+  one vertex per arc end), `GLASS_BARS` (3, straight bars as 2-vertex polylines, rings / tracery as
+  2-vertex bulge polylines), `GLASS_TEXT` (2: window – unit id – shape, `W × H RISE SPRINGING R …`,
+  the glass spec line, `BARS n [PATTERN …] TOTAL L=…`, one line per bar `V1 V X=… Y=…-… L=…`). Units are
+  the SAME rows the Glass tab shows (`buildGlassListForWindow`), qty repeated, stacked top-down
+  `MERGE_GAP` (300) apart; merged files stack windows the same way. `glassDxfParamsForWindow` skips with a
+  reason (not a casement / not arched / no shaped unit), `canExportGlassDxf`, `exportGlassDxfForWindow`
+  (`{name}_glass.dxf`), `exportGlassDxfMerged` (`{label}_glass.dxf`, rectangular-only windows listed as
+  skipped). `downloadDxf` + `safeName` are now exported from `cncExport.js` (one download path, one
+  file-name rule) — the only change there.
+- Buttons: Window → Glass tab, "📐 Glass DXF" next to "📄 Export PDF" (casement windows; disabled with the
+  reason on rectangular ones); Production Pack header, "📐 Glass DXF (all)" next to "📄 Export PDF" while
+  the Glass tab is active (the pack's PDF export lives in that header).
+- `glassPdfExport.js`: column layout re-spaced for a `Shape` column (`rect` / `arched · R 55.5/1305.5`
+  with a 6 × 4.5 mm outline glyph — the GLASS radii, what the glazier cuts, not the frame's); shaped rows
+  take extra 3.2 mm lines: `springing 1198.5 (92%) · H1 y 599.3 (46%) x 0-811 · V1 x 270.3 (33%) to y 1297
+  …` (x as % of the clear width, y as % of the unit height); the bars cell shortens pattern names
+  (`hub`, `dbl hub`, `intersect`); drawing cells for shaped units (`drawShapedGlass`): exact outline
+  (fill + stroke), bar axes, chain H on top from the vertical bars, chain V on the left from the h bars +
+  springing + apex, overall W / H, a `rise` tick on the right, and a second header line `R … · rise … ·
+  springing … · bars mm + %`. No edge-seal offset on shaped units (documented in the code). Rectangular
+  cells and rows untouched.
+
+**Verification:** DXF round-trip through ezdxf on three windows (three-centre 1000×1500 start 1300 with
+1H 2V, semi-circle hub-spoke, gothic intersecting): contour closed, vertex count 6 / 4 / 5, bulge count =
+arcs (3 / 1 / 2), arc length = outline arch length to 0.01, straight length = Wg + 2·springing, bar
+polylines = bars.length (3 / 7 / 7), bar length sum = Σ bar lengths (±0.5 rounding); merged file 3 contours
++ 1 skipped rectangular window with its reason; layers present. PDF built in node (jsPDF) for the same
+three + one rectangular window: 2 pages, 47 KB, strings `arched · R 55.5/1305.5`, `rect`, `springing
+1198.5 (92%)`, `V1 x 270.3 (33%)`, `R1 ring R 121.7`, `rise 105.5`, `1304 mm` present, 20 Bézier ops.
+Sample `docs/handover/samples/sample_glass_order_arched.pdf` saved for the morning look. esbuild +
+eslint clean · no Polish letters · t16 504/504 after the `cncExport.js` change · `npm run build` OK.
+NOT verified: the PDF was not opened in a viewer (node only) — the layout of the shaped drawing cell
+and the re-spaced table columns need Piotr's eye; buttons not clicked in a browser.
+
+**Verdict: ⚠️ C** (data path proven; visual layout unseen).
+
 ## 2026-09-06 — arched-casement-v1: audit fixes T1–T8, then Stage 2 (night run 2, branch `claude/arched-casement-audit-t1-t8-7d5fuk`)
 
 Inputs read in full, in this order: `ARCHED-CASEMENT-v1-AUDIT.md` → `ARCHED-CASEMENT-v1.md` (spec,
