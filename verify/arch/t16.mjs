@@ -31,12 +31,13 @@ writeFileSync(ENTRY, [
   "export * as dxfWriter from '../src/engine/cnc/dxfWriter.js';",
   "export * as specification from '../src/engine/specification.js';",
   "export * as calculations from '../src/engine/calculations.js';",
+  "export * as cncExport from '../src/utils/cncExport.js';",
 ].join('\n'));
 const BUNDLE = resolve(AUDIT, 'arch-bundle.mjs');
 execFileSync('npx', ['-y', 'esbuild@0.25.0', ENTRY, '--bundle', '--format=esm', '--external:react',
   '--platform=node', `--outfile=${BUNDLE}`], { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit'] });
 const M = await import(pathToFileURL(BUNDLE).href);
-const { arch, profile, archDxf, dxfWriter, specification, calculations } = M;
+const { arch, profile, archDxf, dxfWriter, specification, calculations, cncExport } = M;
 const P = profile.DEFAULT_CASEMENT_PROFILE;
 
 // ── tiny assert framework ───────────────────────────────────────────────────
@@ -432,6 +433,24 @@ section('§10.3 pt 9 — profile.arch, migration, PSW field mapping, deriveWindo
   const planLive = arch.buildArchPlan({ shape: a1.arch.shape, width: a1.frame.width, height: a1.frame.height, rise: a1.arch.rise, hinge: a1.arch.hinge }, profile.getCasementProfile());
   const planDef = arch.buildArchPlan({ shape: 'segmental', width: 1200, height: 2000, rise: null, hinge: 'left' }, P);
   check('buildArchPlan from windowSpec + getCasementProfile() equals the default-profile plan', JSON.stringify(planLive.plans.frameHead.pieces.map((p) => [p.no, p.stock, +p.projectedWidth.toFixed(6)])) === JSON.stringify(planDef.plans.frameHead.pieces.map((p) => [p.no, p.stock, +p.projectedWidth.toFixed(6)])) && planLive.hinge === 'left');
+}
+
+// ── §9 export wrappers — skip reasons, never throws ─────────────────────────
+section('§9 cncExport — archParamsForWindow / canExportArchDxf');
+{
+  const mk = (fc, item = {}) => specification.normaliseToWindowSpec({ width: 1200, height: 2000, name: 'W7', ...item }, { fullConfig: { windowCategory: 'casement', casementLayout: '040L', ...fc } });
+  const sash = specification.normaliseToWindowSpec({ width: 1000, height: 1500 }, { fullConfig: { windowCategory: 'sash' } });
+  check('sash → skip "not a casement window"', cncExport.archParamsForWindow(sash, 'S').skip === 'not a casement window');
+  check('standard casement → skip "not an arched casement"', cncExport.archParamsForWindow(mk({ casementType: 'standard' }), 'C').skip === 'not an arched casement');
+  check('unknown PSW shape → skip names it', /unsupported arch shape "foo"/.test(cncExport.archParamsForWindow(mk({ casementType: 'arched', casArchShape: 'foo' }), 'C').skip || ''));
+  const ok = cncExport.archParamsForWindow(mk({ casementType: 'arched', casArchShape: 'segmental-arch', casArchHinge: 'right' }), 'W7');
+  check('arched segmental 1200 → params with plan + winNum', !ok.skip && ok.params.plan.shape === 'segmental' && ok.params.winNum === 'W7' && ok.params.plan.hinge === 'left');
+  check('canExportArchDxf true for the arched casement, false for sash', cncExport.canExportArchDxf(mk({ casementType: 'arched', casArchShape: 'semi-circle' })) === true && cncExport.canExportArchDxf(sash) === false);
+  const narrow = cncExport.archParamsForWindow(mk({ casementType: 'arched', casArchShape: 'semi-circle' }, { width: 300 }), 'N');
+  check('width 300 → readable skip (below the minimum 400mm)', /below the minimum 400mm/.test(narrow.skip || ''), narrow.skip);
+  const noStock = profile.withProfiles(null, { ...P, arch: { ...P.arch, stockWidths: [50] } }, () => cncExport.archParamsForWindow(mk({ casementType: 'arched', casArchShape: 'semi-circle' }), 'N'));
+  check('no stock board fits → skip explains which arc needs what', /no stock board fits \(widest 50mm\): frame head arc 1 needs a board >= \d+mm/.test(noStock.skip || ''), noStock.skip);
+  check('no-throw contract: every skip path returned an object', [sash, mk({}), mk({ casementType: 'arched', casArchShape: 'foo' })].every((w) => typeof cncExport.archParamsForWindow(w, 'x') === 'object'));
 }
 
 // ── summary ─────────────────────────────────────────────────────────────────

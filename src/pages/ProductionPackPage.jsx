@@ -56,7 +56,7 @@ import { groupCasementGlass } from '../components/drawings/casementDrawUtils.js'
 import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 import Window3DCaptureRig from '../components/viewer/Window3DCaptureRig.jsx';
 import ImageLightbox from '../components/ImageLightbox.jsx';
-import { exportCncJambsMerged } from '../utils/cncExport.js';
+import { exportCncJambsMerged, exportArchDxfMerged } from '../utils/cncExport.js';
 
 // ─── Tab config ───
 const TABS = [
@@ -488,6 +488,24 @@ export default function ProductionPackPage() {
                 className="btn btn-secondary text-xs px-4"
               >
                 🛠 CNC Jamb DXF (all)
+              </button>
+            )}
+            {(pp?.type || batch?.type || 'sash') === 'casement' && (
+              <button
+                onClick={() => {
+                  const r = exportArchDxfMerged(
+                    (windowsData || []).map((wd) => ({ windowSpec: wd.windowSpec, name: wd.win?.name })),
+                    pp?.name || batch?.label || 'pack',
+                  );
+                  if (r.error) { alert(`Arch DXF: ${r.error}`); return; }
+                  if (r.skipped?.length) {
+                    alert(`Arch DXF exported (${r.exported} windows).\nSkipped ${r.skipped.length}: ${r.skipped.map((s) => `${s.name} (${s.reason})`).join(', ')}`);
+                  }
+                }}
+                title="One DXF with every arched casement's frame head + leaf top, stacked 300mm apart (VCarve)"
+                className="btn btn-secondary text-xs px-4"
+              >
+                🛠 Arch DXF (all)
               </button>
             )}
           </div>

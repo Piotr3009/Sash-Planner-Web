@@ -124,6 +124,32 @@ the rectangular casement (cut list for arches is a later package — the engine 
 **Verdict: ⚠️** mapping verified against the PSW source, not against spec §4.2 (missing). Not
 verified: whether Piotr wants PSW `elliptical-arch` built as a three-centre (BLOCKERS 4.4).
 
+### Step 5 — export + buttons (`src/utils/cncExport.js`, `WindowDetailPage.jsx`, `ProductionPackPage.jsx`)
+
+**Understanding:** same shape as the jamb export — `archParamsForWindow` maps a windowSpec onto
+the generator or returns a readable `skip` (not a casement / not arched / unsupported shape /
+geometry error / no stock board), `exportArchDxfForWindow` → `{name}_arch.dxf`,
+`exportArchDxfMerged` → `{label}_arch.dxf` stacked 300 mm apart, `canExportArchDxf` for parity.
+
+**UI (no configurator changes):** WindowDetailPage — "🛠 Arch DXF" next to the jamb button,
+shown for every casement window, disabled with the skip reason as tooltip when the window is
+not an arched casement; the plan runs under the batch's profile snapshot through `withProfiles`,
+exactly like `derived`. ProductionPackPage — "🛠 Arch DXF (all)" for casement packs; windows
+that are not arched are listed as skipped in the alert. The merged export plans under the
+ACTIVE profile (a pack can span batches; noted in BLOCKERS 4.9).
+
+**Two approaches, one rejected:** show the button only for arched windows — rejected: Piotr
+would never find it (Petros rule "new function = visible entry"); shown for all casements,
+disabled with the reason.
+
+**Verification:** esbuild on `cncExport.js`, `WindowDetailPage.jsx`, `ProductionPackPage.jsx`;
+`grep -F` on every inserted identifier; harness §9 (8 checks: skip reasons, plan params,
+no-throw contract) → 203 ALL PASS; `npm run build` ✓ (20.7 s, same chunk-size warning as before).
+
+**Verdict: ⚠️** logic verified by harness and build; the click path itself NOT exercised in a
+browser tonight (no arched casement exists in PC data until one is imported from PSW — see
+"Rano dla Piotra").
+
 ---
 
 ## Phase 0 — Project skeleton (React + Vite + layout)
