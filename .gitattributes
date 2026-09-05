@@ -1,2 +1,2 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# DXF is a CAD interchange file: keep CRLF byte-exact (dxfWriter emits what AutoCAD emits)
+*.dxf -text

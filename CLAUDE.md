@@ -155,23 +155,35 @@ karmi cut listę, PDF-y, rysunki, PP. Nigdy nie licz wymiarów okna w innym miej
 
 ## ZADANIE NOCNE — arched-casement-v1
 
-Pełna spec: `@docs/handover/ARCHED-CASEMENT-v1.md`. W skrócie:
+**Stan po nocy 05.09.2026 (branch `claude/arched-casement-v1`, werdykt ⚠️):** pakiet
+zbudowany w całości, ALE plik spec `docs/handover/ARCHED-CASEMENT-v1.md` nie istnieje w repo
+(ani w żadnym branchu / Petros / Drive / Gmail). Wszystkie liczby spoza CLAUDE.md i źródeł PSW są
+założeniami — lista w `BLOCKERS.md` (sekcja 2026-09-05), opis wykonania w
+`docs/handover/ARCHED-CASEMENT-v1-AS-BUILT.md`. **Następny krok: wgrać spec do
+`docs/handover/`, podmienić tabele `EXPECTED` w `verify/arch/t16.mjs` na wektory §10 i puścić
+harness** — dopiero wtedy werdykt może być ✅.
+
+Zakres (wg CLAUDE.md, zrealizowany):
 
 1. `src/engine/arch.js` — geometria (1 / 2 / 3 środki, współśrodkowe offsety, clip do linii
    startu łuku, długości, bulge) + planer segmentów (metoda rzutowania, D13 domyślny wybór).
 2. `src/engine/cnc/archDxf.js` — warstwy CONTOUR / ASSEMBLY / PIECES / FINGER / TEXT, rama
    + skrzydło, styl 1:1 z `jambDxf.js`.
 3. `profile.js` — sekcja `arch` w profilu casement (spec §5).
-4. `specification.js` — `windowSpec.arch` + mapowanie pól PSW (uwaga na odwrócony
-   zawias w formularzu PSW, spec §4.2).
+4. `specification.js` — `windowSpec.arch` + mapowanie pól PSW (odwrócony zawias w formularzu
+   PSW obsłużony — wartość jest odwracana przy odczycie).
 5. `cncExport.js` + przycisk „Arch DXF" obok „Jambs DXF" (`WindowDetailPage.jsx`,
    `ProductionPackPage.jsx`). Bez nowego UI konfiguratora.
-6. `verify/arch/t16.mjs` — musi odtworzyć wektory ze spec §10 (nie odwrotnie).
-7. Przykładowy `sample_arch_1200_segmental.dxf` wygenerowany harnessem → do repo w
-   `docs/handover/samples/` (Piotr otwiera w VCarve rano).
+6. `verify/arch/t16.mjs` — 203 asercje, ALL PASS; **wartości oczekiwane to wzory zamknięte
+   liczone w harnessie, NIE wektory ze spec §10** (spec brak).
+7. `docs/handover/samples/sample_arch_1200_segmental.dxf` — generowany harnessem (Piotr otwiera
+   w VCarve rano). Pozostałe kształty → `.audit/` po uruchomieniu harnessu.
 
-Do BLOCKERS.md na start (znane, nierozstrzygnięte przez Piotra):
-- D13 — wybór N (mniej kawałków vs węższa deska): przyjęty domyślny, alternatywa drukowana.
+Etap 2 (próbki wszystkich kształtów, edge-case'y, raport parity PSW) **nie został zaczęty** —
+warunkiem był werdykt ✅ Etapu 1, a bez specu ✅ jest niemożliwe.
+
+Do BLOCKERS.md (znane, nierozstrzygnięte przez Piotra — wpisane):
+- D13 — wybór N (mniej kawałków vs węższa deska): przyjęty domyślny „mniej kawałków", alternatywa drukowana.
 - D5 — Piotr mówił „palec 10–11", wybrane narzędzie to profil 15/16; przyjęto 15/16/3,8.
 - Głowica Stark d50 na 5-osiowym CNC wymaga trzpienia d50 — decyzja procesowa Piotra, DXF bez zmian.
 

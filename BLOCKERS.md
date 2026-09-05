@@ -4,6 +4,72 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-09-05 — arched-casement-v1
+
+### 0. [CRITICAL] The package spec is missing from the repository
+
+`docs/handover/ARCHED-CASEMENT-v1.md` does not exist on `main`, on any remote branch, in the
+git history, in Petros (`software/*` cabinets), in Google Drive or in Gmail. CLAUDE.md (commit
+78ac6f5, 05.09 01:17) references it, but the `docs/` directory was never committed. Only this
+session exists for the package, so no earlier Claude session holds it either.
+
+What I did instead (per the night rules: simplest solution consistent with what IS known):
+- Scope, file list, layer names, module order, button placement, BLOCKERS entries and the
+  "NIE RÓB DZIŚ" list come verbatim from CLAUDE.md.
+- PSW numbers come from the PSW source itself (read-only clone): `js/price-calculator.js`
+  `window.ArchedSash` (RISE_RATIO, GOTHIC_PROFILE_RATIO, MIN_WIDTH 400 / MAX_WIDTH 1500),
+  `js/casement-controller.js` (`casArchShape`, `casArchHinge`), `online-estimate.html` lines
+  846–888 (shape radios; the hinge radio labelled "Left Hinge" carries `value="right"`).
+- Every other number is my assumption, listed below with the alternative. All of them sit in
+  one place (`DEFAULT_CASEMENT_PROFILE.arch` or the constants at the top of `arch.js`).
+- The harness cross-checks closed-form geometry; it CANNOT reproduce spec §10. When you commit
+  the spec, the `EXPECTED` tables in `verify/arch/t16.mjs` must be replaced by the §10 vectors.
+
+**Ask:** commit the spec (or paste it) — then one pass of the harness tells us which assumptions
+below differ from your decisions.
+
+### 1. D13 — number of pieces N (fewer pieces vs narrower board)
+
+Default taken: **fewest pieces whose projected width (+ allowance) fits a stock board**.
+Alternative printed in the DXF TEXT block: the plan on the **narrowest** stock board (more pieces).
+Both plans come out of `planArchSegments`; only the default is drawn as PIECES.
+
+### 2. D5 — finger joint profile
+
+Piotr said "finger 10–11"; the chosen tool is the 15/16 profile. Taken: **15 / 16 / 3.8**
+(`profile.arch.finger = { length: 15, depth: 16, pitch: 3.8 }`), printed as `FINGER 15/16/3.8` on
+the TEXT layer. The FINGER layer carries the joint faces only (no teeth drawn).
+
+### 3. Stark d50 head on the 5-axis CNC needs a d50 arbor
+
+Process decision for Piotr — the DXF is unchanged either way (joint faces are plain lines; the
+tool does the profile).
+
+### 5. Stage 2 not started (deliberate)
+
+Piotr's gate: Stage 2 only after a ✅ Stage 1. Without the spec the harness cannot reproduce §10,
+so Stage 1 is ⚠️ and Stage 2 (samples for every shape, edge-case harness, PSW parity report)
+was not begun. Each is small once the spec is in: the harness already round-trips every shape
+into `.audit/arch_1200_<shape>.dxf`, the limits already throw readable errors, and the PSW clone
+command works from this container (`git -c http.proxyAuthMethod=basic clone --depth 1 …`).
+
+### 4. ASSUMPTIONS made because the spec is missing (each one is one edit away)
+
+| # | Item | Taken | Alternative / where |
+|---|------|-------|---------------------|
+| 4.1 | Rise limits for free-rise shapes | segmental 0.10–0.45 W, gothic drop 0.55–0.85 W, three-centre 0.15–0.45 W | `ARCH_LIMITS.riseRatio` in `arch.js` |
+| 4.2 | Gothic drop default rise | 0.70 W (PSW `GOTHIC_PROFILE_RATIO.drop`) | PSW also has `shallow` 0.60 |
+| 4.3 | Three-centre haunch radius | rise × 0.5, crown radius from tangency | `THREE_CENTRE_HAUNCH_RATIO` |
+| 4.4 | PSW `elliptical-arch` | mapped to `three-centre` (routable from arcs; ellipse is not) | keep as unsupported → export disabled |
+| 4.5 | Rise vs height | only "straight part > 0" is enforced | PSW arched SASH uses ≥ 900 mm straight; casement has no rule in PSW |
+| 4.6 | Branch name | CLAUDE.md says `claude/arched-casement-v1`; the session harness mandates `claude/arched-casement-v1-m23u5x` — commits pushed to BOTH | delete the one you don't want |
+| 4.7 | Board stock for arch pieces | `profile.arch.stockWidths = [100, 125, 150, 175, 200, 225, 250]`, `widthAllowance = 20` (same idea as `boxRaw.widthAllowance`), `maxPieces = 8` | the real list belongs to the Part Registry / supplier; edit the profile |
+| 4.8 | Piece length limits | none — a piece may be as long as the outer chord (≤ 1500 mm) | add `maxPieceLength` to the profile if boards are shorter |
+| 4.9 | Profile snapshot in the pack export | single-window "Arch DXF" plans under the batch's `_profileSnapshot.casement` (like `derived`); "Arch DXF (all)" in the Production Pack plans under the ACTIVE profile (a pack spans batches) | pass per-window snapshots through `windowsData` if it ever matters |
+| 4.10 | How an arched casement gets INTO PC | only through window data carrying PSW fields (`casementType: 'arched'`, `casArchShape`, `casArchHinge`) or PC-native `archShape` / `archRise` / `archHinge`; the PC configurator has no arched option (spec: "no new configurator UI"), and PC's estimates are PC-made — there is no PSW→PC import path in the code today | the button is visible on every casement window, disabled with the reason; enabling it in the UI needs either a PSW import or an `archShape` field in the configurator (separate package) |
+
+---
+
 ## Branch name mismatch (procedural)
 
 `CLAUDE.md` instructs me to work on `claude/full-build`, but the harness mandates `claude/build-sash-planner-web-exXYt` and explicitly forbids pushing elsewhere without permission.

@@ -4,6 +4,216 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-09-05 — arched-casement-v1 (night run, branch `claude/arched-casement-v1`)
+
+**Blocking fact first:** `docs/handover/ARCHED-CASEMENT-v1.md` (the package spec) is NOT in the
+repository, in any branch, in Petros, Drive or Gmail. Everything below is built from CLAUDE.md,
+the PSW source (`js/price-calculator.js` `window.ArchedSash`, `js/casement-controller.js`,
+`online-estimate.html`) and the existing PC engine conventions. Every number the spec would have
+fixed is listed in BLOCKERS.md as an ASSUMPTION. The harness reproduces closed-form geometry, not
+the spec's §10 vectors — so no step in this section can honestly carry ✅. See the final verdict.
+
+### FINAL VERDICT — ⚠️ (built and machine-verified; not verified against the spec)
+
+**Delivered on `claude/arched-casement-v1` (and `claude/arched-casement-v1-m23u5x`, same
+commits):** all seven §11 files, harness (203 checks ALL PASS), `npm run build` ✓, sample DXF,
+as-built document, BLOCKERS with D13 / D5 / Stark d50 + ten assumptions. `main` untouched.
+
+**Why not ✅:** `docs/handover/ARCHED-CASEMENT-v1.md` does not exist anywhere I could reach.
+The harness reproduces closed-form geometry and my own D13 / stock / limit decisions — it
+cannot prove the spec's §10 vectors. Stage 2 was therefore not started (Piotr's gate).
+
+**NOT verified tonight (honest list):**
+1. Every number in BLOCKERS §4 (rise limits, three-centre haunch ratio, elliptical → three-centre,
+   stock widths, allowance 20, maxPieces 8, straight-part rule) — assumptions.
+2. D13 default direction ("fewest pieces") — assumption; alternative is printed.
+3. Finger profile 15/16/3.8 — read from CLAUDE.md, tool never seen.
+4. VCarve import of the DXF — only ezdxf 1.4.4 round-trip + a matplotlib render were checked.
+5. The UI click path in a browser (build passes, no arched casement exists in PC data — see
+   BLOCKERS 4.10).
+6. Merged "Arch DXF (all)" under a batch profile snapshot (uses the active profile, 4.9).
+7. Board LENGTH limits, piece minimum length (none implemented, 4.8).
+
+### Rano dla Piotra
+
+**Co otworzyć w VCarve:** `docs/handover/samples/sample_arch_1200_segmental.dxf` (mm). Cztery
+rzędy od góry: FRAME HEAD kontur (CONTOUR) z deskami w pozycji sklejenia (ASSEMBLY) i
+płaszczyznami palców (FINGER, czerwone); FRAME HEAD kawałki płasko na deskach (PIECES + ASSEMBLY);
+to samo dla LEAF TOP. Tekst po prawej każdego konturu: kształt, W, strzałka, zawias, promienie,
+plan (2 × deska 150, ALT 4 × deska 100), `FINGER 15/16/3.8`. Sprawdź: (a) łuki importują się jako
+łuki (bulge), nie łamane; (b) czy rysować deski w widoku złożenia (warstwę ASSEMBLY można wyłączyć);
+(c) czy czcionka/rozmiar tekstu 15 mm jest OK; (d) czy palec ma być na płaszczyźnie (tak jak
+teraz) czy z narysowanymi zębami.
+
+**Pozostałe kształty:** `node verify/arch/t16.mjs` zapisuje `.audit/arch_1200_semi-circle.dxf`,
+`…gothic-equilateral.dxf`, `…gothic-drop.dxf`, `…three-centre.dxf` (katalog `.audit` jest
+ignorowany przez git).
+
+**Co sprawdzić w UI:** okno casement → nagłówek strony: przycisk „🛠 Arch DXF" obok „✏️ Edit
+Configuration" (dla sash jest tam „🛠 CNC Jamb DXF"). Dla zwykłego casementu jest wyszarzony z
+tooltipem „not an arched casement". Production Pack typu casement → „🛠 Arch DXF (all)". Aktywny
+przycisk wymaga okna z polami PSW (`casementType: 'arched'`) — w PC nie ma dziś drogi, żeby takie
+okno powstało (BLOCKERS 4.10). To jest luka do decyzji, nie do naprawy „przy okazji".
+
+**Decyzje, które czekają:** (1) wgrać spec i podmienić wektory §10 w harnessie; (2) D13 — „mniej
+kawałków" czy „węższa deska" jako domyślne; (3) D5 — 15/16/3,8 potwierdzone?; (4) lista desek
+stockowych i zapas 20 mm (profil casement → `arch`); (5) PSW „elliptical" jako trzyśrodkowy;
+(6) limity strzałki per kształt; (7) skąd PC ma dostać łukowy casement (import z PSW czy pole w
+konfiguratorze — osobny pakiet); (8) Stark d50 / trzpień.
+
+
+### Step 1 — geometry (`src/engine/arch.js`, harness §10.1)
+
+**Understanding:** one arched member = ring between two concentric contours of the window's outer
+arch, clipped at the arch-start line (y = 0). Shapes: segmental (1 centre below the line),
+semi-circle (1), gothic equilateral / gothic drop (2 centres on the line), three-centre (2 haunch
+centres + 1 crown centre). Rise defaults from PSW `RISE_RATIO` / `GOTHIC_PROFILE_RATIO.drop`.
+
+**Context:** engine only — `arch.js` reads `frameHead.face`, `leafAtJamb`, `leafTop.face`,
+`glassInset` from the casement profile passed in; nothing hard-coded (CLAUDE.md rule 11).
+
+**Two approaches, one rejected:** (a) port the PSW 3D point sampling (`arcPoints`, Bézier for the
+ellipse) — rejected: sampled polylines cannot carry bulges and the 3D "elliptical" is not
+routable from concentric arcs; (b) keep every arc as (centre, radius, a0, a1) with clip flags and
+offset by shrinking radii — chosen (matches the Petros "concentricity" patent and DXF bulge).
+
+**Edge cases handled:** rise smaller than a member face (contour never reaches y = 0 → ArchError),
+rise ≥ height, width outside 400–1500, foreign rise on a fixed-rise shape, unknown shape,
+`atan2(−0, −x)` returning −π on the left arch-start end (found by the harness, fixed).
+
+**Harness:** `node verify/arch/t16.mjs` — 77 checks, ALL PASS: radii, centres, outer / frame-inner
+/ leaf-outer / leaf-inner / glass lengths for all five shapes at W = 1200 against formulas written
+independently in the harness; concentricity; clipping; bulge polyline rebuilds every radius.
+
+**Verdict: ⚠️** code verified against closed-form geometry only; NOT verified against spec §10.1
+(file missing). Not verified: rise limits per shape (my ratios), three-centre haunch ratio 0.5.
+
+### Step 2 — segment planner (`arch.js` §7, harness §10.2)
+
+**Understanding:** a curved member is glued from N straight boards on radial finger joints and
+routed afterwards. For each arc of a ring and each N = 1…maxPieces: split by equal outer angle,
+project every piece onto its board axes (bisector = width, chord = length), board = projected
+width + allowance, stock = narrowest board ≥ that. D13 default = fewest pieces that fit a stock
+board; alternative = plan on the narrowest board (returned, to be printed by the DXF).
+
+**Two approaches, one rejected:** (a) closed-form width ρo − ρi·cos(φ/2) for every piece —
+rejected because end pieces are clipped (arch-start line, gothic apex on the axis) and the inner
+corner is no longer the lowest point (segmental N = 1: 240 mm, not 281 mm); (b) exact projection
+of the actual piece boundary (arc extrema + corners) — chosen; the harness cross-checks it by
+brute-force sampling (4000 points per arc) AND by the closed form on radial-radial pieces.
+
+**Edge cases:** no stock fits → options keep `stock = null`, `noStock = true`, no throw; gothic
+apex = one joint on the axis (finger), arch-start cuts are not joints; three-centre tangent
+joints are one shared radial line for both neighbours.
+
+**Harness:** 140 checks ALL PASS. W = 1200, stock 100–250, allowance 20: segmental 2 pcs / 150
+board (alt 4 / 100), semi-circle 2 / 250 (alt 6 / 100), gothic 1 + 1 (alt 3 + 3), three-centre
+1 + 2 + 1 (alt crown 4).
+
+**Verdict: ⚠️** planner verified two independent ways; D13 default and the stock list are my
+assumptions (BLOCKERS 1, 4.7). Not verified: piece minimum length, board length limits (none in
+the code — a 1500 semi-circle N = 1 asks for a 750 mm board and is simply infeasible).
+
+### Step 3 — CNC drawing (`src/engine/cnc/archDxf.js`, harness §10.3 round-trip)
+
+**Understanding:** one DXF per window with four rows (top-down): FRAME HEAD contour + assembly,
+FRAME HEAD pieces laid flat, LEAF TOP contour + assembly, LEAF TOP pieces. Layers: CONTOUR =
+finished member (routed after glue-up), ASSEMBLY = stock boards (assembled and flat), PIECES =
+piece contours to rout, FINGER = joint faces (planes only, the Stark head cuts the teeth), TEXT =
+labels + plan summary incl. the D13 alternative. Entity model, R12 writer, 200 mm gaps, 15 mm
+text and the merged-stack convention are 1:1 `jambDxf.js`.
+
+**Two approaches, one rejected:** drawing the finger teeth (pitch 3.8 → hundreds of vertices per
+joint, useless to a 5-axis operator) — rejected; joint planes + printed profile — chosen.
+
+**Bug found by the harness:** tilted stock boards in the assembled view overhang the ring's
+bounding box (−29.6 mm left of the origin) → rows are now placed by the bbox of ALL their
+entities. Three other failures were wrong assertions (a single-piece board is axis-aligned too;
+1324.2 not 1324.1; leaf contour picked instead of frame), fixed in the harness, not the code.
+
+**Harness:** `docs/handover/samples/sample_arch_1200_segmental.dxf` written and read back with
+ezdxf 1.4.4 (`verify/arch/dxf_probe.py`): AC1009, five layers, CONTOUR arc lengths = outer +
+inner of both rings (closed form), straight cuts = arch-start ends, PIECES arcs tile the rings,
+one board per piece assembled + flat, FINGER faces 57 mm long, TEXT lines (labels, shape line,
+`FINGER 15/16/3.8`, `ARC 1 R870 L1324.2: 2 x board 150 … (ALT 4 x board 100)`). Same round-trip
+for semi-circle, gothic equilateral, gothic drop, three-centre; merged export stacks 300 mm
+apart; a no-stock plan is refused with a readable ArchError. 176 checks ALL PASS. Rendered the
+three files to PNG via ezdxf/matplotlib and eyeballed the layout (rows, tilted boards, joints).
+
+**Verdict: ⚠️** DXF verified by round-trip and by eye in a renderer — NOT in VCarve (Piotr,
+morning). Not verified: text placement inside VCarve, whether the workshop wants the assembled
+boards drawn at all (ASSEMBLY layer can simply be switched off).
+
+### Step 4 — profile `arch` section + `windowSpec.arch` (spec §4–5, harness §10.3 pt 9)
+
+**Understanding:** the arch geometry already reads its faces from the casement profile; the
+planner and the drawing additionally need the finger profile and the board stock — that is the
+whole `arch` section (`finger 15/16/3.8`, `stockWidths`, `widthAllowance 20`, `maxPieces 8`).
+`normaliseToWindowSpec` gains `arch: { shape, rise, hinge } | null` from PSW's `casementType`
+/ `casArchShape` / `casArchHinge` (or PC-native `archShape` / `archRise` / `archHinge`).
+
+**Reversed hinge:** PSW `online-estimate.html` 887–888 — the radio labelled "Left Hinge" has
+`value="right"` and vice versa, so the saved value is the opposite of what the customer chose. PC
+stores the meaning: `casArchHinge 'right' → hinge 'left'` (default too), `'left' → 'right'`.
+Same policy as the door hinge/open-direction fix already in `specification.js`. Note: PSW's own
+3D passes the raw value straight to `hingeDirection` (`src/3d/App.jsx` 453) — read-only, left as is.
+
+**Migration:** `migrateCasementProfile` fills `arch` (deep-merging `finger`) for every stored
+profile that predates it — persisted user profiles and batch `_profileSnapshot.casement` alike;
+the settings UI edits `elements` / `deductions` only, so nothing there iterates the new key.
+
+**Edge cases:** PSW arched with the radios never touched → `semi-circle` / `hinge left` (PSW
+defaults); unknown PSW shape kept verbatim so the exporter reports it instead of guessing;
+standard casement and sash → `arch: null`; `deriveWindowData` on an arched spec keeps deriving
+the rectangular casement (cut list for arches is a later package — the engine is untouched).
+
+**Harness:** 19 new checks, 195 ALL PASS — including the real data path
+`normaliseToWindowSpec → deriveWindowData → buildArchPlan(getCasementProfile())`.
+
+**Verdict: ⚠️** mapping verified against the PSW source, not against spec §4.2 (missing). Not
+verified: whether Piotr wants PSW `elliptical-arch` built as a three-centre (BLOCKERS 4.4).
+
+### Step 5 — export + buttons (`src/utils/cncExport.js`, `WindowDetailPage.jsx`, `ProductionPackPage.jsx`)
+
+**Understanding:** same shape as the jamb export — `archParamsForWindow` maps a windowSpec onto
+the generator or returns a readable `skip` (not a casement / not arched / unsupported shape /
+geometry error / no stock board), `exportArchDxfForWindow` → `{name}_arch.dxf`,
+`exportArchDxfMerged` → `{label}_arch.dxf` stacked 300 mm apart, `canExportArchDxf` for parity.
+
+**UI (no configurator changes):** WindowDetailPage — "🛠 Arch DXF" next to the jamb button,
+shown for every casement window, disabled with the skip reason as tooltip when the window is
+not an arched casement; the plan runs under the batch's profile snapshot through `withProfiles`,
+exactly like `derived`. ProductionPackPage — "🛠 Arch DXF (all)" for casement packs; windows
+that are not arched are listed as skipped in the alert. The merged export plans under the
+ACTIVE profile (a pack can span batches; noted in BLOCKERS 4.9).
+
+**Two approaches, one rejected:** show the button only for arched windows — rejected: Piotr
+would never find it (Petros rule "new function = visible entry"); shown for all casements,
+disabled with the reason.
+
+**Verification:** esbuild on `cncExport.js`, `WindowDetailPage.jsx`, `ProductionPackPage.jsx`;
+`grep -F` on every inserted identifier; harness §9 (8 checks: skip reasons, plan params,
+no-throw contract) → 203 ALL PASS; `npm run build` ✓ (20.7 s, same chunk-size warning as before).
+
+**Verdict: ⚠️** logic verified by harness and build; the click path itself NOT exercised in a
+browser tonight (no arched casement exists in PC data until one is imported from PSW — see
+"Rano dla Piotra").
+
+### Step 6 — sample DXF, docs, checklist
+
+- `docs/handover/samples/sample_arch_1200_segmental.dxf` — written by the harness on every run,
+  byte-identical between runs (md5 7129d427…), committed.
+- `docs/handover/ARCHED-CASEMENT-v1-AS-BUILT.md` — what was built, per section, for diffing
+  against the real spec. The spec itself was NOT fabricated.
+- CLAUDE.md „ZADANIE NOCNE" updated with the state and the next step; „NIE RÓB DZIŚ" untouched.
+- Checklist: esbuild ✓ on all 7 touched files · zero Polish characters in sources (UTF-8 grep) ·
+  `node verify/arch/t16.mjs` 203/203 ALL PASS · `npm run build` ✓ · `git diff main --stat` = the
+  seven §11 files + verify/ + docs/ + BUILD-LOG + BLOCKERS + .gitignore (`.audit`) · `main` untouched.
+
+**Verdict: ⚠️** — see FINAL VERDICT at the top of this section.
+
+---
+
 ## Phase 0 — Project skeleton (React + Vite + layout)
 
 **Goal:** Empty app with layout loads in the browser.

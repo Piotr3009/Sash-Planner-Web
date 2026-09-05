@@ -24,7 +24,7 @@ import ThreeDPanel from '../components/dashboard/ThreeDPanel.jsx';
 import ExportControls from '../components/export/ExportControls.jsx';
 import { exportGlassPDF } from '../utils/glassPdfExport.js';
 import { exportBomPDF } from '../utils/bomPdfExport.js';
-import { exportCncJambsForWindow, canExportCncJambs } from '../utils/cncExport.js';
+import { exportCncJambsForWindow, canExportCncJambs, exportArchDxfForWindow, archParamsForWindow } from '../utils/cncExport.js';
 
 
 const TABS = [
@@ -79,6 +79,12 @@ export default function WindowDetailPage() {
     try { return withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, () => deriveWindowData(windowSpec, settings)); }
     catch (e) { console.warn('Calculation failed:', e); return null; }
   }, [windowSpec, settings]);
+  // Arched casement CNC export — planned under the batch's profile snapshot,
+  // exactly like `derived` above; `skip` doubles as the button tooltip.
+  const archExport = useMemo(() => {
+    if (!windowSpec) return { skip: 'no data' };
+    return withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, () => archParamsForWindow(windowSpec, item?.name));
+  }, [windowSpec, item?.name, currentBatch]);
 
   const [tab, setTab] = useState('3d');
 
@@ -120,6 +126,21 @@ export default function WindowDetailPage() {
               className={`btn text-sm bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 ${!canExportCncJambs(windowSpec) ? 'opacity-40 cursor-not-allowed' : ''}`}
             >
               🛠 CNC Jamb DXF
+            </button>
+          )}
+          {(windowSpec?.category || 'sash') === 'casement' && (
+            <button
+              onClick={() => {
+                const r = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, () => exportArchDxfForWindow(windowSpec, item.name));
+                if (r.error) alert(`Arch DXF unavailable: ${r.error}`);
+              }}
+              disabled={!!archExport.skip}
+              title={archExport.skip
+                ? `Arch DXF unavailable: ${archExport.skip}`
+                : 'Download the arched head CNC drawing — frame head + leaf top (DXF for VCarve)'}
+              className={`btn text-sm bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 ${archExport.skip ? 'opacity-40 cursor-not-allowed' : ''}`}
+            >
+              🛠 Arch DXF
             </button>
           )}
           <Link to={editUrl} className="btn btn-primary text-sm">✏️ Edit Configuration</Link>

@@ -142,6 +142,21 @@ export const DEFAULT_CASEMENT_PROFILE = {
     // transom-style rule: adjacent tier leafH + partialMullionSeat.
     partialMullionSeat: 8,
   },
+  // ── Arched head (arched-casement-v1, 05.09.2026) ─────────────────────────
+  // Curved members are glued from straight boards on finger joints and routed
+  // afterwards (src/engine/arch.js). The arch geometry itself reads
+  // frameHead.face / leafTop.face / leafAtJamb / glassInset above; this block
+  // holds only what the segment planner and the CNC drawing need.
+  arch: {
+    // Finger-joint profile of the Stark d50 head (D5): finger length / joint
+    // depth / pitch — printed on the drawing as FINGER 15/16/3.8.
+    finger: { length: 15, depth: 16, pitch: 3.8 },
+    // Board widths the planner may pick from (finished piece + allowance must
+    // fit). Workshop stock list — edit here, never in the planner.
+    stockWidths: [100, 125, 150, 175, 200, 225, 250],
+    widthAllowance: 20,  // mm added to the projected piece width before matching a board
+    maxPieces: 8,        // pieces per arc the planner will consider
+  },
   rounding: 0.1,       // mm — CNC-ready, one decimal
 };
 
@@ -169,6 +184,9 @@ export function migrateCasementProfile(profile) {
     geometry: { ...D.geometry, ...profile.geometry },
     deductions: { ...D.deductions, ...profile.deductions },
     lengths: { ...D.lengths, ...profile.lengths },
+    // v1.2: arched-head section (finger joint, board stock) — filled from the
+    // default for profiles stored before arched-casement-v1.
+    arch: { ...D.arch, ...profile.arch, finger: { ...D.arch.finger, ...profile.arch?.finger } },
   };
 }
 
