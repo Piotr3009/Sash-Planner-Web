@@ -117,6 +117,23 @@ export function arcLabelPoint(arc, tx, offset = 0) {
   return tx(arc.cx + (arc.r + offset) * Math.cos(m), arc.cy + (arc.r + offset) * Math.sin(m));
 }
 
+/** A haunch / gothic arc: exactly one end on the springing line (its label goes outside, near the corner). */
+export const isHaunchArc = (arc) => (arc.clip0 === 'archStart') !== (arc.clip1 === 'archStart');
+
+/**
+ * Label point for a BAR arc (no clip info): a ring (centred on the axis) at
+ * its middle angle; a tracery arc (centred on a frame corner) 30 % of the
+ * way from its springing end — two tracery arcs cross near the axis at their
+ * middles. `axisX` = the glass frame axis (Wg / 2). Pushed `offset` mm outward.
+ */
+export function barArcLabelPoint(arc, tx, axisX, offset = 0) {
+  const span = arc.a1 - arc.a0;
+  let m = (arc.a0 + arc.a1) / 2;
+  if (arc.cx < axisX - 1e-6) m = arc.a0 + 0.3 * span;          // starts on the springing at a0
+  else if (arc.cx > axisX + 1e-6) m = arc.a1 - 0.3 * span;     // ends on the springing at a1
+  return tx(arc.cx + (arc.r + offset) * Math.cos(m), arc.cy + (arc.r + offset) * Math.sin(m));
+}
+
 /** `R 150 / 1400 / 150` — every arc's radius in chain order (one decimal when needed). */
 export function radiiText(arcs) {
   const f = (r) => { const v = Math.round(r * 10) / 10; return Number.isInteger(v) ? String(v) : v.toFixed(1); };

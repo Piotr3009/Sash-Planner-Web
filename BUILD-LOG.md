@@ -76,6 +76,56 @@ click zones: head = the outer/land band path, jambs from the springing down. Rec
 Rendered and looked at (three-centre, gothic). **Verification:** esbuild OK · no Polish letters · snapshot
 IDENTICAL. **Verdict: ✅ D2** (t19 assertions added at the end of the night, see T19).
 
+### D3 — `CasementLeafDetail2D.jsx`
+
+**Understanding:** the leaf sheet is what the bench sees: outer leaf (straight stiles + the C-ARCH TOP RAIL
+outer chain), the 24 mm unit edge (= the glazier's outline), the daylight (top rail inner chain), bars with
+the crossing / notch symbols, chains of stile · bars · stile.
+
+**Built:** arched branch when `derived.arch` exists and the group is the (single) arched leaf: leaf outline /
+daylight / unit edge from `leafTop.outer`, `leafTop.inner` and `glassOutline.arcs` (leaf coordinates via
+`archToSheet(fw, rise, ox − rect.x, oy − rect.y)` and `glassToSheet` at the 54.5 unit inset); bars = 22 mm
+bands on the engine axes clipped to the daylight; crosses at every straight v × h crossing and V-notches at
+the straight-edge ends (v bottoms, h / springing ends) — the same symbols as the rectangular leaf, only where
+a bar meets a straight edge; chains built from the engine's straight bars (`role v`, `h` / `springing`,
+de-duplicated by position, so the two springing segments of a hub print as one 22 cut); springing line,
+`stile <leafStraightStile>` + `rise` dims on the right, overall H moved out (80·ts) only when arched; `R`
+labels — haunch / gothic arcs outside near the corner (`isHaunchArc`), crown / semi-circle inside the
+daylight; third title line `Three-centre · stile 1253 · rise 160 · top rail R 110 / 1360 / 110 · C-ATR 949.8`
+(length from the cut-list record). Opening symbol starts on the springing line. Click zones: top rail = the
+ring band path, stiles from the springing down. The rectangular `computeBarPositions` lists are emptied on an
+arched leaf so the old bar drawing renders nothing there (rectangular output byte-identical). Rendered and
+looked at (three-centre 1H 2V, semi-circle hub-spoke, gothic intersecting).
+**Verification:** esbuild OK · no Polish letters (codepoint check, not a byte grep) · snapshot IDENTICAL.
+**Verdict: ✅ D3**
+
+### D4 + E — `CasementGlassDrawing2D.jsx` (glazier sheet, bar end numbers)
+
+**Understanding:** the glazier cuts the outline from the DXF; the sheet is the human copy — the same outline,
+the seal, the spacer bars, and (E) a number at every bar end he cannot measure off a straight edge because it
+lies on a curve.
+
+**Two approaches for the seal, one rejected:** (a) inset the closed polygon (vertex normals, PSW centroid
+trick) — rejected: not concentric, wrong at the tangent points; (b) `offsetArcs(geometry.glass.arcs, 11)`
+in the arch frame, shifted into the glass frame — chosen (exact, rule C keeps the sides at ±(xg − 11)).
+
+**Built:** unit outline = `glassOutline.arcs` (glass frame → sheet), seal = concentric 11 mm offset (frosted
+hatch fills the seal path), spacers = 18 mm bands on the engine bar axes (straight bands, exact arcs for rings
+/ tracery), top / left chains from the straight bars (v; h + springing de-duplicated), springing line,
+`springing` + `rise` dims (right, 34·ts) with the overall H at 74·ts when arched, `R` labels for every glass
+arc (haunch outside / crown inside), third title line `Three-centre · springing 1198.5 · rise 105.5 · R 55.5 /
+1305.5 / 55.5 · 3 bars`, title `811 × 1304 mm · arched`. **E:** straight bar whose top end lies above the
+springing (`onCurve`) → `V1 1297` beside the bar 56 mm below its end (x is on the chain); spoke → `K1 608.3 ·
+1249.7` set back along the spoke; ring → `R1 R 121.7` inside the ring; tracery arc → `T1 R 364.8` at 30 % from
+its springing end (`barArcLabelPoint`, two tracery arcs cross near the axis at their middles) + the end that
+lies on the outline (`from` for right-centred arcs, `to` for left-centred — PSW's arc direction) printed
+outside the outline `62.1 · 1162`. Rendered and looked at (three-centre, semi-circle hub-spoke, gothic
+intersecting): first pass had `V1` on top of `R 1305.5` and `T2` / `T3` on top of each other, and the
+right-hand tracery ends unlabelled (the `to` end sits on the springing there) — all three fixed.
+**Verification:** esbuild OK · no Polish letters · snapshot IDENTICAL (4 windows / 22 sheets) · `A` count per
+sheet = 2 × outline arcs (unit + seal) + 2 × arc bars (checked by hand: 6 / 4 / 12 / 2 / 8).
+**Verdict: ✅ D4 + E** (2D part; E in 3D is part of F).
+
 ## 2026-09-06 — arched-casement-v2 night 3: A + B + C + t18 (branch `claude/arched-casement-v2-impl-0j27uw`)
 
 Inputs read in full, in this order: `CLAUDE.md` → `ARCHED-CASEMENT-v2.md` (spec, P1–P10 override v1) →
