@@ -5,10 +5,15 @@
  * unit's bottom-left corner, y up, mm — exactly what the glazier cuts to):
  *   GLASS_CONTOUR  closed POLYLINE with bulge vertices — exact arcs, one vertex
  *                  per arc end point (VCarve / the glass CNC read true arcs)
- *   GLASS_BARS     bar AXES: straight bars as 2-vertex polylines, curved bars
+ *   GLASS_EDGE     the edge cover line (profile glass.edgeCover per glass type,
+ *                  11 default) inside the contour all round, exact arcs (v3 0.2)
+ *   GLASS_BARS     spacer bar BANDS: two curves ±barWidth/2 (18 → ±9) from the
+ *                  axis, bulge on arcs (v3 0.2)
+ *   GLASS_BAR_AXES bar axes: straight bars as 2-vertex polylines, curved bars
  *                  (rings, tracery) as 2-vertex bulge polylines
  *   GLASS_TEXT     window name, unit id, W × H, radii, rise, springing, the
- *                  glass spec line and one line per bar (`V1 x=… L=…`)
+ *                  glass spec line, one line per bar (`V1 x=… L=…`) and the
+ *                  bar-end dimensioning rows (v3 0.3: s from apex · L · angle)
  * Units are stacked top-down, MERGE_GAP (300 mm) apart, like the jamb and
  * arch CNC files. Serialised by dxfWriter.js (R12, POLYLINE + bulge).
  * Rectangular units are NOT exported here (the glass PDF covers them); a
@@ -18,12 +23,19 @@
 import { writeDxf } from '../engine/cnc/dxfWriter.js';
 import { MERGE_GAP } from '../engine/cnc/jambDxf.js';
 import { buildGlassListForWindow } from '../engine/lists.js';
+import { getCasementProfile } from '../engine/profile.js';
+import { readGlassProfile, barBandCurves, glassEdgePoly, barEndRows, useBarTable } from '../engine/glassBars.js';
 import { downloadDxf, safeName } from './cncExport.js';
 
+// v3 Block 0.2: bars are BANDS (two offset curves ±barWidth/2, bulge on arcs)
+// on GLASS_BARS, the axes move to GLASS_BAR_AXES, the edge cover line
+// (profile glass.edgeCover per glass type) all round on GLASS_EDGE.
 export const GLASS_LAYERS = Object.freeze([
-  { name: 'GLASS_CONTOUR', color: 7 },   // finished unit outline (cut line)
-  { name: 'GLASS_BARS',    color: 3 },   // bar axes (astragal / duplex positions)
-  { name: 'GLASS_TEXT',    color: 2 },
+  { name: 'GLASS_CONTOUR',  color: 7 },   // finished unit outline (cut line)
+  { name: 'GLASS_EDGE',     color: 8 },   // edge cover / perimeter spacer line (contour − edgeCover)
+  { name: 'GLASS_BARS',     color: 3 },   // spacer bar bands (barWidth wide)
+  { name: 'GLASS_BAR_AXES', color: 4 },   // bar axes (astragal / duplex centre lines)
+  { name: 'GLASS_TEXT',     color: 2 },
 ]);
 
 export const GLASS_DXF = Object.freeze({
@@ -125,6 +137,17 @@ export function barTextLine(b) {
   return `${b.id} ${b.role.toUpperCase()} (${fmt1(x0)},${fmt1(y0)})-(${fmt1(x1)},${fmt1(y1)}) L=${L}`;
 }
 
+/** Bar-end dimensioning lines (v3 0.3) — the same rows the sheet and the PDF print. */
+export function barEndTextLines(shape) {
+  const bars = shape.bars || [];
+  if (!bars.length) return [];
+  const rows = barEndRows(bars, shape.outline);
+  const head = useBarTable(bars) ? `BAR ENDS (TABLE, ${bars.length} BARS): ID  S FROM APEX / POSITION  L  ANGLE / R` : 'BAR ENDS: ID  S FROM APEX / POSITION  L  ANGLE / R';
+  // R12 TEXT is ASCII: the degree sign becomes DEG
+  const ascii = (t) => String(t).toUpperCase().replace(/\u00b0/g, 'DEG').replace(/\u00b7/g, '-');
+  return [head, ...rows.map((r) => `${r.id}  ${ascii(r.cells.s)}  L=${r.cells.L}  ${ascii(r.cells.angle)}`)];
+}
+
 /** Text lines of one unit (also reused by the harness). */
 export function unitTextLines(unit, winName) {
   const { row, shape } = unit;
@@ -138,7 +161,24 @@ export function unitTextLines(unit, winName) {
   const bars = shape.bars || [];
   lines.push(bars.length ? `BARS ${bars.length}${shape.pattern && shape.pattern !== 'none' ? ' PATTERN ' + String(shape.pattern).toUpperCase() : ''} TOTAL L=${fmt1(bars.reduce((s, b) => s + b.length, 0))}` : 'NO BARS');
   for (const b of bars) lines.push(barTextLine(b));
+  lines.push(...barEndTextLines(shape));
   return lines;
+}
+
+/** Profile glazier numbers for a unit row (bar width, edge cover of its glass type). */
+export function unitGlassProfile(unit) {
+  return readGlassProfile(getCasementProfile(), unit?.row?.type || 'double');
+}
+
+/** Bulge polyline of one band / axis curve (glass frame) shifted by (ox, oy). */
+function curvePoly(layer, c, ox, oy) {
+  if (c.kind === 'arc') {
+    const a = c.arc;
+    const p0 = [a.cx + a.r * Math.cos(a.a0), a.cy + a.r * Math.sin(a.a0)];
+    const p1 = [a.cx + a.r * Math.cos(a.a1), a.cy + a.r * Math.sin(a.a1)];
+    return polyE(layer, [[p0[0] + ox, p0[1] + oy, bulgeOf(a)], [p1[0] + ox, p1[1] + oy, 0]], false);
+  }
+  return polyE(layer, [[c.from[0] + ox, c.from[1] + oy, 0], [c.to[0] + ox, c.to[1] + oy, 0]], false);
 }
 
 /**
@@ -147,17 +187,14 @@ export function unitTextLines(unit, winName) {
  */
 export function buildGlassUnitEntities(unit, winName = '', ox = 0, oy = 0) {
   const { shape } = unit;
+  const G = unitGlassProfile(unit);
   const E = [];
   E.push(polyE('GLASS_CONTOUR', shift(shape.poly, ox, oy), true));
+  // edge cover line: the contour offset inward all round (concentric arcs)
+  E.push(polyE('GLASS_EDGE', shift(glassEdgePoly(shape.outline, G.edgeCover).pts, ox, oy), true));
   for (const b of shape.bars || []) {
-    if (b.kind === 'arc') {
-      const a = b.arc;
-      const p0 = [a.cx + a.r * Math.cos(a.a0), a.cy + a.r * Math.sin(a.a0)];
-      const p1 = [a.cx + a.r * Math.cos(a.a1), a.cy + a.r * Math.sin(a.a1)];
-      E.push(polyE('GLASS_BARS', [[p0[0] + ox, p0[1] + oy, bulgeOf(a)], [p1[0] + ox, p1[1] + oy, 0]], false));
-    } else {
-      E.push(polyE('GLASS_BARS', [[b.from[0] + ox, b.from[1] + oy, 0], [b.to[0] + ox, b.to[1] + oy, 0]], false));
-    }
+    E.push(curvePoly('GLASS_BAR_AXES', b.kind === 'arc' ? { kind: 'arc', arc: b.arc } : { kind: 'straight', from: b.from, to: b.to }, ox, oy));
+    for (const c of barBandCurves(b, G.barWidth / 2)) E.push(curvePoly('GLASS_BARS', c, ox, oy));
   }
   const C = GLASS_DXF;
   const lines = unitTextLines(unit, winName);

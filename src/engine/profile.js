@@ -193,6 +193,31 @@ export const DEFAULT_CASEMENT_PROFILE = {
     // geometry and live in arch.js.
     limits: { minWidth: 400, maxWidth: 1500, minStraightBelowRise: 900, minLeafStraightStile: 100 },
   },
+  // ── Glazier numbers (ARCHED-WINDOWS-v3 Block 0.2) — the sealed unit's
+  // spacer bar width laid out in the pattern, and the edge cover: the
+  // perimeter spacer / seal band inside the unit contour. DEFAULT (open,
+  // BLOCKERS): 11 for every glass type until Piotr gives the triple value.
+  glass: {
+    barWidth: 18,
+    edgeCover: { default: 11, double: 11, double_slim: 11, triple: 11, single: 11, passive: 11 },
+  },
+  // ── Timber tracery over the arched unit (v3 Block 0.4, numbers from
+  // docs/handover/workshop/arka_CNC-piotr.dxf): bead profile R8 along every
+  // pane opening — pane outline +paneOffset is the VCarve rail, +paneOffset +
+  // profileWidth the bead limit; ridgeLand = timber left between two beads on
+  // a bar (bar width = 2·(paneOffset + profileWidth) + ridgeLand = 22),
+  // edgeLand = timber outside the bead at the board edge (edge margin =
+  // paneOffset + profileWidth + edgeLand = 18). mitreLeg = corner guide leg
+  // along each edge. sides = boards per window (tracery on ONE side, Piotr).
+  tracery: {
+    paneOffset: 2,
+    profileWidth: 8,
+    ridgeLand: 2,
+    edgeLand: 8,
+    mitreLeg: 15,
+    sides: 1,
+    boardThickness: 18,   // DEFAULT (open): the tracery board thickness for the cut list section
+  },
   rounding: 0.1,       // mm — CNC-ready, one decimal
 };
 
@@ -226,6 +251,10 @@ export function migrateCasementProfile(profile) {
     // widthAllowance / maxPieces, invented stock list) is replaced whole.
     // v1.4 (arched-casement-v2): version 3 adds minHaunchRadius + patterns;
     // a stored v2 block is replaced whole (no UI edits this block yet).
+    // v3 (arched-windows-v3): glazier block + tracery block, filled from the
+    // default for older stored copies (no UI edits them yet).
+    glass: { ...D.glass, ...(profile.glass || {}), edgeCover: { ...D.glass.edgeCover, ...(profile.glass?.edgeCover || {}) } },
+    tracery: { ...D.tracery, ...(profile.tracery || {}) },
     arch: profile.arch?.version === D.arch.version
       ? {
           ...D.arch, ...profile.arch,

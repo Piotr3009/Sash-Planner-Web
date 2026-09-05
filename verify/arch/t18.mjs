@@ -291,10 +291,10 @@ section('4 — glazier DXF: ezdxf round-trip, samples docs/handover/samples/samp
     writeFileSync(path, text);
     const p = probe(path);
     const contour = p.polys.filter((x) => x.layer === 'GLASS_CONTOUR');
-    const bars = p.polys.filter((x) => x.layer === 'GLASS_BARS');
+    const bars = p.polys.filter((x) => x.layer === 'GLASS_BAR_AXES');   // v3 0.2: axes moved, GLASS_BARS = bands
     const sh = d.customGlassUnits[0].shape;
     const nArcs = sh.outline.arcs.length;
-    check(`${c.name}: R12, layers GLASS_CONTOUR / GLASS_BARS / GLASS_TEXT`, p.version === 'AC1009' && ['GLASS_CONTOUR', 'GLASS_BARS', 'GLASS_TEXT'].every((l) => p.layers.includes(l)));
+    check(`${c.name}: R12, layers GLASS_CONTOUR / GLASS_EDGE / GLASS_BARS / GLASS_BAR_AXES / GLASS_TEXT`, p.version === 'AC1009' && ['GLASS_CONTOUR', 'GLASS_EDGE', 'GLASS_BARS', 'GLASS_BAR_AXES', 'GLASS_TEXT'].every((l) => p.layers.includes(l)));
     check(`${c.name}: contour closed, ${nArcs + 3} vertices (one per arc end + 3 corners), bulge count = number of arcs (${nArcs})`, contour.length === 1 && contour[0].closed && contour[0].n === nArcs + 3 && contour[0].bulges.filter((b) => b).length === nArcs, `${contour[0]?.n} / ${contour[0]?.bulges.filter((b) => b).length}`);
     expectNear(`${c.name}: contour arc length (ezdxf) = glass arch length`, contour[0].arcs, sh.outline.archLength, 0.01);
     expectNear(`${c.name}: contour straight length = Wg + 2 × springing`, contour[0].straight, sh.outline.width + 2 * sh.outline.springing, 0.01);
@@ -304,7 +304,7 @@ section('4 — glazier DXF: ezdxf round-trip, samples docs/handover/samples/samp
     const arcBars = bars.filter((b) => b.arcs > 0).length;
     check(`${c.name}: curved bars carry a bulge (${sh.bars.filter((b) => b.kind === 'arc').length})`, arcBars === sh.bars.filter((b) => b.kind === 'arc').length);
     const texts = p.texts.map((t) => t.text);
-    check(`${c.name}: TEXT block — unit line, W × H / RISE / SPRINGING / R line, spec line, one line per bar`, texts.some((t) => t === `${c.name} - G1 GLASS ${sh.archShape.toUpperCase()}`) && texts.some((t) => t.startsWith(`W${sh.outline.width} x H`) && t.includes('RISE') && t.includes(' R ')) && texts.filter((t) => /^(V|H|S|R|K|T)\d+ /.test(t)).length === sh.bars.length, texts.slice(0, 5).join(' | '));
+    check(`${c.name}: TEXT block — unit line, W × H / RISE / SPRINGING / R line, spec line, one line per bar`, texts.some((t) => t === `${c.name} - G1 GLASS ${sh.archShape.toUpperCase()}`) && texts.some((t) => t.startsWith(`W${sh.outline.width} x H`) && t.includes('RISE') && t.includes(' R ')) && texts.filter((t) => /^(V|H|S|R|K|T)\d+ /.test(t)).length === 2 * sh.bars.length, texts.slice(0, 5).join(' | '));   // v3 0.3: geometry line + bar-end row per bar
     check(`${c.name}: TEXT lines = unitTextLines (module-side)`, glassDxf.unitTextLines({ id: 'G1', row: lists.buildGlassListForWindow(d, c.spec)[0], shape: sh }, c.name).every((l) => texts.includes(l)));
   }
   const rect = specification.normaliseToWindowSpec({ id: 'R', name: 'R', width: 1000, height: 1500 }, { fullConfig: { windowCategory: 'casement', casementLayout: '040L' } });
@@ -370,8 +370,9 @@ section('6 — glass PDF (jsPDF in node): Shape column, mm + % line, shaped draw
     check('PDF built, 2 pages (table + 4 drawings)', bytes.length > 10000 && (txt.match(/\/Type \/Page[^s]/g) || []).length === 2);
     const has = (s) => txt.includes(s);
     check('Shape column header + "rect" for the rectangular row + "arched · R 55.5/1305.5" for the three-centre unit', has('(Shape)') && has('(rect)') && has('arched · R 55.5/1305.5'));
-    check('mm + % line: "springing 1198.5 \\(92%\\)" and "V1 x 270.3 \\(33%\\)"', has('springing 1198.5 \\(92%\\)') && has('V1 x 270.3 \\(33%\\)'));
-    check('hub-spoke row: ring + spokes listed, bars cell shortened to "hub ast"', has('R1 ring R 121.7') && has('(hub ast)'));
+    // v3 0.3: the header line prints the bar-end rows (x from the corner · s from apex · L) instead of x (%) / y pairs
+    check('mm + % line: "springing 1198.5 \\(92%\\)" and the V1 row "V1 x 270.3 " with "from apex" and "L 1297"', has('springing 1198.5 \\(92%\\)') && has('V1 x 270.3 ') && has('from apex') && has('L 1297'));
+    check('hub-spoke row (7 bars): "7 bars \u2014 see table", table rows "R1 R 121.7" and bars cell shortened to "hub ast"', has('7 bars') && has('see table') && has('R 121.7') && has('(hub ast)'));
     check('shaped drawing cell: "rise 105.5", overall "811 mm" / "1304 mm", Bézier curve operators present', has('rise 105.5') && has('811 mm') && has('1304 mm') && (txt.match(/ c\n/g) || []).length >= 6);
   } catch (e) {
     check('glass PDF section ran (jsPDF loadable in node)', false, String(e?.message || e));

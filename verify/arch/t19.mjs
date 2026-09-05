@@ -33,6 +33,7 @@ const M = await bundleTree(resolve(ROOT, 'src'), 't19', [
   ['cncExport', 'utils/cncExport.js'],
   ['geo3d', '3d/components/casement/archedCasementGeometry.js'],
   ['wsc', 'utils/windowSpecToConfig.js'],
+  ['glassBars', 'engine/glassBars.js'],
 ]);
 const P = M.profile.DEFAULT_CASEMENT_PROFILE;
 
@@ -187,15 +188,16 @@ for (const c of CASES) {
       return S.frame.includes(`C-AH ${fmtHalf(head.length)}`) && S.frame.includes(`C-J/L ${fmtHalf(jamb.length)}`) && S.frame.includes(`C-J/R ${fmtHalf(jamb.length)}`);
     })());
     if (variant === 'bars') {
-      // E: bar end numbers on the glass sheet where the end lies on a curve
-      const onCurve = A.bars.filter((b) => b.kind === 'straight' && b.to[1] > A.glassOutline.springing + 0.01);
-      const vEnds = onCurve.filter((b) => b.role === 'v').map((b) => `${b.id} ${fmtTenth(b.to[1])}`);
-      const otherEnds = onCurve.filter((b) => b.role !== 'v').map((b) => `${b.id} ${fmtTenth(b.to[0])} · ${fmtTenth(b.to[1])}`);
-      const rings = A.bars.filter((b) => b.kind === 'arc').map((b) => `${b.id} R ${fmtTenth(b.arc.r)}`);
-      const traceryEnds = A.bars.filter((b) => b.kind === 'arc' && b.role === 'tracery').flatMap((b) => [b.from, b.to].filter((e) => e[1] > A.glassOutline.springing + 0.01).map((e) => `${fmtTenth(e[0])} · ${fmtTenth(e[1])}`));
-      const want = [...vEnds, ...otherEnds, ...rings, ...traceryEnds];
-      check(`${tag}: glass sheet prints ${want.length} bar end / radius numbers on the curve (${want.slice(0, 3).join(' | ')}…)`,
+      // E / v3 0.3: the glass sheet prints the glassBars.js bar-end rows — labels beside the bars (≤ 4 bars)
+      // or ids beside the bars + every row's cells in the table under the drawing (> 4 bars)
+      const rows = M.glassBars.barEndRows(A.bars, A.glassOutline);
+      const table = M.glassBars.useBarTable(A.bars);
+      const want = table ? rows.flatMap((r) => [r.id, r.cells.s, r.cells.L, r.cells.angle]) : rows.map((r) => r.label);
+      check(`${tag}: glass sheet prints ${want.length} bar-end numbers ${table ? 'in the table' : 'beside the bars'} (${want.slice(0, 3).join(' | ')}…)`,
         want.length > 0 && want.every((w) => S.glass[0].svg.includes(`>${w}<`)), want.filter((w) => !S.glass[0].svg.includes(`>${w}<`)).join(' | '));
+      check(`${tag}: every arc end on the arch is dimensioned as arc length from the apex (no x · y pairs)`,
+        A.bars.filter((b) => b.role === 'tracery' || (b.kind === 'straight' && Math.max(b.from[1], b.to[1]) > A.glassOutline.springing + 0.01))
+          .every((b) => { const r = rows.find((x) => x.id === b.id); return r && r.end && r.end.s >= 0; }) && !/>\d+(\.\d)? · \d+(\.\d)?</.test(S.glass[0].svg));
       check(`${tag}: elevation / leaf clip the bars to the daylight (clipPath present, one band path per bar)`,
         /<clipPath id="clip-cas-elev-/.test(S.elevation) && /<clipPath id="clip-cas-leaf-/.test(S.leaf[0].svg) &&
         (S.elevation.match(/<path d="[^"]*" fill="none" stroke="#94A3B8"/g) || []).length === A.bars.length);
@@ -261,10 +263,10 @@ for (const key of Object.keys(RENDERED)) {
       // bar bands: r ± 11 around the glazier-DXF bar axes; glass frame → arch frame through glassOutline.origin
       const gu = M.glassDxf.shapedGlassUnits(spec, derived)[0];
       const gents = glassEntities(M.glassDxf.buildGlassUnitEntities(gu, key, 0, 0));
-      const barArcs = gents.filter((e) => e.type === 'poly' && e.layer === 'GLASS_BARS' && e.pts.some((p) => p[2])).flatMap((p) => polyArcs(p.pts, false));
+      const barArcs = gents.filter((e) => e.type === 'poly' && e.layer === 'GLASS_BAR_AXES' && e.pts.some((p) => p[2])).flatMap((p) => polyArcs(p.pts, false));
       const ox = A.glassOutline.origin.x - W / 2, oy = A.glassOutline.origin.y - A.geometry.start;
       const twins = barArcs.every((b) => [11, -11].every((d) => hasCircle(rel, { cx: b.cx + ox, cy: b.cy + oy, r: b.r + d }, tolerance)));
-      check(`${key}: elevation — ${barArcs.length} glazier-DXF bar arcs (rings / tracery) drawn as 22 mm bands on the same centres (r ± 11)`, barArcs.length > 0 && twins);
+      check(`${key}: elevation — ${barArcs.length} glazier-DXF bar-axis arcs (rings / tracery) drawn as 22 mm bands on the same centres (r ± 11)`, barArcs.length > 0 && twins);
     }
   }
   // — glazier DXF vs the glass sheet
@@ -279,7 +281,7 @@ for (const key of Object.keys(RENDERED)) {
     gRel.length === A.glassOutline.arcs.length && gRel.every((d) => hasCircle(gsRel, d, tolerance)), gRel.map((d) => `${d.cx.toFixed(2)},${d.cy.toFixed(2)} r${d.r.toFixed(2)}`).join(' | '));
   check(`${key}: glass sheet — the seal arcs are the contour arcs − 11 on the same centres`,
     gRel.every((d) => hasCircle(gsRel, { ...d, r: d.r - 11 }, tolerance)));
-  const gBars = gents.filter((e) => e.type === 'poly' && e.layer === 'GLASS_BARS' && e.pts.some((p) => p[2])).flatMap((p) => polyArcs(p.pts, false));
+  const gBars = gents.filter((e) => e.type === 'poly' && e.layer === 'GLASS_BAR_AXES' && e.pts.some((p) => p[2])).flatMap((p) => polyArcs(p.pts, false));
   if (gBars.length) {
     check(`${key}: glass sheet — ${gBars.length} GLASS_BARS arcs drawn as 18 mm spacer bands (r ± 9) on the same centres`,
       gBars.every((b) => [9, -9].every((d) => hasCircle(gsRel, { ...b, r: b.r + d }, tolerance))));
@@ -287,7 +289,7 @@ for (const key of Object.keys(RENDERED)) {
   check(`${key}: glass sheet — every SVG arc sits on a DXF centre (contour or bar)`,
     gsRel.every((a) => [...gRel, ...gBars].some((d) => near(a.cx, d.cx) && near(a.cy, d.cy))));
   // straight bar bands: the band edges are ±11 (elevation) / ±9 (glass) around the DXF bar axis end points
-  const straight = gents.filter((e) => e.type === 'poly' && e.layer === 'GLASS_BARS' && !e.pts.some((p) => p[2]));
+  const straight = gents.filter((e) => e.type === 'poly' && e.layer === 'GLASS_BAR_AXES' && !e.pts.some((p) => p[2]));
   if (straight.length) {
     const ok = straight.every((p) => {
       const [x0, y0] = p.pts[0], [x1, y1] = p.pts[1];

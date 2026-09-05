@@ -19,6 +19,44 @@ had no `node_modules`; t18 / t19 need react-dom / jspdf resolvable).
 Stages tonight (Piotr 07.09, gate before each next stage): 1 = Block 0, 2 = Block 1 A–E, 3 = Block 1 F–J +
 Block 3, 4 = Block 4 + Block 6.
 
+### 0.2 + 0.3 — glazier DXF bands / edge / axes, bar-end dimensioning (`glassBars.js` new, `glassDxfExport.js`, `CasementGlassDrawing2D.jsx`, `glassPdfExport.js`, `profile.js`)
+
+**Understanding:** the glazier lays an 18 mm spacer bar in the pattern and a perimeter spacer 11 mm inside the
+contour; today the DXF gave him axes only and the sheet printed x·y pairs he cannot measure on a curve. Three
+consumers (sheet, PDF, DXF) must show the same bands, the same edge line and the same bar-end numbers.
+
+**Two approaches, one rejected:** (a) extend each consumer in place (three copies of the band / offset / apex
+arc-length maths) — rejected, night 4 already paid for that with `archDrawUtils.js`; (b) one pure module
+`src/engine/glassBars.js` (band curves, edge chain through `offsetArcs` in the arch frame, arc length from the
+apex, the dimensioning rows + labels + table cells) and three thin consumers — chosen. New file outside the
+spec's list, logged in BLOCKERS.
+
+**Built:**
+- Profile: `DEFAULT_CASEMENT_PROFILE.glass = { barWidth 18, edgeCover { default 11, double, double_slim,
+  triple, single, passive: 11 } }` (DEFAULT (open): 11 for every type until Piotr gives the triple value) +
+  `tracery` block for 0.4; `migrateCasementProfile` fills both from the default for stored copies.
+- DXF layers `GLASS_CONTOUR · GLASS_EDGE · GLASS_BARS (bands, ±barWidth/2, bulge on arcs) · GLASS_BAR_AXES ·
+  GLASS_TEXT`; the text block keeps the geometry line per bar and adds the bar-end rows (`BAR ENDS: ID  S FROM
+  APEX / POSITION  L  ANGLE / R`, degree sign → `DEG`, R12 is ASCII).
+- Dimensioning (0.3): vertical bar `x from the bottom-left · s from apex L/R · L`; spoke `s from apex · angle
+  from the hub · L` (a ring→ring segment prints its radial extent `r 121.7-243.3` instead); ring `R · centre`;
+  h / springing `y from the bottom corners`; tracery `R · s from apex`. More than 4 bars → ids beside the bars,
+  the numbers in a table under the drawing (sheet: 4 columns, `MGN_TABLE` grows the viewBox; PDF: same table
+  under the sketch in the cell, header line says `N bars — see table`; DXF: the rows in GLASS_TEXT). The
+  x·y pairs of night 4 are gone (t19 asserts the regex `>x · y<` no longer matches).
+- Sheet / PDF draw the edge line and the bands from the profile numbers (PDF: edge dashed, bands solid, axes
+  dotted, ids at the arch ends).
+- Rectangular branch of the sheet untouched (t19 §1 snapshot byte-identical).
+
+**Verification:** esbuild OK on all five files · t16 504/504 · t18 178/178 (assertions updated: axes now on
+`GLASS_BAR_AXES`, two TEXT lines per bar, PDF header "V1 x 270.3 … from apex … L 1297", hub row "7 bars — see
+table") · t19 244/244 (assertions updated: the sheet prints exactly the module's labels / table cells; every
+straight or tracery end on the arch carries an `s from apex`) · three sheets rendered through headless
+Chromium and looked at (hub-spoke 7 bars, triple hub + 1H 34 bars with the table, gothic intersecting 9
+bars): bands, dashed edge, ids beside the ends, table readable. Not verified: the PDF opened in a viewer
+(built in node, text asserted by string search only); the triple `edgeCover` value is a placeholder.
+**Verdict: ✅ 0.2 / 0.3** (t20 adds the SVG ↔ DXF band / edge arc comparison ±0.01).
+
 ### 0.1 — FIT view in the arch CNC DXF (`arch.js`, `archDxf.js`)
 
 **Understanding:** Piotr overlaid the frame ring and the leaf ring by hand and read the 17 mm rebate lap as an

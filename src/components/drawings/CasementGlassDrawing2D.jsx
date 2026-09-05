@@ -8,17 +8,20 @@
  * goes in the title. Unit = leaf − 109 (glass enters 12.5 into the rebate),
  * so the unit origin sits at stile − 12.5 in leaf coordinates.
  *
- * Arched casement (arched-casement-v2 night 4, spec §4 D + E): the unit IS
- * derived.arch.glassOutline — the SAME ArcChain the glazier DXF cuts — with
- * the 11 mm edge seal as a concentric offset, the spacer bars as 18 mm bands
- * on the engine bar axes (derived.arch.bars), dims for the springing, the
- * rise and every glass radius, and a number at every bar end that lies on a
- * curve (E: the glazier cannot measure those from a chain). Rectangular units
- * take the branch below unchanged (byte-identical, verify/arch/t19.mjs).
+ * Arched casement (arched-casement-v2 night 4, spec §4 D + E; v3 Block 0.2 /
+ * 0.3): the unit IS derived.arch.glassOutline — the SAME ArcChain the glazier
+ * DXF cuts — with the edge cover line (profile glass.edgeCover per glass type)
+ * as a concentric offset, the spacer bars as profile glass.barWidth bands on
+ * the engine bar axes (derived.arch.bars), dims for the springing, the rise and
+ * every glass radius, and the bar-end dimensioning of engine/glassBars.js
+ * (straight edges from the bottom corners, arc ends as arc length from the
+ * apex, spokes with the hub angle; more than 4 bars → ids on the drawing and a
+ * table under it). Rectangular units take the branch below unchanged
+ * (byte-identical, verify/arch/t19.mjs).
  */
 import { useMemo } from 'react';
 import { getCasementProfile } from '../../engine/profile.js';
-import { offsetArcs } from '../../engine/arch.js';
+import { readGlassProfile, glassEdgeArcs, barEndRows, useBarTable } from '../../engine/glassBars.js';
 import { DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 import { casementBarCounts } from './casementDrawUtils.js';
@@ -77,17 +80,20 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
     const A = derived.arch;
     if (A?.geometry && A.glassOutline && idx === 0) {
       const O = A.glassOutline;
-      const xg = O.width / 2, ys = O.springing;
-      // 11 mm seal = the glass chain offset concentrically (arch frame), then moved into the glass frame
-      const seal = offsetArcs(A.geometry.glass.arcs, EDGE_SEAL).map((a) => ({ ...a, cx: a.cx + xg, cy: a.cy + ys }));
+      // v3 0.2: spacer width and edge cover per glass type from the profile (glassBars.js — the DXF reads the same)
+      const G = readGlassProfile(p, windowSpec.glazing?.type || 'double');
+      // edge cover line = the glass chain offset concentrically (arch frame), moved into the glass frame
+      const seal = glassEdgeArcs(O, G.edgeCover);
       const bars = A.bars || [];
       const isH = (b) => b.kind === 'straight' && Math.abs(b.from[1] - b.to[1]) < 1e-6 && (b.role === 'h' || b.role === 'springing');
       const isV = (b) => b.kind === 'straight' && b.role === 'v' && Math.abs(b.from[0] - b.to[0]) < 1e-6;
       const vList = [...new Set(bars.filter(isV).map((b) => b.from[0]))].sort((a, b) => a - b)
-        .map((cx) => ({ cx, left: cx - SPACER / 2, right: cx + SPACER / 2 }));
+        .map((cx) => ({ cx, left: cx - G.barWidth / 2, right: cx + G.barWidth / 2 }));
       const hList = [...new Set(bars.filter(isH).map((b) => b.from[1]))].sort((a, b) => b - a)
-        .map((y) => { const cy = O.height - y; return { cy, top: cy - SPACER / 2, bot: cy + SPACER / 2 }; });
-      return { glassW: O.width, glassH: O.height, vBars: [], hBars: [], arch: { outline: O, seal, bars, vList, hList, label: A.geometry.label } };
+        .map((y) => { const cy = O.height - y; return { cy, top: cy - G.barWidth / 2, bot: cy + G.barWidth / 2 }; });
+      // v3 0.3: bar-end dimensioning rows (s from apex / positions from the bottom corners / L / angle)
+      const endRows = barEndRows(bars, O);
+      return { glassW: O.width, glassH: O.height, vBars: [], hBars: [], arch: { outline: O, seal, bars, vList, hList, label: A.geometry.label, spacer: G.barWidth, edgeCover: G.edgeCover, endRows, table: useBarTable(bars) } };
     }
     return { glassW, glassH, vBars, hBars };
   }, [windowSpec, derived, group]);
@@ -101,10 +107,14 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
   const MGN_RIGHT = 100 * layoutSc;
   const MGN_BOT = 70 * layoutSc;
   const MGN_TITLE = (geom.arch ? 70 : 44) * layoutSc;   // arched: third title line
+  // v3 0.3: more than 4 bars → the bar-end numbers go in a table under the drawing
+  const TABLE_ROW = 16 * layoutSc;
+  const tableRows = geom.arch?.table ? geom.arch.endRows : [];
+  const MGN_TABLE = tableRows.length ? (tableRows.length + 1.5) * TABLE_ROW : 0;
 
   const ox = MGN_LEFT, oy = MGN_TOP;
   const totalW = ox + glassW + MGN_RIGHT;
-  const totalH = oy + glassH + MGN_BOT + MGN_TITLE;
+  const totalH = oy + glassH + MGN_BOT + MGN_TABLE + MGN_TITLE;
   const ts = totalW / VIEWBOX_REF;
   const sw = (n) => n * layoutSc;
   const X = (x) => ox + x;
@@ -138,32 +148,34 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
     const O = arch.outline;
     const txG = glassToSheet(X(0), Y(0), glassH);
     const dir = (b) => { const d = [b.to[0] - b.from[0], b.to[1] - b.from[1]]; const l = Math.hypot(d[0], d[1]) || 1; return [d[0] / l, d[1] / l]; };
+    // v3 0.3: one label per bar — the dimensioning row's text (≤ 4 bars) or the id alone (table under the drawing)
     const endLabels = [];
+    const rowById = new Map(arch.endRows.map((r) => [r.id, r]));
+    const labelFor = (b) => (arch.table ? b.id : rowById.get(b.id)?.label || b.id);
     for (const b of arch.bars) {
       if (b.kind === 'straight') {
-        if (!onCurve(b.to, O)) continue;
         const u = dir(b);
-        const vertical = Math.abs(u[0]) < 1e-6;
-        // vertical bar: the x is on the top chain — print the height of the top end beside the bar;
-        // any other bar (spoke): both numbers, set back along the bar
+        const vertical = Math.abs(u[0]) < 1e-6, horizontal = Math.abs(u[1]) < 1e-6;
+        if (horizontal) {
+          // h / springing bar: label at its left end, just above the bar
+          endLabels.push({ at: txG(b.from[0] + sw(6), b.from[1] + sw(14)), anchor: 'start', text: labelFor(b) });
+          continue;
+        }
+        if (!onCurve(b.to, O) && !onCurve(b.from, O)) continue;
+        const top = b.to[1] >= b.from[1] ? b.to : b.from;
+        // vertical bar: beside the bar below its top end; spoke: set back along the bar
         const back = vertical ? sw(56) : sw(34);
-        const at = txG(b.to[0] - u[0] * back + (vertical ? sw(6) : 0), b.to[1] - u[1] * back);
-        endLabels.push({ at, anchor: vertical ? 'start' : 'middle', text: vertical ? `${b.id} ${fmt(b.to[1])}` : `${b.id} ${fmt(b.to[0])} · ${fmt(b.to[1])}` });
+        const at = txG(top[0] - u[0] * back + (vertical ? sw(6) : 0), top[1] - u[1] * back);
+        endLabels.push({ at, anchor: vertical ? 'start' : 'middle', text: labelFor(b) });
       } else {
         const inward = b.role === 'ring' ? -sw(12) : sw(12);
-        endLabels.push({ at: barArcLabelPoint(b.arc, txG, O.width / 2, inward), anchor: 'middle', text: `${b.id} R ${fmt(b.arc.r)}` });
-        // a tracery arc meets the outline at ONE end — the other end sits on the springing line
-        for (const e of [b.from, b.to]) {
-          if (!onCurve(e, O)) continue;
-          // outside the outline, away from the axis (the glass interior is busy with the tracery)
-          endLabels.push({ at: txG(e[0] + (e[0] < O.width / 2 ? -sw(18) : sw(18)), e[1] + sw(12)), anchor: 'middle', text: `${fmt(e[0])} · ${fmt(e[1])}` });
-        }
+        endLabels.push({ at: barArcLabelPoint(b.arc, txG, O.width / 2, inward), anchor: 'middle', text: labelFor(b) });
       }
     }
     AP = {
       unitD: archedOutlineD(O.arcs, txG, Y(glassH)),
-      sealD: archedOutlineD(arch.seal, txG, Y(glassH - EDGE_SEAL)),
-      barsD: arch.bars.map((b) => barBandD(b, txG, SPACER / 2)),
+      sealD: archedOutlineD(arch.seal, txG, Y(glassH - arch.edgeCover)),
+      barsD: arch.bars.map((b) => barBandD(b, txG, arch.spacer / 2)),
       radii: O.arcs.map((a) => ({ r: a.r, at: isHaunchArc(a) ? arcLabelPoint(a, txG, sw(10)) : arcLabelPoint(a, txG, -sw(16)) })),
       springY: Y(glassH - O.springing),
       endLabels,
@@ -171,8 +183,10 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
   }
   const annFs = tfs(SIZES.dimSmall, totalW);
   const endFs = tfs(SIZES.notch, totalW);
-  const archLine = arch ? `${arch.label} · springing ${fmt(arch.outline.springing)} · rise ${fmt(arch.outline.rise)} · ${radiiText(arch.outline.arcs)} · ${arch.bars.length} bars` : '';
-  const titleY = oy + glassH + MGN_BOT + MGN_TITLE * 0.35;
+  const archLine = arch ? `${arch.label} · springing ${fmt(arch.outline.springing)} · rise ${fmt(arch.outline.rise)} · ${radiiText(arch.outline.arcs)} · ${arch.bars.length} bars · edge ${fmt(arch.edgeCover)} · spacer ${fmt(arch.spacer)}` : '';
+  const tableTop = oy + glassH + MGN_BOT;
+  const tableFs = tfs(SIZES.dimSmall, totalW);
+  const titleY = tableTop + MGN_TABLE + MGN_TITLE * 0.35;
 
   return (
     <div className="w-full">
@@ -269,6 +283,24 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
             {AP.endLabels.map((el, k) => (
               <text key={`e-${k}`} x={el.at[0]} y={el.at[1]} fill={COLORS.dim} fontSize={endFs}
                 fontFamily={FONT_FAMILY} textAnchor={el.anchor} fontWeight={WEIGHTS.dim}>{el.text}</text>
+            ))}
+          </g>
+        )}
+
+        {/* v3 0.3: bar-end table (more than 4 bars): id · s from apex / position · L · angle / R */}
+        {tableRows.length > 0 && (
+          <g>
+            {[['ID', 0], ['s from apex / position', 0.12], ['L', 0.58], ['angle / R', 0.72]].map(([h, fx]) => (
+              <text key={`th-${h}`} x={X(fx * glassW)} y={tableTop + TABLE_ROW * 0.9} fill={COLORS.subtitle} fontSize={tableFs}
+                fontFamily={FONT_FAMILY} textAnchor="start" fontWeight={WEIGHTS.subtitle}>{h}</text>
+            ))}
+            {tableRows.map((r, i) => (
+              <g key={`tr-${r.id}`}>
+                {[[r.id, 0], [r.cells.s, 0.12], [r.cells.L, 0.58], [r.cells.angle, 0.72]].map(([v, fx], k) => (
+                  <text key={`td-${k}`} x={X(fx * glassW)} y={tableTop + TABLE_ROW * (i + 2)} fill={COLORS.dim} fontSize={tableFs}
+                    fontFamily={FONT_FAMILY} textAnchor="start" fontWeight={WEIGHTS.dim}>{v}</text>
+                ))}
+              </g>
             ))}
           </g>
         )}
