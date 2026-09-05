@@ -4,6 +4,70 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-09-06 — arched-casement-v2 night 3: A + B + C + t18 (branch `claude/arched-casement-v2-impl-0j27uw`)
+
+Inputs read in full, in this order: `CLAUDE.md` → `ARCHED-CASEMENT-v2.md` (spec, P1–P10 override v1) →
+`ARCHED-CASEMENT-v1.md` §0 → `ARCHED-CASEMENT-v1-AUDIT.md` §2 → `-AS-BUILT.md`, `BLOCKERS.md`, `BUILD-LOG.md`
+(night 2). Baseline on the branch start (`faedf98` = `origin/main`): t16 465/465, t17 73/73 ALL PASS.
+The spec v2 §3 vectors were checked by hand before coding (r 150 / R 1400 / T (392, 144) / 73.74° /
+1180.72 etc. all follow from P3) — they are the expected values, the harness reproduces them.
+PSW clone (read-only) succeeded: `FixFrameWindow.jsx` 667–830 / 847–1030 and `price-calculator.js`
+985–1000 were read for the bar patterns and `PATTERNS_FOR_SHAPE`.
+
+Decisions taken up front (details in BLOCKERS.md §9):
+1. `segmental` is removed from `ARCH_SHAPES` (P2). The t16 §10.1 / §10.2 segmental vectors are
+   superseded by a three-centre rise 240 under P3 (r clamps to 150, crown R 1320); the 390 vector is
+   unchanged (r 253.5 > 150). t16 §10.3 item 10 now freezes `casementLayouts.js` + `jambDxf.js` only —
+   `lists.js` / `calculations.js` are in scope for v2 (B).
+2. `archArcs(shape, W, rise, { minHaunchRadius })`: the P3 minimum is an option so pure-geometry
+   callers keep the v1 rule; `buildArchGeometry` reads it from `profile.arch.minHaunchRadius` (required,
+   readable error when missing). Consequence F2: a Round arch needs rise > 150 (rise = r leaves no crown
+   arc) — at W 400 the PSW defaults (80 / 130) are rejected; Auto (0.325 W) clears 150 from W 462.
+3. Profile `arch` block → version 3 (`minHaunchRadius`, `patterns` ring ratios / tracery pitch); a stored
+   v2 block is replaced whole (no UI edits it).
+
+### A — configurator (`ConfiguratorPage.jsx`, `projectStore.js`, `specification.js`, `arch.js`, `profile.js`)
+
+**Understanding:** the joiner picks Round | Gothic and types where the arch starts (mm from the cill);
+rise = H − start; the engine shape (semi-circle / three-centre) is a result, as are the radii.
+
+**Two approaches, one rejected:** (a) keep `rise` as the state and derive `start` for display — rejected:
+"changing H keeps start, recomputes rise" (P4) is natural only when `start` is the state; (b) `start` is
+the state, `rise` derived, `resolveRoundShape` picks the engine shape — chosen.
+
+**Built:**
+- `arch.js`: `ARCH_SHAPES` without segmental, `LEGACY_ARCH_SHAPES` (v1 'segmental' → three-centre 0.20 W),
+  `PSW_ARCH_RISE_RATIO`, `ROUND_AUTO_RATIO` 0.325, `resolveRoundShape(W, rise)` (±0.5 → semi-circle, above
+  half → "use Gothic"), `readMinHaunchRadius`, bar-pattern vocabulary (`ARCH_BAR_PATTERNS`,
+  `PATTERNS_FOR_SHAPE` from PSW 990–995, `isHubPattern`), `buildArchGeometry` returns `start`, `radii`,
+  `minHaunchRadius`, `glass.halfWidth`; rings expose the `centre` chain.
+- `specification.js` `archFromSpec(item, fc, width, height)`: `archStart` → rise = H − start (riseSource from
+  the item, default custom); v1 `archRise` still honoured; PSW `segmental-arch` → three-centre 0.20 W,
+  `elliptical-arch` → 0.325 W; v1-era PC 'segmental' → three-centre 0.20 W with riseSource 'ratio' even if
+  it had a custom rise (spec A wording); Round shapes re-resolved through `resolveRoundShape` (a start
+  giving rise > W/2 throws "use Gothic" — never a silent shape); `arch.bars = { pattern, h, v }`, unknown
+  pattern throws.
+- `projectStore.js`: `archStart`, `archBarPattern` whitelisted in both builders.
+- Configurator: chips Round | Gothic; "Arch starts at (mm from cill)" NumInput (no spinners) + chip Auto
+  (H − 0.325 W) + button Half (H − W/2, sets custom); Gothic profile chips with a derived, disabled start;
+  live line `Rise 200 · R 150 / 1400 / 150` (`R 500` semi-circle, `R 1000` gothic); right panel: Type,
+  Arch starts at (auto/custom), Rise · R, Leaves, Bars (+ pattern); CNC row prints the ArchError text and
+  the Save button is disabled while the arch is invalid; Pattern chips filtered by the resolved shape
+  (a pattern the shape does not offer resets to none); vertical chips hidden for hub patterns (PSW ignores
+  v there — the ring ends are the verticals); edit / prefill restore start (from `archStart`, else H −
+  `archRise`), riseSource, pattern; a v1 'segmental' loads as Round on Auto. Height clamp: Gothic
+  `ratio·W + 900`, Round `901` (the typed start carries the 900 rule, reported by arch.js).
+- 3D sync unchanged apart from the removed segmental key (night 4 rewrites the component).
+
+**Verification:** esbuild OK on all five files · scratch eslint `no-undef` clean · no Polish letters ·
+t16 rewritten for v2: 504/504 ALL PASS (incl. `resolveRoundShape`, P3 clamp, v3 profile migration,
+PC `archStart` / Half / "use Gothic" / legacy migration / bars mapping) · t17: 72/72 ALL PASS (F2 boundary
+150 / 151, W 400 rise 160 → r 150, exporter skips) · sample `sample_arch_1200_segmental.dxf` replaced by
+`sample_arch_1200_three-centre-rise240.dxf` (head 2 + 3 + 2 × 95, leaf 2 + 4 + 2 × 95).
+NOT verified: the configurator in a browser (no UI run in this session — Piotr's morning test).
+
+**Verdict: ✅ A** (engine-side proven by harness; UI compiled and linted only).
+
 ## 2026-09-06 — arched-casement-v1: audit fixes T1–T8, then Stage 2 (night run 2, branch `claude/arched-casement-audit-t1-t8-7d5fuk`)
 
 Inputs read in full, in this order: `ARCHED-CASEMENT-v1-AUDIT.md` → `ARCHED-CASEMENT-v1.md` (spec,

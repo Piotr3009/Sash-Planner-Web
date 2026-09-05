@@ -1,5 +1,6 @@
 /**
- * arch.js — arched casement head: geometry + segment planner (arched-casement-v1).
+ * arch.js — arched casement head: geometry, glazing bars + segment planner
+ * (arched-casement-v1 geometry core, v2 shape model).
  *
  * One arched member (frame head, leaf top rail) is a RING between two
  * concentric contours, clipped at the ARCH-START line — the horizontal line
@@ -11,17 +12,25 @@
  * line. Outer arcs run COUNTER-CLOCKWISE from the right arch-start point over
  * the apex to the left arch-start point (angles increase along the contour).
  *
- * Shapes (centres sit on the arch-start line unless stated):
- *   segmental           1 centre, below the line; rise < W/2
- *   semi-circle         1 centre, R = W/2, rise = W/2 (fixed by the shape)
+ * RULE C (v2 P1): every arch starts VERTICAL at the jambs, so a horizontal cut
+ * on the arch-start line is exactly the member face wide. Shapes:
+ *   semi-circle         1 centre on the line, R = W/2 — rise = W/2 exactly
+ *   three-centre        2 haunch centres on the line + 1 crown centre below it;
+ *                       haunch r = max(rise²/halfW, profile arch.minHaunchRadius),
+ *                       crown radius from tangency — rise below W/2
  *   gothic-equilateral  2 centres at the opposite arch-start points, R = W
  *   gothic-drop         2 centres inside the span, rise ≥ W/2 (free)
- *   three-centre        2 haunch centres on the line (r = rise²/halfW) + 1 crown centre below it; rise < W/2
+ * A "Round" arch (the configurator's word) resolves to semi-circle or
+ * three-centre from its rise (resolveRoundShape); above half the width only
+ * a gothic exists. The v1 'segmental' (single centre below the line — it did
+ * not start vertical) is gone; PSW 'segmental-arch' and v1-era saved windows
+ * migrate to a three-centre with rise 0.20 × W (P10).
  *
- * Workshop numbers (member faces, leaf inset, glass inset, finger joint,
- * board stock) come from the casement profile — none are hard-coded here.
- * Shape defaults quoted from PSW: js/price-calculator.js (window.ArchedSash,
- * RISE_RATIO / GOTHIC_PROFILE_RATIO / MIN_WIDTH / MAX_WIDTH).
+ * Workshop numbers (member faces, leaf inset, glass inset, haunch minimum,
+ * finger joint, board stock, bar pattern ratios) come from the casement
+ * profile — none are hard-coded here. Shape defaults quoted from PSW:
+ * js/price-calculator.js (window.ArchedSash, RISE_RATIO / GOTHIC_PROFILE_RATIO /
+ * MIN_WIDTH / MAX_WIDTH / PATTERNS_FOR_SHAPE).
  */
 
 const TAU = Math.PI * 2;
@@ -31,36 +40,60 @@ export class ArchError extends Error {
 }
 
 export const ARCH_SHAPES = Object.freeze([
-  'segmental', 'semi-circle', 'gothic-equilateral', 'gothic-drop', 'three-centre',
+  'semi-circle', 'three-centre', 'gothic-equilateral', 'gothic-drop',
 ]);
 
 export const ARCH_SHAPE_LABELS = Object.freeze({
-  'segmental': 'Segmental',
   'semi-circle': 'Semi-circle',
+  'three-centre': 'Three-centre',
   'gothic-equilateral': 'Gothic equilateral',
   'gothic-drop': 'Gothic drop',
-  'three-centre': 'Three-centre',
 });
 
-// PSW casArchShape → PC shape. PSW "elliptical" is drawn as an ellipse in the
-// 3D preview; a workshop cannot rout an ellipse from concentric arcs, so it is
-// built as the classic three-centre approximation.
+// The configurator offers two families: Round (semi-circle | three-centre,
+// resolved from the rise) and Gothic (equilateral | drop | shallow profile).
+export const ROUND_SHAPES = Object.freeze(['semi-circle', 'three-centre']);
+export const GOTHIC_SHAPES = Object.freeze(['gothic-equilateral', 'gothic-drop']);
+export const isRoundShape = (shape) => ROUND_SHAPES.includes(shape);
+export const isGothicShape = (shape) => GOTHIC_SHAPES.includes(shape);
+
+// v1-era PC shapes that no longer exist → their v2 replacement (P10). A saved
+// window carrying one of these migrates on load with `riseSource: 'ratio'`.
+export const LEGACY_ARCH_SHAPES = Object.freeze({
+  'segmental': { shape: 'three-centre', riseRatio: 0.20 },
+});
+
+// PSW casArchShape → PC shape (P10). PSW "elliptical" is drawn as an ellipse
+// in the 3D preview; a workshop cannot rout an ellipse from concentric arcs,
+// so it is built as the classic three-centre approximation. PSW "segmental"
+// is a single-centre arc that does not start vertical (rule C) — it becomes
+// a three-centre with the PSW segmental rise.
 export const PSW_ARCH_SHAPE = Object.freeze({
   'gothic-arch': 'gothic-equilateral',
   'semi-circle': 'semi-circle',
-  'segmental-arch': 'segmental',
+  'segmental-arch': 'three-centre',
   'elliptical-arch': 'three-centre',
 });
 
-// Default rise as a fraction of the external frame width — PSW
-// js/price-calculator.js RISE_RATIO (segmental 0.20, elliptical 0.325,
-// semi-circle 0.50, gothic √3/2) and GOTHIC_PROFILE_RATIO.drop (0.70).
-export const ARCH_RISE_RATIO = Object.freeze({
-  'segmental': 0.20,
+// PSW js/price-calculator.js RISE_RATIO — rise as a fraction of the external
+// frame width, keyed by the PSW shape (the source the ratio belongs to).
+export const PSW_ARCH_RISE_RATIO = Object.freeze({
+  'segmental-arch': 0.20,
+  'elliptical-arch': 0.325,
   'semi-circle': 0.5,
+  'gothic-arch': Math.sqrt(3) / 2,
+});
+
+// Configurator "Auto" for a Round arch: the PSW elliptical default (P4).
+export const ROUND_AUTO_RATIO = 0.325;
+
+// Default rise per PC shape (fraction of the external width): PSW RISE_RATIO
+// (elliptical 0.325, semi-circle 0.50, gothic √3/2) and GOTHIC_PROFILE_RATIO.drop.
+export const ARCH_RISE_RATIO = Object.freeze({
+  'semi-circle': 0.5,
+  'three-centre': ROUND_AUTO_RATIO,
   'gothic-equilateral': Math.sqrt(3) / 2,
   'gothic-drop': 0.70,
-  'three-centre': 0.325,
 });
 
 // Gothic profile presets (PSW GOTHIC_PROFILE_RATIO, spec §3.2 / §5): rise as a
@@ -72,11 +105,36 @@ export const GOTHIC_PROFILE_RATIO = Object.freeze({
   drop: 0.70,
   shallow: 0.60,
 });
+export const GOTHIC_PROFILES = Object.freeze(['equilateral', 'drop', 'shallow']);
 
 // Shapes whose rise is fixed by the geometry (no free rise).
 export const ARCH_FIXED_RISE = Object.freeze(['semi-circle', 'gothic-equilateral']);
 
 export function isArchShape(shape) { return ARCH_SHAPES.includes(shape); }
+
+// ── Glazing bar patterns in the arch (P5) — vocabulary and availability per
+// shape, one copy in PC (PSW keeps two: price-calculator.js PATTERNS_FOR_SHAPE
+// lines 990–995 and the 3D). Geometry: buildArchBars below.
+export const ARCH_BAR_PATTERNS = Object.freeze([
+  'none', 'half-hub', 'hub-spoke', 'double-hub-spoke', 'triple-hub-spoke', 'intersecting',
+]);
+export const ARCH_BAR_PATTERN_LABELS = Object.freeze({
+  'none': 'None',
+  'half-hub': 'Half hub',
+  'hub-spoke': 'Hub & spoke',
+  'double-hub-spoke': 'Double hub & spoke',
+  'triple-hub-spoke': 'Triple hub & spoke',
+  'intersecting': 'Intersecting',
+});
+export const HUB_PATTERNS = Object.freeze(['half-hub', 'hub-spoke', 'double-hub-spoke', 'triple-hub-spoke']);
+export const isHubPattern = (pattern) => HUB_PATTERNS.includes(pattern);
+export const PATTERNS_FOR_SHAPE = Object.freeze({
+  'semi-circle': ['none', 'half-hub', 'hub-spoke', 'double-hub-spoke', 'triple-hub-spoke', 'intersecting'],
+  'gothic-equilateral': ['none', 'intersecting'],
+  'gothic-drop': ['none', 'intersecting'],
+  'three-centre': ['none'],
+});
+export function patternsForShape(shape) { return PATTERNS_FOR_SHAPE[shape] || ['none']; }
 
 const r1 = (v) => Math.round(v * 10) / 10;
 
@@ -99,11 +157,30 @@ export function readArchLimits(limits) {
   return L;
 }
 
+/** profile.arch.minHaunchRadius (P3) — the smallest haunch radius of a three-centre arch. */
+export function readMinHaunchRadius(archProfile) {
+  const v = Number(archProfile?.minHaunchRadius);
+  if (!(v > 0)) throw new ArchError('Casement profile arch.minHaunchRadius is missing (mm, > 0)');
+  return v;
+}
+
+/**
+ * Round arch → PC shape from the rise (v2 §2.2). Exactly half the width
+ * (±tol) is a semi-circle; below it a three-centre; above it only a gothic
+ * can rise that far.
+ */
+export function resolveRoundShape(width, rise, tol = 0.5) {
+  const W = Number(width), h = Number(rise), hw = W / 2;
+  if (!(W > 0)) throw new ArchError(`Round arch width must be a positive number of mm, got "${width}"`);
+  if (!(h > 0)) throw new ArchError(`Round arch rise must be a positive number of mm, got "${rise}"`);
+  if (Math.abs(h - hw) <= tol) return 'semi-circle';
+  if (h > hw) throw new ArchError(`Round arch rise ${r1(h)}mm is above half the width (${r1(hw)}mm): use Gothic`);
+  return 'three-centre';
+}
+
 /**
  * Physical validity of a rise for a shape — these are geometry, not workshop
  * choices, so they are not profile settings:
- *   segmental     rise < W/2  (a single-centre arc with the centre below the
- *                 springing line cannot rise more; W/2 is the semi-circle)
  *   gothic-drop   rise ≥ W/2  (below that the two arcs cannot meet in a point)
  *   three-centre  rise < W/2  (at W/2 the haunch radius reaches the rise and
  *                 there is no crown circle — the shape is a semi-circle)
@@ -112,7 +189,6 @@ export function assertRisePhysics(shape, width, rise) {
   const W = Number(width), h = Number(rise), hw = W / 2;
   const label = ARCH_SHAPE_LABELS[shape];
   if (!(h > 0)) throw new ArchError(`${label} rise must be a positive number of mm, got "${rise}"`);
-  if (shape === 'segmental' && !(h < hw)) throw new ArchError(`${label} rise ${r1(h)}mm must be below half the width (${r1(hw)}mm) — a single-centre arc cannot rise more; use semi-circle or gothic`);
   if (shape === 'gothic-drop' && !(h >= hw)) throw new ArchError(`${label} rise ${r1(h)}mm must be at least half the width (${r1(hw)}mm) — below that the two arcs cannot meet in a point`);
   if (shape === 'three-centre' && !(h < hw)) throw new ArchError(`${label} rise ${r1(h)}mm must be below half the width (${r1(hw)}mm) — at W/2 the shape is a semi-circle`);
 }
@@ -148,18 +224,14 @@ export function resolveArchRise(shape, width, rise, limits) {
  *   'archStart' — the arc ends on the arch-start line (y = 0)
  *   'axis'      — the arc ends on the window axis (x = 0): pointed apex
  *   null        — tangent joint with the neighbouring arc (stays radial)
+ * opts.minHaunchRadius (three-centre, P3): haunch r = max(rise²/halfW, this);
+ * pure-geometry callers may omit it (0 = the v1 ellipse-curvature rule alone).
  */
-export function archArcs(shape, width, rise) {
+export function archArcs(shape, width, rise, opts = {}) {
   const W = Number(width), h = Number(rise), hw = W / 2;
   if (!isArchShape(shape)) throw new ArchError(`Unknown arch shape "${shape}"`);
   assertRisePhysics(shape, W, h);
   switch (shape) {
-    case 'segmental': {
-      const R = (hw * hw + h * h) / (2 * h);
-      const d = R - h;                         // centre depth below the arch-start line
-      const a = Math.atan2(d, hw);             // right arch-start point seen from the centre
-      return [{ cx: 0, cy: -d, r: R, a0: a, a1: Math.PI - a, clip0: 'archStart', clip1: 'archStart' }];
-    }
     case 'semi-circle':
       return [{ cx: 0, cy: 0, r: hw, a0: 0, a1: Math.PI, clip0: 'archStart', clip1: 'archStart' }];
     case 'gothic-equilateral':
@@ -176,8 +248,14 @@ export function archArcs(shape, width, rise) {
     case 'three-centre': {
       // Basket-handle approximation of the half-ellipse (a = W/2, b = rise):
       // haunch radius = the ellipse's radius of curvature at the springing,
-      // r = b²/a (spec §6.1); the crown radius follows from tangency.
-      const r = (h * h) / hw;
+      // r = b²/a (spec §6.1), never below the profile minimum (v2 P3 — the
+      // leaf-top inner ring must keep a positive radius); the crown radius
+      // follows from tangency. The haunch arcs start vertical at the jambs
+      // (centres ON the arch-start line) — rule C.
+      const rMin = Number(opts?.minHaunchRadius) || 0;
+      const r = Math.max((h * h) / hw, rMin);
+      if (!(h > r)) throw new ArchError(`Round arch rise ${r1(h)}mm must exceed the haunch radius ${r1(r)}mm (profile arch.minHaunchRadius ${r1(rMin)}) — below that there is no crown arc`);
+      if (!(r <= hw)) throw new ArchError(`Haunch radius ${r1(r)}mm exceeds half the width (${r1(hw)}mm)`);
       const e = hw - r;                        // haunch centre x
       const R = (e * e + h * h - r * r) / (2 * (h - r));   // crown radius from tangency
       const t = Math.atan2(R - h, e);          // tangent point seen from the crown centre
@@ -263,6 +341,7 @@ export function buildRing(baseArcs, outerOffset, innerOffset, label = '') {
     label,
     outer,
     inner,
+    centre,
     thickness: innerOffset - outerOffset,
     offsets: { outer: outerOffset, inner: innerOffset },
     lengths: {
@@ -312,12 +391,14 @@ export function ringBBox(ring) {
  *   frame head : outer 0            → inner frameHead.face
  *   leaf top   : outer leafAtJamb   → inner leafAtJamb + leafTop.face
  *   glass line : leafAtJamb + leafTop.face − glassInset
+ * Three-centre haunch minimum: profile.arch.minHaunchRadius (P3).
  */
 export function buildArchGeometry({ shape, width, height, rise }, profile) {
   if (!profile?.elements?.frameHead || !profile?.elements?.leafTop || !profile?.deductions || !profile?.geometry) {
     throw new ArchError('Casement profile is missing the frameHead / leafTop / deductions / geometry sections');
   }
   const L = readArchLimits(profile.arch?.limits);
+  const minHaunchRadius = readMinHaunchRadius(profile.arch);
   const W = Number(width);
   const h = resolveArchRise(shape, W, rise, L);
   let straightHeight = null, leafStraightStile = null;
@@ -336,7 +417,7 @@ export function buildArchGeometry({ shape, width, height, rise }, profile) {
       throw new ArchError(`Straight stile of the arched leaf is ${r1(leafStraightStile)}mm — minimum ${L.minLeafStraightStile}mm`);
     }
   }
-  const base = archArcs(shape, W, h);
+  const base = archArcs(shape, W, h, { minHaunchRadius });
   const tFrame = Number(profile.elements.frameHead.face);
   const leafInset = Number(profile.deductions.leafAtJamb);
   const tLeaf = Number(profile.elements.leafTop.face);
@@ -350,14 +431,17 @@ export function buildArchGeometry({ shape, width, height, rise }, profile) {
     label: ARCH_SHAPE_LABELS[shape],
     width: W,
     rise: h,
+    start: straightHeight,                      // arch-start line from the cill (= straight height)
     straightHeight,
     leafStraightStile,
     limits: L,
+    minHaunchRadius,
+    radii: base.map((a) => a.r),                // outer radius per arc (1 / 2 / 3 values)
     arcs: base,
     offsets: { frameInner: tFrame, leafOuter: leafInset, leafInner: leafInset + tLeaf, glass: glassOffset },
     frameHead,
     leafTop,
-    glass: { arcs: glassArcs, length: arcsLength(glassArcs), apex: arcsExtent(glassArcs, [0, 1]).max },
+    glass: { arcs: glassArcs, length: arcsLength(glassArcs), apex: arcsExtent(glassArcs, [0, 1]).max, halfWidth: W / 2 - glassOffset },
   };
 }
 

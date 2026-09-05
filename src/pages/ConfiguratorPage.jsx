@@ -7,7 +7,10 @@ import { GLASS_TYPES, GLASS_SPECS, GLASS_COATINGS, GLASS_FINISHES, FROSTED_LOCAT
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
 import { buildVentGrilles } from '../engine/lists.js';
 import { FAN_AXIS_OFFSET_TOP, FAN_AXIS_OFFSET_BOTTOM } from '../engine/casementLayouts.js';
-import { ARCH_RISE_RATIO, GOTHIC_PROFILE_RATIO, buildArchPlan } from '../engine/arch.js';
+import {
+  GOTHIC_PROFILE_RATIO, ROUND_AUTO_RATIO, LEGACY_ARCH_SHAPES, PATTERNS_FOR_SHAPE, ARCH_BAR_PATTERN_LABELS,
+  isHubPattern, isGothicShape, resolveRoundShape, buildArchPlan,
+} from '../engine/arch.js';
 import { getCasementProfile } from '../engine/profile.js';
 import CasementLayoutPicker from '../components/configurator/CasementLayoutPicker.jsx';
 import NumInput from '../components/NumInput.jsx';
@@ -106,25 +109,24 @@ const DOUBLE_CONSTRAINTS = { minW: 400, maxW: 3000, minH: 400, maxH: 3000 };
 // (Piotr 21.08). Height stays at the sash limit. Note this is a FRAME limit
 // only — per-leaf hardware limits live in casementHardware.js and still apply.
 const CASEMENT_CONSTRAINTS = { minW: 400, maxW: 5000, minH: 400, maxH: 3000 };
-// Arched casement (arched-casement-v1): shape is an attribute of the casement,
-// never a separate batch type. UI shape 'gothic' + profile maps to the engine's
-// 'gothic-equilateral' / 'gothic-drop' (see pcArchShape). Rise defaults to the
-// PSW ratio × width and tracks width until the user types a value (custom).
+// Arched casement (arched-casement-v2): shape is an attribute of the casement,
+// never a separate batch type. The joiner picks Round | Gothic and types WHERE
+// THE ARCH STARTS (mm from the cill); rise = H − start. A Round arch resolves
+// to the engine's 'semi-circle' (start exactly H − W/2) or 'three-centre'
+// (resolveRoundShape, rule C: every arch starts vertical at the jambs); Gothic
+// + profile → 'gothic-equilateral' / 'gothic-drop' with a derived start.
+// Radii are results, shown in the right panel, never typed.
 const CAS_FRAME_SHAPES = [{ value: 'standard', label: 'Standard' }, { value: 'arched', label: 'Arched' }];
-const CAS_ARCH_SHAPES = [
-  { value: 'segmental', label: 'Segmental' }, { value: 'semi-circle', label: 'Semi-circle' },
-  { value: 'gothic', label: 'Gothic' }, { value: 'three-centre', label: 'Three-centre' },
-];
+const CAS_ARCH_SHAPES = [{ value: 'round', label: 'Round' }, { value: 'gothic', label: 'Gothic' }];
 const CAS_GOTHIC_PROFILES = [{ value: 'equilateral', label: 'Equilateral' }, { value: 'drop', label: 'Drop' }, { value: 'shallow', label: 'Shallow' }];
 const CAS_ARCH_HINGES = [{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }];
-const uiArchToPc = (ui, profile) => ui === 'gothic' ? (profile === 'equilateral' ? 'gothic-equilateral' : 'gothic-drop') : ui;
-const pcArchToUi = (pc) => (pc === 'gothic-equilateral' || pc === 'gothic-drop') ? 'gothic' : (pc || 'segmental');
-const archRatioFor = (ui, profile) => ui === 'gothic' ? (GOTHIC_PROFILE_RATIO[profile] || GOTHIC_PROFILE_RATIO.equilateral) : (ARCH_RISE_RATIO[ui] || 0);
-// Semi-circle and equilateral gothic have a rise fixed by geometry — no custom input.
-const archRiseIsFixed = (ui, profile) => ui === 'semi-circle' || (ui === 'gothic' && profile === 'equilateral');
+const gothicPcShape = (profile) => (profile === 'equilateral' ? 'gothic-equilateral' : 'gothic-drop');
+// Saved PC shape → chip: gothic-* → Gothic; semi-circle / three-centre and the v1-era 'segmental' → Round.
+const pcArchToUi = (pc) => (isGothicShape(pc) ? 'gothic' : 'round');
 // The shared 3D (ArchedCasementWindow, identical to PSW) takes PSW shape names
-// and ignores the rise (its own fixed ratios). 'gothic-drop' has no 3D twin.
-const PC_TO_3D_ARCH = { 'segmental': 'segmental-arch', 'semi-circle': 'semi-circle', 'gothic-equilateral': 'gothic-arch', 'gothic-drop': 'gothic-arch', 'three-centre': 'elliptical-arch' };
+// and ignores the rise (its own fixed ratios) — night-4 work (spec v2 F).
+// 'gothic-drop' has no 3D twin; 'three-centre' is drawn as the PSW ellipse.
+const PC_TO_3D_ARCH = { 'semi-circle': 'semi-circle', 'gothic-equilateral': 'gothic-arch', 'gothic-drop': 'gothic-arch', 'three-centre': 'elliptical-arch' };
 
 // Migrate old custom bar format (position → mm)
 function migrateBars(bars) {
@@ -219,11 +221,12 @@ export default function ConfiguratorPage() {
   const [casLayout, setCasLayout] = useState('040L');
   const [casHinges, setCasHinges] = useState(null);
   const [casFrameShape, setCasFrameShape] = useState('standard');
-  const [casArchShapeUi, setCasArchShapeUi] = useState('segmental');
+  const [casArchShapeUi, setCasArchShapeUi] = useState('round');
   const [casArchProfile, setCasArchProfile] = useState('equilateral');
-  const [casArchRise, setCasArchRise] = useState('');
+  const [casArchStart, setCasArchStart] = useState('');        // mm from the cill (v2 P4)
   const [casArchRiseSource, setCasArchRiseSource] = useState('ratio');
   const [casArchHinge, setCasArchHinge] = useState('left');
+  const [casArchPattern, setCasArchPattern] = useState('none'); // bar pattern in the arch (v2 P5)
   const [fanMm, setFanMm] = useState('');
   const [fan2Mm, setFan2Mm] = useState('');
   const [midMm, setMidMm] = useState('');
@@ -316,9 +319,17 @@ export default function ConfiguratorPage() {
     setCasFrameShape(w.casementType === 'arched' ? 'arched' : 'standard');
     setCasArchShapeUi(pcArchToUi(w.archShape));
     setCasArchProfile(w.archShape === 'gothic-drop' ? (w.archProfile === 'shallow' ? 'shallow' : 'drop') : (w.archProfile || 'equilateral'));
-    setCasArchRise(w.archRise != null ? String(w.archRise) : '');
-    setCasArchRiseSource(w.archRiseSource || (w.archRise != null ? 'custom' : 'ratio'));
+    // v2: the arch start from the cill; a v1 window carries archRise only
+    // (start = H − rise); a v1-era 'segmental' migrates to Round on the Auto
+    // ratio with riseSource 'ratio' (spec v2 P10 / §3 A).
+    const wH = Number(w.height) || 0;
+    const legacyShape = !!LEGACY_ARCH_SHAPES[w.archShape];
+    const startFromRise = w.archRise != null && w.archRise !== '' && wH > 0 ? wH - Number(w.archRise) : null;
+    const savedStart = legacyShape ? null : (w.archStart ?? startFromRise);
+    setCasArchStart(savedStart != null ? String(savedStart) : '');
+    setCasArchRiseSource(legacyShape ? 'ratio' : (w.archRiseSource || (savedStart != null ? 'custom' : 'ratio')));
     setCasArchHinge(w.archHinge === 'right' ? 'right' : 'left');
+    setCasArchPattern(w.archBarPattern || 'none');
     setFanMm(w.fanlightAxis ?? (w.fanlightHeight != null && w.fanlightHeight !== ''
       ? Number(w.fanlightHeight) + FAN_AXIS_OFFSET_TOP : ''));
     setFan2Mm(w.fan2Axis ?? (w.casementFan2Height != null && w.casementFan2Height !== ''
@@ -435,57 +446,87 @@ export default function ConfiguratorPage() {
   const isCasementBatch = batch?.type === 'casement';
   const isArched = isCasementBatch && casFrameShape === 'arched';
   const archLimits = isArched ? (getCasementProfile()?.arch?.limits || {}) : null;
-  const archRiseNum = Number(casArchRise) || 0;
+  const extW = Number(inW) || 400;
+  const extH = Number(inH) || 400;
+
+  // ── Arched casement (v2): Round | Gothic, arch start measured from the cill ──
+  const isGothicUi = casArchShapeUi === 'gothic';
+  const gothicRatio = GOTHIC_PROFILE_RATIO[casArchProfile] || GOTHIC_PROFILE_RATIO.equilateral;
+  // Auto start: Round = H − 0.325 × W (PSW elliptical default); Gothic = H − profile ratio × W (always derived)
+  const archAutoStart = Math.round(extH - (isGothicUi ? gothicRatio : ROUND_AUTO_RATIO) * extW);
+  const archHalfStart = Math.round(extH - extW / 2);           // semi-circle: rise = W/2
+  const minStraight = archLimits?.minStraightBelowRise || 900;
   const dimConstraints = isArched
     ? {
         minW: archLimits.minWidth || 400, maxW: archLimits.maxWidth || 1500,
-        minH: Math.max(CASEMENT_CONSTRAINTS.minH, Math.round(archRiseNum + (archLimits.minStraightBelowRise || 900))),
+        // Gothic: the start is derived, so the height must leave the straight part
+        // below the rise; Round: the typed start carries the rule (start >= 900),
+        // the height only needs to clear it — arch.js reports the rest as text.
+        minH: Math.max(CASEMENT_CONSTRAINTS.minH, isGothicUi ? Math.round(gothicRatio * extW + minStraight) : minStraight + 1),
         maxH: CASEMENT_CONSTRAINTS.maxH,
       }
     : isCasementBatch
       ? CASEMENT_CONSTRAINTS
       : (sashType === 'triple' ? TRIPLE_CONSTRAINTS : DOUBLE_CONSTRAINTS);
+  useEffect(() => {
+    if (!isArched) return;
+    // Gothic: the start is always derived. Round on Auto: start follows W and H;
+    // a typed (custom) start is kept when H changes — the rise recomputes.
+    if (isGothicUi) {
+      if (casArchRiseSource !== 'ratio') setCasArchRiseSource('ratio');
+      setCasArchStart(String(archAutoStart));
+    } else if (casArchRiseSource === 'ratio') {
+      setCasArchStart(String(archAutoStart));
+    }
+  }, [isArched, isGothicUi, casArchRiseSource, archAutoStart]);
+  const archStartNum = Number(casArchStart) || 0;
+  const archRiseNum = archStartNum > 0 ? extH - archStartNum : 0;
+  // Resolved engine shape — Round: semi-circle at exactly half the width, three-centre below, error above (use Gothic)
+  const archShapeResolved = useMemo(() => {
+    if (!isArched) return { shape: null, error: null };
+    if (isGothicUi) return { shape: gothicPcShape(casArchProfile), error: null };
+    if (!(archRiseNum > 0)) return { shape: null, error: 'Arch start must be below the frame height' };
+    try { return { shape: resolveRoundShape(extW, archRiseNum), error: null }; }
+    catch (e) { return { shape: null, error: e?.message || String(e) }; }
+  }, [isArched, isGothicUi, casArchProfile, extW, archRiseNum]);
+  const pcArchShape = archShapeResolved.shape;
+  const archPatterns = PATTERNS_FOR_SHAPE[pcArchShape] || PATTERNS_FOR_SHAPE['three-centre'];   // frozen arrays: stable effect deps
+  useEffect(() => {
+    // a pattern the resolved shape does not offer (e.g. a hub on a three-centre) falls back to none
+    if (isArched && !archPatterns.includes(casArchPattern)) setCasArchPattern('none');
+  }, [isArched, archPatterns, casArchPattern]);
+  const archPlan = useMemo(() => {
+    if (!isArched) return null;
+    if (archShapeResolved.error) return { error: archShapeResolved.error };
+    try {
+      return buildArchPlan({ shape: pcArchShape, width: extW, height: extH, rise: archRiseNum, hinge: casArchHinge }, getCasementProfile());
+    } catch (e) {
+      return { error: e?.message || String(e) };
+    }
+  }, [isArched, archShapeResolved, pcArchShape, extW, extH, archRiseNum, casArchHinge]);
+  const archError = archPlan?.error || null;
+  // Radii are results: "R 150 / 1400 / 150" (three-centre), "R 500" (semi-circle), "R 1000" (gothic, both arcs equal)
+  const archRadiiText = (() => {
+    if (!archPlan || archPlan.error) return '—';
+    const radii = (archPlan.arcs || []).map((a) => Math.round(a.r));
+    return new Set(radii).size === 1 ? `R ${radii[0]}` : `R ${radii.join(' / ')}`;
+  })();
+  const archPlanRow = (member) => {
+    const m = archPlan?.plans?.[member];
+    const ring = archPlan?.[member];
+    if (!m || !ring) return '—';
+    // every arc: one radius for a semi-circle, three for a three-centre, two for a gothic
+    const radii = (ring.outer || []).map((a) => Math.round(a.r)).join(' / ');
+    const parts = (m.arcs || []).map((a) => a.default ? `${a.default.n} × ${a.default.stock}` : '?').join(' + ');
+    return `R ${radii} · ${parts}`;
+  };
 
   // ─── Effective values ───
   const isSingle = colourMode === 'single';
   const hasGasFill = glassType !== 'single' && glassType !== 'passive'; // sealed units only
   const frameDepth = FRAME_DEPTHS[frameType] || 164;
-
-  const extW = Number(inW) || 400;
-  const extH = Number(inH) || 400;
   const effectiveLBars = sameBars ? uBars : lBars;
   const isCasement = batch?.type === 'casement';
-
-  // ── Arched casement: derived shape / ratio, auto rise, CNC preview ──
-  const pcArchShape = uiArchToPc(casArchShapeUi, casArchProfile);
-  const archRatio = archRatioFor(casArchShapeUi, casArchProfile);
-  const archFixedRise = archRiseIsFixed(casArchShapeUi, casArchProfile);
-  const archAutoRise = Math.round(archRatio * extW);
-  useEffect(() => {
-    if (!isArched) return;
-    // Ratio-driven rise follows width, shape and profile; fixed-rise shapes never take a custom value.
-    if (casArchRiseSource === 'ratio' || archFixedRise) {
-      if (archFixedRise && casArchRiseSource !== 'ratio') setCasArchRiseSource('ratio');
-      setCasArchRise(String(archAutoRise));
-    }
-  }, [isArched, casArchRiseSource, archFixedRise, archAutoRise]);
-  const archPlan = useMemo(() => {
-    if (!isArched || !archRiseNum) return null;
-    try {
-      return buildArchPlan({ shape: pcArchShape, width: extW, height: extH, rise: archRiseNum }, getCasementProfile());
-    } catch (e) {
-      return { error: e?.message || String(e) };
-    }
-  }, [isArched, pcArchShape, extW, extH, archRiseNum]);
-  const archPlanRow = (member) => {
-    const m = archPlan?.plans?.[member];
-    const ring = archPlan?.[member];
-    if (!m || !ring) return '—';
-    // every arc: one radius for a single-centre arch, three for a three-centre, two for a gothic
-    const radii = (ring.outer || []).map((a) => Math.round(a.r)).join(' / ');
-    const parts = (m.arcs || []).map((a) => a.default ? `${a.default.n} × ${a.default.stock}` : '?').join(' + ');
-    return `R ${radii} · ${parts}`;
-  };
   const isDoor = batch?.type === 'door' || batch?.type === 'doors';
 
   // Switching door type loads that type's default size — but only while the
@@ -587,13 +628,14 @@ export default function ConfiguratorPage() {
         casementLayout: isArched ? (casArchHinge === 'right' ? '040R' : '040L') : casLayout,
         casementHinges: isArched ? null : (casHinges ? [...casHinges] : null),
         // Arched casement (PC-native fields read by specification.js archFromSpec).
-        // archRise is stored only for a custom value: null = follow the PSW ratio.
         casementType: isArched ? 'arched' : 'standard',
         archShape: isArched ? pcArchShape : null,
-        archProfile: isArched && casArchShapeUi === 'gothic' ? casArchProfile : null,
-        archRise: isArched && casArchRiseSource === 'custom' && !archFixedRise ? archRiseNum : null,
-        archRiseSource: isArched ? (archFixedRise ? 'ratio' : casArchRiseSource) : null,
+        archProfile: isArched && isGothicUi ? casArchProfile : null,
+        archStart: isArched ? archStartNum : null,
+        archRise: isArched ? archRiseNum : null,
+        archRiseSource: isArched ? casArchRiseSource : null,
         archHinge: isArched ? casArchHinge : null,
+        archBarPattern: isArched ? casArchPattern : null,
         casementMiddleWidth: casCalc.isTriple ? casCalc.midEff : 0,
         fanlightRatio: casCalc.fanRatio,
         casementFan2Ratio: casCalc.fan2Ratio,
@@ -628,7 +670,7 @@ export default function ConfiguratorPage() {
       spacerColor, sashType, splitRatio, headType, openingType: opening,
       boxType: frameType === 'slim' ? 'slim' : 'standard', boxDepth: frameDepth,
     });
-  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, isArched, pcArchShape, casArchShapeUi, casArchProfile, casArchRiseSource, archRiseNum, archFixedRise, casArchHinge, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType]);
+  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, isArched, pcArchShape, isGothicUi, casArchProfile, casArchRiseSource, archStartNum, archRiseNum, casArchHinge, casArchPattern, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType]);
   useEffect(() => { sync(); }, [sync]);
 
   // ─── B4: Listen for 3D ready event and re-sync ───
@@ -659,13 +701,15 @@ export default function ConfiguratorPage() {
         casementLayout: isArched ? (casArchHinge === 'right' ? '040R' : '040L') : casLayout,
         casementHinges: isArched ? null : (casHinges ? [...casHinges] : null),
         // Arched casement (PC-native fields read by specification.js archFromSpec).
-        // archRise is stored only for a custom value: null = follow the PSW ratio.
         casementType: isArched ? 'arched' : 'standard',
         archShape: isArched ? pcArchShape : null,
-        archProfile: isArched && casArchShapeUi === 'gothic' ? casArchProfile : null,
-        archRise: isArched && casArchRiseSource === 'custom' && !archFixedRise ? archRiseNum : null,
-        archRiseSource: isArched ? (archFixedRise ? 'ratio' : casArchRiseSource) : null,
+        archProfile: isArched && isGothicUi ? casArchProfile : null,
+        // v2: the start from the cill is what the joiner typed; archRise = H − start is kept for compatibility
+        archStart: isArched ? archStartNum : null,
+        archRise: isArched ? archRiseNum : null,
+        archRiseSource: isArched ? casArchRiseSource : null,
         archHinge: isArched ? casArchHinge : null,
+        archBarPattern: isArched ? casArchPattern : null,
         fanlightAxis: casCalc.hasFan ? casCalc.fanEff : null,
         fan2Axis: casCalc.hasFan2 ? casCalc.fan2Eff : null,
         casementMiddleWidth: casCalc.isTriple ? casCalc.midEff : 0,
@@ -734,7 +778,12 @@ export default function ConfiguratorPage() {
         <div className="flex items-center gap-3">
           <input type="text" placeholder="Window name (max 7)" maxLength={7} value={winName} onChange={e => setWinName(e.target.value)}
             className={`px-3 py-2 border-2 rounded-lg text-sm w-56 bg-surface-800 ${winName.trim() ? 'border-accent-500 text-ink-50' : 'border-status-danger/50 text-ink-200'}`} />
-          <button onClick={save} className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'}`}>
+          <button
+            onClick={save}
+            disabled={!!(isArched && archError)}
+            title={isArched && archError ? `Arch: ${archError}` : undefined}
+            className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'} ${isArched && archError ? 'opacity-40 cursor-not-allowed' : ''}`}
+          >
             {isEditMode ? '✓ Update Window' : '✓ Save to Batch'}
           </button>
         </div>
@@ -762,38 +811,52 @@ export default function ConfiguratorPage() {
             )}
             {isArched && <>
               <Lbl>Arch shape</Lbl><HChips o={CAS_ARCH_SHAPES} v={casArchShapeUi} c={setCasArchShapeUi} />
-              {casArchShapeUi === 'gothic' && <>
+              {isGothicUi && <>
                 <Lbl>Gothic profile</Lbl><HChips o={CAS_GOTHIC_PROFILES} v={casArchProfile} c={setCasArchProfile} />
               </>}
-              <Lbl>Rise (mm)</Lbl>
+              <Lbl>Arch starts at (mm from cill)</Lbl>
               <div className="flex items-center gap-2 mb-1">
                 <NumInput
-                  value={casArchRise}
-                  disabled={archFixedRise}
+                  value={casArchStart}
+                  disabled={isGothicUi}
                   onCommit={(v) => {
                     const n = Number(v);
-                    if (Number.isFinite(n) && n > 0) { setCasArchRise(String(n)); setCasArchRiseSource('custom'); }
+                    if (Number.isFinite(n) && n > 0) { setCasArchStart(String(Math.round(n))); setCasArchRiseSource('custom'); }
                   }}
                   className="w-24 px-3 py-2 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-sm disabled:opacity-50"
                 />
-                <button
-                  type="button"
-                  disabled={archFixedRise}
-                  onClick={() => { setCasArchRiseSource('ratio'); setCasArchRise(String(archAutoRise)); }}
-                  className={`px-2.5 py-1 text-[11px] rounded-lg border transition-all disabled:opacity-50 ${casArchRiseSource === 'ratio' ? 'border-accent-500 bg-accent-500/15 text-accent-400 font-medium' : 'border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500'}`}
-                >
-                  Auto {Math.round(archRatio * 100)}%
-                </button>
+                {!isGothicUi && <>
+                  <button
+                    type="button"
+                    onClick={() => { setCasArchRiseSource('ratio'); setCasArchStart(String(archAutoStart)); }}
+                    title={`H − ${ROUND_AUTO_RATIO} × W = ${archAutoStart}`}
+                    className={`px-2.5 py-1 text-[11px] rounded-lg border transition-all ${casArchRiseSource === 'ratio' ? 'border-accent-500 bg-accent-500/15 text-accent-400 font-medium' : 'border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500'}`}
+                  >
+                    Auto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setCasArchRiseSource('custom'); setCasArchStart(String(archHalfStart)); }}
+                    title={`H − W/2 = ${archHalfStart} (semi-circle)`}
+                    className="px-2.5 py-1 text-[11px] rounded-lg border transition-all border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500"
+                  >
+                    Half
+                  </button>
+                </>}
               </div>
-              <div className="text-[11px] text-ink-500 mb-2">
-                {archFixedRise
-                  ? 'Rise is fixed by the shape (W/2 for a semi-circle, 0.866 × W for an equilateral gothic).'
-                  : 'Auto follows the PSW ratio and tracks width. Typing a value switches to custom.'}
+              <div className="text-[11px] text-ink-500 mb-1">
+                {isGothicUi
+                  ? `Start is derived: H − ${gothicRatio.toFixed(3)} × W (${casArchProfile}).`
+                  : 'Auto = H − 0.325 × W. Half = H − W/2 (semi-circle). Typing a value switches to custom and stays put when H changes; below half the width the arch is a three-centre, above it use Gothic.'}
+              </div>
+              <div className="text-[11px] text-ink-300 mb-2">
+                Rise <span className="text-accent-400 font-medium">{archRiseNum}</span> · <span className="text-accent-400 font-medium">{archRadiiText}</span>
+                {!isGothicUi && pcArchShape && <span className="text-ink-500"> · {pcArchShape}</span>}
               </div>
               <Lbl>Hinge side</Lbl><HChips o={CAS_ARCH_HINGES} v={casArchHinge} c={setCasArchHinge} />
               <div className="text-[11px] text-ink-300 bg-surface-700/50 border border-surface-500 rounded-lg px-3 py-2 mt-1">
                 Single leaf. Lights, layout card and fanlight bars are hidden while Arched is on.
-                Width {dimConstraints.minW}–{dimConstraints.maxW}, height at least rise + {(archLimits?.minStraightBelowRise || 900)}.
+                Width {dimConstraints.minW}–{dimConstraints.maxW}, arch start at least {minStraight} from the cill.
               </div>
             </>}
           </Sec>}
@@ -863,8 +926,20 @@ export default function ConfiguratorPage() {
           </Sec>
 
           {isCasement && <Sec t="Glazing Bars">
-            <Lbl>Main — horizontal</Lbl><HChips o={CAS_BAR_COUNTS} v={casHB} c={setCasHB} />
-            <Lbl>Main — vertical</Lbl><HChips o={CAS_BAR_COUNTS} v={casVB} c={setCasVB} />
+            <Lbl>Main — horizontal{isArched ? ' (below the springing)' : ''}</Lbl><HChips o={CAS_BAR_COUNTS} v={casHB} c={setCasHB} />
+            {!(isArched && isHubPattern(casArchPattern)) && <>
+              <Lbl>Main — vertical</Lbl><HChips o={CAS_BAR_COUNTS} v={casVB} c={setCasVB} />
+            </>}
+            {isArched && <>
+              <Lbl>Pattern in the arch</Lbl>
+              <HChips o={archPatterns.map((p) => ({ value: p, label: ARCH_BAR_PATTERN_LABELS[p] || p }))} v={casArchPattern} c={setCasArchPattern} />
+              {isHubPattern(casArchPattern) && (
+                <div className="text-[11px] text-ink-500 mb-2">Hub patterns bring their own verticals below the springing (the ring ends) — the vertical count is not used (PSW rule).</div>
+              )}
+              {archPatterns.length === 1 && (
+                <div className="text-[11px] text-ink-500 mb-2">Patterns exist for a semi-circle (Half) and for gothic arches; a three-centre takes straight bars only.</div>
+              )}
+            </>}
             {casCalc.hasFan && !isArched && <>
               <Lbl>Fanlight — horizontal</Lbl><HChips o={CAS_FAN_BAR_COUNTS} v={casFanHB} c={setCasFanHB} />
               <Lbl>Fanlight — vertical</Lbl><HChips o={CAS_FAN_BAR_COUNTS} v={casFanVB} c={setCasFanVB} />
@@ -873,7 +948,7 @@ export default function ConfiguratorPage() {
               <Lbl>Fanlight 2 — horizontal</Lbl><HChips o={CAS_FAN_BAR_COUNTS} v={casFan2HB} c={setCasFan2HB} />
               <Lbl>Fanlight 2 — vertical</Lbl><HChips o={CAS_FAN_BAR_COUNTS} v={casFan2VB} c={setCasFan2VB} />
             </>}
-            {(casHB + casVB + casFanHB + casFanVB + casFan2HB + casFan2VB) > 0 && (
+            {((casHB + casVB + casFanHB + casFanVB + casFan2HB + casFan2VB) > 0 || (isArched && casArchPattern !== 'none')) && (
               <><Lbl>Bar type</Lbl><HChips o={BAR_TYPE_OPTIONS} v={casBarType} c={setCasBarType} /></>
             )}
           </Sec>}
@@ -1063,14 +1138,15 @@ export default function ConfiguratorPage() {
           <SG t="Dimensions"><SR l="Frame" v={`${extW} × ${extH}`} /><SR l="Depth" v={`${frameDepth}mm`} /></SG>
           {isSash && <SG t="Product"><SR l="Sash" v={sashType} /><SR l="Head" v={headType} /></SG>}
           {isCasement && isArched && <SG t="Layout">
-            <SR l="Type" v={`Arched · ${casArchShapeUi}${casArchShapeUi === 'gothic' ? ` (${casArchProfile})` : ''}`} />
-            <SR l="Rise" v={`${archRiseNum} (${casArchRiseSource === 'ratio' ? 'auto' : 'custom'})`} />
+            <SR l="Type" v={`Arched · ${isGothicUi ? `Gothic (${casArchProfile})` : `Round (${pcArchShape || '?'})`}`} />
+            <SR l="Arch starts at" v={`${archStartNum} mm · ${casArchRiseSource === 'ratio' ? 'auto' : 'custom'}`} />
+            <SR l="Rise" v={`${archRiseNum} · ${archRadiiText}`} />
             <SR l="Leaves" v={`1 · hinge ${casArchHinge}`} />
-            <SR l="Bars" v={`${casHB}H × ${casVB}V`} />
+            <SR l="Bars" v={`${casHB}H × ${isHubPattern(casArchPattern) ? 0 : casVB}V${casArchPattern !== 'none' ? ` · ${ARCH_BAR_PATTERN_LABELS[casArchPattern] || casArchPattern}` : ''}`} />
           </SG>}
           {isCasement && isArched && <SG t="CNC">
-            {archPlan?.error
-              ? <SR l="Arch" v={archPlan.error} />
+            {archError
+              ? <div className="px-4 py-1 text-[11px] text-amber-400">Arch: {archError}</div>
               : <>
                 <SR l="Head" v={archPlanRow('frameHead')} />
                 <SR l="Leaf top" v={archPlanRow('leafTop')} />

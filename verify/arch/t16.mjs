@@ -9,13 +9,17 @@
  * forms and brute-force sampling written here cross-check the module where
  * the spec lists no number. Sections follow spec §10.3 items 1–10.
  *
- * Spec errata handled explicitly (BLOCKERS.md §6, both flagged for Piotr):
- *   E1  §10.1 segmental "arcLen_in 1237.41" = R_in × θ_out (unclipped arc);
- *       §6.2 clips every chain at the arch-start line ⇒ 1112.66. Both asserted.
- *   E2  §10.2 "LEAF segmental (R 830/763, θ 87.21°)" reuses the HEAD angle; the
- *       leaf ring's own clipped span is 81.24° ⇒ W_req 107.93 / 98.80 / 94.56,
- *       D13 default 5 × 95 (ALT 3 × 180). The spec's 111.1 / 100.6 and its
- *       "4 × 105" are reproduced from the head angle to prove the reading.
+ * Spec errata E1 / E2 (BLOCKERS.md §6.2 / §6.3) concerned the v1 segmental
+ * vectors only — moot since v2 removed the shape (history kept there).
+ *
+ * arched-casement-v2 (06.09, night 3): the v1 'segmental' shape is gone (P1 rule
+ * C — every arch starts vertical at the jambs; P2). Its §10.1 / §10.2 vectors
+ * are superseded by a THREE-CENTRE with the same rise 240 under P3
+ * (haunch r = max(rise²/halfW, minHaunchRadius 150) → r 150, crown R 1320;
+ * numbers computed 06.09 from the P3 rule and cross-checked by the independent
+ * closed form + option table below). The 390 vector is unchanged (r 253.5 > 150).
+ * lists.js / calculations.js are IN SCOPE for v2 (cut list, glass shape), so
+ * §10.3 item 10 now freezes casementLayouts.js and jambDxf.js only.
  *
  * Run: node verify/arch/t16.mjs            (writes the sample DXF too)
  */
@@ -78,17 +82,26 @@ check('profile numbers read for the arch: frameHead 57 / leafAtJamb 40 / leafTop
 // §10.3 item 1 — rise defaults reproduce §3.2 for every shape / gothic profile
 // ═══════════════════════════════════════════════════════════════════════════
 section('§10.3 pt 1 — rise = ratio × external width (spec §3.2)');
-expectNear('segmental default rise = 0.20 × W (PSW RISE_RATIO)', arch.resolveArchRise('segmental', W, null, LIM), 240, 1e-9);
+check('v2: ARCH_SHAPES = semi-circle | three-centre | gothic-equilateral | gothic-drop — no segmental (P2)',
+  JSON.stringify(arch.ARCH_SHAPES) === JSON.stringify(['semi-circle', 'three-centre', 'gothic-equilateral', 'gothic-drop']) && !arch.isArchShape('segmental'));
+expectThrows('v2: resolveArchRise("segmental") is an unknown shape', () => arch.resolveArchRise('segmental', W, null, LIM), /Unknown arch shape "segmental"/);
+check('v2: LEGACY_ARCH_SHAPES.segmental → three-centre with the PSW segmental ratio 0.20 (P10)', arch.LEGACY_ARCH_SHAPES.segmental?.shape === 'three-centre' && arch.LEGACY_ARCH_SHAPES.segmental?.riseRatio === 0.20);
+check('v2: PSW_ARCH_RISE_RATIO = segmental-arch 0.20 / elliptical-arch 0.325 / semi-circle 0.5 / gothic-arch √3/2',
+  arch.PSW_ARCH_RISE_RATIO['segmental-arch'] === 0.20 && arch.PSW_ARCH_RISE_RATIO['elliptical-arch'] === 0.325 && arch.PSW_ARCH_RISE_RATIO['semi-circle'] === 0.5 && near(arch.PSW_ARCH_RISE_RATIO['gothic-arch'], Math.sqrt(3) / 2, 1e-12));
+check('v2: ROUND_AUTO_RATIO 0.325 (configurator Auto = PSW elliptical default, P4)', arch.ROUND_AUTO_RATIO === 0.325 && arch.ARCH_RISE_RATIO['three-centre'] === 0.325);
+check('v2: resolveRoundShape — W 1000: rise 500 → semi-circle, 499.6 → semi-circle (±0.5), 499.4 → three-centre',
+  arch.resolveRoundShape(1000, 500) === 'semi-circle' && arch.resolveRoundShape(1000, 499.6) === 'semi-circle' && arch.resolveRoundShape(1000, 499.4) === 'three-centre');
+expectThrows('v2: resolveRoundShape rise 520 > W/2 → "use Gothic"', () => arch.resolveRoundShape(1000, 520), /above half the width \(500mm\): use Gothic/);
 expectNear('three-centre default rise = 0.325 × W (PSW elliptical)', arch.resolveArchRise('three-centre', W, null, LIM), 390, 1e-9);
 expectNear('semi-circle default rise = 0.50 × W', arch.resolveArchRise('semi-circle', W, null, LIM), 600, 1e-9);
 expectNear('gothic equilateral default rise = √3/2 × W = 1039.23', arch.resolveArchRise('gothic-equilateral', W, null, LIM), 1039.23, 0.01);
 expectNear('gothic-drop default rise = 0.70 × W (PSW GOTHIC_PROFILE_RATIO.drop)', arch.resolveArchRise('gothic-drop', W, null, LIM), 840, 1e-9);
 check('GOTHIC_PROFILE_RATIO = { equilateral √3/2, drop 0.70, shallow 0.60 } (spec §3.2 / §5)',
   near(arch.GOTHIC_PROFILE_RATIO.equilateral, Math.sqrt(3) / 2, 1e-12) && arch.GOTHIC_PROFILE_RATIO.drop === 0.70 && arch.GOTHIC_PROFILE_RATIO.shallow === 0.60);
-check('ARCH_RISE_RATIO covers the five PC shapes with the PSW ratios',
-  arch.ARCH_RISE_RATIO.segmental === 0.20 && arch.ARCH_RISE_RATIO['semi-circle'] === 0.5 && arch.ARCH_RISE_RATIO['three-centre'] === 0.325
+check('ARCH_RISE_RATIO covers the four PC shapes with the PSW ratios',
+  arch.ARCH_RISE_RATIO.segmental === undefined && arch.ARCH_RISE_RATIO['semi-circle'] === 0.5 && arch.ARCH_RISE_RATIO['three-centre'] === 0.325
   && near(arch.ARCH_RISE_RATIO['gothic-equilateral'], Math.sqrt(3) / 2, 1e-12) && arch.ARCH_RISE_RATIO['gothic-drop'] === 0.70);
-check('PSW shape map covers the four PSW radios', ['gothic-arch', 'semi-circle', 'segmental-arch', 'elliptical-arch'].every((k) => arch.isArchShape(arch.PSW_ARCH_SHAPE[k])));
+check('PSW shape map covers the four PSW radios; segmental-arch → three-centre (P10)', ['gothic-arch', 'semi-circle', 'segmental-arch', 'elliptical-arch'].every((k) => arch.isArchShape(arch.PSW_ARCH_SHAPE[k])) && arch.PSW_ARCH_SHAPE['segmental-arch'] === 'three-centre');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // §10.3 item 2 — every chain in §10.1 within 0.01 mm / 0.01°
@@ -96,12 +109,6 @@ check('PSW shape map covers the four PSW radios', ['gothic-arch', 'semi-circle',
 // §10.3 item 4 — three-centre tangency
 // ═══════════════════════════════════════════════════════════════════════════
 // Independent closed forms (used where the spec lists no number, e.g. offsets).
-function segmentalExp(h, δ) {
-  const R = (W * W / 4 + h * h) / (2 * h), d = R - h, ρ = R - δ;
-  const x = Math.sqrt(ρ * ρ - d * d);
-  const span = Math.PI - 2 * Math.atan2(d, x);
-  return { R, ρ, span, length: ρ * span, apex: ρ - d, xEnd: x };
-}
 function semiExp(δ) { const ρ = W / 2 - δ; return { ρ, length: Math.PI * ρ, apex: ρ }; }
 function gothicExp(h, δ) {
   const c = (h * h - W * W / 4) / W, R = W / 2 + c, ρ = R - δ;
@@ -109,55 +116,44 @@ function gothicExp(h, δ) {
   const t = Math.atan2(y, c);
   return { c, R, ρ, length: 2 * ρ * t, apex: y };
 }
-function threeExp(h, δ) {
-  const r = (h * h) / (W / 2), e = W / 2 - r;
+// rMin = profile arch.minHaunchRadius (v2 P3): r = max(h²/a, rMin)
+function threeExp(h, δ, rMin = 0) {
+  const r = Math.max((h * h) / (W / 2), rMin), e = W / 2 - r;
   const R = (e * e + h * h - r * r) / (2 * (h - r));
   const t = Math.atan2(R - h, e);
   const length = 2 * (r - δ) * t + (R - δ) * (Math.PI - 2 * t);
-  return { r, e, R, t, length, apex: h - δ };
+  return { r, e, R, t, length, apex: h - δ, xEnd: W / 2 - δ };   // rule C: every offset ends on the line at x = W/2 − δ
 }
+const R_MIN = P.arch.minHaunchRadius;
+check('profile arch.minHaunchRadius = 150 (v2 P3)', R_MIN === 150);
 
 // Spec §10.1 vectors, verbatim.
 const SPEC_GEOMETRY = [
-  { shape: 'segmental', rise: 240, exp: (δ) => segmentalExp(240, δ), R: 870, centres: [[0, -630]],
-    spec: { Rout: 870.00, Rin: 813.00, thetaDeg: 87.21, lenOut: 1324.16, lenInUnclipped: 1237.41, centreBelow: 630.00, innerX: 513.88, leafRout: 830.00, leafRin: 763.00 } },
+  // v2: the former "segmental 240" window is a three-centre with rise 240 — haunch r clamps to 150 (P3), crown R 1320
+  { key: 'three-centre-240', shape: 'three-centre', rise: 240, exp: (δ) => threeExp(240, δ, R_MIN), R: 1320, centres: [[450, 0], [0, -1080], [-450, 0]],
+    spec: { r: 150.00, R: 1320.00, smallCx: 450.00, largeBelow: 1080.00, tangent: [507.69, 138.46], smallSpan: 67.38, largeSpan: 45.24, lenSmall: 176.40, lenLarge: 1042.25, total: 1395.05, csCl: 1170.00,
+      rings: { headInner: [93, 1263, 93], leafOuter: [110, 1280, 110], leafInner: [43, 1213, 43], glass: [55.5, 1225.5, 55.5] } } },
   { shape: 'semi-circle', rise: null, exp: semiExp, R: 600, centres: [[0, 0]],
     spec: { Rout: 600.00, Rin: 543.00, thetaDeg: 180, lenOut: 1884.96, lenIn: 1705.88 } },
   { shape: 'gothic-equilateral', rise: null, exp: (δ) => gothicExp(W * Math.sqrt(3) / 2, δ), R: 1200, centres: [[-600, 0], [600, 0]],
     spec: { rise: 1039.23, c: 600.00, Rout: 1200.00, Rin: 1143.00, spanDeg: 60, lenOutEach: 1256.64 } },
   { shape: 'gothic-drop', rise: 840, exp: (δ) => gothicExp(840, δ), R: 888, centres: [[-288, 0], [288, 0]],
     spec: { rise: 840.00, c: 288.00, Rout: 888.00, Rin: 831.00, spanDeg: 71.08, lenOutEach: 1101.56 } },
-  { shape: 'three-centre', rise: 390, exp: (δ) => threeExp(390, δ), R: 761.54, centres: [[346.5, 0], [0, -371.54], [-346.5, 0]],
-    spec: { r: 253.50, R: 761.54, smallCx: 346.50, largeBelow: 371.54, tangent: [519.40, 185.39], smallSpan: 47.00, largeSpan: 86.01, lenSmall: 207.93, lenLarge: 1143.13, csCl: 508.04 } },
+  { shape: 'three-centre', rise: 390, exp: (δ) => threeExp(390, δ, R_MIN), R: 761.54, centres: [[346.5, 0], [0, -371.54], [-346.5, 0]],
+    spec: { r: 253.50, R: 761.54, smallCx: 346.50, largeBelow: 371.54, tangent: [519.40, 185.39], smallSpan: 47.00, largeSpan: 86.01, lenSmall: 207.93, lenLarge: 1143.13, total: 1559.00, csCl: 508.04 } },
 ];
 
 section('§10.3 pt 2–4 — geometry, W = 1200, casement profile defaults (spec §10.1 vectors)');
 const GEOM = {};
 for (const v of SPEC_GEOMETRY) {
   const g = arch.buildArchGeometry({ shape: v.shape, width: W, height: 2000, rise: v.rise }, P);
-  GEOM[v.shape] = g;
-  const tag = v.shape, S = v.spec;
+  const tag = v.key || v.shape, S = v.spec;
+  GEOM[tag] = g;
   const big = g.arcs.reduce((m, a) => (a.r > m.r ? a : m), g.arcs[0]);
   expectNear(`${tag}: main radius ${v.R}`, big.r, v.R, 0.01);
   check(`${tag}: centres ${JSON.stringify(v.centres)}`, g.arcs.length === v.centres.length && g.arcs.every((a, i) => near(a.cx, v.centres[i][0], 0.01) && near(a.cy, v.centres[i][1], 0.01)),
     JSON.stringify(g.arcs.map((a) => [+a.cx.toFixed(3), +a.cy.toFixed(3)])));
   // ── spec literals per shape ──
-  if (tag === 'segmental') {
-    const o = g.frameHead.outer[0], i = g.frameHead.inner[0];
-    expectNear('segmental: R_out 870.00', o.r, S.Rout, 0.01);
-    expectNear('segmental: R_in 813.00 (= R_out − frameHead.face)', i.r, S.Rin, 0.01);
-    expectNear('segmental: theta 87.21°', arch.arcSpan(o) * DEG, S.thetaDeg, 0.01);
-    expectNear('segmental: arcLen_out 1324.16', arch.arcLen(o), S.lenOut, 0.01);
-    expectNear('segmental: centre 630.00 below the arch-start line', -o.cy, S.centreBelow, 0.01);
-    expectNear('segmental: inner arc meets the arch-start line at x = W/2 ± 513.88', g.frameHead.ends.innerRight[0], S.innerX, 0.01);
-    // E1: the spec's arcLen_in is R_in × θ_out (the unclipped concentric arc); §6.2 clips it at y = 0
-    expectNear('segmental: spec "arcLen_in 1237.41" = R_in × θ_out, the UNCLIPPED inner arc (erratum E1)', i.r * arch.arcSpan(o), S.lenInUnclipped, 0.01);
-    expectNear('segmental: arcLen_in of the inner arc CLIPPED at the arch-start line (spec §6.2) = 1112.55', arch.arcLen(i), 1112.55, 0.01);
-    expectNear('segmental: clipped arcLen_in = closed form R_in × (π − 2·atan2(630, 513.88))', arch.arcLen(i), segmentalExp(240, tF).length, 1e-6);
-    expectNear('segmental: leaf R_out 830.00 (= R_out − leafAtJamb)', g.leafTop.outer[0].r, S.leafRout, 0.01);
-    expectNear('segmental: leaf R_in 763.00 (= leaf R_out − leafTop.face)', g.leafTop.inner[0].r, S.leafRin, 0.01);
-    expectNear('segmental: leaf ring own clipped span 81.24° (E2 — the spec reuses the head 87.21° for the leaf)', arch.arcSpan(g.leafTop.outer[0]) * DEG, 81.24, 0.01);
-  }
   if (tag === 'semi-circle') {
     const o = g.frameHead.outer[0], i = g.frameHead.inner[0];
     expectNear('semi-circle: R_out 600.00', o.r, S.Rout, 0.01);
@@ -176,26 +172,36 @@ for (const v of SPEC_GEOMETRY) {
     expectNear(`${tag}: arcLen_out ${S.lenOutEach} each`, arch.arcLen(g.frameHead.outer[0]), S.lenOutEach, 0.01);
     expectNear(`${tag}: arcLen_out ${S.lenOutEach} (second arc)`, arch.arcLen(g.frameHead.outer[1]), S.lenOutEach, 0.01);
   }
-  if (tag === 'three-centre') {
+  if (v.shape === 'three-centre') {
     const [s0, big3, s1] = g.arcs;
-    expectNear('three-centre: haunch radius r = rise²/halfW = 253.50', s0.r, S.r, 0.01);
-    expectNear('three-centre: crown radius R = 761.54', big3.r, S.R, 0.01);
-    expectNear('three-centre: small centres x = W/2 ± 346.50', s0.cx, S.smallCx, 0.01);
-    expectNear('three-centre: large centre 371.54 below the arch-start line', -big3.cy, S.largeBelow, 0.01);
+    const rRule = Math.max(v.rise * v.rise / (W / 2), R_MIN);
+    expectNear(`${tag}: haunch radius r = max(rise²/halfW, ${R_MIN}) = ${S.r} (P3)`, s0.r, S.r, 0.01);
+    check(`${tag}: r equals the P3 rule exactly (${rRule.toFixed(2)}${rRule === R_MIN ? ' — clamped by minHaunchRadius' : ' — ellipse curvature'})`, near(s0.r, rRule, 1e-9));
+    expectNear(`${tag}: crown radius R = ${S.R}`, big3.r, S.R, 0.01);
+    expectNear(`${tag}: small centres x = W/2 ± ${S.smallCx}`, s0.cx, S.smallCx, 0.01);
+    check(`${tag}: haunch centres ON the arch-start line (rule C — the arch starts vertical at the jamb)`, near(s0.cy, 0, 1e-12) && near(s1.cy, 0, 1e-12));
+    expectNear(`${tag}: large centre ${S.largeBelow} below the arch-start line`, -big3.cy, S.largeBelow, 0.01);
     const T = arch.arcPoint(s0, s0.a1);
-    check('three-centre: tangent point (W/2 + 519.40, arch-start + 185.39) lies on both circles', near(T[0], S.tangent[0], 0.01) && near(T[1], S.tangent[1], 0.01)
+    check(`${tag}: tangent point (W/2 + ${S.tangent[0]}, arch-start + ${S.tangent[1]}) lies on both circles`, near(T[0], S.tangent[0], 0.01) && near(T[1], S.tangent[1], 0.01)
       && near(Math.hypot(T[0] - big3.cx, T[1] - big3.cy), big3.r, 1e-6) && near(Math.hypot(T[0] - s0.cx, T[1] - s0.cy), s0.r, 1e-6), `${T.map((c) => c.toFixed(2))}`);
-    expectNear('three-centre: small span 47.00°', arch.arcSpan(s0) * DEG, S.smallSpan, 0.01);
-    expectNear('three-centre: large span 86.01°', arch.arcSpan(big3) * DEG, S.largeSpan, 0.01);
-    expectNear('three-centre: arcLen small 207.93 each', arch.arcLen(s0), S.lenSmall, 0.01);
-    expectNear('three-centre: arcLen large 1143.13', arch.arcLen(big3), S.lenLarge, 0.01);
-    expectNear('three-centre: tangency |Cs − CL| = R − r = 508.04', Math.hypot(s0.cx - big3.cx, s0.cy - big3.cy), S.csCl, 0.01);
-    check('three-centre: |Cs − CL| equals R − r exactly', near(Math.hypot(s0.cx - big3.cx, s0.cy - big3.cy), big3.r - s0.r, 1e-6));
-    check('three-centre: mirrored haunch arc', near(s1.cx, -s0.cx, 1e-9) && near(s1.r, s0.r, 1e-9) && near(arch.arcSpan(s1), arch.arcSpan(s0), 1e-9));
-    check('three-centre: chain is tangent-continuous (shared end points at both tangent points)', (() => {
+    expectNear(`${tag}: small span ${S.smallSpan}°`, arch.arcSpan(s0) * DEG, S.smallSpan, 0.01);
+    expectNear(`${tag}: large span ${S.largeSpan}°`, arch.arcSpan(big3) * DEG, S.largeSpan, 0.01);
+    expectNear(`${tag}: arcLen small ${S.lenSmall} each`, arch.arcLen(s0), S.lenSmall, 0.01);
+    expectNear(`${tag}: arcLen large ${S.lenLarge}`, arch.arcLen(big3), S.lenLarge, 0.01);
+    expectNear(`${tag}: total outer length ${S.total}`, arch.arcsLength(g.arcs), S.total, 0.01);
+    expectNear(`${tag}: tangency |Cs − CL| = R − r = ${S.csCl}`, Math.hypot(s0.cx - big3.cx, s0.cy - big3.cy), S.csCl, 0.01);
+    check(`${tag}: |Cs − CL| equals R − r exactly`, near(Math.hypot(s0.cx - big3.cx, s0.cy - big3.cy), big3.r - s0.r, 1e-6));
+    check(`${tag}: mirrored haunch arc`, near(s1.cx, -s0.cx, 1e-9) && near(s1.r, s0.r, 1e-9) && near(arch.arcSpan(s1), arch.arcSpan(s0), 1e-9));
+    check(`${tag}: chain is tangent-continuous (shared end points at both tangent points)`, (() => {
       const a = arch.arcPoint(s0, s0.a1), b = arch.arcPoint(big3, big3.a0), c = arch.arcPoint(big3, big3.a1), d = arch.arcPoint(s1, s1.a0);
       return near(a[0], b[0], 1e-6) && near(a[1], b[1], 1e-6) && near(c[0], d[0], 1e-6) && near(c[1], d[1], 1e-6);
     })());
+    check(`${tag}: geometry reports radii [${g.radii.map((r) => +r.toFixed(2))}], start = 2000 − rise, minHaunchRadius ${R_MIN}`, g.radii.length === 3 && near(g.radii[1], S.R, 0.01) && g.start === 2000 - v.rise && g.minHaunchRadius === R_MIN);
+    if (S.rings) {
+      const same = (arcs, exp) => arcs.length === exp.length && arcs.every((a, i) => near(a.r, exp[i], 1e-9));
+      check(`${tag}: rings — head inner ${S.rings.headInner} · leaf outer ${S.rings.leafOuter} · leaf inner ${S.rings.leafInner} · glass ${S.rings.glass}`,
+        same(g.frameHead.inner, S.rings.headInner) && same(g.leafTop.outer, S.rings.leafOuter) && same(g.leafTop.inner, S.rings.leafInner) && same(g.glass.arcs, S.rings.glass));
+    }
   }
   // ── closed-form cross-checks for the rings the spec does not list ──
   const o = v.exp(0);
@@ -247,28 +253,37 @@ for (const v of SPEC_GEOMETRY) {
 section('limits & errors (readable ArchError) — profile.arch.limits, physics per shape');
 check('profile.arch.limits = { 400, 1500, 900, 100 } (spec §3.3 / §5)', LIM.minWidth === 400 && LIM.maxWidth === 1500 && LIM.minStraightBelowRise === 900 && LIM.minLeafStraightStile === 100);
 check('no ARCH_LIMITS constant left in arch.js (limits come from the profile)', arch.ARCH_LIMITS === undefined);
-expectThrows('width below 400 throws', () => arch.resolveArchRise('segmental', 399, null, LIM), /below the minimum 400mm/);
-expectThrows('width above 1500 throws', () => arch.resolveArchRise('segmental', 1501, null, LIM), /above the maximum 1500mm/);
+expectThrows('width below 400 throws', () => arch.resolveArchRise('three-centre', 399, null, LIM), /below the minimum 400mm/);
+expectThrows('width above 1500 throws', () => arch.resolveArchRise('three-centre', 1501, null, LIM), /above the maximum 1500mm/);
 expectThrows('semi-circle refuses a foreign rise', () => arch.resolveArchRise('semi-circle', 1200, 500, LIM), /fixed by the shape at 600mm/);
 expectThrows('unknown shape throws', () => arch.resolveArchRise('elliptical', 1200, null, LIM), /Unknown arch shape/);
-expectThrows('missing limits throw (no defaults in arch.js)', () => arch.resolveArchRise('segmental', 1200, null, undefined), /arch\.limits is missing/);
+expectThrows('missing limits throw (no defaults in arch.js)', () => arch.resolveArchRise('three-centre', 1200, null, undefined), /arch\.limits is missing/);
+expectThrows('missing arch.minHaunchRadius throws (no defaults in arch.js, v2 P3)', () => arch.buildArchGeometry({ shape: 'semi-circle', width: 1200, height: 2000 }, { ...P, arch: { ...P.arch, minHaunchRadius: undefined } }), /arch\.minHaunchRadius is missing/);
 expectThrows('H < rise + 900 throws (semi-circle 1200 in H 1499)', () => arch.buildArchGeometry({ shape: 'semi-circle', width: 1200, height: 1499 }, P), /leaves 899mm straight below the arch — minimum 900mm/);
 check('H = rise + 900 passes (straight 900, leaf straight stile 900 − 47 = 853)', (() => { const g = arch.buildArchGeometry({ shape: 'semi-circle', width: 1200, height: 1500 }, P); return g.straightHeight === 900 && near(g.leafStraightStile, 900 - (P.deductions.leafFullHeight - P.deductions.leafAtJamb), 1e-9); })());
 {
   const loose = { ...P, arch: { ...P.arch, limits: { ...P.arch.limits, minStraightBelowRise: 0 } } };
-  expectThrows('leaf straight stile < 100 throws when the 900 rule is relaxed (straight 140 → stile 93)', () => arch.buildArchGeometry({ shape: 'segmental', width: 1200, height: 380, rise: 240 }, loose), /Straight stile of the arched leaf is 93mm — minimum 100mm/);
-  check('leaf straight stile = 100 passes (straight 147)', arch.buildArchGeometry({ shape: 'segmental', width: 1200, height: 387, rise: 240 }, loose).leafStraightStile === 100);
+  expectThrows('leaf straight stile < 100 throws when the 900 rule is relaxed (straight 140 → stile 93)', () => arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 380, rise: 240 }, loose), /Straight stile of the arched leaf is 93mm — minimum 100mm/);
+  check('leaf straight stile = 100 passes (straight 147)', arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 387, rise: 240 }, loose).leafStraightStile === 100);
 }
-expectThrows('segmental rise ≥ W/2 is a hard error (single-centre arc)', () => arch.resolveArchRise('segmental', 1200, 600, LIM), /must be below half the width \(600mm\)/);
-expectThrows('segmental rise ≥ W/2 also refused by archArcs directly', () => arch.archArcs('segmental', 1200, 700), /must be below half the width/);
+expectThrows('three-centre rise ≥ W/2 is a hard error (resolveArchRise)', () => arch.resolveArchRise('three-centre', 1200, 600, LIM), /must be below half the width \(600mm\)/);
 expectThrows('gothic-drop rise < W/2 throws (arcs cannot meet in a point)', () => arch.resolveArchRise('gothic-drop', 1200, 599, LIM), /must be at least half the width \(600mm\)/);
 expectThrows('three-centre rise ≥ W/2 throws (semi-circle)', () => arch.archArcs('three-centre', 1200, 600), /must be below half the width/);
-expectThrows('three-centre haunch smaller than the frame face throws readably (rise 180 → r 54)', () => arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 2000, rise: 180 }, P), /Offset 57mm exceeds the arc radius 54mm/);
-expectThrows('rise ≤ 0 throws', () => arch.resolveArchRise('segmental', 1200, 0, LIM), /must be a positive number/);
-check('segmental rise 0.05 × W (60 mm, below the old invented 0.10 window) is accepted: R 3030', near(arch.archArcs('segmental', 1200, 60)[0].r, 3030, 1e-9));
+check('P3: rise 180 at W 1200 → haunch r clamps to 150 (v1 rule gave 54 < the frame face), crown R 3540 — builds', (() => {
+  const g = arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 2000, rise: 180 }, P);
+  return near(g.arcs[0].r, 150, 1e-9) && near(g.arcs[1].r, 3540, 1e-6) && near(g.frameHead.inner[0].r, 93, 1e-9);
+})());
+expectThrows('P3: rise 150 = minHaunchRadius → no crown arc, readable', () => arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 2000, rise: 150 }, P), /rise 150mm must exceed the haunch radius 150mm \(profile arch\.minHaunchRadius 150\)/);
+expectThrows('P3: rise 120 < minHaunchRadius → readable', () => arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 2000, rise: 120 }, P), /rise 120mm must exceed the haunch radius 150mm/);
+check('archArcs three-centre: opts.minHaunchRadius 150 clamps r (rise 240 → 150); without it the v1 rule r = b²/a = 96 stands (pure-geometry callers)',
+  near(arch.archArcs('three-centre', 1200, 240, { minHaunchRadius: 150 })[0].r, 150, 1e-9) && near(arch.archArcs('three-centre', 1200, 240)[0].r, 96, 1e-9));
+expectThrows('rise ≤ 0 throws', () => arch.resolveArchRise('three-centre', 1200, 0, LIM), /must be a positive number/);
 check('gothic-drop rise 0.917 × W (1100 mm, above the old 0.85 window) is accepted', arch.archArcs('gothic-drop', 1200, 1100).length === 2);
 check('gothic-drop rise = W/2 degenerates into a semi-circle (c = 0) and is accepted', (() => { const a = arch.archArcs('gothic-drop', 1200, 600); return near(a[0].cx, 0, 1e-9) && near(a[0].r, 600, 1e-9); })());
-check('three-centre rise 0.10 × W (120 mm) passes the rise rules; the frame face then fails readably', (() => { try { arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 2000, rise: 120 }, P); return false; } catch (e) { return /Offset 57mm exceeds the arc radius 24mm/.test(e.message); } })());
+check('three-centre rise 0.10 × W (120 mm): archArcs without the P3 minimum keeps r 24 (v1); buildArchGeometry applies the profile minimum and refuses it', (() => {
+  const raw = arch.archArcs('three-centre', 1200, 120);
+  try { arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 2000, rise: 120 }, P); return false; } catch (e) { return near(raw[0].r, 24, 1e-9) && /must exceed the haunch radius 150mm/.test(e.message); }
+})());
 
 // ═══════════════════════════════════════════════════════════════════════════
 // §10.3 item 6 — segment plans reproduce §10.2
@@ -351,19 +366,17 @@ function expectedChoice(options, rule = PLAN_OPTS.pieceRule) {
 
 // Spec §10.2 vectors, verbatim (allowance 10, finger 15, max segment 36°, stock D7).
 const SPEC_PLANS = {
-  headSegmental: {
-    thetaDeg: 87.21,
-    options: [
-      { N: 3, phiDeg: 29.07, wReq: 102.70, Lout: 441.71, Lin: 403.06, cutDeg: 14.53, stock: 105, roughMid: 471.71, roughEnd: 456.71 },
-      { N: 4, phiDeg: 21.80, wReq: 91.49, Lout: 332.85, Lin: 303.72, cutDeg: 10.90, stock: 95 },
-      { N: 5, phiDeg: 17.44, wReq: 86.28, Lout: 266.86, stock: 95 },
-    ],
-    d13: { n: 4, stock: 95 }, runnerUp: { n: 3, stock: 105 },
+  // v2: the §10.2 "HEAD / LEAF segmental 1200" vectors are superseded (P2) —
+  // the same window is a three-centre rise 240 under P3; its per-arc plan is
+  // asserted against the independent option table below (PLAN_VECTORS) and
+  // these literals computed 06.09 from that rule:
+  headThreeCentre240: {
+    haunch: { thetaDeg: 67.38, nMin: 2, options: [{ N: 2, wReq: 80.56, stock: 95 }, { N: 3, wReq: 78.59, stock: 95 }], d13: { n: 2, stock: 95 }, runnerUp: null },
+    crown: { thetaDeg: 45.24, nMin: 2, options: [{ N: 2, wReq: 101.33, stock: 105 }, { N: 3, wReq: 87.83, stock: 95 }, { N: 4, wReq: 83.10, stock: 95 }], d13: { n: 3, stock: 95 }, runnerUp: { n: 2, stock: 105 } },
   },
-  leafSegmental: {
-    // E2: the spec computed these with the HEAD angle 87.21°; the leaf ring's own clipped span is 81.24°
-    specHeadAngle: { thetaDeg: 87.21, wReq3: 111.1, wReq4: 100.6, d13: { n: 4, stock: 105 }, runnerUp: { n: 3, stock: 180 } },
-    ownAngle: { thetaDeg: 81.24, options: [{ N: 3, stock: 180 }, { N: 4, stock: 105 }, { N: 5, stock: 95 }], d13: { n: 5, stock: 95 }, runnerUp: { n: 3, stock: 180 } },
+  leafThreeCentre240: {
+    haunch: { thetaDeg: 67.38, nMin: 2, options: [{ N: 2, wReq: 88.42, stock: 95 }], d13: { n: 2, stock: 95 }, runnerUp: null },
+    crown: { thetaDeg: 45.24, nMin: 2, options: [{ N: 2, wReq: 110.36, stock: 180 }, { N: 3, wReq: 97.40, stock: 105 }, { N: 4, wReq: 92.85, stock: 95 }], d13: { n: 4, stock: 95 }, runnerUp: { n: 2, stock: 180 } },
   },
   headSemi: {
     thetaDeg: 180,
@@ -401,32 +414,32 @@ function assertSpecPlan(label, planArc, S) {
   check(`${label}: runner-up printed → ${S.runnerUp.n} × ${S.runnerUp.stock}`, planArc.alternative?.n === S.runnerUp.n && planArc.alternative?.stock === S.runnerUp.stock, `${planArc.alternative?.n} × ${planArc.alternative?.stock}`);
 }
 {
-  const gS = GEOM.segmental, gC = GEOM['semi-circle'];
-  assertSpecPlan('HEAD segmental 1200', arch.planArchSegments(gS.frameHead, P.arch).arcs[0], SPEC_PLANS.headSegmental);
+  const gS = GEOM['three-centre-240'], gC = GEOM['semi-circle'];
   assertSpecPlan('HEAD semi-circle 1200', arch.planArchSegments(gC.frameHead, P.arch).arcs[0], SPEC_PLANS.headSemi);
-  // LEAF segmental — erratum E2
-  const L = SPEC_PLANS.leafSegmental;
-  const leafArc = arch.planArchSegments(gS.leafTop, P.arch).arcs[0];
-  const Ro = gS.leafTop.outer[0].r, Ri = gS.leafTop.inner[0].r, a = P.arch.contourAllowance;
-  const wAt = (thetaDeg, n) => (Ro + a) - (Ri - a) * Math.cos((thetaDeg / DEG) / n / 2);
-  expectNear('LEAF segmental (E2): spec W_req 111.1 for N=3 is the closed form with the HEAD angle 87.21°', wAt(L.specHeadAngle.thetaDeg, 3), L.specHeadAngle.wReq3, 0.05);
-  expectNear('LEAF segmental (E2): spec W_req 100.6 for N=4 is the closed form with the HEAD angle 87.21°', wAt(L.specHeadAngle.thetaDeg, 4), L.specHeadAngle.wReq4, 0.05);
-  expectNear('LEAF segmental: ring own clipped span 81.24° (spec §6.2)', leafArc.spanDeg, L.ownAngle.thetaDeg, 0.01);
-  for (const so of L.ownAngle.options) {
-    const o = leafArc.options.find((x) => x.n === so.N);
-    const mids = o.pieces.filter((pc) => pc.endStart === 'radial' && pc.endEnd === 'radial');
-    check(`LEAF segmental N=${so.N}: middle W_req == closed form at the own span (${wAt(L.ownAngle.thetaDeg, so.N).toFixed(2)}), stock ${so.stock}`,
-      mids.every((pc) => near(pc.wReq, wAt(leafArc.spanDeg, so.N), 0.05)) && o.stock === so.stock, `${o.wReq.toFixed(2)} → ${o.stock}`);
-  }
-  check('LEAF segmental: N=3 → 180 (wasteful) and N=4 → 105 hold under both readings', leafArc.options.find((x) => x.n === 3).stock === 180 && leafArc.options.find((x) => x.n === 4).stock === 105);
-  check(`LEAF segmental: D13 default at the own span → ${L.ownAngle.d13.n} × ${L.ownAngle.d13.stock} (spec says 4 × 105 from the head angle — E2), runner-up ${L.ownAngle.runnerUp.n} × ${L.ownAngle.runnerUp.stock}`,
-    leafArc.default?.n === L.ownAngle.d13.n && leafArc.default?.stock === L.ownAngle.d13.stock && leafArc.alternative?.n === L.ownAngle.runnerUp.n && leafArc.alternative?.stock === L.ownAngle.runnerUp.stock,
-    `${leafArc.default?.n} × ${leafArc.default?.stock}, alt ${leafArc.alternative?.n} × ${leafArc.alternative?.stock}`);
+  // three-centre 240 (the former segmental window under P3): per-arc literals
+  const arcPlan = (label, planArc, S) => {
+    expectNear(`${label}: θ ${S.thetaDeg}°`, planArc.spanDeg, S.thetaDeg, 0.01);
+    check(`${label}: N_min ${S.nMin}`, planArc.nMin === S.nMin, String(planArc.nMin));
+    for (const so of S.options) {
+      const o = planArc.options.find((x) => x.n === so.N);
+      check(`${label} N=${so.N}: W_req ${so.wReq} (±0.05), stock ${so.stock}`, !!o && near(o.wReq, so.wReq, 0.05) && o.stock === so.stock, o ? `${o.wReq.toFixed(2)} → ${o.stock}` : 'missing');
+    }
+    check(`${label}: D13 default ${S.d13.n} × ${S.d13.stock}, runner-up ${S.runnerUp ? `${S.runnerUp.n} × ${S.runnerUp.stock}` : 'none'}`,
+      planArc.default?.n === S.d13.n && planArc.default?.stock === S.d13.stock && (planArc.alternative?.n ?? null) === (S.runnerUp?.n ?? null) && (planArc.alternative?.stock ?? null) === (S.runnerUp?.stock ?? null),
+      `${planArc.default?.n} × ${planArc.default?.stock}, alt ${planArc.alternative?.n} × ${planArc.alternative?.stock}`);
+  };
+  const ph = arch.planArchSegments(gS.frameHead, P.arch), pl = arch.planArchSegments(gS.leafTop, P.arch);
+  arcPlan('HEAD three-centre 240 haunch', ph.arcs[0], SPEC_PLANS.headThreeCentre240.haunch);
+  arcPlan('HEAD three-centre 240 crown', ph.arcs[1], SPEC_PLANS.headThreeCentre240.crown);
+  arcPlan('LEAF three-centre 240 haunch', pl.arcs[0], SPEC_PLANS.leafThreeCentre240.haunch);
+  arcPlan('LEAF three-centre 240 crown', pl.arcs[1], SPEC_PLANS.leafThreeCentre240.crown);
+  check('three-centre 240: both haunch arcs plan identically (mirror)', JSON.stringify(ph.arcs[0].options.map((o) => [o.n, +o.wReq.toFixed(6), o.stock])) === JSON.stringify(ph.arcs[2].options.map((o) => [o.n, +o.wReq.toFixed(6), o.stock])));
+  check('three-centre 240: head 2 + 3 + 2 = 7 pieces, leaf 2 + 4 + 2 = 8 — never a single solid board', ph.totalPieces === 7 && pl.totalPieces === 8);
 }
 
 section('§10.3 pt 6 — planner vs independent option table, every shape, both D13 rules');
 const PLAN_VECTORS = [
-  { shape: 'segmental', defN: [4], altN: [3] },
+  { key: 'three-centre-240', shape: 'three-centre', defN: [2, 3, 2], altN: [null, 2, null] },
   { shape: 'semi-circle', defN: [7], altN: [5] },
   { shape: 'gothic-equilateral', defN: [3, 3], altN: [2, 2] },
   { shape: 'gothic-drop', defN: [3, 3], altN: [2, 2] },
@@ -434,10 +447,10 @@ const PLAN_VECTORS = [
 ];
 const PLANS = {};
 for (const v of PLAN_VECTORS) {
-  const g = GEOM[v.shape];
+  const tag = v.key || v.shape;
+  const g = GEOM[tag];
   const plan = arch.planArchSegments(g.frameHead, PLAN_OPTS);
-  PLANS[v.shape] = plan;
-  const tag = v.shape;
+  PLANS[tag] = plan;
   check(`${tag}: one plan per arc (${g.arcs.length})`, plan.arcs.length === g.arcs.length);
   plan.arcs.forEach((pa, i) => {
     const ring = g.frameHead;
@@ -511,15 +524,10 @@ for (const v of PLAN_VECTORS) {
   expectThrows('missing maxSegmentAngleDeg throws (no defaults in the planner)', () => arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, maxSegmentAngleDeg: undefined }), /maxSegmentAngleDeg is missing/);
   expectThrows('missing contourAllowance throws (no defaults in the planner)', () => arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, contourAllowance: undefined }), /contourAllowance is missing/);
   expectThrows('missing finger length throws (no defaults in the planner)', () => arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, finger: {} }), /finger\.length is missing/);
-  // a short single-centre arc: one board allowed only when a stock board fits it.
-  // The rise must still exceed the deepest ring offset (leaf inner 107), so a
-  // span below 36° only exists on wide, very flat arches: W 1500, rise 110 → R 2611.8, θ 33.4°
-  expectThrows('segmental rise 60 < leaf ring depth 107 → readable error (contour does not reach the arch-start line)', () => arch.buildArchGeometry({ shape: 'segmental', width: 1200, height: 2000, rise: 60 }, P), /does not reach the arch-start line/);
-  const shallow = arch.buildArchGeometry({ shape: 'segmental', width: 1500, height: 2000, rise: 110 }, P);
-  const p1 = arch.planArchSegments(shallow.frameHead, PLAN_OPTS);
-  check(`shallow segmental (θ ${p1.arcs[0].spanDeg.toFixed(1)}° < 36°): N_min 1 when a board fits (W_req ${p1.arcs[0].options[0].wReq.toFixed(1)} → ${p1.arcs[0].options[0].stock})`, p1.arcs[0].nMin === 1 && p1.arcs[0].options[0].stock != null);
-  const p2 = arch.planArchSegments(shallow.frameHead, { ...PLAN_OPTS, stockWidths: [95] });
-  check('shallow segmental with only 95 mm stock: N=1 does not fit → N_min 2', p2.arcs[0].nMin === 2 && p2.arcs[0].options[0].n === 2);
+  // v2: the "one board for a single-centre arc below 36°" rule (spec §7.2) has
+  // no product left to apply to — the only single-arc shape is the 180°
+  // semi-circle (rule C). The planner branch stays; the semi-circle proves it idle.
+  check('semi-circle (the only single-arc shape): N_min stays 5, the one-board branch never fires', PLANS['semi-circle'].arcs[0].nMin === 5);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -546,7 +554,7 @@ for (const shape of Object.keys(PLANS)) {
 // ═══════════════════════════════════════════════════════════════════════════
 // §10.3 item 5 — bulge polylines through dxfWriter → ezdxf; DXF structure
 // ═══════════════════════════════════════════════════════════════════════════
-const ARCH_SECTION = { ...PLAN_OPTS, limits: { minWidth: 400, maxWidth: 1500, minStraightBelowRise: 900, minLeafStraightStile: 100 } };
+const ARCH_SECTION = { ...PLAN_OPTS, minHaunchRadius: P.arch.minHaunchRadius, limits: { minWidth: 400, maxWidth: 1500, minStraightBelowRise: 900, minLeafStraightStile: 100 } };
 const PA = P.arch ? P : { ...P, arch: ARCH_SECTION };
 const SAMPLES = resolve(ROOT, 'docs', 'handover', 'samples');
 mkdirSync(SAMPLES, { recursive: true });
@@ -571,40 +579,45 @@ function inPoly(q, pts, tol = 1e-6) {
   return true;
 }
 
-section('§10.3 pt 5 — DXF round-trip via ezdxf — sample_arch_1200_segmental.dxf (frame head + leaf top)');
+section('§10.3 pt 5 — DXF round-trip via ezdxf — sample_arch_1200_three-centre-rise240.dxf (frame head + leaf top)');
 {
-  const plan = arch.buildArchPlan({ shape: 'segmental', width: W, height: 2000, rise: null, hinge: 'left' }, PA);
+  const plan = arch.buildArchPlan({ shape: 'three-centre', width: W, height: 2000, rise: 240, hinge: 'left' }, PA);
   const ents = archDxf.buildArchEntities(plan, 'W1');
   const dxf = dxfWriter.writeDxf(ents, archDxf.ARCH_LAYERS);
-  const path = resolve(SAMPLES, 'sample_arch_1200_segmental.dxf');
+  const path = resolve(SAMPLES, 'sample_arch_1200_three-centre-rise240.dxf');
   writeFileSync(path, dxf);
   const d = probe(path);
   check('DXF is R12 (AC1009)', d.version === 'AC1009', d.version);
   check('layers CONTOUR / ASSEMBLY / PIECES / FINGER / TEXT present', ['CONTOUR', 'ASSEMBLY', 'PIECES', 'FINGER', 'TEXT'].every((l) => d.layers.includes(l)), d.layers.join(','));
   const contours = d.polys.filter((p) => p.layer === 'CONTOUR');
-  check('CONTOUR: two closed rings (frame head, leaf top), exactly one vertex per arc end point (4 each)', contours.length === 2 && contours.every((p) => p.closed && p.n === 4));
+  check('CONTOUR: two closed rings (frame head, leaf top), exactly one vertex per arc end point (8 each — 3 arcs out, 2 cuts, 3 arcs back)', contours.length === 2 && contours.every((p) => p.closed && p.n === 8));
   const frameC = contours.reduce((m, p) => (p.arcs > m.arcs ? p : m), contours[0]);
   const leafC = contours.find((p) => p !== frameC);
   // item 5 proper: arc length recomputed from vertices + bulges = arcLength(chain) within 0.01
   expectNear('frame head CONTOUR: ezdxf arc length (vertices + bulges) = arcLength(outer) + arcLength(inner) within 0.01', frameC.arcs, plan.frameHead.lengths.outer + plan.frameHead.lengths.inner, 0.01);
   expectNear('leaf top CONTOUR: ezdxf arc length = arcLength(outer) + arcLength(inner) within 0.01', leafC.arcs, plan.leafTop.lengths.outer + plan.leafTop.lengths.inner, 0.01);
-  const fo = segmentalExp(240, 0), fi = segmentalExp(240, tF), lo = segmentalExp(240, oL), li = segmentalExp(240, oL + tL);
-  expectNear('frame head CONTOUR arc length = closed form (1324.16 + 1112.66)', frameC.arcs, fo.length + fi.length, 0.01);
-  expectNear('frame head CONTOUR straight length = two arch-start cuts (2 × (600 − 513.88))', frameC.straight, 2 * (fo.xEnd - fi.xEnd), 0.01);
+  const fo = threeExp(240, 0, R_MIN), fi = threeExp(240, tF, R_MIN), lo = threeExp(240, oL, R_MIN), li = threeExp(240, oL + tL, R_MIN);
+  expectNear('frame head CONTOUR arc length = closed form (1395.05 + 1215.98)', frameC.arcs, fo.length + fi.length, 0.01);
+  expectNear('frame head CONTOUR straight length = two arch-start cuts, each exactly the face (rule C: 2 × 57)', frameC.straight, 2 * tF, 0.01);
   expectNear('leaf top CONTOUR arc length = closed form', leafC.arcs, lo.length + li.length, 0.01);
-  expectNear('leaf top CONTOUR straight length = two arch-start cuts', leafC.straight, 2 * (lo.xEnd - li.xEnd), 0.01);
-  check('CONTOUR bulges: |bulge| = tan(Δ/4) of the arcs (two arcs in the frame ring, 0 on the cuts)', (() => {
-    const exp = [Math.tan(arch.arcSpan(plan.frameHead.outer[0]) / 4), 0, Math.tan(arch.arcSpan(plan.frameHead.inner[0]) / 4), 0];
-    return frameC.bulges.length === 4 && frameC.bulges.every((b, i) => near(Math.abs(b), exp[i], 1e-5));   // dxfWriter writes 6 decimals
+  expectNear('leaf top CONTOUR straight length = two arch-start cuts = 2 × leafTop.face (rule C)', leafC.straight, 2 * tL, 0.01);
+  check('CONTOUR bulges: |bulge| = tan(Δ/4) of the six arcs in the frame ring, 0 on the two cuts', (() => {
+    const exp = [...plan.frameHead.outer.map((a) => Math.tan(arch.arcSpan(a) / 4)), 0, ...[...plan.frameHead.inner].reverse().map((a) => Math.tan(arch.arcSpan(a) / 4)), 0];
+    return frameC.bulges.length === 8 && frameC.bulges.every((b, i) => near(Math.abs(b), exp[i], 1e-5));   // dxfWriter writes 6 decimals
   })(), frameC.bulges.map((b) => b.toFixed(4)).join(' '));
   check('frame head contour sits above the leaf contour (reading order top-down)', frameC.bbox[1] > leafC.bbox[3]);
-  // plans in the sample = spec D13 (narrowest): head 4 × 95 (ALT 3 × 105); leaf at its own span 5 × 95 (ALT 3 × 180)
+  // plans in the sample = D13 (narrowest) per arc: head 2 + 3 + 2 × 95 (crown ALT 2 × 105); leaf 2 + 4 + 2 × 95 (crown ALT 2 × 180)
   const nF = plan.plans.frameHead.totalPieces, nL = plan.plans.leafTop.totalPieces;
-  const expF = expectedChoice(expectedOptions(plan.frameHead, 0), PA.arch.pieceRule), expL = expectedChoice(expectedOptions(plan.leafTop, 0), PA.arch.pieceRule);
-  check(`sample plans: frame head ${nF} × ${expF.def.stock}, leaf top ${nL} × ${expL.def.stock} (independent option table)`,
-    nF === expF.def.n && nL === expL.def.n && plan.plans.frameHead.pieces.every((pc) => pc.stock === expF.def.stock) && plan.plans.leafTop.pieces.every((pc) => pc.stock === expL.def.stock),
-    `${nF}/${nL} stock ${plan.plans.frameHead.pieces[0]?.stock}/${plan.plans.leafTop.pieces[0]?.stock} vs ${expF.def.n}/${expL.def.n} stock ${expF.def.stock}/${expL.def.stock}`);
-  check('sample plans = spec §10.2 D13: head 4 × 95 (runner-up 3 × 105) — never a single solid board', nF === 4 && expF.def.stock === 95 && expF.alt.n === 3 && expF.alt.stock === 105 && nL >= 2);
+  const expFa = plan.frameHead.outer.map((_, i) => expectedChoice(expectedOptions(plan.frameHead, i), PA.arch.pieceRule));
+  const expLa = plan.leafTop.outer.map((_, i) => expectedChoice(expectedOptions(plan.leafTop, i), PA.arch.pieceRule));
+  const expF = expFa[0], expL = expLa[0];
+  const sumN = (arr) => arr.reduce((a, e) => a + e.def.n, 0);
+  const stocksOk = (pl, exp) => pl.arcs.every((a, i) => a.default.pieces.every(() => a.default.stock === exp[i].def.stock));
+  check(`sample plans: frame head ${nF} pieces (${expFa.map((e) => e.def.n).join(' + ')}), leaf top ${nL} (${expLa.map((e) => e.def.n).join(' + ')}) — independent option table per arc`,
+    nF === sumN(expFa) && nL === sumN(expLa) && stocksOk(plan.plans.frameHead, expFa) && stocksOk(plan.plans.leafTop, expLa),
+    `${nF}/${nL} vs ${sumN(expFa)}/${sumN(expLa)}`);
+  check('sample plans (P3 three-centre 240): head 2 + 3 + 2 × 95 (crown runner-up 2 × 105), leaf 2 + 4 + 2 × 95 — never a single solid board',
+    nF === 7 && nL === 8 && expFa.every((e) => e.def.stock === 95) && expFa[1].alt?.n === 2 && expFa[1].alt?.stock === 105 && expLa.every((e) => e.def.stock === 95));
   const stockF = expF.def.stock, stockL = expL.def.stock;
   const pieces = d.polys.filter((p) => p.layer === 'PIECES');
   check(`PIECES: ${nF + nL} closed 4-vertex polylines`, pieces.length === nF + nL && pieces.every((p) => p.closed && p.n === 4), String(pieces.length));
@@ -640,12 +653,14 @@ section('§10.3 pt 5 — DXF round-trip via ezdxf — sample_arch_1200_segmental
   check('FINGER zones: each 16 mm in from a flat board end (finger.depth)', zones.every((z) => flatBoards.some((bd) => near(z.bbox[0], bd.bbox[0] + 16, 1e-6) || near(z.bbox[0], bd.bbox[2] - 16, 1e-6))), String(zones.length));
   const texts = d.texts.map((t) => t.text);
   check('TEXT: labels for both members', texts.some((t) => t === 'W1 - FRAME HEAD') && texts.some((t) => t === 'W1 - LEAF TOP'));
-  check('TEXT: shape / size / hinge line', texts.some((t) => t === 'SEGMENTAL W1200 RISE240 H2000 HINGE L'), texts.join(' | '));
+  check('TEXT: shape / size / hinge line', texts.some((t) => t === 'THREE-CENTRE W1200 RISE240 H2000 HINGE L'), texts.join(' | '));
   check('TEXT: finger profile 15/16/3.8', texts.some((t) => t === 'FINGER 15/16/3.8'));
   check('TEXT: allowance 10 per side + max segment 36 deg + rule printed', texts.some((t) => t === 'ALLOWANCE 10 PER SIDE  MAX SEGMENT 36 DEG  RULE NARROWEST'), texts.filter((t) => t.startsWith('ALLOW')).join(' | '));
-  const altTxt = expF.alt ? ` \\(ALT ${expF.alt.n} x board ${expF.alt.stock}\\)` : '';
-  const planRe = new RegExp(`^ARC 1 R870 L1324\\.2 87\\.2DEG: ${expF.def.n} x board ${expF.def.stock} L\\d+(\\.\\d)? ROUGH \\d+(\\.\\d)?${altTxt}$`);
-  check(`TEXT: D13 default + runner-up printed (${expF.def.n} × ${expF.def.stock}, ALT ${expF.alt?.n ?? '-'} × ${expF.alt?.stock ?? '-'})`, texts.some((t) => planRe.test(t)), texts.filter((t) => t.startsWith('ARC')).join(' | '));
+  const altTxt = (e) => (e.alt ? ` \\(ALT ${e.alt.n} x board ${e.alt.stock}\\)` : '');
+  const planRe = new RegExp(`^ARC 1 R150 L176\\.4 67\\.4DEG: ${expF.def.n} x board ${expF.def.stock} L\\d+(\\.\\d)? ROUGH \\d+(\\.\\d)?${altTxt(expF)}$`);
+  check(`TEXT: haunch ARC 1 line (${expF.def.n} × ${expF.def.stock}, no ALT)`, texts.some((t) => planRe.test(t)), texts.filter((t) => t.startsWith('ARC 1')).join(' | '));
+  const crownRe = new RegExp(`^ARC 2 R1320 L1042\\.2 45\\.2DEG: ${expFa[1].def.n} x board ${expFa[1].def.stock} L\\d+(\\.\\d)? ROUGH \\d+(\\.\\d)?${altTxt(expFa[1])}$`);
+  check(`TEXT: crown ARC 2 line with the D13 runner-up (${expFa[1].def.n} × ${expFa[1].def.stock}, ALT ${expFa[1].alt?.n ?? '-'} × ${expFa[1].alt?.stock ?? '-'})`, texts.some((t) => crownRe.test(t)), texts.filter((t) => t.startsWith('ARC 2')).join(' | '));
   check('TEXT: flat piece labels print L <rough> x <stock>', texts.some((t) => new RegExp(`^W1 - FRAME HEAD P1 L\\d+(\\.\\d)? x${stockF}$`).test(t)) && texts.some((t) => new RegExp(`^W1 - LEAF TOP P1 L\\d+(\\.\\d)? x${stockL}$`).test(t)), texts.filter((t) => / P1 /.test(t)).join(' | '));
   check('TEXT: flat piece note prints OUT / IN / CUT codes / finger ends', texts.filter((t) => /^OUT \d+(\.\d)? IN \d+(\.\d)? CUT [JSA]\d+(\.\d)?\/[JSA]\d+(\.\d)? (FINGER BOTH ENDS|FINGER ONE END|NO FINGER)$/.test(t)).length === nF + nL, texts.filter((t) => t.startsWith('OUT')).join(' | '));
   check('TEXT: cut-code legend line', texts.some((t) => t.startsWith('CUT CODES: J = JOINT FROM SQUARE')));
@@ -661,9 +676,9 @@ section('§10.3 pt 5 — DXF round-trip via ezdxf — sample_arch_1200_segmental
     { shape: 'semi-circle', rise: null, exp: semiExp },
     { shape: 'gothic-equilateral', rise: null, exp: (δ) => gothicExp(W * Math.sqrt(3) / 2, δ) },
     { shape: 'gothic-drop', rise: 840, exp: (δ) => gothicExp(840, δ) },
-    { shape: 'three-centre', rise: 390, exp: (δ) => threeExp(390, δ) },
+    { shape: 'three-centre', rise: 390, exp: (δ) => threeExp(390, δ, R_MIN) },
   ];
-  // Stage 2a: one sample per shape next to the segmental one (docs/handover/samples), ezdxf-checked below
+  // Stage 2a: one sample per shape next to the three-centre-240 one (docs/handover/samples), ezdxf-checked below
   for (const c of cases) {
     const plan = arch.buildArchPlan({ shape: c.shape, width: W, height: 2000, rise: c.rise, hinge: 'right' }, PA);
     const path = resolve(SAMPLES, `sample_arch_1200_${c.shape}.dxf`);
@@ -696,7 +711,7 @@ section('§10.3 pt 8 — cncExport: canExportArchDxf, archParamsForWindow, merge
   check('sash → skip "not a casement window"', cncExport.archParamsForWindow(sash, 'S').skip === 'not a casement window');
   check('standard casement → skip "not an arched casement"', cncExport.archParamsForWindow(mk({ casementType: 'standard' }), 'C').skip === 'not an arched casement');
   const ok = cncExport.archParamsForWindow(mk({ casementType: 'arched', casArchShape: 'segmental-arch', casArchHinge: 'right' }), 'W7');
-  check('arched segmental 1200 → params with plan + winNum', !ok.skip && ok.params.plan.shape === 'segmental' && ok.params.winNum === 'W7' && ok.params.plan.hinge === 'left');
+  check('PSW segmental-arch 1200 → params with a three-centre rise 240 plan (P10) + winNum', !ok.skip && ok.params.plan.shape === 'three-centre' && ok.params.plan.rise === 240 && ok.params.winNum === 'W7' && ok.params.plan.hinge === 'left', ok.skip);
   check('canExportArchDxf: true for the arched casement, false for a rectangular casement, sash and door',
     cncExport.canExportArchDxf(mk({ casementType: 'arched', casArchShape: 'semi-circle' })) === true && cncExport.canExportArchDxf(mk({ casementType: 'standard' })) === false
     && cncExport.canExportArchDxf(sash) === false && cncExport.canExportArchDxf(door) === false);
@@ -730,7 +745,7 @@ section('§10.3 pt 8 — cncExport: canExportArchDxf, archParamsForWindow, merge
   const contoursA = dm.polys.filter((p) => p.layer === 'CONTOUR');
   check('merged DXF: 4 CONTOUR rings (2 windows × head + leaf), labels A and B', contoursA.length === 4 && dm.texts.some((t) => t.text === 'A - FRAME HEAD') && dm.texts.some((t) => t.text === 'B - FRAME HEAD'));
   {
-    const p1 = arch.buildArchPlan({ shape: 'segmental', width: W, height: 2000 }, PA);
+    const p1 = arch.buildArchPlan({ shape: 'three-centre', width: W, height: 2000, rise: 240 }, PA);
     const p2 = arch.buildArchPlan({ shape: 'semi-circle', width: 1000, height: 1800 }, PA);
     const one = archDxf.buildArchEntities(p1, 'A');
     const merged = archDxf.buildMergedArchEntities([{ plan: p1, winNum: 'A' }, { plan: p2, winNum: 'B' }]);
@@ -765,7 +780,9 @@ section('§10.3 pt 9 — normaliseToWindowSpec PSW mapping, riseSource, unknown 
   expectThrows('unknown PSW shape throws (never a silent rectangle)', () => psw({ casementType: 'arched', casArchShape: 'foo' }), /Unknown PSW arch shape "foo" on window "PSW-1"/);
   expectThrows('unknown PC-native shape throws', () => specification.normaliseToWindowSpec({ width: 1200, height: 2000, windowCategory: 'casement', archShape: 'oval' }), /Unknown arch shape "oval"/);
   const a1 = psw({ casementType: 'arched', casArchShape: 'segmental-arch', casArchHinge: 'right' });
-  check('PSW arched casement → category casement, arch.shape segmental, rise 240 (ratio 0.20)', a1.category === 'casement' && a1.arch?.shape === 'segmental' && near(a1.arch?.rise, 240, 1e-9) && a1.arch?.riseSource === 'ratio');
+  check('PSW segmental-arch → three-centre (P10), rise 240 (PSW segmental ratio 0.20), start 1760, riseSource ratio, bars none 0/0',
+    a1.category === 'casement' && a1.arch?.shape === 'three-centre' && near(a1.arch?.rise, 240, 1e-9) && a1.arch?.start === 1760 && a1.arch?.riseSource === 'ratio'
+    && a1.arch?.bars?.pattern === 'none' && a1.arch?.bars?.h === 0 && a1.arch?.bars?.v === 0, JSON.stringify(a1.arch));
   check('PSW casArchHinge "right" (radio labelled "Left Hinge") → hinge left (reversed on read)', a1.arch?.hinge === 'left', String(a1.arch?.hinge));
   const a2 = psw({ casementType: 'arched', casArchShape: 'gothic-arch', casArchHinge: 'left' });
   check('PSW casArchHinge "left" (radio labelled "Right Hinge") → hinge right', a2.arch?.hinge === 'right');
@@ -782,19 +799,32 @@ section('§10.3 pt 9 — normaliseToWindowSpec PSW mapping, riseSource, unknown 
   const a4 = specification.normaliseToWindowSpec({ width: 1200, height: 2000, windowCategory: 'casement', archShape: 'gothic-drop', archRise: 800, archHinge: 'right' });
   check('PC-native item: archShape / archRise / archHinge taken as-is, riseSource custom', a4.arch?.shape === 'gothic-drop' && a4.arch?.rise === 800 && a4.arch?.riseSource === 'custom' && a4.arch?.hinge === 'right');
   const a5 = specification.normaliseToWindowSpec({ width: 1200, height: 2000, windowCategory: 'casement', casementType: 'arched', casArchShape: 'segmental-arch', casArchHinge: 'left' });
-  check('batch item with PSW field names (moveToProduction copies config) → mapped the same way', a5.arch?.shape === 'segmental' && a5.arch?.hinge === 'right');
-  check('rise follows the width: W 1000 segmental → 200', near(psw({ casementType: 'arched', casArchShape: 'segmental-arch' }, { width: 1000 }).arch?.rise, 200, 1e-9));
+  check('batch item with PSW field names (moveToProduction copies config) → mapped the same way', a5.arch?.shape === 'three-centre' && a5.arch?.hinge === 'right');
+  check('rise follows the width: W 1000 PSW segmental-arch → 200', near(psw({ casementType: 'arched', casArchShape: 'segmental-arch' }, { width: 1000 }).arch?.rise, 200, 1e-9));
+  // v2: PC-native start / legacy shape / round resolution / bars
+  const v2a = specification.normaliseToWindowSpec({ width: 1000, height: 1500, windowCategory: 'casement', casementType: 'arched', archShape: 'three-centre', archStart: 1300, archRiseSource: 'custom', archHinge: 'left' });
+  check('PC item with archStart 1300 (H 1500) → rise 200, start 1300, three-centre, riseSource custom', v2a.arch?.shape === 'three-centre' && v2a.arch?.rise === 200 && v2a.arch?.start === 1300 && v2a.arch?.riseSource === 'custom', JSON.stringify(v2a.arch));
+  const v2b = specification.normaliseToWindowSpec({ width: 1000, height: 1500, windowCategory: 'casement', casementType: 'arched', archShape: 'three-centre', archStart: 1000, archRiseSource: 'custom' });
+  check('PC item with archStart = H − W/2 → resolves to semi-circle (Half), rise 500', v2b.arch?.shape === 'semi-circle' && v2b.arch?.rise === 500, JSON.stringify(v2b.arch));
+  expectThrows('PC item with archStart giving rise 520 > W/2 throws "use Gothic" (never a silent shape)', () => specification.normaliseToWindowSpec({ width: 1000, height: 1500, windowCategory: 'casement', casementType: 'arched', archShape: 'three-centre', archStart: 980 }), /above half the width \(500mm\): use Gothic/);
+  const v2c = specification.normaliseToWindowSpec({ width: 1200, height: 2000, windowCategory: 'casement', casementType: 'arched', archShape: 'segmental', archRise: 300, archRiseSource: 'custom' });
+  check('v1-era PC "segmental" (even with a custom rise) migrates to three-centre, rise 0.20 × W = 240, riseSource ratio (P10 / spec A)', v2c.arch?.shape === 'three-centre' && v2c.arch?.rise === 240 && v2c.arch?.riseSource === 'ratio' && v2c.arch?.start === 1760, JSON.stringify(v2c.arch));
+  const v2d = specification.normaliseToWindowSpec({ width: 1000, height: 1500, windowCategory: 'casement', casementType: 'arched', archShape: 'semi-circle', archStart: 1000, archBarPattern: 'hub-spoke', casementHBars: 1, casementVBars: 2 });
+  check('bars: archBarPattern hub-spoke + casementHBars 1 / casementVBars 2 → arch.bars { hub-spoke, 1, 2 }', v2d.arch?.bars?.pattern === 'hub-spoke' && v2d.arch?.bars?.h === 1 && v2d.arch?.bars?.v === 2, JSON.stringify(v2d.arch?.bars));
+  expectThrows('unknown bar pattern throws', () => specification.normaliseToWindowSpec({ width: 1000, height: 1500, windowCategory: 'casement', casementType: 'arched', archShape: 'semi-circle', archBarPattern: 'star' }), /Unknown arch bar pattern "star"/);
+  check('PSW elliptical-arch W 1000 → three-centre rise 325 (0.325), start = H − 325', (() => { const s = psw({ casementType: 'arched', casArchShape: 'elliptical-arch' }, { width: 1000, height: 1500 }); return s.arch?.shape === 'three-centre' && near(s.arch?.rise, 325, 1e-9) && s.arch?.start === 1175; })());
   // real data path: windowSpec → deriveWindowData (must not throw) → plan from the ACTIVE profile
   let derived = null, err = null;
   try { derived = calculations.deriveWindowData(a1, {}); } catch (e) { err = e; }
   check('deriveWindowData on an arched casement spec does not throw (rectangular casement engine unchanged)', !err && derived && !derived.unsupported && derived.components.box.length >= 4, err ? String(err) : '');
   const planLive = arch.buildArchPlan({ shape: a1.arch.shape, width: a1.frame.width, height: a1.frame.height, rise: a1.arch.rise, hinge: a1.arch.hinge }, profile.getCasementProfile());
-  const planDef = arch.buildArchPlan({ shape: 'segmental', width: 1200, height: 2000, rise: null, hinge: 'left' }, P);
+  const planDef = arch.buildArchPlan({ shape: 'three-centre', width: 1200, height: 2000, rise: 240, hinge: 'left' }, P);
   check('buildArchPlan from windowSpec + getCasementProfile() equals the default-profile plan', JSON.stringify(planLive.plans.frameHead.pieces.map((p) => [p.no, p.stock, +p.wReq.toFixed(6)])) === JSON.stringify(planDef.plans.frameHead.pieces.map((p) => [p.no, p.stock, +p.wReq.toFixed(6)])) && planLive.hinge === 'left');
 
   // profile block + migration
-  check('DEFAULT_CASEMENT_PROFILE.arch v2: finger 15/16/3.8, stock D7 [50, 63, 75, 95, 105, 180, 200], contourAllowance 10, maxSegmentAngleDeg 36, pieceRule narrowest, limits',
-    P.arch && P.arch.version === 2 && P.arch.finger.length === 15 && P.arch.finger.depth === 16 && P.arch.finger.pitch === 3.8
+  check('DEFAULT_CASEMENT_PROFILE.arch v3: finger 15/16/3.8, stock D7 [50, 63, 75, 95, 105, 180, 200], contourAllowance 10, maxSegmentAngleDeg 36, pieceRule narrowest, limits, minHaunchRadius 150, patterns',
+    P.arch && P.arch.version === 3 && P.arch.minHaunchRadius === 150 && JSON.stringify(P.arch.patterns.hubRingRatios) === '[0.3,0.6,0.8]' && P.arch.patterns.intersecting.pitch === 450
+    && P.arch.finger.length === 15 && P.arch.finger.depth === 16 && P.arch.finger.pitch === 3.8
     && JSON.stringify(P.arch.stockWidths) === JSON.stringify([50, 63, 75, 95, 105, 180, 200]) && P.arch.contourAllowance === 10 && P.arch.maxSegmentAngleDeg === 36
     && P.arch.pieceRule === 'narrowest' && !('widthAllowance' in P.arch) && !('maxPieces' in P.arch)
     && JSON.stringify(P.arch.limits) === JSON.stringify({ minWidth: 400, maxWidth: 1500, minStraightBelowRise: 900, minLeafStraightStile: 100 }));
@@ -802,10 +832,13 @@ section('§10.3 pt 9 — normaliseToWindowSpec PSW mapping, riseSource, unknown 
   void _drop;
   const m1 = profile.migrateCasementProfile(v11);
   check('migrateCasementProfile: v1.1 profile without arch gets the default section', JSON.stringify(m1.arch) === JSON.stringify(P.arch));
-  const m2 = profile.migrateCasementProfile({ ...v11, arch: { version: 2, finger: { pitch: 4.2 }, stockWidths: [150], limits: { maxWidth: 1800 } } });
-  check('migrateCasementProfile: partial v2 arch section merges (pitch 4.2, stock [150], maxWidth 1800, rest default)',
+  const m2 = profile.migrateCasementProfile({ ...v11, arch: { version: 3, finger: { pitch: 4.2 }, stockWidths: [150], limits: { maxWidth: 1800 }, patterns: { intersecting: { pitch: 500 } } } });
+  check('migrateCasementProfile: partial v3 arch section merges (pitch 4.2, stock [150], maxWidth 1800, tracery pitch 500, rest default)',
     m2.arch.finger.length === 15 && m2.arch.finger.pitch === 4.2 && JSON.stringify(m2.arch.stockWidths) === '[150]' && m2.arch.contourAllowance === 10 && m2.arch.maxSegmentAngleDeg === 36
-    && m2.arch.limits.maxWidth === 1800 && m2.arch.limits.minWidth === 400 && m2.arch.limits.minStraightBelowRise === 900);
+    && m2.arch.limits.maxWidth === 1800 && m2.arch.limits.minWidth === 400 && m2.arch.limits.minStraightBelowRise === 900 && m2.arch.minHaunchRadius === 150
+    && m2.arch.patterns.intersecting.pitch === 500 && m2.arch.patterns.intersecting.minMullions === 2 && JSON.stringify(m2.arch.patterns.hubRingRatios) === '[0.3,0.6,0.8]');
+  const m2v2 = profile.migrateCasementProfile({ ...v11, arch: { version: 2, finger: { length: 15, depth: 16, pitch: 3.8 }, stockWidths: [50, 63, 75, 95, 105, 180, 200], contourAllowance: 10, maxSegmentAngleDeg: 36, pieceRule: 'fewest', limits: P.arch.limits } });
+  check('migrateCasementProfile: a stored v2 block (no minHaunchRadius) is replaced whole by the v3 default', JSON.stringify(m2v2.arch) === JSON.stringify(P.arch));
   const m3 = profile.migrateCasementProfile({ ...v11, arch: { finger: { length: 15, depth: 16, pitch: 3.8 }, stockWidths: [100, 125, 150, 175, 200, 225, 250], widthAllowance: 20, maxPieces: 8 } });
   check('migrateCasementProfile: night-1 arch block (no version, invented stock list) is replaced whole by the v2 default', JSON.stringify(m3.arch) === JSON.stringify(P.arch));
   check('migrateCasementProfile: pre-v1 shape still replaced by the default (arch included)', profile.migrateCasementProfile({ frameDepth: 93 }).arch === P.arch);
@@ -814,9 +847,9 @@ section('§10.3 pt 9 — normaliseToWindowSpec PSW mapping, riseSource, unknown 
 // ═══════════════════════════════════════════════════════════════════════════
 // §10.3 item 10 — frozen files untouched (git diff against the merge base with main)
 // ═══════════════════════════════════════════════════════════════════════════
-section('§10.3 pt 10 — casementLayouts.js / lists.js / calculations.js unchanged (git diff vs merge-base with main)');
+section('§10.3 pt 10 — casementLayouts.js / jambDxf.js unchanged (git diff vs merge-base with main); v2 opens lists.js + calculations.js');
 {
-  const FROZEN = ['src/engine/casementLayouts.js', 'src/engine/lists.js', 'src/engine/calculations.js', 'src/engine/cnc/jambDxf.js'];
+  const FROZEN = ['src/engine/casementLayouts.js', 'src/engine/cnc/jambDxf.js'];
   let base = null;
   for (const ref of ['origin/main', 'main']) {
     try { base = execFileSync('git', ['merge-base', 'HEAD', ref], { cwd: ROOT, encoding: 'utf8' }).trim(); break; } catch { /* try the next ref */ }

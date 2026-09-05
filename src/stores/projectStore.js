@@ -557,6 +557,9 @@ export const useProjectStore = create((set, get) => ({
       archRise: windowConfig.archRise ?? null,
       archRiseSource: windowConfig.archRiseSource ?? null,
       archHinge: windowConfig.archHinge ?? null,
+      // arched-casement-v2: where the arch starts (mm from the cill) and the bar pattern in the arch
+      archStart: windowConfig.archStart ?? null,
+      archBarPattern: windowConfig.archBarPattern ?? null,
       fanlightHeight: windowConfig.fanlightHeight ?? null,
       fanlightAxis: windowConfig.fanlightAxis ?? null,
       fan2Axis: windowConfig.fan2Axis ?? null,
@@ -711,6 +714,9 @@ export const useProjectStore = create((set, get) => ({
       archRise: windowConfig.archRise ?? null,
       archRiseSource: windowConfig.archRiseSource ?? null,
       archHinge: windowConfig.archHinge ?? null,
+      // arched-casement-v2: where the arch starts (mm from the cill) and the bar pattern in the arch
+      archStart: windowConfig.archStart ?? null,
+      archBarPattern: windowConfig.archBarPattern ?? null,
       fanlightHeight: windowConfig.fanlightHeight ?? null,
       fanlightAxis: windowConfig.fanlightAxis ?? null,
       fan2Axis: windowConfig.fan2Axis ?? null,

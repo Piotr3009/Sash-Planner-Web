@@ -150,7 +150,23 @@ export const DEFAULT_CASEMENT_PROFILE = {
   arch: {
     // Schema version of this block. No UI edits it, so a stored copy with an
     // older version is replaced by this default (migrateCasementProfile).
-    version: 2,
+    // v3 (arched-casement-v2): minHaunchRadius + bar pattern ratios.
+    version: 3,
+    // Smallest haunch radius of a three-centre (Round below half width) arch,
+    // mm (v2 P3): r = max(rise² / halfW, this). Keeps the leaf-top inner ring
+    // positive (150 − leafAtJamb 40 − leafTop.face 67 = 43) — a Round arch
+    // therefore needs a rise above this value.
+    minHaunchRadius: 150,
+    // Glazing bar patterns in the arch (v2 P5), geometry ported from PSW
+    // 3d-src FixFrameWindow.jsx (semiBarPattern / intersectingData) on the
+    // glass outline: hub ring radii as fractions of the clear half width
+    // (ring 1 / 2 / 3), intersecting tracery mullion pitch (one mullion per
+    // this many mm of clear width, clamped to min..max) and the smallest
+    // tracery arc radius still drawn.
+    patterns: {
+      hubRingRatios: [0.3, 0.6, 0.8],
+      intersecting: { pitch: 450, minMullions: 2, maxMullions: 4, minRadius: 30 },
+    },
     // Finger-joint profile of the Stark d50 head (D5): finger length / joint
     // depth / pitch — printed on the drawing as FINGER 15/16/3.8.
     finger: { length: 15, depth: 16, pitch: 3.8 },
@@ -208,8 +224,18 @@ export function migrateCasementProfile(profile) {
     // default for profiles stored before arched-casement-v1. v1.3: the block
     // carries a schema version; an older stored block (night-1 keys
     // widthAllowance / maxPieces, invented stock list) is replaced whole.
+    // v1.4 (arched-casement-v2): version 3 adds minHaunchRadius + patterns;
+    // a stored v2 block is replaced whole (no UI edits this block yet).
     arch: profile.arch?.version === D.arch.version
-      ? { ...D.arch, ...profile.arch, finger: { ...D.arch.finger, ...profile.arch.finger }, limits: { ...D.arch.limits, ...profile.arch.limits } }
+      ? {
+          ...D.arch, ...profile.arch,
+          finger: { ...D.arch.finger, ...profile.arch.finger },
+          limits: { ...D.arch.limits, ...profile.arch.limits },
+          patterns: {
+            ...D.arch.patterns, ...(profile.arch.patterns || {}),
+            intersecting: { ...D.arch.patterns.intersecting, ...(profile.arch.patterns?.intersecting || {}) },
+          },
+        }
       : D.arch,
   };
 }
