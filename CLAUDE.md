@@ -154,26 +154,38 @@ karmi cut listę, PDF-y, rysunki, PP. Nigdy nie licz wymiarów okna w innym miej
 
 ---
 
-## STAN — arched-casement-v2 zamknięty: noc 3 (A+B+C) na `main` (PR #4), noc 4 (D+E+F+t19) na branchu sesji
-v1: geometria (`src/engine/arch.js`), planer desek, CNC DXF (`archDxf.js`), harnessy t16/t17.
-v2 noc 3 (na `main`): model kształtów v2 (P1 reguła C, `segmental` usunięty, Round → półkole / trójłuk z
-`minHaunchRadius` 150), konfigurator Round | Gothic z polem „Arch starts at", silnik z `C-ARCH HEAD` /
-`C-ARCH TOP RAIL`, szyba jako kształt, pręty (proste + wzory PSW), eksporty dla szklarza (DXF + PDF), harness t18.
-v2 noc 4 (branch `claude/arched-casement-v2-def-enkyue`, do mergu rano): cztery arkusze 2D casement rysują
-łuki z ArcChain `derived.arch` przez `archDrawUtils.js` (SVG `A`, nigdy Bézier; okna proste bajt w bajt —
-fixture `verify/arch/fixtures/rect-casement-sheets.json`), pręty + liczby końców na łuku (E),
-`ArchedCasementWindow.jsx` przepisany na `arch.js` przez czysty helper `archedCasementGeometry.js`
-(propsy PSW + `archRise` / `archProfile` / `barPattern` / `archMinHaunchRadius` / `archPatterns`),
-`windowSpecToConfig` + `update3D` + `src/3d/App.jsx` przekazują nowe propsy, `docs/handover/PSW-3D-ARCH-PORT.md`,
-harness `verify/arch/t19.mjs` (snapshot, arkusze, JEDEN KONTUR SVG ↔ DXF ±0,01, helper 3D, okablowanie).
-Werdykty w `BUILD-LOG.md` (sekcja noc 4), otwarte pytania w `BLOCKERS.md §10` (+ §9 P9 / D13 / 9.3 / F2).
-Spec: `docs/handover/ARCHED-CASEMENT-v2.md` (+ v1, v1-AUDIT jako historia).
+## STAN — łuki casement zamknięte (noce 1–4, na `main`)
+v1 geometria + planer + CNC DXF; v2 reguła C, konfigurator Round | Gothic, silnik z krzywymi
+elementami, pręty (proste + wzory PSW), eksporty dla szklarza, 2D z łuków, 3D na `arch.js`.
+Harnessy t16–t19 ALL PASS. Werdykty w `BUILD-LOG.md`, otwarte w `BLOCKERS.md`.
+Spec: `docs/handover/ARCHED-CASEMENT-v1.md`, `-v1-AUDIT.md`, `-v2.md` (historia decyzji).
 
-## ZADANIE NOCNE — brak (noc 4 zamknięta; następny pakiet po przeglądzie Piotra)
+## ZADANIE NOCNE 5 — ARCHED-WINDOWS-v3: Blok 0 + Blok 1 (A–E)
 
-Kandydaci z BLOCKERS §10 / §9 (Piotr decyduje): 10.1 podgląd 3D okna łukowego w `WindowPreview3D` /
-`Window3DCaptureRig` (sześć linii), 10.3 twarze 3D z profilu, 9.10 BOM z desek planera, P9 (900), D13,
-9.3 minimalna długość kawałka, F2 (rise > 150). Harnessy do utrzymania: t16 / t17 / t18 / t19 ALL PASS.
+Spec: `@docs/handover/ARCHED-WINDOWS-v3.md`. Czytasz w całości; przy rozbieżności z v1/v2
+wygrywa v3. Rysunek warsztatowy: `docs/handover/workshop/arka_CNC-piotr.dxf` (przeczytaj
+`ezdxf`, nie zgaduj warstw).
+
+Zakres tej nocy — TYLKO:
+- **Blok 0** (casement): 0.1 widok FIT w Arch DXF · 0.2 szklarz: pasy 18, oblamówka 11, osie ·
+  0.3 wymiarowanie końców prętów (od dołu / od wierzchołka po łuku, tabela > 4) · 0.4 eksport
+  **Tracery DXF + LSP** wg konwencji `arka` (pakiet w `docs/handover/workshop/arka-lsp-package/`
+  = książka reguł: warstwy `ARKA_*`, +2 / +10, narożniki 15 po krzywej, przekrój verbatim;
+  traceria = deska z JEDNEJ strony szyby, część `C-TRACERY`; wzory generyczne hub-spoke +
+  preset `quad-hub-spoke` z DWG) · **0.4b zawias 1:1 z PSW — usuń odwracanie wartości z nocy 3** · **0.4c audyt
+  logiki prętów per kształt (t20_bars)** · 0.5 drobne z BLOCKERS §10 · 0.6 decyzje profilu
+- **Blok 1 A–E** (sash łukowy, strona silnika): model + import PSW, konfigurator sash, silnik
+  z regułą C i głowicą 80, wagi z prawdziwego obrysu, cut list `S-AH` / `S-ATR`, harness t21
+- harnessy t20 (Blok 0) i t21 (Blok 1) ALL PASS; t16–t19 nadal ALL PASS; okna prostokątne
+  (sash i casement) snapshot-identyczne
+
+**Nie zaczynaj Bloku 1 F–J (2D/3D sash), Bloku 3 (okna stałe), 4, 6 (archiwum) — to noce 6–7.
+Drzwi, sliding, bifold, front door: poza zakresem (Piotr 07.09).**
+Nie ruszaj `casementLayouts.js`, modułu beading sash (dla łuku: zapisz lukę w BLOCKERS, nie
+generuj listew), listy „NIE RÓB DZIŚ".
+
+Sesja w chmurze, własny branch, commit + push po każdym zamkniętym punkcie (0.1 → 0.6 →
+1A → 1E). Każde **DEFAULT (open)** ze spec = wpis w BLOCKERS z przyjętą wartością.
 
 ## NIE RÓB DZIŚ (zaplanowane, osobne pakiety)
 

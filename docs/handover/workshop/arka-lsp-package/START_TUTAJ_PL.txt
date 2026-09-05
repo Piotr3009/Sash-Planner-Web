@@ -1,0 +1,178 @@
+ARKA / BARY / PRZEKROJ R8 - V1
+==============================
+Podstawa: zalaczony plik "arka_CNC - piotr.dxf".
+To geometria CAD do sprawdzenia, NIE zatwierdzony program CNC.
+
+1. NAJSZYBSZA PROBA
+------------------
+Otworz NOWY rysunek AutoCAD w milimetrach, w zakladce MODEL.
+APPLOAD -> Arka_Bary_R8_V1.lsp -> Load.
+Wpisz ARKADEMO i wskaz punkt wstawienia (Enter = 0,0).
+Powstana obrysy, PANE, zewnetrzne granice profilu, MITRE i JEDEN przekroj.
+Uzyj ZOOM Extents, gdy calosc nie jest widoczna.
+
+LSP wymaga AutoCAD dla Windows z Visual LISP/ActiveX.
+Nie testowano go w uruchomionym AutoCAD ani w VCarve.
+W razie blokady bezpieczenstwa uzyj zaufanego folderu dla sprawdzonego LSP;
+nie wylaczaj globalnie zabezpieczen SECURELOAD.
+
+2. TWOJ KOLEJNY RYSUNEK
+----------------------
+ARKABARY:
+- Opcjonalnie wskaz zewnetrzny OUTLINE calego okna. Enter pomija ten element.
+- Zaznacz TYLKO zamkniete obrysy POL pomiedzy barami (bazowe OUTLINE).
+  W zalaczonym wzorze jest 5 takich pol. Nie wybieraj dodatkowo PANE,
+  FRONT_HINGES_3MM i MITRE: sa to wyniki, nie kolejne pola.
+- Wskaz lewy dolny rog KOPII wyniku. Enter wstawia kopie obok (+100 mm).
+- Zrodlo zostaje nietkniete. Nowe obiekty maja warstwy ARKA_*.
+
+To nie jest rozpoznawanie sieci samych otwartych OSI barow.
+W tej wersji wejsciem sa zamkniete LWPOLYLINE z prostymi i lukami kolowymi,
+bez szerokosci polilinii, w WCS XY, Z=0, normalna +Z.
+SPLINE, polilinie 3D i osobne niepolaczone linie/ARC trzeba najpierw opracowac
+jako poprawne obwody pol. LSP nie dopowiada, po ktorej stronie osi jest bar.
+
+ARKAUSTAW - zmiana odstepu PANE, R, pionowego odcinka i ramion MITRE.
+ARKAPROFIL - sam przekroj: JEDNA otwarta polilinia, poza obrysem okna.
+ARKARESET - powrot do 2 / 8 / 6 / 15 mm.
+ARKA - pomoc.
+Zmiana ustawien dotyczy kolejnego wyniku, nie edytuje istniejacej geometrii.
+Nie uruchamiaj wielokrotnie generowania w tym samym miejscu: powstana kopie.
+
+3. ZASADA WARSTW I ODSTEPOW
+--------------------------
+ARKA_OUTLINE           - bazowe obrysy skopiowane bez skalowania.
+ARKA_PANE              - OUTLINE pola powiekszony na zewnatrz o 2 mm.
+ARKA_FRONT_HINGES_3MM   - limit profilu, OUTLINE pola powiekszony o 10 mm.
+                         Zachowano koncowke nazwy ze zrodla; to NIE wiercenia.
+ARKA_MITRE             - otwarte dwuramienne polilinie przy rzeczywistych
+                         zalamaniach obwodu limitu. Kazde ramie biegnie
+                         po krzywej 15 mm, z zachowaniem lukow.
+ARKA_SECTION           - jeden przekroj: cwiercluk R8 i pion 6 mm.
+ARKA_PANE_ZEWN_REF     - osobna linia referencyjna: obrys ZEWN. pomniejszony
+                         o 2 mm. Celowo oddzielona od PANE pol, aby nie
+                         wybrac jej automatycznie jako wewnetrznej prowadnicy.
+ARKA_INFO_NO_CUT        - opisy pomocnicze. Nie przeznaczac do frezowania.
+
+2 mm + 8 mm = 10 mm. Odstepy sa normalnymi OFFSETAMI, nie zmiana skali.
+Miedzy PANE a limitem profilu jest 8 mm, zarowno na prostych, jak na lukach.
+Zmiana R w ARKAUSTAW zmienia tez szerokosc profilu i odleglosc limitu:
+OFFSET limitu = OFFSET PANE + R.
+
+MITRE nie jest przekatna poprowadzona pod stalym katem 45 stopni.
+Sa to fragmenty dwoch sasiednich odcinkow obwodu, polaczone w narozniku.
+LSP zachowuje prawdziwe luki (bulge), a nie zamienia ich na setki odcinkow.
+Na gladkich polaczeniach z roznica stycznych <=0.5 stopnia nie tworzy narozka.
+Przy bardzo krotkich odcinkach ramie jest ograniczone do 45% ich dlugosci,
+aby dwa sasiednie narozniki nie nachodzily na siebie. Pojawia sie komunikat.
+Dlugosc MITRE w tej wersji jest mierzona PO KRZYWEJ.
+
+OFFSETGAPTYPE jest tymczasowo ustawione na 0 i przywracane po poleceniu.
+Nie zmieniamy zrodla ani jego warstw. Nieprawidlowy/wieloczesciowy OFFSET
+przerywa polecenie; nowo utworzona geometria jest wtedy usuwana.
+Kontrola przeciec limitow jest tylko kontrola 2D, nie analiza dostepu frezu.
+Nie sprawdza wszystkich przypadkow zawierania, szerokosci pozostalego
+materialu, przestrzeni mocowania ani wymagan wytrzymalosciowych.
+
+4. PRZEKROJ - FAKTY Z PLIKU, NIE POPRZEDNIA PROPOZYCJA DRZWICZEK
+--------------------------------------------------------------
+W zrodle przekroj to LINE 4E9 i ARC 4EA, obydwa na warstwie 0.
+Warstwa SECTION w zrodle jest pusta.
+Odcinek prosty ma 6 mm. Luk ma promien 8 mm i kat 90 stopni.
+Przekroj zajmuje 8 mm w poziomie i 14 mm w pionie.
+Nie dodano filetow, zaokraglen ani wyrownania stycznej w miejscu laczenia.
+
+W nowym SECTION geometria jest zlaczona w JEDNA OTWARTA LWPOLYLINE:
+(0,0) -> luk R8 -> (8,8) -> pion 6 -> (8,14).
+Bulge pierwszego segmentu: -0.414213562373095.
+Pierwszy, niski koniec jest oznaczony START przy wewnetrznym PANE.
+Wspolrzedna Y przekroju reprezentuje wysokosc wzgledna profilu.
+Nie przypisano zera materialu/maszyny. 14 mm NIE jest zatwierdzona glebokoscia
+skrawania. Grubosc, Z, orientacja i ksztalt koncowy wymagaja weryfikacji.
+
+5. VCARVE - WYBOR WEKTOROW, NIE GOTOWE SCIEZKI
+--------------------------------------------
+Importuj DXF w milimetrach i sprawdz skale.
+Dla funkcji Moulding Toolpath zamknieta prowadnica oznacza wewnetrzna
+krawedz profilu: tutaj wybieraj PANE POL (nie PANE_ZEWN_REF), a przekroj
+SECTION jako ostatni. Vectric opisuje, ze przy zamknietej prowadnicy
+profil jest rozwijany na zewnatrz. Sprawdz strone i start w podgladzie.
+Zewnetrzna granica FRONT_HINGES_3MM jest limitem/kontrola szerokosci,
+nie zalecana tu zamknieta prowadnica do rozwiniecia profilu na zewnatrz.
+
+Nie zaznaczaj wszystkich warstw jako jednej operacji V-Carve/Profile.
+MITRE pozostaje geometria narozy, nie automatyczna sciezka narzedzia.
+Opcja Create Sharp Corners w Moulding Toolpath wymaga osobnego sprawdzenia.
+Wybor frezu, pionowe fragmenty przekroju, przejscie przez naroznik,
+glebokosci, naddatki, mocowanie i postprocesor nie zostaly zaprogramowane.
+Szczegolnie uwazaj na zachowanie materialu miedzy dwoma profilami bara.
+W wygenerowanym przykladzie najmniejszy odstep ich limitow wynosi ok. 1.65 mm.
+To wartosc geometrii, nie potwierdzenie, ze taki detal mozna bezpiecznie obrobic.
+Najpierw pelna symulacja i probka jednego naroznika/barowego polaczenia.
+
+6. CO ZACHOWANO, A CO PRZELICZONO
+-------------------------------
+ARKADEMO i DXF demonstracyjny uzywaja 6 bazowych OUTLINE z Twojego pliku:
+1 obrys zewnetrzny + 5 pol. Nie zmieniamy ich ksztaltu ani skali.
+Offsety 2 i 10 mm sa natomiast przeliczane od nowa, a nie kopiowane
+w ciemno z kazdej pomocniczej polilinii w zalaczniku.
+
+W zrodle 4 pierwsze pola realizuja zasade 2 / 10 mm. Male dolne prawe pole
+ma nieco inny luk OUTLINE niz wynika z sasiednich konturow PANE/profilu.
+Staly OFFSET tego OUTLINE daje lokalnie ok. 0.35 mm roznicy wzgledem
+oryginalnego pomocniczego limitu. Nie nazywamy tego kopia 1:1.
+
+W zrodle 3 pomocnicze kontury sa oznaczone jako OTWARTE:
+4D4 PANE: szczelina ok. 0.0000515 mm.
+4D5 FRONT_HINGES_3MM: szczelina ok. 0.0002149 mm.
+4D7 PANE: szczelina ok. 0.0198402 mm.
+Nie zamknieto ich po cichu w pliku referencyjnym. Nowe kontury sa tworzone
+z zamknietych OUTLINE, a nie z tych otwartych konturow pomocniczych.
+
+Zrodlowe MITRE to 20 polilinii; jeden naroznik jest rozdzielony.
+Nowy wynik ma 19 naroznikow, kazdy jako jedna dwuramienna polilinia.
+W zrodle dlugosci ramion sa w przyblizeniu 15 mm; tutaj dokladnie 15 mm
+po krzywej, z wyjatkiem opisanej reguly krotkich odcinkow.
+
+7. PLIKI
+--------
+Arka_Bary_R8_V1.lsp
+  Samodzielny skrypt z wbudowanym przykladem. Nie wymaga innych plikow.
+Arka_Demo_Warstwy_R8.dxf
+  Przyklad wygenerowany analitycznie z tych samych bazowych obrysow.
+  LSP korzysta z natywnego OFFSET AutoCAD, ktorego tu nie uruchomiono.
+Przekroj_R8_pion6_JEDNA_POLILINIA.dxf
+  Tylko jeden przekroj, bez napisow i dodatkowych linii.
+ZRODLO_odniesienie_bez_poprawek.dxf
+  Kopia referencyjna z przesunieciem modelu blisko (0,0).
+  Oryginalne warstwy, bulge i flagi otwarcia pozostawiono.
+Arka_Podglad_Warstwy_Przekroj_MITRE.png
+  Plansza z faktycznej geometrii wektorowej, nie render AI ani symulacja CAM.
+Kontrola_geometrii.json / Test_rdzenia_LSP.json
+  Wyniki testow oraz ograniczenia testowania.
+
+8. WERYFIKACJA
+--------------
+Sprawdzono skladnie podstawowych formularzy LSP i nawiasy.
+Rdzen obliczen LSP wykonano w malym interpreterze testowym: 24 przypadki,
+w tym odwzorowanie lukow, narozniki, krotkie odcinki, profil jako 1 obiekt.
+Testy odniesienia obejmuja rowniez obwody zgodne i przeciwne do wskazowek zegara.
+Sprawdzono prawdziwe odleglosci offsetow, dlugosci MITRE oraz kontury DXF.
+Audyt wygenerowanych DXF: 0 bledow.
+
+NIE wykonano testu w AutoCAD, natywnego vla-Offset, symulacji VCarve ani CNC.
+Nie dostarczono .crv, G-code, CIX, BPP ani postprocesora maszyny.
+
+9. DOKUMENTACJA FUNKCJI (nie zrodlo geometrii)
+--------------------------------------------
+Autodesk - ladowanie AutoLISP / APPLOAD:
+https://help.autodesk.com/cloudhelp/2027/ENU/AutoCAD-Customization/files/GUID-4E633A41-30EA-4C6B-ABC5-11F58970E1EE.htm
+Autodesk - Offset Method, Windows ActiveX:
+https://help.autodesk.com/cloudhelp/2025/ENU/AutoCAD-ActiveX-Reference/files/GUID-50EF273A-7552-4D6B-8523-BB956334D08A.htm
+Autodesk - OFFSETGAPTYPE:
+https://help.autodesk.com/cloudhelp/2021/ENU/AutoCAD-Core/files/GUID-EB2A74E1-E6C8-4690-9658-7F731AB7FD84.htm
+Vectric - Moulding Toolpath, selection, closed rails, cross section:
+https://docs.vectric.com/docs/V12.5/VCarveDesktop/ENU/Help/form/uiExtrudedToolpathForm/index.html
+
+Parametry zrodla odczytano bezposrednio z DXF. Dokumentacja internetowa
+sluzy tylko do sprawdzenia zasad funkcji AutoCAD/Vectric.

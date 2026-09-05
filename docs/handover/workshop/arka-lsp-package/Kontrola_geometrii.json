@@ -1,0 +1,138 @@
+{
+  "source_name": "arka_CNC - piotr.dxf",
+  "source_sha256": "91861076c0214b7706ac85ba2804b870484fb1068e4f39e533abbf75896352b2",
+  "source_units": "mm",
+  "source_entities": 40,
+  "source_layers": {
+    "0": 2,
+    "Defpoints": 0,
+    "OUTLINE": 6,
+    "PANE": 6,
+    "MITRE": 20,
+    "SECTION": 0,
+    "CENTRE": 1,
+    "DOORS": 0,
+    "UNIT_NUMBER": 0,
+    "FRONT_HINGES_35MM": 0,
+    "FRONT_HINGES_3MM": 5
+  },
+  "source_section": {
+    "line_handle": "4E9",
+    "arc_handle": "4EA",
+    "straight_mm": 6,
+    "arc_radius_mm": 8,
+    "arc_sweep_degrees": 90,
+    "width_mm": 8,
+    "height_mm": 14
+  },
+  "defaults": {
+    "pane_offset_mm": 2,
+    "profile_width_mm": 8,
+    "profile_limit_offset_mm": 10,
+    "corner_leg_arc_length_mm": 15
+  },
+  "closed_generated_polygons_valid": true,
+  "closed_paths": 17,
+  "open_corner_paths": 19,
+  "open_profile_paths": 1,
+  "max_corner_leg_length_error_mm": 1.2789769243681803e-13,
+  "max_corner_on_rail_sampling_error_mm": 0.000199792680874332,
+  "max_true_offset_error_mm": 2.2737367544323206e-13,
+  "minimum_distance_between_profile_limits_mm": 1.6484007983710225,
+  "source_open_loops_not_silently_closed": [
+    {
+      "handle": "4D4",
+      "layer": "PANE",
+      "endpoint_gap_mm": 5.149568119122705e-05
+    },
+    {
+      "handle": "4D5",
+      "layer": "FRONT_HINGES_3MM",
+      "endpoint_gap_mm": 0.0002148887701878266
+    },
+    {
+      "handle": "4D7",
+      "layer": "PANE",
+      "endpoint_gap_mm": 0.01984023419117875
+    }
+  ],
+  "new_offsets_vs_source_auxiliary_geometry": [
+    {
+      "source_handle": "4C6",
+      "layer_role": "PANE",
+      "outline_handle": "4C5",
+      "hausdorff_distance_approx_mm": 0.002439945456644165
+    },
+    {
+      "source_handle": "4C7",
+      "layer_role": "PROFILE_LIMIT",
+      "outline_handle": "4C5",
+      "hausdorff_distance_approx_mm": 0.002942657392279453
+    },
+    {
+      "source_handle": "4C9",
+      "layer_role": "PANE",
+      "outline_handle": "4C8",
+      "hausdorff_distance_approx_mm": 0.0022624229080546307
+    },
+    {
+      "source_handle": "4CA",
+      "layer_role": "PROFILE_LIMIT",
+      "outline_handle": "4C8",
+      "hausdorff_distance_approx_mm": 0.0027214656413558757
+    },
+    {
+      "source_handle": "4CE",
+      "layer_role": "PANE",
+      "outline_handle": "4CD",
+      "hausdorff_distance_approx_mm": 0.001643592523607435
+    },
+    {
+      "source_handle": "4CF",
+      "layer_role": "PROFILE_LIMIT",
+      "outline_handle": "4CD",
+      "hausdorff_distance_approx_mm": 0.0021220594073474318
+    },
+    {
+      "source_handle": "4D1",
+      "layer_role": "PANE",
+      "outline_handle": "4D0",
+      "hausdorff_distance_approx_mm": 0.0014852236672986542
+    },
+    {
+      "source_handle": "4D2",
+      "layer_role": "PROFILE_LIMIT",
+      "outline_handle": "4D0",
+      "hausdorff_distance_approx_mm": 0.0018893708897678699
+    },
+    {
+      "source_handle": "4D4",
+      "layer_role": "PANE",
+      "outline_handle": "4D3",
+      "hausdorff_distance_approx_mm": 0.3246350318181612
+    },
+    {
+      "source_handle": "4D5",
+      "layer_role": "PROFILE_LIMIT",
+      "outline_handle": "4D3",
+      "hausdorff_distance_approx_mm": 0.3515508809871619
+    }
+  ],
+  "DXF_audit_errors": 0,
+  "profile_DXF_audit_errors": 0,
+  "tests": [
+    "closed loop validity",
+    "true circle/line offsets",
+    "exact bulges",
+    "corner lengths",
+    "corner locations",
+    "CW and CCW contours",
+    "smooth circle no artificial corners",
+    "short segment trimming"
+  ],
+  "AutoCAD_executed": false,
+  "native_AutoCAD_OFFSET_executed": false,
+  "VCarve_executed": false,
+  "CNC_executed": false,
+  "demo_DXF_note": "Analytical Python reference from source OUTLINE; LSP uses AutoCAD native Offset. Compare in AutoCAD before use."
+}
