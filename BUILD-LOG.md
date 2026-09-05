@@ -145,6 +145,30 @@ inside the board.
 
 **Verdict: ✅ T3.**
 
+### T4 — three-centre haunch radius (`arch.js` `archArcs`)
+
+**Understanding:** the "elliptical" arch is a basket handle (D9): two haunch circles on the
+springing line + one crown circle below it, tangent-continuous. Night 1 fixed the haunch radius at
+`0.5 × rise` (invented); spec §6.1 sets it to the ellipse's radius of curvature at the springing,
+`r = rise² / halfW`, so the basket handle actually approximates the ellipse the customer saw.
+
+**Change:** `THREE_CENTRE_HAUNCH_RATIO` removed (it was the invented constant — justification:
+replaced by the spec formula, nothing else read it); `r = h²/hw`; the tangency solve kept as is
+(audit: correct). New guard: three-centre rise ≥ W/2 throws readably (r ≥ rise → no crown circle;
+at W/2 the shape is a semi-circle). Too small a rise still fails readably one step later
+(`rise 180 → r 54 < frame face 57 → "Offset 57mm exceeds the arc radius 54mm"`).
+
+**Numbers (W 1200, rise 390):** r 253.50, R 761.54, small centres ±346.50, crown centre 371.54
+below the arch-start line, tangent point (W/2 + 519.40, +185.39), spans 47.00° / 86.01°, arc
+lengths 207.93 each / 1143.13, |Cs − CL| = 508.04 = R − r — every spec §10.1 value within 0.01.
+Plans (narrowest): haunches 2 × 95 each (107 mm rough pieces), crown 4 × 95 (ALT 3 × 105).
+
+**Verification:** esbuild OK · harness: the independent three-centre formula now uses r = h²/(W/2);
+spec literals asserted explicitly (radii, tangent point on both circles, spans, lengths, tangency,
+mirror), two new error cases; 267/267 ALL PASS.
+
+**Verdict: ✅ T4.**
+
 ## 2026-09-05 — arched-casement-v1 (night run, branch `claude/arched-casement-v1`)
 
 **Blocking fact first:** `docs/handover/ARCHED-CASEMENT-v1.md` (the package spec) is NOT in the

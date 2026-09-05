@@ -82,10 +82,11 @@ function gothicExp(h, δ) {
   const t = Math.atan2(y, c);
   return { c, R, ρ, length: 2 * ρ * t, apex: y };
 }
-// three-centre: haunch r = h/2 at (±(W/2 − r), 0); crown R from tangency; the
-// tangent angle t is shared by all offsets (radial joints).
+// three-centre (spec §6.1): haunch r = h²/(W/2) — the ellipse's curvature radius
+// at the springing — at (±(W/2 − r), 0); crown R from tangency; the tangent
+// angle t is shared by all offsets (radial joints).
 function threeExp(h, δ) {
-  const r = h * 0.5, e = W / 2 - r;
+  const r = (h * h) / (W / 2), e = W / 2 - r;
   const R = (e * e + h * h - r * r) / (2 * (h - r));
   const t = Math.atan2(R - h, e);
   const length = 2 * (r - δ) * t + (R - δ) * (Math.PI - 2 * t);
@@ -97,7 +98,7 @@ const EXPECTED = [
   { shape: 'semi-circle', rise: null, exp: semiExp, R: 600, centres: [[0, 0]] },
   { shape: 'gothic-equilateral', rise: null, exp: (δ) => gothicExp(W * Math.sqrt(3) / 2, δ), R: 1200, centres: [[-600, 0], [600, 0]] },
   { shape: 'gothic-drop', rise: 840, exp: (δ) => gothicExp(840, δ), R: 888, centres: [[-288, 0], [288, 0]] },
-  { shape: 'three-centre', rise: 390, exp: (δ) => threeExp(390, δ), R: 713.0769, centres: [[405, 0], [0, -323.0769], [-405, 0]] },
+  { shape: 'three-centre', rise: 390, exp: (δ) => threeExp(390, δ), R: 761.54, centres: [[346.5, 0], [0, -371.54], [-346.5, 0]] },
 ];
 
 section('§10.1 geometry — W = 1200, casement profile defaults');
@@ -137,6 +138,22 @@ for (const v of EXPECTED) {
     expectNear('segmental: frame inner arch-start x', g.frameHead.ends.innerRight[0], fi.xEnd);
     expectNear('segmental: outer arch-start x = W/2', g.frameHead.ends.outerRight[0], 600);
   }
+  if (v.shape === 'three-centre') {
+    // spec §10.1 literals (rise 390): r 253.50, R 761.54, small centres ±346.50, large centre 371.54 below,
+    // tangent point (W/2 + 519.40, +185.39), spans 47.00° / 86.01°, arc lengths 207.93 each / 1143.13
+    const [s0, big, s1] = g.arcs;
+    expectNear('three-centre: haunch radius r = rise²/halfW = 253.50', s0.r, 253.50, 0.01);
+    expectNear('three-centre: crown radius R = 761.54', big.r, 761.54, 0.01);
+    const T = arch.arcPoint(s0, s0.a1);
+    check('three-centre: tangent point (519.40, 185.39) lies on both circles', near(T[0], 519.40, 0.01) && near(T[1], 185.39, 0.01)
+      && near(Math.hypot(T[0] - big.cx, T[1] - big.cy), big.r, 1e-6) && near(Math.hypot(T[0] - s0.cx, T[1] - s0.cy), s0.r, 1e-6), `${T.map((c) => c.toFixed(2))}`);
+    expectNear('three-centre: small span 47.00°', arch.arcSpan(s0) * 180 / Math.PI, 47.00, 0.01);
+    expectNear('three-centre: large span 86.01°', arch.arcSpan(big) * 180 / Math.PI, 86.01, 0.01);
+    expectNear('three-centre: small arc length 207.93', arch.arcLen(s0), 207.93, 0.01);
+    expectNear('three-centre: large arc length 1143.13', arch.arcLen(big), 1143.13, 0.01);
+    expectNear('three-centre: tangency |Cs − CL| = R − r = 508.04', Math.hypot(s0.cx - big.cx, s0.cy - big.cy), big.r - s0.r, 1e-6);
+    check('three-centre: mirrored haunch arc', near(s1.cx, -s0.cx, 1e-9) && near(s1.r, s0.r, 1e-9) && near(arch.arcSpan(s1), arch.arcSpan(s0), 1e-9));
+  }
   // bulge polyline: rebuild every arc segment from (p0, p1, bulge) and compare radii
   const poly = arch.ringPoly(g.frameHead);
   const n = poly.length;
@@ -164,6 +181,8 @@ expectThrows('width above 1500 throws', () => arch.resolveArchRise('segmental', 
 expectThrows('semi-circle refuses a foreign rise', () => arch.resolveArchRise('semi-circle', 1200, 500), /fixed by the shape at 600mm/);
 expectThrows('unknown shape throws', () => arch.resolveArchRise('elliptical', 1200, null), /Unknown arch shape/);
 expectThrows('rise ≥ height throws', () => arch.buildArchGeometry({ shape: 'semi-circle', width: 1200, height: 600 }, P), /no straight part/);
+expectThrows('three-centre rise ≥ W/2 throws (semi-circle)', () => arch.archArcs('three-centre', 1200, 600), /must be below half the width/);
+expectThrows('three-centre haunch smaller than the frame face throws readably (rise 180 → r 54)', () => arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 2000, rise: 180 }, P), /Offset 57mm exceeds the arc radius 54mm/);
 expectNear('segmental default rise = 0.20 × W (PSW RISE_RATIO)', arch.resolveArchRise('segmental', 1200, null), 240, 1e-9);
 expectNear('three-centre default rise = 0.325 × W (PSW elliptical)', arch.resolveArchRise('three-centre', 1200, null), 390, 1e-9);
 expectNear('gothic-drop default rise = 0.70 × W (PSW GOTHIC_PROFILE_RATIO.drop)', arch.resolveArchRise('gothic-drop', 1200, null), 840, 1e-9);

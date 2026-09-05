@@ -16,7 +16,7 @@
  *   semi-circle         1 centre, R = W/2, rise = W/2 (fixed by the shape)
  *   gothic-equilateral  2 centres at the opposite arch-start points, R = W
  *   gothic-drop         2 centres inside the span, W/2 < rise < W·√3/2
- *   three-centre        2 haunch centres on the line + 1 crown centre below it
+ *   three-centre        2 haunch centres on the line (r = rise²/halfW) + 1 crown centre below it; rise < W/2
  *
  * Workshop numbers (member faces, leaf inset, glass inset, finger joint,
  * board stock) come from the casement profile — none are hard-coded here.
@@ -76,10 +76,6 @@ export const ARCH_LIMITS = Object.freeze({
     'three-centre': [0.15, 0.45],
   }),
 });
-
-// Three-centre: haunch (side) radius as a fraction of the rise. The crown
-// radius follows from tangency, so this one ratio fixes the whole curve.
-export const THREE_CENTRE_HAUNCH_RATIO = 0.5;
 
 export function isArchShape(shape) { return ARCH_SHAPES.includes(shape); }
 
@@ -142,7 +138,11 @@ export function archArcs(shape, width, rise) {
       ];
     }
     case 'three-centre': {
-      const r = h * THREE_CENTRE_HAUNCH_RATIO;
+      // Basket-handle approximation of the half-ellipse (a = W/2, b = rise):
+      // haunch radius = the ellipse's radius of curvature at the springing,
+      // r = b²/a (spec §6.1); the crown radius follows from tangency.
+      if (!(h < hw)) throw new ArchError(`Three-centre rise ${r1(h)}mm must be below half the width (${r1(hw)}mm) — at W/2 the shape is a semi-circle`);
+      const r = (h * h) / hw;
       const e = hw - r;                        // haunch centre x
       const R = (e * e + h * h - r * r) / (2 * (h - r));   // crown radius from tangency
       const t = Math.atan2(R - h, e);          // tangent point seen from the crown centre
