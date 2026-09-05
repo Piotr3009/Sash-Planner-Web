@@ -4,6 +4,32 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-09-06 — arched-casement-v2 night 3 (A + B + C + t18, branch `claude/arched-casement-v2-impl-0j27uw`)
+
+Status of the older entries: **§1 D13 OPEN** (unchanged — `profile.arch.pieceRule` 'narrowest', ALT printed),
+**§2 D5 OPEN**, **§3 d50 arbor OPEN**, **§6.5 minimum piece length OPEN** (worse under P3, see 9.3),
+**P9 OPEN** (9.1). §6.3 (E2) and §6.2 (E1) are moot — the segmental shape is gone (P2).
+
+### 9. Open after night 3 (for Piotr)
+
+| # | Item | What was built | Ask |
+|---|------|----------------|-----|
+| 9.1 | **P9 — straight height limit for the casement** | `profile.arch.limits.minStraightBelowRise` stays **900** (PSW sash rule). In the v2 configurator the rule sits on the typed start: "arch start at least 900 from the cill" (Round) / `H ≥ ratio·W + 900` (Gothic) | Give the casement number (or confirm 900) — one profile value, no code |
+| 9.2 | **D13** piece rule | unchanged: 'narrowest' default, the other rule printed as ALT | decide |
+| 9.3 | **Minimum piece length** (§6.5) — now sharper | Under P3 the haunch arcs are r 150 with spans up to ~90°: the 1000 × 1500 start-1300 head plans **3 pieces of ~65 mm** per haunch (rough ~98 with fingers), the 1200/240 head 2 × ~110. The angle rule (36°) forces it; nothing in the spec allows a longer board on a small radius | Is a 65–110 mm finger-jointed piece acceptable, or a `minPieceLength` (single board per haunch below it)? Profile setting, not decided in code |
+| 9.4 | **F2 — Round arch needs rise > 150** | P3's `minHaunchRadius` 150 replaces the v1 F1 finding: `rise ≤ 150` leaves no crown arc (rise = r is a flat top) → readable ArchError. At W 400 the PSW defaults (segmental-arch 80, elliptical-arch 130) are rejected; **Auto (0.325 W) clears 150 only from W 462**; the configurator shows the message and disables Save | Accept (a 400-wide Round arch with a 130 rise is not a product) or lower `minHaunchRadius` (the leaf inner ring needs r > 107, the allowance band r > 117) |
+| 9.5 | v1-era `segmental` windows | migrate on load to three-centre with rise **0.20 W**, riseSource **'ratio'** (spec A wording, even when a custom rise was saved). The configurator's Auto for Round is **0.325 W**, so opening such a window in the editor shows Auto = 0.325 W and re-saving moves it there; the engine uses 0.20 W until then | Only the 05.09 test windows are affected; confirm or ask for 'custom' with the 0.20 start kept |
+| 9.6 | Hub patterns ignore the vertical count | PSW rule ported 1:1 (`semiBarPattern` has no user verticals on hub patterns — the ring ends are the verticals). The configurator hides the vertical chips while a hub pattern is selected and the row label prints `0V`; `intersecting` keeps the user's straight bars (as PSW) | FYI — say if you want user verticals on hubs anyway |
+| 9.7 | Springing bar on hub patterns | PSW `hub-spoke` / double / triple have NO full-width springing bar — the springing is made of the two end spokes from ring 1 outward (the hub interior stays open). Only `half-hub` has the full bar. Ported as is; spec §2.3 says the end spokes "ARE the springing bar" — same reading | FYI; a full springing bar on every hub would be a one-line change |
+| 9.8 | Spoke insets | PSW draws spokes from `ring + 0.6·BAR_W` to `outline − 0.4·BAR_W` (3D anti-overlap). The glazier list gives axes ring → ring → outline, exact | FYI |
+| 9.9 | Shape column radii | The PDF Shape column and the DXF text print the **glass** radii (55.5 / 1305.5 for the 1000 × 1500 start-1300 window), not the frame's (150 / 1400) — the glazier cuts the glass. Identical radii are printed once (`R 55.5/1305.5`); the drawing note prints all three | confirm |
+| 9.10 | BOM part slots for the curved members | `C-ARCH HEAD` → `c_frame_head`, `C-ARCH TOP RAIL` → `c_sash_top_rail` (else the BOM drops the timber). The blank is really glued from `profile.arch.stockWidths` boards (95 / 105 …), so the metres booked against the 57 × 93 / 67 × 57 slots are the arc lengths, not the board purchase — the arch DXF sheet carries the real board list | Decide whether the BOM should book the planner's boards (N × stock × rough per piece) — separate small package |
+| 9.11 | `bom.js` / `cncExport.js` touched outside the spec's file list | two `ELEMENT_TO_PART_ID` rows (9.10) and `export` on `downloadDxf` / `safeName` (one download path for the glazier DXF) | FYI |
+| 9.12 | Merged DXF stacking on arc extents | `glassDxfExport` stacks units on their TRUE extents (arc apex). `archDxf` / `jambDxf` `entitiesBBox` is vertex-only; the arch sheets are covered by the straight ASSEMBLY boards so no overlap is known, but a semi-circle CONTOUR alone would overlap — not touched (jambDxf is frozen) | FYI |
+| 9.13 | Height rule vs the typed start | Round: the H input clamps to ≥ 901 only; the 900 rule is reported by arch.js as text ("leaves 850mm straight below the arch — minimum 900mm") and Save is disabled. Gothic: H clamps to `ratio·W + 900` as before | FYI |
+| 9.14 | `windowSpecToConfig.js` (3D) | untouched: still maps PC shapes onto PSW names for the shared viewer (`three-centre` → `elliptical-arch`), so a Round arch with rise 0.20 W previews as the PSW ellipse until night 4 (F) | night 4 |
+| 9.15 | Configurator not run in a browser | every UI change compiled (esbuild + `npm run build`) and linted (`no-undef`), logic proven through the same engine calls, but no click-through | morning test |
+
 ## 2026-09-06 — arched-casement-v1: audit fixes T1–T8 (night run 2)
 
 Status of the night-1 entries below: **§0 resolved** (spec committed 06.09), **§1 D13 OPEN**,

@@ -154,33 +154,31 @@ karmi cut listę, PDF-y, rysunki, PP. Nigdy nie licz wymiarów okna w innym miej
 
 ---
 
-## STAN — arched-casement-v1 zamknięty (noce 1–2, na `main`)
-Geometria (`src/engine/arch.js`), planer desek, CNC DXF (`archDxf.js`), harnessy t16/t17,
-konfigurator z blokiem łuku (05.09). Werdykty w `BUILD-LOG.md`, otwarte pytania w `BLOCKERS.md`.
-Spec i audyt: `docs/handover/ARCHED-CASEMENT-v1.md`, `-AUDIT.md`.
+## STAN — arched-casement-v1 zamknięty (noce 1–2, na `main`), v2 noc 3 zrobiona (branch)
+v1: geometria (`src/engine/arch.js`), planer desek, CNC DXF (`archDxf.js`), harnessy t16/t17.
+v2 noc 3 (branch `claude/arched-casement-v2-impl-0j27uw`, 06.09): model kształtów v2 (P1 reguła C,
+`segmental` usunięty, Round → półkole / trójłuk z `minHaunchRadius` 150), konfigurator Round | Gothic
+z polem „Arch starts at", silnik z `C-ARCH HEAD` / `C-ARCH TOP RAIL`, szyba jako kształt, pręty
+(proste + wzory PSW), eksporty dla szklarza (DXF + PDF), harness `verify/arch/t18.mjs`.
+Werdykty w `BUILD-LOG.md` (sekcja 06.09 noc 3), otwarte pytania w `BLOCKERS.md §9`.
+Spec: `docs/handover/ARCHED-CASEMENT-v2.md` (+ v1, v1-AUDIT jako historia).
 
-## ZADANIE NOCNE 3 — arched-casement-v2, część A + B + C
+## ZADANIE NOCNE 4 — arched-casement-v2, część D + E + F (po mergu nocy 3)
 
-Spec: `@docs/handover/ARCHED-CASEMENT-v2.md`. Czytasz w całości, potem v1 §0 (zasady) i
-v1-AUDIT §2 (co nie może się zepsuć). Decyzje z v2 §1 (P1–P10) nadpisują v1 tam, gdzie się
-różnią — najważniejsza: **P1 reguła C: każdy łuk zaczyna się pionowo przy jambie; `segmental`
-znika, poniżej połowy = trójłuk, dokładnie połowa = półkole.**
+Spec: `@docs/handover/ARCHED-CASEMENT-v2.md` §4. Czytasz w całości, potem BUILD-LOG (noc 3)
+i BLOCKERS §9. Zakres — TYLKO:
+- **D** arkusze 2D (`CasementElevation2D`, `CasementFrameDetail2D`, `CasementLeafDetail2D`,
+  `CasementGlassDrawing2D`): łuki z ArcChain (`derived.arch.geometry`, `derived.arch.glassOutline`,
+  `derived.arch.bars`) jako SVG `A`, nigdy Bézier; wymiary W, H, start, rise, każdy promień;
+  okna proste bajt-w-bajt identyczne (snapshot).
+- **E** pręty: rysunek 2D + wymiary końców na łuku (silnik i eksporty już są z nocy 3).
+- **F** 3D: przepisanie `ArchedCasementWindow.jsx` na `arch.js` (nazwy propsów PSW + `archRise`,
+  `archProfile`, `barPattern`), `windowSpecToConfig.js` i `update3D` przekazują nowe propsy;
+  `docs/handover/PSW-3D-ARCH-PORT.md`.
+- harness `verify/arch/t19.mjs` (spec §4); t16/t17/t18 nadal ALL PASS.
 
-Zakres tej nocy — TYLKO:
-- **A** konfigurator: Round | Gothic, pole „Arch starts at", Auto / Half, pręty z wzorami
-- **B** silnik: `C-ARCH HEAD` / `C-ARCH TOP RAIL` (długość po osi łuku), szyba jako kształt,
-  lista prętów z długościami, farba/uszczelka/waga z prawdziwego obrysu
-- **C** eksporty dla szklarza: DXF (kontur + osie prętów) i PDF (mm + %), próbki do
-  `docs/handover/samples/`
-- harness `verify/arch/t18.mjs` na wektorach ze spec §3 (są policzone — odtwórz je, nie
-  wyliczaj); t16/t17 nadal ALL PASS (t16: wektory trójłuku aktualizujesz wg P3)
-
-**Nie zaczynaj D / E / F (2D, 3D) — to noc 4.** Nie dotykaj `casementLayouts.js`, beadingu,
-listy „NIE RÓB DZIŚ".
-
-Sesja w chmurze, na własnym branchu, commit + push po każdym zamkniętym zadaniu
-(A → B → C → harness). BLOCKERS na start: P9 (limit 900 dla casement — Piotr nie odpowiedział),
-D13, minimalna długość kawałka hauszu.
+Nie ruszaj `casementLayouts.js`, beadingu, listy „NIE RÓB DZIŚ". Otwarte w BLOCKERS §9:
+P9 (900), D13, minimalna długość kawałka (9.3), F2 (rise > 150).
 
 ## NIE RÓB DZIŚ (zaplanowane, osobne pakiety)
 
@@ -192,7 +190,9 @@ D13, minimalna długość kawałka hauszu.
 - Mullions/ślemienia casement nie trafiają do cut listy (`components.box`) — znana luka silnika, nie tego pakietu.
 - Łuki: zmiana nazw kształtów na `'gothic'` + `profile` (spec §3.4), typy linii (DASHED) w
   `dxfWriter.js`, złącze głowica/ościeżnica i skrzydło/słupek na linii startu łuku (haunch),
-  konfigurator łuków (mockup najpierw) — osobne pakiety.
+  BOM z desek planera zamiast długości łuku (BLOCKERS 9.10), pełna listwa na linii startu
+  w hub-spoke (9.7), pionowe pręty użytkownika przy hubach (9.6), `minPieceLength` (9.3),
+  paginacja tabeli w glass PDF przy wielu kształtowych szybach — osobne pakiety.
 
 ---
 
@@ -206,9 +206,9 @@ D13, minimalna długość kawałka hauszu.
 ## Checklist na koniec sesji
 
 - [ ] branch sesji wypchnięty, `main` nietknięty
-- [ ] `node verify/arch/t16.mjs` i `node verify/arch/t17_edges.mjs` → ALL PASS
+- [ ] `node verify/arch/t16.mjs`, `node verify/arch/t17_edges.mjs`, `node verify/arch/t18.mjs` → ALL PASS
 - [ ] `npm run build` przechodzi
 - [ ] esbuild OK na każdym dotkniętym pliku, zero polskiego w źródłach
 - [ ] `git diff main --stat` obejmuje TYLKO pliki ze spec §11 (+ verify, docs, BUILD-LOG, BLOCKERS, CLAUDE.md)
-- [ ] `docs/handover/samples/sample_arch_1200_*.dxf` w repo (pięć kształtów)
+- [ ] `docs/handover/samples/sample_arch_1200_*.dxf` (pięć: semi-circle, gothic ×2, three-centre 390 i 240) + `sample_glass_*.dxf` w repo
 - [ ] BUILD-LOG.md z werdyktami, BLOCKERS.md z D13 / D5 / d50 otwartymi + wszystkim, co wyszło w nocy

@@ -183,6 +183,61 @@ and the re-spaced table columns need Piotr's eye; buttons not clicked in a brows
 
 **Verdict: ⚠️ C** (data path proven; visual layout unseen).
 
+### H — harness `verify/arch/t18.mjs` (spec v2 §3 vectors), samples, closing checks
+
+**Built:** `t18` bundles arch / profile / specification / calculations / lists / bom / dxfWriter /
+glassDxfExport / glassPdfExport (jsx loader, react + jspdf external) and asserts on the real path
+(PC item with `archStart` → `normaliseToWindowSpec` → `deriveWindowData` → lists → DXF → ezdxf → PDF):
+1. geometry vectors verbatim from spec §3 — 1000/1500 start 1300 (r 150, R 1400, Cs ±350, CL −1200,
+   T (392, 144), 73.74° / 32.52°, 193.05 + 794.62 + 193.05 = 1180.72, rings 93/1343 · 110/1360 · 43/1293 ·
+   55.5/1305.5), start 1175 (r 211.25, R 634.62, T (432.83, 154.49), 47.00° / 86.01°, 1299.17), 1500/2000
+   start 1700 (r 150, R 1425, 61.93° / 56.14°, 1720.63), start 1100 (r 320, R 562.5, 42.08° / 95.85°,
+   1410.99), Half → semi-circle R 500 length 1570.80, start = H − 520 → "use Gothic" (from
+   `normaliseToWindowSpec` and `resolveRoundShape`), rise 140 → F2 message, gothic start / radii;
+2. bars — 2 verticals at ±135.17, tops 382.31 above the springing (L 1281), 1 h bar at 449.25, hub ring
+   121.65, spokes 0/60/120/180° ring → outline (L 284), ring-end verticals, half / double / triple role
+   counts (2 / 18 / 34 bars, rings 121.65 / 243.3 / 324.4), intersecting on gothic + semi-circle
+   (2 mullions, 4 tracery arcs centred on the outer corners ±94.5 outside the glass, ends ON the outline),
+   pattern availability errors, v-bar tops on the three-centre chain, Green area = numeric integral;
+3. cut list — C-AH 1091.19 = ring centre line (= mean of outer 1180.72 / inner 1001.65), notes
+   `R 150/1400/150 · 8 pieces · stock 95/95/95`, jambs 1300, C-ATR 949.82, stiles 1253, bottom rail 920,
+   040L / 040R by hinge, grouped symbols `C-AH C-J-L/R C-CILL C-ST-L/R C-ATR C-BR` (no `?`), glass unit
+   811 × 1304 with shape, rows + labels, paint / seals / glass m² from the true outline, timber weight =
+   Σ section × density × length, BOM slots for both curved members, and the 4 rectangular fixtures
+   JSON-identical to `origin/main`;
+4. glazier DXF — three samples written to `docs/handover/samples/` (`sample_glass_1000x1500_three-centre_
+   start1300.dxf`, `…_semi-circle_hub-spoke.dxf`, `sample_glass_1000x1800_gothic_intersecting.dxf`) +
+   `sample_glass_pack_merged.dxf`: R12, layers, contour closed with `arcs + 3` vertices and bulge count =
+   arcs, arc length = glass arch length, straight = Wg + 2·springing, bar axes = bars.length, Σ lengths,
+   text block = `unitTextLines`, skips (rectangular / sash / null derived), merged stacked exactly 300
+   apart on TRUE extents (a `polyBBox` with arc extents was added after the first run showed the
+   vertex-only bbox would let a semi-circle apex overlap the unit above — fixed in `glassDxfExport.js`);
+5. PSW import — `segmental-arch` W1200 → three-centre rise 240 start 1760 riseSource ratio (derives with
+   r 150 / R 1320), elliptical 390, semi-circle 600, gothic drop 840, v1 'segmental' migration, v1
+   `archRise`-only item, Auto item, hinge inversion;
+6. glass PDF in node — 2 pages, Shape header, `rect`, `arched · R 55.5/1305.5`, the mm + % line, hub row,
+   shaped drawing strings and Bézier operators;
+7. profile v3 block / vocabulary / cut-list order / BOM map; 8. structural evidence (labelled as such):
+   store whitelist text, configurator chips + save fields, all samples present.
+
+**Result:** t18 **178 / 178 ALL PASS** · t16 504 / 504 · t17 72 / 72 · `npm run build` OK · esbuild on
+every touched file · no Polish letters in src / verify · `git diff origin/main --stat`: spec §5 files +
+`bom.js` (2 rows), `cncExport.js` (2 exports), `WindowDetailPage.jsx` / `ProductionPackPage.jsx`
+(buttons), verify, samples, docs, logs — `casementLayouts.js`, beading, `jambDxf.js`, `src/3d` untouched.
+
+**Verdict: ✅ H**
+
+### Rano dla Piotra — what to look at (5 minutes)
+1. Configurator → casement batch → Arched: chips **Round | Gothic**, type "Arch starts at" (e.g. 1300 on
+   1000 × 1500 → `Rise 200 · R 150 / 1400 / 150`), **Half** → `R 500`, patterns appear only on Half;
+   type 850 → the CNC row shows "use Gothic" and Save is greyed. Then Save → Cut list shows
+   `C-AH 1091` and `C-ATR 950`, Glass tab shows 811 × 1304 with `Shape` and the **📐 Glass DXF** button.
+2. Open `docs/handover/samples/sample_glass_1000x1500_semi-circle_hub-spoke.dxf` in VCarve: closed
+   contour, ring + spokes + ring-end verticals on GLASS_BARS, text on GLASS_TEXT.
+3. Open `docs/handover/samples/sample_glass_order_arched.pdf`: page 1 Shape column + the mm/% lines,
+   page 2 the three shaped drawings — the layout is the thing this session could not see.
+4. Answer BLOCKERS §9.1 (900), 9.3 (short haunch pieces), 9.4 (rise > 150 at W < 462) when you can.
+
 ## 2026-09-06 — arched-casement-v1: audit fixes T1–T8, then Stage 2 (night run 2, branch `claude/arched-casement-audit-t1-t8-7d5fuk`)
 
 Inputs read in full, in this order: `ARCHED-CASEMENT-v1-AUDIT.md` → `ARCHED-CASEMENT-v1.md` (spec,

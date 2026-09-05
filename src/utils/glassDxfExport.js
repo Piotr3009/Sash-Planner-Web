@@ -16,7 +16,7 @@
  * File names: {name}_glass.dxf, merged {label}_glass.dxf.
  */
 import { writeDxf } from '../engine/cnc/dxfWriter.js';
-import { entitiesBBox, MERGE_GAP } from '../engine/cnc/jambDxf.js';
+import { MERGE_GAP } from '../engine/cnc/jambDxf.js';
 import { buildGlassListForWindow } from '../engine/lists.js';
 import { downloadDxf, safeName } from './cncExport.js';
 
@@ -44,6 +44,55 @@ const shift = (pts, dx, dy) => pts.map(([x, y, b]) => [x + dx, y + dy, b ?? 0]);
 
 /** Bulge for an arc traversed from a0 to a1 counter-clockwise (tan of a quarter of the span). */
 const bulgeOf = (arc) => Math.tan((arc.a1 - arc.a0) / 4);
+
+/**
+ * Exact bounding box of a bulge polyline — arc EXTENTS included (a glass
+ * unit's contour has no vertex at its apex: the arc rises above the springing
+ * vertices, so a vertex-only box would let stacked units overlap).
+ */
+export function polyBBox(pts, closed = true) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const take = (x, y) => { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; };
+  const n = pts.length;
+  const last = closed ? n : n - 1;
+  for (let i = 0; i < n; i++) {
+    const [x0, y0, b] = pts[i];
+    take(x0, y0);
+    if (i >= last || !b) continue;
+    const [x1, y1] = pts[(i + 1) % n];
+    // arc from (x0, y0) to (x1, y1) with bulge b: included angle θ, radius r,
+    // centre on the perpendicular bisector (left of the chord for b > 0)
+    const theta = 4 * Math.atan(Math.abs(b));
+    const chord = Math.hypot(x1 - x0, y1 - y0);
+    if (!(chord > 0)) continue;
+    const r = chord / (2 * Math.sin(theta / 2));
+    const d = r * Math.cos(theta / 2) * Math.sign(b);
+    const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+    const nx = -(y1 - y0) / chord, ny = (x1 - x0) / chord;
+    const cx = mx + nx * d, cy = my + ny * d;
+    // sweep from the start angle over θ (counter-clockwise for b > 0)
+    const a0 = Math.atan2(y0 - cy, x0 - cx);
+    const dir = Math.sign(b);
+    for (const k of [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2]) {
+      let rel = (k - a0) * dir;
+      rel = ((rel % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      if (rel > 0 && rel < theta) take(cx + r * Math.cos(k), cy + r * Math.sin(k));
+    }
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+/** Bounding box of an entity list with exact arc extents (text ignored). */
+export function glassEntitiesBBox(entities) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const e of entities) {
+    if (e.type !== 'poly') continue;
+    const b = polyBBox(e.pts, !!e.closed);
+    if (b.minX < minX) minX = b.minX; if (b.maxX > maxX) maxX = b.maxX;
+    if (b.minY < minY) minY = b.minY; if (b.maxY > maxY) maxY = b.maxY;
+  }
+  return { minX, minY, maxX, maxY };
+}
 
 /**
  * Shaped glass units of one window — the SAME rows the Glass tab and the glass
@@ -148,7 +197,7 @@ export function buildMergedGlassEntities(items) {
   let cursorY = 0;
   for (const it of items) {
     const ents = buildGlassWindowEntities(it.units, it.winNum, 0, 0);
-    const bb = entitiesBBox(ents);
+    const bb = glassEntitiesBBox(ents);
     const oy = cursorY - bb.maxY;
     for (const e of ents) {
       if (e.type === 'poly') all.push({ ...e, pts: e.pts.map(([x, yy, b]) => [x, yy + oy, b]) });
