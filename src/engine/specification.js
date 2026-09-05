@@ -43,6 +43,7 @@ export const DOOR_FRAME_DEPTH = 93;
 export const glassGas = (type) => (type === 'single' || type === 'passive') ? '' : 'argon';
 import { FAN_AXIS_OFFSET_TOP, FAN_AXIS_OFFSET_BOTTOM } from './casementLayouts.js';
 import { profileBoxDepth } from './profile.js';
+import { PSW_ARCH_SHAPE } from './arch.js';
 
 function customBarsFromSpec(spec, item) {
   // New format: item stores custom bars directly as arrays of {type, mm}
@@ -68,6 +69,40 @@ function customBarsFromSpec(spec, item) {
     vertical: collect(upper.vertical || lower.vertical || []),
     horizontal: collect(upper.horizontal || lower.horizontal || [])
   };
+}
+
+/**
+ * Arched casement fields (arched-casement-v1). Returns null for every window
+ * that is not an arched casement, so consumers test `windowSpec.arch?.shape`.
+ *
+ * PSW source: casement-controller.js getCasementConfig() writes
+ *   casementType 'arched', casArchShape (gothic-arch | semi-circle |
+ *   segmental-arch | elliptical-arch), casArchHinge ('right' | 'left').
+ * PSW form (online-estimate.html 887–888): the radio LABELLED "Left Hinge"
+ * carries value="right" and vice versa — the stored value is the OPPOSITE of
+ * what the customer chose. PC stores the meaning, so the value is inverted
+ * here, once, on read (same policy as the door hinge/open-direction fix).
+ * PC-native items may carry archShape / archRise / archHinge directly, already
+ * in PC vocabulary.
+ */
+export function archFromSpec(item, fc) {
+  const pcShape = item?.archShape || fc.archShape;
+  const pswShape = item?.casArchShape || fc.casArchShape;
+  const isArched = (item?.casementType || fc.casementType) === 'arched' || !!pcShape;
+  if (!isArched) return null;
+  let shape = null;
+  if (pcShape) shape = pcShape;                                           // unknown values kept, reported by the exporter
+  else if (pswShape) shape = PSW_ARCH_SHAPE[pswShape] || pswShape;
+  else shape = PSW_ARCH_SHAPE['semi-circle'];                             // PSW default when the radio never changed
+  const riseRaw = item?.archRise ?? fc.archRise;
+  const rise = riseRaw == null || riseRaw === '' ? null : Number(riseRaw);
+  let hinge;
+  if (item?.archHinge || fc.archHinge) hinge = (item?.archHinge || fc.archHinge) === 'right' ? 'right' : 'left';
+  else {
+    const psw = item?.casArchHinge || fc.casArchHinge || 'right';        // PSW default value = "Left Hinge" label
+    hinge = psw === 'right' ? 'left' : 'right';                           // inverted: label is the truth
+  }
+  return { shape, rise: Number.isFinite(rise) ? rise : null, hinge };
 }
 
 /**
@@ -190,6 +225,8 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
         fan2V: Number(item?.casementFan2VBars ?? fc.casementFan2VBars) || 0,
       },
     },
+    // ── Arched casement (arched-casement-v1) — null unless casementType 'arched'
+    arch: archFromSpec(item, fc),
     // ── Doors (PSW parity, Piotr 04.08) ─────────────────────────────────
     // Field names and value vocabularies match the PSW door-controller 1:1 so
     // a future PSW→PC import maps straight across. Two known PSW bugs are NOT

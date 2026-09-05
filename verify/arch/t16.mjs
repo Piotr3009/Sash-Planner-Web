@@ -29,12 +29,14 @@ writeFileSync(ENTRY, [
   "export * as profile from '../src/engine/profile.js';",
   "export * as archDxf from '../src/engine/cnc/archDxf.js';",
   "export * as dxfWriter from '../src/engine/cnc/dxfWriter.js';",
+  "export * as specification from '../src/engine/specification.js';",
+  "export * as calculations from '../src/engine/calculations.js';",
 ].join('\n'));
 const BUNDLE = resolve(AUDIT, 'arch-bundle.mjs');
 execFileSync('npx', ['-y', 'esbuild@0.25.0', ENTRY, '--bundle', '--format=esm', '--external:react',
   '--platform=node', `--outfile=${BUNDLE}`], { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit'] });
 const M = await import(pathToFileURL(BUNDLE).href);
-const { arch, profile, archDxf, dxfWriter } = M;
+const { arch, profile, archDxf, dxfWriter, specification, calculations } = M;
 const P = profile.DEFAULT_CASEMENT_PROFILE;
 
 // ── tiny assert framework ───────────────────────────────────────────────────
@@ -383,6 +385,53 @@ section('§10.3 DXF round-trip — sample_arch_1200_segmental.dxf (frame head + 
   const maxYB = Math.max(...polysB.flatMap((e) => e.pts.map((p) => p[1])));
   check('merged: second window sits ≥ 300 mm below the first', merged.length === one.length + archDxf.buildArchEntities(p2, 'B').length && minYA - maxYB >= 300 - 1e-6, `${(minYA - maxYB).toFixed(1)}`);
   expectThrows('buildArchEntities refuses a plan with no stock', () => archDxf.buildArchEntities(arch.buildArchPlan({ shape: 'semi-circle', width: W, height: 2000 }, { ...PA, arch: { ...ARCH_SECTION, stockWidths: [50] } }), 'X'), /No stock board fits/);
+}
+
+// ── §10.3 pt 9 — profile section + PSW → windowSpec.arch mapping (real data path)
+section('§10.3 pt 9 — profile.arch, migration, PSW field mapping, deriveWindowData path');
+{
+  check('DEFAULT_CASEMENT_PROFILE.arch present: finger 15/16/3.8, stock 100…250, allowance 20, maxPieces 8',
+    P.arch && P.arch.finger.length === 15 && P.arch.finger.depth === 16 && P.arch.finger.pitch === 3.8
+    && JSON.stringify(P.arch.stockWidths) === JSON.stringify([100, 125, 150, 175, 200, 225, 250]) && P.arch.widthAllowance === 20 && P.arch.maxPieces === 8);
+  // stored v1.1 profile (no arch) → migration fills the section; partial finger merges
+  const { arch: _drop, ...v11 } = JSON.parse(JSON.stringify(P));
+  void _drop;
+  const m1 = profile.migrateCasementProfile(v11);
+  check('migrateCasementProfile: v1.1 profile without arch gets the default section', JSON.stringify(m1.arch) === JSON.stringify(P.arch));
+  const m2 = profile.migrateCasementProfile({ ...v11, arch: { finger: { pitch: 4.2 }, stockWidths: [150] } });
+  check('migrateCasementProfile: partial arch section merges (pitch 4.2, stock [150], rest default)',
+    m2.arch.finger.length === 15 && m2.arch.finger.pitch === 4.2 && JSON.stringify(m2.arch.stockWidths) === '[150]' && m2.arch.widthAllowance === 20);
+  check('migrateCasementProfile: pre-v1 shape still replaced by the default (arch included)', profile.migrateCasementProfile({ frameDepth: 93 }).arch === P.arch);
+
+  const psw = (fc, item = {}) => specification.normaliseToWindowSpec(
+    { width: 1200, height: 2000, name: 'PSW-1', ...item },
+    { fullConfig: { windowCategory: 'casement', casementLayout: '040L', glassType: 'double', ...fc } });
+  const a1 = psw({ casementType: 'arched', casArchShape: 'segmental-arch', casArchHinge: 'right' });
+  check('PSW arched casement → category casement, arch.shape segmental', a1.category === 'casement' && a1.arch?.shape === 'segmental');
+  check('PSW casArchHinge "right" (radio labelled "Left Hinge") → hinge left (reversed on read)', a1.arch?.hinge === 'left', String(a1.arch?.hinge));
+  check('PSW gives no rise → rise null (shape default applies later)', a1.arch?.rise === null);
+  const a2 = psw({ casementType: 'arched', casArchShape: 'gothic-arch', casArchHinge: 'left' });
+  check('PSW casArchHinge "left" (radio labelled "Right Hinge") → hinge right', a2.arch?.hinge === 'right');
+  check('PSW gothic-arch → gothic-equilateral', a2.arch?.shape === 'gothic-equilateral');
+  check('PSW elliptical-arch → three-centre', psw({ casementType: 'arched', casArchShape: 'elliptical-arch' }).arch?.shape === 'three-centre');
+  check('PSW semi-circle → semi-circle', psw({ casementType: 'arched', casArchShape: 'semi-circle' }).arch?.shape === 'semi-circle');
+  const a3 = psw({ casementType: 'arched' });
+  check('PSW arched with no shape/hinge saved → semi-circle, hinge left (PSW defaults)', a3.arch?.shape === 'semi-circle' && a3.arch?.hinge === 'left');
+  check('PSW unknown shape is kept verbatim for the exporter to report', psw({ casementType: 'arched', casArchShape: 'foo' }).arch?.shape === 'foo');
+  check('standard casement → arch null', psw({ casementType: 'standard' }).arch === null);
+  check('sash window → arch null', specification.normaliseToWindowSpec({ width: 1000, height: 1500 }, { fullConfig: { windowCategory: 'sash' } }).arch === null);
+  const a4 = specification.normaliseToWindowSpec({ width: 1200, height: 2000, windowCategory: 'casement', archShape: 'gothic-drop', archRise: 800, archHinge: 'right' });
+  check('PC-native item: archShape / archRise / archHinge taken as-is', a4.arch?.shape === 'gothic-drop' && a4.arch?.rise === 800 && a4.arch?.hinge === 'right');
+  const a5 = specification.normaliseToWindowSpec({ width: 1200, height: 2000, windowCategory: 'casement', casementType: 'arched', casArchShape: 'segmental-arch', casArchHinge: 'left' });
+  check('batch item with PSW field names (moveToProduction copies config) → mapped the same way', a5.arch?.shape === 'segmental' && a5.arch?.hinge === 'right');
+
+  // real data path: windowSpec → deriveWindowData (must not throw) → plan from the ACTIVE profile
+  let derived = null, err = null;
+  try { derived = calculations.deriveWindowData(a1, {}); } catch (e) { err = e; }
+  check('deriveWindowData on an arched casement spec does not throw (rectangular casement engine unchanged)', !err && derived && !derived.unsupported && derived.components.box.length >= 4, err ? String(err) : '');
+  const planLive = arch.buildArchPlan({ shape: a1.arch.shape, width: a1.frame.width, height: a1.frame.height, rise: a1.arch.rise, hinge: a1.arch.hinge }, profile.getCasementProfile());
+  const planDef = arch.buildArchPlan({ shape: 'segmental', width: 1200, height: 2000, rise: null, hinge: 'left' }, P);
+  check('buildArchPlan from windowSpec + getCasementProfile() equals the default-profile plan', JSON.stringify(planLive.plans.frameHead.pieces.map((p) => [p.no, p.stock, +p.projectedWidth.toFixed(6)])) === JSON.stringify(planDef.plans.frameHead.pieces.map((p) => [p.no, p.stock, +p.projectedWidth.toFixed(6)])) && planLive.hinge === 'left');
 }
 
 // ── summary ─────────────────────────────────────────────────────────────────

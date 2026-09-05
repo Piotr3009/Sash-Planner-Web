@@ -95,6 +95,35 @@ three files to PNG via ezdxf/matplotlib and eyeballed the layout (rows, tilted b
 morning). Not verified: text placement inside VCarve, whether the workshop wants the assembled
 boards drawn at all (ASSEMBLY layer can simply be switched off).
 
+### Step 4 — profile `arch` section + `windowSpec.arch` (spec §4–5, harness §10.3 pt 9)
+
+**Understanding:** the arch geometry already reads its faces from the casement profile; the
+planner and the drawing additionally need the finger profile and the board stock — that is the
+whole `arch` section (`finger 15/16/3.8`, `stockWidths`, `widthAllowance 20`, `maxPieces 8`).
+`normaliseToWindowSpec` gains `arch: { shape, rise, hinge } | null` from PSW's `casementType`
+/ `casArchShape` / `casArchHinge` (or PC-native `archShape` / `archRise` / `archHinge`).
+
+**Reversed hinge:** PSW `online-estimate.html` 887–888 — the radio labelled "Left Hinge" has
+`value="right"` and vice versa, so the saved value is the opposite of what the customer chose. PC
+stores the meaning: `casArchHinge 'right' → hinge 'left'` (default too), `'left' → 'right'`.
+Same policy as the door hinge/open-direction fix already in `specification.js`. Note: PSW's own
+3D passes the raw value straight to `hingeDirection` (`src/3d/App.jsx` 453) — read-only, left as is.
+
+**Migration:** `migrateCasementProfile` fills `arch` (deep-merging `finger`) for every stored
+profile that predates it — persisted user profiles and batch `_profileSnapshot.casement` alike;
+the settings UI edits `elements` / `deductions` only, so nothing there iterates the new key.
+
+**Edge cases:** PSW arched with the radios never touched → `semi-circle` / `hinge left` (PSW
+defaults); unknown PSW shape kept verbatim so the exporter reports it instead of guessing;
+standard casement and sash → `arch: null`; `deriveWindowData` on an arched spec keeps deriving
+the rectangular casement (cut list for arches is a later package — the engine is untouched).
+
+**Harness:** 19 new checks, 195 ALL PASS — including the real data path
+`normaliseToWindowSpec → deriveWindowData → buildArchPlan(getCasementProfile())`.
+
+**Verdict: ⚠️** mapping verified against the PSW source, not against spec §4.2 (missing). Not
+verified: whether Piotr wants PSW `elliptical-arch` built as a three-centre (BLOCKERS 4.4).
+
 ---
 
 ## Phase 0 — Project skeleton (React + Vite + layout)
