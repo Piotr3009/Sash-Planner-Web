@@ -153,39 +153,27 @@ karmi cut listę, PDF-y, rysunki, PP. Nigdy nie licz wymiarów okna w innym miej
 
 ---
 
-## ZADANIE NOCNE — arched-casement-v1
+## ZADANIE NOCNE 2 — arched-casement-v1: poprawki po audycie, potem Etap 2
 
-**Stan po nocy 05.09.2026 (branch `claude/arched-casement-v1`, werdykt ⚠️):** pakiet
-zbudowany w całości, ALE plik spec `docs/handover/ARCHED-CASEMENT-v1.md` nie istnieje w repo
-(ani w żadnym branchu / Petros / Drive / Gmail). Wszystkie liczby spoza CLAUDE.md i źródeł PSW są
-założeniami — lista w `BLOCKERS.md` (sekcja 2026-09-05), opis wykonania w
-`docs/handover/ARCHED-CASEMENT-v1-AS-BUILT.md`. **Następny krok: wgrać spec do
-`docs/handover/`, podmienić tabele `EXPECTED` w `verify/arch/t16.mjs` na wektory §10 i puścić
-harness** — dopiero wtedy werdykt może być ✅.
+Stan: pakiet z nocy 05.09 jest na `main` (zbudowany bez spec — spec nie był wtedy w repo).
+Teraz w repo są trzy dokumenty i czytasz je W TEJ KOLEJNOŚCI:
+1. `@docs/handover/ARCHED-CASEMENT-v1-AUDIT.md` — co jest dobre, co poprawić (T1–T8), potem Etap 2
+2. `@docs/handover/ARCHED-CASEMENT-v1.md` — spec referencyjny; przy rozbieżności spec wygrywa
+3. `docs/handover/ARCHED-CASEMENT-v1-AS-BUILT.md` — Twój własny opis z nocy 1 (do porównania)
 
-Zakres (wg CLAUDE.md, zrealizowany):
+Pracujesz **bezpośrednio na `main`** (aplikacja nie jest live — decyzja Piotra 06.09).
+Commit po każdym zamkniętym zadaniu T1…T8, push. Harness `node verify/arch/t16.mjs`
+ALL PASS z wektorami ze spec §10 przed commitem T7 — bez tego brak ✅.
 
-1. `src/engine/arch.js` — geometria (1 / 2 / 3 środki, współśrodkowe offsety, clip do linii
-   startu łuku, długości, bulge) + planer segmentów (metoda rzutowania, D13 domyślny wybór).
-2. `src/engine/cnc/archDxf.js` — warstwy CONTOUR / ASSEMBLY / PIECES / FINGER / TEXT, rama
-   + skrzydło, styl 1:1 z `jambDxf.js`.
-3. `profile.js` — sekcja `arch` w profilu casement (spec §5).
-4. `specification.js` — `windowSpec.arch` + mapowanie pól PSW (odwrócony zawias w formularzu
-   PSW obsłużony — wartość jest odwracana przy odczycie).
-5. `cncExport.js` + przycisk „Arch DXF" obok „Jambs DXF" (`WindowDetailPage.jsx`,
-   `ProductionPackPage.jsx`). Bez nowego UI konfiguratora.
-6. `verify/arch/t16.mjs` — 203 asercje, ALL PASS; **wartości oczekiwane to wzory zamknięte
-   liczone w harnessie, NIE wektory ze spec §10** (spec brak).
-7. `docs/handover/samples/sample_arch_1200_segmental.dxf` — generowany harnessem (Piotr otwiera
-   w VCarve rano). Pozostałe kształty → `.audit/` po uruchomieniu harnessu.
+Kolejność: T2 (lista desek) → T1 (limit kąta) → T6 (reguła wyboru N) → T3 (długość surowa)
+→ T4 (trójśrodkowy) → T5 (limity) → T7 (harness ze spec) → T8 (próbka DXF, BLOCKERS, branch)
+→ dopiero potem Etap 2 z audytu §5.
 
-Etap 2 (próbki wszystkich kształtów, edge-case'y, raport parity PSW) **nie został zaczęty** —
-warunkiem był werdykt ✅ Etapu 1, a bez specu ✅ jest niemożliwe.
+Wszystkie numery warsztatowe (deski, palec, naddatek, kąt, reguła) siedzą w
+`DEFAULT_CASEMENT_PROFILE.arch` — nigdy w planerze.
 
-Do BLOCKERS.md (znane, nierozstrzygnięte przez Piotra — wpisane):
-- D13 — wybór N (mniej kawałków vs węższa deska): przyjęty domyślny „mniej kawałków", alternatywa drukowana.
-- D5 — Piotr mówił „palec 10–11", wybrane narzędzie to profil 15/16; przyjęto 15/16/3,8.
-- Głowica Stark d50 na 5-osiowym CNC wymaga trzpienia d50 — decyzja procesowa Piotra, DXF bez zmian.
+Do BLOCKERS.md zostają otwarte (Piotr): D13 reguła domyślna, D5 palec 15/16 vs 10–11,
+głowica d50 na CNC. Nie zamykaj ich sam.
 
 ## NIE RÓB DZIŚ (zaplanowane, osobne pakiety)
 
