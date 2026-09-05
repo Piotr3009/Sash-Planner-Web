@@ -186,6 +186,11 @@ export const DEFAULT_CASEMENT_PROFILE = {
     // (tie -> fewer pieces); 'fewest' = fewest pieces that fit a board. The
     // other rule's plan is printed on the sheet as ALT. Flip here, no code.
     pieceRule: 'narrowest',
+    // v3 0.6 (DEFAULT open, BLOCKERS): a finger-jointed piece shorter than
+    // this (finished chord, mm) is flagged on the plan (`shortPieces`) and
+    // the sheet — never blocked. Piotr decides whether a 65–110 mm haunch
+    // piece is acceptable (BLOCKERS 9.3).
+    minPieceLength: 150,
     // Validity limits (spec §3.3 / §5): PSW MIN_WIDTH / MAX_WIDTH, and the PSW
     // arched-sash rules adopted for the casement until Piotr says otherwise —
     // straight part below the arch (height >= rise + this) and the straight

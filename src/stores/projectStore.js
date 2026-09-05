@@ -560,6 +560,9 @@ export const useProjectStore = create((set, get) => ({
       // arched-casement-v2: where the arch starts (mm from the cill) and the bar pattern in the arch
       archStart: windowConfig.archStart ?? null,
       archBarPattern: windowConfig.archBarPattern ?? null,
+      // arched-windows-v3 0.4: custom hub (spoke count, ring fractions)
+      archSpokes: windowConfig.archSpokes ?? null,
+      archRings: Array.isArray(windowConfig.archRings) ? windowConfig.archRings : null,
       fanlightHeight: windowConfig.fanlightHeight ?? null,
       fanlightAxis: windowConfig.fanlightAxis ?? null,
       fan2Axis: windowConfig.fan2Axis ?? null,
@@ -717,6 +720,9 @@ export const useProjectStore = create((set, get) => ({
       // arched-casement-v2: where the arch starts (mm from the cill) and the bar pattern in the arch
       archStart: windowConfig.archStart ?? null,
       archBarPattern: windowConfig.archBarPattern ?? null,
+      // arched-windows-v3 0.4: custom hub (spoke count, ring fractions)
+      archSpokes: windowConfig.archSpokes ?? null,
+      archRings: Array.isArray(windowConfig.archRings) ? windowConfig.archRings : null,
       fanlightHeight: windowConfig.fanlightHeight ?? null,
       fanlightAxis: windowConfig.fanlightAxis ?? null,
       fan2Axis: windowConfig.fan2Axis ?? null,

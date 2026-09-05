@@ -83,9 +83,9 @@ function customBarsFromSpec(spec, item) {
  *   casementType 'arched', casArchShape (gothic-arch | semi-circle |
  *   segmental-arch | elliptical-arch), casArchHinge ('right' | 'left').
  * PSW form (online-estimate.html 887–888): the radio LABELLED "Left Hinge"
- * carries value="right" and vice versa — the stored value is the OPPOSITE of
- * what the customer chose. PC stores the meaning, so the value is inverted
- * here, once, on read (same policy as the door hinge/open-direction fix).
+ * carries value="right". Since v3 0.4b the VALUE is taken 1:1 (identity
+ * mapping, Piotr 07.09) — both 3Ds render the same estimate identically; the
+ * label wording is a PSW-side question (BLOCKERS).
  * PC-native items carry archShape / archStart / archRise / archRiseSource /
  * archHinge / archProfile / archBarPattern directly, in PC vocabulary.
  *
@@ -149,19 +149,23 @@ export function archFromSpec(item, fc, width, height) {
   }
   if (isRoundShape(shape) && Number.isFinite(rise)) shape = resolveRoundShape(W, rise);   // v2 §2.2, may throw "use Gothic"
   const start = Number.isFinite(rise) && H > 0 ? H - rise : null;
-  let hinge;
-  if (item?.archHinge || fc.archHinge) hinge = (item?.archHinge || fc.archHinge) === 'right' ? 'right' : 'left';
-  else {
-    // casArchHinge = stored config; 'cas-arch-opening' = the raw form field
-    const psw = item?.casArchHinge || fc.casArchHinge || fc['cas-arch-opening'] || 'right';   // PSW default value = "Left Hinge" label
-    hinge = psw === 'right' ? 'left' : 'right';                           // inverted: label is the truth
-  }
+  // Hinge (v3 0.4b, Piotr 07.09 "PSW–PC musi sie zgadzac 1 do 1"): the VALUE is
+  // the contract — PSW's 3D passes casArchHinge straight to hingeDirection and
+  // PC's 3D is the same component, so PC keeps it as is. (The PSW radio
+  // labelled "Left Hinge" carries value="right" — a PSW-side question, BLOCKERS.)
+  const hingeRaw = item?.archHinge || fc.archHinge || item?.casArchHinge || fc.casArchHinge || fc['cas-arch-opening'] || 'right';
+  const hinge = hingeRaw === 'left' ? 'left' : 'right';
   const pattern = item?.archBarPattern || fc.archBarPattern || 'none';
   if (!ARCH_BAR_PATTERNS.includes(pattern)) throw new ArchError(`Unknown arch bar pattern "${pattern}" on window "${name}"`);
+  const ringsRaw = item?.archRings ?? fc.archRings;
   const bars = {
     pattern,
     h: Number(item?.casementHBars ?? fc.casementHBars) || 0,   // straight bars below the springing
     v: Number(item?.casementVBars ?? fc.casementVBars) || 0,   // straight bars across the clear width
+    // v3 0.4 custom hub: spoke count + ring fractions (only read when pattern === 'custom')
+    spokes: Number(item?.archSpokes ?? fc.archSpokes) || 0,
+    rings: Array.isArray(ringsRaw) ? ringsRaw.map(Number).filter((k) => k > 0 && k < 1)
+      : typeof ringsRaw === 'string' ? ringsRaw.split(/[,\s]+/).map(Number).filter((k) => k > 0 && k < 1) : [],
   };
   return { shape, profile, rise, start, riseSource, hinge, bars };
 }

@@ -247,6 +247,8 @@ export default function ArchedCasementWindow({
   barPattern = null,
   archMinHaunchRadius = 0,
   archPatterns = null,
+  archSpokes = null,      // v3 0.4: custom hub spoke count (PC)
+  archRings = null,       // v3 0.4: custom hub ring fractions (PC)
   hingeDirection = 'left',
   opening = 0.3,
   woodColor = '#F6F6F6',
@@ -302,9 +304,9 @@ export default function ArchedCasementWindow({
 
   // ── Geometry: arch.js chains in mm around the window centre ──
   const G = useMemo(() => safeArchedCasementGeometry({
-    width, height, archShape, archRise, archProfile, barPattern: pattern, hBars, vBars,
+    width, height, archShape, archRise, archProfile, barPattern: pattern, hBars, vBars, spokes: archSpokes, rings: archRings,
     minHaunchRadius: archMinHaunchRadius, patterns: archPatterns || PSW_BAR_PATTERN_SETTINGS, dims: DIMS,
-  }), [width, height, archShape, archRise, archProfile, pattern, hBars, vBars, archMinHaunchRadius, archPatterns]);
+  }), [width, height, archShape, archRise, archProfile, pattern, hBars, vBars, archSpokes, archRings, archMinHaunchRadius, archPatterns]);
 
   const D = mm(FRAME_DEPTH);
   const halfD = D / 2;
@@ -446,7 +448,9 @@ export default function ArchedCasementWindow({
         <group>
           <DimensionGuide from={[-W / 2, H / 2 + mm(80), 0]} to={[W / 2, H / 2 + mm(80), 0]} label={`${width} mm`} offset={[0, 0.05, 0]} />
           <DimensionGuide from={[W / 2 + mm(130), -H / 2, 0]} to={[W / 2 + mm(130), H / 2, 0]} label={`${Math.round(outerEffH)} mm`} offset={[0.07, 0, 0]} />
-          {G && <DimensionGuide from={[-W / 2 - mm(130), springY, 0]} to={[-W / 2 - mm(130), H / 2, 0]} label={`↑ ${Math.round(G.rise)} mm`} offset={[-0.07, 0, 0]} />}
+          {/* v3 0.5: guide texts name what they measure — rise above the springing, arch start from the cill */}
+          {G && <DimensionGuide from={[-W / 2 - mm(130), springY, 0]} to={[-W / 2 - mm(130), H / 2, 0]} label={`rise ${Math.round(G.rise)} mm`} offset={[-0.07, 0, 0]} />}
+          {G && <DimensionGuide from={[-W / 2 - mm(130), -H / 2, 0]} to={[-W / 2 - mm(130), springY, 0]} label={`start ${Math.round(G.start)} mm`} offset={[-0.07, 0, 0]} />}
         </group>
       )}
     </group>

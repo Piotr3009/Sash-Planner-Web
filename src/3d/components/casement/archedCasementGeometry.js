@@ -97,7 +97,7 @@ export function contourAt(base, delta, tx) {
  */
 export function archedCasementGeometry({
   width, height, archShape, archRise, archProfile, barPattern = 'none', hBars = 0, vBars = 0,
-  minHaunchRadius = 0, patterns = PSW_BAR_PATTERN_SETTINGS, dims,
+  minHaunchRadius = 0, patterns = PSW_BAR_PATTERN_SETTINGS, dims, spokes = null, rings = null,
 }) {
   const W = Number(width);
   const D = dims;
@@ -142,7 +142,11 @@ export function archedCasementGeometry({
   const outline = buildGlassOutline(leafInnerArcs, xg, springY - glassBottom);
   const allowed = patternsForShape(shape);
   const pattern = allowed.includes(barPattern) ? barPattern : 'none';
-  const barSet = buildArchBars({ outline, shape, pattern, h: hBars, v: vBars, frameHalfWidth: W / 2 }, patterns);
+  // v3 0.4: custom hub needs its spoke count / ring list; a custom pattern without them (or any
+  // bar error) falls back to straight bars only — the preview never crashes on bar data
+  let barSet;
+  try { barSet = buildArchBars({ outline, shape, pattern, h: hBars, v: vBars, frameHalfWidth: W / 2, spokes, rings }, patterns); }
+  catch (e) { barSet = buildArchBars({ outline, shape, pattern: 'none', h: hBars, v: vBars, frameHalfWidth: W / 2 }, patterns); barSet.error = String(e?.message || e); }
   const g2w = (p) => [p[0] - xg, glassBottom + p[1]];                    // glass frame → 3D mm
   const bars = barSet.bars.map((b) => (b.kind === 'arc'
     ? { ...b, from: g2w(b.from), to: g2w(b.to), arc: { ...b.arc, cx: b.arc.cx - xg, cy: b.arc.cy + glassBottom } }

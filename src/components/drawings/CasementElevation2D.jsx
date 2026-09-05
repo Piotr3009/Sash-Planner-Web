@@ -130,7 +130,7 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
   const projNum = projectNumber || '';
   const titleText = `Front Elevation${projNum ? ` — ${projNum}` : ''} — ${winName}`;
   const subtitleText = arch
-    ? `Casement ${derived.casement.layout} · arched · ${fw} × ${fh} mm · exterior view`
+    ? `Casement · arched · ${fw} × ${fh} mm · exterior view`
     : `Casement ${derived.casement.layout} · ${fw} × ${fh} mm · exterior view`;
   const archLine = arch ? `${arch.AG.label} · start ${fmt(arch.start)} · rise ${fmt(arch.rise)} · ${radiiText(arch.outer)}` : '';
   const titleY = oy + fh + DM + TITLE_AREA * 0.5;

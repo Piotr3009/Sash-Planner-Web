@@ -115,8 +115,12 @@ export function isArchShape(shape) { return ARCH_SHAPES.includes(shape); }
 // ── Glazing bar patterns in the arch (P5) — vocabulary and availability per
 // shape, one copy in PC (PSW keeps two: price-calculator.js PATTERNS_FOR_SHAPE
 // lines 990–995 and the 3D). Geometry: buildArchBars below.
+// v3 0.4: the PSW patterns plus the workshop preset `quad-hub-spoke` (from
+// arka_CNC-piotr.dxf: 5 spokes = 45°, rings 1/3 · 2/3, the vertical spoke
+// runs through the hub) and `custom` (spoke count 3–9, ring list) — every hub
+// pattern is one generic hubSpoke({ spokes, rings, hubVertical }).
 export const ARCH_BAR_PATTERNS = Object.freeze([
-  'none', 'half-hub', 'hub-spoke', 'double-hub-spoke', 'triple-hub-spoke', 'intersecting',
+  'none', 'half-hub', 'hub-spoke', 'double-hub-spoke', 'triple-hub-spoke', 'quad-hub-spoke', 'custom', 'intersecting',
 ]);
 export const ARCH_BAR_PATTERN_LABELS = Object.freeze({
   'none': 'None',
@@ -124,17 +128,40 @@ export const ARCH_BAR_PATTERN_LABELS = Object.freeze({
   'hub-spoke': 'Hub & spoke',
   'double-hub-spoke': 'Double hub & spoke',
   'triple-hub-spoke': 'Triple hub & spoke',
+  'quad-hub-spoke': 'Quad hub & spoke (workshop)',
+  'custom': 'Custom hub',
   'intersecting': 'Intersecting',
 });
-export const HUB_PATTERNS = Object.freeze(['half-hub', 'hub-spoke', 'double-hub-spoke', 'triple-hub-spoke']);
+export const HUB_PATTERNS = Object.freeze(['half-hub', 'hub-spoke', 'double-hub-spoke', 'triple-hub-spoke', 'quad-hub-spoke', 'custom']);
 export const isHubPattern = (pattern) => HUB_PATTERNS.includes(pattern);
-export const PATTERNS_FOR_SHAPE = Object.freeze({
+// PSW price-calculator.js PATTERNS_FOR_SHAPE (990–995) — the customer-facing set, 1:1
+export const PSW_PATTERNS_FOR_SHAPE = Object.freeze({
   'semi-circle': ['none', 'half-hub', 'hub-spoke', 'double-hub-spoke', 'triple-hub-spoke', 'intersecting'],
   'gothic-equilateral': ['none', 'intersecting'],
   'gothic-drop': ['none', 'intersecting'],
   'three-centre': ['none'],
 });
+// PC adds the workshop preset and the custom hub on the semi-circle only (hubs need one centre)
+export const PC_EXTRA_PATTERNS = Object.freeze({ 'semi-circle': ['quad-hub-spoke', 'custom'] });
+export const PATTERNS_FOR_SHAPE = Object.freeze({
+  'semi-circle': [...PSW_PATTERNS_FOR_SHAPE['semi-circle'], ...PC_EXTRA_PATTERNS['semi-circle']],
+  'gothic-equilateral': PSW_PATTERNS_FOR_SHAPE['gothic-equilateral'],
+  'gothic-drop': PSW_PATTERNS_FOR_SHAPE['gothic-drop'],
+  'three-centre': PSW_PATTERNS_FOR_SHAPE['three-centre'],
+});
 export function patternsForShape(shape) { return PATTERNS_FOR_SHAPE[shape] || ['none']; }
+// Hub presets: spokes evenly from 0 to π (the two end spokes ARE the springing
+// bar), rings as fractions of the clear half width (PSW presets read the
+// profile hubRingRatios; the workshop preset carries the DWG's thirds),
+// hubVertical = the 90° spoke continues through the hub to the springing line.
+export const HUB_PRESETS = Object.freeze({
+  'half-hub': { spokes: 0, rings: 1, hubVertical: false },
+  'hub-spoke': { spokes: 4, rings: 1, hubVertical: false },
+  'double-hub-spoke': { spokes: 6, rings: 2, hubVertical: false },
+  'triple-hub-spoke': { spokes: 8, rings: 3, hubVertical: false },
+  'quad-hub-spoke': { spokes: 5, ringRatios: [1 / 3, 2 / 3], hubVertical: true },
+});
+export const CUSTOM_HUB_LIMITS = Object.freeze({ minSpokes: 3, maxSpokes: 9, maxRings: 4 });
 
 const r1 = (v) => Math.round(v * 10) / 10;
 
@@ -631,7 +658,8 @@ function readPlannerSettings(opts) {
   if (!PIECE_RULES.includes(pieceRule)) throw new ArchError(`Casement profile arch.pieceRule must be one of ${PIECE_RULES.join(' | ')}, got "${pieceRule}"`);
   const fingerLength = Number(opts?.finger?.length);
   if (!(fingerLength >= 0)) throw new ArchError('Casement profile arch.finger.length is missing (mm per jointed end)');
-  return { stockWidths, allowance, maxDeg, maxAngle: maxDeg * Math.PI / 180, pieceRule, fingerLength };
+  const minPieceLength = Number(opts?.minPieceLength) || 0;    // v3 0.6: warn only (0 = no warning)
+  return { stockWidths, allowance, maxDeg, maxAngle: maxDeg * Math.PI / 180, pieceRule, fingerLength, minPieceLength };
 }
 
 /** D13 selection among the feasible options of one arc (see banner, rule 7). */
@@ -710,10 +738,16 @@ export function planArchSegments(ring, opts) {
     if (!a.default) continue;
     for (const p of a.default.pieces) pieces.push({ ...p, no: pieces.length + 1, stock: a.default.stock });
   }
+  // v3 0.6: short pieces are flagged, never blocked (profile arch.minPieceLength, DEFAULT open)
+  const shortPieces = S.minPieceLength > 0
+    ? pieces.filter((p) => p.L < S.minPieceLength).map((p) => `piece ${p.no} (arc ${p.arc + 1}) is ${r1(p.L)} mm long - below minPieceLength ${S.minPieceLength}`)
+    : [];
   return {
     arcs,
     pieces,
     totalPieces: pieces.length,
+    shortPieces,
+    minPieceLength: S.minPieceLength,
     noStock: arcs.some((a) => !a.default),
     stockWidths: [...S.stockWidths],
     contourAllowance: S.allowance,
@@ -894,6 +928,9 @@ function traceryHit(arcs, c, r, side) {
  * Patterns — PSW 3d-src FixFrameWindow.jsx `semiBarPattern` (lines 847–1030)
  * and `intersectingData` (667–830) ported on the glass outline:
  *   half-hub           springing bar + ring 1, nothing else
+ *   quad-hub-spoke     workshop preset (arka_CNC-piotr.dxf): rings 1/3 · 2/3 of xg,
+ *                      5 spokes (45°), the vertical spoke runs through the hub
+ *   custom             { spokes 3–9, rings [fractions] } from the window spec
  *   hub-spoke          ring 1 (0.3·xg), 4 spokes at i/3·π from the ring to the
  *                      outline — the two end spokes lie ON the springing line and
  *                      are the springing bar; ring-end verticals below the line;
@@ -909,7 +946,7 @@ function traceryHit(arcs, c, r, side) {
  * Output: [{ id, kind: 'straight'|'arc', role, from, to, arc?, length }], lengths
  * rounded to 0.5 mm; roles v | h | springing | ring | spoke | tracery.
  */
-export function buildArchBars({ outline, shape, pattern = 'none', h = 0, v = 0, frameHalfWidth }, patternOpts) {
+export function buildArchBars({ outline, shape, pattern = 'none', h = 0, v = 0, frameHalfWidth, spokes, rings }, patternOpts) {
   const pat = pattern || 'none';
   if (!ARCH_BAR_PATTERNS.includes(pat)) throw new ArchError(`Unknown arch bar pattern "${pattern}"`);
   const allowed = patternsForShape(shape);
@@ -941,27 +978,40 @@ export function buildArchBars({ outline, shape, pattern = 'none', h = 0, v = 0, 
   if (hub) {
     const S = readPatternSettings(patternOpts);
     if (arcs.length !== 1) throw new ArchError(`Hub patterns need a semi-circle outline (one arc), got ${arcs.length} arcs`);
-    const nRings = pat === 'triple-hub-spoke' ? 3 : pat === 'double-hub-spoke' ? 2 : 1;
-    const rings = S.ratios.slice(0, nRings).map((k) => k * xg);
-    const c = [xg, ys];
-    if (pat === 'half-hub') {
-      straight('springing', 0, ys, Wg, ys);
-      arcBar('ring', { cx: c[0], cy: c[1], r: rings[0], a0: 0, a1: Math.PI });
+    // generic hubSpoke({ spokes, rings, hubVertical }) — presets or the user's custom numbers
+    let def;
+    if (pat === 'custom') {
+      const n = Math.floor(Number(spokes));
+      const rr = Array.isArray(rings) ? rings.map(Number) : [];
+      if (!(n >= CUSTOM_HUB_LIMITS.minSpokes && n <= CUSTOM_HUB_LIMITS.maxSpokes)) throw new ArchError(`Custom hub: spoke count must be ${CUSTOM_HUB_LIMITS.minSpokes}–${CUSTOM_HUB_LIMITS.maxSpokes}, got "${spokes}"`);
+      if (!rr.length || rr.length > CUSTOM_HUB_LIMITS.maxRings || !rr.every((k) => k > 0 && k < 1)) throw new ArchError(`Custom hub: rings must be 1–${CUSTOM_HUB_LIMITS.maxRings} fractions of the half width (0 < k < 1), got "${rings}"`);
+      def = { spokes: n, ringRatios: [...rr].sort((a, b) => a - b), hubVertical: false };
     } else {
-      for (const rk of rings) arcBar('ring', { cx: c[0], cy: c[1], r: rk, a0: 0, a1: Math.PI });
-      const spokeCount = nRings === 3 ? 8 : nRings === 2 ? 6 : 4;
-      const bounds = [...rings, arcs[0].r];                          // ring → ring → outline (semi-circle radius = xg)
-      for (let i = 0; i < spokeCount; i++) {
-        const ang = (i / (spokeCount - 1)) * Math.PI;
-        const onLine = i === 0 || i === spokeCount - 1;             // the end spokes lie on the springing line
+      const P = HUB_PRESETS[pat];
+      def = { spokes: P.spokes, ringRatios: P.ringRatios || S.ratios.slice(0, P.rings), hubVertical: P.hubVertical };
+    }
+    const ringR = def.ringRatios.map((k) => k * xg);
+    const c = [xg, ys];
+    if (def.spokes === 0) {
+      straight('springing', 0, ys, Wg, ys);                            // half-hub: the springing bar + ring 1
+      arcBar('ring', { cx: c[0], cy: c[1], r: ringR[0], a0: 0, a1: Math.PI });
+    } else {
+      for (const rk of ringR) arcBar('ring', { cx: c[0], cy: c[1], r: rk, a0: 0, a1: Math.PI });
+      const bounds = [...ringR, arcs[0].r];                           // ring → ring → outline (semi-circle radius = xg)
+      for (let i = 0; i < def.spokes; i++) {
+        const ang = (i / (def.spokes - 1)) * Math.PI;
+        const onLine = i === 0 || i === def.spokes - 1;               // the end spokes lie on the springing line
         const ca = Math.cos(ang), sa = Math.sin(ang);
         for (let k = 0; k < bounds.length - 1; k++) {
           const r0 = bounds[k], r1s = bounds[k + 1];
           straight(onLine ? 'springing' : 'spoke', c[0] + r0 * ca, c[1] + r0 * sa, c[0] + r1s * ca, c[1] + r1s * sa);
         }
+        // workshop preset: the vertical spoke continues through the hub to the springing line (DWG)
+        if (def.hubVertical && Math.abs(ang - Math.PI / 2) < 1e-9) straight('spoke', c[0], c[1], c[0], c[1] + ringR[0]);
       }
       // PSW 875–886: every ring end continues straight down to the glass bottom
-      for (const rk of rings) {
+      for (const rk of ringR) {
+        if (!(ys > 0)) break;
         straight('v', xg - rk, 0, xg - rk, ys);
         straight('v', xg + rk, 0, xg + rk, ys);
       }

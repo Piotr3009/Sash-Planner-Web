@@ -19,6 +19,102 @@ had no `node_modules`; t18 / t19 need react-dom / jspdf resolvable).
 Stages tonight (Piotr 07.09, gate before each next stage): 1 = Block 0, 2 = Block 1 A–E, 3 = Block 1 F–J +
 Block 3, 4 = Block 4 + Block 6.
 
+### 0.4 — tracery export DXF + LSP, the `arka` convention (`src/engine/cnc/traceryExport.js` new, `dxfWriter.js` POINT, `arch.js` patterns, `calculations.js`, `lists.js`, `bom.js`, `cncExport.js`, pages, configurator, 3D props)
+
+**Understanding:** one timber board over the arched unit, cut on the CNC to the pane pattern; the bead R8 runs
+along every opening. The workshop DWG (one quadrant, R 600, quad-hub-spoke) is the thing to reproduce; the
+package explains the offsets (+2 rail / +10 limit / 22 bar / 18 margin) and the section; its mitre legs are
+placed the wrong way round.
+
+**Read from the DWG (ezdxf, not memory):** centre (−3227.6189, 1606.5905); board OUTLINE 4D6 R 600 to
+x = centre + 7; panes 4D3 (hub R 189), 4CD / 4D0 (R 211–389), 4C5 / 4C8 (R 411–582), all bottoms at
+centre + 18, hub cut at centre − 11; +2 (PANE) and +10 (FRONT_HINGES_3MM) as concentric offsets; 20 MITRE
+polylines (19 corners, 581 + 587 one corner in two halves), e.g. 51A apex (−3510.4607, 1888.0181) → legs
+(−3499.8541, 1877.4115) along the 45° spoke edge and (−3520.8413, 1877.1854) along the R 399 arc — both INTO
+pane 4D2; section LINE 4E9 (6 mm) + ARC 4EA (R 8, 90°) on layer 0 = the package polyline `(0,0) → bulge
+−0.4142 → (8,8) → (8,14)` after translation (asserted in t20 §4 — the section is NOT a DWG/package difference).
+
+**Two approaches, one rejected:** (a) analytic panes per pattern (sectors of rings for hubs, lens shapes for
+intersecting) — rejected: a second geometry per pattern and nothing for straight bars crossing a haunch;
+(b) a planar arrangement of lines + circular arcs (split at intersections, overlapping pieces merged, stubs
+pruned, faces walked with the interior on the left), each face offset edge-wise (bar edge barWidth/2, board
+edge edgeMargin; arcs keep their centre, corners = intersection of the offset edges nearest the original
+corner, vanishing edges dropped) — chosen: pattern-agnostic, exact arcs, the DWG falls out of it.
+
+**Built:**
+- `traceryExport.js`: curves, `intersections` (line/line, line/circle, circle/circle incl. T-junctions),
+  `arrangementFaces`, `offsetFace`, `cornerGuides` (tangent difference > 0.5°, legs 15 mm along the curve
+  into the pane, bulge kept), `boardFromOutline` (daylight = unit inset by `glassInset`), `barCurves`,
+  `buildTraceryGeometry` (mode auto: quadrant when no pane straddles the axis — the axis becomes a bar edge
+  and the cut a board edge 18 − 11 = 7 past it, exactly the DWG's 4D6; else full), `buildTraceryEntities`
+  (layers `ARKA_OUTLINE · ARKA_PANE · ARKA_FRONT_HINGES_3MM · ARKA_MITRE · ARKA_SECTION · ARKA_PANE_ZEWN_REF ·
+  ARKA_CENTRE · ARKA_INFO_NO_CUT`, section outside the board with `START`, texts incl. `NOT A TOOLPATH` and
+  warnings), `writeTraceryLsp` (`(defun c:ARKA …)`, insertion point prompt Enter = 0,0, `-LAYER`, `entmake`
+  LWPOLYLINE 90/70/10/42, POINT, TEXT — plain AutoLISP), `parseTraceryLsp` (harness), `buildTraceryForDerived`.
+- Profile `tracery { paneOffset 2, profileWidth 8, ridgeLand 2, edgeLand 8, mitreLeg 15, sides 1,
+  boardThickness 18 }` → bar 22 / margin 18 / limit +10 derived, never typed twice.
+- Patterns (`arch.js`): generic `hubSpoke({ spokes, rings, hubVertical })` behind every hub preset
+  (`HUB_PRESETS`: half-hub 0/1, hub-spoke 4/1, double 6/2, triple 8/3 from the profile ratios,
+  **quad-hub-spoke 5 / [1/3, 2/3] + hub vertical** from the DWG) and `custom` (spokes 3–9, ring list from the
+  window: `archSpokes` / `archRings`); `PSW_PATTERNS_FOR_SHAPE` kept 1:1, `PC_EXTRA_PATTERNS` only on the
+  semi-circle. Ring-end verticals skipped on a zero-height springing (fanlight board).
+- Engine: `derived.arch.tracery { mode, panes, areas, bbox, warnings }`, `C-TRACERY` (`C-TRY-P1`) record,
+  paint + tracery face; `CUT_LIST_ORDER` `C-TRY`; BOM slot `c_tracery` (+ part list). Export:
+  `traceryParamsForWindow` / `exportTraceryDxfForWindow` / `exportTraceryLspForWindow` / `exportTraceryMerged`;
+  buttons `Tracery DXF` / `Tracery LSP` next to `Arch DXF` (disabled with the reason when no pattern),
+  `Tracery DXF (all)` / `LSP (all)` on the pack. Configurator: the two presets in the chip row, custom UI.
+  3D: `archSpokes` / `archRings` through App.jsx → ArchedCasementWindow → geometry helper (which now falls
+  back to straight bars instead of throwing on bad bar data).
+
+**Verification (t20 §4–§6, ALL PASS):** DWG reproduction — quadrant, 5 panes, 19 guides, pane radii 189 /
+211–389 / 411–582 ±0.5 (the DWG's own hub arc is 0.32 off its circle), the 5 OUTLINE panes, 5 PANE and
+5 FRONT_HINGES_3MM contours vertex for vertex ±0.5, +2 / +10 concentric exactly, every DWG MITRE matched
+(apex ±0.5, legs ±1 mm — corner 51A to 0.02), legs 15.00 along the curve, section verbatim = DWG = package
+DXF, board to +7, ZEWN_REF R 598; DXF read back by ezdxf (8 layers, counts), LSP parsed back = the same
+45 entities. Engine windows: hub-spoke full 6 panes, quad-hub-spoke + 1V full 13, gothic intersecting,
+custom 7 / [0.25, 0.55] — no collapse, panes inside the board; single + merged exports; samples written.
+esbuild OK on every file, eslint no-undef clean, `npm run build` OK. Not verified: AutoCAD / VCarve (no CAD
+here — BLOCKERS 11.16), a click-through of the buttons. **Verdict: ✅ 0.4** with DEFAULT (open) entries
+11.4–11.8 / 11.12 / 11.13.
+
+### 0.4b — hinge value 1:1 with PSW (`specification.js`)
+
+Inversion removed: `hinge = value === 'left' ? 'left' : 'right'` (PSW default value `right`). t16 (7
+assertions) / t18 (1) rewritten for the identity; t20 §7 asserts it and greps the old ternary away. PSW
+label wording logged as 11.11. **Verdict: ✅ 0.4b**
+
+### 0.4c — bar logic audit (`verify/arch/t20_bars.mjs`, ALL PASS 30)
+
+208 shape × pattern × 0–3 h × 0–3 v cases (semi-circle 8 patterns, three-centre 1, gothic ×2 2): every user
+vertical ends on the outline (< 0.01), the gothic centre bar at the apex, h bars strictly between the glass
+bottom and the springing at the requested count (also at the profile's minimum straight height; 10 mm below
+→ readable ArchError), hub ring-end verticals bottom → springing, no bar end outside the unit, bar run =
+Σ lengths, beading = run × 1.15. PSW `PATTERNS_FOR_SHAPE` literal (990–995) = `PSW_PATTERNS_FOR_SHAPE`,
+re-read from the live clone; fix radios none | sunburst / none | patternA read from `online-estimate.html`
+(Block 3 vocabulary). `intersecting`: the PSW sampling loop (FixFrameWindow.jsx 667–700) copied — every
+PSW vertex lies on a PC arc within its range (±1 step) for W 1000 / 1400 equilateral and 1000 drop; PC ends
+exactly on the outline. Elevation / leaf sheet / glazier DXF: same bar count, DXF axes = engine ends.
+**No PC bug found**; two PSW-behaviour questions logged (11.6, 11.12). **Verdict: ✅ 0.4c**
+
+### 0.5 — small fixes from BLOCKERS §10
+
+Leaf sheet R labels inside the daylight (haunch label collided with the `67` chain); arched elevation subtitle
+without the layout code; 3D guides `rise … mm` + `start … mm`; rasteriser: the clipPath elevation rendered
+through an `<img>` data URL in headless Chromium (bars clipped) — jsPDF itself not run in a browser. t19
+244/244 (rectangular snapshot untouched). **Verdict: ✅ 0.5** (PDF page: morning, 11.10)
+
+### 0.6 — profile decisions
+
+`arch.minPieceLength` 150 (new, warn only: `plan.shortPieces`), the rest confirmed unchanged (t20 §7).
+**Verdict: ✅ 0.6** (all DEFAULT (open), BLOCKERS 11.2 / 11.3)
+
+### STAGE 1 GATE — ✅ ALL PASS
+
+t16 504 · t17 72 · t18 178 · t19 244 · t20 112 · t20_bars 30 · `npm run build` OK · rectangular casements
+byte-identical (t18 §3, t19 §1, t20 §6). Assertions rewritten tonight because the spec changed the rule:
+t16 hinge ×7, t18 layers / text lines / PDF header / hinge / vocabulary / pattern table, t19 bar-end format
+(x·y pairs gone) and the `GLASS_BAR_AXES` layer — each one names the v3 item.
+
 ### 0.2 + 0.3 — glazier DXF bands / edge / axes, bar-end dimensioning (`glassBars.js` new, `glassDxfExport.js`, `CasementGlassDrawing2D.jsx`, `glassPdfExport.js`, `profile.js`)
 
 **Understanding:** the glazier lays an 18 mm spacer bar in the pattern and a perimeter spacer 11 mm inside the

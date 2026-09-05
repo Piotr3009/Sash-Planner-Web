@@ -79,6 +79,7 @@ Object.assign(ELEMENT_TO_PART_ID, {
   'MULLION (L)': 'mullion',
   'MULLION (R)': 'mullion',
   'C-FRAME HEAD': 'c_frame_head',
+  'C-TRACERY': 'c_tracery',            // v3 0.4: tracery board (material line in the BOM)
   'C-FRAME CILL': 'c_frame_cill',
   'C-FRAME JAMB (L)': 'c_frame_jamb',
   'C-FRAME JAMB (R)': 'c_frame_jamb',

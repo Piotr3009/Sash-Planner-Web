@@ -226,6 +226,8 @@ export default function ConfiguratorPage() {
   const [casArchRiseSource, setCasArchRiseSource] = useState('ratio');
   const [casArchHinge, setCasArchHinge] = useState('left');
   const [casArchPattern, setCasArchPattern] = useState('none'); // bar pattern in the arch (v2 P5)
+  const [casArchSpokes, setCasArchSpokes] = useState(5);          // v3 0.4 custom hub: spoke count 3–9
+  const [casArchRingsText, setCasArchRingsText] = useState('0.3, 0.6');   // v3 0.4 custom hub: ring fractions of the half width
   const [fanMm, setFanMm] = useState('');
   const [fan2Mm, setFan2Mm] = useState('');
   const [midMm, setMidMm] = useState('');
@@ -329,6 +331,8 @@ export default function ConfiguratorPage() {
     setCasArchRiseSource(legacyShape ? 'ratio' : (w.archRiseSource || (savedStart != null ? 'custom' : 'ratio')));
     setCasArchHinge(w.archHinge === 'right' ? 'right' : 'left');
     setCasArchPattern(w.archBarPattern || 'none');
+    setCasArchSpokes(Number(w.archSpokes) || 5);
+    setCasArchRingsText(Array.isArray(w.archRings) && w.archRings.length ? w.archRings.join(', ') : '0.3, 0.6');
     setFanMm(w.fanlightAxis ?? (w.fanlightHeight != null && w.fanlightHeight !== ''
       ? Number(w.fanlightHeight) + FAN_AXIS_OFFSET_TOP : ''));
     setFan2Mm(w.fan2Axis ?? (w.casementFan2Height != null && w.casementFan2Height !== ''
@@ -490,6 +494,9 @@ export default function ConfiguratorPage() {
   }, [isArched, isGothicUi, casArchProfile, extW, archRiseNum]);
   const pcArchShape = archShapeResolved.shape;
   const archPatterns = PATTERNS_FOR_SHAPE[pcArchShape] || PATTERNS_FOR_SHAPE['three-centre'];   // frozen arrays: stable effect deps
+  // v3 0.4 custom hub: ring list parsed once (fractions 0 < k < 1, sorted); saved only while the pattern is custom
+  const casArchRings = useMemo(() => String(casArchRingsText).split(/[,\s]+/).map(Number).filter((k) => k > 0 && k < 1).sort((a, b) => a - b), [casArchRingsText]);
+  const isCustomHub = isArched && casArchPattern === 'custom';
   useEffect(() => {
     // a pattern the resolved shape does not offer (e.g. a hub on a three-centre) falls back to none
     if (isArched && !archPatterns.includes(casArchPattern)) setCasArchPattern('none');
@@ -626,6 +633,8 @@ export default function ConfiguratorPage() {
         casArchShape: isArched ? pcArchShape : 'semi-circle',
         casArchHinge: isArched ? casArchHinge : 'left',
         barPattern: isArched ? casArchPattern : 'none',
+        archSpokes: isCustomHub ? casArchSpokes : null,
+        archRings: isCustomHub ? casArchRings : null,
         archMinHaunchRadius: getCasementProfile().arch.minHaunchRadius,
         archPatterns: getCasementProfile().arch.patterns,
         casementLayout: isArched ? (casArchHinge === 'right' ? '040R' : '040L') : casLayout,
@@ -673,7 +682,7 @@ export default function ConfiguratorPage() {
       spacerColor, sashType, splitRatio, headType, openingType: opening,
       boxType: frameType === 'slim' ? 'slim' : 'standard', boxDepth: frameDepth,
     });
-  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, isArched, pcArchShape, isGothicUi, casArchProfile, casArchRiseSource, archStartNum, archRiseNum, casArchHinge, casArchPattern, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType]);
+  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, isArched, pcArchShape, isGothicUi, casArchProfile, casArchRiseSource, archStartNum, archRiseNum, casArchHinge, casArchPattern, isCustomHub, casArchSpokes, casArchRings, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType]);
   useEffect(() => { sync(); }, [sync]);
 
   // ─── B4: Listen for 3D ready event and re-sync ───
@@ -713,6 +722,8 @@ export default function ConfiguratorPage() {
         archRiseSource: isArched ? casArchRiseSource : null,
         archHinge: isArched ? casArchHinge : null,
         archBarPattern: isArched ? casArchPattern : null,
+        archSpokes: isCustomHub ? casArchSpokes : null,
+        archRings: isCustomHub ? casArchRings : null,
         fanlightAxis: casCalc.hasFan ? casCalc.fanEff : null,
         fan2Axis: casCalc.hasFan2 ? casCalc.fan2Eff : null,
         casementMiddleWidth: casCalc.isTriple ? casCalc.midEff : 0,
@@ -939,6 +950,14 @@ export default function ConfiguratorPage() {
               {isHubPattern(casArchPattern) && (
                 <div className="text-[11px] text-ink-500 mb-2">Hub patterns bring their own verticals below the springing (the ring ends) — the vertical count is not used (PSW rule).</div>
               )}
+              {isCustomHub && <>
+                <Lbl>Custom hub — spokes (3–9, evenly from springing to springing)</Lbl>
+                <HChips o={[3, 4, 5, 6, 7, 8, 9].map((n) => ({ value: n, label: String(n) }))} v={casArchSpokes} c={setCasArchSpokes} />
+                <Lbl>Custom hub — rings (fractions of the half width, e.g. 0.3, 0.6)</Lbl>
+                <input type="text" value={casArchRingsText} onChange={(e) => setCasArchRingsText(e.target.value)}
+                  className="w-full px-3 py-2 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs mb-2" />
+                <div className="text-[11px] text-ink-500 mb-2">{casArchRings.length ? `Rings at ${casArchRings.join(' / ')} of the half width` : 'Enter at least one fraction between 0 and 1'}</div>
+              </>}
               {archPatterns.length === 1 && (
                 <div className="text-[11px] text-ink-500 mb-2">Patterns exist for a semi-circle (Half) and for gothic arches; a three-centre takes straight bars only.</div>
               )}

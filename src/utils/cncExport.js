@@ -24,6 +24,7 @@ import {
   buildJambEntities, buildMergedJambEntities, CNC_LAYERS, jambVentCount,
 } from '../engine/cnc/jambDxf.js';
 import { buildArchEntities, buildMergedArchEntities, ARCH_LAYERS } from '../engine/cnc/archDxf.js';
+import { buildTraceryForDerived, writeTraceryLsp, TRACERY_LAYERS, boardBBox } from '../engine/cnc/traceryExport.js';
 import { buildArchPlan, isArchShape, ArchError } from '../engine/arch.js';
 import { getCasementProfile } from '../engine/profile.js';
 import { writeDxf } from '../engine/cnc/dxfWriter.js';
@@ -36,8 +37,8 @@ const FRAME_TO_CNC = { standard: 'standard', slim: 'slim', triple: 'triple' };
 // one browser download path for every DXF the app writes.
 export const safeName = (s) => String(s || 'window').replace(/[^\w.-]+/g, '_');
 
-export function downloadDxf(filename, content) {
-  const blob = new Blob([content], { type: 'application/dxf' });
+export function downloadDxf(filename, content, mime = 'application/dxf') {
+  const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -185,4 +186,84 @@ export function exportArchDxfMerged(windows, fileLabel) {
   const ents = buildMergedArchEntities(items);
   downloadDxf(`${safeName(fileLabel || 'pack')}_arch.dxf`, writeDxf(ents, ARCH_LAYERS));
   return { ok: true, exported: items.length, skipped };
+}
+
+// ─── Tracery DXF + LSP (arched-windows-v3 Block 0.4) ────────────────────────
+
+/**
+ * Map one PC window onto the tracery generator (glass frame, same frame as
+ * the glazier DXF). Returns { params: { build, winNum } } or { skip: reason }:
+ * only an arched casement WITH a bar pattern has a tracery board.
+ */
+export function traceryParamsForWindow(windowSpec, derived, name) {
+  if (!windowSpec) return { skip: 'no data' };
+  if ((windowSpec.category || 'sash') !== 'casement') return { skip: 'not a casement window' };
+  if (!windowSpec.arch?.shape) return { skip: 'not an arched casement' };
+  if (!derived?.arch) return { skip: 'window could not be calculated' };
+  if (!derived.arch.pattern || derived.arch.pattern === 'none') return { skip: 'no bar pattern in the arch — the tracery is the pattern cut from one board' };
+  try {
+    const build = buildTraceryForDerived(derived, getCasementProfile(), String(name || windowSpec.name || ''));
+    return { params: { build, winNum: String(name || windowSpec.name || '') } };
+  } catch (e) {
+    if (e instanceof ArchError) return { skip: e.message };
+    throw e;
+  }
+}
+
+export function canExportTracery(windowSpec, derived) {
+  return !traceryParamsForWindow(windowSpec, derived, '').skip;
+}
+
+/** Single window → {name}_tracery.dxf. Returns { ok, panes, mode, warnings } or { error }. */
+export function exportTraceryDxfForWindow(windowSpec, derived, name) {
+  const r = traceryParamsForWindow(windowSpec, derived, name);
+  if (r.skip) return { error: r.skip };
+  const { build, winNum } = r.params;
+  downloadDxf(`${safeName(winNum)}_tracery.dxf`, writeDxf(build.entities, TRACERY_LAYERS));
+  return { ok: true, panes: build.geom.panes.length, mode: build.geom.mode, warnings: build.geom.warnings };
+}
+
+/** Single window → {name}_tracery.lsp (the same entity list as the DXF). */
+export function exportTraceryLspForWindow(windowSpec, derived, name) {
+  const r = traceryParamsForWindow(windowSpec, derived, name);
+  if (r.skip) return { error: r.skip };
+  const { build, winNum } = r.params;
+  downloadDxf(`${safeName(winNum)}_tracery.lsp`, writeTraceryLsp(build.entities, TRACERY_LAYERS, build.info), 'text/plain');
+  return { ok: true, panes: build.geom.panes.length, mode: build.geom.mode, warnings: build.geom.warnings };
+}
+
+/** Entity lists of many windows stacked top-down 300 mm apart (same convention as the arch / glass files). */
+export function buildMergedTraceryEntities(builds) {
+  const all = [];
+  let cursorY = 0;
+  for (const b of builds) {
+    const bb = boardBBox(b.geom.board.pts);
+    const oy = cursorY - bb.maxY;
+    for (const e of b.entities) {
+      if (e.type === 'poly') all.push({ ...e, pts: e.pts.map(([x, y, bu]) => [x, y + oy, bu]) });
+      else all.push({ ...e, y: e.y + oy });
+    }
+    cursorY = oy + bb.minY - 300;
+  }
+  return all;
+}
+
+/**
+ * Many windows (PP or batch) → one merged tracery DXF or LSP.
+ * windows: [{ windowSpec, derived, name }], kind: 'dxf' | 'lsp'
+ */
+export function exportTraceryMerged(windows, fileLabel, kind = 'dxf') {
+  const builds = [];
+  const skipped = [];
+  for (const w of windows || []) {
+    const r = traceryParamsForWindow(w.windowSpec, w.derived, w.name);
+    if (r.skip) skipped.push({ name: w.name || '?', reason: r.skip });
+    else builds.push(r.params.build);
+  }
+  if (!builds.length) return { error: 'No arched casement with a bar pattern in this pack', skipped };
+  const ents = buildMergedTraceryEntities(builds);
+  const base = safeName(fileLabel || 'pack');
+  if (kind === 'lsp') downloadDxf(`${base}_tracery.lsp`, writeTraceryLsp(ents, TRACERY_LAYERS, { winNum: base, pattern: 'pack' }), 'text/plain');
+  else downloadDxf(`${base}_tracery.dxf`, writeDxf(ents, TRACERY_LAYERS));
+  return { ok: true, exported: builds.length, skipped };
 }

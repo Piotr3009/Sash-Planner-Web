@@ -25,7 +25,7 @@ import ExportControls from '../components/export/ExportControls.jsx';
 import { exportGlassPDF } from '../utils/glassPdfExport.js';
 import { exportGlassDxfForWindow, glassDxfParamsForWindow } from '../utils/glassDxfExport.js';
 import { exportBomPDF } from '../utils/bomPdfExport.js';
-import { exportCncJambsForWindow, canExportCncJambs, exportArchDxfForWindow, archParamsForWindow } from '../utils/cncExport.js';
+import { exportCncJambsForWindow, canExportCncJambs, exportArchDxfForWindow, archParamsForWindow, traceryParamsForWindow, exportTraceryDxfForWindow, exportTraceryLspForWindow } from '../utils/cncExport.js';
 
 
 const TABS = [
@@ -144,6 +144,24 @@ export default function WindowDetailPage() {
               🛠 Arch DXF
             </button>
           )}
+          {(windowSpec?.category || 'sash') === 'casement' && (() => {
+            // v3 0.4: tracery board (DXF for VCarve + LSP for AutoCAD) — only with a bar pattern in the arch
+            const tr = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, () => traceryParamsForWindow(windowSpec, derived, item?.name));
+            const cls = `btn text-sm bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 ${tr.skip ? 'opacity-40 cursor-not-allowed' : ''}`;
+            const run = (fn, label) => {
+              const r = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, () => fn(windowSpec, derived, item?.name));
+              if (r.error) alert(`${label} unavailable: ${r.error}`);
+              else if (r.warnings?.length) alert(`${label}: ${r.warnings.join('; ')}`);
+            };
+            return (<>
+              <button onClick={() => run(exportTraceryDxfForWindow, 'Tracery DXF')} disabled={!!tr.skip}
+                title={tr.skip ? `Tracery DXF unavailable: ${tr.skip}` : 'Tracery board DXF (arka layers: pane daylights, +2 rail, +10 limit, corner guides, section) for VCarve'}
+                className={cls}>🪟 Tracery DXF</button>
+              <button onClick={() => run(exportTraceryLspForWindow, 'Tracery LSP')} disabled={!!tr.skip}
+                title={tr.skip ? `Tracery LSP unavailable: ${tr.skip}` : 'The same tracery as AutoLISP (APPLOAD, then ARKA)'}
+                className={cls}>🪟 Tracery LSP</button>
+            </>);
+          })()}
           <Link to={editUrl} className="btn btn-primary text-sm">✏️ Edit Configuration</Link>
         </div>
       </div>

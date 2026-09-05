@@ -2,6 +2,7 @@ import { resolveCasementLayout, fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DE
 import { selectCasementHinges, summariseHinges, selectCasementLocks, summariseLocks } from './casementHardware.js';
 import { getWindowProfile, getCasementProfile, getDoorProfile, profileSashDepth, profileBoardWidth, boardWidthForDepth, kgPerM } from './profile.js';
 import { buildArchGeometry, planArchSegments, buildGlassOutline, buildArchBars, glassOutlinePoly, chainAreaAboveLine, ArchError } from './arch.js';
+import { buildTraceryForDerived } from './cnc/traceryExport.js';
 
 /**
  * calculations.js - ETAP 3
@@ -640,7 +641,7 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     };
 
     // ── Arch geometry, blank plans, glass outline and bars — profile numbers only ──
-    let AG = null, archPlans = null, archOutline = null, archBars = null, glassBottomEdge = null;
+    let AG = null, archPlans = null, archOutline = null, archBars = null, glassBottomEdge = null, archTracery = null;
     if (archSpec) {
         if (glassInset == null) throw new ArchError('Casement profile geometry.glassInset is missing — required for the arched glass outline');
         AG = buildArchGeometry({ shape: archSpec.shape, width: frameWidth, height: frameHeight, rise: archSpec.rise }, p);
@@ -653,7 +654,13 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
         archBars = buildArchBars({
             outline: archOutline, shape: AG.shape, pattern: archSpec.bars?.pattern || 'none',
             h: casBars.h, v: casBars.v, frameHalfWidth: frameWidth / 2,
+            spokes: archSpec.bars?.spokes, rings: archSpec.bars?.rings,
         }, p.arch?.patterns);
+        // v3 0.4: the timber tracery (one board, one side) over the unit when a
+        // pattern is set — geometry from traceryExport.js on the same bar list
+        if (archBars.pattern !== 'none' && p.tracery) {
+            archTracery = buildTraceryForDerived({ arch: { glassOutline: archOutline, bars: archBars.bars, pattern: archBars.pattern } }, p, windowSpec.name || '');
+        }
     }
 
     // Record helper: profile rounding (0.1) + element letter code on top of
@@ -863,6 +870,15 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
         }
         sash.push(mk('sash', 'C-BOTTOM RAIL', secLeaf, R(s.leafW - (p.lengths.bottomRailDeduct || 0)), 1, `C-BR-${pcode}`,
             [pn.hinge === 'top' ? 'lock' : '', noteBase].filter(Boolean).join(' · ')));
+        // v3 0.4: tracery board — qty = sides, section = board thickness x blank W,
+        // length = blank H (bounding box of the board outline + contourAllowance)
+        if (archSpec && archTracery) {
+            const T = archTracery.T, bb = archTracery.geom.bbox;
+            const allow = Number(p.arch?.contourAllowance) || 0;
+            const blankW = R(bb.maxX - bb.minX + 2 * allow), blankH = R(bb.maxY - bb.minY + 2 * allow);
+            sash.push(mk('sash', 'C-TRACERY', `${T.boardThickness}x${blankW}`, blankH, T.sides, `C-TRY-${pcode}`,
+                `blank ${blankW} x ${blankH} · ${archBars.pattern} · ${archTracery.geom.panes.length} panes · ${archTracery.geom.mode}`));
+        }
     });
 
     // ── Glass: one 24 mm unit per pane (fixed = dummy sash, same math) ──
@@ -1018,6 +1034,7 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
                 barCounts: archBars.counts,
                 barTotalLength: archBars.totalLength,
                 pattern: archBars.pattern,
+                tracery: archTracery ? { mode: archTracery.geom.mode, panes: archTracery.geom.panes.length, areas: archTracery.geom.areas, bbox: archTracery.geom.bbox, warnings: archTracery.geom.warnings } : null,
                 glassOutline: {
                     ...archOutline,
                     // glass-frame origin in FRAME coordinates (mm from the frame's
@@ -1032,8 +1049,9 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
             glass: R(glassKg),
             total: R((timberKg + glassKg) * wMargin),
         },
+        // v3 0.4: the tracery face (board minus panes, one side) adds to the paint area
         paint: archSpec
-            ? paintFromAreaSqm(round((frameWidth * AG.start + chainAreaAboveLine(AG.arcs)) / 1_000_000))
+            ? paintFromAreaSqm(round((frameWidth * AG.start + chainAreaAboveLine(AG.arcs) + (archTracery ? archTracery.geom.areas.timber * archTracery.T.sides : 0)) / 1_000_000))
             : calculatePaint(frameWidth, frameHeight),
         consumables: {
             glass: { type: windowSpec.glazing?.type || 'double', sqm: Math.round(glassSqm * 100) / 100 },

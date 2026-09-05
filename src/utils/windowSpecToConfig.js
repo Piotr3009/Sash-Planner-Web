@@ -96,6 +96,8 @@ export function windowSpecToConfig(windowSpec) {
       barPattern: arch.bars?.pattern || 'none',
       archMinHaunchRadius: Number(archProfileSettings?.minHaunchRadius) || 0,
       archPatterns: archProfileSettings?.patterns || null,
+      archSpokes: Number(arch.bars?.spokes) || null,
+      archRings: Array.isArray(arch.bars?.rings) && arch.bars.rings.length ? [...arch.bars.rings] : null,
     } : { casementType: 'standard' };
     return {
       windowCategory: 'casement',

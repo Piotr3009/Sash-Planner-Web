@@ -197,9 +197,11 @@ section('2 — bars on the glass outline (spec §2.3 / §3 vectors), glass frame
   check('intersecting on a semi-circle: same construction, 2 mullions + 4 tracery arcs, ends on the outline', si.bars.filter((b) => b.role === 'tracery').length === 4 && si.bars.filter((b) => b.role === 'tracery').every((b) => onOutline(b.arc.cx < 0 ? b.to : b.from, si.glassOutline)));
   expectThrows('hub-spoke on a three-centre → readable (PATTERNS_FOR_SHAPE: three-centre takes none)', () => derive(pcItem('B8', 1000, 1500, { archShape: 'three-centre', archStart: 1300, archBarPattern: 'hub-spoke' })), /Bar pattern "hub-spoke" is not available on a Three-centre arch \(allowed: none\)/);
   expectThrows('intersecting on a three-centre → readable', () => derive(pcItem('B9', 1000, 1500, { archShape: 'three-centre', archStart: 1300, archBarPattern: 'intersecting' })), /not available on a Three-centre arch/);
-  check('PATTERNS_FOR_SHAPE = PSW price-calculator.js 990–995 (semi-circle six, gothic none | intersecting, three-centre none)',
-    JSON.stringify(arch.PATTERNS_FOR_SHAPE['semi-circle']) === JSON.stringify(['none', 'half-hub', 'hub-spoke', 'double-hub-spoke', 'triple-hub-spoke', 'intersecting'])
-    && JSON.stringify(arch.PATTERNS_FOR_SHAPE['gothic-equilateral']) === '["none","intersecting"]' && JSON.stringify(arch.PATTERNS_FOR_SHAPE['gothic-drop']) === '["none","intersecting"]' && JSON.stringify(arch.PATTERNS_FOR_SHAPE['three-centre']) === '["none"]');
+  check('PSW_PATTERNS_FOR_SHAPE = PSW price-calculator.js 990–995 (semi-circle six, gothic none | intersecting, three-centre none); PC adds quad-hub-spoke + custom on the semi-circle only (v3 0.4)',
+    JSON.stringify(arch.PSW_PATTERNS_FOR_SHAPE['semi-circle']) === JSON.stringify(['none', 'half-hub', 'hub-spoke', 'double-hub-spoke', 'triple-hub-spoke', 'intersecting'])
+    && JSON.stringify(arch.PSW_PATTERNS_FOR_SHAPE['gothic-equilateral']) === '["none","intersecting"]' && JSON.stringify(arch.PSW_PATTERNS_FOR_SHAPE['gothic-drop']) === '["none","intersecting"]' && JSON.stringify(arch.PSW_PATTERNS_FOR_SHAPE['three-centre']) === '["none"]'
+    && JSON.stringify(arch.PATTERNS_FOR_SHAPE['semi-circle']) === JSON.stringify([...arch.PSW_PATTERNS_FOR_SHAPE['semi-circle'], 'quad-hub-spoke', 'custom'])
+    && JSON.stringify(arch.PATTERNS_FOR_SHAPE['gothic-equilateral']) === '["none","intersecting"]' && JSON.stringify(arch.PATTERNS_FOR_SHAPE['three-centre']) === '["none"]');
   // three-centre straight bars: the v-bar top follows the arc chain (haunch / crown)
   const tc = D.V1.d.arch;
   const tv = tc.bars;
@@ -352,7 +354,7 @@ section('5 — PSW import (P10) and v1-era migration');
   check('v1 item with archRise only (no archStart) → rise 300 custom, start 1200', v1.arch.rise === 300 && v1.arch.riseSource === 'custom' && v1.arch.start === 1200);
   const auto = specification.normaliseToWindowSpec({ width: 1000, height: 1500, windowCategory: 'casement', casementType: 'arched', archShape: 'three-centre', archStart: 1175, archRiseSource: 'ratio' });
   check('v2 item saved on Auto (archStart 1175, riseSource ratio) → rise 325, riseSource ratio kept', auto.arch.rise === 325 && auto.arch.riseSource === 'ratio');
-  check('PSW hinge inversion still applies (casArchHinge right → hinge left)', a.arch.hinge === 'left');
+  check('v3 0.4b: PSW hinge value taken 1:1 (casArchHinge right → hinge right, identity mapping)', a.arch.hinge === 'right');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -382,7 +384,7 @@ section('6 — glass PDF (jsPDF in node): Shape column, mm + % line, shaped draw
 // ═══════════════════════════════════════════════════════════════════════════
 section('7 — profile v3 block and vocabulary');
 check('profile.arch v3: minHaunchRadius 150, hubRingRatios [0.3, 0.6, 0.8], intersecting { 450, 2, 4, 30 }', P.arch.version === 3 && P.arch.minHaunchRadius === 150 && JSON.stringify(P.arch.patterns.hubRingRatios) === '[0.3,0.6,0.8]' && JSON.stringify(P.arch.patterns.intersecting) === '{"pitch":450,"minMullions":2,"maxMullions":4,"minRadius":30}');
-check('ARCH_BAR_PATTERNS vocabulary (six values) and labels', JSON.stringify(arch.ARCH_BAR_PATTERNS) === '["none","half-hub","hub-spoke","double-hub-spoke","triple-hub-spoke","intersecting"]' && arch.ARCH_BAR_PATTERNS.every((p) => typeof arch.ARCH_BAR_PATTERN_LABELS[p] === 'string'));
+check('ARCH_BAR_PATTERNS vocabulary (PSW six + v3 quad-hub-spoke + custom) and labels', JSON.stringify(arch.ARCH_BAR_PATTERNS) === '["none","half-hub","hub-spoke","double-hub-spoke","triple-hub-spoke","quad-hub-spoke","custom","intersecting"]' && arch.ARCH_BAR_PATTERNS.every((p) => typeof arch.ARCH_BAR_PATTERN_LABELS[p] === 'string'));
 expectThrows('unknown pattern in an item throws at normalisation', () => pcItem('X', 1000, 1500, { archShape: 'three-centre', archStart: 1000, archBarPattern: 'star' }), /Unknown arch bar pattern "star"/);
 check('CUT_LIST_ORDER: C-AH directly after C-FH, C-ATR directly after C-TR', (() => { const s = lists.CUT_LIST_ORDER.map((x) => x.symbol); return s[s.indexOf('C-FH') + 1] === 'C-AH' && s[s.indexOf('C-TR') + 1] === 'C-ATR'; })());
 check('bom ELEMENT_TO_PART_ID maps both curved members', bom.ELEMENT_TO_PART_ID['C-ARCH HEAD'] === 'c_frame_head' && bom.ELEMENT_TO_PART_ID['C-ARCH TOP RAIL'] === 'c_sash_top_rail');

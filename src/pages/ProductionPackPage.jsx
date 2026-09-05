@@ -56,7 +56,7 @@ import { groupCasementGlass } from '../components/drawings/casementDrawUtils.js'
 import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 import Window3DCaptureRig from '../components/viewer/Window3DCaptureRig.jsx';
 import ImageLightbox from '../components/ImageLightbox.jsx';
-import { exportCncJambsMerged, exportArchDxfMerged } from '../utils/cncExport.js';
+import { exportCncJambsMerged, exportArchDxfMerged, exportTraceryMerged } from '../utils/cncExport.js';
 import { exportGlassDxfMerged } from '../utils/glassDxfExport.js';
 
 // ─── Tab config ───
@@ -530,6 +530,24 @@ export default function ProductionPackPage() {
                 🛠 Arch DXF (all)
               </button>
             )}
+            {(pp?.type || batch?.type || 'sash') === 'casement' && ['dxf', 'lsp'].map((kind) => (
+              <button key={`tracery-${kind}`}
+                onClick={() => {
+                  const r = exportTraceryMerged(
+                    (windowsData || []).map((wd) => ({ windowSpec: wd.windowSpec, derived: wd.derived, name: wd.win?.name })),
+                    pp?.name || batch?.label || 'pack', kind,
+                  );
+                  if (r.error) { alert(`Tracery ${kind.toUpperCase()}: ${r.error}`); return; }
+                  if (r.skipped?.length) {
+                    alert(`Tracery ${kind.toUpperCase()} exported (${r.exported} windows).\nSkipped ${r.skipped.length}: ${r.skipped.map((s) => `${s.name} (${s.reason})`).join(', ')}`);
+                  }
+                }}
+                title={`One ${kind.toUpperCase()} with every arched casement's tracery board (bar pattern in the arch), stacked 300mm apart`}
+                className="btn btn-secondary text-xs px-4"
+              >
+                🪟 Tracery {kind.toUpperCase()} (all)
+              </button>
+            ))}
           </div>
         </div>
       </header>

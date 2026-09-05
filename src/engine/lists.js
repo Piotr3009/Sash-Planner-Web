@@ -499,6 +499,8 @@ export const CUT_LIST_ORDER = [
   { match: 'C-TOP RAIL',                symbol: 'C-TR',    label: 'Leaf Top Rail' },
   { match: 'C-ARCH TOP RAIL',           symbol: 'C-ATR',   label: 'Arched Leaf Top Rail' },
   { match: 'C-BOTTOM RAIL',             symbol: 'C-BR',    label: 'Leaf Bottom Rail' },
+  // v3 0.4: timber tracery board over the arched unit (one board, one side; section = thickness x blank W, length = blank H)
+  { match: 'C-TRACERY',                 symbol: 'C-TRY',   label: 'Tracery Board' },
   // ── DOOR (frame first, then dividers, then leaves, then side panels).
   //    French leaves share the single-leaf element names: identical lengths
   //    consolidate into one row (qty summed), pairs merge per window. ──
