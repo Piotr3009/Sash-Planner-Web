@@ -23,6 +23,7 @@ import PreCutPanel from '../components/dashboard/PreCutPanel.jsx';
 import ThreeDPanel from '../components/dashboard/ThreeDPanel.jsx';
 import ExportControls from '../components/export/ExportControls.jsx';
 import { exportGlassPDF } from '../utils/glassPdfExport.js';
+import { exportGlassDxfForWindow, glassDxfParamsForWindow } from '../utils/glassDxfExport.js';
 import { exportBomPDF } from '../utils/bomPdfExport.js';
 import { exportCncJambsForWindow, canExportCncJambs, exportArchDxfForWindow, archParamsForWindow } from '../utils/cncExport.js';
 
@@ -311,9 +312,30 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
       <div className="card p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="text-sm font-semibold text-ink-50">Glass Schedule</div>
-          <button onClick={handleExport} className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors">
-            📄 Export PDF
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Glazier DXF for shaped (arched) units — arched-casement-v2 C. Same
+                row and style as the PDF export; disabled with the reason on
+                windows without a shaped unit. */}
+            {(windowSpec?.category || 'sash') === 'casement' && (() => {
+              const r = glassDxfParamsForWindow(windowSpec, derived, item?.name);
+              return (
+                <button
+                  onClick={() => {
+                    const res = exportGlassDxfForWindow(windowSpec, derived, item?.name);
+                    if (res.error) alert(`Glass DXF unavailable: ${res.error}`);
+                  }}
+                  disabled={!!r.skip}
+                  title={r.skip ? `Glass DXF unavailable: ${r.skip}` : 'Glazier DXF: exact contour + bar axes of every shaped unit'}
+                  className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  📐 Glass DXF
+                </button>
+              );
+            })()}
+            <button onClick={handleExport} className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors">
+              📄 Export PDF
+            </button>
+          </div>
         </div>
         <div className="bg-surface-600 rounded-lg border border-surface-500 overflow-hidden">
           <table className="w-full text-xs">

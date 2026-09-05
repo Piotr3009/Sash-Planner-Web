@@ -6,10 +6,18 @@
  *
  * Page 1: compact header + full summary table
  * Page 2+: compact header + 6 CAD drawings per page (3×2)
+ *
+ * Shaped units (arched casement, arched-casement-v2 C): the schedule gains a
+ * Shape column (`arched · R …` with a tiny outline glyph, `rect` otherwise)
+ * and, per shaped row, a second line with the bar positions in mm AND in % of
+ * the clear width / height (P6); the drawing cell draws the true outline
+ * (exact arcs as cubic Béziers) and the bar axes from the engine's bar list.
+ * Rectangular units are unchanged.
  */
 import { jsPDF } from 'jspdf';
 import { buildGlassListForWindow } from '../engine/lists.js';
 import { computeGlassBarPositions } from '../components/drawings/drawingUtils.jsx';
+import { chainYAtX } from '../engine/arch.js';
 
 // ─── COLORS (RGB 0-255) ───
 const C = {
@@ -63,16 +71,118 @@ function fmt(n) {
 
 // ─── SUMMARY TABLE COLUMN OFFSETS (mm from table x) ───
 const COL = {
-  no: 0, window: 8, sash: 32, width: 62, height: 86, type: 112,
-  makeup: 138, spec: 164, coating: 190, gas: 214, finish: 228,
-  spacer: 246, bars: 266,
+  no: 0, window: 8, sash: 30, width: 54, height: 76, shape: 98, type: 124,
+  makeup: 146, spec: 170, coating: 194, gas: 214, finish: 228,
+  spacer: 244, bars: 266,
 };
+const SHAPE_ICON = { w: 6, h: 4.5 };       // outline glyph in the Shape column (mm)
+const SHAPE_LINE_H = 3.2;                  // extra table line for the bar positions of a shaped unit
+const PATTERN_SHORT = { 'half-hub': 'half hub', 'hub-spoke': 'hub', 'double-hub-spoke': 'dbl hub', 'triple-hub-spoke': 'tpl hub', 'intersecting': 'intersect' };
 
 // Label helpers — mirror the on-screen Glass Schedule wording.
 const coatingLabel = (c) => (c === 'soft_coat' ? 'Soft Coat' : 'Standard');
 const gasLabel = (g) => (g ? String(g).charAt(0).toUpperCase() + String(g).slice(1) : '—');
 const spacerTypeLabel = (t) => (t === 'alu' ? 'alu' : 'warm');
 const spacerLabel = (g) => `${g.spacer || '—'} · ${spacerTypeLabel(g.spacerType)}`;
+
+// ─── SHAPED UNITS (arched casement) ───
+const pct = (v, base) => (base > 0 ? `${Math.round((v / base) * 100)}%` : '—');
+const DEG = 180 / Math.PI;
+
+/** `arched · R 55.5/1305.5/55.5` — the GLASS radii (what the glazier cuts), or `rect`. */
+function shapeLabel(shape) {
+  if (!shape) return 'rect';
+  const radii = [...new Set((shape.radii || []).map((r) => fmt(r)))];
+  return `arched · R ${radii.length ? radii.join('/') : '?'}`;
+}
+
+/**
+ * Bar positions of a shaped unit in mm and in % of the clear width (x) /
+ * clear height (y, unit bottom → apex) — P6, one line for the schedule.
+ */
+function shapeBarText(shape) {
+  const W = shape.outline?.width || 0, H = shape.outline?.height || 0;
+  const parts = [`springing ${fmt(shape.springing)} (${pct(shape.springing, H)})`];
+  for (const b of shape.bars || []) {
+    if (b.kind === 'arc') {
+      const a = b.arc;
+      parts.push(b.role === 'ring'
+        ? `${b.id} ring R ${fmt(a.r)}`
+        : `${b.id} ${b.role} R ${fmt(a.r)} c (${fmt(a.cx)}, ${fmt(a.cy)})`);
+      continue;
+    }
+    const [x0, y0] = b.from, [x1, y1] = b.to;
+    if (b.role === 'v' || Math.abs(x1 - x0) < 1e-6) parts.push(`${b.id} x ${fmt(x0)} (${pct(x0, W)}) to y ${fmt(Math.max(y0, y1))}`);
+    else if (b.role === 'h' || b.role === 'springing' || Math.abs(y1 - y0) < 1e-6) parts.push(`${b.id} y ${fmt(y0)} (${pct(y0, H)}) x ${fmt(Math.min(x0, x1))}-${fmt(Math.max(x0, x1))}`);
+    else parts.push(`${b.id} ${b.role} ${fmt(Math.atan2(y1 - y0, x1 - x0) * DEG)}° from (${fmt(x0)}, ${fmt(y0)}) L ${fmt(b.length)}`);
+  }
+  return parts.join(' · ');
+}
+
+/** Cubic Bézier segments (≤ 90° each) of a counter-clockwise arc, unit frame (y up). */
+function arcBeziers(a) {
+  const span = a.a1 - a.a0;
+  const n = Math.max(1, Math.ceil(Math.abs(span) / (Math.PI / 2) - 1e-9));
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const t0 = a.a0 + span * i / n, t1 = a.a0 + span * (i + 1) / n;
+    const k = (4 / 3) * Math.tan((t1 - t0) / 4);
+    const p0 = [a.cx + a.r * Math.cos(t0), a.cy + a.r * Math.sin(t0)];
+    const p3 = [a.cx + a.r * Math.cos(t1), a.cy + a.r * Math.sin(t1)];
+    const c1 = [p0[0] - k * a.r * Math.sin(t0), p0[1] + k * a.r * Math.cos(t0)];
+    const c2 = [p3[0] + k * a.r * Math.sin(t1), p3[1] - k * a.r * Math.cos(t1)];
+    out.push({ p0, c1, c2, p3 });
+  }
+  return out;
+}
+
+/**
+ * jsPDF `lines()` path of the outline: relative vectors from the unit's
+ * bottom-left corner, unit frame scaled by `sc`, PDF y down.
+ */
+function outlineLines(outline, sc) {
+  let cur = [0, 0];
+  const lines = [];
+  const to = (x, y) => { const px = x * sc, py = -y * sc; lines.push([px - cur[0], py - cur[1]]); cur = [px, py]; };
+  const bez = (c1, c2, p) => {
+    lines.push([c1[0] * sc - cur[0], -c1[1] * sc - cur[1], c2[0] * sc - cur[0], -c2[1] * sc - cur[1], p[0] * sc - cur[0], -p[1] * sc - cur[1]]);
+    cur = [p[0] * sc, -p[1] * sc];
+  };
+  to(outline.width, 0);
+  to(outline.width, outline.springing);
+  for (const a of outline.arcs) for (const seg of arcBeziers(a)) bez(seg.c1, seg.c2, seg.p3);
+  return lines;   // closed by jsPDF back to (0, 0)
+}
+
+/** Stroke one bar axis (straight or arc) inside a drawing placed with its unit origin at (ox, oyBottom). */
+function drawBarAxis(doc, b, ox, oyBottom, sc) {
+  if (b.kind === 'arc') {
+    const segs = arcBeziers(b.arc);
+    const p0 = segs[0].p0;
+    let cur = [p0[0] * sc, -p0[1] * sc];
+    const lines = segs.map((sg) => {
+      const l = [sg.c1[0] * sc - cur[0], -sg.c1[1] * sc - cur[1], sg.c2[0] * sc - cur[0], -sg.c2[1] * sc - cur[1], sg.p3[0] * sc - cur[0], -sg.p3[1] * sc - cur[1]];
+      cur = [sg.p3[0] * sc, -sg.p3[1] * sc];
+      return l;
+    });
+    doc.lines(lines, ox + p0[0] * sc, oyBottom - p0[1] * sc, [1, 1], 'S', false);
+  } else {
+    doc.line(ox + b.from[0] * sc, oyBottom - b.from[1] * sc, ox + b.to[0] * sc, oyBottom - b.to[1] * sc);
+  }
+}
+
+/** Tiny outline glyph for the Shape column. */
+function drawShapeIcon(doc, shape, x, yTop, w, h) {
+  const o = shape.outline;
+  if (!o?.width || !o?.height) return;
+  const sc = Math.min(w / o.width, h / o.height);
+  const gw = o.width * sc, gh = o.height * sc;
+  const ox = x + (w - gw) / 2, oyBottom = yTop + (h - gh) / 2 + gh;
+  dc(doc, C.glass);
+  fc(doc, C.glassFill);
+  doc.setLineWidth(LW.seal);
+  doc.lines(outlineLines(o, sc), ox, oyBottom, [1, 1], 'FD', true);
+}
 
 function segsBetween(from, to, cutPairs) {
   if (!cutPairs.length) return [{ a: from, b: to }];
@@ -241,6 +351,7 @@ function drawTable(doc, items, startY) {
     { l: 'Sash',       dx: COL.sash },
     { l: 'Width (mm)', dx: COL.width },
     { l: 'Height (mm)',dx: COL.height },
+    { l: 'Shape',      dx: COL.shape },
     { l: 'Type',       dx: COL.type },
     { l: 'Makeup',     dx: COL.makeup },
     { l: 'Spec',       dx: COL.spec },
@@ -261,11 +372,13 @@ function drawTable(doc, items, startY) {
   doc.line(x, y + 1.5, x + 270, y + 1.5);
   y += TABLE_ROW_H;
 
-  // Rows
+  // Rows — a shaped unit takes extra lines for its bar positions (mm + %)
   items.forEach((g, i) => {
+    const extra = g.shape ? doc.splitTextToSize(shapeBarText(g.shape), 262) : [];
+    const rowH = TABLE_ROW_H + extra.length * SHAPE_LINE_H;
     if (i % 2 === 0) {
       fc(doc, C.rowBg);
-      doc.rect(x - 1, y - 3.5, 272, TABLE_ROW_H, 'F');
+      doc.rect(x - 1, y - 3.5, 272, rowH, 'F');
     }
 
     // Solid black on every row (Piotr 02.08 — the alternating C.dark read
@@ -285,6 +398,16 @@ function drawTable(doc, items, startY) {
     doc.text(fmt(g.glassH), x + COL.height, y);
 
     doc.setFont('helvetica', 'normal');
+    // Shape: glyph + `arched · R …` (5.5pt to fit) or `rect`
+    if (g.shape) {
+      drawShapeIcon(doc, g.shape, x + COL.shape, y - 3.4, SHAPE_ICON.w, SHAPE_ICON.h);
+      tc(doc, C.black);
+      doc.setFontSize(5.5);
+      doc.text(shapeLabel(g.shape), x + COL.shape + SHAPE_ICON.w + 1, y);
+      doc.setFontSize(6.5);
+    } else {
+      doc.text('rect', x + COL.shape, y);
+    }
     doc.text(g.type || '', x + COL.type, y);
     doc.text(g.makeup || '—', x + COL.makeup, y);
     doc.text(g.spec || '', x + COL.spec, y);
@@ -296,14 +419,25 @@ function drawTable(doc, items, startY) {
     // Bars: compact form in the TABLE ("2H×1V geo") so it clears the Spacer
     // column; the full wording travels on the drawing spec line (Piotr 02.08).
     doc.setFontSize(5.5);
-    const barsCell = String(g.bars || 'none')
+    let barsCell = String(g.bars || 'none')
       .replace(/\s*×\s*/g, '×')
       .replace('georgian', 'geo')
       .replace('astragal', 'ast');
+    for (const [long, short] of Object.entries(PATTERN_SHORT)) barsCell = barsCell.replace(long, short);
     doc.text(barsCell, x + 269, y, { align: 'right' });
     doc.setFontSize(6.5);
 
-    y += TABLE_ROW_H;
+    // Shaped unit: bar positions in mm and % of the clear width / height (P6)
+    if (extra.length) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(5);
+      tc(doc, C.dark);
+      extra.forEach((line, k) => doc.text(line, x + COL.window, y + SHAPE_LINE_H * (k + 1)));
+      doc.setFontSize(6.5);
+      tc(doc, C.black);
+    }
+
+    y += rowH;
   });
 
   return y;
@@ -340,6 +474,9 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
   dc(doc, C.black);
   doc.setLineWidth(LW.cellIn);
   doc.line(cx + 0.3, cy + 6, cx + cw - 0.3, cy + 6);
+
+  // Shaped unit (arched casement): true outline + bar axes, own dimensions
+  if (g.shape) { drawShapedGlass(doc, cx, cy, cw, ch, g); return; }
 
   // Drawing area — no bottom text, maximized
   const dMargin = { l: 10, t: 8, r: 10, b: 8 };
@@ -534,6 +671,126 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
 
 }
 
+// ─── SHAPED GLASS DRAWING (arched casement) ───
+// Same cell frame as drawGlass; the outline is the exact glass shape (arcs as
+// cubic Béziers, ≤ 90° per segment), the bars are the engine's bar axes, the
+// dimensions: chain H on top (vertical bar x's), chain V on the left (h bars,
+// springing, apex), overall W below and H on the right, radii + rise line under
+// the title. No edge-seal offset on shaped units (the glazier's edge detail
+// follows the outline; the DXF is the cutting reference).
+function drawShapedGlass(doc, cx, cy, cw, ch, g) {
+  const shape = g.shape;
+  const o = shape.outline;
+  const bars = shape.bars || [];
+  // second header line: radii, rise, springing, bars in mm + %
+  const headTop = cy + 6;
+  const note = `R ${(shape.radii || []).map(fmt).join(' / ')} · rise ${fmt(shape.rise)} · ${shapeBarText(shape)}`;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(4.5);
+  tc(doc, C.dark);
+  const noteLines = doc.splitTextToSize(note, cw - 4).slice(0, 2);
+  noteLines.forEach((l, i) => doc.text(l, cx + 2, headTop + 2.6 + i * 2.6));
+  const headH = 6 + noteLines.length * 2.6 + 0.8;
+  dc(doc, C.black);
+  doc.setLineWidth(LW.cellIn);
+  doc.line(cx + 0.3, cy + headH, cx + cw - 0.3, cy + headH);
+
+  const dMargin = { l: 10, t: 8, r: 10, b: 8 };
+  const areaX = cx + 2;
+  const areaY = cy + headH + 2;
+  const areaW = cw - 4;
+  const areaH = ch - headH - 6;
+  const availW = areaW - dMargin.l - dMargin.r;
+  const availH = areaH - dMargin.t - dMargin.b;
+  const sc = Math.min(availW / o.width, availH / o.height);
+  const gw = o.width * sc;
+  const gh = o.height * sc;
+  const gx = areaX + dMargin.l + (availW - gw) / 2;
+  const gy = areaY + dMargin.t + (availH - gh) / 2;
+  const oyBottom = gy + gh;
+
+  // Outline (fill + stroke)
+  fc(doc, C.glassFill);
+  dc(doc, C.glass);
+  doc.setLineWidth(LW.outline);
+  doc.lines(outlineLines(o, sc), gx, oyBottom, [1, 1], 'FD', true);
+
+  // Bar axes
+  dc(doc, C.glass);
+  doc.setLineWidth(LW.seal);
+  for (const b of bars) drawBarAxis(doc, b, gx, oyBottom, sc);
+
+  // ── CHAIN H (top): vertical bar / mullion x positions ──
+  const xs = [...new Set(bars.filter((b) => b.kind === 'straight' && Math.abs(b.to[0] - b.from[0]) < 1e-6).map((b) => Math.round(b.from[0] * 10) / 10))].sort((a, b) => a - b);
+  const hCuts = [0, ...xs.filter((v) => v > 0 && v < o.width), o.width];
+  const chainY = gy - 4;
+  dc(doc, C.dim);
+  doc.setLineWidth(LW.dimLine);
+  doc.line(gx, chainY, gx + gw, chainY);
+  hCuts.forEach((cut) => {
+    const px = gx + cut * sc;
+    doc.setLineWidth(LW.tick);
+    doc.line(px, chainY - 1.2, px, chainY + 1.2);
+    doc.setLineWidth(LW.ext);
+    doc.setLineDashPattern([0.5, 0.4], 0);
+    const yTop = chainYAtX(o.arcs, cut) ?? o.springing;          // outline height at this x
+    doc.line(px, chainY + 1.2, px, oyBottom - yTop * sc);
+    doc.setLineDashPattern([], 0);
+  });
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(6);
+  tc(doc, C.dim);
+  for (let i = 0; i < hCuts.length - 1; i++) {
+    const midX = gx + (hCuts[i] + hCuts[i + 1]) / 2 * sc;
+    doc.text(fmt(hCuts[i + 1] - hCuts[i]), midX, chainY - 1.8, { align: 'center' });
+  }
+
+  // ── CHAIN V (left): horizontal bars, springing, apex ──
+  const ys = [...new Set(bars.filter((b) => b.kind === 'straight' && Math.abs(b.to[1] - b.from[1]) < 1e-6).map((b) => Math.round(b.from[1] * 10) / 10))];
+  const vCuts = [...new Set([0, ...ys.filter((v) => v > 0 && v < o.height), Math.round(o.springing * 10) / 10, o.height])].sort((a, b) => a - b);
+  const chainX = gx - 4;
+  dc(doc, C.dim);
+  doc.setLineWidth(LW.dimLine);
+  doc.line(chainX, gy, chainX, oyBottom);
+  vCuts.forEach((cut) => {
+    const py = oyBottom - cut * sc;
+    doc.setLineWidth(LW.tick);
+    doc.line(chainX - 1.2, py, chainX + 1.2, py);
+    doc.setLineWidth(LW.ext);
+    doc.setLineDashPattern([0.5, 0.4], 0);
+    doc.line(chainX + 1.2, py, gx, py);
+    doc.setLineDashPattern([], 0);
+  });
+  for (let i = 0; i < vCuts.length - 1; i++) {
+    const midY = oyBottom - (vCuts[i] + vCuts[i + 1]) / 2 * sc;
+    doc.text(fmt(vCuts[i + 1] - vCuts[i]), chainX - 1.8, midY, { angle: 90, align: 'center' });
+  }
+
+  // ── OVERALL WIDTH (bottom) / HEIGHT (right) ──
+  const owY = oyBottom + 4;
+  dc(doc, C.dim);
+  doc.setLineWidth(LW.dimOver);
+  doc.line(gx, owY, gx + gw, owY);
+  doc.line(gx, owY - 1.2, gx, owY + 1.2);
+  doc.line(gx + gw, owY - 1.2, gx + gw, owY + 1.2);
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(6);
+  tc(doc, C.dim);
+  doc.text(`${fmt(o.width)} mm`, gx + gw / 2, owY + 3.5, { align: 'center' });
+  const ohX = gx + gw + 4;
+  doc.setLineWidth(LW.dimOver);
+  doc.line(ohX, gy, ohX, oyBottom);
+  doc.line(ohX - 1.2, gy, ohX + 1.2, gy);
+  doc.line(ohX - 1.2, oyBottom, ohX + 1.2, oyBottom);
+  doc.text(`${fmt(o.height)} mm`, ohX + 3.5, gy + gh / 2, { angle: 90, align: 'center' });
+  // springing tick on the right (rise above it)
+  const spY = oyBottom - o.springing * sc;
+  doc.setLineWidth(LW.tick);
+  doc.line(ohX - 1.2, spY, ohX + 1.2, spY);
+  doc.setFontSize(5);
+  doc.text(`rise ${fmt(shape.rise)}`, ohX + 3.5, (gy + spY) / 2, { angle: 90, align: 'center' });
+}
+
 // ─── FOOTER ───
 
 function drawFooter(doc, info, pageNum, totalPages) {
@@ -611,6 +868,9 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
           bars: r.bars || 'none',
           barsV: r.barsV,
           barsH: r.barsH,
+          // shaped unit (arched casement): outline + bar list for the Shape
+          // column, the mm + % line and the drawing cell
+          shape: r.shape?.kind === 'arched' ? r.shape : null,
           sashW,
           sashH,
           faces: derived?.sashDims,

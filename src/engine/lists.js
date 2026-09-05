@@ -216,6 +216,22 @@ export function buildGlassListForWindow(derived, windowSpec) {
           row.bars = `${h}H × ${v}V ${barType}`;
         }
       }
+      // Shaped unit (arched casement, arched-casement-v2): the row keeps the
+      // bounding width × height; `shape` carries the outline + bar list for the
+      // glazier exports, and the bars label comes from the engine's bar list
+      // (hub patterns drop the straight verticals, PSW rule).
+      if (u.shape) {
+        row.shape = u.shape;
+        const bc = u.shape.barCounts || { h: 0, v: 0 };
+        const pat = u.shape.pattern && u.shape.pattern !== 'none' ? u.shape.pattern : null;
+        row.barsV = bc.v;
+        row.barsH = bc.h;
+        const parts = [];
+        if (bc.v > 0 || bc.h > 0) parts.push(`${bc.h}H × ${bc.v}V`);
+        if (pat) parts.push(pat);
+        if (parts.length) row.bars = `${parts.join(' · ')} ${barType}`;
+        else delete row.bars;
+      }
       return row;
     });
   }
@@ -473,12 +489,15 @@ export const CUT_LIST_ORDER = [
   { match: 'BOTTOM RAIL',               symbol: 'BR',      label: 'Bottom Rail' },
   // ── CASEMENT (frame first, then dividers, then leaves) ──
   { match: 'C-FRAME HEAD',              symbol: 'C-FH',    label: 'Frame Head' },
+  // Arched casement (arched-casement-v2): curved head / leaf top rail, length = arc length at the member centre line
+  { match: 'C-ARCH HEAD',               symbol: 'C-AH',    label: 'Arched Frame Head' },
   { match: 'C-FRAME JAMB (L)',          symbol: 'C-J-L/R', label: 'Frame Jambs (pair)',          isPair: true },
   { match: 'C-FRAME CILL',              symbol: 'C-CILL',  label: 'Frame Cill' },
   { match: 'C-MULLION',                 symbol: 'C-M',     label: 'Mullion' },
   { match: 'C-TRANSOM',                 symbol: 'C-T',     label: 'Transom' },
   { match: 'C-STILE (L)',               symbol: 'C-ST-L/R', label: 'Leaf Stiles (pair)',         isPair: true },
   { match: 'C-TOP RAIL',                symbol: 'C-TR',    label: 'Leaf Top Rail' },
+  { match: 'C-ARCH TOP RAIL',           symbol: 'C-ATR',   label: 'Arched Leaf Top Rail' },
   { match: 'C-BOTTOM RAIL',             symbol: 'C-BR',    label: 'Leaf Bottom Rail' },
   // ── DOOR (frame first, then dividers, then leaves, then side panels).
   //    French leaves share the single-leaf element names: identical lengths

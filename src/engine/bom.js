@@ -85,6 +85,12 @@ Object.assign(ELEMENT_TO_PART_ID, {
   'C-STILE (L)': 'c_sash_stile',
   'C-STILE (R)': 'c_sash_stile',
   'C-TOP RAIL': 'c_sash_top_rail',
+  // Arched casement (arched-casement-v2): curved members buy the same part
+  // slots as their straight counterparts (the blank is glued from the board
+  // stock in profile.arch — see BLOCKERS §9); without these rows the BOM
+  // silently dropped the arch timber.
+  'C-ARCH HEAD': 'c_frame_head',
+  'C-ARCH TOP RAIL': 'c_sash_top_rail',
   'C-BOTTOM RAIL': 'c_sash_bottom_rail',
   'C-MULLION': 'c_mullion',
   'C-TRANSOM': 'c_transom',

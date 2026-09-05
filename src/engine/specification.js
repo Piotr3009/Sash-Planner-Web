@@ -43,7 +43,10 @@ export const DOOR_FRAME_DEPTH = 93;
 export const glassGas = (type) => (type === 'single' || type === 'passive') ? '' : 'argon';
 import { FAN_AXIS_OFFSET_TOP, FAN_AXIS_OFFSET_BOTTOM } from './casementLayouts.js';
 import { profileBoxDepth } from './profile.js';
-import { PSW_ARCH_SHAPE, ARCH_RISE_RATIO, GOTHIC_PROFILE_RATIO, isArchShape, ArchError } from './arch.js';
+import {
+  PSW_ARCH_SHAPE, PSW_ARCH_RISE_RATIO, LEGACY_ARCH_SHAPES, ARCH_RISE_RATIO, GOTHIC_PROFILE_RATIO,
+  ARCH_BAR_PATTERNS, isArchShape, isRoundShape, resolveRoundShape, ArchError,
+} from './arch.js';
 
 function customBarsFromSpec(spec, item) {
   // New format: item stores custom bars directly as arrays of {type, mm}
@@ -72,8 +75,9 @@ function customBarsFromSpec(spec, item) {
 }
 
 /**
- * Arched casement fields (arched-casement-v1). Returns null for every window
- * that is not an arched casement, so consumers test `windowSpec.arch?.shape`.
+ * Arched casement fields (arched-casement-v1, v2 shape model). Returns null
+ * for every window that is not an arched casement, so consumers test
+ * `windowSpec.arch?.shape`.
  *
  * PSW source: casement-controller.js getCasementConfig() writes
  *   casementType 'arched', casArchShape (gothic-arch | semi-circle |
@@ -82,43 +86,69 @@ function customBarsFromSpec(spec, item) {
  * carries value="right" and vice versa — the stored value is the OPPOSITE of
  * what the customer chose. PC stores the meaning, so the value is inverted
  * here, once, on read (same policy as the door hinge/open-direction fix).
- * PC-native items may carry archShape / archRise / archHinge / archProfile
- * directly, already in PC vocabulary.
+ * PC-native items carry archShape / archStart / archRise / archRiseSource /
+ * archHinge / archProfile / archBarPattern directly, in PC vocabulary.
+ *
+ * Rise (v2 P4): the configurator stores WHERE THE ARCH STARTS (`archStart`,
+ * mm from the cill) — rise = height − start. A v1 item without a start keeps
+ * its explicit `archRise`; without either the rise is ratio × external width
+ * (`riseSource: 'ratio'`). Shape (v2 P2 / P10): a Round arch resolves from its
+ * rise — exactly half the width is a semi-circle, below it a three-centre,
+ * above it an ArchError ("use Gothic"). PSW 'segmental-arch' → three-centre
+ * with the PSW segmental rise 0.20 × W, 'elliptical-arch' → 0.325 × W; a v1-era
+ * PC 'segmental' migrates the same way with riseSource 'ratio'. PSW gothic +
+ * archProfile 'drop' / 'shallow' → PC 'gothic-drop' with that profile's rise.
  *
  * Spec §4.1: an UNKNOWN shape throws (a silent rectangle was the critical
- * import bug); a shape WITHOUT a rise gets rise = ratio × external width
- * (`riseSource: 'ratio'`), an explicit rise is `'custom'`. PSW gothic +
- * archProfile 'drop' / 'shallow' → PC 'gothic-drop' with that profile's
- * default rise (§3.2); `profile` is null for non-gothic shapes.
- * `width` = external frame width (mm) for the ratio.
+ * import bug); so does an unknown bar pattern. `width` / `height` = external
+ * frame size (mm).
  */
-export function archFromSpec(item, fc, width) {
-  const pcShape = item?.archShape || fc.archShape;
+export function archFromSpec(item, fc, width, height) {
+  const pcShapeRaw = item?.archShape || fc.archShape;
   const pswShape = item?.casArchShape || fc.casArchShape;
-  const isArched = (item?.casementType || fc.casementType) === 'arched' || !!pcShape;
+  const isArched = (item?.casementType || fc.casementType) === 'arched' || !!pcShapeRaw;
   if (!isArched) return null;
   const name = item?.name || item?.window_number || '?';
   const profileRaw = item?.archProfile || fc.archProfile || item?.casArchProfile || fc.casArchProfile || null;
+  const legacy = pcShapeRaw ? LEGACY_ARCH_SHAPES[pcShapeRaw] : null;
   let shape;
-  if (pcShape) shape = pcShape;
+  let ratio = null;
+  if (legacy) { shape = legacy.shape; ratio = legacy.riseRatio; }                  // P10: v1 'segmental' → three-centre, 0.20 × W
+  else if (pcShapeRaw) shape = pcShapeRaw;
   else if (pswShape) {
     shape = PSW_ARCH_SHAPE[pswShape];
     if (!shape) throw new ArchError(`Unknown PSW arch shape "${pswShape}" on window "${name}" — cannot build an arched casement from it`);
+    ratio = PSW_ARCH_RISE_RATIO[pswShape];
     if (shape === 'gothic-equilateral' && profileRaw && profileRaw !== 'equilateral') shape = 'gothic-drop';
-  } else shape = PSW_ARCH_SHAPE['semi-circle'];                           // PSW default when the radio never changed
+  } else {                                                                          // PSW default when the radio never changed
+    shape = PSW_ARCH_SHAPE['semi-circle'];
+    ratio = PSW_ARCH_RISE_RATIO['semi-circle'];
+  }
   if (!isArchShape(shape)) throw new ArchError(`Unknown arch shape "${shape}" on window "${name}" — cannot build an arched casement from it`);
   const profile = shape === 'gothic-equilateral' ? 'equilateral'
     : shape === 'gothic-drop' ? (profileRaw === 'shallow' ? 'shallow' : 'drop')
     : null;
+  if (profile) ratio = GOTHIC_PROFILE_RATIO[profile];
+  else if (ratio == null) ratio = ARCH_RISE_RATIO[shape];
+  const W = Number(width);
+  const H = Number(height);
+  const startRaw = item?.archStart ?? fc.archStart;
   const riseRaw = item?.archRise ?? fc.archRise;
-  let rise = riseRaw == null || riseRaw === '' ? Number.NaN : Number(riseRaw);
-  let riseSource = 'custom';
-  if (!Number.isFinite(rise)) {
-    const W = Number(width);
-    const ratio = profile ? GOTHIC_PROFILE_RATIO[profile] : ARCH_RISE_RATIO[shape];
-    rise = W > 0 ? ratio * W : null;
+  const startNum = startRaw == null || startRaw === '' ? Number.NaN : Number(startRaw);
+  const riseNum = riseRaw == null || riseRaw === '' ? Number.NaN : Number(riseRaw);
+  let rise, riseSource;
+  if (!legacy && Number.isFinite(startNum) && H > 0) {
+    rise = H - startNum;                                                            // v2: the joiner measures where the arch starts
+    riseSource = (item?.archRiseSource || fc.archRiseSource) === 'ratio' ? 'ratio' : 'custom';
+  } else if (!legacy && Number.isFinite(riseNum)) {
+    rise = riseNum;                                                                 // v1 item: explicit rise, no start
+    riseSource = 'custom';
+  } else {
+    rise = W > 0 ? ratio * W : null;                                                // shape default (PSW ratio) — also every migrated v1 'segmental'
     riseSource = 'ratio';
   }
+  if (isRoundShape(shape) && Number.isFinite(rise)) shape = resolveRoundShape(W, rise);   // v2 §2.2, may throw "use Gothic"
+  const start = Number.isFinite(rise) && H > 0 ? H - rise : null;
   let hinge;
   if (item?.archHinge || fc.archHinge) hinge = (item?.archHinge || fc.archHinge) === 'right' ? 'right' : 'left';
   else {
@@ -126,7 +156,14 @@ export function archFromSpec(item, fc, width) {
     const psw = item?.casArchHinge || fc.casArchHinge || fc['cas-arch-opening'] || 'right';   // PSW default value = "Left Hinge" label
     hinge = psw === 'right' ? 'left' : 'right';                           // inverted: label is the truth
   }
-  return { shape, profile, rise, riseSource, hinge };
+  const pattern = item?.archBarPattern || fc.archBarPattern || 'none';
+  if (!ARCH_BAR_PATTERNS.includes(pattern)) throw new ArchError(`Unknown arch bar pattern "${pattern}" on window "${name}"`);
+  const bars = {
+    pattern,
+    h: Number(item?.casementHBars ?? fc.casementHBars) || 0,   // straight bars below the springing
+    v: Number(item?.casementVBars ?? fc.casementVBars) || 0,   // straight bars across the clear width
+  };
+  return { shape, profile, rise, start, riseSource, hinge, bars };
 }
 
 /**
@@ -250,7 +287,7 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       },
     },
     // ── Arched casement (arched-casement-v1) — null unless casementType 'arched'
-    arch: archFromSpec(item, fc, width),
+    arch: archFromSpec(item, fc, width, height),
     // ── Doors (PSW parity, Piotr 04.08) ─────────────────────────────────
     // Field names and value vocabularies match the PSW door-controller 1:1 so
     // a future PSW→PC import maps straight across. Two known PSW bugs are NOT

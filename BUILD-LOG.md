@@ -4,6 +4,240 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-09-06 — arched-casement-v2 night 3: A + B + C + t18 (branch `claude/arched-casement-v2-impl-0j27uw`)
+
+Inputs read in full, in this order: `CLAUDE.md` → `ARCHED-CASEMENT-v2.md` (spec, P1–P10 override v1) →
+`ARCHED-CASEMENT-v1.md` §0 → `ARCHED-CASEMENT-v1-AUDIT.md` §2 → `-AS-BUILT.md`, `BLOCKERS.md`, `BUILD-LOG.md`
+(night 2). Baseline on the branch start (`faedf98` = `origin/main`): t16 465/465, t17 73/73 ALL PASS.
+The spec v2 §3 vectors were checked by hand before coding (r 150 / R 1400 / T (392, 144) / 73.74° /
+1180.72 etc. all follow from P3) — they are the expected values, the harness reproduces them.
+PSW clone (read-only) succeeded: `FixFrameWindow.jsx` 667–830 / 847–1030 and `price-calculator.js`
+985–1000 were read for the bar patterns and `PATTERNS_FOR_SHAPE`.
+
+Decisions taken up front (details in BLOCKERS.md §9):
+1. `segmental` is removed from `ARCH_SHAPES` (P2). The t16 §10.1 / §10.2 segmental vectors are
+   superseded by a three-centre rise 240 under P3 (r clamps to 150, crown R 1320); the 390 vector is
+   unchanged (r 253.5 > 150). t16 §10.3 item 10 now freezes `casementLayouts.js` + `jambDxf.js` only —
+   `lists.js` / `calculations.js` are in scope for v2 (B).
+2. `archArcs(shape, W, rise, { minHaunchRadius })`: the P3 minimum is an option so pure-geometry
+   callers keep the v1 rule; `buildArchGeometry` reads it from `profile.arch.minHaunchRadius` (required,
+   readable error when missing). Consequence F2: a Round arch needs rise > 150 (rise = r leaves no crown
+   arc) — at W 400 the PSW defaults (80 / 130) are rejected; Auto (0.325 W) clears 150 from W 462.
+3. Profile `arch` block → version 3 (`minHaunchRadius`, `patterns` ring ratios / tracery pitch); a stored
+   v2 block is replaced whole (no UI edits it).
+
+### A — configurator (`ConfiguratorPage.jsx`, `projectStore.js`, `specification.js`, `arch.js`, `profile.js`)
+
+**Understanding:** the joiner picks Round | Gothic and types where the arch starts (mm from the cill);
+rise = H − start; the engine shape (semi-circle / three-centre) is a result, as are the radii.
+
+**Two approaches, one rejected:** (a) keep `rise` as the state and derive `start` for display — rejected:
+"changing H keeps start, recomputes rise" (P4) is natural only when `start` is the state; (b) `start` is
+the state, `rise` derived, `resolveRoundShape` picks the engine shape — chosen.
+
+**Built:**
+- `arch.js`: `ARCH_SHAPES` without segmental, `LEGACY_ARCH_SHAPES` (v1 'segmental' → three-centre 0.20 W),
+  `PSW_ARCH_RISE_RATIO`, `ROUND_AUTO_RATIO` 0.325, `resolveRoundShape(W, rise)` (±0.5 → semi-circle, above
+  half → "use Gothic"), `readMinHaunchRadius`, bar-pattern vocabulary (`ARCH_BAR_PATTERNS`,
+  `PATTERNS_FOR_SHAPE` from PSW 990–995, `isHubPattern`), `buildArchGeometry` returns `start`, `radii`,
+  `minHaunchRadius`, `glass.halfWidth`; rings expose the `centre` chain.
+- `specification.js` `archFromSpec(item, fc, width, height)`: `archStart` → rise = H − start (riseSource from
+  the item, default custom); v1 `archRise` still honoured; PSW `segmental-arch` → three-centre 0.20 W,
+  `elliptical-arch` → 0.325 W; v1-era PC 'segmental' → three-centre 0.20 W with riseSource 'ratio' even if
+  it had a custom rise (spec A wording); Round shapes re-resolved through `resolveRoundShape` (a start
+  giving rise > W/2 throws "use Gothic" — never a silent shape); `arch.bars = { pattern, h, v }`, unknown
+  pattern throws.
+- `projectStore.js`: `archStart`, `archBarPattern` whitelisted in both builders.
+- Configurator: chips Round | Gothic; "Arch starts at (mm from cill)" NumInput (no spinners) + chip Auto
+  (H − 0.325 W) + button Half (H − W/2, sets custom); Gothic profile chips with a derived, disabled start;
+  live line `Rise 200 · R 150 / 1400 / 150` (`R 500` semi-circle, `R 1000` gothic); right panel: Type,
+  Arch starts at (auto/custom), Rise · R, Leaves, Bars (+ pattern); CNC row prints the ArchError text and
+  the Save button is disabled while the arch is invalid; Pattern chips filtered by the resolved shape
+  (a pattern the shape does not offer resets to none); vertical chips hidden for hub patterns (PSW ignores
+  v there — the ring ends are the verticals); edit / prefill restore start (from `archStart`, else H −
+  `archRise`), riseSource, pattern; a v1 'segmental' loads as Round on Auto. Height clamp: Gothic
+  `ratio·W + 900`, Round `901` (the typed start carries the 900 rule, reported by arch.js).
+- 3D sync unchanged apart from the removed segmental key (night 4 rewrites the component).
+
+**Verification:** esbuild OK on all five files · scratch eslint `no-undef` clean · no Polish letters ·
+t16 rewritten for v2: 504/504 ALL PASS (incl. `resolveRoundShape`, P3 clamp, v3 profile migration,
+PC `archStart` / Half / "use Gothic" / legacy migration / bars mapping) · t17: 72/72 ALL PASS (F2 boundary
+150 / 151, W 400 rise 160 → r 150, exporter skips) · sample `sample_arch_1200_segmental.dxf` replaced by
+`sample_arch_1200_three-centre-rise240.dxf` (head 2 + 3 + 2 × 95, leaf 2 + 4 + 2 × 95).
+NOT verified: the configurator in a browser (no UI run in this session — Piotr's morning test).
+
+**Verdict: ✅ A** (engine-side proven by harness; UI compiled and linted only).
+
+### B — engine (`arch.js` bars, `calculations.js`, `lists.js`, `bom.js`)
+
+**Understanding:** when `windowSpec.arch` is set the casement engine keeps the straight rules below
+the springing and swaps the head / leaf top rail for curved members, the glass for a shaped unit and
+the bar counts for a real bar list; paint, seals and weights follow the true outline.
+
+**Two approaches, one rejected:** (a) derive the arch in a separate `deriveArchedCasement` and merge
+— rejected: hardware picks, cill, beading, consumables and the record helper would be duplicated;
+(b) one guarded branch (`archSpec`) inside `deriveCasementWindow`, every rectangular line untouched —
+chosen; proven by the fixture (§ below).
+
+**Built:**
+- `arch.js` (glass outline + bars, v2 §2.3): `chainYAtX`, `chainAreaAboveLine` (Green's theorem, exact —
+  matches a 200 000-strip numeric integral on the gothic chain), `buildGlassOutline` (glass frame: origin
+  = unit bottom-left, y up; asserts rule C — the chain starts at x = xg), `glassOutlinePoly` (closed bulge
+  polyline, one vertex per arc end), `buildArchBars`: straight v (equal divisions of Wg, bottom → outline)
+  and h (equal divisions of the straight height below the springing, full width); hub patterns ported
+  from PSW `semiBarPattern` (rings 0.3 / 0.6 / 0.8 · xg, spokes at i/(n−1)·π segmented ring → ring →
+  outline, the two end spokes ON the springing line = the springing bar, ring-end verticals below the
+  line, half-hub = full springing bar + ring 1, v count ignored for hubs — PSW); `intersecting` ported from
+  `intersectingData` (n = clamp(round(Wg / 450), 2, 4) mullions to the springing, tracery arcs centred on
+  the OUTER frame corners ±W/2, stopped at the outline by exact circle–circle intersection, quarter turn
+  max, radius < 30 skipped). Roles v | h | springing | ring | spoke | tracery; ids V1…, H1…, S1…, R1…, K1…,
+  T1…; lengths rounded to 0.5. Pattern availability enforced (`PATTERNS_FOR_SHAPE`) — a hub on a
+  three-centre throws readably. PSW's spoke insets / bar-top clearance are 3D cosmetics and are not
+  ported: the axes meet the rings and the outline exactly.
+- `calculations.js` `deriveCasementWindow`: layout forced to `040L` / `040R` by the hinge, hinge array
+  ignored; `C-ARCH HEAD` (`C-AH`, `frameHead.face × frameDepth`, length = ring CENTRE-line arc length,
+  notes `R 150/1400/150 · 8 pieces · stock 95/95/95` from `planArchSegments`); jambs = `start` −
+  jambDeduct; `C-STILE` = `leafStraightStile` − stileDeduct (leaf bottom → springing); `C-ARCH TOP RAIL`
+  (`C-ATR`, leaf ring centre line); bottom rail unchanged; glass unit `{ width Wg, height apex, qty 1,
+  role main, location 'arched leaf', shape: { kind 'arched', archShape, outline, poly, springing, apex,
+  rise, radii, area, perimeter, bars, pattern, barCounts } }`; `glassSqm`, pane weight, bead perimeter
+  from the true area / perimeter; astragal bar run = Σ bar lengths; seals: 2·start + head outer arc
+  (+ cill); paint from `W·start + area under the outer chain` (`paintFromAreaSqm` shared with the
+  rectangular path — same numbers); leaf timber run = 2 straight stiles + bottom rail + curved top rail;
+  `derived.arch = { shape, geometry, plans, bars, barCounts, barTotalLength, pattern, glassOutline (+ origin
+  in frame coordinates: x = W/2 − xg = 94.5, y = 101.5) }` — spread in only when arched, so a rectangular
+  casement's output has no new key. Invalid arch numbers throw `ArchError` (every caller —
+  WindowCard, ProjectDetailPage, ProductionPackPage, WindowDetailPage, canvas renderer, Material
+  Assignments — already catches; never a silent rectangle).
+- `lists.js`: `C-ARCH HEAD` → `C-AH` right after `C-FRAME HEAD`, `C-ARCH TOP RAIL` → `C-ATR` right after
+  `C-TOP RAIL` (no `?` groups); glass rows carry `shape` and a bars label from the engine's counts +
+  pattern (`1H × 2V astragal`, `hub-spoke astragal`, `1H · intersecting astragal`).
+- `bom.js`: `C-ARCH HEAD` → `c_frame_head`, `C-ARCH TOP RAIL` → `c_sash_top_rail` — outside the spec's
+  file list, added because `buildWindowPartQtys` silently drops any element name it cannot map (the
+  arch timber would vanish from the BOM). The blank is really glued from `profile.arch.stockWidths`
+  boards — BLOCKERS §9.
+
+**Verification (node, real path `normaliseToWindowSpec → deriveWindowData → lists`):**
+- rectangular fixture (4 windows: 040L 1000×1500 1H×2V, 052L fanlight, 120 georgian triple frosted,
+  180L wider cill) dumped from `origin/main` before any change: `derived`, cut list and glass rows are
+  JSON-identical after B, no `arch` key.
+- three-centre 1000×1500 start 1300 (spec §3 vector): C-AH 1091.2 (centre line), jambs 1300, stiles 1253,
+  C-ATR 949.8, glass 811 × 1304 (springing 1198.5, apex 1304, radii 55.5 / 1305.5 / 55.5), bars H1 811 +
+  V1/V2 1297, seal frame 5.26 m, no `?` cut-list group.
+- semi-circle 1000×1500 (Half) hub-spoke: C-AH 1481.3 (π × 471.5), C-ATR 1339.9, 7 bars (ring R 121.65
+  L 382, 2 springing segments, 2 spokes at 60° / 120°, 2 ring-end verticals), v count dropped.
+- gothic 1000×1800 intersecting: 2 mullions + 4 tracery arcs; jambs 934, stiles 887.
+- t16 504/504, t17 72/72 ALL PASS after the engine change · esbuild + eslint clean on the four files ·
+  no Polish letters.
+NOT verified: the 2D sheets / 3D still draw the arched window as a rectangle (night 4, by design);
+hardware (hinge/lock) picks on the arched leaf use the bounding leaf height — unchanged from v1.
+
+**Verdict: ✅ B**
+
+### C — glazier exports (`glassDxfExport.js` new, `glassPdfExport.js`, `cncExport.js`, `WindowDetailPage.jsx`, `ProductionPackPage.jsx`)
+
+**Understanding:** the glazier gets the exact contour + bar axes as a DXF (cutting reference) and the
+schedule PDF gains a Shape column, an outline drawing and the bar positions in mm and % (P6).
+
+**Two approaches, one rejected:** (a) thumbnails via SVG → canvas captured from the DOM (the "other
+thumbnails" of the glass-drawings PDF) — rejected: needs a browser, cannot run in the harness and the
+schedule PDF already draws its rectangles with jsPDF primitives; (b) draw the outline with jsPDF paths —
+exact arcs as cubic Béziers (≤ 90° per segment, the standard 4/3·tan(Δ/4) construction) — chosen; the
+DXF stays the exact reference.
+
+**Built:**
+- `glassDxfExport.js` (new, R12 via `dxfWriter.js`): layers `GLASS_CONTOUR` (7, closed bulge polyline,
+  one vertex per arc end), `GLASS_BARS` (3, straight bars as 2-vertex polylines, rings / tracery as
+  2-vertex bulge polylines), `GLASS_TEXT` (2: window – unit id – shape, `W × H RISE SPRINGING R …`,
+  the glass spec line, `BARS n [PATTERN …] TOTAL L=…`, one line per bar `V1 V X=… Y=…-… L=…`). Units are
+  the SAME rows the Glass tab shows (`buildGlassListForWindow`), qty repeated, stacked top-down
+  `MERGE_GAP` (300) apart; merged files stack windows the same way. `glassDxfParamsForWindow` skips with a
+  reason (not a casement / not arched / no shaped unit), `canExportGlassDxf`, `exportGlassDxfForWindow`
+  (`{name}_glass.dxf`), `exportGlassDxfMerged` (`{label}_glass.dxf`, rectangular-only windows listed as
+  skipped). `downloadDxf` + `safeName` are now exported from `cncExport.js` (one download path, one
+  file-name rule) — the only change there.
+- Buttons: Window → Glass tab, "📐 Glass DXF" next to "📄 Export PDF" (casement windows; disabled with the
+  reason on rectangular ones); Production Pack header, "📐 Glass DXF (all)" next to "📄 Export PDF" while
+  the Glass tab is active (the pack's PDF export lives in that header).
+- `glassPdfExport.js`: column layout re-spaced for a `Shape` column (`rect` / `arched · R 55.5/1305.5`
+  with a 6 × 4.5 mm outline glyph — the GLASS radii, what the glazier cuts, not the frame's); shaped rows
+  take extra 3.2 mm lines: `springing 1198.5 (92%) · H1 y 599.3 (46%) x 0-811 · V1 x 270.3 (33%) to y 1297
+  …` (x as % of the clear width, y as % of the unit height); the bars cell shortens pattern names
+  (`hub`, `dbl hub`, `intersect`); drawing cells for shaped units (`drawShapedGlass`): exact outline
+  (fill + stroke), bar axes, chain H on top from the vertical bars, chain V on the left from the h bars +
+  springing + apex, overall W / H, a `rise` tick on the right, and a second header line `R … · rise … ·
+  springing … · bars mm + %`. No edge-seal offset on shaped units (documented in the code). Rectangular
+  cells and rows untouched.
+
+**Verification:** DXF round-trip through ezdxf on three windows (three-centre 1000×1500 start 1300 with
+1H 2V, semi-circle hub-spoke, gothic intersecting): contour closed, vertex count 6 / 4 / 5, bulge count =
+arcs (3 / 1 / 2), arc length = outline arch length to 0.01, straight length = Wg + 2·springing, bar
+polylines = bars.length (3 / 7 / 7), bar length sum = Σ bar lengths (±0.5 rounding); merged file 3 contours
++ 1 skipped rectangular window with its reason; layers present. PDF built in node (jsPDF) for the same
+three + one rectangular window: 2 pages, 47 KB, strings `arched · R 55.5/1305.5`, `rect`, `springing
+1198.5 (92%)`, `V1 x 270.3 (33%)`, `R1 ring R 121.7`, `rise 105.5`, `1304 mm` present, 20 Bézier ops.
+Sample `docs/handover/samples/sample_glass_order_arched.pdf` saved for the morning look. esbuild +
+eslint clean · no Polish letters · t16 504/504 after the `cncExport.js` change · `npm run build` OK.
+NOT verified: the PDF was not opened in a viewer (node only) — the layout of the shaped drawing cell
+and the re-spaced table columns need Piotr's eye; buttons not clicked in a browser.
+
+**Verdict: ⚠️ C** (data path proven; visual layout unseen).
+
+### H — harness `verify/arch/t18.mjs` (spec v2 §3 vectors), samples, closing checks
+
+**Built:** `t18` bundles arch / profile / specification / calculations / lists / bom / dxfWriter /
+glassDxfExport / glassPdfExport (jsx loader, react + jspdf external) and asserts on the real path
+(PC item with `archStart` → `normaliseToWindowSpec` → `deriveWindowData` → lists → DXF → ezdxf → PDF):
+1. geometry vectors verbatim from spec §3 — 1000/1500 start 1300 (r 150, R 1400, Cs ±350, CL −1200,
+   T (392, 144), 73.74° / 32.52°, 193.05 + 794.62 + 193.05 = 1180.72, rings 93/1343 · 110/1360 · 43/1293 ·
+   55.5/1305.5), start 1175 (r 211.25, R 634.62, T (432.83, 154.49), 47.00° / 86.01°, 1299.17), 1500/2000
+   start 1700 (r 150, R 1425, 61.93° / 56.14°, 1720.63), start 1100 (r 320, R 562.5, 42.08° / 95.85°,
+   1410.99), Half → semi-circle R 500 length 1570.80, start = H − 520 → "use Gothic" (from
+   `normaliseToWindowSpec` and `resolveRoundShape`), rise 140 → F2 message, gothic start / radii;
+2. bars — 2 verticals at ±135.17, tops 382.31 above the springing (L 1281), 1 h bar at 449.25, hub ring
+   121.65, spokes 0/60/120/180° ring → outline (L 284), ring-end verticals, half / double / triple role
+   counts (2 / 18 / 34 bars, rings 121.65 / 243.3 / 324.4), intersecting on gothic + semi-circle
+   (2 mullions, 4 tracery arcs centred on the outer corners ±94.5 outside the glass, ends ON the outline),
+   pattern availability errors, v-bar tops on the three-centre chain, Green area = numeric integral;
+3. cut list — C-AH 1091.19 = ring centre line (= mean of outer 1180.72 / inner 1001.65), notes
+   `R 150/1400/150 · 8 pieces · stock 95/95/95`, jambs 1300, C-ATR 949.82, stiles 1253, bottom rail 920,
+   040L / 040R by hinge, grouped symbols `C-AH C-J-L/R C-CILL C-ST-L/R C-ATR C-BR` (no `?`), glass unit
+   811 × 1304 with shape, rows + labels, paint / seals / glass m² from the true outline, timber weight =
+   Σ section × density × length, BOM slots for both curved members, and the 4 rectangular fixtures
+   JSON-identical to `origin/main`;
+4. glazier DXF — three samples written to `docs/handover/samples/` (`sample_glass_1000x1500_three-centre_
+   start1300.dxf`, `…_semi-circle_hub-spoke.dxf`, `sample_glass_1000x1800_gothic_intersecting.dxf`) +
+   `sample_glass_pack_merged.dxf`: R12, layers, contour closed with `arcs + 3` vertices and bulge count =
+   arcs, arc length = glass arch length, straight = Wg + 2·springing, bar axes = bars.length, Σ lengths,
+   text block = `unitTextLines`, skips (rectangular / sash / null derived), merged stacked exactly 300
+   apart on TRUE extents (a `polyBBox` with arc extents was added after the first run showed the
+   vertex-only bbox would let a semi-circle apex overlap the unit above — fixed in `glassDxfExport.js`);
+5. PSW import — `segmental-arch` W1200 → three-centre rise 240 start 1760 riseSource ratio (derives with
+   r 150 / R 1320), elliptical 390, semi-circle 600, gothic drop 840, v1 'segmental' migration, v1
+   `archRise`-only item, Auto item, hinge inversion;
+6. glass PDF in node — 2 pages, Shape header, `rect`, `arched · R 55.5/1305.5`, the mm + % line, hub row,
+   shaped drawing strings and Bézier operators;
+7. profile v3 block / vocabulary / cut-list order / BOM map; 8. structural evidence (labelled as such):
+   store whitelist text, configurator chips + save fields, all samples present.
+
+**Result:** t18 **178 / 178 ALL PASS** · t16 504 / 504 · t17 72 / 72 · `npm run build` OK · esbuild on
+every touched file · no Polish letters in src / verify · `git diff origin/main --stat`: spec §5 files +
+`bom.js` (2 rows), `cncExport.js` (2 exports), `WindowDetailPage.jsx` / `ProductionPackPage.jsx`
+(buttons), verify, samples, docs, logs — `casementLayouts.js`, beading, `jambDxf.js`, `src/3d` untouched.
+
+**Verdict: ✅ H**
+
+### Rano dla Piotra — what to look at (5 minutes)
+1. Configurator → casement batch → Arched: chips **Round | Gothic**, type "Arch starts at" (e.g. 1300 on
+   1000 × 1500 → `Rise 200 · R 150 / 1400 / 150`), **Half** → `R 500`, patterns appear only on Half;
+   type 850 → the CNC row shows "use Gothic" and Save is greyed. Then Save → Cut list shows
+   `C-AH 1091` and `C-ATR 950`, Glass tab shows 811 × 1304 with `Shape` and the **📐 Glass DXF** button.
+2. Open `docs/handover/samples/sample_glass_1000x1500_semi-circle_hub-spoke.dxf` in VCarve: closed
+   contour, ring + spokes + ring-end verticals on GLASS_BARS, text on GLASS_TEXT.
+3. Open `docs/handover/samples/sample_glass_order_arched.pdf`: page 1 Shape column + the mm/% lines,
+   page 2 the three shaped drawings — the layout is the thing this session could not see.
+4. Answer BLOCKERS §9.1 (900), 9.3 (short haunch pieces), 9.4 (rise > 150 at W < 462) when you can.
+
 ## 2026-09-06 — arched-casement-v1: audit fixes T1–T8, then Stage 2 (night run 2, branch `claude/arched-casement-audit-t1-t8-7d5fuk`)
 
 Inputs read in full, in this order: `ARCHED-CASEMENT-v1-AUDIT.md` → `ARCHED-CASEMENT-v1.md` (spec,
