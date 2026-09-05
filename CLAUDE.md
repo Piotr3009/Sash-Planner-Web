@@ -180,7 +180,7 @@ Do BLOCKERS.md na start (znane, nierozstrzygnięte przez Piotra):
 - Drzwi: ramiaki skrzydła 92 mm zamiast 94 (materiał 014); próg 4 zawiasów > 2100 mm.
 - Casement: jamby i head 68 mm zamiast 57 (razem z PSW + bump wersji layoutów).
 - Cut list / szyby / 2D / 3D dla łuków, sash i fix frame łukowe, nadświetla łukowe drzwi, wzory prętów w łukach.
-- Listwy przyszybowe (zamrożone).
+- Listwy przyszybowe: moduł beading SASH jest zamrożony; casement nie ma listew w silniku W OGÓLE (także proste) — nie wymyślaj rekordów beading dla casement, to osobny pakiet z przekrojem z profilu.
 - `EstimateConfiguratorPage.jsx` limit 3000 mm (nierozstrzygnięte).
 - Mullions/ślemienia casement nie trafiają do cut listy (`components.box`) — znana luka silnika, nie tego pakietu.
 
