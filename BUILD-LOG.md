@@ -4,6 +4,78 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-09-06 — arched-casement-v2 night 4: D + E + F + t19 (branch `claude/arched-casement-v2-def-enkyue`)
+
+Inputs read in full, in this order: `CLAUDE.md` → `ARCHED-CASEMENT-v2.md` §4 (+ §0–2 for the data model) →
+`BUILD-LOG.md` (night 3) → `BLOCKERS.md` §9 → the four `Casement*2D.jsx`, `drawingUtils.jsx`, `drawingTheme.js`,
+`casementDrawUtils.js`, `arch.js`, the arched branch of `calculations.js`, `ArchedCasementWindow.jsx`,
+`FixFrameWindow.jsx` (PSW bar strips), `CasementFrame.jsx` / `CasementPanel.jsx` constants, `windowSpecToConfig.js`,
+`src/3d/App.jsx` (`update3D`), `archDxf.js` / `glassDxfExport.js` entity builders, `t18.mjs`. Baseline on the branch
+start (`5ba3661` = `origin/main`): t16 504/504, t17 72/72, t18 178/178 ALL PASS (re-run at the end of the night).
+
+Decisions taken up front:
+1. **One contour = one module.** The sheets never compute an arc: every `A` command is written by
+   `src/components/drawings/archDrawUtils.js` (new, pure, no React) straight from an `arch.js` arc
+   `{ cx, cy, r, a0, a1 }` — the same objects `derived.arch.geometry` / `glassOutline` / `bars` hand to the DXF
+   builders. Sweep flag from the chain direction (counter-clockwise a0 → a1 in the y-up frame = sweep 0 on the
+   y-down sheet, 1 when traversed backwards), large-arc flag from the span. Outside the spec's file list — added
+   because the alternative was the same 60 lines copied into four sheets.
+2. **Bars on the elevation / leaf sheet are the engine axes (glass frame, to the unit edge) clipped to the
+   daylight with an SVG `clipPath`** built from the daylight chain — the bars keep the glazier's geometry
+   exactly and the wood hides the 12.5 mm that sits in the rebate, as on the real window. No bar is re-cut to
+   the daylight in code (circle–circle work for tracery arcs would have been a second geometry).
+3. **Exterior land line** on the elevation / frame sheet = `offsetArcs(outer, geometry.land)` (36 in), the
+   arched twin of the existing `landRect`; the DXF ring inner (57) is not what the eye sees from outside.
+4. **Snapshot = fixture, not hashes.** `verify/arch/t19_baseline.mjs` rendered the four sheets (22 SVGs, all
+   panes / glass groups of the four rectangular fixtures) from `HEAD` with react-dom/server BEFORE any sheet
+   was touched → `verify/arch/fixtures/rect-casement-sheets.json` (full strings, so a failure shows a diff).
+
+### D0 — baseline snapshot (`verify/arch/lib/sheets.mjs`, `verify/arch/t19_baseline.mjs`, fixture)
+
+**Built:** `bundleTree(srcRoot, tag)` bundles the four sheets + engine of ANY source tree (`git archive` of a
+commit or the live `src/`) with esbuild (react / react-dom external), `renderSheets` renders every sheet the
+DrawingsPanel / WindowDetailPage show (elevation, frame, one leaf sheet per `groupCasementLeaves` group, one glass
+sheet per `groupCasementGlass` group) with `renderToStaticMarkup`. Render proven deterministic (two runs
+byte-identical). **Verdict: ✅ D0**
+
+### D1 — `archDrawUtils.js` + `CasementElevation2D.jsx`
+
+**Understanding:** the exterior view of an arched casement shows the frame band (outer contour → land line),
+the leaf top rail outer edge, the daylight and the bars — all curved from the springing line up.
+
+**Two approaches, one rejected:** (a) offset the ArcChain *in the sheet* (radius − 36 etc.) — rejected: a second
+offset implementation next to `arch.js` `offsetArcs`; (b) build every contour with `offsetArcs` / the ring
+chains the engine already exposes and only *serialise* them here — chosen.
+
+**Built:** `archToSheet` / `glassToSheet` transforms, `svgArc`, `chainArcsD`, `archedOutlineD` (sides at the
+chain's own end x — rule C — bottom at a given y), `ringBandD`, `barBandD` (22 mm band: rotated polygon for a
+straight bar, r ± 11 arcs for a ring / tracery), `barAxisD`, `arcLabelPoint` (crown arc: mid angle; haunch arc:
+¾ of the way from the springing end so the label clears the corner dims), `radiiText`, `onCurve`.
+Elevation: when `derived.arch` exists — frame band (evenodd outer + land outlines), outer / land strokes,
+leaf outline from `leafTop.outer`, daylight from `leafTop.inner` (glass fill), bars from `derived.arch.bars`
+transformed through `glassOutline.origin`, clipped to the daylight; opening symbol starts on the springing line
+(`lf.topY`); springing centre-line (dash pattern of the transom axes), `start` and `rise` DimV on the left, an
+`R …` label per outer arc, third title line `Three-centre · start 1300 · rise 200 · R 150 / 1400 / 150`
+(`TITLE_AREA` 75 instead of 50 only when arched), `data-arch-origin="ox,oy"` on the `<svg>` (only when arched)
+so t19 can map sheet coordinates back to the frame. Rectangular branch: JSX untouched, output byte-identical
+(fixture, 4 windows / 22 sheets). Rendered to PNG through headless Chromium and looked at: three-centre 1H 2V,
+semi-circle hub-spoke, gothic intersecting, semi-circle triple hub — arcs, bands, clipped bars, dims in place;
+the first pass had the haunch `R 150` label on top of the `rise` dim and centre crosses inside the glass —
+label moved (`arcLabelPoint`), crosses dropped (the CNC sheet carries the centres).
+**Verification:** esbuild OK (both files) · no Polish letters · snapshot IDENTICAL · `A` count per sheet =
+7 × arcs + 2 × arc bars (checked by hand on four windows, asserted in t19). **Verdict: ✅ D1**
+
+### D2 — `CasementFrameDetail2D.jsx`
+
+**Built:** head band + strokes from the same outer / land chains; `C-AH <length>` label (length + notes read
+from the cut-list record `C-ARCH HEAD` in `derived.components.box` — the sheet prints what the cut list prints),
+`C-J/L` / `C-J/R <start>` centred on the straight jamb, right chain `rise · start−41 · 41` (no top chain on an
+arched frame — the head is curved, dimensioned by the radii and the C-AH length), springing line, `start` /
+`rise` dims, `R` labels, third title line with the planner notes (`R 150/1400/150 · 8 pieces · stock 95/95/95`);
+click zones: head = the outer/land band path, jambs from the springing down. Rectangular output byte-identical.
+Rendered and looked at (three-centre, gothic). **Verification:** esbuild OK · no Polish letters · snapshot
+IDENTICAL. **Verdict: ✅ D2** (t19 assertions added at the end of the night, see T19).
+
 ## 2026-09-06 — arched-casement-v2 night 3: A + B + C + t18 (branch `claude/arched-casement-v2-impl-0j27uw`)
 
 Inputs read in full, in this order: `CLAUDE.md` → `ARCHED-CASEMENT-v2.md` (spec, P1–P10 override v1) →

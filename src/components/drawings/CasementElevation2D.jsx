@@ -6,12 +6,22 @@
  * DimH/DimV + TitleBlock from drawingUtils. Geometry comes exclusively from
  * derived.casement (engine single source) + the casement profile:
  * layers 36 · 4 · LEAF · 6 · [8|axis|13] · 4 · LEAF · 6 · 41.
+ *
+ * Arched casement (arched-casement-v2 night 4, spec §4 D): when derived.arch
+ * exists the head, the leaf top and the daylight are drawn from the SAME
+ * ArcChains the engine and the DXF exports use (derived.arch.geometry rings,
+ * derived.arch.glassOutline, derived.arch.bars) as SVG `A` arcs — never a
+ * Bezier, never re-derived here. Bars are 22 mm bands on the engine axes,
+ * clipped to the daylight. Rectangular windows take the branch below
+ * unchanged (byte-identical output, verify/arch/t19.mjs snapshot).
  */
 import { useMemo } from 'react';
 import { getCasementProfile } from '../../engine/profile.js';
-import { computeBarPositions, DimH, DimV, TitleBlock, Label } from './drawingUtils.jsx';
-import { COLORS, STROKES, DIMS, VIEWBOX_REF } from './drawingTheme.js';
+import { offsetArcs } from '../../engine/arch.js';
+import { computeBarPositions, DimH, DimV, TitleBlock, Label, tfs } from './drawingUtils.jsx';
+import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, DIMS, VIEWBOX_REF } from './drawingTheme.js';
 import { casementBarCounts } from './casementDrawUtils.js';
+import { archToSheet, glassToSheet, archedOutlineD, barBandD, arcLabelPoint, radiiText } from './archDrawUtils.js';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
 const BAR_WIDTH = 22;
@@ -42,11 +52,31 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
         glassX, glassY, glassW, glassH,
         vCount: counts.v, hCount: counts.h, barW: BAR_WIDTH,
       });
-      return { r, hinge: pn.hinge, glassX, glassY, glassW, glassH, barPos, i };
+      return { r, hinge: pn.hinge, glassX, glassY, glassW, glassH, barPos, i, topY: r.y };
     });
 
+    // ── Arched casement: chains from derived.arch (engine single source) ──
+    let arch = null;
+    const A = derived.arch;
+    if (A?.geometry && A.glassOutline && leaves.length === 1) {
+      const AG = A.geometry;
+      const lf = leaves[0];
+      lf.topY = AG.rise;                     // opening symbol starts on the springing line
+      arch = {
+        AG,
+        rise: AG.rise,
+        start: AG.start,
+        outer: AG.arcs,                      // frame outer contour
+        land: offsetArcs(AG.arcs, g.land),   // exterior land line (36 in from the outer)
+        leafOuter: AG.leafTop.outer,         // leaf top rail outer (leafAtJamb)
+        daylight: AG.leafTop.inner,          // leaf top rail inner (daylight)
+        outline: A.glassOutline,             // glass unit (glass frame) + origin in frame coords
+        bars: A.bars || [],
+      };
+    }
+
     return {
-      fw, fh, g, stile, leaves,
+      fw, fh, g, stile, leaves, arch,
       mullions: cas.mullionRuns || [],
       transoms: cas.transomRuns || [],
       cill: cas.cill || { wider: false, extension: 0, length: fw },
@@ -61,7 +91,7 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
   const layoutSc = Math.max(fw, fh) / 500;
   const DM = 60 * layoutSc;
   const M = 70 * layoutSc;
-  const TITLE_AREA = 50 * layoutSc;
+  const TITLE_AREA = (geom.arch ? 75 : 50) * layoutSc;   // arched: third title line (shape · start · rise · radii)
   const totalW = M + fw + DM * 2 + M;
   const totalH = M + fh + DM + TITLE_AREA;
   const ox = M, oy = M;
@@ -74,17 +104,53 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
     w: fw - 2 * g.land, h: fh - g.land - g.cillVisible,
   };
 
+  // ── Arched paths (sheet coords): frame outer / land, leaf outer / daylight, bars ──
+  const arch = geom.arch;
+  let AP = null;
+  if (arch) {
+    const lf = geom.leaves[0];
+    const txF = archToSheet(fw, arch.rise, ox, oy);
+    const txG = glassToSheet(X(arch.outline.origin.x), Y(fh - arch.outline.origin.y - arch.outline.height), arch.outline.height);
+    const clipId = `clip-cas-elev-${String(windowSpec?.id || windowSpec?.name || 'w').replace(/[^a-zA-Z0-9]/g, '_')}`;
+    AP = {
+      txF,
+      outerD: archedOutlineD(arch.outer, txF, Y(fh)),
+      landD: archedOutlineD(arch.land, txF, Y(fh - g.cillVisible)),
+      leafD: archedOutlineD(arch.leafOuter, txF, Y(lf.r.y + lf.r.h)),
+      daylightD: archedOutlineD(arch.daylight, txF, Y(lf.r.y + lf.r.h - geom.stile)),
+      barsD: arch.bars.map((b) => barBandD(b, txG, BAR_WIDTH / 2)),
+      clipId,
+      radii: arch.outer.map((a) => ({ r: a.r, at: arcLabelPoint(a, txF, sw(14)) })),
+      springY: Y(arch.rise),
+    };
+  }
+  const annFs = tfs(SIZES.dimSmall, totalW);
+
   const winName = windowSpec?.name || 'Window';
   const projNum = projectNumber || '';
   const titleText = `Front Elevation${projNum ? ` — ${projNum}` : ''} — ${winName}`;
-  const subtitleText = `Casement ${derived.casement.layout} · ${fw} × ${fh} mm · exterior view`;
+  const subtitleText = arch
+    ? `Casement ${derived.casement.layout} · arched · ${fw} × ${fh} mm · exterior view`
+    : `Casement ${derived.casement.layout} · ${fw} × ${fh} mm · exterior view`;
+  const archLine = arch ? `${arch.AG.label} · start ${fmt(arch.start)} · rise ${fmt(arch.rise)} · ${radiiText(arch.outer)}` : '';
+  const titleY = oy + fh + DM + TITLE_AREA * 0.5;
+  const ts = totalW / VIEWBOX_REF;
 
   return (
     <div className="w-full">
       <svg viewBox={`0 0 ${totalW} ${totalH}`} xmlns="http://www.w3.org/2000/svg"
-        className="w-full h-auto" style={{ background: COLORS.bg }}>
+        className="w-full h-auto" style={{ background: COLORS.bg }}
+        data-arch-origin={AP ? `${ox},${oy}` : undefined}>
 
         {/* ── FRAME band (outer − rebate opening) + cill face ── */}
+        {AP ? (
+          <>
+            <path d={`${AP.outerD} ${AP.landD}`} fillRule="evenodd" fill={COLORS.frameFill} stroke="none" />
+            <path d={AP.outerD} fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frame} {...NS} />
+            <path d={AP.landD} fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
+          </>
+        ) : (
+          <>
         <path
           d={`M ${X(0)} ${Y(0)} H ${X(fw)} V ${Y(fh)} H ${X(0)} Z
               M ${landRect.x} ${landRect.y} H ${landRect.x + landRect.w}
@@ -94,6 +160,8 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
           fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frame} {...NS} />
         <rect x={landRect.x} y={landRect.y} width={landRect.w} height={landRect.h}
           fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
+          </>
+        )}
         {/* Cill face — overhangs ±50 beyond the frame when 'wider' */}
         <line x1={X(0)} y1={Y(fh - g.cillVisible)} x2={X(fw)} y2={Y(fh - g.cillVisible)}
           stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} />
@@ -130,6 +198,20 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
         {/* ── LEAVES: outline, glass, bars, opening symbol, pane label ── */}
         {geom.leaves.map((lf) => (
           <g key={`lf-${lf.i}`}>
+            {AP ? (
+              <>
+                <path d={AP.leafD} fill="none" stroke={COLORS.sash} strokeWidth={STROKES.sash} {...NS} />
+                <path d={AP.daylightD} fill={COLORS.glass} fillOpacity={COLORS.glassOpacity}
+                  stroke={COLORS.glass} strokeWidth={STROKES.glassLight} {...NS} />
+                <clipPath id={AP.clipId}><path d={AP.daylightD} /></clipPath>
+                <g clipPath={`url(#${AP.clipId})`}>
+                  {AP.barsD.map((d, k) => (
+                    <path key={`ab-${k}`} d={d} fill="none" stroke={COLORS.bar} strokeWidth={STROKES.bar} {...NS} />
+                  ))}
+                </g>
+              </>
+            ) : (
+              <>
             <rect x={X(lf.r.x)} y={Y(lf.r.y)} width={lf.r.w} height={lf.r.h}
               fill="none" stroke={COLORS.sash} strokeWidth={STROKES.sash} {...NS} />
             <rect x={X(lf.glassX)} y={Y(lf.glassY)} width={lf.glassW} height={lf.glassH}
@@ -145,13 +227,15 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
                 width={lf.glassW} height={BAR_WIDTH}
                 fill="none" stroke={COLORS.bar} strokeWidth={STROKES.bar} {...NS} />
             ))}
+              </>
+            )}
             {lf.hinge === 'left' && (
-              <path d={`M ${X(lf.r.x + lf.r.w)} ${Y(lf.r.y)} L ${X(lf.r.x)} ${Y(lf.r.y + lf.r.h / 2)} L ${X(lf.r.x + lf.r.w)} ${Y(lf.r.y + lf.r.h)}`}
+              <path d={`M ${X(lf.r.x + lf.r.w)} ${Y(lf.topY)} L ${X(lf.r.x)} ${Y(lf.r.y + lf.r.h / 2)} L ${X(lf.r.x + lf.r.w)} ${Y(lf.r.y + lf.r.h)}`}
                 fill="none" stroke={COLORS.meeting} strokeWidth={STROKES.meeting} {...NS}
                 strokeDasharray={`${sw(6)},${sw(4)}`} />
             )}
             {lf.hinge === 'right' && (
-              <path d={`M ${X(lf.r.x)} ${Y(lf.r.y)} L ${X(lf.r.x + lf.r.w)} ${Y(lf.r.y + lf.r.h / 2)} L ${X(lf.r.x)} ${Y(lf.r.y + lf.r.h)}`}
+              <path d={`M ${X(lf.r.x)} ${Y(lf.topY)} L ${X(lf.r.x + lf.r.w)} ${Y(lf.r.y + lf.r.h / 2)} L ${X(lf.r.x)} ${Y(lf.r.y + lf.r.h)}`}
                 fill="none" stroke={COLORS.meeting} strokeWidth={STROKES.meeting} {...NS}
                 strokeDasharray={`${sw(6)},${sw(4)}`} />
             )}
@@ -177,6 +261,23 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
             label={`axis ${fmt(mu.axisX)}`} small vbw={totalW} />
         ))}
 
+        {/* ── ARCH: springing line, start / rise dims, radii + centres ── */}
+        {AP && (
+          <g>
+            <line x1={X(0) - sw(10)} y1={AP.springY} x2={X(fw) + sw(10)} y2={AP.springY}
+              stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS}
+              strokeDasharray={`${sw(8)},${sw(3)},${sw(2)},${sw(3)}`} />
+            <DimV x={ox - DM * 0.45} y1={AP.springY} y2={Y(fh)} extFrom={X(0)}
+              label={`start ${fmt(arch.start)}`} small vbw={totalW} />
+            <DimV x={ox - DM * 0.45} y1={Y(0)} y2={AP.springY} extFrom={X(0)}
+              label={`rise ${fmt(arch.rise)}`} small vbw={totalW} />
+            {AP.radii.map((rl, k) => (
+              <text key={`r-${k}`} x={rl.at[0]} y={rl.at[1]} fill={COLORS.dim} fontSize={annFs}
+                fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.dim}>{`R ${fmt(rl.r)}`}</text>
+            ))}
+          </g>
+        )}
+
         {/* ── OVERALL DIMS ── */}
         <DimH y={oy + fh + DM * 0.8} x1={X(0)} x2={X(fw)} extFrom={Y(fh)}
           label={fmt(fw)} vbw={totalW} />
@@ -184,8 +285,12 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
           label={fmt(fh)} vbw={totalW} />
 
         {/* ── TITLE ── */}
-        <TitleBlock x={totalW / 2} y={oy + fh + DM + TITLE_AREA * 0.5}
+        <TitleBlock x={totalW / 2} y={titleY}
           title={titleText} subtitle={subtitleText} vbw={totalW} />
+        {arch && (
+          <text x={totalW / 2} y={titleY + 40 * ts} fill={COLORS.subtitle} fontSize={SIZES.subtitle * ts}
+            fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>{archLine}</text>
+        )}
       </svg>
     </div>
   );
