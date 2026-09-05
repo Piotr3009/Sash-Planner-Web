@@ -18,15 +18,16 @@ Trzy osobne produkty, nie duplikować logiki między nimi:
 
 ## TRYB PRACY: AUTONOMIA NOCNA
 
-Zadanie na tę sesję: **pakiet `arched-casement-v1`** — pełna specyfikacja w
-`@docs/handover/ARCHED-CASEMENT-v1.md`. Piotr zatwierdził cały zakres z góry.
-**Nie czekaj na potwierdzenia** w obrębie tego zakresu. Poza zakresem — nie wychodź.
+Zadanie na sesję jest w sekcji **„ZADANIE NOCNE"** niżej, spec w `docs/handover/`. Piotr
+zatwierdza cały zakres z góry — **nie czekaj na potwierdzenia** w jego obrębie, poza zakres
+nie wychodź.
 
-- Branch roboczy: `claude/arched-casement-v1` (od `main`). **Nigdy nie pushuj na `main`.**
-- Commit po każdym zamkniętym kroku (geometria → planer → DXF → eksport → UI), push brancha.
+- Sesja w chmurze na własnym branchu (nazwę nadaje środowisko). **Nigdy nie pushuj na `main`**
+  — Piotr merguje rano.
+- Commit po każdym zamkniętym zadaniu, push brancha.
 - Problem blokujący albo niejasna logika biznesowa → wpis w `BLOCKERS.md`, jedź dalej z resztą.
-- Werdykty per krok → `BUILD-LOG.md` (nowa sekcja na górze, data 2026-09-05).
-- Harness musi przejść **ALL PASS przed każdym commitem** kroku, którego dotyczy.
+- Werdykty per zadanie → `BUILD-LOG.md` (nowa sekcja na górze, z datą).
+- Harness musi przejść **ALL PASS przed każdym commitem** zadania, którego dotyczy.
 
 Rzeczy z listy „NIE RÓB DZIŚ" (§ niżej) są celowo poza zakresem, nawet jeśli wyglądają na
 łatwe do „przy okazji".
@@ -153,29 +154,33 @@ karmi cut listę, PDF-y, rysunki, PP. Nigdy nie licz wymiarów okna w innym miej
 
 ---
 
-## STAN PO NOCY 2 — arched-casement-v1: audyt T1–T8 + Etap 2 zrobione
+## STAN — arched-casement-v1 zamknięty (noce 1–2, na `main`)
+Geometria (`src/engine/arch.js`), planer desek, CNC DXF (`archDxf.js`), harnessy t16/t17,
+konfigurator z blokiem łuku (05.09). Werdykty w `BUILD-LOG.md`, otwarte pytania w `BLOCKERS.md`.
+Spec i audyt: `docs/handover/ARCHED-CASEMENT-v1.md`, `-AUDIT.md`.
 
-Branch `claude/arched-casement-audit-t1-t8-7d5fuk` (od `main` b801039) czeka na merge przez Piotra.
-Zrobione: T2 lista desek D7 → T1 kąt 36° / N_min / pas naddatku 10 mm na stronę → T6 `pieceRule`
-→ T3 długość surowa, cięcia, strefy palca → T4 `r = rise²/halfW` → T5 limity w
-`profile.arch.limits` + fizyka → T7 harness na wektorach spec → T8 próbka, BLOCKERS, branch →
-Etap 2 a–d. Werdykty w `BUILD-LOG.md` (sekcja 2026-09-06), pytania w `BLOCKERS.md` §6–§8.
+## ZADANIE NOCNE 3 — arched-casement-v2, część A + B + C
 
-Harnessy (wszystkie muszą być ALL PASS przed każdym commitem dotykającym `arch.js` / `archDxf.js` /
-`profile.arch` / `specification.js`):
-```
-node verify/arch/t16.mjs                                   # spec §10, 465 checków, pisze próbki DXF
-node verify/arch/t17_edges.mjs                             # krawędzie, 73 checki
-node verify/parity/psw-casement-layouts.mjs <klon-psw>     # raport PSW↔PC (read-only)
-```
+Spec: `@docs/handover/ARCHED-CASEMENT-v2.md`. Czytasz w całości, potem v1 §0 (zasady) i
+v1-AUDIT §2 (co nie może się zepsuć). Decyzje z v2 §1 (P1–P10) nadpisują v1 tam, gdzie się
+różnią — najważniejsza: **P1 reguła C: każdy łuk zaczyna się pionowo przy jambie; `segmental`
+znika, poniżej połowy = trójłuk, dokładnie połowa = półkole.**
 
-Wszystkie numery warsztatowe łuków siedzą w `DEFAULT_CASEMENT_PROFILE.arch` (v2): `finger`,
-`stockWidths`, `contourAllowance` (na stronę), `maxSegmentAngleDeg`, `pieceRule`, `limits`.
-Planer nie ma żadnych domyślnych liczb — brak ustawienia = czytelny `ArchError`.
+Zakres tej nocy — TYLKO:
+- **A** konfigurator: Round | Gothic, pole „Arch starts at", Auto / Half, pręty z wzorami
+- **B** silnik: `C-ARCH HEAD` / `C-ARCH TOP RAIL` (długość po osi łuku), szyba jako kształt,
+  lista prętów z długościami, farba/uszczelka/waga z prawdziwego obrysu
+- **C** eksporty dla szklarza: DXF (kontur + osie prętów) i PDF (mm + %), próbki do
+  `docs/handover/samples/`
+- harness `verify/arch/t18.mjs` na wektorach ze spec §3 (są policzone — odtwórz je, nie
+  wyliczaj); t16/t17 nadal ALL PASS (t16: wektory trójłuku aktualizujesz wg P3)
 
-Otwarte dla Piotra (nie zamykać w kodzie): D13 `pieceRule` (domyślnie `narrowest`), D5 palec
-15/16 vs 10–11, głowica d50 na CNC, erratum E2 (skrzydło na własnym kącie → 5 × 95, spec mówi
-4 × 105), minimalna długość kawałka (6.5), minimalna strzałka 117 mm (8.1).
+**Nie zaczynaj D / E / F (2D, 3D) — to noc 4.** Nie dotykaj `casementLayouts.js`, beadingu,
+listy „NIE RÓB DZIŚ".
+
+Sesja w chmurze, na własnym branchu, commit + push po każdym zamkniętym zadaniu
+(A → B → C → harness). BLOCKERS na start: P9 (limit 900 dla casement — Piotr nie odpowiedział),
+D13, minimalna długość kawałka hauszu.
 
 ## NIE RÓB DZIŚ (zaplanowane, osobne pakiety)
 
