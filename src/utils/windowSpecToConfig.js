@@ -81,11 +81,27 @@ export function windowSpecToConfig(windowSpec) {
   // stay top-level for the shared camera auto-fit in the viewer Scenes.
   if ((windowSpec.category || 'sash') === 'casement') {
     const casementProps = windowSpecToCasementProps(windowSpec);
+    // Arched casement: the shared 3D (ArchedCasementWindow, PSW names) draws the
+    // arch from its own fixed ratios — it takes the shape and hinge only, so a
+    // custom rise is not visible in the preview (production geometry lives in
+    // arch.js). PC 'gothic-drop' has no 3D counterpart → drawn as gothic-arch;
+    // 'three-centre' → PSW 'elliptical-arch'.
+    const arch = windowSpec.arch || null;
+    const archConfig = arch ? {
+      casementType: 'arched',
+      casArchShape: ({
+        'segmental': 'segmental-arch', 'semi-circle': 'semi-circle',
+        'gothic-equilateral': 'gothic-arch', 'gothic-drop': 'gothic-arch',
+        'three-centre': 'elliptical-arch',
+      })[arch.shape] || 'semi-circle',
+      casArchHinge: arch.hinge === 'right' ? 'right' : 'left',
+    } : { casementType: 'standard' };
     return {
       windowCategory: 'casement',
       width: casementProps.width,
       height: casementProps.height,
       casementProps,
+      ...archConfig,
     };
   }
 

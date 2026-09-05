@@ -550,6 +550,13 @@ export const useProjectStore = create((set, get) => ({
       // for edit-mode prefill, which reads top-level fields.
       casementLayout: windowConfig.casementLayout || '040L',
       casementHinges: Array.isArray(windowConfig.casementHinges) ? windowConfig.casementHinges : null,
+      // Arched casement (arched-casement-v1) — PC-native names read by specification.js.
+      casementType: windowConfig.casementType === 'arched' ? 'arched' : 'standard',
+      archShape: windowConfig.archShape ?? null,
+      archProfile: windowConfig.archProfile ?? null,
+      archRise: windowConfig.archRise ?? null,
+      archRiseSource: windowConfig.archRiseSource ?? null,
+      archHinge: windowConfig.archHinge ?? null,
       fanlightHeight: windowConfig.fanlightHeight ?? null,
       fanlightAxis: windowConfig.fanlightAxis ?? null,
       fan2Axis: windowConfig.fan2Axis ?? null,
@@ -697,6 +704,13 @@ export const useProjectStore = create((set, get) => ({
       // for edit-mode prefill, which reads top-level fields.
       casementLayout: windowConfig.casementLayout || '040L',
       casementHinges: Array.isArray(windowConfig.casementHinges) ? windowConfig.casementHinges : null,
+      // Arched casement (arched-casement-v1) — PC-native names read by specification.js.
+      casementType: windowConfig.casementType === 'arched' ? 'arched' : 'standard',
+      archShape: windowConfig.archShape ?? null,
+      archProfile: windowConfig.archProfile ?? null,
+      archRise: windowConfig.archRise ?? null,
+      archRiseSource: windowConfig.archRiseSource ?? null,
+      archHinge: windowConfig.archHinge ?? null,
       fanlightHeight: windowConfig.fanlightHeight ?? null,
       fanlightAxis: windowConfig.fanlightAxis ?? null,
       fan2Axis: windowConfig.fan2Axis ?? null,
