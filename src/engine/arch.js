@@ -315,52 +315,92 @@ export function buildArchGeometry({ shape, width, height, rise }, profile) {
 // SEGMENT PLANNER — a curved member is glued up from N straight boards
 // (finger-jointed on radial faces) and the ring contour is routed afterwards.
 //
-// Projection method: each piece is projected onto its own board axes — the
-// chord of its outer arc (length) and the arc's bisector (width). The board a
-// piece needs is that projected width plus the workshop allowance, matched to
-// the narrowest stock board that is at least as wide.
+// Spec §7 (ARCHED-CASEMENT-v1.md):
+//  1. every arc of the ring is planned on its own — a joint is mandatory at
+//     every tangent point / apex;
+//  2. N_min = max(2, ceil(θ / maxSegmentAngle)) per arc (grain run-out); a
+//     single-centre arc shorter than maxSegmentAngle may be ONE board when a
+//     stock board fits it;
+//  3. candidates N = N_min … N_min + 3, equal angles φ = θ / N on the outer
+//     contour; piece axis = tangent at the mid-angle, normal = radial there;
+//  4. the ALLOWANCE BAND — outer contour + contourAllowance, inner contour −
+//     contourAllowance — bounded by the radial joint planes, and by the
+//     arch-start line / apex axis for the end pieces (that is the haunch);
+//  5. the band is projected onto the piece axes exactly (arc end points +
+//     interior extrema): W_req = extent on the normal, L = extent on the axis.
+//     For a middle piece this equals the closed form
+//     W_req = (Ro + a) − (Ri − a)·cos(φ/2),  L = 2·(Ro + a)·sin(φ/2);
+//  6. stock = narrowest stock width ≥ W_req, none → that N is infeasible.
 //
-// D13 (BLOCKERS): the DEFAULT plan is the one with the FEWEST pieces that fit
-// a stock board; the ALTERNATIVE is the plan on the NARROWEST stock board.
-// Both are returned so the drawing can print the alternative.
+// Every number (allowance, max angle, stock list, selection rule) comes from
+// profile.arch — nothing is defaulted here.
 // ═══════════════════════════════════════════════════════════════════════════
 
 const pieceEndType = (clip) => (clip === 'archStart' ? 'archStart' : clip === 'axis' ? 'axis' : 'tangent');
 
-/** Split arc i of a ring into n equal (by outer angle) pieces. */
-export function partitionArc(ring, arcIndex, n) {
+/**
+ * Allowance band of a ring (spec §7.4): outer contour grown by `a`, inner
+ * contour shrunk by `a`, clipped ends recomputed on the band radii.
+ */
+export function allowanceBand(ring, a) {
+  const d = Number(a);
+  if (!(d >= 0)) throw new ArchError(`Contour allowance must be a number of mm >= 0, got "${a}"`);
+  return { outer: offsetArcs(ring.outer, -d), inner: offsetArcs(ring.inner, d) };
+}
+
+/**
+ * Split arc i of a ring into n equal (by outer angle) pieces.
+ * `band` (allowanceBand of the same ring) drives the board projection; the
+ * finished piece arcs (outer / inner) are kept for the drawing.
+ */
+export function partitionArc(ring, arcIndex, n, band = null) {
   const outer = ring.outer[arcIndex];
   const inner = ring.inner[arcIndex];
+  const bO = band ? band.outer[arcIndex] : outer;
+  const bI = band ? band.inner[arcIndex] : inner;
   const phi = arcSpan(outer) / n;
   const pieces = [];
   for (let k = 0; k < n; k++) {
+    const first = k === 0, last = k === n - 1;
     const ao0 = outer.a0 + k * phi;
-    const ao1 = k === n - 1 ? outer.a1 : outer.a0 + (k + 1) * phi;
-    const ai0 = k === 0 ? inner.a0 : ao0;
-    const ai1 = k === n - 1 ? inner.a1 : ao1;
+    const ao1 = last ? outer.a1 : outer.a0 + (k + 1) * phi;
     const oArc = { ...outer, a0: ao0, a1: ao1 };
-    const iArc = { ...inner, a0: ai0, a1: ai1 };
+    const iArc = { ...inner, a0: first ? inner.a0 : ao0, a1: last ? inner.a1 : ao1 };
+    // allowance band of this piece: joint planes are radial (same angles);
+    // the arch-start / apex ends use the band's own clipped angles
+    const bandOuter = { ...bO, a0: first ? bO.a0 : ao0, a1: last ? bO.a1 : ao1 };
+    const bandInner = { ...bI, a0: first ? bI.a0 : ao0, a1: last ? bI.a1 : ao1 };
     // Board axes: bisector b (width direction, pointing to the apex side) and
     // the chord direction u (length direction, counter-clockwise tangent).
     const m = (ao0 + ao1) / 2;
     const b = [Math.cos(m), Math.sin(m)];
     const u = [-Math.sin(m), Math.cos(m)];
-    const sO = arcExtent(oArc, u), sI = arcExtent(iArc, u);
-    const wO = arcExtent(oArc, b), wI = arcExtent(iArc, b);
+    const sO = arcExtent(bandOuter, u), sI = arcExtent(bandInner, u);
+    const wO = arcExtent(bandOuter, b), wI = arcExtent(bandInner, b);
     const sMin = Math.min(sO.min, sI.min), sMax = Math.max(sO.max, sI.max);
     const wMin = Math.min(wO.min, wI.min), wMax = Math.max(wO.max, wI.max);
+    // acute angle between the piece axis and the horizontal (the arch-start
+    // line) — the end cut the CNC needs for an arch-start end
+    const axisAngle = Math.abs(Math.atan2(u[1], u[0]));
+    const axisAngleDeg = (axisAngle > Math.PI / 2 ? Math.PI - axisAngle : axisAngle) * 180 / Math.PI;
     pieces.push({
       arc: arcIndex,
       k,
       n,
+      phi,
+      phiDeg: phi * 180 / Math.PI,
+      axisAngleDeg,
       outer: oArc,
       inner: iArc,
-      endStart: k === 0 ? pieceEndType(outer.clip0) : 'radial',
-      endEnd: k === n - 1 ? pieceEndType(outer.clip1) : 'radial',
+      band: { outer: bandOuter, inner: bandInner },
+      endStart: first ? pieceEndType(outer.clip0) : 'radial',
+      endEnd: last ? pieceEndType(outer.clip1) : 'radial',
       axes: { bisector: m, b, u },
       extents: { s: [sMin, sMax], w: [wMin, wMax] },
-      projectedWidth: wMax - wMin,
-      chordLength: sMax - sMin,
+      wReq: wMax - wMin,
+      projectedWidth: wMax - wMin,   // alias kept for the drawing (= W_req, band included)
+      L: sMax - sMin,
+      chordLength: sMax - sMin,      // alias kept for the drawing (= L_out of the band)
     });
   }
   return pieces;
@@ -369,6 +409,17 @@ export function partitionArc(ring, arcIndex, n) {
 /** Closed bulge polyline of one piece: outer arc CCW, radial/clipped end, inner arc CW, other end. */
 export function piecePoly(piece) {
   const { outer, inner } = piece;
+  return [
+    [...arcPoint(outer, outer.a0), arcBulge(outer)],
+    [...arcPoint(outer, outer.a1), 0],
+    [...arcPoint(inner, inner.a1), -arcBulge(inner)],
+    [...arcPoint(inner, inner.a0), 0],
+  ];
+}
+
+/** Same polygon for the piece's allowance band (what the stock board must contain). */
+export function pieceBandPoly(piece) {
+  const { outer, inner } = piece.band;
   return [
     [...arcPoint(outer, outer.a0), arcBulge(outer)],
     [...arcPoint(outer, outer.a1), 0],
@@ -392,36 +443,62 @@ function stockFor(boardWidth, stockWidths) {
   return null;
 }
 
+function readPlannerSettings(opts) {
+  const stockWidths = Array.isArray(opts?.stockWidths) ? opts.stockWidths.map(Number).filter((w) => w > 0) : [];
+  const allowance = Number(opts?.contourAllowance);
+  if (!(allowance >= 0)) throw new ArchError('Casement profile arch.contourAllowance is missing (mm per side)');
+  const maxDeg = Number(opts?.maxSegmentAngleDeg);
+  if (!(maxDeg > 0 && maxDeg <= 180)) throw new ArchError('Casement profile arch.maxSegmentAngleDeg is missing (degrees, 0 < angle <= 180)');
+  return { stockWidths, allowance, maxDeg, maxAngle: maxDeg * Math.PI / 180 };
+}
+
 /**
  * Plan every arc of a ring.
- * opts: { stockWidths: number[], widthAllowance: number, maxPieces: number }
- * Returns { arcs: [{ index, radiusOuter, radiusInner, span, options, default, alternative }],
+ * opts = profile.arch: { stockWidths, contourAllowance, maxSegmentAngleDeg }
+ * Returns { arcs: [{ index, radiusOuter, radiusInner, span, spanDeg, nMin, nMax,
+ *                    options, default, alternative }],
  *           pieces (default plan, numbered 1..N across arcs), totalPieces, noStock }.
  * Never throws for "no board fits": the options simply carry stock = null.
  */
 export function planArchSegments(ring, opts) {
-  const stockWidths = Array.isArray(opts?.stockWidths) ? opts.stockWidths : [];
-  const allowance = Number(opts?.widthAllowance) || 0;
-  const maxPieces = Math.max(1, Math.floor(Number(opts?.maxPieces) || 8));
+  const S = readPlannerSettings(opts);
+  const band = allowanceBand(ring, S.allowance);
+  const evaluate = (i, n) => {
+    const pieces = partitionArc(ring, i, n, band);
+    const wReq = Math.max(...pieces.map((p) => p.wReq));
+    const L = Math.max(...pieces.map((p) => p.L));
+    return {
+      n, pieces,
+      wReq,
+      projectedWidth: wReq,     // alias (drawing)
+      boardWidth: wReq,         // alias (export messages)
+      L,
+      chordLength: L,           // alias (drawing)
+      stock: stockFor(wReq, S.stockWidths),
+    };
+  };
   const arcs = ring.outer.map((outer, i) => {
+    const theta = arcSpan(outer);
+    let nMin = Math.max(2, Math.ceil(theta / S.maxAngle - 1e-9));
+    // one short single-centre arc (segmental) may be a single board — only
+    // when a stock board actually fits it (spec §7.2)
+    if (ring.outer.length === 1 && theta < S.maxAngle && evaluate(i, 1).stock != null) nMin = 1;
+    const nMax = nMin + 3;
     const options = [];
-    for (let n = 1; n <= maxPieces; n++) {
-      const pieces = partitionArc(ring, i, n);
-      const projectedWidth = Math.max(...pieces.map((p) => p.projectedWidth));
-      const chordLength = Math.max(...pieces.map((p) => p.chordLength));
-      const boardWidth = projectedWidth + allowance;
-      options.push({ n, pieces, projectedWidth, chordLength, boardWidth, stock: stockFor(boardWidth, stockWidths) });
-    }
+    for (let n = nMin; n <= nMax; n++) options.push(evaluate(i, n));
     const feasible = options.filter((o) => o.stock != null);
-    const def = feasible[0] || null;                                  // fewest pieces
+    const def = feasible[0] || null;                                   // fewest pieces
     let alt = null;
-    for (const o of feasible) if (!alt || o.stock < alt.stock) alt = o; // narrowest board
+    for (const o of feasible) if (!alt || o.stock < alt.stock) alt = o;  // narrowest board
     if (alt && def && alt.n === def.n) alt = null;
     return {
       index: i,
       radiusOuter: outer.r,
       radiusInner: ring.inner[i].r,
-      span: arcSpan(outer),
+      span: theta,
+      spanDeg: theta * 180 / Math.PI,
+      nMin,
+      nMax,
       options,
       default: def,
       alternative: alt,
@@ -437,16 +514,16 @@ export function planArchSegments(ring, opts) {
     pieces,
     totalPieces: pieces.length,
     noStock: arcs.some((a) => !a.default),
-    stockWidths: [...stockWidths],
-    widthAllowance: allowance,
-    maxPieces,
+    stockWidths: [...S.stockWidths],
+    contourAllowance: S.allowance,
+    maxSegmentAngleDeg: S.maxDeg,
   };
 }
 
 /**
  * Whole-window plan: geometry + segment plans for the frame head and the
  * leaf top rail, finger-joint profile — everything the DXF builder needs.
- * Reads profile.arch: { finger, stockWidths, widthAllowance, maxPieces }.
+ * Reads profile.arch: { finger, stockWidths, contourAllowance, maxSegmentAngleDeg }.
  */
 export function buildArchPlan(input, profile) {
   if (!profile?.arch) throw new ArchError('Casement profile has no "arch" section (stock widths / finger joint)');
@@ -457,6 +534,7 @@ export function buildArchPlan(input, profile) {
     ...geometry,
     hinge: input.hinge === 'right' ? 'right' : 'left',
     finger: { ...profile.arch.finger },
+    blank: { contourAllowance: frameHead.contourAllowance, maxSegmentAngleDeg: frameHead.maxSegmentAngleDeg },
     plans: { frameHead, leafTop },
     noStock: frameHead.noStock || leafTop.noStock,
   };

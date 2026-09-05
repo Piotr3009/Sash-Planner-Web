@@ -73,7 +73,7 @@ function planSummary(plan) {
   return plan.arcs.map((a, i) => {
     const d = a.default;
     const alt = a.alternative;
-    const arcTxt = `ARC ${i + 1} R${fmt1(a.radiusOuter)} L${fmt1(a.radiusOuter * a.span)}`;
+    const arcTxt = `ARC ${i + 1} R${fmt1(a.radiusOuter)} L${fmt1(a.radiusOuter * a.span)} ${fmt1(a.spanDeg)}DEG`;
     if (!d) return `${arcTxt}: NO STOCK BOARD FITS (needs ${fmt1(a.options[a.options.length - 1].boardWidth)}+)`;
     const altTxt = alt ? ` (ALT ${alt.n} x board ${alt.stock})` : '';
     return `${arcTxt}: ${d.n} x board ${d.stock} L${fmt1(d.chordLength)}${altTxt}`;
@@ -115,6 +115,7 @@ function contourRow(ring, plan, ctx, ox, oy) {
     `FACE ${fmt1(ring.thickness)} OFFSET ${fmt1(ring.offsets.outer)} OUTER L${fmt1(ring.lengths.outer)} INNER L${fmt1(ring.lengths.inner)}`,
     ...planSummary(plan),
     `FINGER ${ctx.finger.length}/${ctx.finger.depth}/${ctx.finger.pitch}`,
+    `ALLOWANCE ${fmt1(plan.contourAllowance)} PER SIDE  MAX SEGMENT ${fmt1(plan.maxSegmentAngleDeg)} DEG`,
   ];
   const blockH = lines.length * C.lineH;
   const height = Math.max(rowBB.maxY - rowBB.minY, blockH);

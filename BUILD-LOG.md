@@ -41,6 +41,51 @@ ALL PASS · sample DXF NOT regenerated (restored via git; regenerated after T6/T
 
 **Verdict: ✅ T2** (stock list is now Piotr's, verified in the profile and through the DXF path).
 
+### T1 — max segment angle, N_min, allowance band (`arch.js`, `profile.js`, `archDxf.js`)
+
+**Understanding:** a board may not span more than 36° of arc (grain run-out), so every arc needs
+`N_min = max(2, ceil(θ / 36°))` pieces; candidates run `N_min … N_min + 3`. A single-centre arc
+shorter than 36° may be one board only when a stock board really fits it. The board a piece needs
+is the projection of the ALLOWANCE BAND (outer + 10, inner − 10, spec §7.4) onto the piece axes —
+not "piece + 20".
+
+**Two approaches, one rejected:** (a) keep the night-1 projection of the finished piece and add
+`widthAllowance` afterwards — rejected: 103.02 vs the spec's 102.70 for N = 3 (the inner offset
+arc sags less than the finished inner arc), fails T7's ±0.05; (b) offset both contours by the
+allowance with the existing `offsetArcs` (clipped ends recomputed on the band radii) and project
+that band with the existing exact extent code — chosen, four lines of new geometry.
+
+**Changes:** `allowanceBand(ring, a)`, `partitionArc(ring, i, n, band)` (band-driven extents,
+finished arcs kept for the drawing, per piece `phi/phiDeg/axisAngleDeg/wReq/L/band`),
+`planArchSegments` reads `contourAllowance` + `maxSegmentAngleDeg` (throws a readable ArchError
+when a setting is missing — no defaults in the planner), N window per spec §7.2–7.3, `nMin/nMax/
+spanDeg` on every arc result. Profile: `arch.version 2`, `contourAllowance 10`,
+`maxSegmentAngleDeg 36`; `widthAllowance` and `maxPieces` removed (replaced by the spec model —
+justification above); `migrateCasementProfile` replaces a stored arch block whose version differs
+(no UI edits this block, so nothing user-set is lost; a night-1 block persisted in a browser would
+otherwise keep the invented list and lack the new keys). DXF: arc line now prints the span in
+degrees, new TEXT line `ALLOWANCE 10 PER SIDE  MAX SEGMENT 36 DEG`.
+
+**Edge cases:** allowance 0 accepted; `contourAllowance` ≥ inner radius → `offsetArcs` throws
+readably; θ < 36° single arc with no fitting board → N_min 2; three-centre haunch arcs (38.6° at the
+night-1 radius) get 2 pieces of 69 mm — the spec's rule, flagged in BLOCKERS §6 as a question
+(minimum piece length).
+
+**Results (W 1200, D7, rule still "fewest pieces" until T6):** head segmental N 3…6, W_req
+102.70 / 91.49 / 86.28 / 83.45 → stock 105 / 95 / 95 / 95, middle L 441.69 (spec 441.71),
+end pieces W_req = middle (not wider), default 3 × 105, alt 4 × 95; semi-circle N 5…8, W_req
+103.09 / 95.16 / 90.36 / 87.24, L 377.00 — every number equals spec §10.2 within 0.02;
+gothic 2 per side; leaf segmental (own span 81.24°) 107.93 / 98.80 / 94.56 / 92.25 → 180 / 105 /
+95 / 95.
+
+**Verification:** esbuild OK on the three files · no Polish letters · harness rewritten in this
+area: independent option table now builds the band with its own clip formulas, samples 4000 points
+per arc, cross-checks the closed forms for middle pieces, asserts N candidates / N_min, every
+piece's W_req and L, and end pieces ≥ middle; profile v2 + migration-replacement checks; 226/226
+ALL PASS · sample DXF restored (regenerated later).
+
+**Verdict: ✅ T1.**
+
 ## 2026-09-05 — arched-casement-v1 (night run, branch `claude/arched-casement-v1`)
 
 **Blocking fact first:** `docs/handover/ARCHED-CASEMENT-v1.md` (the package spec) is NOT in the

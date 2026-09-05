@@ -176,37 +176,63 @@ check('PSW shape map covers the four PSW radios', ['gothic-arch', 'semi-circle',
 // per arc), which also covers the arch-start and apex ends where the inner arc
 // is clipped and the closed form no longer applies.
 // Stock list D7 (Piotr 05.09, spec §5) — the same list DEFAULT_CASEMENT_PROFILE.arch carries.
-const PLAN_OPTS = { stockWidths: [50, 63, 75, 95, 105, 180, 200], widthAllowance: 20, maxPieces: 8 };
+// Allowance 10 mm per side (D6), max segment angle 36° (D8).
+const PLAN_OPTS = { stockWidths: [50, 63, 75, 95, 105, 180, 200], contourAllowance: 10, maxSegmentAngleDeg: 36 };
 function sampled(cx, cy, r, a0, a1, N = 4000) {
   const pts = [];
   for (let j = 0; j <= N; j++) { const a = a0 + (a1 - a0) * j / N; pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); }
   return pts;
 }
+// Independent clip of a circle (cx, cy, ρ) at the arch-start line (y = 0) or
+// the window axis (x = 0) — the band arcs have other radii than the ring arcs.
+function clipAt(clip, cx, cy, r, end) {
+  if (clip === 'archStart') { const x = Math.sqrt(r * r - cy * cy); return end === 0 ? Math.atan2(-cy || 0, x) : Math.atan2(-cy || 0, -x); }
+  if (clip === 'axis') { const y = Math.sqrt(r * r - cx * cx); return Math.atan2(y, -cx); }
+  return null;
+}
+// Spec §7: allowance band (outer + a, inner − a) bounded by the radial joint
+// planes and, for the end pieces, by the arch-start line / apex axis; every
+// piece projected onto its own axes (sampled boundary, 4000 points per arc).
+// N_min = max(2, ceil(θ / maxAngle)), N = N_min … N_min + 3; a single-centre
+// arc shorter than maxAngle may be ONE board if a stock board fits it.
 function expectedOptions(ring, i) {
   const O = ring.outer[i], I = ring.inner[i];
+  const a = PLAN_OPTS.contourAllowance;
+  const rO = O.r + a, rI = I.r - a;
+  const bO0 = clipAt(O.clip0, O.cx, O.cy, rO, 0) ?? O.a0, bO1 = clipAt(O.clip1, O.cx, O.cy, rO, 1) ?? O.a1;
+  const bI0 = clipAt(I.clip0, I.cx, I.cy, rI, 0) ?? I.a0, bI1 = clipAt(I.clip1, I.cx, I.cy, rI, 1) ?? I.a1;
   const span = O.a1 - O.a0;
-  const out = [];
-  for (let n = 1; n <= PLAN_OPTS.maxPieces; n++) {
+  const maxAngle = PLAN_OPTS.maxSegmentAngleDeg * Math.PI / 180;
+  const evalN = (n) => {
     const phi = span / n;
-    let width = 0, length = 0;
+    let width = 0, length = 0, midWidth = null;
+    const pieces = [];
     for (let k = 0; k < n; k++) {
       const ao0 = O.a0 + k * phi, ao1 = k === n - 1 ? O.a1 : O.a0 + (k + 1) * phi;
-      const ai0 = k === 0 ? I.a0 : ao0, ai1 = k === n - 1 ? I.a1 : ao1;
+      const o0 = k === 0 ? bO0 : ao0, o1 = k === n - 1 ? bO1 : ao1;
+      const i0 = k === 0 ? bI0 : ao0, i1 = k === n - 1 ? bI1 : ao1;
       const m = (ao0 + ao1) / 2, b = [Math.cos(m), Math.sin(m)], u = [-Math.sin(m), Math.cos(m)];
-      const pts = [...sampled(O.cx, O.cy, O.r, ao0, ao1), ...sampled(I.cx, I.cy, I.r, ai0, ai1)];
+      const pts = [...sampled(O.cx, O.cy, rO, o0, o1), ...sampled(I.cx, I.cy, rI, i0, i1)];
       const w = pts.map((q) => q[0] * b[0] + q[1] * b[1]), sv = pts.map((q) => q[0] * u[0] + q[1] * u[1]);
-      width = Math.max(width, Math.max(...w) - Math.min(...w));
-      length = Math.max(length, Math.max(...sv) - Math.min(...sv));
+      const pw = Math.max(...w) - Math.min(...w), pl = Math.max(...sv) - Math.min(...sv);
+      width = Math.max(width, pw);
+      length = Math.max(length, pl);
+      pieces.push({ k, width: pw, length: pl });
       const radialBoth = k > 0 && k < n - 1;
       if (radialBoth) {
-        const cf = O.r - I.r * Math.cos(phi / 2);
-        if (!near(Math.max(...w) - Math.min(...w), cf, 0.01)) throw new Error(`closed-form mismatch n=${n} k=${k}`);
+        const cf = rO - rI * Math.cos(phi / 2);          // spec §7.5 closed form (middle pieces)
+        if (!near(pw, cf, 0.01)) throw new Error(`closed-form mismatch n=${n} k=${k}: ${pw} vs ${cf}`);
+        if (!near(pl, 2 * rO * Math.sin(phi / 2), 0.01)) throw new Error(`closed-form length mismatch n=${n} k=${k}`);
+        midWidth = cf;
       }
     }
-    const board = width + PLAN_OPTS.widthAllowance;
-    const stock = PLAN_OPTS.stockWidths.find((sw) => sw >= board - 1e-9) ?? null;
-    out.push({ n, width, length, board, stock });
-  }
+    const stock = PLAN_OPTS.stockWidths.find((sw) => sw >= width - 1e-9) ?? null;
+    return { n, phi, width, midWidth, length, board: width, stock, pieces };
+  };
+  let nMin = Math.max(2, Math.ceil(span / maxAngle - 1e-9));
+  if (ring.outer.length === 1 && span < maxAngle && evalN(1).stock != null) nMin = 1;
+  const out = [];
+  for (let n = nMin; n <= nMin + 3; n++) out.push(evalN(n));
   return out;
 }
 function expectedChoice(options) {
@@ -218,12 +244,12 @@ function expectedChoice(options) {
   return { def, alt };
 }
 
-section('§10.2 segment planner — W = 1200, stock D7 50…200, allowance 20');
+section('§10.2 segment planner — W = 1200, stock D7 50…200, allowance 10 per side, max segment 36°');
 const PLAN_VECTORS = [
-  { shape: 'segmental', rise: 240, defN: [2], altN: [4] },          // 2 × board 180 vs 4 × board 95
-  { shape: 'semi-circle', rise: null, defN: [3], altN: [7] },       // 3 × 180 vs 7 × 95
+  { shape: 'segmental', rise: 240, defN: [3], altN: [4] },          // 3 × board 105 vs 4 × board 95 (spec §10.2)
+  { shape: 'semi-circle', rise: null, defN: [5], altN: [7] },       // 5 × 105 vs 7 × 95 (spec §10.2)
   { shape: 'gothic-equilateral', rise: null, defN: [2, 2], altN: [3, 3] },
-  { shape: 'three-centre', rise: 390, defN: [1, 2, 1], altN: [null, 4, null] },
+  { shape: 'three-centre', rise: 390, defN: [2, 3, 2], altN: [null, 4, null] },
 ];
 for (const v of PLAN_VECTORS) {
   const g = arch.buildArchGeometry({ shape: v.shape, width: W, height: 2000, rise: v.rise }, P);
@@ -233,12 +259,18 @@ for (const v of PLAN_VECTORS) {
   plan.arcs.forEach((pa, i) => {
     const ring = g.frameHead;
     const exp = expectedOptions(ring, i);
-    const okW = pa.options.every((o, j) => near(o.projectedWidth, exp[j].width, 0.01));
-    const okL = pa.options.every((o, j) => near(o.chordLength, exp[j].length, 0.01));
+    check(`${tag} arc ${i}: N candidates ${exp[0].n}…${exp[exp.length - 1].n} (N_min = max(2, ceil(${pa.spanDeg.toFixed(2)}° / 36°)))`,
+      pa.options.length === exp.length && pa.options.every((o, j) => o.n === exp[j].n) && pa.nMin === exp[0].n, pa.options.map((o) => o.n).join(' '));
+    const okW = pa.options.every((o, j) => near(o.wReq, exp[j].width, 0.01));
+    const okL = pa.options.every((o, j) => near(o.L, exp[j].length, 0.01));
     const okS = pa.options.every((o, j) => o.stock === exp[j].stock);
-    check(`${tag} arc ${i}: projected widths for n = 1…8 (sampled + closed form)`, okW, pa.options.map((o) => o.projectedWidth.toFixed(1)).join(' ') + ' vs ' + exp.map((o) => o.width.toFixed(1)).join(' '));
-    check(`${tag} arc ${i}: chord lengths for n = 1…8`, okL);
+    check(`${tag} arc ${i}: W_req of the allowance band per N (sampled + closed form)`, okW, pa.options.map((o) => o.wReq.toFixed(2)).join(' ') + ' vs ' + exp.map((o) => o.width.toFixed(2)).join(' '));
+    check(`${tag} arc ${i}: L of the allowance band per N`, okL, pa.options.map((o) => o.L.toFixed(2)).join(' ') + ' vs ' + exp.map((o) => o.length.toFixed(2)).join(' '));
     check(`${tag} arc ${i}: stock match per option`, okS, pa.options.map((o) => o.stock).join(' '));
+    const okPieces = pa.options.every((o, j) => o.pieces.every((pc, k) => near(pc.wReq, exp[j].pieces[k].width, 0.01) && near(pc.L, exp[j].pieces[k].length, 0.01)));
+    check(`${tag} arc ${i}: every piece's own W_req / L match the sampled band`, okPieces);
+    const endsGE = pa.options.every((o, j) => exp[j].midWidth == null || o.pieces.every((pc) => pc.wReq + 1e-9 >= exp[j].midWidth));
+    check(`${tag} arc ${i}: end pieces W_req >= middle-piece closed form (spec §10.2)`, endsGE);
     const { def, alt } = expectedChoice(exp);
     check(`${tag} arc ${i}: D13 default = fewest pieces (n = ${def?.n ?? '-'})`, (pa.default?.n ?? null) === (def?.n ?? null) && (pa.default?.n ?? null) === v.defN[i]);
     check(`${tag} arc ${i}: D13 alternative = narrowest board (n = ${alt?.n ?? '-'})`, (pa.alternative?.n ?? null) === (alt?.n ?? null) && (pa.alternative?.n ?? null) === v.altN[i]);
@@ -278,15 +310,15 @@ for (const v of PLAN_VECTORS) {
   // three-centre: tangent joints are radial for both neighbours (same line)
   const g = arch.buildArchGeometry({ shape: 'three-centre', width: W, height: 2000, rise: 390 }, P);
   const plan = arch.planArchSegments(g.frameHead, PLAN_OPTS);
-  const haunch = plan.arcs[0].default.pieces[0], crown = plan.arcs[1].default.pieces[0];
-  const jH = arch.pieceJoints(haunch)[0], jC = arch.pieceJoints(crown)[0];
+  const hp = plan.arcs[0].default.pieces, haunchLast = hp[hp.length - 1], crown = plan.arcs[1].default.pieces[0];
+  const jHs = arch.pieceJoints(haunchLast), jH = jHs[jHs.length - 1], jC = arch.pieceJoints(crown)[0];
   check('three-centre: haunch/crown share the tangent joint line', near(jH[0][0], jC[0][0], 1e-9) && near(jH[0][1], jC[0][1], 1e-9) && near(jH[1][0], jC[1][0], 1e-9) && near(jH[1][1], jC[1][1], 1e-9));
-  check('three-centre: haunch ends = archStart → tangent', haunch.endStart === 'archStart' && haunch.endEnd === 'tangent');
+  check('three-centre: haunch ends = archStart → … → tangent', hp[0].endStart === 'archStart' && haunchLast.endEnd === 'tangent');
 }
 {
   // no stock fits → options with stock null, plan.noStock, nothing thrown
   const g = arch.buildArchGeometry({ shape: 'semi-circle', width: W, height: 2000 }, P);
-  const plan = arch.planArchSegments(g.frameHead, { stockWidths: [50], widthAllowance: 20, maxPieces: 4 });
+  const plan = arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, stockWidths: [50] });
   check('no matching board: returns options with stock = null and noStock = true', plan.noStock === true && plan.arcs[0].default === null && plan.arcs[0].options.every((o) => o.stock === null) && plan.pieces.length === 0);
 }
 
@@ -353,8 +385,9 @@ section('§10.3 DXF round-trip — sample_arch_1200_segmental.dxf (frame head + 
   check('TEXT: labels for both members', texts.some((t) => t === 'W1 - FRAME HEAD') && texts.some((t) => t === 'W1 - LEAF TOP'));
   check('TEXT: shape / size / hinge line', texts.some((t) => t === 'SEGMENTAL W1200 RISE240 H2000 HINGE L'), texts.join(' | '));
   check('TEXT: finger profile 15/16/3.8', texts.some((t) => t === 'FINGER 15/16/3.8'));
+  check('TEXT: allowance 10 per side + max segment 36 deg printed', texts.some((t) => t === 'ALLOWANCE 10 PER SIDE  MAX SEGMENT 36 DEG'), texts.filter((t) => t.startsWith('ALLOW')).join(' | '));
   const altTxt = expF.alt ? ` \\(ALT ${expF.alt.n} x board ${expF.alt.stock}\\)` : '';
-  const planRe = new RegExp(`^ARC 1 R870 L1324\\.2: ${expF.def.n} x board ${expF.def.stock} L\\d+(\\.\\d)?${altTxt}$`);
+  const planRe = new RegExp(`^ARC 1 R870 L1324\\.2 87\\.2DEG: ${expF.def.n} x board ${expF.def.stock} L\\d+(\\.\\d)?${altTxt}$`);
   check(`TEXT: D13 default + alternative printed (${expF.def.n} × ${expF.def.stock}, ALT ${expF.alt?.n ?? '-'} × ${expF.alt?.stock ?? '-'})`, texts.some((t) => planRe.test(t)), texts.filter((t) => t.startsWith('ARC')).join(' | '));
   check('TEXT: flat piece labels with board size', texts.some((t) => new RegExp(`^W1 - FRAME HEAD P1 \\d+(\\.\\d)?x${stockF}$`).test(t)) && texts.some((t) => new RegExp(`^W1 - LEAF TOP P1 \\d+(\\.\\d)?x${stockL}$`).test(t)));
   const minX = Math.min(...d.polys.map((p) => p.bbox[0])), minY = Math.min(...d.polys.map((p) => p.bbox[1]));
@@ -403,17 +436,20 @@ section('§10.3 DXF round-trip — sample_arch_1200_segmental.dxf (frame head + 
 // ── §10.3 pt 9 — profile section + PSW → windowSpec.arch mapping (real data path)
 section('§10.3 pt 9 — profile.arch, migration, PSW field mapping, deriveWindowData path');
 {
-  check('DEFAULT_CASEMENT_PROFILE.arch present: finger 15/16/3.8, stock D7 [50, 63, 75, 95, 105, 180, 200], allowance 20, maxPieces 8',
-    P.arch && P.arch.finger.length === 15 && P.arch.finger.depth === 16 && P.arch.finger.pitch === 3.8
-    && JSON.stringify(P.arch.stockWidths) === JSON.stringify([50, 63, 75, 95, 105, 180, 200]) && P.arch.widthAllowance === 20 && P.arch.maxPieces === 8);
+  check('DEFAULT_CASEMENT_PROFILE.arch v2: finger 15/16/3.8, stock D7 [50, 63, 75, 95, 105, 180, 200], contourAllowance 10, maxSegmentAngleDeg 36',
+    P.arch && P.arch.version === 2 && P.arch.finger.length === 15 && P.arch.finger.depth === 16 && P.arch.finger.pitch === 3.8
+    && JSON.stringify(P.arch.stockWidths) === JSON.stringify([50, 63, 75, 95, 105, 180, 200]) && P.arch.contourAllowance === 10 && P.arch.maxSegmentAngleDeg === 36
+    && !('widthAllowance' in P.arch) && !('maxPieces' in P.arch));
   // stored v1.1 profile (no arch) → migration fills the section; partial finger merges
   const { arch: _drop, ...v11 } = JSON.parse(JSON.stringify(P));
   void _drop;
   const m1 = profile.migrateCasementProfile(v11);
   check('migrateCasementProfile: v1.1 profile without arch gets the default section', JSON.stringify(m1.arch) === JSON.stringify(P.arch));
-  const m2 = profile.migrateCasementProfile({ ...v11, arch: { finger: { pitch: 4.2 }, stockWidths: [150] } });
-  check('migrateCasementProfile: partial arch section merges (pitch 4.2, stock [150], rest default)',
-    m2.arch.finger.length === 15 && m2.arch.finger.pitch === 4.2 && JSON.stringify(m2.arch.stockWidths) === '[150]' && m2.arch.widthAllowance === 20);
+  const m2 = profile.migrateCasementProfile({ ...v11, arch: { version: 2, finger: { pitch: 4.2 }, stockWidths: [150] } });
+  check('migrateCasementProfile: partial v2 arch section merges (pitch 4.2, stock [150], rest default)',
+    m2.arch.finger.length === 15 && m2.arch.finger.pitch === 4.2 && JSON.stringify(m2.arch.stockWidths) === '[150]' && m2.arch.contourAllowance === 10 && m2.arch.maxSegmentAngleDeg === 36);
+  const m3 = profile.migrateCasementProfile({ ...v11, arch: { finger: { length: 15, depth: 16, pitch: 3.8 }, stockWidths: [100, 125, 150, 175, 200, 225, 250], widthAllowance: 20, maxPieces: 8 } });
+  check('migrateCasementProfile: night-1 arch block (no version, invented stock list) is replaced whole by the v2 default', JSON.stringify(m3.arch) === JSON.stringify(P.arch));
   check('migrateCasementProfile: pre-v1 shape still replaced by the default (arch included)', profile.migrateCasementProfile({ frameDepth: 93 }).arch === P.arch);
 
   const psw = (fc, item = {}) => specification.normaliseToWindowSpec(
