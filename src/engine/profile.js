@@ -152,8 +152,9 @@ export const DEFAULT_CASEMENT_PROFILE = {
     // depth / pitch — printed on the drawing as FINGER 15/16/3.8.
     finger: { length: 15, depth: 16, pitch: 3.8 },
     // Board widths the planner may pick from (finished piece + allowance must
-    // fit). Workshop stock list — edit here, never in the planner.
-    stockWidths: [100, 125, 150, 175, 200, 225, 250],
+    // fit). Workshop stock list (Piotr 05.09, spec D7) — edit here, never in
+    // the planner.
+    stockWidths: [50, 63, 75, 95, 105, 180, 200],
     widthAllowance: 20,  // mm added to the projected piece width before matching a board
     maxPieces: 8,        // pieces per arc the planner will consider
   },

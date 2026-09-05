@@ -4,6 +4,43 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-09-06 — arched-casement-v1: audit fixes T1–T8, then Stage 2 (night run 2, branch `claude/arched-casement-audit-t1-t8-7d5fuk`)
+
+Inputs read in full, in this order: `ARCHED-CASEMENT-v1-AUDIT.md` → `ARCHED-CASEMENT-v1.md` (spec,
+wins on every discrepancy) → `ARCHED-CASEMENT-v1-AS-BUILT.md`. Baseline before any change:
+`node verify/arch/t16.mjs` 203 checks ALL PASS on `main` (b801039). Order of work per CLAUDE.md:
+T2 → T1 → T6 → T3 → T4 → T5 → T7 → T8 → Stage 2 a→d. One commit per closed task.
+
+Two spec-vs-audit conflicts settled up front by the rule "spec wins" (details in BLOCKERS.md §6):
+1. Audit T2 says keep `widthAllowance: 20` ("equivalent to 10 per side"); audit T7 demands
+   middle-piece `W_req` == spec §10.2 within ±0.05. Both cannot hold: "+20 after projection" gives
+   103.02 for N = 3, the spec's band formula `(Ro + a) − (Ri − a)·cos(φ/2)` gives 102.70. The
+   planner is moved to the spec §7.4 model (allowance band 10 mm per side, `contourAllowance`) in T1.
+2. Spec §10.2 "LEAF segmental (R 830/763, θ 87.21°)" reuses the HEAD's included angle. By spec §6.2
+   every chain is clipped at the arch-start line, so the leaf ring's own span at R 830 is 81.24°.
+   With 87.21° the closed formula reproduces the spec's 111.1 / 100.6 exactly; with the leaf's own
+   span it gives 107.9 / 98.8. The geometry follows §6.2; the leaf line is logged as a spec erratum.
+
+### T2 — stock list D7 (`src/engine/profile.js`)
+
+**Understanding:** the board widths the planner may pick from are workshop data; the night-1 list
+`[100 … 250]` was invented. Piotr's list (D7): `[50, 63, 75, 95, 105, 180, 200]`.
+
+**Change:** `DEFAULT_CASEMENT_PROFILE.arch.stockWidths` → D7. `widthAllowance: 20` and
+`maxPieces: 8` untouched in this step (T1 replaces both, see above). Harness: the local
+`PLAN_OPTS` copy now carries the same list; every plan literal in the DXF section (piece counts,
+board heights, FINGER count, `ALT` text, flat labels) is now derived from the harness's own
+independent option table instead of hard-coded `2 × 150 / 1 × 225`, so the checks stay structural
+until the spec vectors land in T7. Gothic piece-end checks generalised to N pieces per side.
+
+**Observed with D7 under the night-1 rule (fewest pieces):** head 2 × 180, leaf 2 × 180, semi-circle
+3 × 180, gothic 2 + 2 × 180 — all still too few pieces (43° per board); that is T1's job.
+
+**Verification:** esbuild `profile.js` OK · no Polish letters in touched files · harness 203/203
+ALL PASS · sample DXF NOT regenerated (restored via git; regenerated after T6/T8 as instructed).
+
+**Verdict: ✅ T2** (stock list is now Piotr's, verified in the profile and through the DXF path).
+
 ## 2026-09-05 — arched-casement-v1 (night run, branch `claude/arched-casement-v1`)
 
 **Blocking fact first:** `docs/handover/ARCHED-CASEMENT-v1.md` (the package spec) is NOT in the

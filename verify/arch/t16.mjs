@@ -175,7 +175,8 @@ check('PSW shape map covers the four PSW radios', ['gothic-arch', 'semi-circle',
 // of every piece boundary projected onto the bisector / chord axes (4000 points
 // per arc), which also covers the arch-start and apex ends where the inner arc
 // is clipped and the closed form no longer applies.
-const PLAN_OPTS = { stockWidths: [100, 125, 150, 175, 200, 225, 250], widthAllowance: 20, maxPieces: 8 };
+// Stock list D7 (Piotr 05.09, spec §5) — the same list DEFAULT_CASEMENT_PROFILE.arch carries.
+const PLAN_OPTS = { stockWidths: [50, 63, 75, 95, 105, 180, 200], widthAllowance: 20, maxPieces: 8 };
 function sampled(cx, cy, r, a0, a1, N = 4000) {
   const pts = [];
   for (let j = 0; j <= N; j++) { const a = a0 + (a1 - a0) * j / N; pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); }
@@ -217,11 +218,11 @@ function expectedChoice(options) {
   return { def, alt };
 }
 
-section('§10.2 segment planner — W = 1200, stock 100…250, allowance 20');
+section('§10.2 segment planner — W = 1200, stock D7 50…200, allowance 20');
 const PLAN_VECTORS = [
-  { shape: 'segmental', rise: 240, defN: [2], altN: [4] },          // 2 × board 150 vs 4 × board 100
-  { shape: 'semi-circle', rise: null, defN: [2], altN: [6] },       // 2 × 250 vs 6 × 100
-  { shape: 'gothic-equilateral', rise: null, defN: [1, 1], altN: [3, 3] },
+  { shape: 'segmental', rise: 240, defN: [2], altN: [4] },          // 2 × board 180 vs 4 × board 95
+  { shape: 'semi-circle', rise: null, defN: [3], altN: [7] },       // 3 × 180 vs 7 × 95
+  { shape: 'gothic-equilateral', rise: null, defN: [2, 2], altN: [3, 3] },
   { shape: 'three-centre', rise: 390, defN: [1, 2, 1], altN: [null, 4, null] },
 ];
 for (const v of PLAN_VECTORS) {
@@ -263,10 +264,14 @@ for (const v of PLAN_VECTORS) {
   // gothic apex: the joint on the axis is a finger joint, the arch-start cuts are not
   const g = arch.buildArchGeometry({ shape: 'gothic-equilateral', width: W, height: 2000 }, P);
   const plan = arch.planArchSegments(g.frameHead, PLAN_OPTS);
+  const nSide = plan.arcs[0].default.n;
   const ends = plan.pieces.map((pc) => [pc.endStart, pc.endEnd]);
-  check('gothic: piece ends = archStart→axis, axis→archStart', JSON.stringify(ends) === JSON.stringify([['archStart', 'axis'], ['axis', 'archStart']]), JSON.stringify(ends));
-  const apexJoints = plan.pieces.flatMap((pc) => arch.pieceJoints(pc));
-  check('gothic: exactly one joint face per piece, both on the axis (x = 0)', apexJoints.length === 2 && apexJoints.every(([pi, po]) => near(pi[0], 0, 1e-9) && near(po[0], 0, 1e-9)));
+  const expEnds = [...Array(nSide)].map((_, k) => [k === 0 ? 'archStart' : 'radial', k === nSide - 1 ? 'axis' : 'radial'])
+    .concat([...Array(nSide)].map((_, k) => [k === 0 ? 'axis' : 'radial', k === nSide - 1 ? 'archStart' : 'radial']));
+  check(`gothic: piece ends per side (${nSide} pcs) = archStart→radial…→axis, mirrored`, JSON.stringify(ends) === JSON.stringify(expEnds), JSON.stringify(ends));
+  const allJoints = plan.pieces.flatMap((pc) => arch.pieceJoints(pc));
+  const apexJoints = allJoints.filter(([pi, po]) => near(pi[0], 0, 1e-9) && near(po[0], 0, 1e-9));
+  check(`gothic: ${4 * nSide - 2} joint faces reported (every non-arch-start end, shared joints twice), exactly 2 on the axis (x = 0)`, allJoints.length === 4 * nSide - 2 && apexJoints.length === 2, String(allJoints.length));
   expectNear('gothic: apex joint runs from inner apex 972.86 to outer apex 1039.23', apexJoints[0][1][1] - apexJoints[0][0][1], 1039.2305 - 972.8648, 0.01);
 }
 {
@@ -320,10 +325,13 @@ section('§10.3 DXF round-trip — sample_arch_1200_segmental.dxf (frame head + 
   expectNear('leaf top CONTOUR arc length = outer + inner (closed form)', leafC.arcs, lo.length + li.length, 0.05);
   expectNear('leaf top CONTOUR straight length = two arch-start cuts', leafC.straight, 2 * (lo.xEnd - li.xEnd), 0.05);
   check('frame head contour sits above the leaf contour (reading order top-down)', frameC.bbox[1] > leafC.bbox[3]);
-  // pieces: default plans (frame 2 × 150, leaf 1 × 225 with this stock list)
+  // pieces: default plans — expected from the independent option table (same stock list as the profile)
   const nF = plan.plans.frameHead.totalPieces, nL = plan.plans.leafTop.totalPieces;
-  check(`default plans: frame head ${nF} pcs, leaf top ${nL} pcs`, nF === 2 && nL === 1 && plan.plans.frameHead.pieces[0].stock === 150 && plan.plans.leafTop.pieces[0].stock === 225,
-    `${nF}/${nL} stock ${plan.plans.frameHead.pieces[0]?.stock}/${plan.plans.leafTop.pieces[0]?.stock}`);
+  const expF = expectedChoice(expectedOptions(plan.frameHead, 0)), expL = expectedChoice(expectedOptions(plan.leafTop, 0));
+  check(`default plans: frame head ${nF} × ${expF.def.stock}, leaf top ${nL} × ${expL.def.stock} (independent option table)`,
+    nF === expF.def.n && nL === expL.def.n && plan.plans.frameHead.pieces.every((pc) => pc.stock === expF.def.stock) && plan.plans.leafTop.pieces.every((pc) => pc.stock === expL.def.stock),
+    `${nF}/${nL} stock ${plan.plans.frameHead.pieces[0]?.stock}/${plan.plans.leafTop.pieces[0]?.stock} vs ${expF.def.n}/${expL.def.n} stock ${expF.def.stock}/${expL.def.stock}`);
+  const stockF = expF.def.stock, stockL = expL.def.stock;
   const pieces = d.polys.filter((p) => p.layer === 'PIECES');
   check(`PIECES: ${nF + nL} closed 4-vertex polylines`, pieces.length === nF + nL && pieces.every((p) => p.closed && p.n === 4), String(pieces.length));
   expectNear('PIECES arc lengths tile both rings (outer + inner of frame and leaf)', sumBy(pieces, (p) => p.arcs), fo.length + fi.length + lo.length + li.length, 0.05);
@@ -332,19 +340,23 @@ section('§10.3 DXF round-trip — sample_arch_1200_segmental.dxf (frame head + 
   // flat boards = the ones that contain a PIECES polyline; each is an axis-aligned stock rectangle
   const inside = (a, b) => a[0] >= b[0] - 1e-6 && a[1] >= b[1] - 1e-6 && a[2] <= b[2] + 1e-6 && a[3] <= b[3] + 1e-6;
   const flatBoards = boards.filter((bd) => pieces.some((pc) => inside(pc.bbox, bd.bbox)));
-  check('flat boards: one axis-aligned stock rectangle (150 / 225 high) around every flat piece', flatBoards.length === nF + nL
-    && flatBoards.every((bd) => near(bd.bbox[3] - bd.bbox[1], 150, 1e-6) || near(bd.bbox[3] - bd.bbox[1], 225, 1e-6)), String(flatBoards.length));
+  check(`flat boards: one axis-aligned stock rectangle (${stockF} / ${stockL} high) around every flat piece`, flatBoards.length === nF + nL
+    && flatBoards.every((bd) => near(bd.bbox[3] - bd.bbox[1], stockF, 1e-6) || near(bd.bbox[3] - bd.bbox[1], stockL, 1e-6)), String(flatBoards.length));
   const fingers = d.polys.filter((p) => p.layer === 'FINGER');
-  // frame: 1 joint in the assembly + 2 radial ends in the pieces row; leaf: none
-  check('FINGER: 3 joint faces (1 assembled + 2 on the flat frame pieces), open polylines', fingers.length === 3 && fingers.every((p) => !p.closed && p.n === 2), String(fingers.length));
+  // per ring: N − 1 joints in the assembly + 2·(N − 1) radial ends in the pieces row
+  const nFingerExp = 3 * ((nF - 1) + (nL - 1));
+  check(`FINGER: ${nFingerExp} joint faces (assembled + flat, both rings), open polylines`, fingers.length === nFingerExp && fingers.every((p) => !p.closed && p.n === 2), String(fingers.length));
   const jointLen = fingers.map((p) => p.straight);
-  check('FINGER faces are the member face long (57 mm, radial)', jointLen.every((l) => near(l, tF, 0.01)), jointLen.map((l) => l.toFixed(2)).join(' '));
+  check(`FINGER faces are the member face long (${tF} mm frame × ${3 * (nF - 1)}, ${tL} mm leaf × ${3 * (nL - 1)}, radial)`,
+    jointLen.filter((l) => near(l, tF, 0.01)).length === 3 * (nF - 1) && jointLen.filter((l) => near(l, tL, 0.01)).length === 3 * (nL - 1), jointLen.map((l) => l.toFixed(2)).join(' '));
   const texts = d.texts.map((t) => t.text);
   check('TEXT: labels for both members', texts.some((t) => t === 'W1 - FRAME HEAD') && texts.some((t) => t === 'W1 - LEAF TOP'));
   check('TEXT: shape / size / hinge line', texts.some((t) => t === 'SEGMENTAL W1200 RISE240 H2000 HINGE L'), texts.join(' | '));
   check('TEXT: finger profile 15/16/3.8', texts.some((t) => t === 'FINGER 15/16/3.8'));
-  check('TEXT: D13 default + alternative printed', texts.some((t) => /ARC 1 R870 L1324\.2: 2 x board 150 L\d+(\.\d)? \(ALT 4 x board 100\)/.test(t)), texts.filter((t) => t.startsWith('ARC')).join(' | '));
-  check('TEXT: flat piece labels with board size', texts.some((t) => /^W1 - FRAME HEAD P1 \d+(\.\d)?x150$/.test(t)) && texts.some((t) => /^W1 - LEAF TOP P1 \d+(\.\d)?x225$/.test(t)));
+  const altTxt = expF.alt ? ` \\(ALT ${expF.alt.n} x board ${expF.alt.stock}\\)` : '';
+  const planRe = new RegExp(`^ARC 1 R870 L1324\\.2: ${expF.def.n} x board ${expF.def.stock} L\\d+(\\.\\d)?${altTxt}$`);
+  check(`TEXT: D13 default + alternative printed (${expF.def.n} × ${expF.def.stock}, ALT ${expF.alt?.n ?? '-'} × ${expF.alt?.stock ?? '-'})`, texts.some((t) => planRe.test(t)), texts.filter((t) => t.startsWith('ARC')).join(' | '));
+  check('TEXT: flat piece labels with board size', texts.some((t) => new RegExp(`^W1 - FRAME HEAD P1 \\d+(\\.\\d)?x${stockF}$`).test(t)) && texts.some((t) => new RegExp(`^W1 - LEAF TOP P1 \\d+(\\.\\d)?x${stockL}$`).test(t)));
   const minX = Math.min(...d.polys.map((p) => p.bbox[0])), minY = Math.min(...d.polys.map((p) => p.bbox[1]));
   check('drawing origin: nothing left of / below (0, 0)', minX >= -1e-6 && minY >= -1e-6, `${minX.toFixed(3)}, ${minY.toFixed(3)}`);
   // polyLength (JS) agrees with ezdxf-side arithmetic on the frame contour
@@ -391,9 +403,9 @@ section('§10.3 DXF round-trip — sample_arch_1200_segmental.dxf (frame head + 
 // ── §10.3 pt 9 — profile section + PSW → windowSpec.arch mapping (real data path)
 section('§10.3 pt 9 — profile.arch, migration, PSW field mapping, deriveWindowData path');
 {
-  check('DEFAULT_CASEMENT_PROFILE.arch present: finger 15/16/3.8, stock 100…250, allowance 20, maxPieces 8',
+  check('DEFAULT_CASEMENT_PROFILE.arch present: finger 15/16/3.8, stock D7 [50, 63, 75, 95, 105, 180, 200], allowance 20, maxPieces 8',
     P.arch && P.arch.finger.length === 15 && P.arch.finger.depth === 16 && P.arch.finger.pitch === 3.8
-    && JSON.stringify(P.arch.stockWidths) === JSON.stringify([100, 125, 150, 175, 200, 225, 250]) && P.arch.widthAllowance === 20 && P.arch.maxPieces === 8);
+    && JSON.stringify(P.arch.stockWidths) === JSON.stringify([50, 63, 75, 95, 105, 180, 200]) && P.arch.widthAllowance === 20 && P.arch.maxPieces === 8);
   // stored v1.1 profile (no arch) → migration fills the section; partial finger merges
   const { arch: _drop, ...v11 } = JSON.parse(JSON.stringify(P));
   void _drop;
