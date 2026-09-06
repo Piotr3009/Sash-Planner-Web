@@ -3,6 +3,60 @@
 Verdicts per phase, in execution order.
 
 ---
+## 2026-09-06 — ARCHED-WINDOWS-v4 night 6 (branch `claude/arched-windows-v4-5rqezr`) — **STOPPED AT THE START GATE, NO CODE WRITTEN**
+
+Inputs read in full: `CLAUDE.md` (night 6) → `docs/handover/ARCHED-WINDOWS-v4.md` (all four blocks) →
+`BLOCKERS.md` → `BUILD-LOG.md` (night 5) → `src/engine/arch.js` (planner: `readPlannerSettings`,
+`pickOption`, `planArchSegments`, `partitionArc`, `allowanceBand`, `piecePoly`, `pieceBandPoly`) →
+`src/engine/profile.js` (casement + door blocks) → `src/pages/WindowDetailPage.jsx` (export buttons) →
+`src/pages/DashboardPage.jsx` (archive flow) → `verify/arch/t24_stage4.mjs` → Petros (`entries`,
+`decisions`, `reminders`).
+
+### Gate — FAILED, session stopped as instructed
+
+CLAUDE.md night 6: *"Zanim ruszysz, sprawdź, że paczka arch-pieces-v1 jest na `main` … Jeśli nie —
+STOP, wpis w BLOCKERS, koniec sesji."* All three checks fail on `origin/main` = `048e47c`:
+`pieceStockTrapezoid` 0, `glazingRebate` 0, the "Tracery LSP" button still at
+`src/pages/WindowDetailPage.jsx:160`. Full evidence — including the whole-history pickaxe search and
+the Petros / Drive / Gmail sweep — in `BLOCKERS.md` §A of this date.
+
+**Verdict: ❌ night 6 not started.** Zero lines of `src/` changed; `git diff origin/main --stat` for
+this branch covers only `BLOCKERS.md` and `BUILD-LOG.md`.
+
+### What I did instead of guessing
+
+1. **Proved the gate failure** rather than asserting it: 8 branches swept, `git log --all -S` on four
+   package symbols (they appear only in `CLAUDE.md` and the v4 spec, never under `src/`), Petros
+   entries, Google Drive, Gmail. Details in BLOCKERS §A.
+2. **Baselined `main`** so night 7 starts from a known state: `npm install`, `pip install ezdxf`
+   (1.4.4), all ten harnesses, `npm run build`. Result: **t16, t17_edges, t18, t19, t20, t20_bars,
+   t21, t22, t23 ALL PASS; t24_stage4 25/26 with one FAIL; build green.** BLOCKERS §B.
+3. **Diagnosed the single FAIL** to an out-of-date harness assertion, not a code regression: you
+   changed the dashboard archive flow yourself in `dce5a16` (always confirm, after an accidental
+   click), and `t24_stage4.mjs:80` still asserts the old immediate-archive branch. Left untouched —
+   out of v4 scope, needs your word. BLOCKERS §C.
+4. **Mapped each v4 block against the missing package** so you can decide what night 7 can do without
+   it. BLOCKERS §D.
+
+### Why I did not build Block C on the existing planner
+
+Two approaches, one rejected. (a) Implement C.1–C.8 on the current `planArchSegments`, inventing
+`pieceStockTrapezoid` / `pieceStockEdges` / `glazingRebate` to match the spec's prose — **rejected**:
+v4 C.3 names those functions as *inputs* to the new partitioner, so their signatures and their
+trapezoid/edge semantics are decisions already taken in a chat I cannot read; a guess would be merged
+against your real package and one of the two would have to be thrown away, and every t25 vector in
+C.5 is quoted against the real one. (b) Stop at the gate, prove the failure, hand back a measured
+baseline and an unblocking question — **taken**, and it is what both CLAUDE.md and the spec instruct.
+
+### Not verified tonight
+
+Everything in the v4 scope: no Block C / B / E / F code exists, so nothing about the segment planner,
+the CLAMPS layer, the Window Settings card, the glazier PDF layout, `intersecting` from the vertical
+bars, or the 68 mm frame has been written, run or checked. No new sample DXF or PDF was produced.
+`t25` and `t26` do not exist. The 9 passing harnesses and the green build were measured in this
+container only (node + ezdxf); no browser, no VCarve, no bSolid, no PDF viewer.
+
+---
 
 ## 2026-09-07 — ARCHED-WINDOWS-v3 night 5 (branch `claude/arched-windows-v3-9v0sw7`)
 

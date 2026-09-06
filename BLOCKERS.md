@@ -4,6 +4,89 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-09-06 — ARCHED-WINDOWS-v4 night 6: **STOPPED AT THE START GATE** (branch `claude/arched-windows-v4-5rqezr`)
+
+### A. [CRITICAL — BLOCKS THE WHOLE NIGHT] The `arch-pieces-v1` package is not in the repository
+
+`CLAUDE.md` (night 6) and `docs/handover/ARCHED-WINDOWS-v4.md` both open with the same gate: the chat
+package **arch-pieces-v1** (06.09) must be on `main` before the night starts, verified by three greps.
+**All three fail**, so the session stopped there, as the gate instructs.
+
+| Gate check (CLAUDE.md) | Required | Actual on `origin/main` = `048e47c` |
+|---|---|---|
+| `grep -c pieceStockTrapezoid src/engine/arch.js` | > 0 | **0** |
+| `grep -c glazingRebate src/engine/profile.js` | > 0 | **0** |
+| no "Tracery LSP" button | absent | **present**, `src/pages/WindowDetailPage.jsx:160–162` |
+
+**Where I looked (exhaustive, all negative for source code):**
+- Working tree, and every one of the 8 branches on `origin`
+  (`git show <ref>:src/engine/arch.js | grep -c pieceStockTrapezoid` → 0 on all).
+- The **whole history**: `git log --all -S'pieceStockTrapezoid' --oneline`, and the same for
+  `pieceStockEdges`, `glazingRebate`, `minClampLength`. Each returns exactly one commit, `048e47c`
+  ("v6 noc", 06.09 15:45), and that commit touches **only two files**: `CLAUDE.md` and
+  `docs/handover/ARCHED-WINDOWS-v4.md`. The names have therefore never existed under `src/` in any
+  commit of this repository — they exist only as prose in the spec that assumes them.
+- Petros (`entries`): one matching note, `warsztat/biesse` 06.09 14:34, "Rover A 1532: minimalna
+  dlugosc elementu 450 mm…". It carries the Block C **numbers** (`cnc.minClampLength` 450,
+  `arch.minPieceLength` 400, boards 63/75/95/105/120/150/180/200) but no code and nothing about the
+  trapezoid piece model, the glued blank, `glazingRebate`, or the LSP removal.
+- Google Drive (`fullText contains 'pieceStockTrapezoid' or 'arch-pieces'`) → nothing.
+- Gmail (`pieceStockTrapezoid OR "arch-pieces" OR glazingRebate newer_than:14d`) → nothing.
+
+**What `arch.js` actually still is:** the v1/v3 planner. `planArchSegments()` partitions **each arc of
+the ring separately** (`ring.outer.map((outer, i) => …)`, `src/engine/arch.js:788`) — precisely the
+behaviour v4 C.3 exists to replace — sizing boards from the allowance band projection
+(`allowanceBand` + `partitionArc` + `stockFor`), with `PIECE_RULES` `'narrowest' | 'fewest'` and
+`minPieceLength` warn-only. There is no trapezoid abstraction and no ASSEMBLY (glued blank) model.
+
+**Current profile values, for the record (they are the v4 "before" column):**
+`arch.stockWidths [50, 63, 75, 95, 105, 180, 200]` · `arch.minPieceLength 150` (warn) · no
+`cnc.minClampLength` · no `arch.wasteThreshold` · no `cnc.clamp` · casement `frameHead.face 57`,
+`frameJamb.face 57`, `geometry.land 36`, `deductions.leafAtJamb 40` · door `couplingPost.width 114`
+· no `geometry.glazingRebate`.
+
+**Ask (this is the one thing that unblocks night 7):** push the arch-pieces-v1 code to `main`, or say
+"build it" and give it a spec section in `docs/handover/`. I deliberately did **not** invent
+`pieceStockTrapezoid` / `pieceStockEdges` / `glazingRebate`: Block C is written to consume them
+(v4 C.3 names them as inputs), so guessing their shape would put a night's work on top of an API you
+would then have to merge against — the exact failure the gate was added to prevent.
+
+### B. Baseline of `main` measured tonight (so night 7 does not start blind)
+
+`npm install` (the container ships without `node_modules`), `pip install ezdxf` → 1.4.4, then every
+harness on the session checklist, on an untouched `origin/main` = `048e47c`:
+
+| Harness | Result |
+|---|---|
+| t16, t17_edges, t18, t19, t20, t20_bars, t21, t22, t23 | **ALL PASS** (9 of 10) |
+| t24_stage4 | **25 passed, 1 FAILED** |
+| `npm run build` | **green** (21.4 s; the pre-existing >500 kB chunk warning only) |
+
+### C. [t24_stage4 FAIL — not a regression, an out-of-date assertion] Dashboard archive flow
+
+`verify/arch/t24_stage4.mjs:80` still asserts the night-5 rule:
+`dp.includes("if (open === 0) { archiveProject(project.id); return; }")` — archive immediately when
+every batch pack is complete, confirm otherwise.
+
+You changed that yourself in commit `dce5a16` (06.09 12:19, `Update DashboardPage.jsx`), and the code
+says why:
+
+```js
+// v3 Block 6: Archive — ALWAYS behind a confirm (Piotr 06.09: an accidental click made a
+// project vanish). Open batches only add a warning line; they never change the flow.
+```
+
+So the application is right and the harness is stale. **I did not touch either** — the fix is one line
+in the harness, but it is outside the v4 scope and the night stopped at the gate, so it is your call:
+
+**Ask:** confirm "always confirm" is final, and I will re-point that assertion at the new flow
+(`openLine` warning + a single `setConfirmAction` path) in the first commit of night 7. Until then the
+session checklist cannot read ALL PASS, and the cause is this one assertion, not the arch code.
+Note this also makes BLOCKERS §15.6 ("archive from the card: immediate when every batch's pack is
+complete, confirm otherwise") out of date.
+
+---
+
 ## 2026-09-07 — ARCHED-WINDOWS-v3 night 5, Stage 1 = Block 0 (branch `claude/arched-windows-v3-9v0sw7`)
 
 Status of the older entries: **§9.1 P9 (900) OPEN → v3 0.6 keeps 900**, **§9.2 D13 OPEN → 'narrowest' kept**,
