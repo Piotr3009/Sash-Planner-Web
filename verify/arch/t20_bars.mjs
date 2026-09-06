@@ -51,6 +51,9 @@ execFileSync('npx', ['-y', 'esbuild@0.25.0', ENTRY, '--bundle', '--format=esm', 
 const M = await import(pathToFileURL(BUNDLE).href);
 const { arch, profile, specification, calculations, glassDxf } = M;
 const P = profile.DEFAULT_CASEMENT_PROFILE;
+// profile numbers behind the spec E vectors (v4 Block F): glass offset from the frame outer = leafAtJamb + leafTop.face − glassInset (51 + 67 − 12.5 = 105.5, was 94.5)
+const glassOff = P.deductions.leafAtJamb + P.elements.leafTop.face - P.geometry.glassInset;
+const xgS = (1000 - 2 * glassOff) / 2;   // clear half width of the W 1000 semi-circle = the intersecting arc radius: 394.5 (spec quotes 405.5 at the 57 face)
 
 let pass = 0, fail = 0;
 const failures = [];
@@ -247,8 +250,8 @@ section('3 — intersecting = the PSW SASH rule (ArchedSashWindow.jsx 915–940)
   }
   const CASES = [
     ['G3 (spec: gothic 1000 × 1900, 3 V → 6 arcs)', 1000, 1900, { archShape: 'gothic-equilateral', casementVBars: 3 }, { arcs: 6 }],
-    ['S2 (spec: semi-circle 1000, 2 V → 4 arcs R 405.5)', 1000, 1500, { archShape: 'three-centre', archStart: 1000, casementVBars: 2 }, { arcs: 4, R: 405.5 }],
-    ['S0 (spec: 0 V → columns at ±202.75)', 1000, 1500, { archShape: 'three-centre', archStart: 1000 }, { arcs: 4, R: 405.5, columns: [-202.75, 202.75] }],
+    [`S2 (spec: semi-circle 1000, 2 V → 4 arcs R ${xgS} = (1000 − 2·${glassOff})/2; 405.5 at the 57 face)`, 1000, 1500, { archShape: 'three-centre', archStart: 1000, casementVBars: 2 }, { arcs: 4, R: xgS }],
+    [`S0 (spec: 0 V → columns at ±${xgS / 2} = ±Wg/4; ±202.75 at the 57 face)`, 1000, 1500, { archShape: 'three-centre', archStart: 1000 }, { arcs: 4, R: xgS, columns: [-xgS / 2, xgS / 2] }],
     ['G2 1400 × 2400', 1400, 2400, { archShape: 'gothic-equilateral', casementVBars: 2 }, { arcs: 4 }],
     ['GD 1000 × 1700 drop', 1000, 1700, { archShape: 'gothic-drop', archProfile: 'drop', casementVBars: 1 }, { arcs: 2 }],
   ];
@@ -259,7 +262,7 @@ section('3 — intersecting = the PSW SASH rule (ArchedSashWindow.jsx 915–940)
     const tracery = d.arch.bars.filter((b) => b.role === 'tracery');
     const columns = d.arch.bars.filter((b) => b.role === 'v').map((b) => b.from[0] - xg);
     const Rg = O.arcs[0].r;
-    check(`${name}: ${exp.arcs} arcs, each starting at a column x on the springing, ending on the outline, R = outline radius ${Rg.toFixed(1)}${exp.R ? ` (spec ${exp.R})` : ' (spec quotes the FRAME radius — errata E4)'}`,
+    check(`${name}: ${exp.arcs} arcs, each starting at a column x on the springing, ending on the outline, R = outline radius ${Rg.toFixed(1)}${exp.R ? ` (= the clear half width ${exp.R})` : ' (spec quotes the FRAME radius — errata E4)'}`,
       tracery.length === exp.arcs && (exp.R == null || near(Rg, exp.R, 1e-6)) && tracery.every((b) => {
         const start = near(b.arc.a0, 0, 1e-9) ? b.from : b.to, end = start === b.from ? b.to : b.from;
         return near(b.arc.r, Rg, 1e-6) && near(start[1], O.springing, 1e-6) && columns.some((c) => near(c + xg, start[0], 1e-6)) && distToChain(O.arcs, end) < 0.01 && near(b.arc.cy, O.springing, 1e-9) && near(Math.abs(b.arc.cx - start[0]), Rg, 1e-6);

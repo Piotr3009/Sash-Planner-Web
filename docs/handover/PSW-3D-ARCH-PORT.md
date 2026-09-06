@@ -172,3 +172,18 @@ the old geometry for fix-only gothic / semi-circle products — replace it with 
 (columns from `casementVBars`, default ±¼, arcs `R` = outline radius) when PSW's fix-frame should
 match PC's cut list / tracery; until then a fix-only window ordered from PSW draws different
 tracery in PSW's viewer than PC produces.
+
+## 9. Frame face 68 — `frameDims` prop (ARCHED-WINDOWS-v4 Block F, 06.09.2026)
+
+PC's copies of `casement/CasementFrame.jsx`, `casement/CasementWindow.jsx`,
+`casement/ArchedCasementWindow.jsx`, `door/DoorFrame.jsx`, `door/DoorWindow.jsx` and
+`door/DoorSidePanel.jsx` take an optional `frameDims` prop `{ frameFace, extFace }` (extFace = the
+visible land = face − rebate 21). The module constants `FRAME_FACE = 57` / `EXT_FACE = 36` stay as
+the defaults (`resolveFrameDims(null)` → 57 / 36), so copying the files into PSW changes nothing
+until PSW passes the prop. PC passes `{ 68, 47 }` for casements and `{ 68, 36 }` for doors from
+the profiles (`windowSpecToConfig.js` `casementFrameDims()` / `doorFrameDims()`, the App's
+`update3D({ frameDims })`). `CasementWindow` also hands `geo: { frameFace, bottomFace, mullionW }`
+to `resolveCasementLayout`, so the layout's mullion positions follow the face. Untouched:
+`ArchedDoorWindow.jsx` and `TransomPanel.jsx` (not rendered by PC — arched doors and door transom
+panels are out of PC's scope), `FixFrameWindow.jsx` (PSW's own 64 frame). The full PSW-side list
+of lines is in `PSW-FRAME-68-PORT.md`.

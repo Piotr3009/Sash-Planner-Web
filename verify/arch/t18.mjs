@@ -4,10 +4,13 @@
  * Bundles the engine + export modules into .audit/ with esbuild and asserts on
  * the REAL data path: normaliseToWindowSpec (PC item with archStart / PSW
  * fullConfig) → deriveWindowData → lists → glazier DXF → ezdxf → glass PDF.
- * The EXPECTED numbers are the spec §3 vectors (profile faces 57 / 67,
- * leafAtJamb 40, glassInset 12.5, minHaunchRadius 150) — reproduced here, not
- * derived from the code; closed forms and numeric integrals cross-check what
- * the spec does not list (areas, bar tops, tracery ends).
+ * The EXPECTED numbers are the spec §3 vectors: the OUTER geometry (W, rise,
+ * radii, arc lengths) is reproduced as literals; every profile-dependent number
+ * (rings, clear width, springing, bar ends — v4 Block F: faces 68 / 67,
+ * leafAtJamb 51, glassInset 12.5, minHaunchRadius 150) is computed here from
+ * the profile object with its formula, never read from the code; closed forms
+ * and numeric integrals cross-check what the spec does not list (areas, bar
+ * tops, tracery ends).
  *
  * Sections: 1 geometry vectors · 2 bars · 3 cut list + engine (fixture) ·
  * 4 glazier DXF (samples) · 5 PSW import + migration · 6 glass PDF ·
@@ -19,6 +22,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { independentPlan as indPlan } from './lib/indPlanner.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const AUDIT = resolve(ROOT, '.audit');
@@ -69,14 +73,16 @@ function probe(path) {
   return JSON.parse(out);
 }
 
-// profile numbers the vectors assume
+// profile numbers the vectors assume (v4 Block F, frame schema 2) — the ONE literal check below; everything downstream is a formula of these
 const tF = P.elements.frameHead.face, oL = P.deductions.leafAtJamb, tL = P.elements.leafTop.face, gI = P.geometry.glassInset;
-const cillSide = P.deductions.leafFullHeight - P.deductions.leafAtJamb;          // 47
-const glassBottom = cillSide + (P.elements.leafBottom.face - gI);                // 101.5
-const glassOff = oL + tL - gI;                                                   // 94.5
-check('profile numbers behind the §3 vectors: faces 57 / 67, leafAtJamb 40, glassInset 12.5, minHaunchRadius 150',
-  tF === 57 && tL === 67 && oL === 40 && gI === 12.5 && P.arch.minHaunchRadius === 150);
-check('derived constants: glass bottom edge 101.5 from the frame bottom, glass offset 94.5 from the frame outer', glassBottom === 101.5 && glassOff === 94.5);
+const cillSide = P.deductions.leafFullHeight - P.deductions.leafAtJamb;          // 98 − 51 = 47 (unchanged)
+const glassBottom = cillSide + (P.elements.leafBottom.face - gI);                // 47 + 67 − 12.5 = 101.5 (unchanged)
+const glassOff = oL + tL - gI;                                                   // 51 + 67 − 12.5 = 105.5 (was 94.5)
+const r05 = (v) => Math.round(v * 2) / 2;                                        // the engine's bar-length rounding (0.5 mm)
+const fmt1 = (v) => { const r = Math.round(v * 10) / 10; return Number.isInteger(r) ? String(r) : r.toFixed(1); };   // PDF / bar-row number format (1 dp, integers bare)
+check('profile numbers behind the §3 vectors (v4 Block F): faces 68 / 68 / 67, land 47, leafAtJamb 51, leafFullHeight 98, fanFromAxis 65, glassInset 12.5, minHaunchRadius 150, frameSchema 2',
+  tF === 68 && P.elements.frameJamb.face === 68 && tL === 67 && P.geometry.land === 47 && oL === 51 && P.deductions.leafFullHeight === 98 && P.deductions.fanFromAxis === 65 && gI === 12.5 && P.arch.minHaunchRadius === 150 && P.frameSchema === 2);
+check('derived constants: glass bottom edge 101.5 = (98 − 51) + (67 − 12.5) from the frame bottom (unchanged), glass offset 105.5 = 51 + 67 − 12.5 from the frame outer (was 94.5)', glassBottom === 101.5 && glassOff === 105.5);
 
 // PC item → windowSpec → derived, the way the app does it (window saved by the configurator)
 const pcItem = (id, width, height, fields) => specification.normaliseToWindowSpec(
@@ -85,9 +91,11 @@ const derive = (spec) => calculations.deriveWindowData(spec, {});
 
 // ═══════════════════════════════════════════════════════════════════════════
 section('1 — geometry vectors (spec v2 §3), real path: archStart → rise → shape → derived.arch.geometry');
+// V1 rings: the outer radii 150 / 1400 / 150 offset concentrically (rule C keeps the angles) — frame inner r − tF, leaf outer r − oL, leaf inner r − oL − tL, glass r − oL − tL + gI
+const ringV1 = (off) => [150 - off, 1400 - off, 150 - off];
 const V = [
   { id: 'V1', W: 1000, H: 1500, start: 1300, exp: { shape: 'three-centre', rise: 200, r: 150, R: 1400.00, csX: 350, clY: -1200, T: [392.00, 144.00], haunchDeg: 73.74, crownDeg: 32.52, lens: [193.05, 794.62, 193.05], total: 1180.72,
-    rings: { headInner: [93, 1343, 93], leafOuter: [110, 1360, 110], leafInner: [43, 1293, 43], glass: [55.5, 1305.5, 55.5] } } },
+    rings: { headInner: ringV1(tF), leafOuter: ringV1(oL), leafInner: ringV1(oL + tL), glass: ringV1(glassOff) } } },
   { id: 'V2', W: 1000, H: 1500, start: 1175, exp: { shape: 'three-centre', rise: 325, r: 211.25, R: 634.62, T: [432.83, 154.49], haunchDeg: 47.00, crownDeg: 86.01, total: 1299.17 } },
   { id: 'V3', W: 1500, H: 2000, start: 1700, exp: { shape: 'three-centre', rise: 300, r: 150, R: 1425.00, haunchDeg: 61.93, crownDeg: 56.14, total: 1720.63 } },
   { id: 'V4', W: 1000, H: 1500, start: 1100, exp: { shape: 'three-centre', rise: 400, r: 320, R: 562.50, haunchDeg: 42.08, crownDeg: 95.85, total: 1410.99 } },
@@ -147,46 +155,54 @@ section('2 — bars on the glass outline (spec §2.3 / §3 vectors), glass frame
   const d = derive(spec);
   const u = d.customGlassUnits[0];
   const o = d.arch.glassOutline;
-  check('semi-circle W1000: glass clear width Wg = 811 (glass half 405.5), unit 811 × 1304, springing 898.5 = start − 101.5', u.width === 811 && near(u.height, 1304, 1e-6) && near(o.springing, 898.5, 1e-9) && near(o.width, 811, 1e-9));
-  check('semi-circle W1000: glass outline apex = springing + 405.5, rise 405.5, one arc R 405.5 centred (405.5, 898.5)', near(o.apex, 1304, 1e-9) && near(o.rise, 405.5, 1e-9) && o.arcs.length === 1 && near(o.arcs[0].r, 405.5, 1e-9) && near(o.arcs[0].cx, 405.5, 1e-9) && near(o.arcs[0].cy, 898.5, 1e-9));
-  expectNear('semi-circle W1000: glass area = 811 × 898.5 + π·405.5²/2 (exact, Green)', o.area, 811 * 898.5 + Math.PI * 405.5 * 405.5 / 2, 1e-6);
-  expectNear('semi-circle W1000: glass perimeter = 811 + 2·898.5 + π·405.5', o.perimeter, 811 + 2 * 898.5 + Math.PI * 405.5, 1e-6);
-  check('glass-frame origin in frame coordinates = (94.5, 101.5)', o.origin.x === 94.5 && o.origin.y === 101.5, JSON.stringify(o.origin));
+  // semi-circle W1000 start 1000 on the glass: clear width = W − 2·glassOff, half width, springing = start − glassBottom (789 / 394.5 / 898.5)
+  const WgS = 1000 - 2 * glassOff, xgS = WgS / 2, ysS = 1000 - glassBottom;
+  check(`semi-circle W1000: glass clear width Wg = ${WgS} = 1000 − 2 × ${glassOff} (glass half ${xgS}), unit ${WgS} × ${ysS + xgS}, springing ${ysS} = start − ${glassBottom}`, u.width === WgS && near(u.height, ysS + xgS, 1e-6) && near(o.springing, ysS, 1e-9) && near(o.width, WgS, 1e-9));
+  check(`semi-circle W1000: glass outline apex = springing + ${xgS}, rise ${xgS}, one arc R ${xgS} centred (${xgS}, ${ysS})`, near(o.apex, ysS + xgS, 1e-9) && near(o.rise, xgS, 1e-9) && o.arcs.length === 1 && near(o.arcs[0].r, xgS, 1e-9) && near(o.arcs[0].cx, xgS, 1e-9) && near(o.arcs[0].cy, ysS, 1e-9));
+  expectNear(`semi-circle W1000: glass area = ${WgS} × ${ysS} + π·${xgS}²/2 (exact, Green)`, o.area, WgS * ysS + Math.PI * xgS * xgS / 2, 1e-6);
+  expectNear(`semi-circle W1000: glass perimeter = ${WgS} + 2·${ysS} + π·${xgS}`, o.perimeter, WgS + 2 * ysS + Math.PI * xgS, 1e-6);
+  check(`glass-frame origin in frame coordinates = (glassOff ${glassOff}, glassBottom ${glassBottom})`, o.origin.x === glassOff && o.origin.y === glassBottom, JSON.stringify(o.origin));
   const vb = d.arch.bars.filter((b) => b.role === 'v');
-  check('2 vertical bars at thirds of Wg: x = 405.5 ± 135.17 (270.33 / 540.67 in the glass frame), from the bottom edge', vb.length === 2 && near(vb[0].from[0], 405.5 - 135.1667, 0.01) && near(vb[1].from[0], 405.5 + 135.1667, 0.01) && vb.every((b) => b.from[1] === 0), vb.map((b) => b.from[0].toFixed(2)).join(' '));
-  check('vertical bar top = 382.31 above the springing (= sqrt(405.5² − 135.17²)), length 1280.8 → 1281 (0.5 mm)', vb.every((b) => near(b.to[1] - o.springing, 382.31, 0.01) && b.length === 1281), vb.map((b) => (b.to[1] - o.springing).toFixed(2) + '/' + b.length).join(' '));
+  const vX = [WgS / 3, 2 * WgS / 3];                                            // thirds of the clear width (263 / 526)
+  const vTop = Math.sqrt(xgS * xgS - (xgS - vX[0]) ** 2);                       // height above the springing on the semi-circle: sqrt(xg² − (xg − Wg/3)²)
+  const vLen = r05(ysS + vTop);                                                  // 1270.44 → 1270.5
+  check(`2 vertical bars at thirds of Wg: x = ${xgS} ± ${(xgS - vX[0]).toFixed(2)} (${vX[0].toFixed(2)} / ${vX[1].toFixed(2)} in the glass frame), from the bottom edge`, vb.length === 2 && near(vb[0].from[0], vX[0], 0.01) && near(vb[1].from[0], vX[1], 0.01) && vb.every((b) => b.from[1] === 0), vb.map((b) => b.from[0].toFixed(2)).join(' '));
+  check(`vertical bar top = ${vTop.toFixed(2)} above the springing (= sqrt(${xgS}² − ${(xgS - vX[0]).toFixed(2)}²)), length ${(ysS + vTop).toFixed(1)} → ${vLen} (0.5 mm)`, vb.every((b) => near(b.to[1] - o.springing, vTop, 0.01) && b.length === vLen), vb.map((b) => (b.to[1] - o.springing).toFixed(2) + '/' + b.length).join(' '));
   const hb = d.arch.bars.filter((b) => b.role === 'h');
-  check('1 horizontal bar at half the straight height (449.25), full clear width 811 — never across the arc', hb.length === 1 && near(hb[0].from[1], 449.25, 1e-9) && hb[0].from[0] === 0 && near(hb[0].to[0], 811, 1e-9) && hb[0].length === 811);
+  check(`1 horizontal bar at half the straight height (${ysS / 2}), full clear width ${WgS} — never across the arc`, hb.length === 1 && near(hb[0].from[1], ysS / 2, 1e-9) && hb[0].from[0] === 0 && near(hb[0].to[0], WgS, 1e-9) && hb[0].length === WgS);
   check('bar ids V1 / V2 / H1, kinds straight, counts { h 1, v 2 }', d.arch.bars.map((b) => b.id).sort().join(',') === 'H1,V1,V2' && d.arch.bars.every((b) => b.kind === 'straight') && d.arch.barCounts.h === 1 && d.arch.barCounts.v === 2);
-  expectNear('astragal bar run = Σ bar lengths (811 + 2 × 1281 = 3373) feeds the beading records', d.arch.barTotalLength, 3373, 1e-9);
-  check('beading: C-TRIANGLE / C-GEORGIAN MIDDLE = round(3373 × 1.15) = 3879', d.components.beading.filter((b) => /TRIANGLE|GEORGIAN/.test(b.elementName)).every((b) => b.length === Math.round(3373 * 1.15)), d.components.beading.map((b) => b.length).join(' '));
+  const barRun = WgS + 2 * vLen;                                                // 789 + 2 × 1270.5 = 3330
+  expectNear(`astragal bar run = Σ bar lengths (${WgS} + 2 × ${vLen} = ${barRun}) feeds the beading records`, d.arch.barTotalLength, barRun, 1e-9);
+  check(`beading: C-TRIANGLE / C-GEORGIAN MIDDLE = round(${barRun} × 1.15) = ${Math.round(barRun * 1.15)}`, d.components.beading.filter((b) => /TRIANGLE|GEORGIAN/.test(b.elementName)).every((b) => b.length === Math.round(barRun * 1.15)), d.components.beading.map((b) => b.length).join(' '));
 
   // hub-spoke (PSW semiBarPattern) on the same unit
   const hub = derive(pcItem('B2', 1000, 1500, { archShape: 'three-centre', archStart: 1000, archBarPattern: 'hub-spoke', casementHBars: 0, casementVBars: 2 })).arch;
   const ring = hub.bars.filter((b) => b.role === 'ring');
-  check('hub-spoke: ring r = 0.3 × 405.5 = 121.65, half ring (0..π) centred on the springing midpoint', ring.length === 1 && near(ring[0].arc.r, 121.65, 1e-9) && near(ring[0].arc.cx, 405.5, 1e-9) && near(ring[0].arc.cy, 898.5, 1e-9) && near(ring[0].arc.a0, 0, 1e-12) && near(ring[0].arc.a1, Math.PI, 1e-12) && ring[0].length === 382);
+  const hubK = P.arch.patterns.hubRingRatios;                                   // [0.3, 0.6, 0.8] — asserted literally in section 7
+  const ringR1 = hubK[0] * xgS, ringLen = r05(Math.PI * ringR1), spokeLen = r05(xgS - ringR1);   // 118.35 / 372 / 276
+  check(`hub-spoke: ring r = ${hubK[0]} × ${xgS} = ${ringR1}, half ring (0..π) centred on the springing midpoint, length π·r → ${ringLen}`, ring.length === 1 && near(ring[0].arc.r, ringR1, 1e-9) && near(ring[0].arc.cx, xgS, 1e-9) && near(ring[0].arc.cy, ysS, 1e-9) && near(ring[0].arc.a0, 0, 1e-12) && near(ring[0].arc.a1, Math.PI, 1e-12) && ring[0].length === ringLen);
   const spokes = hub.bars.filter((b) => b.role === 'spoke' || b.role === 'springing');
-  const angles = spokes.map((b) => Math.round(Math.atan2(b.to[1] - 898.5, b.to[0] - 405.5) * DEG)).sort((a, b) => a - b);
+  const angles = spokes.map((b) => Math.round(Math.atan2(b.to[1] - ysS, b.to[0] - xgS) * DEG)).sort((a, b) => a - b);
   check('hub-spoke: 4 spokes at 0 / 60 / 120 / 180° — the two end spokes ARE the springing bar (role springing), from the ring to the outline', spokes.length === 4 && angles.join(',') === '0,60,120,180' && spokes.filter((b) => b.role === 'springing').length === 2, angles.join(','));
-  check('hub-spoke: spokes run ring (121.65) → outline (405.5): length 283.85 → 284', spokes.every((b) => b.length === 284 && near(Math.hypot(b.from[0] - 405.5, b.from[1] - 898.5), 121.65, 1e-6) && near(Math.hypot(b.to[0] - 405.5, b.to[1] - 898.5), 405.5, 1e-6)));
+  check(`hub-spoke: spokes run ring (${ringR1}) → outline (${xgS}): length ${(xgS - ringR1).toFixed(2)} → ${spokeLen}`, spokes.every((b) => b.length === spokeLen && near(Math.hypot(b.from[0] - xgS, b.from[1] - ysS), ringR1, 1e-6) && near(Math.hypot(b.to[0] - xgS, b.to[1] - ysS), xgS, 1e-6)));
   const rv = hub.bars.filter((b) => b.role === 'v');
-  check('hub-spoke: ring ends continue as verticals at x = 405.5 ± 121.65 down to the glass bottom; the user\'s v = 2 is ignored (PSW rule) — counts.v = 0', rv.length === 2 && near(rv[0].from[0], 405.5 - 121.65, 1e-9) && near(rv[1].from[0], 405.5 + 121.65, 1e-9) && rv.every((b) => b.from[1] === 0 && near(b.to[1], 898.5, 1e-9)) && hub.barCounts.v === 0);
+  check(`hub-spoke: ring ends continue as verticals at x = ${xgS} ± ${ringR1} down to the glass bottom; the user's v = 2 is ignored (PSW rule) — counts.v = 0`, rv.length === 2 && near(rv[0].from[0], xgS - ringR1, 1e-9) && near(rv[1].from[0], xgS + ringR1, 1e-9) && rv.every((b) => b.from[1] === 0 && near(b.to[1], ysS, 1e-9)) && hub.barCounts.v === 0);
   check('hub-spoke: 7 bars total, ids R1 S1 K1 K2 S2 V1 V2', hub.bars.length === 7 && hub.bars.map((b) => b.id).join(' ') === 'R1 S1 K1 K2 S2 V1 V2', hub.bars.map((b) => b.id).join(' '));
   const half = derive(pcItem('B3', 1000, 1500, { archShape: 'three-centre', archStart: 1000, archBarPattern: 'half-hub' })).arch;
-  check('half-hub: full-width springing bar + ring 1 only (no spokes, no verticals)', half.bars.length === 2 && half.bars[0].role === 'springing' && half.bars[0].length === 811 && half.bars[1].role === 'ring');
+  check(`half-hub: full-width springing bar (${WgS}) + ring 1 only (no spokes, no verticals)`, half.bars.length === 2 && half.bars[0].role === 'springing' && half.bars[0].length === WgS && half.bars[1].role === 'ring');
   const dbl = derive(pcItem('B4', 1000, 1500, { archShape: 'three-centre', archStart: 1000, archBarPattern: 'double-hub-spoke' })).arch;
   const dblRoles = dbl.bars.reduce((m, b) => { m[b.role] = (m[b.role] || 0) + 1; return m; }, {});
   check('double-hub-spoke roles: ring 2, springing 4, spoke 8, v 4 (18 bars)', dblRoles.ring === 2 && dblRoles.springing === 4 && dblRoles.spoke === 8 && dblRoles.v === 4 && dbl.bars.length === 18, JSON.stringify(dblRoles));
   const tpl = derive(pcItem('B5', 1000, 1500, { archShape: 'three-centre', archStart: 1000, archBarPattern: 'triple-hub-spoke', casementHBars: 1 })).arch;
   const tplRoles = tpl.bars.reduce((m, b) => { m[b.role] = (m[b.role] || 0) + 1; return m; }, {});
   check('triple-hub-spoke + 1 h bar: ring 3 (0.3 / 0.6 / 0.8), springing 6, spoke 18, v 6, h 1 (34 bars)', tplRoles.ring === 3 && tplRoles.springing === 6 && tplRoles.spoke === 18 && tplRoles.v === 6 && tplRoles.h === 1 && tpl.bars.length === 34, JSON.stringify(tplRoles));
-  check('triple-hub-spoke rings r = 121.65 / 243.3 / 324.4', tpl.bars.filter((b) => b.role === 'ring').map((b) => +b.arc.r.toFixed(2)).join(',') === '121.65,243.3,324.4');
+  check(`triple-hub-spoke rings r = ${hubK.map((k) => k * xgS).join(' / ')} (= ${hubK.join(' / ')} × ${xgS})`, (() => { const rr = tpl.bars.filter((b) => b.role === 'ring'); return rr.length === 3 && rr.every((b, i) => near(b.arc.r, hubK[i] * xgS, 1e-9)); })(), tpl.bars.filter((b) => b.role === 'ring').map((b) => b.arc.r).join(' / '));
   // intersecting — v4 Block E: arcs spring from the vertical bars (PSW sash rule), no pitch mullions
   const gi = derive(pcItem('B6', 1000, 1800, { archShape: 'gothic-equilateral', archBarPattern: 'intersecting' })).arch;
   const trac = gi.bars.filter((b) => b.role === 'tracery');
   const mull = gi.bars.filter((b) => b.role === 'v');
-  const Wg = gi.glassOutline.width, Rg = gi.glassOutline.arcs[0].r;
-  check('intersecting gothic W1000, 0 V: two default columns at ±¼ of the clear width (202.75 / 608.25), from the bottom to the springing only', mull.length === 2 && near(mull[0].from[0], Wg / 4, 1e-6) && near(mull[1].from[0], 3 * Wg / 4, 1e-6) && mull.every((b) => near(b.to[1], gi.glassOutline.springing, 1e-9)));
+  const Wg = 1000 - 2 * glassOff, Rg = 1000 - glassOff;   // gothic equilateral W1000 on the glass: clear width 789, outline radius = frame R (W) − glassOff = 894.5 (were 811 / 905.5)
+  check(`intersecting gothic W1000, 0 V: two default columns at ±¼ of the clear width (${Wg / 4} / ${3 * Wg / 4}), from the bottom to the springing only`, mull.length === 2 && near(mull[0].from[0], Wg / 4, 1e-6) && near(mull[1].from[0], 3 * Wg / 4, 1e-6) && mull.every((b) => near(b.to[1], gi.glassOutline.springing, 1e-9)));
   check(`intersecting gothic: 4 tracery arcs with the outline's own radius ${Rg.toFixed(1)} (concentric glass radius; the spec's "R 1000" is the frame radius — errata E4), centres on the springing line at column ∓ R`,
     trac.length === 4 && trac.every((b) => near(b.arc.r, Rg, 1e-6) && near(b.arc.cy, gi.glassOutline.springing, 1e-9) && mull.some((m) => near(Math.abs(b.arc.cx - m.from[0]), Rg, 1e-6))), trac.map((b) => `${b.arc.cx.toFixed(1)}/${b.arc.r.toFixed(1)}`).join(' '));
   const onOutline = (pt, o2) => near(pt[1], arch.chainYAtX(o2.arcs, pt[0]), 1e-6);
@@ -195,7 +211,7 @@ section('2 — bars on the glass outline (spec §2.3 / §3 vectors), glass frame
     return near(start[1], gi.glassOutline.springing, 1e-6) && mull.some((m) => near(m.from[0], start[0], 1e-6)) && onOutline(end, gi.glassOutline) && b.arc.a1 - b.arc.a0 <= Math.PI / 2 + 1e-9;
   }));
   const si = derive(pcItem('B7', 1000, 1500, { archShape: 'three-centre', archStart: 1000, archBarPattern: 'intersecting' })).arch;
-  check('intersecting on a semi-circle, 0 V: 2 default columns + 4 tracery arcs R 405.5 (the clear half width), ends on the outline', si.bars.filter((b) => b.role === 'v').length === 2 && si.bars.filter((b) => b.role === 'tracery').length === 4 && si.bars.filter((b) => b.role === 'tracery').every((b) => near(b.arc.r, 405.5, 1e-6) && (onOutline(b.from, si.glassOutline) || onOutline(b.to, si.glassOutline))));
+  check(`intersecting on a semi-circle, 0 V: 2 default columns + 4 tracery arcs R ${xgS} (the clear half width), ends on the outline`, si.bars.filter((b) => b.role === 'v').length === 2 && si.bars.filter((b) => b.role === 'tracery').length === 4 && si.bars.filter((b) => b.role === 'tracery').every((b) => near(b.arc.r, xgS, 1e-6) && (onOutline(b.from, si.glassOutline) || onOutline(b.to, si.glassOutline))));
   expectThrows('hub-spoke on a three-centre → readable (PATTERNS_FOR_SHAPE: three-centre takes none)', () => derive(pcItem('B8', 1000, 1500, { archShape: 'three-centre', archStart: 1300, archBarPattern: 'hub-spoke' })), /Bar pattern "hub-spoke" is not available on a Three-centre arch \(allowed: none\)/);
   expectThrows('intersecting on a three-centre → readable', () => derive(pcItem('B9', 1000, 1500, { archShape: 'three-centre', archStart: 1300, archBarPattern: 'intersecting' })), /not available on a Three-centre arch/);
   check('PSW_PATTERNS_FOR_SHAPE = PSW price-calculator.js 990–995 (semi-circle six, gothic none | intersecting, three-centre none); PC adds quad-hub-spoke + custom on the semi-circle only (v3 0.4)',
@@ -208,7 +224,8 @@ section('2 — bars on the glass outline (spec §2.3 / §3 vectors), glass frame
   const tv = tc.bars;
   check('V1 (three-centre 1000/1500 start 1300) with no bars → empty list, pattern none', tv.length === 0 && tc.pattern === 'none');
   const tc2 = derive(pcItem('B10', 1000, 1500, { archShape: 'three-centre', archStart: 1300, casementVBars: 3 })).arch;
-  check('three-centre with 3 v bars: tops on the chain (chainYAtX), the middle one at the apex 1304, outer ones lower', tc2.bars.length === 3 && near(tc2.bars[1].to[1], 1304, 1e-9) && tc2.bars[0].to[1] < 1304 && tc2.bars.every((b) => near(b.to[1], arch.chainYAtX(tc2.glassOutline.arcs, b.from[0]), 1e-9)), tc2.bars.map((b) => b.to[1].toFixed(1)).join(' '));
+  const tcApex = (1300 - glassBottom) + (V[0].exp.rise - glassOff);            // glass springing + glass rise (rise − glassOff): 1198.5 + 94.5 = 1293
+  check(`three-centre with 3 v bars: tops on the chain (chainYAtX), the middle one at the apex ${tcApex} (= 1300 − ${glassBottom} + ${V[0].exp.rise} − ${glassOff}), outer ones lower`, tc2.bars.length === 3 && near(tc2.bars[1].to[1], tcApex, 1e-9) && tc2.bars[0].to[1] < tcApex && tc2.bars.every((b) => near(b.to[1], arch.chainYAtX(tc2.glassOutline.arcs, b.from[0]), 1e-9)), tc2.bars.map((b) => b.to[1].toFixed(1)).join(' '));
   // exact area vs numeric integration on the gothic glass chain
   const gg = gi.glassOutline;
   let num = 0; const N = 100000;
@@ -221,31 +238,39 @@ section('3 — cut list, glass unit, paint / seals / weights; rectangular caseme
 {
   const { d, spec } = D.V1;
   const g = d.arch.geometry;
+  const E1 = V[0].exp;                                                          // V1 outer vectors: rise 200, r 150 / R 1400, outer chain 1180.72
+  const Wg1 = 1000 - 2 * glassOff, ys1 = 1300 - glassBottom, rise1 = E1.rise - glassOff, apex1 = ys1 + rise1;   // 789 / 1198.5 / 94.5 / 1293
+  // rule C: the outer chain turns exactly π, so a concentric line `off` inside it is shorter by off·π — head centre line at tF/2, leaf ring centre at oL + tL/2
+  const ahLen = E1.total - (tF / 2) * Math.PI, atrLen = E1.total - (oL + tL / 2) * Math.PI;   // 1073.91 / 915.26 (were 1091.19 / 949.82 at the 57 face)
   const byName = (arr, n) => arr.find((c) => c.elementName === n);
   const head = byName(d.components.box, 'C-ARCH HEAD');
-  check('C-ARCH HEAD replaces C-FRAME HEAD: code C-AH, section 57x93', !!head && !byName(d.components.box, 'C-FRAME HEAD') && head.code === 'C-AH' && head.section === '57x93');
-  expectNear('C-ARCH HEAD length = centre-line arc length of the head ring (1091.19)', head.length, g.frameHead.lengths.centre, 0.05);
-  expectNear('  … = 1091.19 (mean of outer 1180.72 and inner 1001.65 for rule-C shapes)', head.length, (g.frameHead.lengths.outer + g.frameHead.lengths.inner) / 2, 0.05);
-  check('C-ARCH HEAD notes (v4 whole-chain planner): R 150/1400/150 · 2 pieces · stock 180', head.notes === 'R 150/1400/150 · 2 pieces · stock 180', head.notes);
+  check(`C-ARCH HEAD replaces C-FRAME HEAD: code C-AH, section ${tF}x${P.frameDepth}`, !!head && !byName(d.components.box, 'C-FRAME HEAD') && head.code === 'C-AH' && head.section === `${tF}x${P.frameDepth}`);
+  expectNear(`C-ARCH HEAD length = centre-line arc length of the head ring (${ahLen.toFixed(2)} = ${E1.total} − ${tF}/2·π)`, head.length, ahLen, 0.05);
+  expectNear(`  … = ${ahLen.toFixed(2)} (mean of outer ${E1.total} and inner ${(E1.total - tF * Math.PI).toFixed(2)} for rule-C shapes)`, head.length, (g.frameHead.lengths.outer + g.frameHead.lengths.inner) / 2, 0.05);
+  // piece plan of the head ring through the INDEPENDENT planner (verify/arch/lib/indPlanner.mjs) on the ring geometry, options from the profile
+  const ipHead = indPlan(g.frameHead, { stock: P.arch.stockWidths, allowance: P.arch.contourAllowance, finger: P.arch.finger.length, minClamp: P.cnc.minClampLength, minPiece: P.arch.minPieceLength, threshold: P.arch.wasteThreshold })[0];
+  const headNotes = `R ${E1.r}/${Math.round(E1.R)}/${E1.r} · ${ipHead.def?.n} pieces · stock ${ipHead.def?.stock}`;
+  check(`C-ARCH HEAD notes (v4 whole-chain planner, independent plan of the ${tF}-thick ring): ${headNotes}`, !!ipHead.def && head.notes === headNotes, head.notes);
   const jamb = byName(d.components.box, 'C-FRAME JAMB (L)');
   check('jambs = start (1300) − jambDeduct, both sides', jamb.length === 1300 && byName(d.components.box, 'C-FRAME JAMB (R)').length === 1300);
   check('cill unchanged (1000)', byName(d.components.box, 'C-FRAME CILL').length === 1000);
   const atr = byName(d.components.sash, 'C-ARCH TOP RAIL');
   check('C-ARCH TOP RAIL replaces C-TOP RAIL: code C-ATR-P1, section 67x57', !!atr && !byName(d.components.sash, 'C-TOP RAIL') && atr.code === 'C-ATR-P1' && atr.section === '67x57');
-  expectNear('C-ARCH TOP RAIL length = leaf ring centre line (949.82)', atr.length, g.leafTop.lengths.centre, 0.05);
-  check('stiles = leaf straight stile = start − 47 = 1253', byName(d.components.sash, 'C-STILE (L)').length === 1253 && byName(d.components.sash, 'C-STILE (R)').length === 1253);
-  check('bottom rail = leaf width 920 (unchanged rule)', byName(d.components.sash, 'C-BOTTOM RAIL').length === 920);
+  expectNear(`C-ARCH TOP RAIL length = leaf ring centre line (${atrLen.toFixed(2)} = ${E1.total} − (${oL} + ${tL}/2)·π)`, atr.length, atrLen, 0.05);
+  check(`stiles = leaf straight stile = start − cillSide ${cillSide} = ${1300 - cillSide}`, byName(d.components.sash, 'C-STILE (L)').length === 1300 - cillSide && byName(d.components.sash, 'C-STILE (R)').length === 1300 - cillSide);
+  check(`bottom rail = leaf width ${1000 - 2 * oL} = 1000 − 2 × ${oL} (unchanged rule)`, byName(d.components.sash, 'C-BOTTOM RAIL').length === 1000 - 2 * oL);
   check('layout forced to the single leaf of the hinge side (040L, hinge left), hinges null', d.casement.layout === '040L' && d.casement.panes === 1);
   check('hinge right → 040R', derive(pcItem('C1', 1000, 1500, { archShape: 'three-centre', archStart: 1300, archHinge: 'right' })).casement.layout === '040R');
   const cut = lists.buildCutListForWindow(d, spec).map((r) => ({ ...r, windowName: 'V1' }));
   const groups = lists.buildGroupedCutList(cut);
   check('grouped cut list: C-AH right after the frame head slot, C-ATR after the leaf top rail, no "?" group', groups.map((x) => x.symbol).join(' ') === 'C-AH C-J-L/R C-CILL C-ST-L/R C-ATR C-BR' && !groups.some((x) => x.symbol === '?'), groups.map((x) => x.symbol).join(' '));
-  check('C-AH group: 1091 × 1, C-ATR group: 950 × 1 (integer cut list)', groups.find((x) => x.symbol === 'C-AH').rows[0].length === 1091 && groups.find((x) => x.symbol === 'C-ATR').rows[0].length === 950);
+  check(`C-AH group: ${Math.round(ahLen)} × 1, C-ATR group: ${Math.round(atrLen)} × 1 (integer cut list = round of the centre lines)`, groups.find((x) => x.symbol === 'C-AH').rows[0].length === Math.round(ahLen) && groups.find((x) => x.symbol === 'C-ATR').rows[0].length === Math.round(atrLen));
   const u = d.customGlassUnits[0];
-  check('glass unit: 811 × 1304, qty 1, role main, location "arched leaf", shape.kind arched', u.width === 811 && near(u.height, 1304, 1e-6) && u.qty === 1 && u.role === 'main' && u.location === 'arched leaf' && u.shape?.kind === 'arched');
-  check('glass unit shape: springing 1198.5 (= 1300 − 101.5), apex 1304, rise 105.5, radii 55.5 / 1305.5 / 55.5, 6-vertex poly', near(u.shape.springing, 1198.5, 1e-9) && near(u.shape.apex, 1304, 1e-9) && near(u.shape.rise, 105.5, 1e-9) && JSON.stringify(u.shape.radii) === '[55.5,1305.5,55.5]' && u.shape.poly.length === 6);
+  const radii1 = ringV1(glassOff);                                              // glass radii 44.5 / 1294.5 / 44.5
+  check(`glass unit: ${Wg1} × ${apex1}, qty 1, role main, location "arched leaf", shape.kind arched`, u.width === Wg1 && near(u.height, apex1, 1e-6) && u.qty === 1 && u.role === 'main' && u.location === 'arched leaf' && u.shape?.kind === 'arched');
+  check(`glass unit shape: springing ${ys1} (= 1300 − ${glassBottom}), apex ${apex1}, rise ${rise1} (= ${E1.rise} − ${glassOff}), radii ${radii1.join(' / ')}, 6-vertex poly`, near(u.shape.springing, ys1, 1e-9) && near(u.shape.apex, apex1, 1e-9) && near(u.shape.rise, rise1, 1e-9) && JSON.stringify(u.shape.radii) === JSON.stringify(radii1) && u.shape.poly.length === 6);
   const rows = lists.buildGlassListForWindow(d, spec);
-  check('glass row: 811 × 1304, carries shape, no bars label without bars', rows.length === 1 && rows[0].width === 811 && rows[0].height === 1304 && rows[0].shape?.kind === 'arched' && rows[0].bars === undefined, JSON.stringify(rows[0].bars));
+  check(`glass row: ${Wg1} × ${apex1}, carries shape, no bars label without bars`, rows.length === 1 && rows[0].width === Wg1 && rows[0].height === apex1 && rows[0].shape?.kind === 'arched' && rows[0].bars === undefined, JSON.stringify(rows[0].bars));
   const rowsB = lists.buildGlassListForWindow(derive(pcItem('C2', 1000, 1500, { archShape: 'three-centre', archStart: 1000, archBarPattern: 'hub-spoke', casementHBars: 1 })), spec);
   check('glass row bars label: "1H × 0V · hub-spoke astragal"', rowsB[0].bars === '1H × 0V · hub-spoke astragal', rowsB[0].bars);
   // true-outline consumables
@@ -263,7 +288,7 @@ section('3 — cut list, glass unit, paint / seals / weights; rectangular caseme
   // 06.09: the pre-cut lists one row PER PIECE (end pieces are shorter than middle pieces), so the
   // BOM metres = Σ over the plan's pieces of their own rough length (outer stock edge + fingers)
   const blankMm = (plan) => plan.pieces.reduce((s2, pc) => s2 + Math.round(pc.roughLength), 0);
-  check('BOM: C-ARCH HEAD → c_frame_head (mm = Σ blank pieces × rough length), C-ARCH TOP RAIL → c_sash_top_rail (same rule)', qtys.c_frame_head?.mm === blankMm(d.arch.plans.frameHead) && qtys.c_sash_top_rail?.mm === blankMm(d.arch.plans.leafTop) && qtys.c_frame_head.mm > 1091 + 20, JSON.stringify([qtys.c_frame_head, qtys.c_sash_top_rail]));
+  check('BOM: C-ARCH HEAD → c_frame_head (mm = Σ blank pieces × rough length), C-ARCH TOP RAIL → c_sash_top_rail (same rule)', qtys.c_frame_head?.mm === blankMm(d.arch.plans.frameHead) && qtys.c_sash_top_rail?.mm === blankMm(d.arch.plans.leafTop) && qtys.c_frame_head.mm > ahLen + 20, JSON.stringify([qtys.c_frame_head, qtys.c_sash_top_rail]));
   // rectangular casements: byte-identical to the origin/main fixture
   const FX = JSON.parse(readFileSync(resolve(ROOT, 'verify', 'arch', 'fixtures', 'rect-casement-base.json'), 'utf8'));
   for (const [name, c] of Object.entries(FX)) {
@@ -326,10 +351,12 @@ section('4 — glazier DXF: ezdxf round-trip, samples docs/handover/samples/samp
   writeFileSync(mergedPath, await lastBlob.text());
   const pm = probe(mergedPath);
   const mc = pm.polys.filter((x) => x.layer === 'GLASS_CONTOUR').sort((a, b) => b.bbox[1] - a.bbox[1]);
-  // true unit heights (apex, not the vertex top): TC1 1304, SC1 1304, GO1 1587.41 — stacked 300 apart from y = 0 downwards
-  const hts = [1304, 1304, 1587.4111];
+  // true unit heights (apex, not the vertex top) from the profile — TC1: (1300 − glassBottom) + (200 − glassOff); SC1: (1000 − glassBottom) + Wg/2;
+  // GO1 gothic equilateral W1000 H1800: springing = H − W·√3/2 − glassBottom, glass R = W − glassOff centred on the far springing corner → apex = springing + sqrt(Rg² − (W/2)²)
+  // (1293 / 1293 / 1574.18; were 1304 / 1304 / 1587.41 at the 57 face) — stacked 300 apart from y = 0 downwards
+  const hts = [(1300 - glassBottom) + (200 - glassOff), (1000 - glassBottom) + (1000 - 2 * glassOff) / 2, (1800 - 1000 * Math.sqrt(3) / 2 - glassBottom) + Math.sqrt((1000 - glassOff) ** 2 - 500 ** 2)];
   const bottoms = [-hts[0], -hts[0] - 300 - hts[1], -hts[0] - 300 - hts[1] - 300 - hts[2]];
-  check('merged: 3 contours stacked top-down exactly 300 mm apart on their TRUE extents (arc apex, not the springing vertices) — bottoms at −1304 / −2908 / −4795.4',
+  check(`merged: 3 contours stacked top-down exactly 300 mm apart on their TRUE extents (arc apex, not the springing vertices) — bottoms at ${bottoms.map((b) => b.toFixed(1)).join(' / ')}`,
     mc.length === 3 && mc.every((c, i) => near(c.bbox[1], bottoms[i], 0.01)), mc.map((c) => c.bbox.map((v) => v.toFixed(1)).join(',')).join(' | '));
   const pb = glassDxf.polyBBox([[0, 0, 0], [811, 0, 0], [811, 898.5, 1], [0, 898.5, 0]], true);
   check('polyBBox: a semi-circle contour (bulge 1) reaches the apex 1304, not the vertex top 898.5', near(pb.maxY, 1304, 1e-6) && near(pb.minY, 0, 1e-9) && near(pb.maxX, 811, 1e-9));
@@ -377,11 +404,20 @@ section('6 — glass PDF (jsPDF in node): Shape column, mm + % line, shaped draw
     // v4 Block B: + one bars page (three shaped units with bars fit one page: 3 + 7 + 3 rows)
     check('PDF built, 3 pages (table + 4 drawings + bars page)', bytes.length > 10000 && (txt.match(/\/Type \/Page[^s]/g) || []).length === 3);
     const has = (s) => txt.includes(s);
-    check('Shape column header + "rect" for the rectangular row + "arched · R 55.5/1305.5" for the three-centre unit', has('(Shape)') && has('(rect)') && has('arched · R 55.5/1305.5'));
+    // expected strings from the profile formulas, printed with the PDF's own number format (fmt1: 1 dp, integers bare)
+    const E1 = V[0].exp;
+    const ysP = 1300 - glassBottom, riseP = E1.rise - glassOff, apexP = ysP + riseP, WgP = 1000 - 2 * glassOff, xgP = WgP / 2;   // V1 / P1b: 1198.5 / 94.5 / 1293 / 789 / 394.5
+    const radiiP = [...new Set(ringV1(glassOff).map(fmt1))].join('/');                                                          // 44.5/1294.5
+    const pctP = Math.round(ysP / apexP * 100);                                                                                    // springing as % of the unit height (apex): 93
+    // P1b V1 at the first third of Wg (x 263, axis-relative −131.5) lies on the crown arc (centre y = rise − R, R − glassOff): top = cy + sqrt(Rg² − x²)
+    const v1TopP = (E1.rise - E1.R) + Math.sqrt((E1.R - glassOff) ** 2 - (WgP / 3 - xgP) ** 2);
+    const v1LenP = r05(ysP + v1TopP);                                                                                              // 1286.30 → 1286.5
+    const ringP = fmt1(P.arch.patterns.hubRingRatios[0] * xgP);                                                                   // P2 hub ring: 0.3 × 394.5 = 118.35 → "118.4"
+    check(`Shape column header + "rect" for the rectangular row + "arched · R ${radiiP}" for the three-centre unit`, has('(Shape)') && has('(rect)') && has(`arched · R ${radiiP}`));
     // v3 0.3: the header line prints the bar-end rows (x from the corner · s from apex · L) instead of x (%) / y pairs
-    check('mm + % line: "springing 1198.5 \\(92%\\)" and the V1 row "V1 x 270.3 " with "from apex" and "L 1297"', has('springing 1198.5 \\(92%\\)') && has('V1 x 270.3 ') && has('from apex') && has('L 1297'));
-    check('hub-spoke row (7 bars): "7 bars \u2014 see table", table rows "R1 R 121.7" and bars cell shortened to "hub ast"', has('7 bars') && has('see table') && has('R 121.7') && has('(hub ast)'));
-    check('shaped drawing cell: "rise 105.5", overall "811 mm" / "1304 mm", Bézier curve operators present', has('rise 105.5') && has('811 mm') && has('1304 mm') && (txt.match(/ c\n/g) || []).length >= 6);
+    check(`mm + % line: "springing ${fmt1(ysP)} \\(${pctP}%\\)" and the V1 row "V1 x ${fmt1(WgP / 3)} " with "from apex" and "L ${fmt1(v1LenP)}"`, has(`springing ${fmt1(ysP)} \\(${pctP}%\\)`) && has(`V1 x ${fmt1(WgP / 3)} `) && has('from apex') && has(`L ${fmt1(v1LenP)}`));
+    check(`hub-spoke row (7 bars): "7 bars — see table", table rows "R1 R ${ringP}" and bars cell shortened to "hub ast"`, has('7 bars') && has('see table') && has(`R ${ringP}`) && has('(hub ast)'));
+    check(`shaped drawing cell: "rise ${fmt1(riseP)}", overall "${fmt1(WgP)} mm" / "${fmt1(apexP)} mm", Bézier curve operators present`, has(`rise ${fmt1(riseP)}`) && has(`${fmt1(WgP)} mm`) && has(`${fmt1(apexP)} mm`) && (txt.match(/ c\n/g) || []).length >= 6);
   } catch (e) {
     check('glass PDF section ran (jsPDF loadable in node)', false, String(e?.message || e));
   }

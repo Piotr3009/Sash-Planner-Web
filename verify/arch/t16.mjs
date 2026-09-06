@@ -19,7 +19,8 @@
  * numbers computed 06.09 from the P3 rule and cross-checked by the independent
  * closed form + option table below). The 390 vector is unchanged (r 253.5 > 150).
  * lists.js / calculations.js are IN SCOPE for v2 (cut list, glass shape), so
- * §10.3 item 10 now freezes casementLayouts.js and jambDxf.js only.
+ * §10.3 item 10 freezes jambDxf.js; casementLayouts.js may differ from the merge-base
+ * ONLY in frameFace + CASEMENT_LAYOUTS_VERSION (ARCHED-WINDOWS-v4 Block F, frame 68).
  *
  * ARCHED-WINDOWS-v4 Block C (night 6): the segment planner is the whole-chain
  * planner v2 (pieces across arc boundaries, gothic split at the apex, two hard
@@ -31,7 +32,7 @@
  * Run: node verify/arch/t16.mjs            (writes the sample DXF too)
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { independentPlan } from './lib/indPlanner.mjs';
@@ -50,12 +51,13 @@ writeFileSync(ENTRY, [
   "export * as specification from '../src/engine/specification.js';",
   "export * as calculations from '../src/engine/calculations.js';",
   "export * as cncExport from '../src/utils/cncExport.js';",
+  "export * as layouts from '../src/engine/casementLayouts.js';",
 ].join('\n'));
 const BUNDLE = resolve(AUDIT, 'arch-bundle.mjs');
 execFileSync('npx', ['-y', 'esbuild@0.25.0', ENTRY, '--bundle', '--format=esm', '--external:react',
   '--platform=node', `--outfile=${BUNDLE}`], { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit'] });
 const M = await import(pathToFileURL(BUNDLE).href);
-const { arch, profile, archDxf, dxfWriter, specification, calculations, cncExport } = M;
+const { arch, profile, archDxf, dxfWriter, specification, calculations, cncExport, layouts } = M;
 const P = profile.DEFAULT_CASEMENT_PROFILE;
 
 // ── tiny assert framework ───────────────────────────────────────────────────
@@ -78,13 +80,17 @@ const DEG = 180 / Math.PI;
 
 // ── constants shared by every section ───────────────────────────────────────
 const W = 1200;
-const tF = P.elements.frameHead.face;        // 57
-const oL = P.deductions.leafAtJamb;          // 40
+const tF = P.elements.frameHead.face;        // 68 (v4 Block F, was 57)
+const oL = P.deductions.leafAtJamb;          // 51 (v4 Block F, was 40)
 const tL = P.elements.leafTop.face;          // 67
 const gI = P.geometry.glassInset;            // 12.5
 const LIM = P.arch.limits;
-check('profile numbers read for the arch: frameHead 57 / leafAtJamb 40 / leafTop 67 / glassInset 12.5',
-  tF === 57 && oL === 40 && tL === 67 && gI === 12.5, `${tF}/${oL}/${tL}/${gI}`);
+// v4 Block F (option B): the spec numbers for the frame — the ONE check that may carry literals;
+// every inner vector below is written as a formula of tF / oL / tL / gI.
+check('profile = spec F: frameHead 68 / frameJamb 68 / land 47 / rebate 21 / leafAtJamb 51 / leafFullHeight 98 / fanFromAxis 65 / leafTop 67 / glassInset 12.5',
+  tF === 68 && P.elements.frameJamb.face === 68 && P.geometry.land === 47 && P.geometry.rebate === 21 && oL === 51 && P.deductions.leafFullHeight === 98 && P.deductions.fanFromAxis === 65 && tL === 67 && gI === 12.5,
+  `${tF}/${P.elements.frameJamb.face}/${P.geometry.land}/${P.geometry.rebate}/${oL}/${P.deductions.leafFullHeight}/${P.deductions.fanFromAxis}/${tL}/${gI}`);
+check('profile: land + rebate = frame face (option B — the rebate stays 21, the land grows)', P.geometry.land + P.geometry.rebate === tF && oL === P.geometry.land + P.geometry.gap);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // §10.3 item 1 — rise defaults reproduce §3.2 for every shape / gothic profile
@@ -135,18 +141,23 @@ function threeExp(h, δ, rMin = 0) {
 const R_MIN = P.arch.minHaunchRadius;
 check('profile arch.minHaunchRadius = 150 (v2 P3)', R_MIN === 150);
 
-// Spec §10.1 vectors, verbatim.
+// Spec §10.1 vectors, verbatim for the OUTER geometry (W and rise only); every inner
+// radius / ring is the outer number minus the profile offsets (v4 Block F: tF 68, oL 51).
+const ringSet = (r, R) => ({
+  headInner: [r - tF, R - tF, r - tF], leafOuter: [r - oL, R - oL, r - oL],
+  leafInner: [r - oL - tL, R - oL - tL, r - oL - tL], glass: [r - oL - tL + gI, R - oL - tL + gI, r - oL - tL + gI],
+});
 const SPEC_GEOMETRY = [
   // v2: the former "segmental 240" window is a three-centre with rise 240 — haunch r clamps to 150 (P3), crown R 1320
   { key: 'three-centre-240', shape: 'three-centre', rise: 240, exp: (δ) => threeExp(240, δ, R_MIN), R: 1320, centres: [[450, 0], [0, -1080], [-450, 0]],
     spec: { r: 150.00, R: 1320.00, smallCx: 450.00, largeBelow: 1080.00, tangent: [507.69, 138.46], smallSpan: 67.38, largeSpan: 45.24, lenSmall: 176.40, lenLarge: 1042.25, total: 1395.05, csCl: 1170.00,
-      rings: { headInner: [93, 1263, 93], leafOuter: [110, 1280, 110], leafInner: [43, 1213, 43], glass: [55.5, 1225.5, 55.5] } } },
+      rings: ringSet(R_MIN, 1320) } },   // 57-face spec: 93,1263,93 · 110,1280,110 · 43,1213,43 · 55.5,1225.5,55.5
   { shape: 'semi-circle', rise: null, exp: semiExp, R: 600, centres: [[0, 0]],
-    spec: { Rout: 600.00, Rin: 543.00, thetaDeg: 180, lenOut: 1884.96, lenIn: 1705.88 } },
+    spec: { Rout: 600.00, Rin: 600 - tF, thetaDeg: 180, lenOut: 1884.96, lenIn: Math.PI * (600 - tF) } },   // 57-face spec: Rin 543, lenIn 1705.88
   { shape: 'gothic-equilateral', rise: null, exp: (δ) => gothicExp(W * Math.sqrt(3) / 2, δ), R: 1200, centres: [[-600, 0], [600, 0]],
-    spec: { rise: 1039.23, c: 600.00, Rout: 1200.00, Rin: 1143.00, spanDeg: 60, lenOutEach: 1256.64 } },
+    spec: { rise: 1039.23, c: 600.00, Rout: 1200.00, Rin: 1200 - tF, spanDeg: 60, lenOutEach: 1256.64 } },   // 57-face spec: Rin 1143
   { shape: 'gothic-drop', rise: 840, exp: (δ) => gothicExp(840, δ), R: 888, centres: [[-288, 0], [288, 0]],
-    spec: { rise: 840.00, c: 288.00, Rout: 888.00, Rin: 831.00, spanDeg: 71.08, lenOutEach: 1101.56 } },
+    spec: { rise: 840.00, c: 288.00, Rout: 888.00, Rin: 888 - tF, spanDeg: 71.08, lenOutEach: 1101.56 } },   // 57-face spec: Rin 831
   { shape: 'three-centre', rise: 390, exp: (δ) => threeExp(390, δ, R_MIN), R: 761.54, centres: [[346.5, 0], [0, -371.54], [-346.5, 0]],
     spec: { r: 253.50, R: 761.54, smallCx: 346.50, largeBelow: 371.54, tangent: [519.40, 185.39], smallSpan: 47.00, largeSpan: 86.01, lenSmall: 207.93, lenLarge: 1143.13, total: 1559.00, csCl: 508.04 } },
 ];
@@ -165,10 +176,10 @@ for (const v of SPEC_GEOMETRY) {
   if (tag === 'semi-circle') {
     const o = g.frameHead.outer[0], i = g.frameHead.inner[0];
     expectNear('semi-circle: R_out 600.00', o.r, S.Rout, 0.01);
-    expectNear('semi-circle: R_in 543.00', i.r, S.Rin, 0.01);
+    expectNear(`semi-circle: R_in ${S.Rin.toFixed(2)} (= 600 − frame face ${tF})`, i.r, S.Rin, 0.01);
     expectNear('semi-circle: theta 180°', arch.arcSpan(o) * DEG, S.thetaDeg, 0.01);
     expectNear('semi-circle: arcLen_out 1884.96', arch.arcLen(o), S.lenOut, 0.01);
-    expectNear('semi-circle: arcLen_in 1705.88', arch.arcLen(i), S.lenIn, 0.01);
+    expectNear(`semi-circle: arcLen_in ${S.lenIn.toFixed(2)} (= π · R_in)`, arch.arcLen(i), S.lenIn, 0.01);
   }
   if (tag === 'gothic-equilateral' || tag === 'gothic-drop') {
     expectNear(`${tag}: rise ${S.rise}`, g.rise, S.rise, 0.01);
@@ -277,9 +288,9 @@ check('H = rise + 900 passes (straight 900, leaf straight stile 900 − 47 = 853
 expectThrows('three-centre rise ≥ W/2 is a hard error (resolveArchRise)', () => arch.resolveArchRise('three-centre', 1200, 600, LIM), /must be below half the width \(600mm\)/);
 expectThrows('gothic-drop rise < W/2 throws (arcs cannot meet in a point)', () => arch.resolveArchRise('gothic-drop', 1200, 599, LIM), /must be at least half the width \(600mm\)/);
 expectThrows('three-centre rise ≥ W/2 throws (semi-circle)', () => arch.archArcs('three-centre', 1200, 600), /must be below half the width/);
-check('P3: rise 180 at W 1200 → haunch r clamps to 150 (v1 rule gave 54 < the frame face), crown R 3540 — builds', (() => {
+check(`P3: rise 180 at W 1200 → haunch r clamps to 150 (v1 rule gave 54 < the frame face), crown R 3540, head inner haunch ${150 - tF} (= 150 − tF) — builds`, (() => {
   const g = arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 2000, rise: 180 }, P);
-  return near(g.arcs[0].r, 150, 1e-9) && near(g.arcs[1].r, 3540, 1e-6) && near(g.frameHead.inner[0].r, 93, 1e-9);
+  return near(g.arcs[0].r, 150, 1e-9) && near(g.arcs[1].r, 3540, 1e-6) && near(g.frameHead.inner[0].r, 150 - tF, 1e-9);
 })());
 expectThrows('P3: rise 150 = minHaunchRadius → no crown arc, readable', () => arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 2000, rise: 150 }, P), /rise 150mm must exceed the haunch radius 150mm \(profile arch\.minHaunchRadius 150\)/);
 expectThrows('P3: rise 120 < minHaunchRadius → readable', () => arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 2000, rise: 120 }, P), /rise 120mm must exceed the haunch radius 150mm/);
@@ -391,7 +402,9 @@ for (const v of PLAN_VECTORS) {
   const allJoints = plan.pieces.flatMap((pc) => arch.pieceJoints(pc));
   const apexJoints = allJoints.filter(([pi, po]) => near(pi[0], 0, 1e-9) && near(po[0], 0, 1e-9));
   check(`gothic: ${4 * nSide - 2} joint faces reported (every non-springing end, shared joints twice), exactly 2 on the axis (x = 0)`, allJoints.length === 4 * nSide - 2 && apexJoints.length === 2, String(allJoints.length));
-  expectNear('gothic: apex joint runs from inner apex 972.86 to outer apex 1039.23', apexJoints[0][1][1] - apexJoints[0][0][1], 1039.2305 - 972.8648, 0.01);
+  // outer apex = √(1200² − 600²) = 1039.23; inner apex = √((1200 − tF)² − 600²) (57-face spec: 972.86)
+  const apexOut = Math.sqrt(1200 ** 2 - 600 ** 2), apexIn = Math.sqrt((1200 - tF) ** 2 - 600 ** 2);
+  expectNear(`gothic: apex joint runs from inner apex ${apexIn.toFixed(2)} to outer apex ${apexOut.toFixed(2)}`, apexJoints[0][1][1] - apexJoints[0][0][1], apexOut - apexIn, 0.01);
   const apexCut = plan.pieces[nSide - 1].endCuts[1];
   check('gothic: apex end cut kind "apex", from-square = angle between the vertical plane and the board normal', apexCut.kind === 'apex' && near(apexCut.fromSquareDeg, Math.acos(Math.abs(plan.pieces[nSide - 1].axes.b[1])) * DEG, 1e-9));
   const sq = plan.pieces[0].endCuts[0];
@@ -503,8 +516,15 @@ section('§10.3 pt 5 — DXF round-trip via ezdxf — sample_arch_1200_three-cen
   const stocksOk = (pl, exp) => pl.arcs.every((a, i) => a.default.stock === exp[i].def.stock && a.rule === exp[i].rule);
   check(`sample plans: frame head ${nF} pieces (${iF.map((e) => `${e.def.n} × ${e.def.stock} ${e.rule}`).join(' + ')}), leaf top ${nL} (${iL.map((e) => `${e.def.n} × ${e.def.stock} ${e.rule}`).join(' + ')}) — independent planner per group`,
     nF === sumN(iF) && nL === sumN(iL) && stocksOk(plan.plans.frameHead, iF) && stocksOk(plan.plans.leafTop, iL), `${nF}/${nL} vs ${sumN(iF)}/${sumN(iL)}`);
-  check('sample plans (three-centre 240, v4): head fewest 2 × 180 → economy 3 × 150 (waste above 45 %), leaf 2 × 180 fewest — every piece a compound haunch + crown board, no 100 mm haunch triangles',
-    iF[0].fewest.n === 2 && iF[0].fewest.stock === 180 && iF[0].def.n === 3 && iF[0].def.stock === 150 && iF[0].rule === 'economy' && iL[0].def.n === 2 && iL[0].def.stock === 180 && iL[0].rule === 'fewest'
+  // v4 Block F: the verdicts follow the independent planner on the LIVE rings. Face 57 (Stage 1):
+  // head 2 × 180 → economy 3 × 150, leaf 2 × 180 fewest. Face 68: the head ring is thicker (W_req
+  // 176.8 on 180, no narrower alternative within N + 3) and the leaf ring smaller (fewest ONE 200
+  // board, alternative 2 × 180 on a narrower board → economy by the C.4 rule). One head piece is
+  // impossible: rise 240 + face + 2 × allowance exceeds the widest board.
+  const verdict = (e) => `fewest ${e.fewest.n} × ${e.fewest.stock} (waste ${Math.round(e.fewest.waste * 100)} %)${e.alt ? ` → alt ${e.alt.n} × ${e.alt.stock} (${Math.round(e.alt.waste * 100)} %)` : ', no alternative'} ⇒ ${e.rule} ${e.def.n} × ${e.def.stock}`;
+  const ruleOk = (e) => e.rule === ((e.alt && e.fewest.waste > PLAN_OPTS.wasteThreshold) ? 'economy' : 'fewest') && e.def === (e.rule === 'economy' ? e.alt : e.fewest);
+  check(`sample plans (three-centre 240, v4, face ${tF}): head ${verdict(iF[0])}; leaf ${verdict(iL[0])} — C.4 rule, head ≥ 2 pieces (240 + ${tF} + 20 > 200), every head piece ≥ 450 / ≥ 400, every leaf piece a compound haunch + crown board`,
+    ruleOk(iF[0]) && ruleOk(iL[0]) && iF[0].fewest.n >= 2 && 240 + tF + 2 * PLAN_OPTS.contourAllowance > PLAN_OPTS.stockWidths[PLAN_OPTS.stockWidths.length - 1]
     && plan.plans.frameHead.pieces.every((pc) => pc.roughLength >= 450 && pc.shorterEdge >= 400) && plan.plans.leafTop.pieces.every((pc) => pc.compound));
   const stockF = iF[0].def.stock, stockL = iL[0].def.stock;
   const pieces = d.polys.filter((p) => p.layer === 'PIECES');
@@ -563,9 +583,14 @@ section('§10.3 pt 5 — DXF round-trip via ezdxf — sample_arch_1200_three-cen
   check('TEXT: allowance 10 per side + both hard limits + the board cap printed', texts.some((t) => t === 'ALLOWANCE 10 PER SIDE  LIMITS: OVERALL >= 450 (CLAMP)  SHORTER EDGE >= 400  STOCK MAX 200'), texts.filter((t) => t.startsWith('ALLOW')).join(' | '));
   const chainRe = new RegExp(`^CHAIN R150/1320/150 L1395(\\.\\d)? 180DEG: FEWEST ${iF[0].fewest.n} x board ${iF[0].fewest.stock} L\\d+(\\.\\d)? ROUGH \\d+(\\.\\d)? WASTE ${Math.round(iF[0].fewest.waste * 100)}%$`);
   check(`TEXT: head CHAIN line (radii 150/1320/150, 180°, FEWEST ${iF[0].fewest.n} × ${iF[0].fewest.stock}, waste ${Math.round(iF[0].fewest.waste * 100)} %)`, texts.some((t) => chainRe.test(t)), texts.filter((t) => t.startsWith('CHAIN')).join(' | '));
-  const altRe = new RegExp(`^  ECONOMY ALT ${iF[0].alt.n} x board ${iF[0].alt.stock} L\\d+(\\.\\d)? ROUGH \\d+(\\.\\d)? WASTE ${Math.round(iF[0].alt.waste * 100)}% -> DEFAULT ECONOMY \\(THRESHOLD 45%\\)$`);
-  check(`TEXT: head ECONOMY ALT line (${iF[0].alt.n} × ${iF[0].alt.stock} → DEFAULT ECONOMY, threshold 45 %)`, texts.some((t) => altRe.test(t)), texts.filter((t) => t.startsWith('  ECONOMY')).join(' | '));
-  check('TEXT: leaf line — NO ECONOMY ALT WITHIN 5 PIECES -> DEFAULT FEWEST', texts.some((t) => t === '  NO ECONOMY ALT WITHIN 5 PIECES -> DEFAULT FEWEST'), texts.filter((t) => t.startsWith('  NO')).join(' | '));
+  // one alternative line per ring, in ring order (head, leaf): ECONOMY ALT … -> DEFAULT <rule> when the
+  // independent planner found an alternative, otherwise NO ECONOMY ALT WITHIN N+3 PIECES -> DEFAULT FEWEST
+  const altLineRe = (e) => e.alt
+    ? new RegExp(`^  ECONOMY ALT ${e.alt.n} x board ${e.alt.stock} L\\d+(\\.\\d)? ROUGH \\d+(\\.\\d)? WASTE ${Math.round(e.alt.waste * 100)}% -> DEFAULT ${e.rule.toUpperCase()} \\(THRESHOLD 45%\\)$`)
+    : new RegExp(`^  NO ECONOMY ALT WITHIN ${e.fewest.n + 3} PIECES -> DEFAULT FEWEST$`);
+  const altLines = texts.filter((t) => t.startsWith('  ECONOMY') || t.startsWith('  NO ECONOMY'));
+  check(`TEXT: alternative lines per ring — head ${iF[0].alt ? `ECONOMY ALT ${iF[0].alt.n} × ${iF[0].alt.stock} → DEFAULT ${iF[0].rule.toUpperCase()}` : `NO ECONOMY ALT WITHIN ${iF[0].fewest.n + 3} PIECES`}, leaf ${iL[0].alt ? `ECONOMY ALT ${iL[0].alt.n} × ${iL[0].alt.stock} → DEFAULT ${iL[0].rule.toUpperCase()}` : `NO ECONOMY ALT WITHIN ${iL[0].fewest.n + 3} PIECES`} (threshold 45 %)`,
+    altLines.length === 2 && [iF[0], iL[0]].every((e) => altLines.some((t) => altLineRe(e).test(t))), altLines.join(' | '));
   check('TEXT: CLAMPS (SUGGESTION) line per ring with the piece thickness 93 / 57', texts.some((t) => t === 'CLAMPS (SUGGESTION): UNICLAMP 130 x 130, CLEARANCE 20 FROM THE END CUTS, JAWS 40-98, PIECE THICKNESS 93') && texts.some((t) => t.endsWith('PIECE THICKNESS 57')));
   check('TEXT: flat piece labels print L <rough> x <stock>', texts.some((t) => new RegExp(`^W1 - FRAME HEAD P1 L\\d+(\\.\\d)? x${stockF}$`).test(t)) && texts.some((t) => new RegExp(`^W1 - LEAF TOP P1 L\\d+(\\.\\d)? x${stockL}$`).test(t)), texts.filter((t) => / P1 /.test(t)).join(' | '));
   check('TEXT: flat piece note prints OUT / IN / CUT codes (J<deg> joint, Q square springing end, A<deg> apex) / finger ends', texts.filter((t) => /^OUT \d+(\.\d)? IN \d+(\.\d)? CUT (Q|[JA]\d+(\.\d)?)\/(Q|[JA]\d+(\.\d)?) (FINGER BOTH ENDS|FINGER ONE END|NO FINGER)$/.test(t)).length === nF + nL, texts.filter((t) => t.startsWith('OUT')).join(' | '));
@@ -761,9 +786,10 @@ section('§10.3 pt 9 — normaliseToWindowSpec PSW mapping, riseSource, unknown 
 // ═══════════════════════════════════════════════════════════════════════════
 // §10.3 item 10 — frozen files untouched (git diff against the merge base with main)
 // ═══════════════════════════════════════════════════════════════════════════
-section('§10.3 pt 10 — casementLayouts.js / jambDxf.js unchanged (git diff vs merge-base with main); v2 opens lists.js + calculations.js');
+section('§10.3 pt 10 — jambDxf.js unchanged; casementLayouts.js differs from the merge-base ONLY in frameFace + CASEMENT_LAYOUTS_VERSION (v4 Block F)');
 {
-  const FROZEN = ['src/engine/casementLayouts.js', 'src/engine/cnc/jambDxf.js'];
+  const FROZEN = ['src/engine/cnc/jambDxf.js'];
+  const LAYOUTS = 'src/engine/casementLayouts.js';
   let base = null;
   for (const ref of ['origin/main', 'main']) {
     try { base = execFileSync('git', ['merge-base', 'HEAD', ref], { cwd: ROOT, encoding: 'utf8' }).trim(); break; } catch { /* try the next ref */ }
@@ -774,6 +800,18 @@ section('§10.3 pt 10 — casementLayouts.js / jambDxf.js unchanged (git diff vs
     check(`frozen files unchanged since merge-base ${base.slice(0, 7)}: ${FROZEN.map((f) => f.split('/').pop()).join(', ')}`, diff === '', diff);
     const wt = execFileSync('git', ['status', '--porcelain', '--', ...FROZEN], { cwd: ROOT, encoding: 'utf8' }).trim();
     check('frozen files clean in the working tree', wt === '', wt);
+    // casementLayouts.js: strip comments and blank lines on both sides; the remaining code may differ in
+    // exactly two lines — the frameFace constant and the version constant (Piotr: "only FRAME_FACE + version").
+    const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map((l) => l.replace(/\/\/.*$/, '').trimEnd()).filter((l) => l.trim() !== '');
+    const oldCode = strip(execFileSync('git', ['show', `${base}:${LAYOUTS}`], { cwd: ROOT, encoding: 'utf8' }));
+    const newCode = strip(readFileSync(resolve(ROOT, LAYOUTS), 'utf8'));
+    const changed = [];
+    for (let i = 0; i < Math.max(oldCode.length, newCode.length); i++) if (oldCode[i] !== newCode[i]) changed.push([oldCode[i], newCode[i]]);
+    const allowed = (o, n) => (/^export const CASEMENT_LAYOUTS_VERSION = \d+;$/.test(o) && /^export const CASEMENT_LAYOUTS_VERSION = \d+;$/.test(n))
+      || (/^\s*frameFace: \d+,$/.test(o) && /^\s*frameFace: \d+,$/.test(n));
+    check(`casementLayouts.js code (comments stripped) differs from the merge-base in exactly 2 lines: frameFace 57 → ${layouts.CASEMENT_GEO_DEFAULTS.frameFace}, version 2 → ${layouts.CASEMENT_LAYOUTS_VERSION} — panel order / layout defs untouched`,
+      oldCode.length === newCode.length && changed.length === 2 && changed.every(([o, n]) => allowed(o, n)), JSON.stringify(changed));
+    check('casementLayouts.js: frameFace = the casement profile frameHead.face (68), version 3', layouts.CASEMENT_GEO_DEFAULTS.frameFace === tF && layouts.CASEMENT_LAYOUTS_VERSION === 3);
   }
 }
 

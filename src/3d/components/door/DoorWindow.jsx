@@ -28,7 +28,7 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import { Text, Line } from '@react-three/drei';
-import DoorFrame, { FRAME_FACE, EXT_FACE, FRAME_DEPTH, EXT_DEPTH, INT_DEPTH, REBATE_STEP, MULLION_W, BOTTOM_FACE, BOTTOM_EXT_OUTER, BOTTOM_INNER_FACE, GASKET_T, mm } from './DoorFrame';
+import DoorFrame, { resolveFrameDims, DEFAULT_FRAME_DIMS, FRAME_FACE, EXT_FACE, FRAME_DEPTH, EXT_DEPTH, INT_DEPTH, REBATE_STEP, MULLION_W, BOTTOM_FACE, BOTTOM_EXT_OUTER, BOTTOM_INNER_FACE, GASKET_T, mm } from './DoorFrame';
 import DoorPanel, { SASH_RAIL } from './DoorPanel';
 import DoorSidePanel from './DoorSidePanel';
 import TransomPanel from './TransomPanel';
@@ -36,7 +36,8 @@ import TransomPanel from './TransomPanel';
 // ─── Layout definitions ───
 // Each layout = { panels: [...], mullions?: [...], transoms?: [...] }
 // Panel: { x, y, w, h, hinge } — position & size relative to glass area, hinge type
-function getLayout(code, innerW, innerH, height, fanlightRatio) {
+function getLayout(code, innerW, innerH, height, fanlightRatio, dims = DEFAULT_FRAME_DIMS) {
+  const FRAME_FACE = dims.frameFace;   // v4 Block F: profile face (PC), PSW default 57
   const half = innerW / 2;
   const third = innerW / 3;
   const mullW = MULLION_W;
@@ -471,9 +472,11 @@ export default function DoorWindow({
   transomType = 'none',
   transomHeight = 450,
   transomBars = 'none',
+  frameDims = null,       // v4 Block F (PC): { frameFace, extFace } from the door profile; absent → PSW 57 / 36
 }) {
   const colorE = sameColor ? woodColor : woodColorExt;
   const colorI = sameColor ? woodColor : woodColorInt;
+  const { frameFace: FRAME_FACE } = resolveFrameDims(frameDims);
 
   const extMaterial = useMemo(() => new THREE.MeshPhysicalMaterial({
     color: colorE, roughness: 0.72, metalness: 0.02,
@@ -516,7 +519,7 @@ export default function DoorWindow({
   // Get layout definition
   const layoutDef = useMemo(
     () => {
-      const def = getLayout(layout, innerW, innerH, height, fanlightRatio);
+      const def = getLayout(layout, innerW, innerH, height, fanlightRatio, { frameFace: FRAME_FACE });
       // Sliding direction swap (defaults: 020S/030S=left-to-right, 040S=left-to-right)
       if (layout.endsWith('S') && def.panels) {
         const dir = slideDirection;
@@ -617,6 +620,7 @@ export default function DoorWindow({
           <DoorFrame
             width={width}
             height={height + frTransomH}
+            frameDims={frameDims}
             material={openDirection === 'inward' ? intMaterial : extMaterial}
             materialInt={openDirection === 'inward' ? extMaterial : intMaterial}
             sealColour={sealColour}
@@ -1010,6 +1014,7 @@ export default function DoorWindow({
         <DoorSidePanel
           width={sideLeftWidth}
           height={height}
+          frameDims={frameDims}
           woodColor={woodColor}
           woodColorExt={woodColorExt}
           woodColorInt={woodColorInt}
@@ -1035,6 +1040,7 @@ export default function DoorWindow({
         <DoorSidePanel
           width={sideRightWidth}
           height={height}
+          frameDims={frameDims}
           woodColor={woodColor}
           woodColorExt={woodColorExt}
           woodColorInt={woodColorInt}

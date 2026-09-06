@@ -4,11 +4,26 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
-## 2026-09-06 — ARCHED-WINDOWS-v4 night 6, Stage 1 = Block C (branch `claude/arched-windows-v4-stages-9diax6`)
+## 2026-09-06 — ARCHED-WINDOWS-v4 night 6, Stages 1–4 = Blocks C / B / E / F (branch `claude/arched-windows-v4-stages-9diax6`)
 
 Status of the older entries: **§1 D13 (piece rule) → CLOSED by v4 C.3 / C.4** (fewest pieces first, economy
 alternative above the waste threshold — `pieceRule` removed from the profile); **§9.3 minimum piece length → v4
 C.1 `arch.minPieceLength` 400 HARD** (was 150 warn); §2 D5 / §3 d50 / §9.1 P9 / §9.4 F2 unchanged.
+
+### 19. Stage 4 — frame face 68 everywhere (Block F, option B): DEFAULT (open) values, consequences, questions
+
+| # | Item | Taken | Ask |
+|---|------|-------|-----|
+| 19.1 | **Door land / leafAtJamb** | Spec F: doors change the face (68) and the coupling post (136) only — `DEFAULT_DOOR_PROFILE.geometry.land` stays 36, `deductions.leafAtJamb` 40, so a 1000 door leaf is still 920 and a 68 door jamb shows 36 with a 32 rebate step (68 − 36), not the casement's 21. Physically odd: the same 68 × 93 section rebated 21 on a casement and 32 on a door | Should the door follow option B too (land 47, leafAtJamb 51, leafFullHeight 98, coupling post visible band 47 + 47)? One line in the profile + t27 §5 re-vector |
+| 19.2 | **Stored profile migration (`frameSchema` 2)** | Piotr's tenant profile in Supabase / localStorage still holds 57 / 36 / 40 / 87 / 54. `migrateCasementProfile` now moves each of those keys to the new default ONLY when it still equals the old default; a hand-edited value stays; a copy already marked `frameSchema 2` is never touched. The migrated profile is saved back by the store on its next sync | FYI — if the workshop had deliberately set a 57 jamb in Window Settings it stays 57 (by design); press "Reset to defaults" to take the whole 68 set |
+| 19.3 | **Profile snapshot per project (spec F.5 design note)** | Not built. A profile change re-derives every existing window live — the 06.09 change turns a quoted 920 leaf into 898 on the next open of an old project. `deriveWindowData()` is the single source of truth by design; freezing numbers per project would need a `profileSnapshot` stored with the project (the batch already carries `_profileSnapshot.casement` — unused by the engine) and an engine entry point that takes the snapshot instead of the active profile | Decide: (a) live re-derive (today), (b) snapshot at project creation with a "re-derive with the current profile" button, (c) snapshot at production-pack release only |
+| 19.4 | **Circle 800 frame ring now needs a 200 board** | Frame ring 400 / 332 (was 400 / 343): the independent planner and the engine both give W_req 182.3 > 180 for 4 pieces → **4 × 200** (was 4 × 180); 5 and 6 pieces fit 150 but fail the 400 shorter-edge limit, so no economy alternative. The leaf ring (349 / 282) stays blocked (4 × 180 → shorter edge 371.3 < 400; was 390.1) | FYI — a real material change for the workshop (the widest board on every 800 circle) |
+| 19.5 | **Economy rule C.4 with the smaller leaf ring** | 1200 three-centre rise 240 LEAF top rail at face 68: fewest = ONE 200 board (W_req 199.0, waste 56 %), the C.4 rule then takes 2 × 180 (a narrower board, waste 57.2 % — HIGHER). The rule as written compares board width, not waste; the engine and the harness follow it literally. Head: 2 × 180 fewest, no alternative (was 2 × 180 → economy 3 × 150 at face 57) | Add "AND lower waste" to C.4? (`fewest.waste > threshold && alt.waste < fewest.waste`) — a one-line change in `arch.js` + `indPlanner.mjs`, not made tonight (rule is DEFAULT (open) §16.2) |
+| 19.6 | **Spec C.5 table at face 57** | The C.5 reference numbers (134.7 / 158.3 / 112.6 / 168.1 / 170.6) are the 57-frame numbers by the spec's own words ("Face 57 head ring"). t25 keeps them against a schema-1 profile variant built in the harness and checks the live 68 profile against the independent planner; the face-68 numbers are printed in the BUILD-LOG Stage 4 table | Re-issue C.5 for the 68 frame in the next spec revision |
+| 19.7 | **Part Registry 68 × 93** | `materialAssignmentStore` labels the frame head / jambs `68×93` (hint names the old 57×93); the Part Registry (Supabase data) must carry a 68 × 93 raw material — no DB change in this package | Add the 68 × 93 material in Part Registry and assign it to Frame Head / Frame Jambs; old projects keep their 57 × 93 assignment |
+| 19.8 | **PSW still describes a 57 frame** | Until `PSW-FRAME-68-PORT.md` is applied, PSW imports arrive with 57-based geometry; PC re-derives from its own profile (898 leaf), so the PSW estimate drawing and the PC numbers disagree by 11 per jamb | Port PSW (list of lines in the doc) and bump `window.CASEMENT_LAYOUTS_VERSION` to 3 |
+| 19.9 | **3D not seen** | The `frameDims` threading (11 files) builds and its wiring is asserted by t27 §7, but no browser: the 68 frame in the viewer, the door coupling post 136 and the fanlight axis 102 are unverified visually | Open a 1000 × 1500 casement and a door with a side panel in the viewer in the morning |
+| 19.10 | **`ArchedDoorWindow.jsx` / `TransomPanel.jsx`** | Not threaded (PC never renders them: arched doors and door transom panels are out of PC's scope, CLAUDE.md); they still read `FRAME_FACE` 57 from `DoorFrame.jsx` | FYI |
 
 ### 18. Stage 3 — intersecting from the vertical bars (Block E): errata and questions
 

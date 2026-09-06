@@ -64,7 +64,7 @@ niewspółśrodkowe łuki w 3D).
 8. **Rysunki 2D:** wszystkie stałe wizualne z `drawingTheme.js`; mnożnik `sc` tylko do pozycji, nigdy do `fontSize` / `strokeWidth` / `strokeDasharray`. (W tym pakiecie nie ma 2D — zasada na przyszłość.)
 9. **Batch:** pole `label` (nie `name`); typ drzwi to `'door'` w liczbie pojedynczej.
 10. **Supabase PC:** projekt `teqkuumenoerphfuqijb`, multi-tenant przez `tenant_id`; `user_profiles.id` = `auth.uid()`. SQL nigdy w kodzie aplikacji bez osobnego pliku migracji. **W tym pakiecie nie ma zmian w bazie.**
-11. **Numery warsztatowe siedzą w profilu** (`src/engine/profile.js`), nie w kodzie. Łuki czytają `frameHead.face`, `leafTop.face`, `leafAtJamb`, `glassInset` z profilu — nigdy nie wpisuj 57 / 67 / 40 na sztywno (planowana zmiana ramy casement na 68 mm musi przejść bez dotykania modułu łuków).
+11. **Numery warsztatowe siedzą w profilu** (`src/engine/profile.js`), nie w kodzie. Łuki czytają `frameHead.face`, `leafTop.face`, `leafAtJamb`, `glassInset` z profilu — nigdy nie wpisuj 68 / 67 / 51 na sztywno (rama 68 weszła 06.09 bez dotykania `arch.js`; bramka grep w `verify/arch/t27.mjs` §8). Rama casement i drzwi: face **68**, rebate 21, land 47, `leafAtJamb` 51 (casement), słupek drzwi 136; 3D dostaje `frameDims` z profilu (`windowSpecToConfig.js`), stałe 57 / 36 w `src/3d` to tylko domyślne PSW.
 
 ---
 
@@ -154,7 +154,7 @@ karmi cut listę, PDF-y, rysunki, PP. Nigdy nie licz wymiarów okna w innym miej
 
 ---
 
-## STAN — noc 6 (v4) w toku na branchu sesji: Etap 1 (Blok C, planer v2) ✅ t25 · Etap 2 (Blok B, PDF szklarza) ✅ t26 · Etap 3 (Blok E, intersecting z prętów) ✅ t20_bars — t16–t26 ALL PASS, build OK
+## STAN — noc 6 (v4) zamknięta na branchu sesji: Etap 1 (Blok C, planer v2) ✅ t25 · Etap 2 (Blok B, PDF szklarza) ✅ t26 · Etap 3 (Blok E, intersecting z prętów) ✅ t20_bars · Etap 4 (Blok F, rama 68) ✅ t27 — t16–t27 ALL PASS, build OK
 Planer v2: cały łańcuch dzielony po długości łuku (kawałki przez granice łuków, gotyk w wierzchołku, koło jako
 jeden zamknięty pierścień), dwa twarde limity `cnc.minClampLength 450` / `arch.minPieceLength 400`, deski
 `63…200`, najmniej kawałków + alternatywa ekonomiczna (`arch.wasteThreshold 0.45`), koniec surowego kawałka na
@@ -167,6 +167,15 @@ z ustawienia paczki; prostokąty bajt w bajt jak przed (t26). Otwarte: BLOCKERS 
 Intersecting v4: pręty pionowe do linii startu (0 → kolumny ±¼), z każdego szczytu dwa łuki o promieniu łuku SZKŁA
 (półkole 405.5, gotyk 905.5 — spec „R = 1000" to promień ramy, errata E4), bez pręta na linii startu; klucze
 `arch.patterns.intersecting` usunięte z profilu. Otwarte: BLOCKERS §18.
+Rama 68 (opcja B, Blok F): profil casement `frameHead/frameJamb.face 68`, `land 47`, `rebate 21`, `leafAtJamb 51`,
+`leafFullHeight 98`, `fanFromAxis 65`, `frameSchema 2` (migracja zapisanych profili 57 → 68 klucz po kluczu, tylko
+wartości równe starym domyślnym); drzwi face 68, słupek sprzęgający 136, `transomDeduct 136`, land drzwi 36 bez
+zmian (BLOCKERS 19.1); `casementLayouts` FRAME_FACE 68 + wersja 3 (t16 §10.3 pt 10 pilnuje: tylko te dwie linie);
+3D przez `frameDims` (stałe 57 / 36 zostają domyślnymi PSW); fixtures prostokątne przebazowane (1000 × 1500:
+skrzydło 920 × 1413 → 898 × 1402; `verify/arch/rect_casement_baseline.mjs`, `t19_baseline.mjs live`); wszystkie
+wektory harnessów liczone z profilu; port PSW w `docs/handover/PSW-FRAME-68-PORT.md`. Skutki: koło 800 rama
+4 × 200 (było 180), gotyk 1000 skrzydło PLANUJE się (1 × 200 na stronę), gotyk 600 × 1600 skrzydło blokuje limit
+400, skrzydło tc240 1200 przez regułę C.4 na 2 × 180 mimo wyższego odpadu (19.5). Otwarte: BLOCKERS §19.
 
 ## STAN poprzedni — łuki: casement + sash + okna stałe + archiwum (noce 1–5), paczka arch-pieces-v1 (06.09) na `main`
 Kawałki łuków = proste trapezy (PIECES) i sklejony blank (ASSEMBLY), długość surowa = krawędź
@@ -174,7 +183,12 @@ deski + palec; traceria do drewna (`glazingRebate 18`); Pre-Cut per kawałek; wy
 prętów na dole, całość na górze; LSP usunięty. Harnessy t16–t24 ALL PASS. Spec historyczne:
 `docs/handover/ARCHED-CASEMENT-v1/v2.md`, `ARCHED-WINDOWS-v3.md`.
 
-## ZADANIE NOCNE 6 — ARCHED-WINDOWS-v4: cztery bramkowane etapy w jedną noc
+## ZADANIE NOCNE 6 — ARCHED-WINDOWS-v4: cztery bramkowane etapy w jedną noc — **WYKONANE (06/07.09)**
+
+Cztery etapy zamknięte na branchu sesji, werdykty w `BUILD-LOG.md` (STAGE 1–4 + FINAL), pytania w `BLOCKERS.md`
+§16–§19. Rano: merge do `main`; port PSW wg `docs/handover/PSW-FRAME-68-PORT.md` (w tym
+`window.CASEMENT_LAYOUTS_VERSION = 3`); materiał 68 × 93 w Part Registry (19.7); decyzje: land drzwi (19.1),
+snapshot profilu per projekt (19.3), reguła C.4 „AND niższy odpad" (19.5). Treść zadania jak zlecono:
 
 Spec: `@docs/handover/ARCHED-WINDOWS-v4.md`. Czytasz w całości; przy rozbieżności ze starszymi
 wygrywa v4. Zanim ruszysz, sprawdź, że paczka arch-pieces-v1 jest na `main`:
@@ -207,7 +221,10 @@ face/słupek. Sesja w chmurze, własny branch, commit + push po każdym zamknię
 ## NIE RÓB DZIŚ (zaplanowane, osobne pakiety)
 
 - Drzwi: ramiaki skrzydła 92 mm zamiast 94 (materiał 014); próg 4 zawiasów > 2100 mm.
-- Casement: jamby i head 68 mm zamiast 57 (razem z PSW + bump wersji layoutów).
+- Drzwi: land 47 / `leafAtJamb` 51 na ramie 68 (opcja B także dla drzwi) — decyzja Piotra, BLOCKERS 19.1.
+- Snapshot profilu per projekt (BLOCKERS 19.3) — dziś każde okno liczy się na żywo z aktywnego profilu.
+- Reguła ekonomiczna C.4 „AND niższy odpad" (BLOCKERS 19.5); spec C.5 do ponownego wydania dla ramy 68 (19.6).
+- PSW: port ramy 68 (`PSW-FRAME-68-PORT.md`) — repo tylko do odczytu z PC, Piotr robi sam.
 - Nadświetla łukowe drzwi; drzwi / sliding / bifold / front door poza zakresem (Piotr 07.09).
 - Listwy przyszybowe: moduł beading SASH zamrożony (także łukowe — 12.5, 13.5); casement nie ma listew
   w silniku W OGÓLE — osobny pakiet z przekrojem z profilu.
@@ -229,9 +246,9 @@ face/słupek. Sesja w chmurze, własny branch, commit + push po każdym zamknię
 ## Checklist na koniec sesji
 
 - [ ] branch sesji wypchnięty, `main` nietknięty
-- [ ] `node verify/arch/t16.mjs` … `t26.mjs` (t16, t17_edges, t18, t19, t20, t20_bars, t21, t22, t23, t24_stage4, t25, t26) → ALL PASS (t16 / t18 / t19 / t20 / t22 / t23 / t25 wymagają `pip install ezdxf --break-system-packages`)
+- [ ] `node verify/arch/t16.mjs` … `t27.mjs` (t16, t17_edges, t18, t19, t20, t20_bars, t21, t22, t23, t24_stage4, t25, t26, t27) → ALL PASS (t16 / t18 / t19 / t20 / t22 / t23 / t25 wymagają `pip install ezdxf --break-system-packages`; fixtures prostokątne przebazowuje się TYLKO przy zamierzonej zmianie liczb: `node verify/arch/rect_casement_baseline.mjs` + `node verify/arch/t19_baseline.mjs live`, z wpisem starych i nowych liczb w BUILD-LOG)
 - [ ] `npm run build` przechodzi
 - [ ] esbuild OK na każdym dotkniętym pliku, zero polskiego w źródłach
 - [ ] `git diff main --stat` obejmuje TYLKO pliki ze spec §11 (+ verify, docs, BUILD-LOG, BLOCKERS, CLAUDE.md)
-- [ ] `docs/handover/samples/`: `sample_arch_1200_*.dxf` (pięć), `sample_arch_c5_*.dxf` (cztery, wektory C.5), `sample_glass_*.dxf`, `sample_tracery_*.dxf` (+ stare `.lsp` z nocy 5), `sample_sash_arch_1200_*.dxf` (trzy), `sample_circle_1000_sunburst.dxf` (CNC; 800 tylko glass / tracery — pierścień skrzydła 800 blokuje limit 400), `sample_glass_order_arched.pdf` + `_a3.pdf` (układ v4) w repo
-- [ ] BUILD-LOG.md z werdyktami, BLOCKERS.md z D5 / d50 / P9 / F2 otwartymi (D13 zamknięty przez v4 C.3/C.4) + §11–§15 (noc 5) + §16 (noc 6, etap 1) + wszystkim, co wyszło w nocy
+- [ ] `docs/handover/samples/`: `sample_arch_1200_*.dxf` (pięć), `sample_arch_c5_*.dxf` (pięć — od ramy 68 także `1000_gothic-equilateral`, bo skrzydło gotyku 1000 się planuje), `sample_glass_*.dxf`, `sample_tracery_*.dxf` (+ stare `.lsp` z nocy 5), `sample_sash_arch_1200_*.dxf` (trzy), `sample_circle_1000_sunburst.dxf` (CNC; 800 tylko glass / tracery — pierścień skrzydła 800 blokuje limit 400), `sample_glass_order_arched.pdf` + `_a3.pdf` (układ v4) w repo — wszystkie z profilu 68
+- [ ] BUILD-LOG.md z werdyktami, BLOCKERS.md z D5 / d50 / P9 / F2 otwartymi (D13 zamknięty przez v4 C.3/C.4) + §11–§15 (noc 5) + §16–§19 (noc 6) + wszystkim, co wyszło w nocy

@@ -84,6 +84,7 @@ function CaptureScene({ config, side, onCaptured }) {
           <DoorWindow
             width={config.width}
             height={config.height}
+            frameDims={config.frameDims || null}
             layout={config.doorType === 'french' ? '040F' : (config.doorHinge === 'right' ? '040R' : '040L')}
             opening={0}
             primaryLeaf={config.doorHinge || 'left'}

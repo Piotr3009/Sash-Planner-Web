@@ -91,13 +91,18 @@ export function kgPerM(faceMm, depthMm) {
 // editable default ("settings by client"); formulas in calculations.js read
 // exclusively from this object — no bare numbers there.
 export const DEFAULT_CASEMENT_PROFILE = {
+  // Frame-section schema (ARCHED-WINDOWS-v4 Block F, option B): 2 = head and
+  // jambs 68 wide (land 47, rebate 21). Stored copies with schema 1 (57 / 36 /
+  // 40) are migrated key by key in migrateCasementProfile — only values that
+  // still equal the OLD default move, a workshop edit is kept.
+  frameSchema: 2,
   frameDepth: 93,   // finished depth of frame / mullion / transom members
   leafDepth: 57,
   leafDepthTriple: 61,  // 28mm triple unit needs a deeper rebate    // finished depth of all leaf members
   elements: {
-    frameHead:  { face: 57 },
-    frameJamb:  { face: 57 },
-    frameCill:  { face: 68 },   // profiled section; envelope 68×93
+    frameHead:  { face: 68 },   // v4 Block F: 57 → 68 (option B, rebate 21, land 47)
+    frameJamb:  { face: 68 },
+    frameCill:  { face: 68 },   // profiled section; envelope 68×93 — UNCHANGED by Block F
     mullion:    { face: 68 },   // visible land 26 (13 per side)
     transom:    { face: 68 },
     leafStile:  { face: 67 },   // vertogen: all four leaf members one section,
@@ -105,8 +110,8 @@ export const DEFAULT_CASEMENT_PROFILE = {
     leafBottom: { face: 67 },
   },
   geometry: {
-    land: 36,             // frame land (przylga) — visible frame margin
-    rebate: 21,           // frame rebate depth (57 − 36)
+    land: 47,             // frame land — visible frame margin (68 − 21; v4 Block F)
+    rebate: 21,           // frame rebate depth (68 − 47), unchanged by Block F
     gap: 4,               // leaf side fitting gap (jambs, mullions, head)
     mullionLand: 26,      // mullion visible land (13 + 13, symmetric)
     // Transom land is ASYMMETRIC around the element axis (v1.1):
@@ -121,17 +126,17 @@ export const DEFAULT_CASEMENT_PROFILE = {
     // (Piotr 06.09): 12.5 of it is glass, the remaining 5.5 takes the clips.
     // A tracery board reaches the timber: it sits the full 18 in, not 12.5.
     glazingRebate: 18,
-    // Layer closure: 36+4 + leafH + 6+41 = extH  (full = extH − 87)
-    //                top 36+4 + fan + 6+8 = T    (fan  = T − 54)
+    // Layer closure: 47+4 + leafH + 6+41 = extH  (full = extH − 98)
+    //                top 47+4 + fan + 6+8 = T    (fan  = T − 65)
     //                13+4 + lower + 6+41 = extH − T (lower = extH − T − 64)
   },
   deductions: {
     // Leaf WIDTH per edge (from frame edge / member axis):
-    leafAtJamb: 40,        // land 36 + gap 4
+    leafAtJamb: 51,        // land 47 + gap 4 (v4 Block F; 1000 frame → 898 leaf)
     leafAtMullionAxis: 17, // half-land 13 + gap 4
     // Leaf HEIGHT (T = frame top -> transom axis) — v1.1 layer-verified:
-    leafFullHeight: 87,    // no transom: leafH = extH − 87  (40 top + 47 cill side)
-    fanFromAxis: 54,       // fan (above transom): leafH = T − 54  (40 + 6 + 8)
+    leafFullHeight: 98,    // no transom: leafH = extH − 98  (51 top + 47 cill side)
+    fanFromAxis: 65,       // fan (above transom): leafH = T − 65  (51 + 6 + 8)
     lowerFromAxis: 64,     // below transom: leafH = extH − T − 64  (13+4 + 6+41)
     // Middle tier (transom above AND below, 3-tier 013/023):
     // UNCONFIRMED — awaiting Piotr; provisional symmetric 2×17 like mullions.
@@ -177,7 +182,7 @@ export const DEFAULT_CASEMENT_PROFILE = {
     version: 4,
     // Smallest haunch radius of a three-centre (Round below half width) arch,
     // mm (v2 P3): r = max(rise² / halfW, this). Keeps the leaf-top inner ring
-    // positive (150 − leafAtJamb 40 − leafTop.face 67 = 43) — a Round arch
+    // positive (150 − leafAtJamb 51 − leafTop.face 67 = 32) — a Round arch
     // therefore needs a rise above this value.
     minHaunchRadius: 150,
     // Glazing bar patterns in the arch (v2 P5), geometry ported from PSW
@@ -289,11 +294,16 @@ export function migrateCasementProfile(profile) {
   const D = DEFAULT_CASEMENT_PROFILE;
   const oldShape = !profile.geometry || !profile.lengths || !profile.elements?.leafStile;
   if (oldShape) return D;
+  // v4 Block F (frameSchema 2): a schema-1 copy still carries the 57-wide
+  // frame. Each frame-driven value that equals its OLD default moves to the
+  // new default; anything the workshop edited by hand is left alone.
+  const fs = migrateFrameSchema(profile, D);
   return {
     ...D, ...profile,
-    elements: { ...D.elements, ...profile.elements },
-    geometry: { ...D.geometry, ...profile.geometry },
-    deductions: { ...D.deductions, ...profile.deductions },
+    frameSchema: D.frameSchema,
+    elements: { ...D.elements, ...profile.elements, ...fs.elements },
+    geometry: { ...D.geometry, ...profile.geometry, ...fs.geometry },
+    deductions: { ...D.deductions, ...profile.deductions, ...fs.deductions },
     lengths: { ...D.lengths, ...profile.lengths },
     // v1.2: arched-head section (finger joint, board stock) — filled from the
     // default for profiles stored before arched-casement-v1. v1.3: the block
@@ -322,6 +332,28 @@ export function migrateCasementProfile(profile) {
   };
 }
 
+// Old defaults of frame schema 1 (head / jambs 57, land 36) and the schema-2
+// keys they map to. Returns only the keys that must move.
+const FRAME_SCHEMA_1 = {
+  elements: { frameHead: { face: 57 }, frameJamb: { face: 57 } },
+  geometry: { land: 36 },
+  deductions: { leafAtJamb: 40, leafFullHeight: 87, fanFromAxis: 54 },
+};
+function migrateFrameSchema(profile, D) {
+  const out = { elements: {}, geometry: {}, deductions: {} };
+  if ((Number(profile.frameSchema) || 1) >= D.frameSchema) return out;
+  for (const k of Object.keys(FRAME_SCHEMA_1.elements)) {
+    if (profile.elements?.[k]?.face === FRAME_SCHEMA_1.elements[k].face) out.elements[k] = { ...profile.elements[k], face: D.elements[k].face };
+  }
+  for (const k of Object.keys(FRAME_SCHEMA_1.geometry)) {
+    if (profile.geometry?.[k] === FRAME_SCHEMA_1.geometry[k]) out.geometry[k] = D.geometry[k];
+  }
+  for (const k of Object.keys(FRAME_SCHEMA_1.deductions)) {
+    if (profile.deductions?.[k] === FRAME_SCHEMA_1.deductions[k]) out.deductions[k] = D.deductions[k];
+  }
+  return out;
+}
+
 export function setActiveCasementProfile(profile) {
   activeCasementProfile = migrateCasementProfile(profile);
 }
@@ -340,8 +372,8 @@ export const DEFAULT_DOOR_PROFILE = Object.freeze({
   frameDepth: 93,
   leafDepth: 61,          // = casement 57 + 4mm deeper rebate
   elements: {
-    frameHead:  { face: 57 },
-    frameJamb:  { face: 57 },
+    frameHead:  { face: 68 },   // v4 Block F: 57 → 68, same section as the casement frame
+    frameJamb:  { face: 68 },
     frameCill:  { face: 68 },   // outward-opening: same as casement cill
     mullion:    { face: 68 },   // french centre mullion
     leafStile:  { face: 94 },
@@ -361,14 +393,16 @@ export const DEFAULT_DOOR_PROFILE = Object.freeze({
   // Side panels are FIXED leaves in the same frame, all members 57mm — matches
   // the 3D model (DoorSidePanel stileWidthMm=57), confirmed by Piotr 09.08.
   sidePanel: { member: 57, depth: 57 },
-  // Coupling post between a side panel and the door: ONE member 114 wide with
-  // TWO rebates — the panel leaf laps one side, the door leaf the other
-  // (Piotr 09.08; replaces the two abutting 57 jambs the 3D instantiates).
-  // Outward: both rebates face the exterior, so 36 + 36 = 72 shows from
-  // outside. Inward: the door rebate flips to the interior (3D mirrors the
-  // door frame on Z, DoorWindow.jsx:615) so the door side shows its full 57
-  // face — visible band becomes 36 + 57 = 93, offset towards the door.
-  couplingPost: { width: 114 },
+  // Coupling post between a side panel and the door: ONE member 2 × jamb face
+  // = 136 wide (v4 Block F; was 114) with TWO rebates — the panel leaf laps
+  // one side, the door leaf the other (Piotr 09.08; replaces the two abutting
+  // jambs the 3D instantiates). Outward: both rebates face the exterior, so
+  // land + land = 72 shows from outside. Inward: the door rebate flips to the
+  // interior (3D mirrors the door frame on Z, DoorWindow.jsx:615) so the door
+  // side shows its full 68 face — visible band becomes 36 + 68 = 104, offset
+  // towards the door. The door land stays 36 (spec F: doors change face and
+  // post only — BLOCKERS §19).
+  couplingPost: { width: 136 },
   // Coupled transom (PSW/3D convention): the frame gets TALLER by the transom
   // height — frame.height stays the DOOR zone height. Internal rail 68 (same
   // stock as the mullion), its bottom edge flush with the door opening top;
@@ -399,8 +433,9 @@ export const DEFAULT_DOOR_PROFILE = Object.freeze({
     bottomRailDeduct: 0,
     midRailDeduct: 0,
     mullion: 77,
-    // Transom rail runs between the jambs: default deduct = 2 × jamb face.
-    transomDeduct: 114,
+    // Transom rail runs between the jambs: default deduct = 2 × jamb face
+    // (v4 Block F: 2 × 68 = 136).
+    transomDeduct: 136,
     // Side-panel members follow the door-leaf convention: full outer lengths.
     sideStileDeduct: 0,
     sideRailDeduct: 0,

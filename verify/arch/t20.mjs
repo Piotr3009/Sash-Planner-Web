@@ -53,6 +53,11 @@ execFileSync('npx', ['-y', 'esbuild@0.25.0', ENTRY, '--bundle', '--format=esm', 
 const M = await import(pathToFileURL(BUNDLE).href);
 const { arch, profile, specification, calculations, lists, bom, glassBars, dxfWriter, archDxf, tracery, glassDxf, cncExport } = M;
 const P = profile.DEFAULT_CASEMENT_PROFILE;
+// v4 Block F (frame 68): every frame-driven expectation is computed from the profile with the spec formulas, never read off the engine
+const tF = P.elements.frameHead.face, oL = P.deductions.leafAtJamb, tL = P.elements.leafTop.face, gI = P.geometry.glassInset, land = P.geometry.land;
+const glassOff = oL + tL - gI;                                                                                     // 51 + 67 − 12.5 = 105.5 (was 94.5)
+const glassBottom = (P.deductions.leafFullHeight - P.deductions.leafAtJamb) + (P.elements.leafBottom.face - gI);   // 47 + 54.5 = 101.5 (unchanged)
+const f1 = (v) => { const r = Math.round(v * 10) / 10; return Number.isInteger(r) ? String(r) : r.toFixed(1); };   // one-decimal print of the bar-end rows / DXF text
 
 // ── tiny assert framework ───────────────────────────────────────────────────
 let pass = 0, fail = 0;
@@ -130,12 +135,14 @@ function svgArcs(svg) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-section('1 — FIT view (0.1): W 1200 semi-circle → frame 600 / 543, rebate wall 564, leaf 560 / 493, glass 505.5, gap 4, lap 17');
+// W 1200 semi-circle: frame ring 600 / 600 − face, rebate wall 600 − land, leaf ring 600 − leafAtJamb / − leafTop.face, glass 600 − glassOff
+const rF = 1200 / 2, rFi = rF - tF, rWall = rF - land, rLo = rF - oL, rLi = rLo - tL, rG = rF - glassOff;   // 600 / 532 / 553 / 549 / 482 / 494.5 (was 543 / 564 / 560 / 493 / 505.5)
+section(`1 — FIT view (0.1): W 1200 semi-circle → frame ${rF} / ${rFi}, rebate wall ${rWall}, leaf ${rLo} / ${rLi}, glass ${rG}, gap 4, lap ${tF - oL}`);
 {
   const plan = arch.buildArchPlan({ shape: 'semi-circle', width: 1200, height: 1700, rise: 600, hinge: 'left' }, P);
   check('geometry: rebateWall + fit exposed by buildArchGeometry', Array.isArray(plan.rebateWall) && plan.fit && plan.fit.gap === P.geometry.gap && plan.fit.lap === P.elements.frameHead.face - P.deductions.leafAtJamb && plan.fit.land === P.geometry.land);
-  check('radii: frame 600 / 543, wall 564, leaf 560 / 493, glass 505.5', near(plan.frameHead.outer[0].r, 600, 1e-9) && near(plan.frameHead.inner[0].r, 543, 1e-9) && near(plan.rebateWall[0].r, 564, 1e-9) && near(plan.leafTop.outer[0].r, 560, 1e-9) && near(plan.leafTop.inner[0].r, 493, 1e-9) && near(plan.glass.arcs[0].r, 505.5, 1e-9));
-  check('gap between the rebate wall and the leaf outer = geometry.gap (4); lap = 17', near(plan.rebateWall[0].r - plan.leafTop.outer[0].r, P.geometry.gap, 1e-9) && plan.fit.lap === 17);
+  check(`radii: frame ${rF} / ${rFi} (600 − face ${tF}), wall ${rWall} (− land ${land}), leaf ${rLo} / ${rLi} (− leafAtJamb ${oL} / − leafTop ${tL}), glass ${rG} (− glassOff ${glassOff})`, near(plan.frameHead.outer[0].r, rF, 1e-9) && near(plan.frameHead.inner[0].r, rFi, 1e-9) && near(plan.rebateWall[0].r, rWall, 1e-9) && near(plan.leafTop.outer[0].r, rLo, 1e-9) && near(plan.leafTop.inner[0].r, rLi, 1e-9) && near(plan.glass.arcs[0].r, rG, 1e-9));
+  check(`gap between the rebate wall and the leaf outer = geometry.gap (4); lap = face − leafAtJamb = ${tF - oL}`, near(plan.rebateWall[0].r - plan.leafTop.outer[0].r, P.geometry.gap, 1e-9) && plan.fit.lap === tF - oL);
   const E = archDxf.buildArchEntities(plan, 'F1', 0, 0);
   const path = resolve(AUDIT, 't20_fit_1200.dxf');
   writeFileSync(path, dxfWriter.writeDxf(E, archDxf.ARCH_LAYERS));
@@ -144,10 +151,11 @@ section('1 — FIT view (0.1): W 1200 semi-circle → frame 600 / 543, rebate wa
   const fit = p.polys.filter((x) => x.layer === 'FIT');
   const closed = fit.filter((x) => x.closed);
   const radii = closed.flatMap((x) => polyArcs(x.pts.map((pt, i) => [pt[0], pt[1], x.bulges[i]]), true).map((a) => +a.r.toFixed(3))).sort((a, b) => a - b);
-  check('FIT closed rings: frame ring (600 / 543), leaf ring (560 / 493), glass (505.5) — 5 radii', closed.length === 3 && JSON.stringify(radii) === JSON.stringify([493, 505.5, 543, 560, 600]), JSON.stringify(radii));
+  const fitRadii = [rLi, rG, rFi, rLo, rF].sort((a, b) => a - b);
+  check(`FIT closed rings: frame ring (${rF} / ${rFi}), leaf ring (${rLo} / ${rLi}), glass (${rG}) — 5 radii`, closed.length === 3 && JSON.stringify(radii) === JSON.stringify(fitRadii), JSON.stringify(radii));
   const dashes = fit.filter((x) => !x.closed);
   const dashR = dashes.map((x) => polyArcs(x.pts.map((pt, i) => [pt[0], pt[1], x.bulges[i]]), false)[0]?.r);
-  check(`FIT rebate wall: ${dashes.length} dashes on R 564 (20 / 10 mm — dxfWriter has no linetypes; ±0.5 — a 20 mm chord with a 6-decimal bulge)`, dashes.length > 10 && dashR.every((r) => near(r, 564, 0.5)));
+  check(`FIT rebate wall: ${dashes.length} dashes on R ${rWall} (20 / 10 mm — dxfWriter has no linetypes; ±0.5 — a 20 mm chord with a 6-decimal bulge)`, dashes.length > 10 && dashR.every((r) => near(r, rWall, 0.5)));
   const wallCentre = polyArcs(dashes[0].pts.map((pt, i) => [pt[0], pt[1], dashes[0].bulges[i]]), false)[0];
   const frameCentre = polyArcs(closed[0].pts.map((pt, i) => [pt[0], pt[1], closed[0].bulges[i]]), true)[0];
   check('FIT rings and wall are concentric (same centre ±0.5, dash precision)', near(wallCentre.cx, frameCentre.cx, 0.5) && near(wallCentre.cy, frameCentre.cy, 0.5));
@@ -220,11 +228,13 @@ section('3 — bar-end dimensioning (0.3): closed forms, table above 4 bars, sam
   const spec = pcItem('B1', 1000, 1500, { archShape: 'three-centre', archStart: 1000, archBarPattern: 'hub-spoke' });
   const d = derive(spec);
   const O = d.arch.glassOutline, R = O.arcs[0].r;
+  // W 1000 with start = W → a semicircular glass arc R = 500 − glassOff; springing y = start − glassBottom; hub ring = ratio × R; verticals at R ± ring
+  const Rg = 1000 / 2 - glassOff, yS = 1000 - glassBottom, rR = P.arch.patterns.hubRingRatios[0] * Rg, xV = Rg - rR;   // 394.5 / 898.5 / 118.35 / 276.15 (was 405.5 / 898.5 / 121.65 / 283.85)
   const rows = glassBars.barEndRows(d.arch.bars, O);
   const k1 = rows.find((r) => r.id === 'K1'), k2 = rows.find((r) => r.id === 'K2');
-  check('hub-spoke 1000: spoke K1 at 60° ends on the arc — s from apex = R·30° = 212.32 (R 405.5), side R; K2 mirror side L, same number', near(k1.end.s, R * Math.PI / 6, 0.01) && k1.end.side === 'right' && near(k2.end.s, k1.end.s, 1e-9) && k2.end.side === 'left' && near(k1.angle, 60, 1e-6));
-  check('ring row: R 121.7 · centre (405.5, 898.5)', rows.find((r) => r.id === 'R1').label === 'R1 R 121.7 · c 405.5 / 898.5');
-  check('springing / v rows: positions from the bottom corners (y 898.5 / x 283.9), no apex number below the springing', rows.find((r) => r.id === 'S1').cells.s === 'y 898.5' && rows.find((r) => r.id === 'V1').cells.s === 'x 283.9' && rows.find((r) => r.id === 'V1').end === null);
+  check(`hub-spoke 1000: spoke K1 at 60° ends on the arc — s from apex = R·30° = ${(Rg * Math.PI / 6).toFixed(2)} (R ${Rg} = 500 − glassOff), side R; K2 mirror side L, same number`, near(R, Rg, 1e-9) && near(k1.end.s, Rg * Math.PI / 6, 0.01) && k1.end.side === 'right' && near(k2.end.s, k1.end.s, 1e-9) && k2.end.side === 'left' && near(k1.angle, 60, 1e-6));
+  check(`ring row: R ${f1(rR)} (${P.arch.patterns.hubRingRatios[0]} × ${Rg}) · centre (${f1(Rg)}, ${f1(yS)}) — springing y = start − glassBottom ${glassBottom}`, rows.find((r) => r.id === 'R1').label === `R1 R ${f1(rR)} · c ${f1(Rg)} / ${f1(yS)}`);
+  check(`springing / v rows: positions from the bottom corners (y ${f1(yS)} / x ${f1(xV)} = R − ring), no apex number below the springing`, rows.find((r) => r.id === 'S1').cells.s === `y ${f1(yS)}` && rows.find((r) => r.id === 'V1').cells.s === `x ${f1(xV)}` && rows.find((r) => r.id === 'V1').end === null);
   check('7 bars → table mode; 3 bars → labels beside the bars', glassBars.useBarTable(d.arch.bars) && !glassBars.useBarTable(derive(pcItem('B2', 1000, 1500, { archShape: 'three-centre', archStart: 1300, casementHBars: 1, casementVBars: 2 })).arch.bars));
   const v = derive(pcItem('B3', 1000, 1500, { archShape: 'three-centre', archStart: 1000, casementVBars: 2 }));
   const vr = glassBars.barEndRows(v.arch.bars, v.arch.glassOutline);
@@ -238,7 +248,7 @@ section('3 — bar-end dimensioning (0.3): closed forms, table above 4 bars, sam
   // DXF text carries the rows (ASCII), the PDF header prints them (t18 §6 covers the PDF)
   const unit = glassDxf.shapedGlassUnits(spec, d)[0];
   const lines = glassDxf.unitTextLines(unit, 'B1');
-  check('DXF GLASS_TEXT: BAR ENDS table header + one row per bar, degree sign as DEG', lines.some((l) => l.startsWith('BAR ENDS (TABLE, 7 BARS)')) && lines.filter((l) => /^(V|H|S|R|K|T)\d+  /.test(l)).length === 7 && lines.some((l) => l.includes('212.3 FROM APEX R') && l.includes('60DEG')) && !lines.some((l) => /[^\x00-\x7f]/.test(l)));
+  check(`DXF GLASS_TEXT: BAR ENDS table header + one row per bar (K1 ${f1(Rg * Math.PI / 6)} FROM APEX R), degree sign as DEG`, lines.some((l) => l.startsWith('BAR ENDS (TABLE, 7 BARS)')) && lines.filter((l) => /^(V|H|S|R|K|T)\d+  /.test(l)).length === 7 && lines.some((l) => l.includes(`${f1(Rg * Math.PI / 6)} FROM APEX R`) && l.includes('60DEG')) && !lines.some((l) => /[^\x00-\x7f]/.test(l)));
   check('the x · y pairs of night 4 are gone from the rows', !rows.some((r) => / \d+(\.\d)? · \d+(\.\d)?$/.test(r.label)));
 }
 
@@ -428,7 +438,7 @@ section('7 — 0.4b hinge identity, 0.6 profile decisions, pattern vocabulary');
   check('derived layout follows the value: right → 040R', derive(pcItem('HL', 1000, 1500, { archShape: 'three-centre', archStart: 1300, archHinge: 'right' })).casement.layout === '040R');
   const src = readFileSync(resolve(ROOT, 'src', 'engine', 'specification.js'), 'utf8');
   check('specification.js: no inversion left (`psw === \'right\' ? \'left\'` gone)', !src.includes("psw === 'right' ? 'left' : 'right'"));
-  check('0.6 → v4: minStraightBelowRise 900, minHaunchRadius 150, leafAtJamb 40, minPieceLength 400 (HARD, v4 C.1), no pieceRule', P.arch.limits.minStraightBelowRise === 900 && !('pieceRule' in P.arch) && P.arch.minHaunchRadius === 150 && P.deductions.leafAtJamb === 40 && P.arch.minPieceLength === 400);
+  check('0.6 → v4: minStraightBelowRise 900, minHaunchRadius 150, leafAtJamb 51 (Block F, was 40), minPieceLength 400 (HARD, v4 C.1), no pieceRule', P.arch.limits.minStraightBelowRise === 900 && !('pieceRule' in P.arch) && P.arch.minHaunchRadius === 150 && P.deductions.leafAtJamb === 51 && P.arch.minPieceLength === 400);
   const short = arch.buildArchPlan({ shape: 'three-centre', width: 1000, height: 1500, rise: 200, hinge: 'left' }, P);
   check('v4: the 1000 × 1500 start-1300 head is planned as 2 compound pieces × 180 (haunch + half crown from one board) — no ~65 mm haunch triangles, no short-piece warnings', short.plans.frameHead.totalPieces === 2 && short.plans.frameHead.pieces.every((pc) => pc.compound && pc.stock === 180) && short.plans.frameHead.shortPieces.length === 0);
   check('a plan without short pieces warns nothing (semi-circle 1200)', arch.buildArchPlan({ shape: 'semi-circle', width: 1200, height: 1700, rise: 600, hinge: 'left' }, P).plans.frameHead.shortPieces.length === 0);

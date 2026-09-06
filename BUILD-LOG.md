@@ -16,6 +16,99 @@ t20 116, t20_bars 28, t21 120, t22 75, t23 80, t24 26 — ALL PASS (after `npm i
 Stages tonight (Piotr 06.09, gate before each next stage): 1 = Block C planner v2, 2 = Block B glazier PDF,
 3 = Block E intersecting, 4 = Block F frame 68.
 
+### NIGHT 6 — FINAL VERDICT (all four stages) and the CLAUDE.md checklist
+
+Whole suite on the final tree (`node verify/arch/t16.mjs` … `t27.mjs`): t16 368, t17_edges 70, t18 178, t19 244,
+t20 116, t20_bars 32, t21 120, t22 77, t23 81, t24_stage4 26, t25 201, t26 36, t27 64 — **1613 checks, ALL PASS**;
+`npm run build` OK (16.5 s). Four commits on the session branch (Stage 1 402c58a, Stage 2 222e840, Stage 3 c648a67,
+Stage 4 below); `main` untouched. Every "DEFAULT (open)" is in BLOCKERS §16–§19; every spec erratum (E1–E4, C.5 at
+face 57) is named there.
+
+**Checklist:** branch pushed ✓ · t16–t27 ALL PASS ✓ · build ✓ · esbuild on every touched file ✓ · no Polish added
+to sources ✓ (16 pre-existing Polish comment lines remain in `ParametricSashWindow.jsx`, `App.jsx` lights,
+`DoorElevation2D.jsx`, `casementSectionAssets.js` — older files, not touched tonight beyond the frameDims lines; left
+alone, rule 2) · `git diff main` = the spec §11 files + verify / docs / logs ✓ · samples regenerated from the 68
+profile ✓ (five `sample_arch_1200_*`, five `sample_arch_c5_*` incl. the new `1000_gothic-equilateral`, glass DXFs +
+merged pack, tracery DXFs, `sample_sash_arch_1200_*`, `sample_circle_1000_sunburst`, glass PDFs A4 + A3) ·
+BLOCKERS §19 ✓.
+
+**Honest not-verified list (whole night):** nothing was opened in a browser — the Window Settings "CNC & arches"
+card, the glazier PDF pages in a PDF viewer, the 3D viewer with the 68 frame / 136 post / fanlight axis 102, the
+Production Pack export buttons; no DXF was opened in VCarve / bSolid (ezdxf round-trips only); the Supabase tenant
+profile migration (`frameSchema` 2) ran on synthetic copies in t27, not on Piotr's stored row; PSW is unported (the
+port list is written, not applied); the economy rule C.4 verdict flip on the tc240 leaf (19.5) is reported, not
+resolved.
+
+**Verdict: ✅ night 6 — all four stages closed and gated; open decisions in BLOCKERS 19.1 / 19.3 / 19.5.**
+
+### STAGE 4 — Block F: frame face 68 everywhere, option B (`profile.js`, `casementLayouts.js`, `calculations.js`, `archDxf.js`, `materialAssignmentStore.js`, `windowSpecToConfig.js`, `App.jsx`, `CasementFrame.jsx`, `CasementWindow.jsx`, `ArchedCasementWindow.jsx`, `DoorFrame.jsx`, `DoorWindow.jsx`, `DoorSidePanel.jsx`, `WindowPreview3D.jsx`, `Window3DCaptureRig.jsx`, `ConfiguratorPage.jsx`, `PSW-FRAME-68-PORT.md` new, `PSW-3D-ARCH-PORT.md` §9, `verify/arch/t27.mjs` new, `rect_casement_baseline.mjs` new, `t19_baseline.mjs live`, fixtures re-baselined, t16 / t17 / t18 / t20 / t20_bars / t23 / t24 / t25 / t26 re-vectored)
+
+**Understanding:** Piotr 06.09: head and jambs 57 → 68 on casements AND doors, option B — the rebate stays 21, the
+land grows 36 → 47, gap 4, so `leafAtJamb` 40 → 51; cill unchanged; door post 2 × 68 = 136. Everything downstream
+reads the profile; the 3D reads the profile through a prop with the PSW numbers as defaults; every harness vector
+that carried 57 / 36 / 40 / 114 is recomputed from the profile in the harness; the rectangular casement fixtures are
+re-baselined with the old and new numbers on record.
+
+**Two approaches, one rejected (3D):** (a) replace the constants in `src/3d` with 68 / 47 — rejected: the files are
+1:1 with PSW's 3d-src and PSW is unported; (b) a `frameDims` prop `{ frameFace, extFace }` resolved by
+`resolveFrameDims()` with the module constants as defaults, shadowed per function (TopRail / Stile / Mullion / the
+frame body / the window components), so the PSW copy renders unchanged and PC passes the profile — chosen.
+**Stored profiles:** Piotr's tenant profile (Supabase + localStorage) carries 57 / 36 / 40 / 87 / 54;
+`migrateCasementProfile` does not overwrite user values, so without a migration the app would keep showing 920 in
+the morning. Added `frameSchema: 2` on the default and a key-by-key move for schema-1 copies: a value moves ONLY
+when it still equals the OLD default; a hand edit stays; a schema-2 copy is never re-migrated (DEFAULT (open),
+BLOCKERS 19.2).
+
+**Built:** `DEFAULT_CASEMENT_PROFILE` frameHead / frameJamb 68, land 47, leafAtJamb 51, leafFullHeight 98,
+fanFromAxis 65, `frameSchema 2` + `migrateFrameSchema`; `DEFAULT_DOOR_PROFILE` faces 68, `couplingPost 136`,
+`transomDeduct 136` (2 × jamb face), door land / leafAtJamb 36 / 40 unchanged (spec: face + post only — BLOCKERS
+19.1); `casementLayouts.js` `frameFace 68` + `CASEMENT_LAYOUTS_VERSION 3` and NOTHING else (t16 §10.3 pt 10 now
+strips comments and requires exactly those two code lines to differ from the merge-base); `calculations.js` door
+fallbacks read `DEFAULT_DOOR_PROFILE` (no `?? 57` / `?? 114`); `archDxf.js` joint-plane dedup key normalises −0 (a
+real bug: the gothic 1000 head now plans as one board per side, its apex plane at x = −3e-13 printed "-0.000" and
+was drawn twice — found by t25); `materialAssignmentStore` frame head / jambs `68×93` with a hint naming the old
+57×93 (kept in Part Registry for older projects — a data task, 19.7); 3D `frameDims` threaded through 11 files
+(`windowSpecToConfig.casementFrameDims()` = profile face / land, `doorFrameDims()`; App state + `update3D`
+setter + bucket capture / restore; `CasementWindow` also hands `geo` to `resolveCasementLayout`); `ArchedDoorWindow`
+/ `TransomPanel` untouched (not rendered by PC). `docs/handover/PSW-FRAME-68-PORT.md`: the PSW lines
+(`estimate-renderer.js` 1503 / 2017, `casement-controller.js` 54 version + 153 / 417 innerH + the 91 → 102 fan axis
+offset, `casement-type-modal.js` 378, 3d-src `CasementFrame.jsx` / `DoorFrame.jsx` 12–13).
+
+**Numbers, old → new (all from the profile formulas, printed by `rect_casement_baseline.mjs` and t27):**
+
+| window | formula | face 57 | face 68 |
+|---|---|---|---|
+| 040L 1000 × 1500 leaf | `(W − 2·leafAtJamb) × (H − leafFullHeight)` | 920 × 1413 | **898 × 1402** |
+| 040L 1000 × 1500 glass | `leaf − 2·(67 − 12.5)` | 811 × 1304 | 789 × 1293 |
+| head / jambs section, jamb length | `${face}x93`, `H − jambDeduct` | 57x93, 1500 | 68x93, 1500 |
+| 052L 1200 × 1500 (fan) | fixture R2 | 543 × 449.5 | 532 × 446.2 |
+| 120 1200 × 1200 / 180L 1500 × 1200 | fixtures R3 / R4 | 543 × 1113 / 588.4 × 1113 | 532 × 1102 / 579.6 × 1102 |
+| glass offset / half width W 1000 | `oL + tL − gI`, `(W − 2·off)/2` | 94.5 / 405.5 | 105.5 / 394.5 |
+| three-centre W 1200 rise 240 rings | `r − off`, `R − off` | 93 / 1263 · 110 / 1280 · 43 / 1213 · 55.5 / 1225.5 | 82 / 1252 · 99 / 1269 · 32 / 1202 · 44.5 / 1214.5 |
+| gothic 1200 inner apex | `√((1200 − tF)² − 600²)` | 972.86 | 959.91 |
+| fan axis offset (top) | `frameFace + 34` | 91 | 102 |
+| door 1000 × 2100 leaf | `(W − 2·40) × (H − 87)` | 920 × 2013 | 920 × 2013 (unchanged by design) |
+| door coupling post | `2 × jamb face` | 114x93 | 136x93 |
+| circle 800 frame ring plan | independent planner | 4 × 180 | **4 × 200** (W_req 182.3) |
+| gothic 1000 leaf top rail | independent planner | blocked (2 × 120 / side, edge 386.2) | **plans: 1 × 200 / side** |
+| gothic 600 × 1600 leaf | independent planner | plans (1 × 150, edge 418.8) | blocked (edge 397.0 < 400) |
+| tc240 1200 head / leaf | independent planner | 2 × 180 → economy 3 × 150 / 2 × 180 fewest | 2 × 180 fewest (no alt) / fewest 1 × 200 → economy 2 × 180 (19.5) |
+
+**Verification:** every harness vector with 57 / 36 / 40 / 114 recomputed in the harness from the profile object
+(t16, t17_edges, t18, t20, t20_bars, t23, t24, t25, t26 — one literal "profile = spec" check each, the rest formulas
+or `indPlanner`); t25 §2 runs the spec C.5 table on a schema-1 variant built in the harness (the spec says "face 57
+head ring") AND the live profile against the independent planner; t27 new (64): profile = spec F + option-B
+identities, 040L 1000 × 1500 through `normaliseToWindowSpec` → `deriveWindowData` (leaf / glass / cut list) with
+the old numbers reproduced through the variant and restored, migration matrix (old defaults move, hand edit kept,
+schema-2 untouched, idempotent), layouts, doors (post 136x93, french leaves), `windowSpecToConfig.frameDims`,
+`resolveFrameDims` defaults 57 / 36 + the threading asserted in all 11 files, engine grep gate (no bare 57 / 36 /
+40 / 114 in casement / door code, sash + CNC allow-list), materials labels, fixture provenance. Fixtures:
+`rect-casement-base.json` + `rect-casement-sheets.json` re-baselined from the live tree at c648a67 (`ref: live`),
+sash fixtures untouched (t22 77 ALL PASS proves the sash side). Suite t16–t27 ALL PASS (1613), build OK.
+**Not verified:** anything on screen (3D with the 68 frame, the settings card, the PDFs), VCarve / bSolid, Piotr's
+stored profile row (migration exercised on synthetic copies only), PSW (unported).
+**Verdict: ✅ Stage 4 (Block F).**
+
 ### STAGE 3 — Block E: `intersecting` from the vertical bars (`arch.js`, `profile.js`, `3d/casement/archedCasementGeometry.js`, `PSW-3D-ARCH-PORT.md` §8, t18 / t19 / t20_bars re-vectored)
 
 **Understanding:** Piotr 06.09 (SS1 = PSW arched sash): the tracery arcs must spring from the tops of the

@@ -1,6 +1,6 @@
 import { resolveCasementLayout, fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from './casementLayouts.js';
 import { selectCasementHinges, summariseHinges, selectCasementLocks, summariseLocks } from './casementHardware.js';
-import { getWindowProfile, getCasementProfile, getDoorProfile, profileSashDepth, profileBoardWidth, boardWidthForDepth, profileBoxDepth, kgPerM } from './profile.js';
+import { getWindowProfile, getCasementProfile, getDoorProfile, DEFAULT_DOOR_PROFILE, profileSashDepth, profileBoardWidth, boardWidthForDepth, profileBoxDepth, kgPerM } from './profile.js';
 import { buildArchGeometry, buildSashArchGeometry, planArchSegments, buildGlassOutline, buildArchBars, glassOutlinePoly, chainAreaAboveLine, ArchError, isCircleShape, buildCircleGeometry, buildCircleGlassOutline, buildCircleBars } from './arch.js';
 import { buildTraceryForDerived } from './cnc/traceryExport.js';
 
@@ -608,8 +608,8 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     if (isFixed && fixConstruction !== 'fixedLeaf') throw new ArchError(`Casement profile fix.construction "${fixConstruction}" is not implemented — only 'fixedLeaf' (frame + non-opening leaf) has workshop numbers`);
     const layout = isFixed ? '040L' : archSpec ? (archSpec.hinge === 'right' ? '040R' : '040L') : (cas.layout || '040L');
 
-    // Layout geometry driven by the PROFILE faces (57 / 68 / 68 defaults —
-    // numerically identical to the PSW visual geometry, so 3D/2D/import agree).
+    // Layout geometry driven by the PROFILE faces (68 / 68 / 68 defaults from
+    // v4 Block F; the 3D receives the same faces via windowSpecToConfig).
     const GEO = {
         frameFace: els.frameHead.face,
         bottomFace: els.frameCill.face,
@@ -1161,9 +1161,9 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight) {
     const secFrame = `${els.frameHead.face}x${fd}`;
     const secLeafStile = `${els.leafStile.face}x${ld}`;
     const secLeafBottom = `${els.leafBottom.face}x${ld}`;
-    const spMember = p.sidePanel?.member ?? 57;
-    const postW = p.couplingPost?.width ?? 114;
-    const secSide = `${spMember}x${p.sidePanel?.depth ?? 57}`;
+    const spMember = p.sidePanel?.member ?? DEFAULT_DOOR_PROFILE.sidePanel.member;
+    const postW = p.couplingPost?.width ?? DEFAULT_DOOR_PROFILE.couplingPost.width;
+    const secSide = `${spMember}x${p.sidePanel?.depth ?? DEFAULT_DOOR_PROFILE.sidePanel.depth}`;
     const frameFace = els.frameHead.face;
     const inset = geo.glassInset;
 
@@ -1201,18 +1201,19 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight) {
         { x: doorX, w: frameWidth, kind: 'door' },
         rightW ? { x: doorX + frameWidth, w: rightW, kind: 'panel', side: 'right' } : null,
     ].filter(Boolean);
-    // Coupling posts — ONE member per panel, 114 wide, two rebates. The band
-    // seen from OUTSIDE is not symmetric when the door opens inward: the panel
-    // side always shows its 36 land, the door side shows 36 outward but its
-    // full 57 face inward (that rebate has flipped to the interior).
+    // Coupling posts — ONE member per panel, 2 × jamb face wide (136 from v4
+    // Block F), two rebates. The band seen from OUTSIDE is not symmetric when
+    // the door opens inward: the panel side always shows its land, the door
+    // side shows the land outward but its full frame face inward (that rebate
+    // has flipped to the interior).
     const halfPost = postW / 2;
     const doorFace = els.frameHead.face;
     const posts = [
         leftW ? { axis: R(leftW), doorSide: 'right' } : null,
         rightW ? { axis: R(doorX + frameWidth), doorSide: 'left' } : null,
     ].filter(Boolean).map((po) => {
-        const panelVis = geo.land;                       // 36 always
-        const doorVis = inward ? doorFace : geo.land;    // 57 inward · 36 outward
+        const panelVis = geo.land;                       // land always
+        const doorVis = inward ? doorFace : geo.land;    // face inward · land outward
         const visX = po.doorSide === 'right' ? po.axis - panelVis : po.axis - doorVis;
         return {
             axis: po.axis, doorSide: po.doorSide,

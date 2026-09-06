@@ -23,7 +23,7 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import { Text, Line } from '@react-three/drei';
-import { FRAME_FACE, EXT_FACE, FRAME_DEPTH, EXT_DEPTH, INT_DEPTH, BOTTOM_FACE, BOTTOM_INNER_FACE, GASKET_W, GASKET_T, mm } from './CasementFrame';
+import { resolveFrameDims, FRAME_FACE, EXT_FACE, FRAME_DEPTH, EXT_DEPTH, INT_DEPTH, BOTTOM_FACE, BOTTOM_INNER_FACE, GASKET_W, GASKET_T, mm } from './CasementFrame';
 import { SASH_RAIL, SASH_DEPTH, MAX_ANGLE } from './CasementPanel';
 import { GLASS_UNIT_DEPTH } from './CasementGlazing';
 import WindowCasementHandle from './WindowCasementHandle';
@@ -268,6 +268,7 @@ export default function ArchedCasementWindow({
   sillWider = false,
   fixSemiBarPattern = 'none',
   fixGothicBars = 'none',
+  frameDims = null,       // v4 Block F (PC): { frameFace, extFace } from the profile; absent → PSW 57 / 36
 }) {
   void brightness;
   const colorE = sameColor ? woodColor : woodColorExt;
@@ -302,12 +303,14 @@ export default function ArchedCasementWindow({
   }, [ironmongery]);
 
   const pattern = resolvePattern(barPattern, fixSemiBarPattern, fixGothicBars);
+  // v4 Block F: the frame face / land of the profile over the PSW defaults
+  const dims = useMemo(() => ({ ...DIMS, ...resolveFrameDims(frameDims) }), [frameDims]);
 
   // ── Geometry: arch.js chains in mm around the window centre ──
   const G = useMemo(() => safeArchedCasementGeometry({
     width, height, archShape, archRise, archProfile, barPattern: pattern, hBars, vBars, spokes: archSpokes, rings: archRings,
-    minHaunchRadius: archMinHaunchRadius, patterns: archPatterns || PSW_BAR_PATTERN_SETTINGS, dims: DIMS,
-  }), [width, height, archShape, archRise, archProfile, pattern, hBars, vBars, archSpokes, archRings, archMinHaunchRadius, archPatterns]);
+    minHaunchRadius: archMinHaunchRadius, patterns: archPatterns || PSW_BAR_PATTERN_SETTINGS, dims,
+  }), [width, height, archShape, archRise, archProfile, pattern, hBars, vBars, archSpokes, archRings, archMinHaunchRadius, archPatterns, dims]);
 
   const D = mm(FRAME_DEPTH);
   const halfD = D / 2;

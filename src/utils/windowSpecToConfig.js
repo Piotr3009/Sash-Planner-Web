@@ -48,7 +48,7 @@ const COLOR_MAP = {
 import { buildVentGrilles } from '../engine/lists.js';
 import { RAL_LOOKUP as RAL_COLORS } from '../config.js';
 import { fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from '../engine/casementLayouts.js';
-import { profileBoxDepth, getCasementProfile, getWindowProfile } from '../engine/profile.js';
+import { profileBoxDepth, getCasementProfile, getWindowProfile, getDoorProfile } from '../engine/profile.js';
 
 function resolveColor(name, ral) {
   if (!name && !ral) return '#F4F4F2'; // default white
@@ -124,6 +124,8 @@ export function windowSpecToConfig(windowSpec) {
       extWidth: casementProps.width,
       extHeight: casementProps.height,
       casementProps,
+      // v4 Block F: frame face / land for the 3D frame (App passes it as a prop)
+      frameDims: casementProps.frameDims,
       ...archConfig,
       // v3 Block 3: fixed leaf — no handle, no opening
       fixedLeaf: windowSpec.casement?.kind === 'fixed',
@@ -141,6 +143,8 @@ export function windowSpecToConfig(windowSpec) {
     const dual = col.type === 'dual';
     return {
       windowCategory: 'door',
+      // v4 Block F: the door frame face / land from the door profile (68 / 36)
+      frameDims: doorFrameDims(),
       width: windowSpec.frame?.width || 900,
       height: windowSpec.frame?.height || 2100,
       extWidth: windowSpec.frame?.width || 900,
@@ -278,6 +282,19 @@ export function windowSpecToConfig(windowSpec) {
   };
 }
 
+// ─── Frame dims for the 3D (ARCHED-WINDOWS-v4 Block F) ───
+// The 3D components carry the PSW constants (57 / 36) as defaults; PC hands
+// them the profile numbers: frameFace = head / jamb face, extFace = visible
+// land (face − rebate). Doors keep their own profile (face 68, land 36).
+export function casementFrameDims() {
+  const p = getCasementProfile();
+  return { frameFace: p.elements.frameHead.face, extFace: p.geometry.land };
+}
+export function doorFrameDims() {
+  const p = getDoorProfile();
+  return { frameFace: p.elements.frameHead.face, extFace: p.geometry.land };
+}
+
 // ─── Casement: windowSpec → CasementWindow props ───
 // Same clamps as the configurator/engine (single source: casementLayouts.js).
 
@@ -288,7 +305,8 @@ export function windowSpecToCasementProps(windowSpec) {
   const glazing = windowSpec?.glazing || {};
   const width = Number(frame.width) || 1200;
   const height = Number(frame.height) || 1200;
-  const innerH = height - CASEMENT_GEO_DEFAULTS.frameFace - CASEMENT_GEO_DEFAULTS.bottomFace;
+  const frameDims = casementFrameDims();
+  const innerH = height - frameDims.frameFace - CASEMENT_GEO_DEFAULTS.bottomFace;
   const single = resolveColor(color.single, color.ral);
   const isDual = color.type === 'dual';
   return {
@@ -320,5 +338,6 @@ export function windowSpecToCasementProps(windowSpec) {
     sillWider: !!windowSpec.cill?.wider,
     showGuides: false,
     ironmongery: windowSpec?.hardware?.finish || 'brass',
+    frameDims,
   };
 }

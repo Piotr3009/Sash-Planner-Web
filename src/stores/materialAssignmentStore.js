@@ -75,8 +75,13 @@ export const SASH_WINDOW_PARTS = {
 
 export const CASEMENT_PARTS = {
   frame: [
-    { id: 'c_frame_head', name: 'Frame Head',   section: '57×93', pcs: 1, materialType: 'hardwood' },
-    { id: 'c_frame_jamb', name: 'Frame Jambs',  section: '57×93', pcs: 2, materialType: 'hardwood' },
+    // ARCHED-WINDOWS-v4 Block F (06.09): head and jambs 68 × 93 (was 57 × 93).
+    // The 57 × 93 material stays in Part Registry for projects made before —
+    // an existing assignment is by material id and is not touched.
+    { id: 'c_frame_head', name: 'Frame Head',   section: '68×93', pcs: 1, materialType: 'hardwood',
+      hint: 'Raw section 68×93 from v4 Block F (frame face 68, rebate 21, land 47). Was 57×93 — older projects keep their assigned 57×93 material.' },
+    { id: 'c_frame_jamb', name: 'Frame Jambs',  section: '68×93', pcs: 2, materialType: 'hardwood',
+      hint: 'Raw section 68×93 from v4 Block F. Was 57×93 — older projects keep their assigned 57×93 material.' },
     { id: 'c_frame_cill', name: 'Frame Cill',   section: '68×93', pcs: 1, materialType: 'hardwood', note: 'profiled section' },
     { id: 'c_mullion',    name: 'Mullion',      section: '68×93', pcs: 1, materialType: 'hardwood' },
     { id: 'c_transom',    name: 'Transom',      section: '68×93', pcs: 1, materialType: 'hardwood' },

@@ -12,6 +12,7 @@ import {
   isHubPattern, isGothicShape, resolveRoundShape, buildArchPlan, buildSashArchGeometry, planArchSegments, buildCirclePlan,
 } from '../engine/arch.js';
 import { getCasementProfile, getWindowProfile } from '../engine/profile.js';
+import { casementFrameDims, doorFrameDims } from '../utils/windowSpecToConfig.js';
 import { CONSTANTS } from '../engine/calculations.js';
 import CasementLayoutPicker from '../components/configurator/CasementLayoutPicker.jsx';
 import NumInput from '../components/NumInput.jsx';
@@ -656,6 +657,7 @@ export default function ConfiguratorPage() {
       // Flat door keys — the 3D App was ported from PSW and reads them directly.
       window.update3D({
         windowCategory: 'door', extWidth: extW, extHeight: extH,
+        frameDims: doorFrameDims(),   // v4 Block F: door frame face / land from the profile
         doorType, doorShape, doorStyle, paneling: doorPaneling,
         // French leaves ALWAYS meet on a rebate — never a centre mullion
         // (Piotr 09.08). Field kept false for PSW import parity.
@@ -707,6 +709,7 @@ export default function ConfiguratorPage() {
         archRings: isCustomHub ? casArchRings : null,
         archMinHaunchRadius: getCasementProfile().arch.minHaunchRadius,
         archPatterns: getCasementProfile().arch.patterns,
+        frameDims: casementFrameDims(),   // v4 Block F: frame face / land from the profile
         casementLayout: isFixedCas ? '040L' : isArched ? (casArchHinge === 'right' ? '040R' : '040L') : casLayout,
         casementHinges: isFixedCas ? ['fixed'] : isArched ? null : (casHinges ? [...casHinges] : null),
         // Arched casement (PC-native fields read by specification.js archFromSpec).

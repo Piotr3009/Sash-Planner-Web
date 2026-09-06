@@ -456,6 +456,7 @@ function Scene({ config, isMobile }) {
                 barPattern={config.barPattern || null}
                 archMinHaunchRadius={config.archMinHaunchRadius || 0}
                 archPatterns={config.archPatterns || null}
+                frameDims={config.frameDims || null}
                 archSpokes={config.archSpokes || null}
                 archRings={config.archRings || null}
                 hingeDirection={config.casArchHinge || 'left'}
@@ -482,6 +483,7 @@ function Scene({ config, isMobile }) {
               <CasementWindow
                 width={config.extWidth}
                 height={config.extHeight}
+                frameDims={config.frameDims || null}
                 layout={config.casementLayout}
                 opening={config.casementOpening || 0}
                 fanlightRatio={config.fanlightRatio || 0.3}
@@ -536,6 +538,7 @@ function Scene({ config, isMobile }) {
               <DoorWindow
                 width={config.extWidth}
                 height={config.extHeight}
+                frameDims={config.frameDims || null}
                 layout={config.doorType === 'sliding' ? ('0' + config.panelCount + '0S') : config.doorType === 'bifold' ? ('0' + config.panelCount + '0B') : config.doorType === 'french' ? '040F' : (config.doorHinge === 'right' ? '040R' : '040L')}
                 opening={config.doorOpening || 0}
                 primaryLeaf={config.doorHinge || 'left'}
@@ -678,6 +681,7 @@ export default function App() {
   const [barPattern, setBarPattern] = useState(null);
   const [archMinHaunchRadius, setArchMinHaunchRadius] = useState(0);
   const [archPatterns, setArchPatterns] = useState(null);
+  const [frameDims, setFrameDims] = useState(null);   // v4 Block F (PC): { frameFace, extFace } from the profile
   const [archSpokes, setArchSpokes] = useState(null);     // v3 0.4 custom hub (PC)
   const [archRings, setArchRings] = useState(null);
   const [archHBars, setArchHBars] = useState(0);          // v3 Block 1: arched sash upper straight bars
@@ -756,7 +760,7 @@ export default function App() {
 
   // Capture current state snapshot
   function captureState() {
-    return { extWidth, extHeight, woodColor, woodColorExt, woodColorInt, sameColor, spacerColor, opening, upperOpening, openingType, boxType, showHorns, hornType, ironmongery, upperGlass, lowerGlass, upperBars, lowerBars, sameBars, upperCustomBars, lowerCustomBars, sashType, splitRatio, headType, fixUpperBars, fixLowerBars, fixUpperCustomBars, fixLowerCustomBars, casementLayout, casementOpening, fanlightRatio, casementHBars, casementVBars, casementMiddleWidth, casementHinges, casementFan2Ratio, casementFanHBars, casementFanVBars, casementFan2HBars, casementFan2VBars, glassFinish, frostedLocation, trickleVent, trickleColour, sillExtension, sillWider, sealColour, fixShape, fixType, fixArchRise, fixGothicBars, fixCircleBarPattern, fixCircleBarOffset, fixSemiBarPattern, casementType, casArchShape, casArchHinge, archRise, archProfile, barPattern, archMinHaunchRadius, archPatterns, archSpokes, archRings, archHBars, archVBars, lowerHBars, doorType, doorShape, doorStyle, doorHinge, doorHBars, doorVBars, centerMullion, paneling, sidePanels, sideLeftWidth, sideRightWidth, sideHBars, sideVBars, sideStyle, thresholdType, thresholdExtension, transomType, transomHeight, transomBars, doorOpening, doorOpenDirection, panelCount, slideDirection, extraWidth, glassWidth, panelDepth, frameDepth, foldDirection, trafficDoor, bifoldOpenDirection };
+    return { extWidth, extHeight, woodColor, woodColorExt, woodColorInt, sameColor, spacerColor, opening, upperOpening, openingType, boxType, showHorns, hornType, ironmongery, upperGlass, lowerGlass, upperBars, lowerBars, sameBars, upperCustomBars, lowerCustomBars, sashType, splitRatio, headType, fixUpperBars, fixLowerBars, fixUpperCustomBars, fixLowerCustomBars, casementLayout, casementOpening, fanlightRatio, casementHBars, casementVBars, casementMiddleWidth, casementHinges, casementFan2Ratio, casementFanHBars, casementFanVBars, casementFan2HBars, casementFan2VBars, glassFinish, frostedLocation, trickleVent, trickleColour, sillExtension, sillWider, sealColour, fixShape, fixType, fixArchRise, fixGothicBars, fixCircleBarPattern, fixCircleBarOffset, fixSemiBarPattern, casementType, casArchShape, casArchHinge, archRise, archProfile, barPattern, archMinHaunchRadius, archPatterns, frameDims, archSpokes, archRings, archHBars, archVBars, lowerHBars, doorType, doorShape, doorStyle, doorHinge, doorHBars, doorVBars, centerMullion, paneling, sidePanels, sideLeftWidth, sideRightWidth, sideHBars, sideVBars, sideStyle, thresholdType, thresholdExtension, transomType, transomHeight, transomBars, doorOpening, doorOpenDirection, panelCount, slideDirection, extraWidth, glassWidth, panelDepth, frameDepth, foldDirection, trafficDoor, bifoldOpenDirection };
   }
 
   // Restore state from bucket
@@ -821,6 +825,7 @@ export default function App() {
     if (s.barPattern !== undefined) setBarPattern(s.barPattern);
     if (s.archMinHaunchRadius !== undefined) setArchMinHaunchRadius(s.archMinHaunchRadius);
     if (s.archPatterns !== undefined) setArchPatterns(s.archPatterns);
+    if (s.frameDims !== undefined) setFrameDims(s.frameDims);
     if (s.archSpokes !== undefined) setArchSpokes(s.archSpokes);
     if (s.archRings !== undefined) setArchRings(s.archRings);
     if (s.archHBars !== undefined) setArchHBars(s.archHBars);
@@ -950,6 +955,7 @@ export default function App() {
       if (cfg.barPattern !== undefined) setBarPattern(cfg.barPattern);
       if (cfg.archMinHaunchRadius !== undefined) setArchMinHaunchRadius(cfg.archMinHaunchRadius);
       if (cfg.archPatterns !== undefined) setArchPatterns(cfg.archPatterns);
+      if (cfg.frameDims !== undefined) setFrameDims(cfg.frameDims);
       if (cfg.archSpokes !== undefined) setArchSpokes(cfg.archSpokes);
       if (cfg.archRings !== undefined) setArchRings(cfg.archRings);
       if (cfg.archHBars !== undefined) setArchHBars(cfg.archHBars);
@@ -1067,6 +1073,7 @@ export default function App() {
       barPattern,
       archMinHaunchRadius,
       archPatterns,
+      frameDims,
       archSpokes,
       archRings,
       archHBars,
@@ -1103,7 +1110,7 @@ export default function App() {
       trafficDoor,
       bifoldOpenDirection,
     }),
-    [width, height, extWidth, extHeight, opening, upperOpening, autoRotate, showGuides, showHorns, hornType, ironmongery, upperGlass, lowerGlass, doubleGlazing, spacerColor, brightness, boxType, boxDepthOverride, upperBars, lowerBars, upperCustomBars, lowerCustomBars, woodColor, woodColorExt, woodColorInt, sameColor, sashType, splitRatio, headType, fixUpperBars, fixLowerBars, fixUpperCustomBars, fixLowerCustomBars, windowCategory, casementLayout, casementOpening, fanlightRatio, casementHBars, casementVBars, casementMiddleWidth, casementHinges, casementFan2Ratio, casementFanHBars, casementFanVBars, casementFan2HBars, casementFan2VBars, glassFinish, frostedLocation, trickleVent, trickleColour, sillExtension, sillWider, sealColour, fixShape, fixType, fixArchRise, fixGothicBars, fixCircleBarPattern, fixCircleBarOffset, fixSemiBarPattern, casementType, casArchShape, casArchHinge, archRise, archProfile, barPattern, archMinHaunchRadius, archPatterns, archSpokes, archRings, archHBars, archVBars, lowerHBars, doorType, doorShape, doorStyle, doorHinge, doorHBars, doorVBars, centerMullion, paneling, sidePanels, sideLeftWidth, sideRightWidth, sideHBars, sideVBars, sideStyle, thresholdType, thresholdExtension, transomType, transomHeight, transomBars, doorOpening, doorOpenDirection, panelCount, slideDirection, extraWidth, glassWidth, panelDepth, frameDepth, foldDirection, trafficDoor, bifoldOpenDirection],
+    [width, height, extWidth, extHeight, opening, upperOpening, autoRotate, showGuides, showHorns, hornType, ironmongery, upperGlass, lowerGlass, doubleGlazing, spacerColor, brightness, boxType, boxDepthOverride, upperBars, lowerBars, upperCustomBars, lowerCustomBars, woodColor, woodColorExt, woodColorInt, sameColor, sashType, splitRatio, headType, fixUpperBars, fixLowerBars, fixUpperCustomBars, fixLowerCustomBars, windowCategory, casementLayout, casementOpening, fanlightRatio, casementHBars, casementVBars, casementMiddleWidth, casementHinges, casementFan2Ratio, casementFanHBars, casementFanVBars, casementFan2HBars, casementFan2VBars, glassFinish, frostedLocation, trickleVent, trickleColour, sillExtension, sillWider, sealColour, fixShape, fixType, fixArchRise, fixGothicBars, fixCircleBarPattern, fixCircleBarOffset, fixSemiBarPattern, casementType, casArchShape, casArchHinge, archRise, archProfile, barPattern, archMinHaunchRadius, archPatterns, frameDims, archSpokes, archRings, archHBars, archVBars, lowerHBars, doorType, doorShape, doorStyle, doorHinge, doorHBars, doorVBars, centerMullion, paneling, sidePanels, sideLeftWidth, sideRightWidth, sideHBars, sideVBars, sideStyle, thresholdType, thresholdExtension, transomType, transomHeight, transomBars, doorOpening, doorOpenDirection, panelCount, slideDirection, extraWidth, glassWidth, panelDepth, frameDepth, foldDirection, trafficDoor, bifoldOpenDirection],
   );
 
   return (

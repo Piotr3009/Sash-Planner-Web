@@ -120,6 +120,18 @@ function render(mod, windowsData, extra = {}) {
 const pcItem = (id, width, height, fields) => specification.normaliseToWindowSpec({ id, name: id, width, height, windowCategory: 'casement', casementType: 'arched', ...fields });
 const cas = (id, width, height, fc = {}) => specification.normaliseToWindowSpec({ id, name: id, width, height }, { fullConfig: { windowCategory: 'casement', casementLayout: '040L', ...fc } });
 const wd = (specs) => specs.map((ws) => ({ win: { name: ws.name, _projectNumber: 'P-26' }, windowSpec: ws, derived: calculations.deriveWindowData(ws, {}) }));
+// hub-spoke numbers on the glass outline, from the profile (v4 Block F: the leaf sits leafAtJamb 51 inside the frame):
+//   glassOff = leafAtJamb + leafTop.face − glassInset = 51 + 67 − 12.5 = 105.5 (was 94.5 on the 57 frame)
+//   xg = clear glass half width = (W − 2·glassOff) / 2 = 394.5 for W 1000 (was 405.5)
+//   R1 = hubRingRatios[0] · xg (arch.js hubSpoke: ringR = k · xg) = 0.3 × 394.5 → "118.4" (was "121.7")
+//   spoke at π/3 from the hub: its far end sits π/6 from the apex on the semi-circle outline → s = xg · π/6 → "206.6" (was "212.3")
+const PC = M.profile.DEFAULT_CASEMENT_PROFILE;
+const glassOff = PC.deductions.leafAtJamb + PC.elements.leafTop.face - PC.geometry.glassInset;
+const xg1000 = (1000 - 2 * glassOff) / 2;
+const r1 = (v) => Math.round(v * 10) / 10;
+const fmt = (v) => { const r = r1(v); return Number.isInteger(r) ? String(r) : r.toFixed(1); };   // glassBars.js barEndRows `f`
+const R1_TXT = `R ${fmt(PC.arch.patterns.hubRingRatios[0] * xg1000)}`;
+const SPOKE_TXT = `${fmt(xg1000 * Math.PI / 6)} from apex R`;
 
 // ═══════════════════════════════════════════════════════════════════════════
 section('1 — the three v3 samples: pages, drawing cells (ids only, text under / around the outline), bars page');
@@ -173,7 +185,7 @@ for (const u of units) {
 }
 const thumbs = R.paths.filter((p) => p.page === barsPageNo);
 check('bars page: one window thumbnail per block — a stroked frame contour + the filled unit (3 S + 3 FD paths), thumbnails ≤ 35 mm high', thumbs.filter((p) => p.style === 'S').length === 3 && thumbs.filter((p) => p.style === 'FD').length === 3 && thumbs.filter((p) => p.style === 'S').every((p) => p.bbox[3] - p.bbox[1] <= 36.5)   /* the captured bbox includes Bézier control points (≤ 1.5 mm overshoot on the crown) */, JSON.stringify(thumbs.map((p) => [p.style, p.closed, p.bbox.map((v) => +v.toFixed(1))])));
-check('hub-spoke rows: R1 "R 121.7" and spokes "212.3 from apex R" on the bars page, not on the drawing page', onBars.some((t) => t.text === 'R 121.7') && onBars.some((t) => t.text === '212.3 from apex R') && !onDraw.some((t) => /from apex/.test(t.text)));
+check(`hub-spoke rows: R1 "${R1_TXT}" (0.3 × xg ${xg1000}, glassOff ${glassOff}; was "R 121.7") and spokes "${SPOKE_TXT}" (xg · π/6; was "212.3 from apex R") on the bars page, not on the drawing page`, onBars.some((t) => t.text === R1_TXT) && onBars.some((t) => t.text === SPOKE_TXT) && !onDraw.some((t) => /from apex/.test(t.text)), onBars.filter((t) => /^R \d|from apex R$/.test(t.text)).map((t) => t.text).join(' | '));
 check('schedule (page 1) unchanged: Shape column, rect / arched labels, bar counts', R.texts.some((t) => t.page === 1 && t.text === 'Shape') && R.texts.some((t) => t.page === 1 && /^arched · R /.test(t.text)));
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -188,7 +200,7 @@ section('2 — pagination: blocks stack and never break inside a table; a page h
   const blocksPerPage = {};
   for (let i = 1; i <= 9; i++) {
     const title = Rm.texts.find((t) => t.page > 1 + dp && t.text.startsWith(`${i} · HUB${i} — `));
-    const rowsPages = new Set(Rm.texts.filter((t) => t.page > 1 + dp && t.text === 'R 121.7').map((t) => t.page));
+    const rowsPages = new Set(Rm.texts.filter((t) => t.page > 1 + dp && t.text === R1_TXT).map((t) => t.page));
     if (title) blocksPerPage[title.page] = (blocksPerPage[title.page] || 0) + 1;
     void rowsPages;
   }

@@ -28,7 +28,7 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import { Text, Line } from '@react-three/drei';
-import CasementFrame, { FRAME_FACE, EXT_FACE, FRAME_DEPTH, EXT_DEPTH, INT_DEPTH, REBATE_STEP, MULLION_W, BOTTOM_FACE, BOTTOM_EXT_OUTER, BOTTOM_INNER_FACE, GASKET_T, mm } from './CasementFrame';
+import CasementFrame, { resolveFrameDims, FRAME_FACE, EXT_FACE, FRAME_DEPTH, EXT_DEPTH, INT_DEPTH, REBATE_STEP, MULLION_W, BOTTOM_FACE, BOTTOM_EXT_OUTER, BOTTOM_INNER_FACE, GASKET_T, mm } from './CasementFrame';
 import CasementPanel, { SASH_RAIL } from './CasementPanel';
 import {
   casementLayoutDef,
@@ -70,9 +70,11 @@ export default function CasementWindow({
   hBars = 0,
   vBars = 0,
   ironmongery = 'brass',
+  frameDims = null,       // v4 Block F (PC): { frameFace, extFace } from the profile; absent → PSW 57 / 36
 }) {
   const colorE = sameColor ? woodColor : woodColorExt;
   const colorI = sameColor ? woodColor : woodColorInt;
+  const { frameFace: FRAME_FACE } = resolveFrameDims(frameDims);
 
   const extMaterial = useMemo(() => new THREE.MeshPhysicalMaterial({
     color: colorE, roughness: 0.72, metalness: 0.02,
@@ -100,8 +102,9 @@ export default function CasementWindow({
     () => resolveCasementLayout({
       code: layout, innerW, innerH, height, fanlightRatio, fan2Ratio,
       middleSectionMm: middleSection, casementHinges,
+      geo: { frameFace: FRAME_FACE, bottomFace: BOTTOM_FACE, mullionW: MULLION_W },
     }),
-    [layout, innerW, innerH, height, fanlightRatio, fan2Ratio, casementHinges, middleSection]
+    [layout, innerW, innerH, height, fanlightRatio, fan2Ratio, casementHinges, middleSection, FRAME_FACE]
   );
 
   const W = mm(width);
@@ -114,6 +117,7 @@ export default function CasementWindow({
       <CasementFrame
         width={width}
         height={height}
+        frameDims={frameDims}
         material={extMaterial}
         materialInt={intMaterial}
         sealColour={sealColour}

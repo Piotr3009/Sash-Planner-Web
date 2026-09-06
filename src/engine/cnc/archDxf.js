@@ -78,7 +78,11 @@ function rotate(pts, theta) {
   const c = Math.cos(theta), s = Math.sin(theta);
   return pts.map(([x, y, b]) => [x * c - y * s, x * s + y * c, b ?? 0]);
 }
-const key = (p) => `${p[0].toFixed(3)},${p[1].toFixed(3)}`;
+// Joint-plane dedup key. A gothic apex at x = −3e-13 printed as "-0.000" and
+// missed its twin at "0.000" (v4 Block F: the gothic 1000 head now plans as one
+// board per side and meets itself on the axis) — negative zero is normalised.
+const fix3 = (v) => { const t = v.toFixed(3); return t === '-0.000' ? '0.000' : t; };
+const key = (p) => `${fix3(p[0])},${fix3(p[1])}`;
 
 const pct = (v) => (v == null ? '-' : `${Math.round(v * 100)}%`);
 const optTxt = (o) => `${o.n} x board ${o.stock} L${fmt1(o.chordLength)} ROUGH ${fmt1(o.roughLength)} WASTE ${pct(o.waste)}`;
