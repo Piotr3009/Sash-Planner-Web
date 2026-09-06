@@ -154,28 +154,41 @@ karmi cut listę, PDF-y, rysunki, PP. Nigdy nie licz wymiarów okna w innym miej
 
 ---
 
-## STAN — łuki casement + sash + okna stałe + archiwum (noce 1–5, `main` po merge nocy 5)
-Noce 1–4 (casement): v1 geometria + planer + CNC DXF; v2 reguła C, Round | Gothic, pręty, eksporty dla
-szklarza, 2D, 3D. Noc 5 (ARCHED-WINDOWS-v3, branch `claude/arched-windows-v3-9v0sw7`, cztery etapy):
-Blok 0 (FIT, pasy szklarza 18 / oblamówka 11 / osie, wymiarowanie końców prętów, tracery DXF + LSP wg `arka`,
-zawias 1:1 z PSW, audyt prętów, `minPieceLength`), Blok 1 A–J (sash łukowy: silnik reguła C z głowicą 80,
-`S-AH` / `S-ATR`, wagi z obrysu, DXF + FIT, szklarz, tracery, pięć arkuszy 2D, port `ArchedSashWindow`),
-Blok 3 (okna stałe w partii casement: `casement.kind 'fixed'`, koło = pierścienie `C-FRR` / `C-LFR`, sunburst,
-arkusze koła), Blok 4 (blanki w pre-cut / BOM, sekcja Curved members w PP, dopłata 0, parity 0 HARD),
-Blok 6 (archiwum: SQL w `docs/handover/sql/`, store, ArchivePage, przycisk na karcie, strona read-only).
-Harnessy t16–t24 ALL PASS. Werdykty w `BUILD-LOG.md`, otwarte pytania w `BLOCKERS.md` §11–§15.
-Spec: `docs/handover/ARCHED-WINDOWS-v3.md` (+ v1 / v2 jako historia decyzji).
+## STAN — łuki: casement + sash + okna stałe + archiwum (noce 1–5), paczka arch-pieces-v1 (06.09) na `main`
+Kawałki łuków = proste trapezy (PIECES) i sklejony blank (ASSEMBLY), długość surowa = krawędź
+deski + palec; traceria do drewna (`glazingRebate 18`); Pre-Cut per kawałek; wymiary: odległości
+prętów na dole, całość na górze; LSP usunięty. Harnessy t16–t24 ALL PASS. Spec historyczne:
+`docs/handover/ARCHED-CASEMENT-v1/v2.md`, `ARCHED-WINDOWS-v3.md`.
 
-## ZADANIE NOCNE 6 — do ustalenia z Piotrem rano
+## ZADANIE NOCNE 6 — ARCHED-WINDOWS-v4: cztery bramkowane etapy w jedną noc
 
-Przed kolejną nocą Piotr: (1) klika w przeglądarce listę „NIE zweryfikowane" z końca BUILD-LOG (konfigurator
-Kind / Shape, 3D sash łukowy i koło, Archiwum, karta Curved members), (2) uruchamia SQL
-`docs/handover/sql/2026-09-07_projects_archive.sql` i sprawdza RLS (BLOCKERS 15.7), (3) otwiera próbki DXF / LSP
-w VCarve / AutoCAD, (4) odpowiada na DEFAULT (open) z BLOCKERS §11–§15 (najpilniejsze: 12.1 głowica 80 / inset 89,
-12.4 rise Round sash, 14.1 konstrukcja okna stałego, 14.3 pasowanie koła, 15.3 reguła długości blanku).
-Kandydaci na noc 6: listwy łukowe (moduł beading — osobny pakiet z przekrojem z profilu), pręty PSW w 3D sash
-z silnika (13.2), blokada konfiguratora na projekcie zarchiwizowanym (15.6), `directGlazed` (14.1), PDF karty
-Curved members (15.4).
+Spec: `@docs/handover/ARCHED-WINDOWS-v4.md`. Czytasz w całości; przy rozbieżności ze starszymi
+wygrywa v4. Zanim ruszysz, sprawdź, że paczka arch-pieces-v1 jest na `main`:
+`grep -c pieceStockTrapezoid src/engine/arch.js` > 0, `grep -c glazingRebate src/engine/profile.js`
+> 0, brak przycisku „Tracery LSP". Jeśli nie — STOP, wpis w BLOCKERS, koniec sesji.
+
+**Etapy — następny startuje TYLKO po ALL PASS poprzedniego i zielonym `npm run build`:**
+1. **Blok C — planer kawałków v2:** dwa limity (`cnc.minClampLength 450` na całą długość,
+   `arch.minPieceLength 400` na krótszą krawędź, oba twarde), deski `63 75 95 105 120 150 180 200`,
+   kawałki przez granice łuków (haunch + korona w jednym), gotyk dzielony w wierzchołku, reguła
+   ekonomiczna z progiem odpadu, warstwa `CLAMPS` (Uniclamp 130 × 130, nie ssawki), karta
+   „CNC & arches" w Window Settings.
+   Bramka: t25 z wektorami ze spec C.5 (policzone niezależnie) + t16–t24.
+2. **Blok B — PDF szklarza:** rysunek na całą komórkę, tabele prętów na osobnych stronach na końcu
+   z miniaturką okna i nazwą; na rysunku same ID. Bramka: t26.
+3. **Blok E — intersecting z prętów pionowych** (reguła z PSW sash, jeden silnik dla casement /
+   sash / stałych). Bramka: t20_bars, t22, t23.
+4. **Blok F — rama 68 wszędzie (opcja B):** face 68, land 47, `leafAtJamb 51`, cill bez zmian,
+   słupek drzwi 136, `casementLayouts` FRAME_FACE + bump wersji, 3D z profilu, instrukcja portu
+   do PSW. Bramka: wszystkie harnessy z wektorami przeliczonymi Z WZORÓW (nie z kodu), snapshoty
+   casement/drzwi przebazowane z wpisem starych i nowych liczb w BUILD-LOG.
+
+Etap nie przechodzi — naprawiasz, nie przeskakujesz. Kończą się możliwości — zamykasz etap czysto,
+werdykt, BLOCKERS, koniec.
+
+Bez LISP-a, bez rekordów listew, `casementLayouts.js` tylko stała FRAME_FACE + wersja, drzwi tylko
+face/słupek. Sesja w chmurze, własny branch, commit + push po każdym zamkniętym punkcie. Każde
+**DEFAULT (open)** = wpis w BLOCKERS.
 
 ## NIE RÓB DZIŚ (zaplanowane, osobne pakiety)
 
