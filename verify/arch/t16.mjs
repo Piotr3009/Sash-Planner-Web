@@ -735,7 +735,7 @@ section('§10.3 pt 9 — normaliseToWindowSpec PSW mapping, riseSource, unknown 
 
   // profile block + migration
   check('DEFAULT_CASEMENT_PROFILE.arch v4: finger 15/16/3.8, stock [63, 75, 95, 105, 120, 150, 180, 200], contourAllowance 10, minPieceLength 400, wasteThreshold 0.45, limits, minHaunchRadius 150, patterns; no maxSegmentAngleDeg / pieceRule; cnc block',
-    P.arch && P.arch.version === 4 && P.arch.minHaunchRadius === 150 && JSON.stringify(P.arch.patterns.hubRingRatios) === '[0.3,0.6,0.8]' && P.arch.patterns.intersecting.pitch === 450
+    P.arch && P.arch.version === 4 && P.arch.minHaunchRadius === 150 && JSON.stringify(P.arch.patterns.hubRingRatios) === '[0.3,0.6,0.8]' && !('intersecting' in P.arch.patterns)   // v4 Block E: no intersecting settings
     && P.arch.finger.length === 15 && P.arch.finger.depth === 16 && P.arch.finger.pitch === 3.8
     && JSON.stringify(P.arch.stockWidths) === JSON.stringify([63, 75, 95, 105, 120, 150, 180, 200]) && P.arch.contourAllowance === 10 && P.arch.minPieceLength === 400 && P.arch.wasteThreshold === 0.45
     && !('maxSegmentAngleDeg' in P.arch) && !('pieceRule' in P.arch) && !('widthAllowance' in P.arch) && !('maxPieces' in P.arch)
@@ -745,11 +745,11 @@ section('§10.3 pt 9 — normaliseToWindowSpec PSW mapping, riseSource, unknown 
   void _drop; void _dropC;
   const m1 = profile.migrateCasementProfile(v11);
   check('migrateCasementProfile: v1.1 profile without arch / cnc gets both default sections', JSON.stringify(m1.arch) === JSON.stringify(P.arch) && JSON.stringify(m1.cnc) === JSON.stringify(P.cnc));
-  const m2 = profile.migrateCasementProfile({ ...v11, arch: { version: 4, finger: { pitch: 4.2 }, stockWidths: [150], limits: { maxWidth: 1800 }, patterns: { intersecting: { pitch: 500 } } }, cnc: { clamp: { base: 140 } } });
-  check('migrateCasementProfile: partial v4 arch / cnc sections merge (pitch 4.2, stock [150], maxWidth 1800, tracery pitch 500, clamp base 140, rest default)',
+  const m2 = profile.migrateCasementProfile({ ...v11, arch: { version: 4, finger: { pitch: 4.2 }, stockWidths: [150], limits: { maxWidth: 1800 }, patterns: { hubRingRatios: [0.25, 0.5, 0.75] } }, cnc: { clamp: { base: 140 } } });
+  check('migrateCasementProfile: partial v4 arch / cnc sections merge (pitch 4.2, stock [150], maxWidth 1800, hub ratios, clamp base 140, rest default)',
     m2.arch.finger.length === 15 && m2.arch.finger.pitch === 4.2 && JSON.stringify(m2.arch.stockWidths) === '[150]' && m2.arch.contourAllowance === 10 && m2.arch.minPieceLength === 400 && m2.arch.wasteThreshold === 0.45
     && m2.arch.limits.maxWidth === 1800 && m2.arch.limits.minWidth === 400 && m2.arch.limits.minStraightBelowRise === 900 && m2.arch.minHaunchRadius === 150
-    && m2.arch.patterns.intersecting.pitch === 500 && m2.arch.patterns.intersecting.minMullions === 2 && JSON.stringify(m2.arch.patterns.hubRingRatios) === '[0.3,0.6,0.8]'
+    && JSON.stringify(m2.arch.patterns.hubRingRatios) === '[0.25,0.5,0.75]' && !('intersecting' in m2.arch.patterns)
     && m2.cnc.clamp.base === 140 && m2.cnc.clamp.minThickness === 40 && m2.cnc.minClampLength === 450 && m2.cnc.clampClearance === 20);
   const m2v3 = profile.migrateCasementProfile({ ...v11, arch: { version: 3, finger: { length: 15, depth: 16, pitch: 3.8 }, stockWidths: [50, 63, 75, 95, 105, 180, 200], contourAllowance: 10, maxSegmentAngleDeg: 36, pieceRule: 'narrowest', minPieceLength: 150, minHaunchRadius: 150, limits: P.arch.limits, patterns: P.arch.patterns } });
   check('migrateCasementProfile: a stored v3 block (36° rule, pieceRule, 150 warn) is replaced whole by the v4 default', JSON.stringify(m2v3.arch) === JSON.stringify(P.arch));

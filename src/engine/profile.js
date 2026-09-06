@@ -181,14 +181,13 @@ export const DEFAULT_CASEMENT_PROFILE = {
     // therefore needs a rise above this value.
     minHaunchRadius: 150,
     // Glazing bar patterns in the arch (v2 P5), geometry ported from PSW
-    // 3d-src FixFrameWindow.jsx (semiBarPattern / intersectingData) on the
-    // glass outline: hub ring radii as fractions of the clear half width
-    // (ring 1 / 2 / 3), intersecting tracery mullion pitch (one mullion per
-    // this many mm of clear width, clamped to min..max) and the smallest
-    // tracery arc radius still drawn.
+    // 3d-src FixFrameWindow.jsx (semiBarPattern) on the glass outline: hub
+    // ring radii as fractions of the clear half width (ring 1 / 2 / 3). The
+    // intersecting pattern has no numbers here since v4 Block E — its arcs
+    // spring from the user's vertical bars with the outline's own radius
+    // (the v3 pitch / mullion-count / minimum-radius keys are gone).
     patterns: {
       hubRingRatios: [0.3, 0.6, 0.8],
-      intersecting: { pitch: 450, minMullions: 2, maxMullions: 4, minRadius: 30 },
       // v3 Block 3: sunburst in a CIRCLE fixed window (PSW 3d-src FixFrameWindow
       // CircleFrame): one ring `offset` mm inside the clear circle, `spokes`
       // spokes from the ring to the glass edge. PSW's per-window offset
@@ -316,7 +315,6 @@ export function migrateCasementProfile(profile) {
           limits: { ...D.arch.limits, ...profile.arch.limits },
           patterns: {
             ...D.arch.patterns, ...(profile.arch.patterns || {}),
-            intersecting: { ...D.arch.patterns.intersecting, ...(profile.arch.patterns?.intersecting || {}) },
             sunburst: { ...D.arch.patterns.sunburst, ...(profile.arch.patterns?.sunburst || {}) },
           },
         }

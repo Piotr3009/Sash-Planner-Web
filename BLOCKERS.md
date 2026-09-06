@@ -10,6 +10,15 @@ Status of the older entries: **§1 D13 (piece rule) → CLOSED by v4 C.3 / C.4**
 alternative above the waste threshold — `pieceRule` removed from the profile); **§9.3 minimum piece length → v4
 C.1 `arch.minPieceLength` 400 HARD** (was 150 warn); §2 D5 / §3 d50 / §9.1 P9 / §9.4 F2 unchanged.
 
+### 18. Stage 3 — intersecting from the vertical bars (Block E): errata and questions
+
+| # | Item | Taken | Ask |
+|---|------|-------|-----|
+| 18.1 | **Spec errata E4 — the gothic radius** | Spec E quotes "gothic 1000 × 1900 with 3 V bars → 6 arcs, R = 1000" and "semi-circle 1000 with 2 V → 4 arcs R 405.5 (glass)". 1000 is the FRAME radius (c + halfW on the frame numbers); on the glass, where the bars live, the outline's radius is 905.5 (PSW's own daylight formula gives 905.4). Taken: R = the glass outline's arc radius for every shape (405.5 / 905.5) — "the arch's own radius" as drawn on the glass sheet | Confirm the glass radius; if the frame radius (1000) was meant, the arcs would be flatter than the outline they meet |
+| 18.2 | **PSW fix-frame parity** | PSW's fix-frame `intersectingData` (FixFrameWindow.jsx 667–830) still draws pitch mullions + corner-centred arcs for fix-only products; PC now produces the sash rule for every window type. A fix-only gothic ordered in PSW shows different tracery in PSW's viewer than PC's cut list / tracery board / glass order | Port the sash rule into PSW's fix-frame (PSW-3D-ARCH-PORT.md §8), or accept the viewer difference |
+| 18.3 | **Default columns when 0 V** | ±¼ of the clear width (PSW `[-halfW/2, halfW/2]`), reported as `role 'v'` bars (they are cut as bars) while `barCounts.v` stays 0 (the user set none) | Should the schedule / cut list count the two default columns as bars (they are timber)? Today the bar run and the beading include them; the "bars" text in the schedule says the user's count |
+| 18.4 | **Profile keys removed** | `arch.patterns.intersecting` (pitch 450 / 2–4 mullions / minRadius 30) deleted from the default; a stored v4 profile keeps the key inertly (merge) | FYI |
+
 ### 17. Stage 2 — glazier PDF layout (Block B): DEFAULT (open) values and questions
 
 | # | Item | Taken | Ask |

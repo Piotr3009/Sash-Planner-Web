@@ -30,11 +30,11 @@ import {
 } from '../../../engine/arch.js';
 
 // PSW 3d-src/src/components/fix-frame/FixFrameWindow.jsx literals (semiBarPattern
-// rings 0.3 / 0.6 / 0.8, intersectingData: one mullion per 450 mm, 2..4, arcs
-// under 30 mm skipped) — the fallback when no profile settings are passed.
+// rings 0.3 / 0.6 / 0.8) — the fallback when no profile settings are passed.
+// v4 Block E: intersecting follows the PSW SASH rule in the engine (arcs from
+// the vertical bars, the outline's radius) — no settings.
 export const PSW_BAR_PATTERN_SETTINGS = Object.freeze({
   hubRingRatios: [0.3, 0.6, 0.8],
-  intersecting: { pitch: 450, minMullions: 2, maxMullions: 4, minRadius: 30 },
 });
 
 export const ARC_SEGMENTS = 48;       // samples per arc (PSW SEGS)

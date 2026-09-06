@@ -181,20 +181,21 @@ section('2 — bars on the glass outline (spec §2.3 / §3 vectors), glass frame
   const tplRoles = tpl.bars.reduce((m, b) => { m[b.role] = (m[b.role] || 0) + 1; return m; }, {});
   check('triple-hub-spoke + 1 h bar: ring 3 (0.3 / 0.6 / 0.8), springing 6, spoke 18, v 6, h 1 (34 bars)', tplRoles.ring === 3 && tplRoles.springing === 6 && tplRoles.spoke === 18 && tplRoles.v === 6 && tplRoles.h === 1 && tpl.bars.length === 34, JSON.stringify(tplRoles));
   check('triple-hub-spoke rings r = 121.65 / 243.3 / 324.4', tpl.bars.filter((b) => b.role === 'ring').map((b) => +b.arc.r.toFixed(2)).join(',') === '121.65,243.3,324.4');
-  // intersecting (PSW intersectingData) on a gothic and on a semi-circle
+  // intersecting — v4 Block E: arcs spring from the vertical bars (PSW sash rule), no pitch mullions
   const gi = derive(pcItem('B6', 1000, 1800, { archShape: 'gothic-equilateral', archBarPattern: 'intersecting' })).arch;
   const trac = gi.bars.filter((b) => b.role === 'tracery');
   const mull = gi.bars.filter((b) => b.role === 'v');
-  check('intersecting gothic W1000: 2 mullions (round(811 / 450) = 2) at thirds of Wg, from the bottom to the springing only', mull.length === 2 && near(mull[0].from[0], 811 / 3, 1e-6) && mull.every((b) => near(b.to[1], gi.glassOutline.springing, 1e-9)));
-  check('intersecting gothic: 4 tracery arcs, centres on the outer frame corners (x = −94.5 / 905.5 in the glass frame, y = springing), radius = |mullion − corner|',
-    trac.length === 4 && trac.every((b) => (near(b.arc.cx, -94.5, 1e-9) || near(b.arc.cx, 905.5, 1e-9)) && near(b.arc.cy, gi.glassOutline.springing, 1e-9)) && trac.some((b) => near(b.arc.r, 811 / 3 + 94.5, 1e-6)), trac.map((b) => `${b.arc.cx.toFixed(1)}/${b.arc.r.toFixed(1)}`).join(' '));
+  const Wg = gi.glassOutline.width, Rg = gi.glassOutline.arcs[0].r;
+  check('intersecting gothic W1000, 0 V: two default columns at ±¼ of the clear width (202.75 / 608.25), from the bottom to the springing only', mull.length === 2 && near(mull[0].from[0], Wg / 4, 1e-6) && near(mull[1].from[0], 3 * Wg / 4, 1e-6) && mull.every((b) => near(b.to[1], gi.glassOutline.springing, 1e-9)));
+  check(`intersecting gothic: 4 tracery arcs with the outline's own radius ${Rg.toFixed(1)} (concentric glass radius; the spec's "R 1000" is the frame radius — errata E4), centres on the springing line at column ∓ R`,
+    trac.length === 4 && trac.every((b) => near(b.arc.r, Rg, 1e-6) && near(b.arc.cy, gi.glassOutline.springing, 1e-9) && mull.some((m) => near(Math.abs(b.arc.cx - m.from[0]), Rg, 1e-6))), trac.map((b) => `${b.arc.cx.toFixed(1)}/${b.arc.r.toFixed(1)}`).join(' '));
   const onOutline = (pt, o2) => near(pt[1], arch.chainYAtX(o2.arcs, pt[0]), 1e-6);
-  check('intersecting gothic: every tracery arc starts on a mullion top (springing) and ends ON the glass outline (circle–circle intersection)', trac.every((b) => {
-    const start = b.arc.cx < 0 ? b.from : b.to, end = b.arc.cx < 0 ? b.to : b.from;
-    return near(start[1], gi.glassOutline.springing, 1e-6) && onOutline(end, gi.glassOutline);
+  check('intersecting gothic: every tracery arc starts on a column top (springing) and ends ON the glass outline (circle–circle intersection), a quarter turn at most', trac.every((b) => {
+    const start = b.arc.cx < b.from[0] + 1e-9 && near(b.arc.a0, 0, 1e-9) ? b.from : b.to, end = start === b.from ? b.to : b.from;
+    return near(start[1], gi.glassOutline.springing, 1e-6) && mull.some((m) => near(m.from[0], start[0], 1e-6)) && onOutline(end, gi.glassOutline) && b.arc.a1 - b.arc.a0 <= Math.PI / 2 + 1e-9;
   }));
   const si = derive(pcItem('B7', 1000, 1500, { archShape: 'three-centre', archStart: 1000, archBarPattern: 'intersecting' })).arch;
-  check('intersecting on a semi-circle: same construction, 2 mullions + 4 tracery arcs, ends on the outline', si.bars.filter((b) => b.role === 'tracery').length === 4 && si.bars.filter((b) => b.role === 'tracery').every((b) => onOutline(b.arc.cx < 0 ? b.to : b.from, si.glassOutline)));
+  check('intersecting on a semi-circle, 0 V: 2 default columns + 4 tracery arcs R 405.5 (the clear half width), ends on the outline', si.bars.filter((b) => b.role === 'v').length === 2 && si.bars.filter((b) => b.role === 'tracery').length === 4 && si.bars.filter((b) => b.role === 'tracery').every((b) => near(b.arc.r, 405.5, 1e-6) && (onOutline(b.from, si.glassOutline) || onOutline(b.to, si.glassOutline))));
   expectThrows('hub-spoke on a three-centre → readable (PATTERNS_FOR_SHAPE: three-centre takes none)', () => derive(pcItem('B8', 1000, 1500, { archShape: 'three-centre', archStart: 1300, archBarPattern: 'hub-spoke' })), /Bar pattern "hub-spoke" is not available on a Three-centre arch \(allowed: none\)/);
   expectThrows('intersecting on a three-centre → readable', () => derive(pcItem('B9', 1000, 1500, { archShape: 'three-centre', archStart: 1300, archBarPattern: 'intersecting' })), /not available on a Three-centre arch/);
   check('PSW_PATTERNS_FOR_SHAPE = PSW price-calculator.js 990–995 (semi-circle six, gothic none | intersecting, three-centre none); PC adds quad-hub-spoke + custom on the semi-circle only (v3 0.4)',
@@ -388,7 +389,7 @@ section('6 — glass PDF (jsPDF in node): Shape column, mm + % line, shaped draw
 
 // ═══════════════════════════════════════════════════════════════════════════
 section('7 — profile v3 block and vocabulary');
-check('profile.arch v4: minHaunchRadius 150, hubRingRatios [0.3, 0.6, 0.8], intersecting { 450, 2, 4, 30 }', P.arch.version === 4 && P.arch.minHaunchRadius === 150 && JSON.stringify(P.arch.patterns.hubRingRatios) === '[0.3,0.6,0.8]' && JSON.stringify(P.arch.patterns.intersecting) === '{"pitch":450,"minMullions":2,"maxMullions":4,"minRadius":30}');
+check('profile.arch v4: minHaunchRadius 150, hubRingRatios [0.3, 0.6, 0.8], no intersecting settings (v4 Block E: the arcs take the outline radius)', P.arch.version === 4 && P.arch.minHaunchRadius === 150 && JSON.stringify(P.arch.patterns.hubRingRatios) === '[0.3,0.6,0.8]' && !('intersecting' in P.arch.patterns));
 check('ARCH_BAR_PATTERNS vocabulary (PSW six + v3 quad-hub-spoke + custom + Block 3 sunburst) and labels', JSON.stringify(arch.ARCH_BAR_PATTERNS) === '["none","half-hub","hub-spoke","double-hub-spoke","triple-hub-spoke","quad-hub-spoke","custom","intersecting","sunburst"]' && arch.ARCH_BAR_PATTERNS.every((p) => typeof arch.ARCH_BAR_PATTERN_LABELS[p] === 'string'));
 expectThrows('unknown pattern in an item throws at normalisation', () => pcItem('X', 1000, 1500, { archShape: 'three-centre', archStart: 1000, archBarPattern: 'star' }), /Unknown arch bar pattern "star"/);
 check('CUT_LIST_ORDER: C-AH directly after C-FH, C-ATR directly after C-TR', (() => { const s = lists.CUT_LIST_ORDER.map((x) => x.symbol); return s[s.indexOf('C-FH') + 1] === 'C-AH' && s[s.indexOf('C-TR') + 1] === 'C-ATR'; })());

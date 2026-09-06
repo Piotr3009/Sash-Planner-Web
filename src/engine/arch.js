@@ -1144,10 +1144,7 @@ const BAR_ID_PREFIX = Object.freeze({ v: 'V', h: 'H', springing: 'S', ring: 'R',
 function readPatternSettings(opts) {
   const ratios = Array.isArray(opts?.hubRingRatios) ? opts.hubRingRatios.map(Number) : [];
   if (ratios.length < 3 || !ratios.every((k) => k > 0 && k < 1)) throw new ArchError('Casement profile arch.patterns.hubRingRatios is missing (three fractions of the clear half width)');
-  const I = opts?.intersecting || {};
-  const pitch = Number(I.pitch), minM = Number(I.minMullions), maxM = Number(I.maxMullions), minR = Number(I.minRadius);
-  if (!(pitch > 0 && minM >= 1 && maxM >= minM && minR >= 0)) throw new ArchError('Casement profile arch.patterns.intersecting is missing (pitch / minMullions / maxMullions / minRadius)');
-  return { ratios, pitch, minM, maxM, minR };
+  return { ratios };
 }
 
 /** Intersection points of two circles (none, one or two). */
@@ -1203,16 +1200,25 @@ function traceryHit(arcs, c, r, side) {
  *   double / triple    rings 0.3 / 0.6 (/ 0.8), 6 / 8 spokes segmented ring → ring
  *                      → outline, one vertical per ring end below the line;
  *                      the user's v count is ignored for every hub (PSW rule);
- *   intersecting       n = clamp(round(Wg / pitch), min, max) mullions up to the
- *                      springing; from each mullion top two tracery arcs centred on
- *                      the OUTER frame corners (±W/2 on the springing line, as PSW),
- *                      each stopped at the outline (quarter turn at most).
+ *   intersecting       v4 Block E (Piotr 06.09, PSW ArchedSashWindow.jsx 915–940 —
+ *                      the sash rule, one engine for casement / sash / fixed): the
+ *                      user's vertical bars run to the SPRINGING (0 bars → two
+ *                      default columns at ±¼ of the clear width); every bar top
+ *                      spawns two tracery arcs, left- and right-curving, with the
+ *                      arch's own radius — the glass outline's arc radius (semi-
+ *                      circle: the clear half width; gothic: the concentric radius
+ *                      of the outline arcs) — centred on the springing line on the
+ *                      opposite side (cx = x_bar − dir·R), each clipped where it
+ *                      meets the outline (a quarter turn at most). No springing
+ *                      bar. The v3 port of PSW's fix-frame intersectingData (pitch
+ *                      mullions, arcs centred on the frame corners) is gone.
  * Spoke insets (BAR_W·0.6 / 0.4) and the v-bar top clearance in PSW are 3D
  * cosmetics — the axes here meet the rings and the outline exactly.
  * Output: [{ id, kind: 'straight'|'arc', role, from, to, arc?, length }], lengths
  * rounded to 0.5 mm; roles v | h | springing | ring | spoke | tracery.
  */
 export function buildArchBars({ outline, shape, pattern = 'none', h = 0, v = 0, frameHalfWidth, spokes, rings }, patternOpts) {
+  void frameHalfWidth;   // v3 intersecting used the frame corners; v4 arcs spring from the bars (kept in the signature for the callers)
   const pat = pattern || 'none';
   if (!ARCH_BAR_PATTERNS.includes(pat)) throw new ArchError(`Unknown arch bar pattern "${pattern}"`);
   const allowed = patternsForShape(shape);
@@ -1232,7 +1238,8 @@ export function buildArchBars({ outline, shape, pattern = 'none', h = 0, v = 0, 
     if (!(y > 0)) continue;
     straight('h', 0, y, Wg, y);
   }
-  if (!hub) {
+  const intersecting = pat === 'intersecting';
+  if (!hub && !intersecting) {
     for (let i = 1; i <= nV; i++) {
       const x = Wg * i / (nV + 1);
       const top = chainYAtX(arcs, x);
@@ -1284,21 +1291,22 @@ export function buildArchBars({ outline, shape, pattern = 'none', h = 0, v = 0, 
     }
   }
 
-  if (pat === 'intersecting') {
-    const S = readPatternSettings(patternOpts);
-    const hw = Number(frameHalfWidth);
-    if (!(hw > xg)) throw new ArchError(`Intersecting pattern needs the frame half width (> ${r1(xg)}), got ${frameHalfWidth}`);
-    const n = Math.max(S.minM, Math.min(S.maxM, Math.round(Wg / S.pitch)));
-    for (let i = 1; i <= n; i++) {
-      const x = Wg * i / (n + 1);
-      straight('v', x, 0, x, ys);                                    // mullion up to the springing
-      for (const side of [-1, 1]) {
-        const cx = xg + side * hw;                                   // outer frame corner on the springing line
-        const rM = Math.abs(x - cx);
-        if (rM < S.minR) continue;
-        const phi = traceryHit(arcs, [cx, ys], rM, side);
-        if (phi == null) continue;
-        arcBar('tracery', side < 0 ? { cx, cy: ys, r: rM, a0: 0, a1: phi } : { cx, cy: ys, r: rM, a0: phi, a1: Math.PI });
+  if (intersecting) {
+    // v4 Block E: columns = the user's vertical bars (equal divisions of the clear width, to the springing);
+    // none → the two PSW default columns at ±¼ of the clear width. The arch's own radius = the outline arc
+    // radius (every outline arc of a semi-circle / gothic shares it).
+    const columns = nV > 0 ? Array.from({ length: nV }, (_, i) => Wg * (i + 1) / (nV + 1)) : [xg - Wg / 4, xg + Wg / 4];
+    const R = arcs[0].r;
+    for (const x of columns) {
+      straight('v', x, 0, x, ys);                                    // column up to the springing — the arcs take over
+      for (const dir of [1, -1]) {
+        // dir +1: centre to the LEFT of the column, the arc rises and bends left (angle 0 → up);
+        // dir −1: centre to the RIGHT, the arc bends right (angle π → down to π/2)
+        const cx = x - dir * R;
+        const side = -dir;
+        const phi = traceryHit(arcs, [cx, ys], R, side);
+        if (phi == null) continue;                                   // never inside the outline (cannot happen with the outline's own radius)
+        arcBar('tracery', side < 0 ? { cx, cy: ys, r: R, a0: 0, a1: phi } : { cx, cy: ys, r: R, a0: phi, a1: Math.PI });
       }
     }
   }
@@ -1312,6 +1320,7 @@ export function buildArchBars({ outline, shape, pattern = 'none', h = 0, v = 0, 
   return {
     pattern: pat,
     counts: { h: nH, v: hub ? 0 : nV },
+    columns: intersecting ? bars.filter((b) => b.role === 'v').map((b) => b.from[0]) : undefined,   // v4: the tracery columns (default ±¼ when the user set none)
     bars,
     totalLength: bars.reduce((s, b) => s + b.length, 0),
     byRole: bars.reduce((m, b) => { m[b.role] = (m[b.role] || 0) + 1; return m; }, {}),

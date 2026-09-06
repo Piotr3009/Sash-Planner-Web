@@ -154,7 +154,7 @@ karmi cut listę, PDF-y, rysunki, PP. Nigdy nie licz wymiarów okna w innym miej
 
 ---
 
-## STAN — noc 6 (v4) w toku na branchu sesji: Etap 1 (Blok C, planer v2) ✅ t25 · Etap 2 (Blok B, PDF szklarza) ✅ t26 — t16–t26 ALL PASS, build OK
+## STAN — noc 6 (v4) w toku na branchu sesji: Etap 1 (Blok C, planer v2) ✅ t25 · Etap 2 (Blok B, PDF szklarza) ✅ t26 · Etap 3 (Blok E, intersecting z prętów) ✅ t20_bars — t16–t26 ALL PASS, build OK
 Planer v2: cały łańcuch dzielony po długości łuku (kawałki przez granice łuków, gotyk w wierzchołku, koło jako
 jeden zamknięty pierścień), dwa twarde limity `cnc.minClampLength 450` / `arch.minPieceLength 400`, deski
 `63…200`, najmniej kawałków + alternatywa ekonomiczna (`arch.wasteThreshold 0.45`), koniec surowego kawałka na
@@ -164,6 +164,9 @@ W 400 — bez planu (eksport pomija z powodem). Niezależny planer harnessów: `
 PDF szklarza v4: komórka = rysunek na max skali, tytuł + spec pod nim, łańcuch prętów na dole, szerokość na górze,
 same ID; strony prętów na końcu (miniaturka okna + tabela ID · s od wierzchołka / pozycja · L · kąt / R), A3/A4
 z ustawienia paczki; prostokąty bajt w bajt jak przed (t26). Otwarte: BLOCKERS §17.
+Intersecting v4: pręty pionowe do linii startu (0 → kolumny ±¼), z każdego szczytu dwa łuki o promieniu łuku SZKŁA
+(półkole 405.5, gotyk 905.5 — spec „R = 1000" to promień ramy, errata E4), bez pręta na linii startu; klucze
+`arch.patterns.intersecting` usunięte z profilu. Otwarte: BLOCKERS §18.
 
 ## STAN poprzedni — łuki: casement + sash + okna stałe + archiwum (noce 1–5), paczka arch-pieces-v1 (06.09) na `main`
 Kawałki łuków = proste trapezy (PIECES) i sklejony blank (ASSEMBLY), długość surowa = krawędź

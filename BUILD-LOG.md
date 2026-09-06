@@ -16,6 +16,47 @@ t20 116, t20_bars 28, t21 120, t22 75, t23 80, t24 26 — ALL PASS (after `npm i
 Stages tonight (Piotr 06.09, gate before each next stage): 1 = Block C planner v2, 2 = Block B glazier PDF,
 3 = Block E intersecting, 4 = Block F frame 68.
 
+### STAGE 3 — Block E: `intersecting` from the vertical bars (`arch.js`, `profile.js`, `3d/casement/archedCasementGeometry.js`, `PSW-3D-ARCH-PORT.md` §8, t18 / t19 / t20_bars re-vectored)
+
+**Understanding:** Piotr 06.09 (SS1 = PSW arched sash): the tracery arcs must spring from the tops of the
+vertical bars. PSW's sash does this (`ArchedSashWindow.jsx` 915–940, `useArchedSashBars`: columns = the V bars,
+default ±halfW/2, R = gothic ? c + halfW : halfW on the daylight numbers, arcs centred at column − dir·R, a
+quarter turn, clipped at the profile); PSW's fix-frame `intersectingData` (pitch mullions, arcs centred on the
+frame corners) is independent geometry and v3 ported the wrong one. One rule for casement / sash / fixed.
+
+**Two approaches, one rejected:** (a) port PSW's sash code as-is, radius from the two-centre formula on the glass
+numbers — rejected: the glass outline is the frame's arcs offset concentrically (exact radius 905.5 on gothic
+1000), PSW's formula gives 905.4 — a second geometry by 0.1 mm; (b) R = the glass outline's own arc radius
+(`outline.arcs[0].r`: semi-circle → the clear half width 405.5, gothic → the concentric radius) — chosen; the
+harness ports PSW's sampler and shows it lands on the same arcs within 0.2 mm.
+
+**Built:** `buildArchBars` intersecting branch — columns = the user's v bars at equal divisions of the clear
+width, to the SPRINGING (no bar to the outline any more); 0 → two default columns at ±¼ of the clear width; two
+`tracery` arcs per column, centre `(x − dir·R, springing)`, radius R, clipped with `traceryHit` (first meeting with
+the outline, a quarter turn at most); no springing bar; `counts.v` stays the user's number, `columns` lists the
+column x's. `readPatternSettings` reads `hubRingRatios` only — the profile's `arch.patterns.intersecting { pitch,
+minMullions, maxMullions, minRadius }` and the 3D fallback `PSW_BAR_PATTERN_SETTINGS.intersecting` are gone
+(`frameHalfWidth` stays in the signature, unused). 2D sheets, glazier DXF / PDF, tracery board and the casement 3D
+read `derived.arch.bars` — no other change; the PC copy of `ArchedSashWindow.jsx` already carries PSW's own
+version of this rule. `PATTERNS_FOR_SHAPE` unchanged (intersecting on semi-circle / gothic only).
+
+**Numbers (spec E vectors):** gothic 1000 × 1900, 3 V → 6 arcs, each starting at a column x (202.75 / 405.5 /
+608.25 in the glass frame), R = 905.5 (the glass radius; the spec's "R = 1000" is the FRAME radius c + halfW on
+the frame numbers — errata E4, BLOCKERS 18.1), ends on the outline; semi-circle 1000, 2 V → 4 arcs R 405.5 ✓; 0 V
+→ columns at ±202.75 ✓ (= Wg/4 = 811/4). Tracery board: gothic intersecting 0 V → 4 panes (full mode, no
+collapsed pane), 1 H 2 V → 5 panes.
+
+**Verification:** t20_bars 32/32 (§1: 16 shape × pattern × h × v cases with the new column rule; §3 rewritten —
+PSW sash rule ported on the glass numbers, vertex for vertex within 0.2 mm on five windows incl. the spec's three;
+no springing bar; no settings left), t18 178/178 (intersecting checks re-vectored, profile block without
+intersecting), t19 246/246 (elevation SVG arcs = ring centres + tracery centres, 3D casement bars = engine list
+with the 3D's own daylight radius 908.5), t20 116 (tracery samples regenerated: `sample_tracery_gothic.dxf`),
+t22 77, t23 81, t26 36 (glass PDF sample regenerated with the new gothic arcs). Whole suite t16–t26 ALL PASS,
+`npm run build` OK.
+**Not verified:** the arcs on screen / in the 3D viewer (no browser); PSW's fix-frame viewer still shows the old
+`intersectingData` for fix-only products until PSW ports the rule (PSW-3D-ARCH-PORT.md §8).
+**Verdict: ✅ Stage 3 (Block E).**
+
 ### STAGE 2 — Block B: glazier PDF layout (`glassPdfExport.js`, `ProductionPackPage.jsx`, `verify/arch/t26.mjs` new, t18 §6)
 
 **Understanding:** Piotr 06.09 (SS2) — the per-unit bar table next to the drawing made the drawing unreadable.
