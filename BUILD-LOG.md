@@ -70,6 +70,34 @@ against your real package and one of the two would have to be thrown away, and e
 C.5 is quoted against the real one. (b) Stop at the gate, prove the failure, hand back a measured
 baseline and an unblocking question — **taken**, and it is what both CLAUDE.md and the spec instruct.
 
+### F.6 numbers for 1000 × 1500, measured tonight (you asked for old and new)
+
+Computed from the profile with the F.6 formula `leafH = extH − (land + gap) − (gapCill + cillVisible)`,
+not read back from the code, by swapping only the four F.1 constants in a bundled copy of the engine:
+
+| | face 57 (today) | face 68 (option B) |
+|---|---|---|
+| leaf **width**, 1000 frame (`extW − 2 × leafAtJamb`) | **920** | **898** |
+| leaf **height**, 1500 frame | **1413** | **1402** |
+
+**The spec's old height is wrong.** v4 F.6 writes "leaf 898 × 1409??"; the actual face-57 value is
+**1413** (1500 − (36 + 4) − (6 + 41)), and the new value 1402 (1500 − (47 + 4) − (6 + 41)) is right. So
+the re-baseline line is **920 × 1413 → 898 × 1402**.
+
+Sweep at face 68 (4 shapes × 5 widths × 4 rises = 80 cases, head ring, plan included): **0 hard errors,
+0 plans with `noStock`** — the arch engine takes the new face without new failures.
+
+### What I checked myself vs. what came from the subagents
+
+Checked myself, in the running engine or the tree: the gate greps and the whole-history pickaxe; the
+Petros / Drive / Gmail sweep; all ten harnesses and the build; the t24 diff and your comment in
+`dce5a16`; the C.5 vectors against the current planner (§E1 table); `migrateCasementProfile`'s spread
+(§E2); the Block E rule at `ArchedSashWindow.jsx:936-958`; the F.6 numbers and the face-68 sweep above.
+
+From the subagents and **not** independently re-run by me: Block B's "consumes nothing from the
+package" (analyst + 3 refuters, none dissenting) and the detailed file/line inventory inside the Block B
+and Block F verdicts. Treat those as strong but second-hand.
+
 ### Not verified tonight
 
 Everything in the v4 scope: no Block C / B / E / F code exists, so nothing about the segment planner,

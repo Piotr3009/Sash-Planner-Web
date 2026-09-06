@@ -146,6 +146,12 @@ version + replace-whole migration. **Ask:** confirm that, and confirm a stored p
 overwritten (a tenant who deliberately set 57 loses it) — this is F.5's "profile snapshot per project"
 question arriving early, and it now blocks the stage rather than being a design note.
 
+**E2b. The spec's old leaf height for 1000 × 1500 is wrong.** F.6 writes "leaf 898 × 1409??". Measured
+from the profile with F.6's own formula: face 57 gives **1413** (1500 − (36 + 4) − (6 + 41)), face 68
+gives **1402**. So the casement re-baseline line is **920 × 1413 → 898 × 1402**, not 1409. A face-68
+sweep (4 shapes × 5 widths × 4 rises = 80 cases, head ring + plan) raised **0 hard errors and 0 plans
+with `noStock`** — the arch engine takes the new face without new failures.
+
 **E3. F.6 as written cannot be done before Block C.** It requires re-baselining the arch plan vectors,
 but those plans are exactly what Block C changes. Doing F first re-baselines `t18`'s arch numbers and the
 `sample_arch_*.dxf` twice. **Ask:** confirm F.6 is narrowed to the straight-window snapshots (casement /
