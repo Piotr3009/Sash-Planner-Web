@@ -24,7 +24,7 @@ import {
   buildJambEntities, buildMergedJambEntities, CNC_LAYERS, jambVentCount,
 } from '../engine/cnc/jambDxf.js';
 import { buildArchEntities, buildMergedArchEntities, ARCH_LAYERS } from '../engine/cnc/archDxf.js';
-import { buildTraceryForDerived, writeTraceryLsp, TRACERY_LAYERS, boardBBox } from '../engine/cnc/traceryExport.js';
+import { buildTraceryForDerived, TRACERY_LAYERS, boardBBox } from '../engine/cnc/traceryExport.js';
 import { buildArchPlan, buildCirclePlan, buildSashArchGeometry, planArchSegments, isArchShape, isCircleShape, ArchError } from '../engine/arch.js';
 import { getCasementProfile, getWindowProfile } from '../engine/profile.js';
 import { CONSTANTS } from '../engine/calculations.js';
@@ -237,7 +237,7 @@ export function traceryParamsForWindow(windowSpec, derived, name) {
   if (!derived.arch.pattern || derived.arch.pattern === 'none') return { skip: 'no bar pattern in the arch — the tracery is the pattern cut from one board' };
   try {
     // sash (v3 Block 1 G): the upper unit sits GLASS_REBATE deep in the sash rebate; the CNC numbers are the casement profile's
-    const build = buildTraceryForDerived(derived, getCasementProfile(), String(name || windowSpec.name || ''), category === 'sash' ? { glassInset: CONSTANTS.GLASS_REBATE } : {});
+    const build = buildTraceryForDerived(derived, getCasementProfile(), String(name || windowSpec.name || ''), category === 'sash' ? { glassInset: CONSTANTS.GLASS_REBATE, glazingRebate: getCasementProfile().geometry.glazingRebate } : {});   // rebate 18 everywhere (Piotr 06.09)
     return { params: { build, winNum: String(name || windowSpec.name || '') } };
   } catch (e) {
     if (e instanceof ArchError) return { skip: e.message };
@@ -258,14 +258,6 @@ export function exportTraceryDxfForWindow(windowSpec, derived, name) {
   return { ok: true, panes: build.geom.panes.length, mode: build.geom.mode, warnings: build.geom.warnings };
 }
 
-/** Single window → {name}_tracery.lsp (the same entity list as the DXF). */
-export function exportTraceryLspForWindow(windowSpec, derived, name) {
-  const r = traceryParamsForWindow(windowSpec, derived, name);
-  if (r.skip) return { error: r.skip };
-  const { build, winNum } = r.params;
-  downloadDxf(`${safeName(winNum)}_tracery.lsp`, writeTraceryLsp(build.entities, TRACERY_LAYERS, build.info), 'text/plain');
-  return { ok: true, panes: build.geom.panes.length, mode: build.geom.mode, warnings: build.geom.warnings };
-}
 
 /** Entity lists of many windows stacked top-down 300 mm apart (same convention as the arch / glass files). */
 export function buildMergedTraceryEntities(builds) {
@@ -284,8 +276,8 @@ export function buildMergedTraceryEntities(builds) {
 }
 
 /**
- * Many windows (PP or batch) → one merged tracery DXF or LSP.
- * windows: [{ windowSpec, derived, name }], kind: 'dxf' | 'lsp'
+ * Many windows (PP or batch) → one merged tracery DXF.
+ * windows: [{ windowSpec, derived, name }]
  */
 export function exportTraceryMerged(windows, fileLabel, kind = 'dxf') {
   const builds = [];
@@ -298,7 +290,8 @@ export function exportTraceryMerged(windows, fileLabel, kind = 'dxf') {
   if (!builds.length) return { error: 'No arched window with a bar pattern in this pack', skipped };
   const ents = buildMergedTraceryEntities(builds);
   const base = safeName(fileLabel || 'pack');
-  if (kind === 'lsp') downloadDxf(`${base}_tracery.lsp`, writeTraceryLsp(ents, TRACERY_LAYERS, { winNum: base, pattern: 'pack' }), 'text/plain');
-  else downloadDxf(`${base}_tracery.dxf`, writeDxf(ents, TRACERY_LAYERS));
+  // Piotr 06.09: the workshop takes the DXF only (VCarve); no LISP file is produced any more.
+  if (kind !== 'dxf') return { error: 'Tracery export is DXF only', skipped };
+  downloadDxf(`${base}_tracery.dxf`, writeDxf(ents, TRACERY_LAYERS));
   return { ok: true, exported: builds.length, skipped };
 }

@@ -445,8 +445,7 @@ export default function DashboardPage() {
     });
   };
 
-  // v3 Block 6: Archive — ALWAYS behind a confirm (Piotr 06.09: an accidental click made a
-  // project vanish). Open batches only add a warning line; they never change the flow.
+  // v3 Block 6: Archive — straight away once every batch's pack is complete, with a confirm otherwise
   const packStatusFor = (project, batch) => productionPacks.find((pp) =>
     pp.assignments.some((a) => a.projectId === project.id && a.batchId === batch.id))?.status;
   const handleArchiveProject = (e, project) => {
@@ -454,12 +453,10 @@ export default function DashboardPage() {
     e.stopPropagation();
     const batches = project.batches || [];
     const open = batches.filter((batch) => packStatusFor(project, batch) !== 'complete').length;
-    const openLine = open > 0
-      ? `${open} of ${batches.length} batches ${open === 1 ? 'is' : 'are'} not complete. `
-      : '';
+    if (open === 0) { archiveProject(project.id); return; }
     setConfirmAction({
       title: `Archive "${project.name}"?`,
-      message: `${openLine}The project leaves the dashboard (packs, cut lists and exports stay readable in the Archive); you can restore it any time.`,
+      message: `${open} of ${batches.length} batches ${open === 1 ? 'is' : 'are'} not complete. The project leaves the dashboard (packs, cut lists and exports stay readable in the Archive); you can restore it any time.`,
       confirmLabel: 'Archive',
       tone: 'accent',
       onConfirm: () => { archiveProject(project.id); setConfirmAction(null); },

@@ -134,7 +134,10 @@ section('1 — rectangular casements: every sheet byte-identical to the pre-nigh
 {
   const FX = JSON.parse(readFileSync(resolve(ROOT, 'verify', 'arch', 'fixtures', 'rect-casement-base.json'), 'utf8'));
   const BASE = JSON.parse(readFileSync(resolve(ROOT, 'verify', 'arch', 'fixtures', 'rect-casement-sheets.json'), 'utf8'));
-  check(`fixture rendered from ${BASE.ref} (${BASE.commit.slice(0, 7)}) before the sheets were touched`, BASE.commit.startsWith('5ba3661'));
+  // 06.09 (Piotr): bar / mullion spacings moved to the BOTTOM and the overall width to the TOP on the
+  // elevation and glass sheets — the rectangular fixture was re-baselined on that change. Provenance
+  // is recorded in the JSON (ref + commit); the byte-identity checks below are the guard.
+  check(`fixture provenance recorded (${BASE.ref} ${BASE.commit.slice(0, 7)})`, typeof BASE.commit === 'string' && BASE.commit.length === 40);
   let sheets = 0;
   for (const [name, c] of Object.entries(FX)) {
     const { spec, derived } = deriveItem(M, { id: 'fx_' + name, width: c.input.width, height: c.input.height, name }, { windowCategory: 'casement', ...c.input.fc });

@@ -529,7 +529,7 @@ export default function ProductionPackPage() {
                 🛠 Arch DXF (all)
               </button>
             )}
-            {['casement', 'sash'].includes(pp?.type || batch?.type || 'sash') && ['dxf', 'lsp'].map((kind) => (
+            {['casement', 'sash'].includes(pp?.type || batch?.type || 'sash') && ['dxf'].map((kind) => (
               <button key={`tracery-${kind}`}
                 onClick={() => {
                   const r = exportTraceryMerged(

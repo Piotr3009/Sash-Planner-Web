@@ -377,10 +377,11 @@ section('5 — tracery on engine windows: modes, panes, exports, samples');
     writeFileSync(path, dxfText);
     const p = probe(path);
     check(`${name}: DXF round-trip: ${p.counts.ARKA_OUTLINE?.POLYLINE} OUTLINE polys = panes + board, MITRE ${p.counts.ARKA_MITRE?.POLYLINE}`, p.counts.ARKA_OUTLINE?.POLYLINE === b.geom.panes.length + 1 && p.counts.ARKA_MITRE?.POLYLINE === b.geom.guides.length);
-    const rl = cncExport.exportTraceryLspForWindow(spec, d, name);
-    const lspText = await lastBlob.text();
-    writeFileSync(resolve(SAMPLES, `sample_tracery_${name}.lsp`), lspText);
-    check(`${name}: exportTraceryLspForWindow → ${name}_tracery.lsp, same entities as the DXF`, rl.ok && lastName === `${name}_tracery.lsp` && tracery.parseTraceryLsp(lspText).length === b.entities.length);
+    // Piotr 06.09: the LISP file is no longer exported (DXF only). The writer stays as a harness
+    // cross-check: the same entity list serialised as LISP parses back 1:1.
+    const lspText = tracery.writeTraceryLsp(b.entities, tracery.TRACERY_LAYERS, b.info);
+    check(`${name}: LISP writer round-trip (harness only, no export button): same entity count as the DXF`, tracery.parseTraceryLsp(lspText).length === b.entities.length);
+    check(`${name}: exportTraceryLspForWindow is gone (DXF only)`, typeof cncExport.exportTraceryLspForWindow === 'undefined');
   }
   // no pattern → skip with the reason; rectangular → skip
   const plain = pcItem('TP', 1000, 1500, { archShape: 'three-centre', archStart: 1300, casementVBars: 2 });
@@ -391,7 +392,7 @@ section('5 — tracery on engine windows: modes, panes, exports, samples');
   const m = cncExport.exportTraceryMerged([{ windowSpec: cases[0][1], derived: derive(cases[0][1]), name: 'TH' }, { windowSpec: plain, derived: derive(plain), name: 'TP' }], 'Pack 1', 'dxf');
   check('merged DXF: 1 exported, 1 skipped with reason, Pack_1_tracery.dxf', m.ok && m.exported === 1 && m.skipped.length === 1 && lastName === 'Pack_1_tracery.dxf');
   const ml = cncExport.exportTraceryMerged([{ windowSpec: cases[0][1], derived: derive(cases[0][1]), name: 'TH' }], 'Pack 1', 'lsp');
-  check('merged LSP: Pack_1_tracery.lsp', ml.ok && lastName === 'Pack_1_tracery.lsp');
+  check('merged export refuses a LISP kind (DXF only since 06.09)', !!ml.error && /DXF only/.test(ml.error));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -445,7 +446,7 @@ section('8 — structural evidence (grep, not proof): buttons, store whitelist, 
   const pp = readFileSync(resolve(ROOT, 'src', 'pages', 'ProductionPackPage.jsx'), 'utf8');
   const store = readFileSync(resolve(ROOT, 'src', 'stores', 'projectStore.js'), 'utf8');
   const conf = readFileSync(resolve(ROOT, 'src', 'pages', 'ConfiguratorPage.jsx'), 'utf8');
-  check('WindowDetailPage: Tracery DXF + Tracery LSP buttons next to Arch DXF, disabled with the reason', wdp.includes('Tracery DXF') && wdp.includes('Tracery LSP') && wdp.includes('traceryParamsForWindow') && wdp.includes('disabled={!!tr.skip}'));
+  check('WindowDetailPage: Tracery DXF button next to Arch DXF, disabled with the reason; no LSP button (06.09)', wdp.includes('Tracery DXF') && !wdp.includes('Tracery LSP') && wdp.includes('traceryParamsForWindow') && wdp.includes('disabled={!!tr.skip}'));
   check('ProductionPackPage: Tracery DXF (all) / LSP (all)', pp.includes('exportTraceryMerged') && pp.includes('Tracery {kind.toUpperCase()} (all)'));
   check('projectStore whitelist: archSpokes / archRings (both create and update paths)', (store.match(/archSpokes: windowConfig\.archSpokes/g) || []).length === 2 && (store.match(/archRings: Array\.isArray\(windowConfig\.archRings\)/g) || []).length === 2);
   check('ConfiguratorPage: custom hub UI (spokes chips 3–9, rings text), saved only while custom', conf.includes("casArchPattern === 'custom'") && conf.includes('Custom hub — spokes') && conf.includes('archSpokes: isCustomHub ? casArchSpokes : null'));

@@ -117,6 +117,10 @@ export const DEFAULT_CASEMENT_PROFILE = {
     gapCill: 6,           // gap between bottom rail and cill
     cillVisible: 41,      // cill front height seen from outside
     glassInset: 12.5,     // glass enters the leaf rebate this deep, per side
+    // The leaf's glazing rebate is 18 deep everywhere — casement, sash, fixed
+    // (Piotr 06.09): 12.5 of it is glass, the remaining 5.5 takes the clips.
+    // A tracery board reaches the timber: it sits the full 18 in, not 12.5.
+    glazingRebate: 18,
     // Layer closure: 36+4 + leafH + 6+41 = extH  (full = extH − 87)
     //                top 36+4 + fan + 6+8 = T    (fan  = T − 54)
     //                13+4 + lower + 6+41 = extH − T (lower = extH − T − 64)

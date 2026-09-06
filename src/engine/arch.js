@@ -719,6 +719,71 @@ export function pieceJoints(piece) {
   return out;
 }
 
+/**
+ * One end edge of a piece's STOCK board in world coordinates: the two points
+ * where the end cut meets the board's long edges (w = wLo and w = wHi in the
+ * piece axes). Jointed ends are cut on the radial joint plane; the arch-start
+ * end on the springing line; a gothic apex end on the vertical axis. This is
+ * the raw timber piece after its angled cuts — no arcs (Piotr 06.09).
+ */
+export function pieceEndEdge(piece, which, wLo, wHi) {
+  const { b, u } = piece.axes;
+  const type = which === 'start' ? piece.endStart : piece.endEnd;
+  const aO = which === 'start' ? piece.outer.a0 : piece.outer.a1;
+  const aI = which === 'start' ? piece.inner.a0 : piece.inner.a1;
+  const P = (sv, w) => [sv * u[0] + w * b[0], sv * u[1] + w * b[1]];
+  const dot = (p, v) => p[0] * v[0] + p[1] * v[1];
+  const po = arcPoint(piece.outer, aO);
+  const pi = arcPoint(piece.inner, aI);
+  if (type === 'archStart' || type === 'axis') {
+    const horizontal = type === 'archStart';
+    const solve = (W) => {
+      const den = horizontal ? u[1] : u[0];
+      if (Math.abs(den) < 1e-9) {                     // piece axis parallel to the cut: square end at the band extent
+        const sv = which === 'start' ? piece.extents.s[0] : piece.extents.s[1];
+        return P(sv, W);
+      }
+      const sv = horizontal ? (po[1] - W * b[1]) / u[1] : (po[0] - W * b[0]) / u[0];
+      return P(sv, W);
+    };
+    return [solve(wLo), solve(wHi)];
+  }
+  const d = [po[0] - pi[0], po[1] - pi[1]];          // radial joint plane through this end
+  const dw = dot(d, b);
+  const w0 = dot(pi, b);
+  const at = (W) => { const t = (W - w0) / dw; return [pi[0] + t * d[0], pi[1] + t * d[1]]; };
+  return [at(wLo), at(wHi)];
+}
+
+/**
+ * The raw stock piece after its angled end cuts, in world (assembled)
+ * coordinates: a straight trapezoid `stock` wide (centred on the piece band),
+ * ends on the joint planes / springing line. Neighbours share their joint
+ * edge exactly, so the assembled set is the glued blank before machining.
+ * `fingerExt` extends every jointed end along the piece axis (rough length).
+ * Vertex order: [start-inner, end-inner, end-outer, start-outer]; the START
+ * end (arc a0) sits at −u, the END end (a1) at +u.
+ */
+export function pieceStockTrapezoid(piece, stock, fingerExt = 0) {
+  const { u } = piece.axes;
+  const wLo = piece.extents.w[0] - (stock - piece.projectedWidth) / 2;
+  const wHi = wLo + stock;
+  const [s0, s1] = pieceEndEdge(piece, 'start', wLo, wHi);
+  const [e0, e1] = pieceEndEdge(piece, 'end', wLo, wHi);
+  const [cutStart, cutEnd] = piece.endCuts;
+  const ext = (p, sign) => [p[0] + sign * fingerExt * u[0], p[1] + sign * fingerExt * u[1]];
+  const S0 = cutStart.jointed ? ext(s0, -1) : s0, S1 = cutStart.jointed ? ext(s1, -1) : s1;
+  const E0 = cutEnd.jointed ? ext(e0, +1) : e0, E1 = cutEnd.jointed ? ext(e1, +1) : e1;
+  return [[...S0, 0], [...E0, 0], [...E1, 0], [...S1, 0]];
+}
+
+/** Outer / inner straight edge lengths of the raw piece (no finger extension). */
+export function pieceStockEdges(piece, stock) {
+  const t = pieceStockTrapezoid(piece, stock, 0);
+  const len = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+  return { inner: len(t[0], t[1]), outer: len(t[3], t[2]) };
+}
+
 function stockFor(boardWidth, stockWidths) {
   const sorted = [...stockWidths].map(Number).filter((w) => w > 0).sort((a, b) => a - b);
   for (const w of sorted) if (w + 1e-9 >= boardWidth) return w;
@@ -772,9 +837,18 @@ export function planArchSegments(ring, opts) {
   const evaluate = (i, n) => {
     // rough length = band length + finger length per jointed end (spec §7.7,
     // conservative: the whole finger is added at every joint — Piotr may lower it)
-    const pieces = partitionArc(ring, i, n, band).map((p) => ({ ...p, roughLength: p.L + S.fingerLength * p.jointedEnds }));
+    const wReq0 = Math.max(...partitionArc(ring, i, n, band).map((p) => p.wReq));
+    const stock = stockFor(wReq0, S.stockWidths);
+    // Rough length = the raw piece's OUTER stock edge between its end cuts
+    // (Piotr 06.09: pieces are cut at their angles on the CNC) + finger length
+    // per jointed end. With no fitting stock the band chord stands in.
+    const pieces = partitionArc(ring, i, n, band).map((p) => {
+      const edges = stock != null ? pieceStockEdges(p, stock) : null;
+      const outerEdge = edges ? edges.outer : p.L;
+      return { ...p, stock, outerEdge, innerEdge: edges ? edges.inner : p.Lin, roughLength: outerEdge + S.fingerLength * p.jointedEnds };
+    });
     const wReq = Math.max(...pieces.map((p) => p.wReq));
-    const L = Math.max(...pieces.map((p) => p.L));
+    const L = Math.max(...pieces.map((p) => p.outerEdge));
     const roughLength = Math.max(...pieces.map((p) => p.roughLength));
     return {
       n, pieces,
@@ -782,9 +856,9 @@ export function planArchSegments(ring, opts) {
       projectedWidth: wReq,     // alias (drawing)
       boardWidth: wReq,         // alias (export messages)
       L,
-      chordLength: L,           // alias (drawing)
+      chordLength: L,           // alias (drawing): outer stock edge of the longest piece
       roughLength,
-      stock: stockFor(wReq, S.stockWidths),
+      stock,
     };
   };
   const arcs = ring.outer.map((outer, i) => {

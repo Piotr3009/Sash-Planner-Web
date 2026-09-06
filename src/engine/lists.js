@@ -160,6 +160,31 @@ export function buildCurvedMembersForWindow(derived, windowSpec) {
 export function blankPiecesForRecord(c, plan, resolveRaw) {
   const depth = Number(String(c.section).split('x')[1]) || 0;
   const out = [];
+  // Piotr 06.09: the pre-cut list shows EVERY piece of the blank (5 pieces on the arc = 5 rows),
+  // each with its own stock board, rough length (outer stock edge + finger per jointed end) and
+  // end cuts — end pieces differ from middle pieces, so one row per piece, not one per arc.
+  const cutCode = (cut) => `${cut.kind === 'joint' ? 'J' : cut.kind === 'spring' ? 'S' : 'A'}${Math.round(cut.angleDeg * 10) / 10}`;
+  if (Array.isArray(plan.pieces) && plan.pieces.length && plan.pieces.every((pc) => pc.stock)) {
+    plan.pieces.forEach((pc, i) => {
+      const raw = resolveRaw?.(c.elementName, { kind: 'blank', stock: pc.stock, depth }) || `${pc.stock}x${depth}`;
+      const [cutStart, cutEnd] = pc.endCuts || [];
+      const finger = pc.jointedEnds === 2 ? 'finger both ends' : pc.jointedEnds === 1 ? 'finger one end' : 'no finger';
+      out.push({
+        elementName: c.elementName,
+        length: Math.round(pc.roughLength),
+        finishedLength: Math.round(pc.outerEdge ?? pc.L),
+        section: raw,
+        finishedSection: c.section,
+        quantity: c.quantity || 1,
+        windowId: c.windowId,
+        windowName: c.windowName,
+        blank: true,
+        piece: `S${pc.no ?? i + 1}`,
+        note: `blank piece S${pc.no ?? i + 1} of ${c.elementName} · cut ${cutStart ? cutCode(cutStart) : '?'} / ${cutEnd ? cutCode(cutEnd) : '?'} · ${finger}`,
+      });
+    });
+    return out;
+  }
   for (const a of plan.arcs || []) {
     const d = a.default;
     if (!d || !d.stock) continue;

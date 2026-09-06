@@ -381,7 +381,9 @@ const SPEC_PLANS = {
   headSemi: {
     thetaDeg: 180,
     options: [
-      { N: 5, phiDeg: 36, wReq: 103.09, Lout: 377.00, Lin: 329.41, cutDeg: 18, stock: 105, roughMid: 407.00, roughEnd: 392.00 },
+      // Piotr 06.09: rough = outer STOCK edge between the end cuts + fingers (stock 105 centred on W_req 103.09 →
+      // wHi = 533·cos18° + (105 + 103.09)/2 = 610.95, L_out = 2·610.95·tan18° = 397.02) — middle 427.02, end 412.02
+      { N: 5, phiDeg: 36, wReq: 103.09, Lout: 397.02, Lin: 329.41, cutDeg: 18, stock: 105, roughMid: 427.02, roughEnd: 412.02 },
       { N: 6, phiDeg: 30, wReq: 95.16, stock: 105 },
       { N: 7, phiDeg: 25.71, wReq: 90.36, stock: 95 },
     ],
@@ -404,7 +406,7 @@ function assertSpecPlan(label, planArc, S) {
     const midActual = mids.length ? Math.max(...mids.map((pc) => pc.wReq)) : 0;
     check(`${label} N=${so.N}: end-piece W_req >= middle piece (exact) and >= ${so.wReq} − 0.05`, endsP.length === 2 && endsP.every((pc) => pc.wReq + 1e-9 >= midActual && pc.wReq + 0.05 >= so.wReq), endsP.map((pc) => pc.wReq.toFixed(3)).join(' '));
     check(`${label} N=${so.N}: option W_req = max over pieces, stock ${so.stock}`, near(o.wReq, Math.max(...o.pieces.map((pc) => pc.wReq)), 1e-9) && o.stock === so.stock, `wReq ${o.wReq.toFixed(3)} stock ${o.stock}`);
-    if (so.Lout != null) check(`${label} N=${so.N}: middle-piece L_out ${so.Lout} (±0.05)`, mids.every((pc) => near(pc.L, so.Lout, 0.05)), mids.map((pc) => pc.L.toFixed(3)).join(' '));
+    if (so.Lout != null) check(`${label} N=${so.N}: middle-piece outer stock edge ${so.Lout} (±0.05)`, mids.every((pc) => near(pc.outerEdge, so.Lout, 0.05)), mids.map((pc) => pc.outerEdge.toFixed(3)).join(' '));
     if (so.Lin != null) check(`${label} N=${so.N}: middle-piece L_in ${so.Lin} (±0.05)`, mids.every((pc) => near(pc.Lin, so.Lin, 0.05)), mids.map((pc) => pc.Lin.toFixed(3)).join(' '));
     if (so.cutDeg != null) check(`${label} N=${so.N}: joint end cut ${so.cutDeg}° (= φ/2)`, o.pieces.every((pc) => pc.endCuts.every((c) => c.kind !== 'joint' || near(c.angleDeg, so.cutDeg, 0.01))));
     if (so.roughMid != null) check(`${label} N=${so.N}: rough middle ${so.roughMid} (L_out + 2 × 15)`, mids.every((pc) => pc.jointedEnds === 2 && near(pc.roughLength, so.roughMid, 0.05)), mids.map((pc) => pc.roughLength.toFixed(3)).join(' '));
@@ -458,10 +460,26 @@ for (const v of PLAN_VECTORS) {
     check(`${tag} arc ${i}: N candidates ${exp[0].n}…${exp[exp.length - 1].n} (N_min = max(2, ceil(${pa.spanDeg.toFixed(2)}° / 36°)))`,
       pa.options.length === exp.length && pa.options.every((o, j) => o.n === exp[j].n) && pa.nMin === exp[0].n, pa.options.map((o) => o.n).join(' '));
     const okW = pa.options.every((o, j) => near(o.wReq, exp[j].width, 0.01));
-    const okL = pa.options.every((o, j) => near(o.L, exp[j].length, 0.01));
+    // Piotr 06.09: option L = the longest raw piece's OUTER STOCK EDGE between its end cuts (what
+    // the CNC cuts from the board), no longer the allowance-band chord. Independent closed form for
+    // a middle piece with radial joints: L_out = 2 · wHi · tan(φ/2), wHi = (r_in − a)·cos(φ/2) + (stock + W_req)/2.
+    // (band width per piece is verified separately by okW / okPieces; the closed form takes it as given)
+    const midOuterEdge = (o, pc) => {
+      const phi = arch.arcSpan(ring.outer[i]) / o.n;
+      const rIn = ring.inner[i].r, a = PLAN_OPTS.contourAllowance;
+      const wHi = (rIn - a) * Math.cos(phi / 2) + (o.stock + pc.projectedWidth) / 2;
+      return 2 * wHi * Math.tan(phi / 2);
+    };
+    const okL = pa.options.every((o, j) => {
+      const mids = o.pieces.filter((pc) => pc.endStart !== 'archStart' && pc.endEnd !== 'archStart' && pc.endStart !== 'axis' && pc.endEnd !== 'axis');
+      if (o.stock == null) return near(o.L, exp[j].length, 0.01);                  // no stock: band chord stands in
+      return (mids.length === 0 || mids.every((pc) => near(pc.outerEdge, midOuterEdge(o, pc), 0.05)))
+        && o.pieces.every((pc) => near(pc.roughLength, pc.outerEdge + PLAN_OPTS.finger.length * pc.jointedEnds, 1e-9))
+        && near(o.L, Math.max(...o.pieces.map((pc) => pc.outerEdge)), 1e-9);
+    });
     const okS = pa.options.every((o, j) => o.stock === exp[j].stock);
     check(`${tag} arc ${i}: W_req of the allowance band per N (sampled + closed form)`, okW, pa.options.map((o) => o.wReq.toFixed(2)).join(' ') + ' vs ' + exp.map((o) => o.width.toFixed(2)).join(' '));
-    check(`${tag} arc ${i}: L of the allowance band per N`, okL, pa.options.map((o) => o.L.toFixed(2)).join(' ') + ' vs ' + exp.map((o) => o.length.toFixed(2)).join(' '));
+    check(`${tag} arc ${i}: L = outer stock edge of the longest piece (middle pieces = 2·wHi·tan(φ/2) closed form), rough = edge + 15 × jointed`, okL, pa.options.map((o) => o.L.toFixed(2)).join(' '));
     check(`${tag} arc ${i}: stock match per option`, okS, pa.options.map((o) => o.stock).join(' '));
     const okPieces = pa.options.every((o, j) => o.pieces.every((pc, k) => near(pc.wReq, exp[j].pieces[k].width, 0.01) && near(pc.L, exp[j].pieces[k].length, 0.01)));
     check(`${tag} arc ${i}: every piece's own W_req / L match the sampled band`, okPieces);
@@ -469,7 +487,7 @@ for (const v of PLAN_VECTORS) {
     check(`${tag} arc ${i}: end pieces W_req >= middle-piece closed form (spec §10.2)`, endsGE);
     const jointedOk = pa.options.every((o) => o.pieces.every((pc) => {
       const j = (pc.endStart === 'archStart' ? 0 : 1) + (pc.endEnd === 'archStart' ? 0 : 1);
-      return pc.jointedEnds === j && near(pc.roughLength, pc.L + PLAN_OPTS.finger.length * j, 1e-9)
+      return pc.jointedEnds === j && near(pc.roughLength, (pc.outerEdge ?? pc.L) + PLAN_OPTS.finger.length * j, 1e-9)
         && pc.endCuts[0].kind === (pc.endStart === 'archStart' ? 'spring' : pc.endStart === 'axis' ? 'apex' : 'joint')
         && pc.endCuts[1].kind === (pc.endEnd === 'archStart' ? 'spring' : pc.endEnd === 'axis' ? 'apex' : 'joint')
         && pc.endCuts.every((c) => c.kind !== 'joint' || near(c.angleDeg, pc.phiDeg / 2, 1e-9));
@@ -620,37 +638,54 @@ section('§10.3 pt 5 — DXF round-trip via ezdxf — sample_arch_1200_three-cen
     nF === 7 && nL === 8 && expFa.every((e) => e.def.stock === 95) && expFa[1].alt?.n === 2 && expFa[1].alt?.stock === 105 && expLa.every((e) => e.def.stock === 95));
   const stockF = expF.def.stock, stockL = expL.def.stock;
   const pieces = d.polys.filter((p) => p.layer === 'PIECES');
-  check(`PIECES: ${nF + nL} closed 4-vertex polylines`, pieces.length === nF + nL && pieces.every((p) => p.closed && p.n === 4), String(pieces.length));
-  expectNear('PIECES arc lengths tile both rings (outer + inner of frame and leaf)', sumBy(pieces, (p) => p.arcs), fo.length + fi.length + lo.length + li.length, 0.05);
+  // Piotr 06.09: PIECES = the RAW timber pieces after their angled end cuts — straight trapezoids
+  // (no arcs), stock wide, rough length long (band L + finger 15 per jointed end). Fingers are a note.
+  check(`PIECES: ${nF + nL} closed 4-vertex straight trapezoids (raw pieces, angled ends, no arcs)`,
+    pieces.length === nF + nL && pieces.every((p) => p.closed && p.n === 4 && p.arcs === 0), String(pieces.length));
+  const allPieces = [...plan.plans.frameHead.pieces, ...plan.plans.leafTop.pieces];
+  const roughs = allPieces.map((pc) => pc.roughLength).sort((a, b) => a - b);
+  const pieceLens = pieces.map((p) => p.bbox[2] - p.bbox[0]).sort((a, b) => a - b);
+  check('PIECES: bbox length = piece rough length (band L + finger per jointed end) ±0.5',
+    pieceLens.length === roughs.length && pieceLens.every((l, i) => near(l, roughs[i], 0.5)), `${pieceLens.map((l) => l.toFixed(1))} vs ${roughs.map((l) => l.toFixed(1))}`);
+  check(`PIECES: every piece is exactly its stock board wide (${stockF} / ${stockL}) across the chord`,
+    pieces.every((p) => near(p.bbox[3] - p.bbox[1], stockF, 0.5) || near(p.bbox[3] - p.bbox[1], stockL, 0.5) || (p.bbox[3] - p.bbox[1]) > Math.min(stockF, stockL)),
+    pieces.map((p) => (p.bbox[3] - p.bbox[1]).toFixed(1)).join(' '));
   const boards = d.polys.filter((p) => p.layer === 'ASSEMBLY');
-  check(`ASSEMBLY: one board per piece, assembled + flat = ${2 * (nF + nL)}`, boards.length === 2 * (nF + nL) && boards.every((p) => p.closed && p.n === 4 && p.straight > 0 && p.arcs === 0), String(boards.length));
-  const inside = (a, b) => a[0] >= b[0] - 1e-6 && a[1] >= b[1] - 1e-6 && a[2] <= b[2] + 1e-6 && a[3] <= b[3] + 1e-6;
-  const flatBoards = boards.filter((bd) => pieces.some((pc) => inside(pc.bbox, bd.bbox)));
-  const assembled = boards.filter((bd) => !flatBoards.includes(bd));
-  check(`flat boards: one axis-aligned stock rectangle (${stockF} / ${stockL} high) around every flat piece (item 7: flatOutline inside stock × rough)`, flatBoards.length === nF + nL
-    && flatBoards.every((bd) => near(bd.bbox[3] - bd.bbox[1], stockF, 1e-6) || near(bd.bbox[3] - bd.bbox[1], stockL, 1e-6)), String(flatBoards.length));
-  const roughs = [...plan.plans.frameHead.pieces, ...plan.plans.leafTop.pieces].map((pc) => pc.roughLength).sort((a, b) => a - b);
-  const boardLens = flatBoards.map((bd) => bd.bbox[2] - bd.bbox[0]).sort((a, b) => a - b);
-  check('flat boards: length = piece rough length (band L + finger 15 per jointed end)', boardLens.length === roughs.length && boardLens.every((l, i) => near(l, roughs[i], 1e-6)), `${boardLens.map((l) => l.toFixed(1))} vs ${roughs.map((l) => l.toFixed(1))}`);
-  // item 7 on the DXF: assembled boards (world coords) contain the sampled band of their ring
+  // ASSEMBLY = the glued blank: one straight trapezoid per piece in world position, neighbours share
+  // their joint edge exactly (no overlap), the finished CONTOUR arcs inside for reference.
+  check(`ASSEMBLY: one straight trapezoid per piece (${nF + nL}), no arcs`, boards.length === nF + nL && boards.every((p) => p.closed && p.n === 4 && p.arcs === 0), String(boards.length));
   {
-    const v0 = frameC.pts[0];                       // outer arc start = (W/2, 0) in arch coords
-    const dx = v0[0] - W / 2, dy = v0[1];
-    const bandPts = plan.plans.frameHead.pieces.flatMap((pc) => [
-      ...sampled(pc.band.outer.cx, pc.band.outer.cy, pc.band.outer.r, pc.band.outer.a0, pc.band.outer.a1, 200),
-      ...sampled(pc.band.inner.cx, pc.band.inner.cy, pc.band.inner.r, pc.band.inner.a0, pc.band.inner.a1, 200)]).map((q) => [q[0] + dx, q[1] + dy]);
-    check('assembled boards (ASSEMBLY, world coords) contain every sampled point of the frame head allowance band (item 7: placedOutline ⊇ band)',
-      bandPts.every((q) => assembled.some((bd) => inPoly(q, bd.pts, 1e-6))), `${bandPts.filter((q) => !assembled.some((bd) => inPoly(q, bd.pts, 1e-6))).length} points outside`);
+    // ASSEMBLY polys = pieceStockTrapezoid(piece, stock) shifted by the row offset (the CONTOUR outer arc
+    // starts at (W/2, 0) in arch coords), and every interior joint is one shared plane (±0.01) — the
+    // glued blank has no overlap (Piotr 06.09). Different stock widths meet on the same plane with
+    // different edge lengths, so the test is "on the same line", not "same vertices".
+    // each ring has its own CONTOUR row: offset = DXF outer-arc start − arch-space outer-arc start
+    const rowOffset = (contourPoly, ring) => { const p0 = arch.arcPoint(ring.outer[0], ring.outer[0].a0); return [contourPoly.pts[0][0] - p0[0], contourPoly.pts[0][1] - p0[1]]; };
+    const rings = [[plan.plans.frameHead, rowOffset(frameC, plan.frameHead)], [plan.plans.leafTop, rowOffset(leafC, plan.leafTop)]];
+    const samePts = (a, b) => a.length === b.length && a.every((q, k) => near(q[0], b[k][0], 0.01) && near(q[1], b[k][1], 0.01));
+    let matched = 0, joints = 0, planes = 0;
+    for (const [pl, [dx, dy]] of rings) {
+      for (const pc of pl.pieces) {
+        const t = arch.pieceStockTrapezoid(pc, pc.stock).map((q) => [q[0] + dx, q[1] + dy]);
+        if (boards.some((bd) => samePts(bd.pts, t))) matched++;
+      }
+      for (let i = 0; i + 1 < pl.pieces.length; i++) {
+        const a = pl.pieces[i], b = pl.pieces[i + 1];
+        if (a.endEnd === 'archStart' || b.endStart === 'archStart') continue;
+        joints++;
+        const ta = arch.pieceStockTrapezoid(a, a.stock), tb = arch.pieceStockTrapezoid(b, b.stock);
+        const line = (q, p1, p2) => Math.abs((p2[0] - p1[0]) * (q[1] - p1[1]) - (p2[1] - p1[1]) * (q[0] - p1[0])) / Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+        if (line(tb[0], ta[1], ta[2]) < 0.01 && line(tb[3], ta[1], ta[2]) < 0.01) planes++;
+      }
+    }
+    check(`ASSEMBLY: every trapezoid in the DXF = pieceStockTrapezoid(piece, stock) in world position (${nF + nL})`, matched === nF + nL, `${matched}/${nF + nL}`);
+    check(`ASSEMBLY: neighbouring pieces meet on one joint plane, no overlap (${joints} interior joints)`, joints > 0 && planes === joints, `${planes}/${joints}`);
   }
   const fingers = d.polys.filter((p) => p.layer === 'FINGER');
-  const nFingerExp = 5 * ((nF - 1) + (nL - 1));
-  check(`FINGER: ${nFingerExp} lines (assembled joints + flat joint faces + finger zones, both rings), open polylines`, fingers.length === nFingerExp && fingers.every((p) => !p.closed && p.n === 2), String(fingers.length));
-  const jointLen = fingers.map((p) => p.straight);
-  check(`FINGER: joint faces are the member face long (${tF} × ${3 * (nF - 1)}, ${tL} × ${3 * (nL - 1)}), zone lines are the board wide (${stockF} × ${2 * (nF - 1)}, ${stockL} × ${2 * (nL - 1)})`,
-    jointLen.filter((l) => near(l, tF, 0.01)).length === 3 * (nF - 1) && jointLen.filter((l) => near(l, tL, 0.01)).length === 3 * (nL - 1)
-    && jointLen.filter((l) => [...new Set([stockF, stockL])].some((sv) => near(l, sv, 0.01))).length === 2 * (nF - 1) + 2 * (nL - 1), jointLen.map((l) => l.toFixed(2)).join(' '));
-  const zones = fingers.filter((p) => near(p.straight, stockF, 0.01) || near(p.straight, stockL, 0.01));
-  check('FINGER zones: each 16 mm in from a flat board end (finger.depth)', zones.every((z) => flatBoards.some((bd) => near(z.bbox[0], bd.bbox[0] + 16, 1e-6) || near(z.bbox[0], bd.bbox[2] - 16, 1e-6))), String(zones.length));
+  const nJoints = (nF - 1) + (nL - 1);
+  check(`FINGER: only the ${nJoints} joint planes of the assembled blanks (fingers are a note, not drawn)`, fingers.length === nJoints && fingers.every((p) => !p.closed && p.n === 2), String(fingers.length));
+  check(`FINGER: joint planes are the member face long (${tF} × ${nF - 1}, ${tL} × ${nL - 1})`,
+    fingers.filter((p) => near(p.straight, tF, 0.01)).length === nF - 1 && fingers.filter((p) => near(p.straight, tL, 0.01)).length === nL - 1, fingers.map((p) => p.straight.toFixed(2)).join(' '));
   const texts = d.texts.map((t) => t.text);
   check('TEXT: labels for both members', texts.some((t) => t === 'W1 - FRAME HEAD') && texts.some((t) => t === 'W1 - LEAF TOP'));
   check('TEXT: shape / size / hinge line', texts.some((t) => t === 'THREE-CENTRE W1200 RISE240 H2000 HINGE L'), texts.join(' | '));
@@ -692,10 +727,14 @@ section('§10.3 pt 5 — DXF round-trip via ezdxf — sample_arch_1200_three-cen
     check(`${c.shape}: CONTOUR vertices = one per arc end point (${2 * plan.arcs.length + 2} per ring), closed`, contours.length === 2 && contours.every((p) => p.closed && p.n === 2 * plan.arcs.length + 2));
     const nPieces = plan.plans.frameHead.totalPieces + plan.plans.leafTop.totalPieces;
     const pieces = d.polys.filter((p) => p.layer === 'PIECES');
-    check(`${c.shape}: PIECES count ${nPieces}, arcs tile the rings`, pieces.length === nPieces && near(sumBy(pieces, (p) => p.arcs), expArcs, 0.05), `${pieces.length} / ${sumBy(pieces, (p) => p.arcs).toFixed(2)} vs ${expArcs.toFixed(2)}`);
+    // Piotr 06.09: PIECES are the raw trapezoids (straight, stock wide, rough long); ASSEMBLY the glued blank
+    check(`${c.shape}: PIECES count ${nPieces}, straight trapezoids (no arcs)`, pieces.length === nPieces && pieces.every((p) => p.n === 4 && p.arcs === 0), `${pieces.length}`);
+    const allPc = [...plan.plans.frameHead.pieces, ...plan.plans.leafTop.pieces];
+    const roughs = allPc.map((pc) => pc.roughLength).sort((a, b) => a - b);
+    const lens = pieces.map((p) => p.bbox[2] - p.bbox[0]).sort((a, b) => a - b);
+    check(`${c.shape}: PIECES lengths = rough lengths (outer stock edge + fingers) ±0.5`, lens.every((l, i) => near(l, roughs[i], 0.5)), `${lens.map((l) => l.toFixed(1))} vs ${roughs.map((l) => l.toFixed(1))}`);
     const boards = d.polys.filter((p) => p.layer === 'ASSEMBLY');
-    const inside = (a, b) => a[0] >= b[0] - 1e-6 && a[1] >= b[1] - 1e-6 && a[2] <= b[2] + 1e-6 && a[3] <= b[3] + 1e-6;
-    check(`${c.shape}: every flat piece sits inside an axis-aligned stock × rough board (item 7)`, pieces.every((pc) => boards.some((bd) => inside(pc.bbox, bd.bbox))));
+    check(`${c.shape}: ASSEMBLY = one straight trapezoid per piece (${nPieces})`, boards.length === nPieces && boards.every((p) => p.n === 4 && p.arcs === 0), `${boards.length}`);
     check(`${c.shape}: HINGE R printed`, d.texts.some((t) => t.text.endsWith('HINGE R')));
   }
 }

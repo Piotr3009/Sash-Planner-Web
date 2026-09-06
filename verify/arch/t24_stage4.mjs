@@ -95,10 +95,13 @@ section('3 — Block 4: curved members → blank pieces in the pre-cut, BOM blan
   const items = pre.sashEngineering.flatMap((g) => g.items);
   const headBlanks = items.filter((it) => it.elementName === 'C-ARCH HEAD');
   const plan = d.arch.plans.frameHead;
-  check('pre-cut: C-ARCH HEAD is pre-cut as blank pieces (qty = n, length = rough, section = stock × 93, finishedLength = chord), not as the arc length', headBlanks.length === plan.arcs.length && headBlanks.every((it) => it.blank === true) && headBlanks[0].quantity === plan.arcs[0].default.n && headBlanks[0].length === Math.round(plan.arcs[0].default.roughLength) && headBlanks[0].section === `${plan.arcs[0].default.stock}x93` && headBlanks[0].finishedLength === Math.round(plan.arcs[0].default.chordLength) && !items.some((it) => it.elementName === 'C-ARCH HEAD' && !it.blank));
+  // 06.09 (Piotr): one pre-cut row PER PIECE (S1…Sn) — end pieces are shorter than middle pieces
+  check('pre-cut: C-ARCH HEAD is pre-cut as blank pieces — one row per piece (qty = record qty, length = that piece\'s rough, section = stock × 93, finishedLength = its outer stock edge), not as the arc length',
+    headBlanks.length === plan.pieces.length && headBlanks.every((it, i) => it.blank === true && it.quantity === 1 && it.length === Math.round(plan.pieces[i].roughLength) && it.section === `${plan.pieces[i].stock}x93` && it.finishedLength === Math.round(plan.pieces[i].outerEdge) && /^S\d+$/.test(it.piece))
+    && !items.some((it) => it.elementName === 'C-ARCH HEAD' && !it.blank), `${headBlanks.length} rows vs ${plan.pieces.length} pieces`);
   check('pre-cut: the jambs / cill / stiles are untouched (straight pieces + 20 machining)', items.some((it) => it.elementName === 'C-FRAME JAMB (L)' && it.length === Math.round(d.components.box.find((c) => c.elementName === 'C-FRAME JAMB (L)').length + 20)) && items.filter((it) => !it.blank).every((it) => it.section && it.length > 0));
   const qty = bom.buildWindowPartQtys(d, spec, {}, resolveRaw);
-  const headMm = plan.arcs.reduce((s, a) => s + a.default.n * Math.round(a.default.roughLength), 0);
+  const headMm = plan.pieces.reduce((s, pc) => s + Math.round(pc.roughLength), 0);   // 06.09: Σ per piece (end pieces shorter)
   check('BOM part quantities: c_frame_head mm = Σ pieces × rough length of the blank (board metres, not the arc)', qty.c_frame_head && near(qty.c_frame_head.mm, headMm, 0.5), JSON.stringify(qty.c_frame_head));
   const sashSpec = specification.normaliseToWindowSpec({ id: 'AS', name: 'AS', width: 1000, height: 2200 }, { fullConfig: { windowCategory: 'sash', sashType: 'arched-group', archShape: 'semi-circle' } });
   const ds = derive(sashSpec);
@@ -108,7 +111,7 @@ section('3 — Block 4: curved members → blank pieces in the pre-cut, BOM blan
   const circle = cas('CI', 800, 800, { casementKind: 'fixed', archShape: 'circle' });
   const dc = derive(circle);
   const cRows = lists.buildCurvedMembersForWindow(dc, circle);
-  check('circle: two rings, each with two arcs (180°) in the blank plan; pre-cut blanks 2 arcs × n', cRows.length === 2 && cRows[0].elementName === 'C-FRAME RING' && cRows[0].arcs.length === 2 && cRows[0].arcs.every((a) => a.spanDeg === 180) && lists.buildPrecutForWindow(dc, circle, {}, resolveRaw).sashEngineering.flatMap((g) => g.items).filter((it) => it.elementName === 'C-FRAME RING').length === 2);
+  check('circle: two rings, each with two arcs (180°) in the blank plan; pre-cut one row per piece (06.09)', cRows.length === 2 && cRows[0].elementName === 'C-FRAME RING' && cRows[0].arcs.length === 2 && cRows[0].arcs.every((a) => a.spanDeg === 180) && lists.buildPrecutForWindow(dc, circle, {}, resolveRaw).sashEngineering.flatMap((g) => g.items).filter((it) => it.elementName === 'C-FRAME RING').length === dc.arch.plans.frameHead.pieces.length);
   const plain = cas('P', 600, 1200, {});
   check('rectangular casement: no curved rows, pre-cut unchanged (no blank items)', lists.buildCurvedMembersForWindow(derive(plain), plain).length === 0 && !lists.buildPrecutForWindow(derive(plain), plain, {}, resolveRaw).sashEngineering.flatMap((g) => g.items).some((it) => it.blank));
   const pp = src('pages/ProductionPackPage.jsx');

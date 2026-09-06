@@ -279,17 +279,18 @@ section('7 — glazier DXF + tracery DXF / LSP for the circle (samples)');
   check('texts: GLASS CIRCLE, DIAMETER 611 R 305.5, BARS 8 PATTERN SUNBURST, spoke ends from apex', texts.some((t) => /GLASS CIRCLE$/.test(t)) && texts.some((t) => t.startsWith('DIAMETER 611 R 305.5')) && texts.some((t) => /BARS 8 PATTERN SUNBURST/.test(t)) && texts.some((t) => /FROM APEX/.test(t)));
   check('GLASS_BARS bands: 2 per straight bar + 2 per arc (ring R 105.5 ± 9)', (p.counts.GLASS_BARS?.POLYLINE || 0) === 16 && p.polys.filter((x) => x.layer === 'GLASS_BARS' && x.arcs > 0).length === 4);
   const tr = cncExport.traceryParamsForWindow(CIRCLE, DC, 'CIR');
-  check('traceryParamsForWindow: circle → full mode, 7 panes, board = the daylight circle (bbox 12.5 … 598.5)', !tr.skip && tr.params.build.geom.mode === 'full' && tr.params.build.geom.panes.length === 7 && near(tr.params.build.geom.bbox.minX, 12.5, 1e-6) && near(tr.params.build.geom.bbox.maxX, 611 - 12.5, 1e-6), tr.skip);
+  // Piotr 06.09: board = the unit circle + 5.5 all round (rebate 18 − glass 12.5): bbox −5.5 … 616.5
+  check('traceryParamsForWindow: circle → full mode, 7 panes, board = the unit circle + 5.5 (bbox −5.5 … 616.5)', !tr.skip && tr.params.build.geom.mode === 'full' && tr.params.build.geom.panes.length === 7 && near(tr.params.build.geom.bbox.minX, -5.5, 1e-6) && near(tr.params.build.geom.bbox.maxX, 611 + 5.5, 1e-6), tr.skip);
   const hubPane = tr.params.build.geom.panes.find((pn) => pn.daylight.edges.length === 2);
   check('the hub pane is a full circle: rail at R 105.5 − 11 + 2, limit at R 105.5 − 11 + 10 (bar half 11)', !!hubPane && near(hubPane.rail.edges[0].arc.r, 105.5 - 11 + 2, 1e-6) && near(hubPane.limit.edges[0].arc.r, 105.5 - 11 + 10, 1e-6));
   const rt = cncExport.exportTraceryDxfForWindow(CIRCLE, DC, 'CIR');
   writeFileSync(resolve(SAMPLES, 'sample_tracery_circle_800_sunburst.dxf'), await lastBlob.text());
   check('exportTraceryDxfForWindow → CIR_tracery.dxf, 7 panes', rt.ok && rt.panes === 7 && lastName === 'CIR_tracery.dxf');
-  const rl = cncExport.exportTraceryLspForWindow(CIRCLE, DC, 'CIR');
-  const lsp = await lastBlob.text();
-  writeFileSync(resolve(SAMPLES, 'sample_tracery_circle_800_sunburst.lsp'), lsp);
+  // 06.09 (Piotr): no LISP export any more — the writer is only a harness cross-check of the entity list
+  const lsp = tracery.writeTraceryLsp(rt.build?.entities || cncExport.traceryParamsForWindow(CIRCLE, DC, 'CIR').params.build.entities, tracery.TRACERY_LAYERS, { winNum: 'CIR', pattern: 'sunburst' });
   const parsed = tracery.parseTraceryLsp(lsp);
-  check('LSP round trip: same entity count as the DXF build, ARKA_OUTLINE circle present', rl.ok && parsed.length === tr.params.build.entities.length && parsed.some((e) => e.layer === 'ARKA_OUTLINE' && e.pts?.length === 2));
+  check('LISP writer round-trip (harness only): entity count = DXF entity count', parsed.length === cncExport.traceryParamsForWindow(CIRCLE, DC, 'CIR').params.build.entities.length);
+  check('exportTraceryLspForWindow is gone (DXF only)', typeof cncExport.exportTraceryLspForWindow === 'undefined');
   const pt = probe(resolve(SAMPLES, 'sample_tracery_circle_800_sunburst.dxf'));
   check('tracery DXF: ARKA_* layers, 7 × PANE + 7 × FRONT_HINGES_3MM, MITRE guides at the spoke corners (12 per outer pane = 24 corners … ≥ 12)', ['ARKA_OUTLINE', 'ARKA_PANE', 'ARKA_FRONT_HINGES_3MM', 'ARKA_MITRE', 'ARKA_SECTION'].every((l) => pt.layers.includes(l)) && (pt.counts.ARKA_PANE?.POLYLINE || 0) === 7 && (pt.counts.ARKA_MITRE?.POLYLINE || 0) >= 12);
 }

@@ -508,7 +508,12 @@ export function cornerGuides(contour, leg) {
 }
 
 // ── board + bars → geometry ─────────────────────────────────────────────────
-/** Board loop of an arched glass unit: the daylight (unit outline inset by glassInset), glass frame. */
+/**
+ * Board loop of an arched glass unit in the glass frame: the unit outline offset
+ * by `inset` (positive = inwards, negative = outwards). The tracery board sits
+ * the full glazing rebate in, so the engine path passes glassInset − glazingRebate
+ * (= −5.5 with 12.5 / 18): the board is 5.5 larger than the sealed unit all round.
+ */
 export function boardFromOutline(outline, glassInset) {
   const Wg = outline.width, ys = outline.springing;
   const arcs = glassEdgeArcs(outline, glassInset);
@@ -525,11 +530,23 @@ export function boardFromOutline(outline, glassInset) {
   return { curves, axisX: Wg / 2, centres: arcs.map((a) => [a.cx, a.cy]) };
 }
 
-/** Bar axes (derived.arch.bars, glass frame) → curves tagged 'bar'. */
-export function barCurves(bars) {
-  return (bars || []).map((b) => (b.kind === 'arc'
-    ? arcCurve([b.arc.cx, b.arc.cy], b.arc.r, b.arc.a0, b.arc.a1, 'bar')
-    : lineCurve(b.from, b.to, 'bar'))).filter((cv) => curveLength(cv) > 1e-6);
+/**
+ * Bar axes (derived.arch.bars, glass frame) → curves tagged 'bar'. The engine's
+ * bars end on the GLASS outline; the tracery board reaches the rebate bottom
+ * (`extend` = glazingRebate − glassInset beyond the unit), so every straight
+ * bar is lengthened by that amount at both ends — the timber bar runs to the
+ * board edge, otherwise the panes would not be separated. Rings and other arc
+ * bars end on bars, not on the edge, and are left alone.
+ */
+export function barCurves(bars, extend = 0) {
+  return (bars || []).map((b) => {
+    if (b.kind === 'arc') return arcCurve([b.arc.cx, b.arc.cy], b.arc.r, b.arc.a0, b.arc.a1, 'bar');
+    if (!(extend > 0)) return lineCurve(b.from, b.to, 'bar');
+    const dx = b.to[0] - b.from[0], dy = b.to[1] - b.from[1];
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    return lineCurve([b.from[0] - ux * extend, b.from[1] - uy * extend], [b.to[0] + ux * extend, b.to[1] + uy * extend], 'bar');
+  }).filter((cv) => curveLength(cv) > 1e-6);
 }
 
 const faceBounds = (face) => {
@@ -773,10 +790,16 @@ export function buildTraceryForDerived(derived, profile, winNum = '', opts = {})
   if (!A?.glassOutline || !A.bars) throw new ArchError('Tracery needs derived.arch (glass outline + bars)');
   const glassInset = Number(opts.glassInset ?? profile?.geometry?.glassInset);
   if (!(glassInset >= 0)) throw new ArchError('Casement profile geometry.glassInset is missing');
+  // The board reaches the timber at the bottom of the glazing rebate (Piotr 06.09): the glass
+  // unit sits glassInset (12.5) into an 18 mm rebate, the board the full rebate — so the board
+  // outline is the unit outline moved OUT by (glazingRebate − glassInset) = 5.5, all round.
+  const glazingRebate = Number(opts.glazingRebate ?? profile?.geometry?.glazingRebate);
+  if (!(glazingRebate >= glassInset)) throw new ArchError('Casement profile geometry.glazingRebate is missing or below glassInset');
   const T = readTraceryProfile(profile);
-  const board = boardFromOutline(A.glassOutline, glassInset);
+  const outset = glazingRebate - glassInset;                              // 5.5: board beyond the unit
+  const board = boardFromOutline(A.glassOutline, -outset);
   // a circle board is always cut whole (no springing line to mirror about)
-  const geom = buildTraceryGeometry(board, barCurves(A.bars), T, board.circle ? { ...opts, mode: 'full' } : opts);
+  const geom = buildTraceryGeometry(board, barCurves(A.bars, outset + 1), T, board.circle ? { ...opts, mode: 'full' } : opts);
   const by = A.bars.reduce((m, b) => { m[b.role] = (m[b.role] || 0) + 1; return m; }, {});
   const info = {
     winNum, pattern: A.pattern, spokes: (by.spoke || 0) + (by.springing || 0), rings: by.ring || 0,

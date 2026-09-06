@@ -13,7 +13,8 @@
  *      their assembly position (v3 0.1): the 4 mm gap and the 17 mm lap read
  *      directly; not a toolpath
  *   1. FRAME HEAD — CONTOUR: the finished member routed from the glued blank;
- *                   ASSEMBLY: the boards of the default plan in their glued
+ *                   ASSEMBLY: the raw pieces of the default plan as straight
+ *                   trapezoids meeting on their joint planes (the glued blank
  *                   position; FINGER: joint faces; TEXT: plan summary
  *   2. FRAME HEAD — PIECES: every board laid flat (chord horizontal) with the
  *                   piece contour to rout, its ROUGH stock rectangle
@@ -28,7 +29,7 @@
  * profile numbers are printed on the TEXT layer. dxfWriter has no linetypes
  * (every layer is CONTINUOUS), so the zone lines are plain short polylines.
  */
-import { ArchError, piecePoly, pieceJoints, ringPoly, arcPoint, arcBulge } from '../arch.js';
+import { ArchError, pieceJoints, ringPoly, arcPoint, arcBulge, pieceStockTrapezoid } from '../arch.js';
 import { entitiesBBox, MERGE_GAP } from './jambDxf.js';
 
 export const ARCH_LAYERS = Object.freeze([
@@ -70,16 +71,6 @@ function rotate(pts, theta) {
 }
 const key = (p) => `${p[0].toFixed(3)},${p[1].toFixed(3)}`;
 
-/** Stock board rectangle of a piece in its OWN axes → world points (assembled position). */
-function boardRectWorld(piece, stock) {
-  const { b, u } = piece.axes;
-  const [sMin, sMax] = piece.extents.s;
-  const wLo = piece.extents.w[0] - (stock - piece.projectedWidth) / 2;   // piece centred in the board
-  const wHi = wLo + stock;
-  const P = (s, w) => [s * u[0] + w * b[0], s * u[1] + w * b[1], 0];
-  return [P(sMin, wLo), P(sMax, wLo), P(sMax, wHi), P(sMin, wHi)];
-}
-
 function planSummary(plan) {
   return plan.arcs.map((a, i) => {
     const d = a.default;
@@ -108,7 +99,8 @@ function contourRow(ring, plan, ctx, ox, oy) {
   E.push(polyE('CONTOUR', ringPoly(ring)));
   const seen = new Set();
   for (const pc of plan.pieces) {
-    E.push(polyE('ASSEMBLY', boardRectWorld(pc, pc.stock)));
+    // glued-up blank: the stock trapezoids meet on their joint planes, no overlap (Piotr 06.09)
+    E.push(polyE('ASSEMBLY', pieceStockTrapezoid(pc, pc.stock)));
     for (const [pi, po] of pieceJoints(pc)) {
       const k = key(pi) + '|' + key(po);
       if (seen.has(k)) continue;
@@ -219,31 +211,22 @@ function piecesRow(ring, plan, ctx, ox, oy) {
   const f = ctx.finger;
   for (const pc of plan.pieces) {
     const theta = Math.PI / 2 - pc.axes.bisector;      // bisector → +y, chord → x
-    const [sMin, sMax] = pc.extents.s;
-    const pad = (pc.stock - pc.projectedWidth) / 2;
-    const wLo = pc.extents.w[0] - pad;
     const [cutStart, cutEnd] = pc.endCuts;
-    const mLeft = cutEnd.jointed ? f.length : 0;       // END end is drawn on the left
-    const mRight = cutStart.jointed ? f.length : 0;    // START end on the right
-    const L = sMax - sMin;
-    const rough = mLeft + L + mRight;
-    // after rotation the chord axis u maps to −x, so s ∈ [sMin, sMax] → x ∈ [x + mLeft, x + mLeft + L]
-    const dx = x + mLeft + sMax, dy = oy - wLo;
-    E.push(polyE('ASSEMBLY', [[x, oy, 0], [x + rough, oy, 0], [x + rough, oy + pc.stock, 0], [x, oy + pc.stock, 0]]));
-    E.push(polyE('PIECES', shift(rotate(piecePoly(pc), theta), dx, dy)));
-    for (const [pi, po] of pieceJoints(pc)) {
-      const [[ax, ay], [bx, by]] = rotate([[pi[0], pi[1], 0], [po[0], po[1], 0]], theta);
-      E.push(lineE('FINGER', [ax + dx, ay + dy], [bx + dx, by + dy]));
-    }
-    // finger zones: finger depth in from each jointed board end, full board height
-    if (cutEnd.jointed) E.push(lineE('FINGER', [x + f.depth, oy], [x + f.depth, oy + pc.stock]));
-    if (cutStart.jointed) E.push(lineE('FINGER', [x + rough - f.depth, oy], [x + rough - f.depth, oy + pc.stock]));
+    const L = pc.outerEdge ?? pc.L;
+    // The raw piece: a straight trapezoid (angled ends, finger extension on jointed
+    // ends) laid flat — chord horizontal, END end on the left. Fingers are a note,
+    // not drawn (Piotr 06.09: "fingers tylko jako obliczenia").
+    const trap = rotate(pieceStockTrapezoid(pc, pc.stock, f.length), theta);
+    const minX = Math.min(...trap.map((q) => q[0])), minY = Math.min(...trap.map((q) => q[1]));
+    const dx = x - minX, dy = oy - minY;
+    E.push(polyE('PIECES', shift(trap, dx, dy)));
     const fingerTxt = pc.jointedEnds === 2 ? 'FINGER BOTH ENDS' : pc.jointedEnds === 1 ? 'FINGER ONE END' : 'NO FINGER';
-    E.push(labelE('TEXT', x + rough / 2, oy + pc.stock / 2 + C.noteH, C.textH,
-      `${ctx.winNum ? ctx.winNum + ' - ' : ''}${ring.label} P${pc.no} L${fmt1(rough)} x${pc.stock}`));
-    E.push(labelE('TEXT', x + rough / 2, oy + C.noteH, C.noteH,
-      `OUT ${fmt1(L)} IN ${fmt1(pc.Lin)} CUT ${cutCode(cutEnd)}/${cutCode(cutStart)} ${fingerTxt}`));
-    x += rough + C.pieceGap;
+    const roughDrawn = Math.max(...trap.map((q) => q[0])) - minX;      // rough length = drawn width incl. fingers
+    E.push(labelE('TEXT', x + roughDrawn / 2, oy + pc.stock / 2 + C.noteH, C.textH,
+      `${ctx.winNum ? ctx.winNum + ' - ' : ''}${ring.label} P${pc.no} L${fmt1(roughDrawn)} x${pc.stock}`));
+    E.push(labelE('TEXT', x + roughDrawn / 2, oy + C.noteH, C.noteH,
+      `OUT ${fmt1(L)} IN ${fmt1(pc.innerEdge ?? pc.Lin)} CUT ${cutCode(cutEnd)}/${cutCode(cutStart)} ${fingerTxt}`));
+    x += roughDrawn + C.pieceGap;
     rowH = Math.max(rowH, pc.stock);
   }
   return { entities: E, width: Math.max(0, x - C.pieceGap - ox), height: rowH };

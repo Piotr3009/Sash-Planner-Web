@@ -25,7 +25,7 @@ import ExportControls from '../components/export/ExportControls.jsx';
 import { exportGlassPDF } from '../utils/glassPdfExport.js';
 import { exportGlassDxfForWindow, glassDxfParamsForWindow } from '../utils/glassDxfExport.js';
 import { exportBomPDF } from '../utils/bomPdfExport.js';
-import { exportCncJambsForWindow, canExportCncJambs, exportArchDxfForWindow, archParamsForWindow, traceryParamsForWindow, exportTraceryDxfForWindow, exportTraceryLspForWindow } from '../utils/cncExport.js';
+import { exportCncJambsForWindow, canExportCncJambs, exportArchDxfForWindow, archParamsForWindow, traceryParamsForWindow, exportTraceryDxfForWindow } from '../utils/cncExport.js';
 
 
 const TABS = [
@@ -157,9 +157,6 @@ export default function WindowDetailPage() {
               <button onClick={() => run(exportTraceryDxfForWindow, 'Tracery DXF')} disabled={!!tr.skip}
                 title={tr.skip ? `Tracery DXF unavailable: ${tr.skip}` : 'Tracery board DXF (arka layers: pane daylights, +2 rail, +10 limit, corner guides, section) for VCarve'}
                 className={cls}>🪟 Tracery DXF</button>
-              <button onClick={() => run(exportTraceryLspForWindow, 'Tracery LSP')} disabled={!!tr.skip}
-                title={tr.skip ? `Tracery LSP unavailable: ${tr.skip}` : 'The same tracery as AutoLISP (APPLOAD, then ARKA)'}
-                className={cls}>🪟 Tracery LSP</button>
             </>);
           })()}
           <Link to={editUrl} className="btn btn-primary text-sm">✏️ Edit Configuration</Link>

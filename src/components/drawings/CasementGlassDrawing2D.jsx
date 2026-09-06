@@ -128,7 +128,8 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
 
   const ox = MGN_LEFT, oy = MGN_TOP;
   const totalW = ox + glassW + MGN_RIGHT;
-  const totalH = oy + glassH + MGN_BOT + MGN_TABLE + MGN_TITLE;
+  const MGN_CHAIN = 30 * layoutSc;                        // bar-spacing chain under the glass (Piotr 06.09)
+  const totalH = oy + glassH + MGN_BOT + MGN_CHAIN + MGN_TABLE + MGN_TITLE;
   const ts = totalW / VIEWBOX_REF;
   const sw = (n) => n * layoutSc;
   const X = (x) => ox + x;
@@ -206,7 +207,7 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
       ? `Circle · Ø ${fmt(arch.outline.width)} · R ${fmt(arch.outline.radius)} · ${arch.bars.length} bars · edge ${fmt(arch.edgeCover)} · spacer ${fmt(arch.spacer)}`
       : `${arch.label} · springing ${fmt(arch.outline.springing)} · rise ${fmt(arch.outline.rise)} · ${radiiText(arch.outline.arcs)} · ${arch.bars.length} bars · edge ${fmt(arch.edgeCover)} · spacer ${fmt(arch.spacer)}`)
     : '';
-  const tableTop = oy + glassH + MGN_BOT;
+  const tableTop = oy + glassH + MGN_BOT + MGN_CHAIN;   // bar-spacing chain sits under the glass since 06.09
   const tableFs = tfs(SIZES.dimSmall, totalW);
   const titleY = tableTop + MGN_TABLE + MGN_TITLE * 0.35;
 
@@ -279,8 +280,10 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
         ))}
 
         {/* Chains (only when spacers present) */}
+        {/* Piotr 06.09: bar spacings run along the BOTTOM edge (the glazier measures from the bottom
+            corners), the overall width sits at the TOP */}
         {vBarsDim.length > 0 && (
-          <DimChainH y={oy - 24 * ts} cuts={topCuts.map(X)} extFrom={oy - 4 * ts}
+          <DimChainH y={oy + glassH + 24 * ts} cuts={topCuts.map(X)} extFrom={oy + glassH + 4 * ts}
             vbw={totalW} fmt={(n) => fmt(n)} />
         )}
         {hBarsDim.length > 0 && (
@@ -337,8 +340,8 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
           </g>
         )}
 
-        {/* Overall */}
-        <DimH y={oy + glassH + 30 * ts} x1={X(0)} x2={X(glassW)} extFrom={Y(glassH)}
+        {/* Overall width at the top (Piotr 06.09), height on the right */}
+        <DimH y={oy - 30 * ts} x1={X(0)} x2={X(glassW)} extFrom={Y(0)}
           label={fmt(glassW)} vbw={totalW} />
         <DimV x={ox + glassW + (AP ? 74 : 34) * ts} y1={Y(0)} y2={Y(glassH)} extFrom={X(glassW)}
           label={fmt(glassH)} vbw={totalW} />

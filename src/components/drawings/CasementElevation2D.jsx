@@ -258,9 +258,10 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
             y1={Y(0)} y2={Y(tr.axisT)} extFrom={X(0)}
             label={`T ${fmt(tr.axisT)}`} small vbw={totalW} />
         ))}
+        {/* Piotr 06.09: mullion axes measured along the BOTTOM, the overall width at the TOP */}
         {geom.mullions.filter((mu) => mu.full).map((mu, i) => (
-          <DimH key={`ma-${i}`} y={oy - DM * (0.45 + i * 0.35)}
-            x1={X(0)} x2={X(mu.axisX)} extFrom={Y(0)}
+          <DimH key={`ma-${i}`} y={oy + fh + DM * (0.45 + i * 0.35)}
+            x1={X(0)} x2={X(mu.axisX)} extFrom={Y(fh)}
             label={`axis ${fmt(mu.axisX)}`} small vbw={totalW} />
         ))}
 
@@ -281,8 +282,8 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
           </g>
         )}
 
-        {/* ── OVERALL DIMS ── */}
-        <DimH y={oy + fh + DM * 0.8} x1={X(0)} x2={X(fw)} extFrom={Y(fh)}
+        {/* ── OVERALL DIMS: width at the top (Piotr 06.09), height on the right ── */}
+        <DimH y={oy - DM * 0.8} x1={X(0)} x2={X(fw)} extFrom={Y(0)}
           label={fmt(fw)} vbw={totalW} />
         <DimV x={ox + fw + DM * 0.8} y1={Y(0)} y2={Y(fh)} extFrom={X(fw)}
           label={fmt(fh)} vbw={totalW} />
