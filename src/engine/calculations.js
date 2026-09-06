@@ -656,7 +656,7 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
         // circle (v3 Block 3): frame ring + leaf ring on the profile faces, the
         // glass a full circle at leafInner − glassInset, bars = chords + sunburst
         AG = buildCircleGeometry({ width: frameWidth, height: frameHeight }, p);
-        archPlans = { frameHead: planArchSegments(AG.frameHead, p.arch), leafTop: planArchSegments(AG.leafTop, p.arch) };
+        archPlans = { frameHead: planArchSegments(AG.frameHead, p.arch, p.cnc), leafTop: planArchSegments(AG.leafTop, p.arch, p.cnc) };
         archOutline = buildCircleGlassOutline(AG.glass.arcs);
         glassBottomEdge = frameHeight / 2 - AG.glass.radius;
         archBars = buildCircleBars({
@@ -669,7 +669,7 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     } else if (archSpec) {
         if (glassInset == null) throw new ArchError('Casement profile geometry.glassInset is missing — required for the arched glass outline');
         AG = buildArchGeometry({ shape: archSpec.shape, width: frameWidth, height: frameHeight, rise: archSpec.rise }, p);
-        archPlans = { frameHead: planArchSegments(AG.frameHead, p.arch), leafTop: planArchSegments(AG.leafTop, p.arch) };
+        archPlans = { frameHead: planArchSegments(AG.frameHead, p.arch, p.cnc), leafTop: planArchSegments(AG.leafTop, p.arch, p.cnc) };
         // Glass bottom edge from the frame bottom: cill side of the leaf
         // (gap + cill land = leafFullHeight − leafAtJamb) + bottom rail face − glass inset.
         const cillSide = ded.leafFullHeight - ded.leafAtJamb;
@@ -1428,7 +1428,7 @@ export function deriveWindowData(windowSpec, settings = {}) {
         const prof = getWindowProfile();
         const cp = getCasementProfile();                     // blank planner + pattern numbers live once, here
         const SA = buildSashArchGeometry({ shape: sashArchSpec.shape, width: frameWidth, height: frameHeight, rise: sashArchSpec.rise }, prof, CONSTANTS.GLASS_REBATE);
-        const plans = { head: planArchSegments(SA.head, cp.arch), topRail: planArchSegments(SA.topRail, cp.arch) };
+        const plans = { head: planArchSegments(SA.head, cp.arch, cp.cnc), topRail: planArchSegments(SA.topRail, cp.arch, cp.cnc) };
         const R = (v) => Math.round(v * 10) / 10;
         const f = sashFaces();
         // upper glass: bottom edge = meeting rail bottom + meeting rail face − rebate, springing at H − rise

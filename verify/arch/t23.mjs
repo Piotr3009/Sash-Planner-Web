@@ -131,8 +131,11 @@ section('1 — circle geometry + bars (arch.js): rings on the profile faces, pla
   check('ring lengths: frame centre 2π·371.5, leaf centre 2π·326.5; ringPoly closes (6 vertices)',
     near(G.frameHead.lengths.centre, 2 * Math.PI * 371.5, 1e-6) && near(G.leafTop.lengths.centre, 2 * Math.PI * 326.5, 1e-6) && arch.ringPoly(G.frameHead).length === 6);
   const plan = arch.buildCirclePlan({ width: 800, height: 800 }, CP);
-  check('buildCirclePlan: kind circle, no hinge, frame ring 2 × 180° arcs → 5 pieces each (max 36°), stock found',
-    plan.kind === 'circle' && plan.hinge === null && !plan.noStock && plan.plans.frameHead.arcs.length === 2 && plan.plans.frameHead.arcs.every((a) => near(a.spanDeg, 180, 1e-6) && a.default?.n === 5));
+  // v4 Block C: a circle ring is ONE closed planning group (360°, radial joints only); the 800 frame ring = 4 × 180,
+  // the 800 LEAF ring is BLOCKED by the 400 shorter-edge limit (4 × 180 → 390.1) and reported, never split finer (t25, BLOCKERS)
+  check('buildCirclePlan (v4): kind circle, no hinge, frame ring = one 360° group → 4 pieces × 180; leaf ring blocked "below minimum length" (shorter edge 390 < 400)',
+    plan.kind === 'circle' && plan.hinge === null && plan.noStock && plan.plans.frameHead.arcs.length === 1 && near(plan.plans.frameHead.arcs[0].spanDeg, 360, 1e-6) && plan.plans.frameHead.arcs[0].default?.n === 4 && plan.plans.frameHead.arcs[0].default?.stock === 180
+    && plan.plans.leafTop.noStock && plan.plans.leafTop.noStockReason === 'below minimum length' && /shorter edge 390(\.\d)? < 400/.test(plan.plans.leafTop.reasons[0]), plan.plans.leafTop.reasons.join(' | '));
   expectThrows('height ≠ width → readable ArchError', () => arch.buildCircleGeometry({ width: 800, height: 900 }, CP), /height must equal the diameter/);
   expectThrows('diameter below the profile minimum → ArchError', () => arch.buildCircleGeometry({ width: 300, height: 300 }, CP), /outside/);
   const O = arch.buildCircleGlassOutline(G.glass.arcs);
@@ -170,7 +173,7 @@ const DC = derive(CIRCLE);
   const box = DC.components.box, sash = DC.components.sash;
   check('windowSpec: category casement, kind fixed, arch.shape circle, rise = start = 400, hinge null', CIRCLE.category === 'casement' && CIRCLE.casement.kind === 'fixed' && CIRCLE.arch.shape === 'circle' && CIRCLE.arch.rise === 400 && CIRCLE.arch.hinge === null);
   check('box = ONE record C-FRAME RING 57x93, L = 2π·371.5 (centre line), planner notes + "fixed leaf"',
-    box.length === 1 && box[0].elementName === 'C-FRAME RING' && box[0].code === 'C-FRR' && box[0].section === '57x93' && near(box[0].length, 2334.2, 0.05) && /10 pieces/.test(box[0].notes) && /fixed leaf/.test(box[0].notes));
+    box.length === 1 && box[0].elementName === 'C-FRAME RING' && box[0].code === 'C-FRR' && box[0].section === '57x93' && near(box[0].length, 2334.2, 0.05) && /4 pieces · stock 180/.test(box[0].notes) && /fixed leaf/.test(box[0].notes));
   check('sash = C-LEAF RING 67x57 L 2π·326.5 (+ C-TRACERY for the sunburst) — no stiles, no rails, no jambs, no cill',
     sash.map((r) => r.elementName).join(',') === 'C-LEAF RING,C-TRACERY' && sash[0].code === 'C-LFR-P1' && near(sash[0].length, 2051.5, 0.05) && /^18x/.test(sash[1].section));
   check('no hardware: openers 0, hinge / lock picks null, summaries empty, leafWeights null, derived.casement.kind fixed',
@@ -178,8 +181,8 @@ const DC = derive(CIRCLE);
   const g = DC.customGlassUnits[0];
   check('glass: one unit 611 × 611, kind circle, area π·305.5², poly 2 × bulge 1, bars 8 (ring ×2 + 6 spokes)',
     DC.customGlassUnits.length === 1 && g.width === 611 && g.shape.kind === 'circle' && near(g.shape.area, Math.PI * 305.5 ** 2, 1e-3) && g.shape.poly.length === 2 && g.shape.bars.length === 8 && g.shape.pattern === 'sunburst');
-  check('derived.arch: shape circle, plans on both rings, tracery full mode 7 panes (hub + 6), glassOutline origin (94.5, 94.5) + centreFrame (400, 400)',
-    DC.arch.shape === 'circle' && DC.arch.plans.frameHead.totalPieces === 10 && DC.arch.tracery?.mode === 'full' && DC.arch.tracery.panes === 7 && near(DC.arch.glassOutline.origin.x, 94.5, 1e-6) && DC.arch.glassOutline.centreFrame.x === 400);
+  check('derived.arch: shape circle, frame ring plan 4 pieces (leaf ring blocked by the 400 limit — noted, see t25), tracery full mode 7 panes (hub + 6), glassOutline origin (94.5, 94.5) + centreFrame (400, 400)',
+    DC.arch.shape === 'circle' && DC.arch.plans.frameHead.totalPieces === 4 && DC.arch.plans.leafTop.noStock && DC.arch.tracery?.mode === 'full' && DC.arch.tracery.panes === 7 && near(DC.arch.glassOutline.origin.x, 94.5, 1e-6) && DC.arch.glassOutline.centreFrame.x === 400);
   check('seals: frame seal = 2π·400 × 1.1 (no jambs, no cill run); paint from π·R² + tracery timber; glass sqm = true area',
     near(DC.consumables.sealFrame.meters, 2 * Math.PI * 0.4 * 1.1, 0.01) && DC.paint.areaSqm >= 0.5 && near(DC.consumables.glass.sqm, Math.PI * 0.3055 ** 2, 0.01));
   check('beading: glazing bead = 2π·305.5 × 1.15, astragal = bar run × 1.15 (both faces)',
@@ -238,19 +241,24 @@ section('5 — import: PSW fix-only product, PC casementKind, errors');
 // ═══════════════════════════════════════════════════════════════════════════
 section('6 — CNC DXF: circle rings (CONTOUR / PIECES / FIT), FIXED LEAF text, samples');
 {
-  const r = cncExport.archParamsForWindow(CIRCLE, 'CIR');
-  check('archParamsForWindow accepts the circle: plan kind circle, rings FRAME RING / LEAF RING', !r.skip && r.params.plan.kind === 'circle' && r.params.plan.frameHead.label === 'FRAME RING' && r.params.plan.leafTop.label === 'LEAF RING', r.skip);
+  // v4 Block C: the 800 circle's LEAF ring is blocked by the 400 limit → the export skips it honestly; the CNC sample is a 1000 circle
+  const r800 = cncExport.archParamsForWindow(CIRCLE, 'CIR');
+  check('archParamsForWindow on the 800 circle: skip "below minimum length" naming the leaf ring (4 pieces on 180, shorter edge 390 < 400)', /^no valid blank plan \(below minimum length\): leaf top chain: 4 pieces fit a 180 board but fall below the minimum length \(piece \d of 4: shorter edge 390(\.\d)? < 400/.test(r800.skip || ''), r800.skip);
+  const CIRCLE1000 = cas('CIR', 1000, 1000, { casementKind: 'fixed', archShape: 'circle', archBarPattern: 'sunburst' });
+  const r = cncExport.archParamsForWindow(CIRCLE1000, 'CIR');
+  check('archParamsForWindow accepts the 1000 circle: plan kind circle, rings FRAME RING / LEAF RING, one 360° group per ring', !r.skip && r.params.plan.kind === 'circle' && r.params.plan.frameHead.label === 'FRAME RING' && r.params.plan.leafTop.label === 'LEAF RING' && r.params.plan.plans.frameHead.arcs.length === 1 && r.params.plan.plans.leafTop.arcs.length === 1, r.skip);
   const ents = archDxf.buildArchEntities(r.params.plan, 'CIR', 0, 0);
-  const path = resolve(SAMPLES, 'sample_circle_800_sunburst.dxf');
+  const path = resolve(SAMPLES, 'sample_circle_1000_sunburst.dxf');
   writeFileSync(path, dxfWriter.writeDxf(ents, archDxf.ARCH_LAYERS));
   const p = probe(path);
   const texts = p.texts.map((t) => t.text);
-  check('DXF texts: CIR - FRAME RING / LEAF RING rows, CIRCLE W800 RISE400 H800 FIXED LEAF, no HINGE', texts.some((t) => t === 'CIR - FRAME RING') && texts.some((t) => t === 'CIR - LEAF RING') && texts.some((t) => t.startsWith('CIRCLE W800 RISE400 H800 FIXED LEAF')) && !texts.some((t) => /HINGE/.test(t)));
+  check('DXF texts: CIR - FRAME RING / LEAF RING rows, CIRCLE W1000 RISE500 H1000 FIXED LEAF, RING summary lines, no HINGE', texts.some((t) => t === 'CIR - FRAME RING') && texts.some((t) => t === 'CIR - LEAF RING') && texts.some((t) => t.startsWith('CIRCLE W1000 RISE500 H1000 FIXED LEAF')) && texts.filter((t) => /^RING R\d+ L[\d.]+ 360DEG: FEWEST/.test(t)).length === 2 && !texts.some((t) => /HINGE/.test(t)));
   const fit = p.polys.filter((x) => x.layer === 'FIT');
   const radii = fit.filter((x) => x.closed).flatMap((x) => polyArcs(x.pts.map((pt, i) => [pt[0], pt[1], x.bulges[i]]), true).map((a) => +a.r.toFixed(3)));
-  check('FIT row: closed rings 400 / 343, 360 / 293 and the glass circle 305.5; rebate wall R 364 dashed', [400, 343, 360, 293, 305.5].every((w) => radii.some((x) => near(x, w, 0.01))) && fit.some((x) => !x.closed) && polyArcs(fit.find((x) => !x.closed).pts.map((pt, i) => [pt[0], pt[1], fit.find((x) => !x.closed).bulges[i]]), false).every((a) => near(a.r, 364, 0.05)));
-  check('CONTOUR / PIECES / ASSEMBLY / FINGER present, R12; 24 piece contours (10 + 14)', p.version === 'AC1009' && ['CONTOUR', 'PIECES', 'ASSEMBLY', 'FINGER'].every((l) => p.counts[l]) && p.polys.filter((x) => x.layer === 'PIECES').length === 24);
-  const dl = cncExport.exportArchDxfForWindow(CIRCLE, 'CIR');
+  check('FIT row: closed rings 500 / 443, 460 / 393 and the glass circle 405.5; rebate wall R 464 dashed', [500, 443, 460, 393, 405.5].every((w) => radii.some((x) => near(x, w, 0.01))) && fit.some((x) => !x.closed) && polyArcs(fit.find((x) => !x.closed).pts.map((pt, i) => [pt[0], pt[1], fit.find((x) => !x.closed).bulges[i]]), false).every((a) => near(a.r, 464, 0.05)));
+  const nPieces = r.params.plan.plans.frameHead.totalPieces + r.params.plan.plans.leafTop.totalPieces;
+  check(`CONTOUR / PIECES / ASSEMBLY / FINGER / CLAMPS present, R12; ${nPieces} piece trapezoids (frame ${r.params.plan.plans.frameHead.totalPieces} + leaf ${r.params.plan.plans.leafTop.totalPieces}), every piece jointed at both ends (closed ring)`, p.version === 'AC1009' && ['CONTOUR', 'PIECES', 'ASSEMBLY', 'FINGER', 'CLAMPS'].every((l) => p.counts[l]) && p.polys.filter((x) => x.layer === 'PIECES').length === nPieces && [...r.params.plan.plans.frameHead.pieces, ...r.params.plan.plans.leafTop.pieces].every((pc) => pc.jointedEnds === 2));
+  const dl = cncExport.exportArchDxfForWindow(CIRCLE1000, 'CIR');
   check('exportArchDxfForWindow → CIR_arch.dxf', dl.ok && lastName === 'CIR_arch.dxf');
   const fixedArch = cas('AF', 1000, 1800, { casementType: 'arched', archShape: 'semi-circle', archStart: 1300, casementKind: 'fixed' });
   const ra = cncExport.archParamsForWindow(fixedArch, 'AF');
@@ -258,7 +266,7 @@ section('6 — CNC DXF: circle rings (CONTOUR / PIECES / FIT), FIXED LEAF text, 
   check('arched FIXED casement: plan.fixed, text FIXED LEAF instead of HINGE L / R', ra.params.plan.fixed === true && ta.some((t) => /FIXED LEAF$/.test(t)) && !ta.some((t) => /HINGE/.test(t)));
   const hinged = cncExport.archParamsForWindow(cas('AH', 1000, 1800, { casementType: 'arched', archShape: 'semi-circle', archStart: 1300, archHinge: 'right' }), 'AH');
   check('hinged arched casement unchanged: HINGE R text', archDxf.buildArchEntities(hinged.params.plan, 'AH', 0, 0).filter((e) => e.type === 'text').some((e) => /HINGE R$/.test(e.str)));
-  const merged = cncExport.exportArchDxfMerged([{ windowSpec: CIRCLE, name: 'CIR' }, { windowSpec: fixedArch, name: 'AF' }, { windowSpec: cas('RR', 600, 1200, { casementKind: 'fixed' }), name: 'RR' }], 'Pack F');
+  const merged = cncExport.exportArchDxfMerged([{ windowSpec: CIRCLE1000, name: 'CIR' }, { windowSpec: fixedArch, name: 'AF' }, { windowSpec: cas('RR', 600, 1200, { casementKind: 'fixed' }), name: 'RR' }], 'Pack F');
   check('merged arch DXF: circle + arched fixed exported, rectangular fixed skipped ("not an arched casement")', merged.ok && merged.exported === 2 && merged.skipped.length === 1 && merged.skipped[0].reason === 'not an arched casement');
 }
 

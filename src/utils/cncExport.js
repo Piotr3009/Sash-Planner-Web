@@ -25,8 +25,8 @@ import {
 } from '../engine/cnc/jambDxf.js';
 import { buildArchEntities, buildMergedArchEntities, ARCH_LAYERS } from '../engine/cnc/archDxf.js';
 import { buildTraceryForDerived, TRACERY_LAYERS, boardBBox } from '../engine/cnc/traceryExport.js';
-import { buildArchPlan, buildCirclePlan, buildSashArchGeometry, planArchSegments, isArchShape, isCircleShape, ArchError } from '../engine/arch.js';
-import { getCasementProfile, getWindowProfile } from '../engine/profile.js';
+import { buildArchPlan, buildCirclePlan, buildSashArchGeometry, planArchSegments, planBlankInfo, planCncInfo, isArchShape, isCircleShape, ArchError } from '../engine/arch.js';
+import { getCasementProfile, getWindowProfile, profileBoxDepth, profileSashDepth } from '../engine/profile.js';
 import { CONSTANTS } from '../engine/calculations.js';
 import { writeDxf } from '../engine/cnc/dxfWriter.js';
 import { buildVentGrilles } from '../engine/lists.js';
@@ -128,11 +128,12 @@ export function exportCncJambsMerged(windows, fileLabel) {
  * head ring as `frameHead`, the upper sash top rail ring as `leafTop`, blank plans
  * from the casement arch block, no hinge, no rebate wall (running gap instead).
  */
-export function buildSashArchPlan(input, sashProfile, casementProfile) {
+export function buildSashArchPlan(input, sashProfile, casementProfile, depths = null) {
   if (!casementProfile?.arch) throw new ArchError('Casement profile has no "arch" section (stock widths / finger joint)');
+  if (!casementProfile?.cnc) throw new ArchError('Casement profile has no "cnc" section (clamp length / Uniclamp)');
   const SA = buildSashArchGeometry(input, sashProfile, CONSTANTS.GLASS_REBATE);
-  const frameHead = planArchSegments(SA.head, casementProfile.arch);
-  const leafTop = planArchSegments(SA.topRail, casementProfile.arch);
+  const frameHead = planArchSegments(SA.head, casementProfile.arch, casementProfile.cnc);
+  const leafTop = planArchSegments(SA.topRail, casementProfile.arch, casementProfile.cnc);
   return {
     ...SA,
     kind: 'sash',
@@ -142,7 +143,10 @@ export function buildSashArchPlan(input, sashProfile, casementProfile) {
     rebateWall: null,
     fit: { gap: SA.offsets.sashOuter - SA.offsets.headInner, lap: null, land: null },
     finger: { ...casementProfile.arch.finger },
-    blank: { contourAllowance: frameHead.contourAllowance, maxSegmentAngleDeg: frameHead.maxSegmentAngleDeg, pieceRule: frameHead.pieceRule },
+    blank: planBlankInfo(frameHead),
+    cnc: planCncInfo(casementProfile.cnc),
+    // v4 C.6: the blank thickness per member — box head = the box depth, top rail = the sash depth
+    depths: depths || { frameHead: null, leafTop: null },
     plans: { frameHead, leafTop },
     noStock: frameHead.noStock || leafTop.noStock,
   };
@@ -159,7 +163,8 @@ export function archParamsForWindow(windowSpec, name) {
   const fixed = category === 'casement' && windowSpec.casement?.kind === 'fixed';
   try {
     const plan = category === 'sash'
-      ? buildSashArchPlan({ shape: a.shape, width: windowSpec.frame?.width, height: windowSpec.frame?.height, rise: a.rise }, getWindowProfile(), getCasementProfile())
+      ? buildSashArchPlan({ shape: a.shape, width: windowSpec.frame?.width, height: windowSpec.frame?.height, rise: a.rise }, getWindowProfile(), getCasementProfile(),
+        { frameHead: profileBoxDepth(windowSpec.frame?.type), leafTop: profileSashDepth(windowSpec.frame?.type) })
       : isCircleShape(a.shape)
       ? buildCirclePlan({ width: windowSpec.frame?.width, height: windowSpec.frame?.height }, getCasementProfile())
       : { ...buildArchPlan({
@@ -170,16 +175,13 @@ export function archParamsForWindow(windowSpec, name) {
         hinge: a.hinge,
       }, getCasementProfile()), fixed };
     if (plan.noStock) {
+      // v4 C.1: the planner reports WHY — no board fits, or the pieces fall below a hard length limit
       const needs = [];
       for (const [label, pl] of [[plan.kind === 'sash' ? 'box head' : 'frame head', plan.plans.frameHead], [plan.kind === 'sash' ? 'top rail' : 'leaf top', plan.plans.leafTop]]) {
-        for (const arc of pl.arcs) {
-          if (arc.default) continue;
-          const narrowest = arc.options[arc.options.length - 1];
-          needs.push(`${label} arc ${arc.index + 1} needs a board >= ${Math.ceil(narrowest.boardWidth)}mm`);
-        }
+        for (const r of pl.reasons || []) needs.push(`${label} ${r}`);
       }
-      const maxStock = Math.max(0, ...(plan.plans.frameHead.stockWidths || []));
-      return { skip: `no stock board fits (widest ${maxStock}mm): ${needs.join('; ')}` };
+      const reason = [plan.plans.frameHead, plan.plans.leafTop].some((pl) => pl.noStockReason === 'below minimum length') ? 'below minimum length' : 'no stock board fits';
+      return { skip: `no valid blank plan (${reason}): ${needs.join('; ')}` };
     }
     return { params: { plan, winNum: String(name || windowSpec.name || '') } };
   } catch (e) {

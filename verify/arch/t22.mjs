@@ -128,7 +128,17 @@ const CASES = [
   ['three-centre', psw('ST', 1200, 2400, { archShape: 'elliptical-arch', archHBars: 1, archVBars: 2, lowerHBars: 1 })],
   ['gothic', psw('SG', 1000, 3000, { archShape: 'gothic-arch', archProfile: 'equilateral', archBarPattern: 'intersecting' })],
 ];
-for (const [name, spec] of CASES) {
+// v4 Block C: the CNC blank plan of the 1000 semi-circle / gothic sash heads is BLOCKED by the 400 shorter-edge limit
+// (box head 80 face: 395.5 / gothic side pieces) — the sheets / glazier / 3D cases above keep W 1000; the CNC DXF
+// samples use W 1200 (BLOCKERS). The 1000 skips are asserted first.
+const CNC_CASES = [
+  ['semi-circle', psw('SS', 1200, 2600, { archShape: 'semi-circle', archBarPattern: 'hub-spoke', archHBars: 1, lowerHBars: 2 })],
+  ['three-centre', CASES[1][1]],
+  ['gothic', psw('SG', 1200, 3400, { archShape: 'gothic-arch', archProfile: 'equilateral', archBarPattern: 'intersecting' })],
+];
+check('v4: the 1000 semi-circle sash skips the CNC export honestly — box head 3 × 180 shorter edge 395.5 < 400 (below minimum length)', /^no valid blank plan \(below minimum length\): box head chain: 3 pieces fit a 180 board but fall below the minimum length \(piece \d of 3: shorter edge 395(\.\d)? < 400/.test(cncExport.archParamsForWindow(CASES[0][1], 'SS').skip || ''), cncExport.archParamsForWindow(CASES[0][1], 'SS').skip);
+check('v4: the 1000 gothic sash skips the CNC export honestly (box head sides below minimum length)', /^no valid blank plan \(below minimum length\): box head side 1/.test(cncExport.archParamsForWindow(CASES[2][1], 'SG').skip || ''), cncExport.archParamsForWindow(CASES[2][1], 'SG').skip);
+for (const [name, spec] of CNC_CASES) {
   const r = cncExport.archParamsForWindow(spec, spec.name);
   check(`${name}: archParamsForWindow accepts the arched sash (plan kind sash, no hinge, running gap 9)`, !r.skip && r.params.plan.kind === 'sash' && r.params.plan.hinge === null && near(r.params.plan.fit.gap, SP.deductions.sashWidth / 2 - SP.sashArch.headFace, 1e-9), r.skip);
   if (r.skip) continue;
@@ -152,7 +162,7 @@ for (const [name, spec] of CASES) {
   check('triple sash → skip "triple sash is not arched"', cncExport.archParamsForWindow(t, 'T').skip === 'triple sash is not arched');
   const plain = specification.normaliseToWindowSpec({ id: 'P', name: 'P', width: 1000, height: 1500 }, { fullConfig: { windowCategory: 'sash' } });
   check('plain sash → skip "not an arched sash"', cncExport.archParamsForWindow(plain, 'P').skip === 'not an arched sash');
-  const merged = cncExport.exportArchDxfMerged([{ windowSpec: CASES[0][1], name: 'SS' }, { windowSpec: plain, name: 'P' }], 'Pack S');
+  const merged = cncExport.exportArchDxfMerged([{ windowSpec: CNC_CASES[0][1], name: 'SS' }, { windowSpec: plain, name: 'P' }], 'Pack S');
   check('merged arch DXF: 1 sash exported, plain skipped', merged.ok && merged.exported === 1 && merged.skipped.length === 1 && lastName === 'Pack_S_arch.dxf');
 }
 

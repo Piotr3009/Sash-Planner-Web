@@ -154,7 +154,15 @@ karmi cut listę, PDF-y, rysunki, PP. Nigdy nie licz wymiarów okna w innym miej
 
 ---
 
-## STAN — łuki: casement + sash + okna stałe + archiwum (noce 1–5), paczka arch-pieces-v1 (06.09) na `main`
+## STAN — noc 6 (v4) w toku na branchu sesji: Etap 1 (Blok C, planer v2) ✅ — t25 + t16–t24 ALL PASS, build OK
+Planer v2: cały łańcuch dzielony po długości łuku (kawałki przez granice łuków, gotyk w wierzchołku, koło jako
+jeden zamknięty pierścień), dwa twarde limity `cnc.minClampLength 450` / `arch.minPieceLength 400`, deski
+`63…200`, najmniej kawałków + alternatywa ekonomiczna (`arch.wasteThreshold 0.45`), koniec surowego kawałka na
+linii startu cięty PROSTOPADLE (`Q`, CNC frezuje czoło), warstwa `CLAMPS`, karta „CNC & arches" w Window Settings.
+Skutki limitów (uczciwie raportowane, BLOCKERS §16): gotyk 1000 skrzydło, koło 800 skrzydło, sash 1000 głowica,
+W 400 — bez planu (eksport pomija z powodem). Niezależny planer harnessów: `verify/arch/lib/indPlanner.mjs`.
+
+## STAN poprzedni — łuki: casement + sash + okna stałe + archiwum (noce 1–5), paczka arch-pieces-v1 (06.09) na `main`
 Kawałki łuków = proste trapezy (PIECES) i sklejony blank (ASSEMBLY), długość surowa = krawędź
 deski + palec; traceria do drewna (`glazingRebate 18`); Pre-Cut per kawałek; wymiary: odległości
 prętów na dole, całość na górze; LSP usunięty. Harnessy t16–t24 ALL PASS. Spec historyczne:
@@ -215,9 +223,9 @@ face/słupek. Sesja w chmurze, własny branch, commit + push po każdym zamknię
 ## Checklist na koniec sesji
 
 - [ ] branch sesji wypchnięty, `main` nietknięty
-- [ ] `node verify/arch/t16.mjs` … `t24_stage4.mjs` (t16, t17_edges, t18, t19, t20, t20_bars, t21, t22, t23, t24_stage4) → ALL PASS (t16 / t18 / t19 / t20 / t22 / t23 wymagają `pip install ezdxf --break-system-packages`)
+- [ ] `node verify/arch/t16.mjs` … `t25.mjs` (t16, t17_edges, t18, t19, t20, t20_bars, t21, t22, t23, t24_stage4, t25) → ALL PASS (t16 / t18 / t19 / t20 / t22 / t23 / t25 wymagają `pip install ezdxf --break-system-packages`)
 - [ ] `npm run build` przechodzi
 - [ ] esbuild OK na każdym dotkniętym pliku, zero polskiego w źródłach
 - [ ] `git diff main --stat` obejmuje TYLKO pliki ze spec §11 (+ verify, docs, BUILD-LOG, BLOCKERS, CLAUDE.md)
-- [ ] `docs/handover/samples/`: `sample_arch_1200_*.dxf` (pięć), `sample_glass_*.dxf`, `sample_tracery_*.dxf/.lsp`, `sample_sash_arch_*.dxf`, `sample_circle_800_sunburst.dxf` w repo
-- [ ] BUILD-LOG.md z werdyktami, BLOCKERS.md z D13 / D5 / d50 / P9 / F2 otwartymi + §11–§15 (noc 5) + wszystkim, co wyszło w nocy
+- [ ] `docs/handover/samples/`: `sample_arch_1200_*.dxf` (pięć), `sample_arch_c5_*.dxf` (cztery, wektory C.5), `sample_glass_*.dxf`, `sample_tracery_*.dxf` (+ stare `.lsp` z nocy 5), `sample_sash_arch_1200_*.dxf` (trzy), `sample_circle_1000_sunburst.dxf` (CNC; 800 tylko glass / tracery — pierścień skrzydła 800 blokuje limit 400) w repo
+- [ ] BUILD-LOG.md z werdyktami, BLOCKERS.md z D5 / d50 / P9 / F2 otwartymi (D13 zamknięty przez v4 C.3/C.4) + §11–§15 (noc 5) + §16 (noc 6, etap 1) + wszystkim, co wyszło w nocy

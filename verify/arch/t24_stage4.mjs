@@ -103,7 +103,8 @@ section('3 — Block 4: curved members → blank pieces in the pre-cut, BOM blan
   const qty = bom.buildWindowPartQtys(d, spec, {}, resolveRaw);
   const headMm = plan.pieces.reduce((s, pc) => s + Math.round(pc.roughLength), 0);   // 06.09: Σ per piece (end pieces shorter)
   check('BOM part quantities: c_frame_head mm = Σ pieces × rough length of the blank (board metres, not the arc)', qty.c_frame_head && near(qty.c_frame_head.mm, headMm, 0.5), JSON.stringify(qty.c_frame_head));
-  const sashSpec = specification.normaliseToWindowSpec({ id: 'AS', name: 'AS', width: 1000, height: 2200 }, { fullConfig: { windowCategory: 'sash', sashType: 'arched-group', archShape: 'semi-circle' } });
+  // v4 Block C: the 1000 semi-circle sash box head is blocked by the 400 limit (t21 / t25) — the pre-cut blanks are checked on a 1200 sash
+  const sashSpec = specification.normaliseToWindowSpec({ id: 'AS', name: 'AS', width: 1200, height: 2600 }, { fullConfig: { windowCategory: 'sash', sashType: 'arched-group', archShape: 'semi-circle' } });
   const ds = derive(sashSpec);
   const sashRows = lists.buildCurvedMembersForWindow(ds, sashSpec);
   const sashPre = lists.buildPrecutForWindow(ds, sashSpec, {}, resolveRaw).sashEngineering.flatMap((g) => g.items);
@@ -111,7 +112,9 @@ section('3 — Block 4: curved members → blank pieces in the pre-cut, BOM blan
   const circle = cas('CI', 800, 800, { casementKind: 'fixed', archShape: 'circle' });
   const dc = derive(circle);
   const cRows = lists.buildCurvedMembersForWindow(dc, circle);
-  check('circle: two rings, each with two arcs (180°) in the blank plan; pre-cut one row per piece (06.09)', cRows.length === 2 && cRows[0].elementName === 'C-FRAME RING' && cRows[0].arcs.length === 2 && cRows[0].arcs.every((a) => a.spanDeg === 180) && lists.buildPrecutForWindow(dc, circle, {}, resolveRaw).sashEngineering.flatMap((g) => g.items).filter((it) => it.elementName === 'C-FRAME RING').length === dc.arch.plans.frameHead.pieces.length);
+  const cPre = lists.buildPrecutForWindow(dc, circle, {}, resolveRaw).sashEngineering.flatMap((g) => g.items);
+  check('circle 800 (v4): frame ring = ONE 360° group, 4 pieces × 180 → 4 pre-cut rows; the LEAF ring is blocked by the 400 limit → noStock row, no blank rows (never split finer)', cRows.length === 2 && cRows[0].elementName === 'C-FRAME RING' && cRows[0].arcs.length === 1 && cRows[0].arcs[0].spanDeg === 360 && cRows[0].arcs[0].n === 4 && cRows[0].arcs[0].stock === 180
+    && cPre.filter((it) => it.elementName === 'C-FRAME RING').length === dc.arch.plans.frameHead.pieces.length && dc.arch.plans.frameHead.pieces.length === 4 && cRows[1].noStock === true && cRows[1].shortPieces.length === 1 && cPre.filter((it) => it.elementName === 'C-LEAF RING' && it.blank).length === 0);
   const plain = cas('P', 600, 1200, {});
   check('rectangular casement: no curved rows, pre-cut unchanged (no blank items)', lists.buildCurvedMembersForWindow(derive(plain), plain).length === 0 && !lists.buildPrecutForWindow(derive(plain), plain, {}, resolveRaw).sashEngineering.flatMap((g) => g.items).some((it) => it.blank));
   const pp = src('pages/ProductionPackPage.jsx');

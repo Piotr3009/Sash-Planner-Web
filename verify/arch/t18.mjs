@@ -225,7 +225,7 @@ section('3 — cut list, glass unit, paint / seals / weights; rectangular caseme
   check('C-ARCH HEAD replaces C-FRAME HEAD: code C-AH, section 57x93', !!head && !byName(d.components.box, 'C-FRAME HEAD') && head.code === 'C-AH' && head.section === '57x93');
   expectNear('C-ARCH HEAD length = centre-line arc length of the head ring (1091.19)', head.length, g.frameHead.lengths.centre, 0.05);
   expectNear('  … = 1091.19 (mean of outer 1180.72 and inner 1001.65 for rule-C shapes)', head.length, (g.frameHead.lengths.outer + g.frameHead.lengths.inner) / 2, 0.05);
-  check('C-ARCH HEAD notes: R 150/1400/150 · 8 pieces · stock 95/95/95', head.notes === 'R 150/1400/150 · 8 pieces · stock 95/95/95', head.notes);
+  check('C-ARCH HEAD notes (v4 whole-chain planner): R 150/1400/150 · 2 pieces · stock 180', head.notes === 'R 150/1400/150 · 2 pieces · stock 180', head.notes);
   const jamb = byName(d.components.box, 'C-FRAME JAMB (L)');
   check('jambs = start (1300) − jambDeduct, both sides', jamb.length === 1300 && byName(d.components.box, 'C-FRAME JAMB (R)').length === 1300);
   check('cill unchanged (1000)', byName(d.components.box, 'C-FRAME CILL').length === 1000);
@@ -387,7 +387,7 @@ section('6 — glass PDF (jsPDF in node): Shape column, mm + % line, shaped draw
 
 // ═══════════════════════════════════════════════════════════════════════════
 section('7 — profile v3 block and vocabulary');
-check('profile.arch v3: minHaunchRadius 150, hubRingRatios [0.3, 0.6, 0.8], intersecting { 450, 2, 4, 30 }', P.arch.version === 3 && P.arch.minHaunchRadius === 150 && JSON.stringify(P.arch.patterns.hubRingRatios) === '[0.3,0.6,0.8]' && JSON.stringify(P.arch.patterns.intersecting) === '{"pitch":450,"minMullions":2,"maxMullions":4,"minRadius":30}');
+check('profile.arch v4: minHaunchRadius 150, hubRingRatios [0.3, 0.6, 0.8], intersecting { 450, 2, 4, 30 }', P.arch.version === 4 && P.arch.minHaunchRadius === 150 && JSON.stringify(P.arch.patterns.hubRingRatios) === '[0.3,0.6,0.8]' && JSON.stringify(P.arch.patterns.intersecting) === '{"pitch":450,"minMullions":2,"maxMullions":4,"minRadius":30}');
 check('ARCH_BAR_PATTERNS vocabulary (PSW six + v3 quad-hub-spoke + custom + Block 3 sunburst) and labels', JSON.stringify(arch.ARCH_BAR_PATTERNS) === '["none","half-hub","hub-spoke","double-hub-spoke","triple-hub-spoke","quad-hub-spoke","custom","intersecting","sunburst"]' && arch.ARCH_BAR_PATTERNS.every((p) => typeof arch.ARCH_BAR_PATTERN_LABELS[p] === 'string'));
 expectThrows('unknown pattern in an item throws at normalisation', () => pcItem('X', 1000, 1500, { archShape: 'three-centre', archStart: 1000, archBarPattern: 'star' }), /Unknown arch bar pattern "star"/);
 check('CUT_LIST_ORDER: C-AH directly after C-FH, C-ATR directly after C-TR', (() => { const s = lists.CUT_LIST_ORDER.map((x) => x.symbol); return s[s.indexOf('C-FH') + 1] === 'C-AH' && s[s.indexOf('C-TR') + 1] === 'C-ATR'; })());

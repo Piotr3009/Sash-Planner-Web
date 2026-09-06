@@ -163,7 +163,8 @@ export function blankPiecesForRecord(c, plan, resolveRaw) {
   // Piotr 06.09: the pre-cut list shows EVERY piece of the blank (5 pieces on the arc = 5 rows),
   // each with its own stock board, rough length (outer stock edge + finger per jointed end) and
   // end cuts — end pieces differ from middle pieces, so one row per piece, not one per arc.
-  const cutCode = (cut) => `${cut.kind === 'joint' ? 'J' : cut.kind === 'spring' ? 'S' : 'A'}${Math.round(cut.angleDeg * 10) / 10}`;
+  // v4: J = joint from square, Q = square (springing face routed with the contour), A = apex from square
+  const cutCode = (cut) => (cut.kind === 'square' ? 'Q' : `${cut.kind === 'joint' ? 'J' : 'A'}${Math.round(cut.angleDeg * 10) / 10}`);
   if (Array.isArray(plan.pieces) && plan.pieces.length && plan.pieces.every((pc) => pc.stock)) {
     plan.pieces.forEach((pc, i) => {
       const raw = resolveRaw?.(c.elementName, { kind: 'blank', stock: pc.stock, depth }) || `${pc.stock}x${depth}`;

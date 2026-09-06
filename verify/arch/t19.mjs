@@ -222,7 +222,14 @@ for (const key of Object.keys(RENDERED)) {
   const W = spec.frame.width, H = spec.frame.height;
   const tolerance = 0.01;
   // — arch CNC DXF (the real export path: cncExport.archParamsForWindow → plan → buildArchEntities)
-  const ap = M.cncExport.archParamsForWindow(spec, key);
+  let ap = M.cncExport.archParamsForWindow(spec, key);
+  if (ap.skip && /below minimum length/.test(ap.skip)) {
+    // v4 Block C: the gothic 1000 leaf top rail is blocked by the 400 mm shorter-edge limit (t25, BLOCKERS) — the
+    // export refuses it honestly; the ONE-CONTOUR comparison below does not depend on the plan, so it runs with the
+    // limit relaxed for this window only.
+    check(`${key}: the default profile skips the CNC export honestly (leaf top rail below the 400 limit)`, /leaf top side 1: 2 pieces fit a 120 board but fall below the minimum length/.test(ap.skip), ap.skip);
+    ap = M.profile.withProfiles(null, { ...P, arch: { ...P.arch, minPieceLength: 0 } }, () => M.cncExport.archParamsForWindow(spec, key));
+  }
   check(`${key}: cncExport.archParamsForWindow gives a plan (no skip)`, !!ap.params?.plan && !ap.skip, ap.skip || '');
   if (!ap.params?.plan) continue;
   const ents = M.archDxf.buildArchEntities(ap.params.plan, ap.params.winNum, 0, 0);

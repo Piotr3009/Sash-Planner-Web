@@ -24,6 +24,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { independentPlan } from './lib/indPlanner.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const AUDIT = resolve(ROOT, '.audit');
@@ -61,19 +62,29 @@ const finite = (v) => Number.isFinite(v);
 function planSane(plan) {
   const rings = [plan.frameHead, plan.leafTop];
   const arcsOk = rings.every((r) => [...r.outer, ...r.inner].every((a) => finite(a.r) && a.r > 0 && finite(a.a0) && finite(a.a1) && a.a1 > a.a0));
-  const piecesOk = [plan.plans.frameHead, plan.plans.leafTop].every((pl) => pl.pieces.length >= 2 && pl.pieces.every((pc) =>
-    finite(pc.wReq) && pc.wReq > 0 && finite(pc.L) && pc.L > 0 && finite(pc.roughLength) && pc.roughLength >= pc.L && pc.stock >= pc.wReq - 1e-9
-    && pc.phiDeg <= P.arch.maxSegmentAngleDeg + 1e-9));
+  // v4: N starts at 1 and there is no grain run-out angle — every piece must pass the two hard limits instead
+  const piecesOk = [plan.plans.frameHead, plan.plans.leafTop].every((pl) => pl.pieces.length >= 1 && pl.pieces.every((pc) =>
+    finite(pc.wReq) && pc.wReq > 0 && finite(pc.L) && pc.L > 0 && finite(pc.roughLength) && pc.roughLength >= pc.L - 1e-9 && pc.stock >= pc.wReq - 1e-9
+    && pc.roughLength >= P.cnc.minClampLength - 1e-9 && pc.shorterEdge >= P.arch.minPieceLength - 1e-9));
   return arcsOk && piecesOk && !plan.noStock;
+}
+const IND = { stock: P.arch.stockWidths, allowance: P.arch.contourAllowance, finger: P.arch.finger.length, minClamp: P.cnc.minClampLength, minPiece: P.arch.minPieceLength, threshold: P.arch.wasteThreshold };
+const indPlan = (ring) => independentPlan(ring, IND);
+/** engine plan of a ring equals the independent planner (groups, default n / stock, or both blocked) */
+function planMatches(pl, ring) {
+  const ind = indPlan(ring);
+  return pl.arcs.length === ind.length && pl.arcs.every((gp, i) => (gp.default?.n ?? null) === (ind[i].def?.n ?? null) && (gp.default?.stock ?? null) === (ind[i].def?.stock ?? null) && gp.reason === ind[i].reason);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 section('W 400 / W 1500 — every shape at the PSW default rise, H = rise + 900 + margin');
+// v4: a W 400 arch cannot make a 450 mm piece (semi-circle outer length 628, gothic side 419) — the planner reports
+// it (below minimum length), the geometry still builds; W 1500 plans on every shape.
 const EDGE_EXPECT = {
   400: {
-    'semi-circle': null,
-    'gothic-equilateral': null,
-    'gothic-drop': null,
+    'semi-circle': { blocked: true },
+    'gothic-equilateral': { blocked: true },
+    'gothic-drop': { blocked: true },
     'three-centre': /rise 130mm must exceed the haunch radius 150mm/,   // F2: 0.325 × 400 = 130 ≤ minHaunchRadius
   },
   1500: { 'semi-circle': null, 'gothic-equilateral': null, 'gothic-drop': null, 'three-centre': null },
@@ -83,14 +94,20 @@ for (const Wd of [400, 1500]) {
     const exp = EDGE_EXPECT[Wd][s];
     const rise = arch.ARCH_RISE_RATIO[s] * Wd;
     const H = Math.ceil(rise + P.arch.limits.minStraightBelowRise + 100);
-    if (exp) {
+    if (exp instanceof RegExp) {
       expectThrows(`W ${Wd} ${s} (default rise ${rise.toFixed(1)}): rejected readably (F2)`, () => arch.buildArchPlan({ shape: s, width: Wd, height: H, rise: null, hinge: 'left' }, P), exp);
       continue;
     }
     let plan = null, err = null;
     try { plan = arch.buildArchPlan({ shape: s, width: Wd, height: H, rise: null, hinge: 'left' }, P); } catch (e) { err = e; }
-    check(`W ${Wd} ${s} (rise ${rise.toFixed(1)}): plan builds, every arc ≥ 2 pieces ≤ 36°, boards fit, no NaN`, !err && plan && planSane(plan), err ? err.message : '');
-    if (!plan) continue;
+    if (exp?.blocked) {
+      check(`W ${Wd} ${s} (rise ${rise.toFixed(1)}): geometry builds, the plan is BLOCKED by the 450 / 400 limits (reason below minimum length, never split finer) — engine = independent`,
+        !err && plan && plan.noStock && [plan.plans.frameHead, plan.plans.leafTop].some((pl) => pl.noStockReason === 'below minimum length') && planMatches(plan.plans.frameHead, plan.frameHead) && planMatches(plan.plans.leafTop, plan.leafTop),
+        err ? err.message : (plan?.plans.frameHead.reasons || []).join(' | '));
+      continue;
+    }
+    check(`W ${Wd} ${s} (rise ${rise.toFixed(1)}): plan builds, every piece passes 450 / 400, boards fit, no NaN, engine = independent planner`, !err && plan && planSane(plan) && planMatches(plan.plans.frameHead, plan.frameHead) && planMatches(plan.plans.leafTop, plan.leafTop), err ? err.message : '');
+    if (!plan || plan.noStock) continue;
     // DXF for the edge window goes through the writer and back through ezdxf
     const path = resolve(AUDIT, `edge_${Wd}_${s}.dxf`);
     writeFileSync(path, dxfWriter.writeDxf(archDxf.buildArchEntities(plan, `E${Wd}`), archDxf.ARCH_LAYERS));
@@ -105,11 +122,12 @@ for (const Wd of [400, 1500]) {
 // F2 boundary (v2 P3): the haunch radius is at least 150, so the rise must exceed 150 — nothing else binds
 check(`deepest ring offset read from the profile = ${deepest} (leafAtJamb + leafTop.face) — below minHaunchRadius 150 by ${P.arch.minHaunchRadius - deepest}`, deepest === 107 && P.arch.minHaunchRadius - deepest === 43);
 expectThrows('three-centre rise 150 at W 1200 → equals the haunch minimum, no crown arc — readable', () => arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 2500, rise: 150 }, P), /rise 150mm must exceed the haunch radius 150mm/);
-check('three-centre rise 151 at W 1200 builds (r 150, crown R 101400.5, haunch spans 89.7°) and plans', (() => {
+check('three-centre rise 151 at W 1200 builds (r 150, crown R 101400.5, haunch spans 89.7°); its plan = the independent planner (planned or blocked alike)', (() => {
   const g = arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 2500, rise: 151 }, P);
-  return near(g.arcs[0].r, 150, 1e-9) && near(g.arcs[1].r, 101400.5, 0.01) && planSane(arch.buildArchPlan({ shape: 'three-centre', width: 1200, height: 2500, rise: 151, hinge: 'left' }, P));
+  const pl = arch.buildArchPlan({ shape: 'three-centre', width: 1200, height: 2500, rise: 151, hinge: 'left' }, P);
+  return near(g.arcs[0].r, 150, 1e-9) && near(g.arcs[1].r, 101400.5, 0.01) && planMatches(pl.plans.frameHead, pl.frameHead) && planMatches(pl.plans.leafTop, pl.leafTop) && (pl.noStock || planSane(pl));
 })());
-check('W 400 three-centre with rise 160 builds (r clamps to 150, crown R 280) — v1 gave r 128', (() => { try { const pl = arch.buildArchPlan({ shape: 'three-centre', width: 400, height: 1100, rise: 160, hinge: 'left' }, P); return planSane(pl) && near(pl.arcs[0].r, 150, 1e-9) && near(pl.arcs[1].r, 280, 1e-9); } catch (e) { console.log('        ' + e.message); return false; } })());
+check('W 400 three-centre with rise 160 builds (r clamps to 150, crown R 280) — v1 gave r 128; v4: its plan is blocked (W 400 cannot make a 450 piece), engine = independent', (() => { try { const pl = arch.buildArchPlan({ shape: 'three-centre', width: 400, height: 1100, rise: 160, hinge: 'left' }, P); return pl.noStock && planMatches(pl.plans.frameHead, pl.frameHead) && near(pl.arcs[0].r, 150, 1e-9) && near(pl.arcs[1].r, 280, 1e-9); } catch (e) { console.log('        ' + e.message); return false; } })());
 expectThrows('W 400 three-centre with rise 150 rejected (rise = haunch minimum)', () => arch.buildArchGeometry({ shape: 'three-centre', width: 400, height: 1100, rise: 150 }, P), /rise 150mm must exceed the haunch radius 150mm/);
 expectThrows('W 400 three-centre with rise 146 rejected the same way (no F1 face error any more)', () => arch.buildArchGeometry({ shape: 'three-centre', width: 400, height: 1100, rise: 146 }, P), /rise 146mm must exceed the haunch radius 150mm/);
 check('W 400 three-centre rise 199 (just below W/2): r 198, crown R 200.5, builds', (() => { const g = arch.buildArchGeometry({ shape: 'three-centre', width: 400, height: 1100, rise: 199 }, P); return near(g.arcs[0].r, 198.005, 0.001) && near(g.arcs[1].r, 200.5, 0.01); })());
@@ -161,21 +179,24 @@ expectThrows('missing arch block in the profile → readable (buildArchPlan)', (
 section('no fitting board — planner never throws, exporter explains');
 {
   const g = arch.buildArchGeometry({ shape: 'semi-circle', width: 1500, height: 2400 }, P);
-  const narrow = arch.planArchSegments(g.frameHead, { ...P.arch, stockWidths: [50, 63, 75] });
-  check('semi-circle 1500 with boards ≤ 75: every candidate infeasible, noStock, no pieces, no throw', narrow.noStock && narrow.arcs[0].default === null && narrow.arcs[0].options.every((o) => o.stock === null) && narrow.pieces.length === 0);
-  const okAt95 = arch.planArchSegments(g.frameHead, { ...P.arch, stockWidths: [50, 63, 75, 95] });
-  check('semi-circle 1500 with boards ≤ 95: N 7 fits (W_req 94.1), N 5–6 do not', okAt95.arcs[0].default?.n === 7 && okAt95.arcs[0].options.slice(0, 2).every((o) => o.stock === null));
-  const empty = arch.planArchSegments(g.frameHead, { ...P.arch, stockWidths: [] });
+  const narrow = arch.planArchSegments(g.frameHead, { ...P.arch, stockWidths: [50, 63, 75] }, P.cnc);
+  check('semi-circle 1500 with boards ≤ 75: a 57 face + 2 × 10 allowance (77) never fits — noStock "no stock board fits", no pieces, no throw', narrow.noStock && narrow.noStockReason === 'no stock board fits' && narrow.arcs[0].default === null && narrow.arcs[0].options.every((o) => o.stock === null) && narrow.pieces.length === 0);
+  const at95 = arch.planArchSegments(g.frameHead, { ...P.arch, stockWidths: [50, 63, 75, 95] }, P.cnc);
+  const i95 = independentPlan(g.frameHead, { ...IND, stock: [50, 63, 75, 95] });
+  check(`semi-circle 1500 with boards ≤ 95: a 95 board fits at ${i95[0].blocked?.n} pieces but they fall below 450 / 400 → noStock "below minimum length" (v4: the limits, not the board, block it)`, at95.noStock && at95.noStockReason === 'below minimum length' && at95.arcs[0].blocked?.n === i95[0].blocked?.n && at95.arcs[0].blocked.stock === 95);
+  const empty = arch.planArchSegments(g.frameHead, { ...P.arch, stockWidths: [] }, P.cnc);
   check('empty stock list → noStock, no throw', empty.noStock && empty.pieces.length === 0);
-  const junk = arch.planArchSegments(g.frameHead, { ...P.arch, stockWidths: ['x', -5, 0, 200] });
-  check('junk stock entries ignored, 200 still picked', !junk.noStock && junk.arcs[0].default.stock === 200);
+  const junk = arch.planArchSegments(g.frameHead, { ...P.arch, stockWidths: ['x', -5, 0, 200] }, P.cnc);
+  check('junk stock entries ignored, 200 still picked (3 pieces × 200, no narrower alternative)', !junk.noStock && junk.arcs[0].default.stock === 200 && junk.arcs[0].default.n === 3 && junk.arcs[0].alternative === null);
   expectThrows('buildArchEntities on a no-stock plan → readable', () => archDxf.buildArchEntities(arch.buildArchPlan({ shape: 'semi-circle', width: 1500, height: 2400 }, { ...P, arch: { ...P.arch, stockWidths: [50] } }), 'X'), /No stock board fits/);
   // exporter path on real windowSpec data
   const spec = specification.normaliseToWindowSpec({ width: 1500, height: 2400, name: 'Edge' }, { fullConfig: { windowCategory: 'casement', casementLayout: '040L', casementType: 'arched', casArchShape: 'semi-circle' } });
   const r = profile.withProfiles(null, { ...P, arch: { ...P.arch, stockWidths: [50, 63, 75] } }, () => cncExport.archParamsForWindow(spec, 'Edge'));
-  check('archParamsForWindow: no-stock skip names both members and the widest board', /no stock board fits \(widest 75mm\): frame head arc 1 needs a board >= \d+mm; leaf top arc 1 needs a board >= \d+mm/.test(r.skip || ''), r.skip);
+  check('archParamsForWindow: no-stock skip names both members, the needed width and the widest board (v4 wording)', /^no valid blank plan \(no stock board fits\): frame head chain: no stock board fits \(needs \d+\+ for \d+ pieces, widest 75\); leaf top chain: no stock board fits \(needs \d+\+ for \d+ pieces, widest 75\)$/.test(r.skip || ''), r.skip);
+  const r95 = profile.withProfiles(null, { ...P, arch: { ...P.arch, stockWidths: [63, 75, 95] } }, () => cncExport.archParamsForWindow(spec, 'Edge'));
+  check('archParamsForWindow: a blocked plan skips with "below minimum length" and the failing piece named', /^no valid blank plan \(below minimum length\): frame head chain: \d+ pieces fit a 95 board but fall below the minimum length \(piece \d+ of \d+: (overall|shorter edge) [\d.]+ < \d+/.test(r95.skip || ''), r95.skip);
   const wideStock = profile.withProfiles(null, { ...P, arch: { ...P.arch, stockWidths: [300] } }, () => cncExport.archParamsForWindow(spec, 'Edge'));
-  check('only a 300 mm board: every piece on 300 (N_min still 5 — the angle rule, not the board, sets N)', !wideStock.skip && wideStock.params.plan.plans.frameHead.pieces.length === 5 && wideStock.params.plan.plans.frameHead.pieces.every((pc) => pc.stock === 300));
+  check('only a 300 mm board: the head is TWO pieces on 300 (W_req 277 — v4: the board cap is the widest list entry, N starts at 1)', !wideStock.skip && wideStock.params.plan.plans.frameHead.pieces.length === 2 && wideStock.params.plan.plans.frameHead.pieces.every((pc) => pc.stock === 300), wideStock.skip);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -187,9 +208,11 @@ section('exporter skip messages on the windowSpec path (W 400 / 1500, bad height
   const r2 = cncExport.archParamsForWindow(mk({ casementType: 'arched', casArchShape: 'elliptical-arch' }, { width: 400, height: 1200 }), 'E');
   check('W 400 elliptical → three-centre rise 130 (F2) → skip "rise 130mm must exceed the haunch radius 150mm"', /rise 130mm must exceed the haunch radius 150mm/.test(r2.skip || ''), r2.skip);
   const r2b = cncExport.archParamsForWindow(mk({ casementType: 'arched', casArchShape: 'elliptical-arch' }, { width: 470, height: 1200 }), 'E');
-  check('W 470 elliptical → rise 152.75 > 150 → exports (Auto clears the haunch minimum from W 462)', !r2b.skip, r2b.skip);
+  check('W 470 elliptical → rise 152.75 > 150 → the geometry clears the haunch minimum (Auto from W 462); v4: the plan is blocked by the 450 clamp limit (leaf top ONE piece 410 long) — skipped readably, not F2',
+    !!arch.buildArchGeometry({ shape: 'three-centre', width: 470, height: 1200, rise: 0.325 * 470 }, P) && /^no valid blank plan \(below minimum length\): leaf top chain: 1 piece fit a 150 board but fall below the minimum length \(piece 1 of 1: overall 410(\.\d)? < 450/.test(r2b.skip || ''), r2b.skip);
   const r3 = cncExport.archParamsForWindow(mk({ casementType: 'arched', casArchShape: 'gothic-arch' }, { width: 1500, height: 2400 }), 'E');
-  check('W 1500 gothic H 2400 (rise 1299 + 900 = 2199) → exports, 4 + 4 pieces', !r3.skip && r3.params.plan.plans.frameHead.totalPieces === 8, r3.skip);
+  const i3 = r3.params ? indPlan(r3.params.plan.frameHead) : null;
+  check(`W 1500 gothic H 2400 (rise 1299 + 900 = 2199) → exports, ${i3 ? i3.map((x) => x.def.n).join(' + ') : '?'} pieces per side (independent planner)`, !r3.skip && i3.length === 2 && r3.params.plan.plans.frameHead.totalPieces === i3[0].def.n + i3[1].def.n && planMatches(r3.params.plan.plans.frameHead, r3.params.plan.frameHead), r3.skip);
   const r4 = cncExport.archParamsForWindow(mk({ casementType: 'arched', casArchShape: 'gothic-arch' }, { width: 1500, height: 2100 }), 'E');
   check('W 1500 gothic H 2100 → skip by the 900 rule (801 straight)', /leaves 801mm straight below the arch — minimum 900mm/.test(r4.skip || ''), r4.skip);
   const r5 = cncExport.archParamsForWindow(mk({ casementType: 'arched', casArchShape: 'semi-circle' }, { width: 1501, height: 2500 }), 'E');
@@ -198,7 +221,11 @@ section('exporter skip messages on the windowSpec path (W 400 / 1500, bad height
   const r7a = cncExport.archParamsForWindow(mk({ casementType: 'arched', casArchShape: 'segmental-arch', archStart: 2383 }, { width: 1200, height: 2500 }), 'E');
   check('custom rise 117 (start 2383) → skip "rise 117mm must exceed the haunch radius 150mm" (F2 replaces F1)', /rise 117mm must exceed the haunch radius 150mm/.test(r7a.skip || ''), r7a.skip);
   const r7 = cncExport.archParamsForWindow(mk({ casementType: 'arched', casArchShape: 'segmental-arch', archStart: 2349 }, { width: 1200, height: 2500 }), 'E');
-  check('custom rise 151 (start 2349) → exports; haunch 89.7° → 3 pieces each side, crown 0.5° → 2 (angle rule), all on 95', !r7.skip && r7.params.plan.plans.frameHead.arcs[0].nMin === 3 && r7.params.plan.plans.frameHead.arcs[1].nMin === 2 && r7.params.plan.plans.frameHead.totalPieces === 8 && r7.params.plan.plans.frameHead.pieces.every((pc) => pc.stock === 95), r7.skip || JSON.stringify(r7.params?.plan.plans.frameHead.arcs.map((a) => [a.nMin, a.default?.n, a.default?.stock])));
+  const g7 = arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 2500, rise: 151 }, P);
+  const i7 = indPlan(g7.frameHead), i7l = indPlan(g7.leafTop);
+  check(`custom rise 151 (start 2349): ONE chain per ring (haunch 89.7° + crown 0.5° + haunch in compound pieces) — head ${i7[0].def ? `${i7[0].def.n} × ${i7[0].def.stock}` : 'blocked'}, leaf ${i7l[0].def ? `${i7l[0].def.n} × ${i7l[0].def.stock}` : 'blocked'} (independent); exporter agrees`,
+    (i7[0].def && i7l[0].def) ? (!r7.skip && r7.params.plan.plans.frameHead.arcs.length === 1 && planMatches(r7.params.plan.plans.frameHead, r7.params.plan.frameHead) && planMatches(r7.params.plan.plans.leafTop, r7.params.plan.leafTop)) : /below minimum length/.test(r7.skip || ''),
+    r7.skip || JSON.stringify(r7.params?.plan.plans.frameHead.arcs.map((a) => [a.kind, a.default?.n, a.default?.stock])));
   const r8 = cncExport.archParamsForWindow(mk({ casementType: 'arched', casArchShape: 'segmental-arch' }, { width: 1200, height: 'x' }), 'E');
   check('non-numeric height → readable skip (NaN straight part fails the 900 rule)', /straight below the arch/.test(r8.skip || ''), r8.skip);
 }
@@ -219,12 +246,13 @@ section('merged export with mixed edge windows — good ones exported, bad ones 
     { windowSpec: mk({ casementType: 'arched', casArchShape: 'semi-circle' }, { width: 1501, height: 2500 }), name: 'W1501' },
   ];
   const r = cncExport.exportArchDxfMerged(windows, 'Edges');
-  check('merged: 2 exported (W400 semi, W1500 gothic), 2 skipped with their reasons', r.ok && r.exported === 2 && r.skipped.length === 2 && r.skipped.every((s) => /must exceed the haunch radius|above the maximum/.test(s.reason)), JSON.stringify(r));
+  check('merged: 1 exported (W1500 gothic), 3 skipped with their reasons — W400 semi by the v4 length limits, W400 seg by F2, W1501 by the width', r.ok && r.exported === 1 && r.skipped.length === 3
+    && r.skipped.some((s) => s.name === 'W400 semi' && /no valid blank plan \(below minimum length\)/.test(s.reason)) && r.skipped.some((s) => /must exceed the haunch radius/.test(s.reason)) && r.skipped.some((s) => /above the maximum/.test(s.reason)), JSON.stringify(r));
   const text = await lastBlob.text();
   const path = resolve(AUDIT, 'edges_merged.dxf');
   writeFileSync(path, text);
   const probe = JSON.parse(execFileSync('python3', [resolve(ROOT, 'verify', 'arch', 'dxf_probe.py'), path], { cwd: ROOT, encoding: 'utf8' }));
-  check('merged edge DXF: 4 CONTOUR rings, both labels', probe.polys.filter((p) => p.layer === 'CONTOUR').length === 4 && probe.texts.some((t) => t.text === 'W400 semi - FRAME HEAD') && probe.texts.some((t) => t.text === 'W1500 gothic - FRAME HEAD'));
+  check('merged edge DXF: 2 CONTOUR rings (head + leaf of the gothic), its label, no W400 label', probe.polys.filter((p) => p.layer === 'CONTOUR').length === 2 && probe.texts.some((t) => t.text === 'W1500 gothic - FRAME HEAD') && !probe.texts.some((t) => t.text === 'W400 semi - FRAME HEAD'));
   URL.createObjectURL = oc; URL.revokeObjectURL = orv; delete globalThis.document;
 }
 

@@ -548,7 +548,7 @@ export default function ConfiguratorPage() {
         // sash: geometry from the sash profile (head 80, stile line), blank plans from the casement arch block
         const SA = buildSashArchGeometry({ shape: pcArchShape, width: extW, height: extH, rise: archRiseNum }, getWindowProfile(), CONSTANTS.GLASS_REBATE);
         const cp = getCasementProfile();
-        const plans = { frameHead: planArchSegments(SA.head, cp.arch), leafTop: planArchSegments(SA.topRail, cp.arch) };
+        const plans = { frameHead: planArchSegments(SA.head, cp.arch, cp.cnc), leafTop: planArchSegments(SA.topRail, cp.arch, cp.cnc) };
         return { ...SA, frameHead: SA.head, leafTop: SA.topRail, plans, noStock: plans.frameHead.noStock || plans.leafTop.noStock };
       }
       return buildArchPlan({ shape: pcArchShape, width: extW, height: extH, rise: archRiseNum, hinge: casArchHinge }, getCasementProfile());

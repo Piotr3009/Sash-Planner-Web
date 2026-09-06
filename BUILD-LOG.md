@@ -4,6 +4,114 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-09-06 — ARCHED-WINDOWS-v4 night 6 (branch `claude/arched-windows-v4-stages-9diax6`)
+
+Inputs read in full: `CLAUDE.md` → `docs/handover/ARCHED-WINDOWS-v4.md` → `BLOCKERS.md` (headers + open items) →
+`BUILD-LOG.md` (night 5) → `arch.js`, `profile.js`, `archDxf.js`, `dxfWriter.js`, `cncExport.js`, `calculations.js`
+(arch plan wiring), `lists.js` (curved members, pre-cut blanks), `WindowSettingsPage.jsx`, `windowProfileStore.js`,
+`NumInput.jsx`, the t16–t24 harness conventions. Entry gate (CLAUDE.md): `pieceStockTrapezoid` 2, `glazingRebate` 1,
+"Tracery LSP" 0 → arch-pieces-v1 is on `main`. Baseline on the branch start: t16 507, t17 72, t18 178, t19 244,
+t20 116, t20_bars 28, t21 120, t22 75, t23 80, t24 26 — ALL PASS (after `npm install`, `pip install ezdxf`).
+
+Stages tonight (Piotr 06.09, gate before each next stage): 1 = Block C planner v2, 2 = Block B glazier PDF,
+3 = Block E intersecting, 4 = Block F frame 68.
+
+### STAGE 1 — Block C: segment planner v2 (`profile.js`, `arch.js`, `archDxf.js`, `cncExport.js`, `calculations.js`, `ConfiguratorPage.jsx`, `lists.js`, `windowProfileStore.js`, `WindowSettingsPage.jsx`, `verify/arch/t25.mjs` new, `verify/arch/lib/indPlanner.mjs` new, t16 / t17 / t18 / t19 / t20 / t21 / t22 / t23 / t24 re-vectored)
+
+**Understanding:** the v1 planner cut every arc of the chain on its own (a joint at every tangent point) with a 36°
+grain-run-out rule, which produced the ~100 mm haunch triangles Piotr rejected. v4: the WHOLE chain (springing →
+springing) is partitioned by outer arc length into N equal pieces — a piece may carry a haunch and part of the crown
+(the CNC cuts the compound curve from one board); a gothic is split at the apex first. Two HARD limits replace the
+36° rule: overall length ≥ `cnc.minClampLength` 450 (Rover A 1532: two Uniclamps + end cuts) and the shorter stock
+edge ≥ `arch.minPieceLength` 400; the board cap is the widest entry of the new stock list `63 75 95 105 120 150 180 200`.
+Fewest pieces first; an economy alternative (N + 1 … N + 3 on a narrower board) wins when the fewest plan wastes
+more than `arch.wasteThreshold` 0.45 of its boards. CLAMPS layer with two Uniclamp footprints per flat piece; a
+"CNC & arches" card edits every number.
+
+**Two approaches, one rejected:**
+- Springing end of the RAW piece: (a) keep the v1 horizontal cut on the springing line — rejected: on a tilted
+  compound piece (three-centre 1000 × 250, piece axis 26.6° to the horizontal) the horizontal cut runs the board
+  215 mm past the frame edge (outer 829 / inner 379) and FAILS the 400 limit on a plan the spec declares valid;
+  (b) cut the raw springing end SQUARE to the piece axis at the band extent and let the CNC rout the horizontal
+  springing face with the contour (it is part of the CONTOUR polyline since v1) — chosen; cut code `Q`; the spec's
+  C.5 verdicts hold. Logged as a DEFAULT (open) decision, BLOCKERS 16.3.
+- Board placement on the band: centred (arch-pieces-v1) kept; the flush-inner alternative would lengthen the
+  shorter edge (sash 1000 head 395.5 → 410, circle 800 leaf 390 → 400) — not changed silently, BLOCKERS 16.4.
+
+**Built:**
+- `profile.js` — `arch.version 4`: `stockWidths [63, 75, 95, 105, 120, 150, 180, 200]`, `minPieceLength 400` (hard),
+  `wasteThreshold 0.45`; `maxSegmentAngleDeg` and `pieceRule` (D13) removed — D13 is closed by v4 C.3/C.4. New block
+  `cnc { minClampLength 450, clamp { base 130, minThickness 40, maxThickness 98, minPiece 140 }, clampClearance 20 }`.
+  Migration: a stored v3 arch block is replaced whole, a v4 block merges key by key (the card edits it from now on),
+  `cnc` filled from the default.
+- `arch.js` — `ringGroups` (chain / gothic sides / closed ring), `partitionGroup` (N equal by outer arc length,
+  chord axis u + outward normal b, band projection with `arcsExtent`, end planes: radial / vertical apex axis /
+  square springing), `piecePoly` / `pieceBandPoly` / `pieceJoints` / `pieceEndEdge` / `pieceStockTrapezoid` /
+  `pieceStockEdges` generalised to arc ARRAYS per piece, `bulgePolyArea` (exact band area), `planArchSegments(ring,
+  arch, cnc)` with the two limits, fewest + economy, `noStockReason` 'no stock board fits' | 'below minimum length'
+  and readable `reasons`; `buildArchPlan` / `buildCirclePlan` carry `cnc`, `depths` (93 / 57) and `blank` (limits).
+  The v1 `partitionArc` / `pickOption` / `PIECE_RULES` / `endCut` are gone (superseded, no caller left).
+- `archDxf.js` — layer `CLAMPS` (colour 3): `clampFootprints` — two `clamp.base` squares per flat piece, centred
+  across the board, `clampClearance` from both end-cut LINES over the square's whole height (the joint planes lie 15
+  inside the rough ends), pushed to the two ends; one square + warning when the room is under 2 × base, none +
+  warning under 1 × base; thickness warning when the member depth is outside the jaws (the sash box head 164 →
+  `WARNING: PIECE THICKNESS 164 OUTSIDE THE UNICLAMP JAWS 40-98`). Text block per ring: `CHAIN / SIDE n / RING
+  R… L… …DEG: FEWEST n x board s L… ROUGH … WASTE p%`, `ECONOMY ALT … -> DEFAULT FEWEST|ECONOMY (THRESHOLD 45%)`
+  or `NO ECONOMY ALT WITHIN N PIECES`, `LIMITS: OVERALL >= 450 (CLAMP)  SHORTER EDGE >= 400  STOCK MAX 200`,
+  `CLAMPS (SUGGESTION): UNICLAMP 130 x 130, CLEARANCE 20 …, PIECE THICKNESS 93`; cut codes `J<deg>` / `Q` / `A<deg>`.
+- `cncExport.js` — `buildSashArchPlan` passes `cnc` + depths (box depth / sash depth from the sash profile);
+  `archParamsForWindow` skip = `no valid blank plan (<reason>): <member> <group>: …` with the failing piece named.
+  `calculations.js` (3 call sites), `ConfiguratorPage.jsx`, `lists.js` (cut code `Q`) follow.
+- Settings: `windowProfileStore.setCasementPath(path, value)` (roots arch / cnc / tracery / geometry, finite numbers
+  only) + `setCasementStockWidths(text)` (comma list → sorted positive numbers, empty refused); `WindowSettingsPage`
+  casement page gets the **CNC & arches** card (lock toggle like the others): finger length / groove / pitch,
+  contour allowance, glazing rebate, stock widths, min clamp length, min piece length, waste threshold, Uniclamp
+  base / jaws / clearance, tracery paneOffset / profileWidth / ridgeLand / edgeLand / mitreLeg, and a validation
+  line = the live plan of a semi-circle at the sample width (`✓ frame head 3 × 150 · leaf top 2 × 200` or the
+  planner's reason / `ArchError`). No spinner arrows (global CSS rule).
+
+**Numbers (independent sampler in `lib/indPlanner.mjs`, 800 points per arc, head ring face 57, allowance 10, finger 15):**
+| arch | fewest (spec C.5) | W_req mine / spec | economy default @ 0.45 | raw edges of the fewest plan (outer / inner) |
+|---|---|---|---|---|
+| HALF 1000 | 3 × 150 ✓ | 135.0 / 134.7 | 3 × 150 (4 × 120 fails 450: rough 441.7) | 553.8 / 467.2 · 597.6 / 424.3 · 553.8 / 467.2 |
+| ROUND 1000 rise 250 | 2 × 180 ✓ | 155.7 / 158.3 | 2 × 180 (3 × 150 fails 400) | 621.9 / 531.9 ×2 |
+| GOTHIC 1000 (per side) | 2 × 120 ✓ | 108.8 / 112.6 | 2 × 120 (3 × 95 fails 450) | 533.5 / 501.4 · 580.6 / 428.5 |
+| HALF 1500 | 3 × 180 ✓ | 168.5 / 168.1 | **4 × 150** (waste 63 % > 45 %, alt 55 %) | 884.2 / 676.4 ×3 |
+| tc240 1200 | 2 × 180 ✓ | 166.6 / 170.6 | **3 × 150** (waste 61 %, alt 55 %) | 968.4 / 446.4 ×2 |
+Stock capped at 105: none of the five has a plan — a board fits at 5 / 6 / 3-per-side / 6 / 7 pieces and the
+overall length then fails 450 (339 / 230 / 369 / 416 / 233). **Spec errata E3:** the C.5 edge lengths (508.8 / 432,
+572.5 / 468.9, …) are the allowance-band chords of v1 (`L` / `L_in`), not raw-piece edges, and its W_req differ from
+the sampler by up to 4 mm; the piece counts and boards agree exactly — BLOCKERS 16.1. Circle: one closed group per
+ring (800 frame 4 × 180; 1000 frame 6 × 150 economy / leaf 5 × 180 economy). 2D contours, glazier exports and
+the 3D are untouched (the planner feeds the CNC DXF, cut list notes, pre-cut, BOM, PP only).
+
+**Consequences of the hard limits (honest report, BLOCKERS 16.2 — the engine reports, never splits finer):**
+- gothic 1000 LEAF top rail: 2 per side on 120 → shorter edge 386.2 < 400 → no valid plan (the head is fine);
+- circle 800 LEAF ring: 4 × 180 → 390.1 < 400 → no plan (frame ring 4 × 180 fine);
+- arched SASH 1000 semi-circle box head (80 face): 3 × 180 → 395.5 < 400; gothic 1000 sash head likewise;
+- every W 400 arch and the W 470 elliptical: no piece can reach 450 (semi-circle outer length 628) → no plan;
+- the Arch DXF export skips these with `no valid blank plan (below minimum length): …`; cut list notes say
+  `no stock board fits`; the PP curved row flags the reasons. Piotr can lower the limits on the new card.
+Harness samples moved off the blocked sizes: sash CNC samples 1200 (`sample_sash_arch_1200_semi-circle.dxf`,
+`_1200_gothic.dxf` — the stale 1000 files deleted), circle CNC sample 1000 (`sample_circle_1000_sunburst.dxf`, the
+800 CNC file deleted; the 800 glass / tracery samples stay — no planner in them); t19's gothic 1000 contour
+comparison runs with `minPieceLength 0` after asserting the honest skip.
+
+**Verification:** t25 121/121 (profile v4 + migration; C.5 fewest plans = spec; W_req / raw edges / waste vs the
+independent sampler ±0.5 / ±0.005; cap-105 blocks with the reason; invariants — compound pieces, apex split, closed
+ring, one-board plan, band inside the trapezoid; economy rule at thresholds 1.0 / 0 / 0.45; DXF CLAMPS on four
+regenerated samples via ezdxf — 2 squares per piece, 130 × 130, centred, ≥ 20 (+15 finger) from the cuts, text
+lines, cut codes with Q, thickness warning on the sash head; pre-cut / PP / export skips; settings card + store
+grep). Re-vectored: t16 367 (planner sections against `lib/indPlanner.mjs`, closed forms for single-arc middle
+pieces, sample DXF texts, migration), t17 70, t18 178, t19 246, t20 116, t20_bars 28, t21 120, t22 77, t23 81,
+t24 26 — ALL PASS. `npm run build` OK. esbuild on every touched file, `grep -F` after every write.
+**Not verified:** the card in a browser (no UI run in the container — structural grep + esbuild only), the DXF in
+VCarve / bSolid (CLAMPS placement is a suggestion; whether the Uniclamp really sits under the piece that way is
+Piotr's call), the economy threshold on real jobs (0.45 fires on most semi-circles with a feasible alternative —
+BLOCKERS 16.5), the square springing end on the CNC (16.3).
+**Verdict: ✅ Stage 1 (Block C)** — t25 + t16–t24 ALL PASS, build green; ⚠️ the limits block four common sizes
+(listed above) until Piotr confirms the numbers or the edge model.
+
 ## 2026-09-07 — ARCHED-WINDOWS-v3 night 5 (branch `claude/arched-windows-v3-9v0sw7`)
 
 Inputs read in full: `CLAUDE.md` → `docs/handover/ARCHED-WINDOWS-v3.md` → `BLOCKERS.md` → `BUILD-LOG.md`

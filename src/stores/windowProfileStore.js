@@ -143,6 +143,45 @@ export const useWindowProfileStore = create(
         get()._sync();
       },
 
+      // ── v4 (ARCHED-WINDOWS-v4 Block C) — the "CNC & arches" card ──────────
+      // One generic setter for the numeric fields of the arch / cnc / tracery
+      // blocks and geometry.glazingRebate: `path` = ['arch', 'finger', 'length'].
+      // Roots are whitelisted so a typo can never grow the profile; the value
+      // must parse as a finite number (an empty field commits nothing).
+      setCasementPath: (path, value) => {
+        const roots = ['arch', 'cnc', 'tracery', 'geometry'];
+        if (!Array.isArray(path) || path.length < 2 || !roots.includes(path[0])) return;
+        const v = Number(value);
+        if (!Number.isFinite(v)) return;
+        set((s) => {
+          const casement = clone(s.casement);
+          let node = casement;
+          for (let i = 0; i < path.length - 1; i++) {
+            if (node[path[i]] == null || typeof node[path[i]] !== 'object') return {};
+            node = node[path[i]];
+          }
+          if (!(path[path.length - 1] in node)) return {};
+          node[path[path.length - 1]] = v;
+          return { casement };
+        });
+        get()._sync();
+      },
+
+      // Stock widths as a comma list ("63, 75, 95") → sorted positive numbers;
+      // an empty or all-junk list is refused (the planner needs a board).
+      setCasementStockWidths: (text) => {
+        const widths = String(text ?? '').split(/[,\s;]+/).map(Number).filter((w) => Number.isFinite(w) && w > 0);
+        if (!widths.length) return;
+        const sorted = [...new Set(widths)].sort((a, b) => a - b);
+        set((s) => {
+          const casement = clone(s.casement);
+          if (!casement.arch) return {};
+          casement.arch.stockWidths = sorted;
+          return { casement };
+        });
+        get()._sync();
+      },
+
       resetToDefaults: () => {
         set({ sash: clone(DEFAULT_SASH_PROFILE), casement: clone(DEFAULT_CASEMENT_PROFILE) });
         get()._sync();

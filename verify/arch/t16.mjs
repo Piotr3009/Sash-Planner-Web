@@ -21,12 +21,20 @@
  * lists.js / calculations.js are IN SCOPE for v2 (cut list, glass shape), so
  * §10.3 item 10 now freezes casementLayouts.js and jambDxf.js only.
  *
+ * ARCHED-WINDOWS-v4 Block C (night 6): the segment planner is the whole-chain
+ * planner v2 (pieces across arc boundaries, gothic split at the apex, two hard
+ * limits 450 / 400, stock 63…200, fewest + economy). §10.3 pt 6 / pt 7 and the
+ * plan-dependent DXF checks assert against verify/arch/lib/indPlanner.mjs — an
+ * independent sampler-based implementation of spec C.1–C.4; the v1 §10.2 option
+ * table (36° rule, D13 narrowest / fewest) is superseded.
+ *
  * Run: node verify/arch/t16.mjs            (writes the sample DXF too)
  */
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { independentPlan } from './lib/indPlanner.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const AUDIT = resolve(ROOT, '.audit');
@@ -294,221 +302,81 @@ check('three-centre rise 0.10 × W (120 mm): archArcs without the P3 minimum kee
 // points per arc). N_min = max(2, ceil(θ / maxAngle)), N = N_min … N_min + 3;
 // a single-centre arc shorter than maxAngle may be ONE board if a stock board
 // fits it. Closed forms (spec §7.5) cross-checked on the middle pieces.
-const PLAN_OPTS = { stockWidths: [50, 63, 75, 95, 105, 180, 200], contourAllowance: 10, maxSegmentAngleDeg: 36, pieceRule: 'narrowest', finger: { length: 15, depth: 16, pitch: 3.8 } };
-check('PLAN_OPTS equals the profile arch block (stock D7, allowance 10, max 36°, narrowest, finger 15/16/3.8)',
-  JSON.stringify(PLAN_OPTS.stockWidths) === JSON.stringify(P.arch.stockWidths) && PLAN_OPTS.contourAllowance === P.arch.contourAllowance
-  && PLAN_OPTS.maxSegmentAngleDeg === P.arch.maxSegmentAngleDeg && PLAN_OPTS.pieceRule === P.arch.pieceRule && JSON.stringify(PLAN_OPTS.finger) === JSON.stringify(P.arch.finger));
+// ── planner v2 (ARCHED-WINDOWS-v4 Block C) ───────────────────────────────────
+// The independent implementation lives in lib/indPlanner.mjs: whole-chain
+// partition by outer arc length, 800-point band sampling projected on the
+// piece chord, raw trapezoid edges (square springing end, radial joints, apex
+// axis), the two hard limits, fewest + economy. PLAN_OPTS mirrors the profile
+// blocks and is asserted against them — nothing here is read from arch.js.
+const PLAN_OPTS = { stockWidths: [63, 75, 95, 105, 120, 150, 180, 200], contourAllowance: 10, finger: { length: 15, depth: 16, pitch: 3.8 }, minPieceLength: 400, wasteThreshold: 0.45 };
+const CNC_OPTS = { minClampLength: 450 };
+check('PLAN_OPTS equals the profile arch / cnc blocks (v4: stock 63…200, allowance 10, finger 15/16/3.8, minPieceLength 400, threshold 0.45, minClampLength 450)',
+  JSON.stringify(PLAN_OPTS.stockWidths) === JSON.stringify(P.arch.stockWidths) && PLAN_OPTS.contourAllowance === P.arch.contourAllowance && PLAN_OPTS.minPieceLength === P.arch.minPieceLength
+  && PLAN_OPTS.wasteThreshold === P.arch.wasteThreshold && JSON.stringify(PLAN_OPTS.finger) === JSON.stringify(P.arch.finger) && CNC_OPTS.minClampLength === P.cnc.minClampLength);
+const IND = { stock: PLAN_OPTS.stockWidths, allowance: PLAN_OPTS.contourAllowance, finger: PLAN_OPTS.finger.length, minClamp: CNC_OPTS.minClampLength, minPiece: PLAN_OPTS.minPieceLength, threshold: PLAN_OPTS.wasteThreshold };
+const indPlan = (ring, extra = {}) => independentPlan(ring, { ...IND, ...extra });
 function sampled(cx, cy, r, a0, a1, N = 4000) {
   const pts = [];
   for (let j = 0; j <= N; j++) { const a = a0 + (a1 - a0) * j / N; pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); }
   return pts;
 }
-function clipAt(clip, cx, cy, r, end) {
-  if (clip === 'archStart') { const x = Math.sqrt(r * r - cy * cy); return end === 0 ? Math.atan2(-cy || 0, x) : Math.atan2(-cy || 0, -x); }
-  if (clip === 'axis') { const y = Math.sqrt(r * r - cx * cx); return Math.atan2(y, -cx); }
-  return null;
-}
-function expectedOptions(ring, i) {
-  const O = ring.outer[i], I = ring.inner[i];
-  const a = PLAN_OPTS.contourAllowance;
-  const rO = O.r + a, rI = I.r - a;
-  const bO0 = clipAt(O.clip0, O.cx, O.cy, rO, 0) ?? O.a0, bO1 = clipAt(O.clip1, O.cx, O.cy, rO, 1) ?? O.a1;
-  const bI0 = clipAt(I.clip0, I.cx, I.cy, rI, 0) ?? I.a0, bI1 = clipAt(I.clip1, I.cx, I.cy, rI, 1) ?? I.a1;
-  const span = O.a1 - O.a0;
-  const maxAngle = PLAN_OPTS.maxSegmentAngleDeg / DEG;
-  const evalN = (n) => {
-    const phi = span / n;
-    let width = 0, length = 0, midWidth = null;
-    const pieces = [];
-    for (let k = 0; k < n; k++) {
-      const ao0 = O.a0 + k * phi, ao1 = k === n - 1 ? O.a1 : O.a0 + (k + 1) * phi;
-      const o0 = k === 0 ? bO0 : ao0, o1 = k === n - 1 ? bO1 : ao1;
-      const i0 = k === 0 ? bI0 : ao0, i1 = k === n - 1 ? bI1 : ao1;
-      const m = (ao0 + ao1) / 2, b = [Math.cos(m), Math.sin(m)], u = [-Math.sin(m), Math.cos(m)];
-      const pts = [...sampled(O.cx, O.cy, rO, o0, o1), ...sampled(I.cx, I.cy, rI, i0, i1)];
-      const w = pts.map((q) => q[0] * b[0] + q[1] * b[1]), sv = pts.map((q) => q[0] * u[0] + q[1] * u[1]);
-      const pw = Math.max(...w) - Math.min(...w), pl = Math.max(...sv) - Math.min(...sv);
-      width = Math.max(width, pw);
-      length = Math.max(length, pl);
-      pieces.push({ k, width: pw, length: pl });
-      const radialBoth = k > 0 && k < n - 1;
-      if (radialBoth) {
-        const cf = rO - rI * Math.cos(phi / 2);          // spec §7.5 closed form (middle pieces)
-        if (!near(pw, cf, 0.01)) throw new Error(`closed-form mismatch n=${n} k=${k}: ${pw} vs ${cf}`);
-        if (!near(pl, 2 * rO * Math.sin(phi / 2), 0.01)) throw new Error(`closed-form length mismatch n=${n} k=${k}`);
-        midWidth = cf;
-      }
-    }
-    const stock = PLAN_OPTS.stockWidths.find((sw) => sw >= width - 1e-9) ?? null;
-    return { n, phi, width, midWidth, length, board: width, stock, pieces };
-  };
-  let nMin = Math.max(2, Math.ceil(span / maxAngle - 1e-9));
-  if (ring.outer.length === 1 && span < maxAngle && evalN(1).stock != null) nMin = 1;
-  const out = [];
-  for (let n = nMin; n <= nMin + 3; n++) out.push(evalN(n));
-  return out;
-}
-// D13: 'narrowest' = narrowest stock with N ≤ N_min + 2, tie → fewer pieces;
-// 'fewest' = first feasible N. The other rule's pick is the alternative.
-function pick(options, rule) {
-  const feasible = options.filter((o) => o.stock != null);
-  if (!feasible.length) return null;
-  if (rule === 'fewest') return feasible[0];
-  const nMin = options[0].n;
-  const pool = feasible.filter((o) => o.n <= nMin + 2);
-  return (pool.length ? pool : feasible).reduce((best, o) => (!best || o.stock < best.stock ? o : best), null);
-}
-function expectedChoice(options, rule = PLAN_OPTS.pieceRule) {
-  const def = pick(options, rule);
-  const other = pick(options, rule === 'fewest' ? 'narrowest' : 'fewest');
-  return { def, alt: other && def && other.n !== def.n ? other : null };
-}
 
-// Spec §10.2 vectors, verbatim (allowance 10, finger 15, max segment 36°, stock D7).
-const SPEC_PLANS = {
-  // v2: the §10.2 "HEAD / LEAF segmental 1200" vectors are superseded (P2) —
-  // the same window is a three-centre rise 240 under P3; its per-arc plan is
-  // asserted against the independent option table below (PLAN_VECTORS) and
-  // these literals computed 06.09 from that rule:
-  headThreeCentre240: {
-    haunch: { thetaDeg: 67.38, nMin: 2, options: [{ N: 2, wReq: 80.56, stock: 95 }, { N: 3, wReq: 78.59, stock: 95 }], d13: { n: 2, stock: 95 }, runnerUp: null },
-    crown: { thetaDeg: 45.24, nMin: 2, options: [{ N: 2, wReq: 101.33, stock: 105 }, { N: 3, wReq: 87.83, stock: 95 }, { N: 4, wReq: 83.10, stock: 95 }], d13: { n: 3, stock: 95 }, runnerUp: { n: 2, stock: 105 } },
-  },
-  leafThreeCentre240: {
-    haunch: { thetaDeg: 67.38, nMin: 2, options: [{ N: 2, wReq: 88.42, stock: 95 }], d13: { n: 2, stock: 95 }, runnerUp: null },
-    crown: { thetaDeg: 45.24, nMin: 2, options: [{ N: 2, wReq: 110.36, stock: 180 }, { N: 3, wReq: 97.40, stock: 105 }, { N: 4, wReq: 92.85, stock: 95 }], d13: { n: 4, stock: 95 }, runnerUp: { n: 2, stock: 180 } },
-  },
-  headSemi: {
-    thetaDeg: 180,
-    options: [
-      // Piotr 06.09: rough = outer STOCK edge between the end cuts + fingers (stock 105 centred on W_req 103.09 →
-      // wHi = 533·cos18° + (105 + 103.09)/2 = 610.95, L_out = 2·610.95·tan18° = 397.02) — middle 427.02, end 412.02
-      { N: 5, phiDeg: 36, wReq: 103.09, Lout: 397.02, Lin: 329.41, cutDeg: 18, stock: 105, roughMid: 427.02, roughEnd: 412.02 },
-      { N: 6, phiDeg: 30, wReq: 95.16, stock: 105 },
-      { N: 7, phiDeg: 25.71, wReq: 90.36, stock: 95 },
-    ],
-    d13: { n: 7, stock: 95 }, runnerUp: { n: 5, stock: 105 },
-  },
-};
-
-section('§10.3 pt 6 — segment plans, spec §10.2 vectors (== ±0.05 middle pieces, >= end pieces)');
-function assertSpecPlan(label, planArc, S) {
-  expectNear(`${label}: θ ${S.thetaDeg}°`, planArc.spanDeg, S.thetaDeg, 0.01);
-  check(`${label}: N candidates start at ${S.options[0].N} (N_min = max(2, ceil(θ / 36°)))`, planArc.nMin === S.options[0].N && planArc.options[0].n === S.options[0].N, `nMin ${planArc.nMin}`);
-  for (const so of S.options) {
-    const o = planArc.options.find((x) => x.n === so.N);
-    check(`${label} N=${so.N}: candidate present`, !!o);
-    if (!o) continue;
-    const mids = o.pieces.filter((pc) => pc.endStart === 'radial' && pc.endEnd === 'radial');
-    const endsP = o.pieces.filter((pc) => pc.endStart !== 'radial' || pc.endEnd !== 'radial');
-    expectNear(`${label} N=${so.N}: φ ${so.phiDeg}°`, o.pieces[0].phiDeg, so.phiDeg, 0.01);
-    check(`${label} N=${so.N}: middle-piece W_req == ${so.wReq} (±0.05)`, mids.length > 0 && mids.every((pc) => near(pc.wReq, so.wReq, 0.05)), mids.map((pc) => pc.wReq.toFixed(3)).join(' '));
-    const midActual = mids.length ? Math.max(...mids.map((pc) => pc.wReq)) : 0;
-    check(`${label} N=${so.N}: end-piece W_req >= middle piece (exact) and >= ${so.wReq} − 0.05`, endsP.length === 2 && endsP.every((pc) => pc.wReq + 1e-9 >= midActual && pc.wReq + 0.05 >= so.wReq), endsP.map((pc) => pc.wReq.toFixed(3)).join(' '));
-    check(`${label} N=${so.N}: option W_req = max over pieces, stock ${so.stock}`, near(o.wReq, Math.max(...o.pieces.map((pc) => pc.wReq)), 1e-9) && o.stock === so.stock, `wReq ${o.wReq.toFixed(3)} stock ${o.stock}`);
-    if (so.Lout != null) check(`${label} N=${so.N}: middle-piece outer stock edge ${so.Lout} (±0.05)`, mids.every((pc) => near(pc.outerEdge, so.Lout, 0.05)), mids.map((pc) => pc.outerEdge.toFixed(3)).join(' '));
-    if (so.Lin != null) check(`${label} N=${so.N}: middle-piece L_in ${so.Lin} (±0.05)`, mids.every((pc) => near(pc.Lin, so.Lin, 0.05)), mids.map((pc) => pc.Lin.toFixed(3)).join(' '));
-    if (so.cutDeg != null) check(`${label} N=${so.N}: joint end cut ${so.cutDeg}° (= φ/2)`, o.pieces.every((pc) => pc.endCuts.every((c) => c.kind !== 'joint' || near(c.angleDeg, so.cutDeg, 0.01))));
-    if (so.roughMid != null) check(`${label} N=${so.N}: rough middle ${so.roughMid} (L_out + 2 × 15)`, mids.every((pc) => pc.jointedEnds === 2 && near(pc.roughLength, so.roughMid, 0.05)), mids.map((pc) => pc.roughLength.toFixed(3)).join(' '));
-    if (so.roughEnd != null) check(`${label} N=${so.N}: rough end >= ${so.roughEnd} (L_out + 1 × 15; the band corner on the arch-start line may add length)`, endsP.every((pc) => pc.jointedEnds === 1 && pc.roughLength + 1e-9 >= so.roughEnd), endsP.map((pc) => pc.roughLength.toFixed(3)).join(' '));
-  }
-  check(`${label}: D13 default → ${S.d13.n} × ${S.d13.stock}`, planArc.default?.n === S.d13.n && planArc.default?.stock === S.d13.stock, `${planArc.default?.n} × ${planArc.default?.stock}`);
-  check(`${label}: runner-up printed → ${S.runnerUp.n} × ${S.runnerUp.stock}`, planArc.alternative?.n === S.runnerUp.n && planArc.alternative?.stock === S.runnerUp.stock, `${planArc.alternative?.n} × ${planArc.alternative?.stock}`);
-}
-{
-  const gS = GEOM['three-centre-240'], gC = GEOM['semi-circle'];
-  assertSpecPlan('HEAD semi-circle 1200', arch.planArchSegments(gC.frameHead, P.arch).arcs[0], SPEC_PLANS.headSemi);
-  // three-centre 240 (the former segmental window under P3): per-arc literals
-  const arcPlan = (label, planArc, S) => {
-    expectNear(`${label}: θ ${S.thetaDeg}°`, planArc.spanDeg, S.thetaDeg, 0.01);
-    check(`${label}: N_min ${S.nMin}`, planArc.nMin === S.nMin, String(planArc.nMin));
-    for (const so of S.options) {
-      const o = planArc.options.find((x) => x.n === so.N);
-      check(`${label} N=${so.N}: W_req ${so.wReq} (±0.05), stock ${so.stock}`, !!o && near(o.wReq, so.wReq, 0.05) && o.stock === so.stock, o ? `${o.wReq.toFixed(2)} → ${o.stock}` : 'missing');
-    }
-    check(`${label}: D13 default ${S.d13.n} × ${S.d13.stock}, runner-up ${S.runnerUp ? `${S.runnerUp.n} × ${S.runnerUp.stock}` : 'none'}`,
-      planArc.default?.n === S.d13.n && planArc.default?.stock === S.d13.stock && (planArc.alternative?.n ?? null) === (S.runnerUp?.n ?? null) && (planArc.alternative?.stock ?? null) === (S.runnerUp?.stock ?? null),
-      `${planArc.default?.n} × ${planArc.default?.stock}, alt ${planArc.alternative?.n} × ${planArc.alternative?.stock}`);
-  };
-  const ph = arch.planArchSegments(gS.frameHead, P.arch), pl = arch.planArchSegments(gS.leafTop, P.arch);
-  arcPlan('HEAD three-centre 240 haunch', ph.arcs[0], SPEC_PLANS.headThreeCentre240.haunch);
-  arcPlan('HEAD three-centre 240 crown', ph.arcs[1], SPEC_PLANS.headThreeCentre240.crown);
-  arcPlan('LEAF three-centre 240 haunch', pl.arcs[0], SPEC_PLANS.leafThreeCentre240.haunch);
-  arcPlan('LEAF three-centre 240 crown', pl.arcs[1], SPEC_PLANS.leafThreeCentre240.crown);
-  check('three-centre 240: both haunch arcs plan identically (mirror)', JSON.stringify(ph.arcs[0].options.map((o) => [o.n, +o.wReq.toFixed(6), o.stock])) === JSON.stringify(ph.arcs[2].options.map((o) => [o.n, +o.wReq.toFixed(6), o.stock])));
-  check('three-centre 240: head 2 + 3 + 2 = 7 pieces, leaf 2 + 4 + 2 = 8 — never a single solid board', ph.totalPieces === 7 && pl.totalPieces === 8);
-}
-
-section('§10.3 pt 6 — planner vs independent option table, every shape, both D13 rules');
+section('§10.3 pt 6 — segment plans v2 (v4 Block C): engine vs the independent planner, every shape, W = 1200');
 const PLAN_VECTORS = [
-  { key: 'three-centre-240', shape: 'three-centre', defN: [2, 3, 2], altN: [null, 2, null] },
-  { shape: 'semi-circle', defN: [7], altN: [5] },
-  { shape: 'gothic-equilateral', defN: [3, 3], altN: [2, 2] },
-  { shape: 'gothic-drop', defN: [3, 3], altN: [2, 2] },
-  { shape: 'three-centre', defN: [2, 4, 2], altN: [null, 3, null] },
+  { key: 'three-centre-240', shape: 'three-centre' },
+  { shape: 'semi-circle' },
+  { shape: 'gothic-equilateral' },
+  { shape: 'gothic-drop' },
+  { shape: 'three-centre' },
 ];
 const PLANS = {};
 for (const v of PLAN_VECTORS) {
   const tag = v.key || v.shape;
   const g = GEOM[tag];
-  const plan = arch.planArchSegments(g.frameHead, PLAN_OPTS);
+  const ring = g.frameHead;
+  const plan = arch.planArchSegments(ring, PLAN_OPTS, CNC_OPTS);
   PLANS[tag] = plan;
-  check(`${tag}: one plan per arc (${g.arcs.length})`, plan.arcs.length === g.arcs.length);
-  plan.arcs.forEach((pa, i) => {
-    const ring = g.frameHead;
-    const exp = expectedOptions(ring, i);
-    check(`${tag} arc ${i}: N candidates ${exp[0].n}…${exp[exp.length - 1].n} (N_min = max(2, ceil(${pa.spanDeg.toFixed(2)}° / 36°)))`,
-      pa.options.length === exp.length && pa.options.every((o, j) => o.n === exp[j].n) && pa.nMin === exp[0].n, pa.options.map((o) => o.n).join(' '));
-    const okW = pa.options.every((o, j) => near(o.wReq, exp[j].width, 0.01));
-    // Piotr 06.09: option L = the longest raw piece's OUTER STOCK EDGE between its end cuts (what
-    // the CNC cuts from the board), no longer the allowance-band chord. Independent closed form for
-    // a middle piece with radial joints: L_out = 2 · wHi · tan(φ/2), wHi = (r_in − a)·cos(φ/2) + (stock + W_req)/2.
-    // (band width per piece is verified separately by okW / okPieces; the closed form takes it as given)
-    const midOuterEdge = (o, pc) => {
-      const phi = arch.arcSpan(ring.outer[i]) / o.n;
-      const rIn = ring.inner[i].r, a = PLAN_OPTS.contourAllowance;
-      const wHi = (rIn - a) * Math.cos(phi / 2) + (o.stock + pc.projectedWidth) / 2;
-      return 2 * wHi * Math.tan(phi / 2);
-    };
-    const okL = pa.options.every((o, j) => {
-      const mids = o.pieces.filter((pc) => pc.endStart !== 'archStart' && pc.endEnd !== 'archStart' && pc.endStart !== 'axis' && pc.endEnd !== 'axis');
-      if (o.stock == null) return near(o.L, exp[j].length, 0.01);                  // no stock: band chord stands in
-      return (mids.length === 0 || mids.every((pc) => near(pc.outerEdge, midOuterEdge(o, pc), 0.05)))
-        && o.pieces.every((pc) => near(pc.roughLength, pc.outerEdge + PLAN_OPTS.finger.length * pc.jointedEnds, 1e-9))
-        && near(o.L, Math.max(...o.pieces.map((pc) => pc.outerEdge)), 1e-9);
-    });
-    const okS = pa.options.every((o, j) => o.stock === exp[j].stock);
-    check(`${tag} arc ${i}: W_req of the allowance band per N (sampled + closed form)`, okW, pa.options.map((o) => o.wReq.toFixed(2)).join(' ') + ' vs ' + exp.map((o) => o.width.toFixed(2)).join(' '));
-    check(`${tag} arc ${i}: L = outer stock edge of the longest piece (middle pieces = 2·wHi·tan(φ/2) closed form), rough = edge + 15 × jointed`, okL, pa.options.map((o) => o.L.toFixed(2)).join(' '));
-    check(`${tag} arc ${i}: stock match per option`, okS, pa.options.map((o) => o.stock).join(' '));
-    const okPieces = pa.options.every((o, j) => o.pieces.every((pc, k) => near(pc.wReq, exp[j].pieces[k].width, 0.01) && near(pc.L, exp[j].pieces[k].length, 0.01)));
-    check(`${tag} arc ${i}: every piece's own W_req / L match the sampled band`, okPieces);
-    const endsGE = pa.options.every((o, j) => exp[j].midWidth == null || o.pieces.every((pc) => pc.wReq + 1e-9 >= exp[j].midWidth));
-    check(`${tag} arc ${i}: end pieces W_req >= middle-piece closed form (spec §10.2)`, endsGE);
-    const jointedOk = pa.options.every((o) => o.pieces.every((pc) => {
-      const j = (pc.endStart === 'archStart' ? 0 : 1) + (pc.endEnd === 'archStart' ? 0 : 1);
-      return pc.jointedEnds === j && near(pc.roughLength, (pc.outerEdge ?? pc.L) + PLAN_OPTS.finger.length * j, 1e-9)
-        && pc.endCuts[0].kind === (pc.endStart === 'archStart' ? 'spring' : pc.endStart === 'axis' ? 'apex' : 'joint')
-        && pc.endCuts[1].kind === (pc.endEnd === 'archStart' ? 'spring' : pc.endEnd === 'axis' ? 'apex' : 'joint')
-        && pc.endCuts.every((c) => c.kind !== 'joint' || near(c.angleDeg, pc.phiDeg / 2, 1e-9));
-    }));
-    check(`${tag} arc ${i}: jointedEnds / roughLength = L + 15 × jointed / end-cut kinds and joint angle φ/2`, jointedOk);
-    check(`${tag} arc ${i}: option roughLength = max piece rough`, pa.options.every((o) => near(o.roughLength, Math.max(...o.pieces.map((pc) => pc.roughLength)), 1e-9)));
-    const { def, alt } = expectedChoice(exp);
-    check(`${tag} arc ${i}: D13 default under '${PLAN_OPTS.pieceRule}' = ${def?.n ?? '-'} × ${def?.stock ?? '-'}`, (pa.default?.n ?? null) === (def?.n ?? null) && (pa.default?.n ?? null) === v.defN[i] && (pa.default?.stock ?? null) === (def?.stock ?? null));
-    check(`${tag} arc ${i}: D13 alternative (the other rule) = ${alt?.n ?? '-'} × ${alt?.stock ?? '-'}`, (pa.alternative?.n ?? null) === (alt?.n ?? null) && (pa.alternative?.n ?? null) === v.altN[i]);
-    const flipped = arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, pieceRule: 'fewest' }).arcs[i];
-    const fe = expectedChoice(exp, 'fewest');
-    check(`${tag} arc ${i}: pieceRule 'fewest' → ${fe.def?.n ?? '-'} × ${fe.def?.stock ?? '-'} (ALT ${fe.alt?.n ?? '-'}), same option table`,
-      (flipped.default?.n ?? null) === (fe.def?.n ?? null) && (flipped.alternative?.n ?? null) === (fe.alt?.n ?? null) && flipped.options.every((o, j) => o.n === pa.options[j].n && o.stock === pa.options[j].stock));
-    if (pa.default) {
-      const ps = pa.default.pieces;
-      const tiled = ps.every((pc, k) => k === 0 || (near(pc.outer.a0, ps[k - 1].outer.a1, 1e-12) && near(pc.inner.a0, ps[k - 1].inner.a1, 1e-12)));
-      const full = near(ps[0].outer.a0, ring.outer[i].a0, 1e-12) && near(ps[ps.length - 1].outer.a1, ring.outer[i].a1, 1e-12)
-        && near(ps[0].inner.a0, ring.inner[i].a0, 1e-12) && near(ps[ps.length - 1].inner.a1, ring.inner[i].a1, 1e-12);
-      check(`${tag} arc ${i}: default pieces tile the arc without gaps`, tiled && full);
-      check(`${tag} arc ${i}: every piece is a 4-vertex bulge polygon (finished + band)`, ps.every((pc) => arch.piecePoly(pc).length === 4 && arch.pieceBandPoly(pc).length === 4));
+  const ind = indPlan(ring);
+  check(`${tag}: ${ind.length} planning group(s) (${ind.map((x) => x.kind).join(' + ')}) — a gothic is split at the apex, everything else is one chain`,
+    plan.arcs.length === ind.length && plan.arcs.every((gp, i) => gp.kind === ind[i].kind) && plan.arcs.length === (g.arcs.length === 2 ? 2 : 1));
+  plan.arcs.forEach((gp, i) => {
+    const I = ind[i];
+    const label = `${tag}${ind.length > 1 ? ' side ' + (i + 1) : ''}`;
+    check(`${label}: option table N = 1 … ${I.options[I.options.length - 1].n}: W_req (±0.05 vs the sampler), stock, feasibility`,
+      gp.options.length === I.options.length && gp.options.every((o, j) => o.n === I.options[j].n && near(o.wReq, I.options[j].wReq, 0.05) && o.stock === I.options[j].stock && o.feasible === I.options[j].feasible),
+      gp.options.map((o) => `${o.n}:${o.wReq.toFixed(1)}→${o.stock}${o.feasible ? '✓' : '✗'}`).join(' '));
+    check(`${label}: every piece of every option — W_req / L / raw edges / shorter / overall match the independent sampler (±0.05)`,
+      gp.options.every((o, j) => o.pieces.every((pc, k) => {
+        const ip = I.options[j].pieces[k];
+        return near(pc.wReq, ip.wReq, 0.05) && near(pc.L, ip.L, 0.05) && (o.stock == null || (near(pc.outerEdge, ip.outer, 0.05) && near(pc.innerEdge, ip.inner, 0.05) && near(pc.roughLength, ip.overall, 0.05) && near(pc.shorterEdge, ip.shorter, 0.05)));
+      })));
+    check(`${label}: FEWEST ${I.fewest?.n ?? '-'} × ${I.fewest?.stock ?? '-'}, ALT ${I.alt ? `${I.alt.n} × ${I.alt.stock}` : 'none'}, DEFAULT ${I.def?.n ?? '-'} × ${I.def?.stock ?? '-'} (${I.rule})`,
+      (gp.fewest?.n ?? null) === (I.fewest?.n ?? null) && (gp.fewest?.stock ?? null) === (I.fewest?.stock ?? null) && (gp.alternative?.n ?? null) === (I.alt?.n ?? null)
+      && (gp.default?.n ?? null) === (I.def?.n ?? null) && (gp.default?.stock ?? null) === (I.def?.stock ?? null) && gp.rule === I.rule,
+      `${gp.fewest?.n} × ${gp.fewest?.stock}, alt ${gp.alternative?.n}, default ${gp.default?.n} × ${gp.default?.stock} (${gp.rule})`);
+    check(`${label}: waste of the fewest / alternative plans = (rough × stock − band area) / (rough × stock), independent ±0.005`,
+      near(gp.fewest.waste, I.fewest.waste, 0.005) && (!gp.alternative || near(gp.alternative.waste, I.alt.waste, 0.005)), `${gp.fewest.waste?.toFixed(3)} vs ${I.fewest.waste.toFixed(3)}`);
+    check(`${label}: every default piece passes both limits (overall ≥ 450, shorter edge ≥ 400); every N below the fewest fails`,
+      gp.default.pieces.every((pc) => pc.limitsOk && pc.roughLength >= 450 - 1e-9 && pc.shorterEdge >= 400 - 1e-9) && gp.options.filter((o) => o.n < gp.fewest.n).every((o) => !o.feasible));
+    // closed forms for a single-arc piece with radial joints at both ends (spec §7.5 — still exact in v4)
+    const mids = gp.default.pieces.filter((pc) => !pc.compound && pc.endStart === 'radial' && pc.endEnd === 'radial');
+    if (mids.length) {
+      const okMid = mids.every((pc) => {
+        const O = ring.outer[pc.arc], In = ring.inner[pc.arc], a = PLAN_OPTS.contourAllowance;
+        const phi = pc.span;
+        const wReq = (O.r + a) - (In.r - a) * Math.cos(phi / 2);
+        const wHi = (In.r - a) * Math.cos(phi / 2) + (pc.stock + wReq) / 2;      // board centred on the band
+        const wLo = wHi - pc.stock;
+        return near(pc.wReq, wReq, 0.01) && near(pc.L, 2 * (O.r + a) * Math.sin(phi / 2), 0.01) && near(pc.outerEdge, 2 * wHi * Math.tan(phi / 2), 0.05) && near(pc.innerEdge, 2 * wLo * Math.tan(phi / 2), 0.05)
+          && pc.endCuts.every((c) => c.kind === 'joint' && near(c.fromSquareDeg, phi / 2 * DEG, 1e-6)) && near(pc.roughLength, 2 * wHi * Math.tan(phi / 2) + 2 * PLAN_OPTS.finger.length, 0.05);
+      });
+      check(`${label}: ${mids.length} middle piece(s) — closed forms W_req = (Ro + a) − (Ri − a)·cos(φ/2), L = 2·(Ro + a)·sin(φ/2), edges 2·w·tan(φ/2), joints φ/2 from square, rough = outer edge + 2 × 15`, okMid);
     }
+    const ps = gp.default.pieces;
+    const tiled = ps.every((pc, k) => k === 0 || (near(pc.s[0], ps[k - 1].s[1], 1e-9) && near(pc.outer[0].a0, ps[k - 1].outer[ps[k - 1].outer.length - 1].a1, 1e-9)));
+    const first = ps[0].outer[0], last = ps[ps.length - 1].outer[ps[ps.length - 1].outer.length - 1];
+    const full = near(first.a0, ring.outer[gp.arcIndices[0]].a0, 1e-12) && near(last.a1, ring.outer[gp.arcIndices[gp.arcIndices.length - 1]].a1, 1e-12);
+    check(`${label}: default pieces tile the group by arc length without gaps; polygons close (2 × arcs + 2 vertices)`, tiled && full && ps.every((pc) => arch.piecePoly(pc).length === 2 * pc.outer.length + 2 && arch.pieceBandPoly(pc).length === 2 * pc.outer.length + 2));
   });
   const joints = plan.pieces.flatMap((pc) => arch.pieceJoints(pc));
   check(`${tag}: joint faces run inner → outer (non-zero, ${joints.length} faces)`, joints.length > 0 && joints.every(([pi, po]) => Math.hypot(po[0] - pi[0], po[1] - pi[1]) > 0));
@@ -522,51 +390,55 @@ for (const v of PLAN_VECTORS) {
   check(`gothic: piece ends per side (${nSide} pcs) = archStart→radial…→axis, mirrored`, JSON.stringify(ends) === JSON.stringify(expEnds), JSON.stringify(ends));
   const allJoints = plan.pieces.flatMap((pc) => arch.pieceJoints(pc));
   const apexJoints = allJoints.filter(([pi, po]) => near(pi[0], 0, 1e-9) && near(po[0], 0, 1e-9));
-  check(`gothic: ${4 * nSide - 2} joint faces reported (every non-arch-start end, shared joints twice), exactly 2 on the axis (x = 0)`, allJoints.length === 4 * nSide - 2 && apexJoints.length === 2, String(allJoints.length));
+  check(`gothic: ${4 * nSide - 2} joint faces reported (every non-springing end, shared joints twice), exactly 2 on the axis (x = 0)`, allJoints.length === 4 * nSide - 2 && apexJoints.length === 2, String(allJoints.length));
   expectNear('gothic: apex joint runs from inner apex 972.86 to outer apex 1039.23', apexJoints[0][1][1] - apexJoints[0][0][1], 1039.2305 - 972.8648, 0.01);
   const apexCut = plan.pieces[nSide - 1].endCuts[1];
-  check('gothic: apex end cut kind "apex", from-square = piece axis to the horizontal', apexCut.kind === 'apex' && near(apexCut.fromSquareDeg, plan.pieces[nSide - 1].axisAngleDeg, 1e-9));
+  check('gothic: apex end cut kind "apex", from-square = angle between the vertical plane and the board normal', apexCut.kind === 'apex' && near(apexCut.fromSquareDeg, Math.acos(Math.abs(plan.pieces[nSide - 1].axes.b[1])) * DEG, 1e-9));
+  const sq = plan.pieces[0].endCuts[0];
+  check('gothic: springing end cut kind "square" (Q), not jointed, contour wedge = piece axis to the horizontal', sq.kind === 'square' && !sq.jointed && sq.fromSquareDeg === 0 && near(sq.contourDeg, 180 - Math.atan2(plan.pieces[0].axes.u[1], plan.pieces[0].axes.u[0]) * DEG, 1e-9));
 }
 {
   const plan = PLANS['three-centre'];
-  const hp = plan.arcs[0].default.pieces, haunchLast = hp[hp.length - 1], crown = plan.arcs[1].default.pieces[0];
-  const jHs = arch.pieceJoints(haunchLast), jH = jHs[jHs.length - 1], jC = arch.pieceJoints(crown)[0];
-  check('three-centre: haunch/crown share the tangent joint line', near(jH[0][0], jC[0][0], 1e-9) && near(jH[0][1], jC[0][1], 1e-9) && near(jH[1][0], jC[1][0], 1e-9) && near(jH[1][1], jC[1][1], 1e-9));
-  check('three-centre: haunch ends = archStart → … → tangent', hp[0].endStart === 'archStart' && haunchLast.endEnd === 'tangent');
+  const ps = plan.pieces;
+  check('three-centre (390): ONE chain, a piece may span the haunch / crown tangent (a compound piece exists), every joint radial to the local arc at the cut point', plan.arcs.length === 1 && plan.arcs[0].kind === 'chain' && ps.some((pc) => pc.compound) && ps.every((pc, k) => k === 0 || near(pc.planes.start.angle, ps[k - 1].planes.end.angle, 1e-12)));
+  check('three-centre: neighbours share their joint plane — the start edge of piece k lies on the line of the end edge of piece k − 1 (±0.01; boards are centred on their own bands, so the vertices differ)', ps.every((pc, k) => {
+    if (k === 0) return true;
+    const a = arch.pieceStockTrapezoid(ps[k - 1], ps[k - 1].stock), b = arch.pieceStockTrapezoid(pc, pc.stock);
+    const line = (q, p1, p2) => Math.abs((p2[0] - p1[0]) * (q[1] - p1[1]) - (p2[1] - p1[1]) * (q[0] - p1[0])) / Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+    return line(b[0], a[1], a[2]) < 0.01 && line(b[3], a[1], a[2]) < 0.01;
+  }));
+  check('three-centre: every band arc keeps its centre and radius ± allowance (concentric band)', ps.every((pc) => pc.band.outer.every((a, i) => near(a.r, pc.outer[i].r + PLAN_OPTS.contourAllowance, 1e-9) && a.cx === pc.outer[i].cx) && pc.band.inner.every((a, i) => near(a.r, pc.inner[i].r - PLAN_OPTS.contourAllowance, 1e-9))));
 }
 {
   const g = GEOM['semi-circle'];
-  const plan = arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, stockWidths: [50] });
-  check('no matching board: returns options with stock = null and noStock = true', plan.noStock === true && plan.arcs[0].default === null && plan.arcs[0].options.every((o) => o.stock === null) && plan.pieces.length === 0);
-  expectThrows('unknown pieceRule throws a readable ArchError', () => arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, pieceRule: 'cheapest' }), /pieceRule must be one of narrowest \| fewest/);
-  expectThrows('missing maxSegmentAngleDeg throws (no defaults in the planner)', () => arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, maxSegmentAngleDeg: undefined }), /maxSegmentAngleDeg is missing/);
-  expectThrows('missing contourAllowance throws (no defaults in the planner)', () => arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, contourAllowance: undefined }), /contourAllowance is missing/);
-  expectThrows('missing finger length throws (no defaults in the planner)', () => arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, finger: {} }), /finger\.length is missing/);
-  // v2: the "one board for a single-centre arc below 36°" rule (spec §7.2) has
-  // no product left to apply to — the only single-arc shape is the 180°
-  // semi-circle (rule C). The planner branch stays; the semi-circle proves it idle.
-  check('semi-circle (the only single-arc shape): N_min stays 5, the one-board branch never fires', PLANS['semi-circle'].arcs[0].nMin === 5);
+  const plan = arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, stockWidths: [50] }, CNC_OPTS);
+  check('no matching board: returns options with stock = null and noStock = true (reason "no stock board fits")', plan.noStock === true && plan.noStockReason === 'no stock board fits' && plan.arcs[0].default === null && plan.arcs[0].options.every((o) => o.stock === null) && plan.pieces.length === 0);
+  const blocked = arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, stockWidths: [95] }, CNC_OPTS);
+  const ib = indPlan(g.frameHead, { stock: [95] });
+  check(`only a 95 board: a board fits at ${ib[0].blocked?.n} pieces but the limits fail → noStock, reason "below minimum length", never split finer`, blocked.noStock && blocked.noStockReason === 'below minimum length' && blocked.arcs[0].blocked?.n === ib[0].blocked?.n && blocked.pieces.length === 0 && blocked.reasons.length === 1);
+  expectThrows('missing contourAllowance throws (no defaults in the planner)', () => arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, contourAllowance: undefined }, CNC_OPTS), /contourAllowance is missing/);
+  expectThrows('missing finger length throws (no defaults in the planner)', () => arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, finger: {} }, CNC_OPTS), /finger\.length is missing/);
+  expectThrows('missing cnc block throws (v4: cnc.minClampLength)', () => arch.planArchSegments(g.frameHead, PLAN_OPTS, undefined), /cnc\.minClampLength is missing/);
+  check('v4: N starts at 1 — the shallow 1000 × rise 200 leaf top rail is ONE 180 board, no joint', arch.buildArchPlan({ shape: 'three-centre', width: 1000, height: 1500, rise: 200 }, P).plans.leafTop.pieces.length === 1);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// §10.3 item 7 — every board contains its piece's allowance band (plan data)
+// §10.3 item 7 — every raw board contains its piece's allowance band (plan data)
 // ═══════════════════════════════════════════════════════════════════════════
-section('§10.3 pt 7 — stock boards contain the allowance band (point-in-rectangle on sampled band points)');
+section('§10.3 pt 7 — stock boards contain the allowance band (point-in-trapezoid on sampled band points)');
 function bandContained(pc, stock) {
-  const { b, u } = pc.axes;
-  const [sMin, sMax] = pc.extents.s;
-  const wLo = pc.extents.w[0] - (stock - pc.wReq) / 2, wHi = wLo + stock;
-  const pts = [...sampled(pc.band.outer.cx, pc.band.outer.cy, pc.band.outer.r, pc.band.outer.a0, pc.band.outer.a1, 400),
-    ...sampled(pc.band.inner.cx, pc.band.inner.cy, pc.band.inner.r, pc.band.inner.a0, pc.band.inner.a1, 400)];
-  return pts.every((q) => { const s = q[0] * u[0] + q[1] * u[1], w = q[0] * b[0] + q[1] * b[1]; return s >= sMin - 1e-6 && s <= sMax + 1e-6 && w >= wLo - 1e-6 && w <= wHi + 1e-6; });
+  const T = arch.pieceStockTrapezoid(pc, stock);
+  const inside = (q) => { let sgn = 0; for (let i = 0; i < 4; i++) { const a = T[i], b = T[(i + 1) % 4]; const cr = (b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0]); if (Math.abs(cr) < 1e-6) continue; if (!sgn) sgn = Math.sign(cr); else if (Math.sign(cr) !== sgn) return false; } return true; };
+  const pts = [...pc.band.outer.flatMap((a) => sampled(a.cx, a.cy, a.r, a.a0, a.a1, 400)), ...pc.band.inner.flatMap((a) => sampled(a.cx, a.cy, a.r, a.a0, a.a1, 400))];
+  return pts.every(inside);
 }
 for (const shape of Object.keys(PLANS)) {
   const plan = PLANS[shape];
-  check(`${shape}: every default piece's band (outer + 10 / inner − 10) fits inside its stock × L board`, plan.pieces.every((pc) => bandContained(pc, pc.stock)));
+  check(`${shape}: every default piece's band (outer + 10 / inner − 10) fits inside its raw trapezoid`, plan.pieces.every((pc) => bandContained(pc, pc.stock)));
   check(`${shape}: the finished piece contour lies inside the band (r_out < band r_out, r_in > band r_in, angles within)`, plan.pieces.every((pc) =>
-    pc.outer.r < pc.band.outer.r && pc.inner.r > pc.band.inner.r && pc.outer.a0 >= pc.band.outer.a0 - 1e-9 && pc.outer.a1 <= pc.band.outer.a1 + 1e-9));
-  // every option (not only the default) — the DXF may print any of them as ALT
-  check(`${shape}: bands fit their boards for every feasible option`, plan.arcs.every((a) => a.options.every((o) => o.stock == null || o.pieces.every((pc) => bandContained(pc, o.stock)))));
+    pc.outer.every((a, i) => a.r < pc.band.outer[i].r && a.a0 >= pc.band.outer[i].a0 - 1e-9 && a.a1 <= pc.band.outer[i].a1 + 1e-9) && pc.inner.every((a, i) => a.r > pc.band.inner[i].r)));
+  // every feasible option (not only the default) — the DXF prints the alternative as ALT
+  check(`${shape}: bands fit their boards for every option with a board`, plan.arcs.every((a) => a.options.every((o) => o.stock == null || o.pieces.every((pc) => bandContained(pc, o.stock)))));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -606,7 +478,7 @@ section('§10.3 pt 5 — DXF round-trip via ezdxf — sample_arch_1200_three-cen
   writeFileSync(path, dxf);
   const d = probe(path);
   check('DXF is R12 (AC1009)', d.version === 'AC1009', d.version);
-  check('layers CONTOUR / ASSEMBLY / PIECES / FINGER / TEXT present', ['CONTOUR', 'ASSEMBLY', 'PIECES', 'FINGER', 'TEXT'].every((l) => d.layers.includes(l)), d.layers.join(','));
+  check('layers CONTOUR / ASSEMBLY / PIECES / FINGER / CLAMPS / TEXT present', ['CONTOUR', 'ASSEMBLY', 'PIECES', 'FINGER', 'CLAMPS', 'TEXT'].every((l) => d.layers.includes(l)), d.layers.join(','));
   const contours = d.polys.filter((p) => p.layer === 'CONTOUR');
   check('CONTOUR: two closed rings (frame head, leaf top), exactly one vertex per arc end point (8 each — 3 arcs out, 2 cuts, 3 arcs back)', contours.length === 2 && contours.every((p) => p.closed && p.n === 8));
   const frameC = contours.reduce((m, p) => (p.arcs > m.arcs ? p : m), contours[0]);
@@ -624,19 +496,17 @@ section('§10.3 pt 5 — DXF round-trip via ezdxf — sample_arch_1200_three-cen
     return frameC.bulges.length === 8 && frameC.bulges.every((b, i) => near(Math.abs(b), exp[i], 1e-5));   // dxfWriter writes 6 decimals
   })(), frameC.bulges.map((b) => b.toFixed(4)).join(' '));
   check('frame head contour sits above the leaf contour (reading order top-down)', frameC.bbox[1] > leafC.bbox[3]);
-  // plans in the sample = D13 (narrowest) per arc: head 2 + 3 + 2 × 95 (crown ALT 2 × 105); leaf 2 + 4 + 2 × 95 (crown ALT 2 × 180)
+  // plans in the sample (v4): one chain per ring — head FEWEST 2 × 180 (waste 61 %) → ECONOMY 3 × 150; leaf 2 × 180 (no alternative passes)
   const nF = plan.plans.frameHead.totalPieces, nL = plan.plans.leafTop.totalPieces;
-  const expFa = plan.frameHead.outer.map((_, i) => expectedChoice(expectedOptions(plan.frameHead, i), PA.arch.pieceRule));
-  const expLa = plan.leafTop.outer.map((_, i) => expectedChoice(expectedOptions(plan.leafTop, i), PA.arch.pieceRule));
-  const expF = expFa[0], expL = expLa[0];
+  const iF = indPlan(plan.frameHead), iL = indPlan(plan.leafTop);
   const sumN = (arr) => arr.reduce((a, e) => a + e.def.n, 0);
-  const stocksOk = (pl, exp) => pl.arcs.every((a, i) => a.default.pieces.every(() => a.default.stock === exp[i].def.stock));
-  check(`sample plans: frame head ${nF} pieces (${expFa.map((e) => e.def.n).join(' + ')}), leaf top ${nL} (${expLa.map((e) => e.def.n).join(' + ')}) — independent option table per arc`,
-    nF === sumN(expFa) && nL === sumN(expLa) && stocksOk(plan.plans.frameHead, expFa) && stocksOk(plan.plans.leafTop, expLa),
-    `${nF}/${nL} vs ${sumN(expFa)}/${sumN(expLa)}`);
-  check('sample plans (P3 three-centre 240): head 2 + 3 + 2 × 95 (crown runner-up 2 × 105), leaf 2 + 4 + 2 × 95 — never a single solid board',
-    nF === 7 && nL === 8 && expFa.every((e) => e.def.stock === 95) && expFa[1].alt?.n === 2 && expFa[1].alt?.stock === 105 && expLa.every((e) => e.def.stock === 95));
-  const stockF = expF.def.stock, stockL = expL.def.stock;
+  const stocksOk = (pl, exp) => pl.arcs.every((a, i) => a.default.stock === exp[i].def.stock && a.rule === exp[i].rule);
+  check(`sample plans: frame head ${nF} pieces (${iF.map((e) => `${e.def.n} × ${e.def.stock} ${e.rule}`).join(' + ')}), leaf top ${nL} (${iL.map((e) => `${e.def.n} × ${e.def.stock} ${e.rule}`).join(' + ')}) — independent planner per group`,
+    nF === sumN(iF) && nL === sumN(iL) && stocksOk(plan.plans.frameHead, iF) && stocksOk(plan.plans.leafTop, iL), `${nF}/${nL} vs ${sumN(iF)}/${sumN(iL)}`);
+  check('sample plans (three-centre 240, v4): head fewest 2 × 180 → economy 3 × 150 (waste above 45 %), leaf 2 × 180 fewest — every piece a compound haunch + crown board, no 100 mm haunch triangles',
+    iF[0].fewest.n === 2 && iF[0].fewest.stock === 180 && iF[0].def.n === 3 && iF[0].def.stock === 150 && iF[0].rule === 'economy' && iL[0].def.n === 2 && iL[0].def.stock === 180 && iL[0].rule === 'fewest'
+    && plan.plans.frameHead.pieces.every((pc) => pc.roughLength >= 450 && pc.shorterEdge >= 400) && plan.plans.leafTop.pieces.every((pc) => pc.compound));
+  const stockF = iF[0].def.stock, stockL = iL[0].def.stock;
   const pieces = d.polys.filter((p) => p.layer === 'PIECES');
   // Piotr 06.09: PIECES = the RAW timber pieces after their angled end cuts — straight trapezoids
   // (no arcs), stock wide, rough length long (band L + finger 15 per jointed end). Fingers are a note.
@@ -690,15 +560,18 @@ section('§10.3 pt 5 — DXF round-trip via ezdxf — sample_arch_1200_three-cen
   check('TEXT: labels for both members', texts.some((t) => t === 'W1 - FRAME HEAD') && texts.some((t) => t === 'W1 - LEAF TOP'));
   check('TEXT: shape / size / hinge line', texts.some((t) => t === 'THREE-CENTRE W1200 RISE240 H2000 HINGE L'), texts.join(' | '));
   check('TEXT: finger profile 15/16/3.8', texts.some((t) => t === 'FINGER 15/16/3.8'));
-  check('TEXT: allowance 10 per side + max segment 36 deg + rule printed', texts.some((t) => t === 'ALLOWANCE 10 PER SIDE  MAX SEGMENT 36 DEG  RULE NARROWEST'), texts.filter((t) => t.startsWith('ALLOW')).join(' | '));
-  const altTxt = (e) => (e.alt ? ` \\(ALT ${e.alt.n} x board ${e.alt.stock}\\)` : '');
-  const planRe = new RegExp(`^ARC 1 R150 L176\\.4 67\\.4DEG: ${expF.def.n} x board ${expF.def.stock} L\\d+(\\.\\d)? ROUGH \\d+(\\.\\d)?${altTxt(expF)}$`);
-  check(`TEXT: haunch ARC 1 line (${expF.def.n} × ${expF.def.stock}, no ALT)`, texts.some((t) => planRe.test(t)), texts.filter((t) => t.startsWith('ARC 1')).join(' | '));
-  const crownRe = new RegExp(`^ARC 2 R1320 L1042\\.2 45\\.2DEG: ${expFa[1].def.n} x board ${expFa[1].def.stock} L\\d+(\\.\\d)? ROUGH \\d+(\\.\\d)?${altTxt(expFa[1])}$`);
-  check(`TEXT: crown ARC 2 line with the D13 runner-up (${expFa[1].def.n} × ${expFa[1].def.stock}, ALT ${expFa[1].alt?.n ?? '-'} × ${expFa[1].alt?.stock ?? '-'})`, texts.some((t) => crownRe.test(t)), texts.filter((t) => t.startsWith('ARC 2')).join(' | '));
+  check('TEXT: allowance 10 per side + both hard limits + the board cap printed', texts.some((t) => t === 'ALLOWANCE 10 PER SIDE  LIMITS: OVERALL >= 450 (CLAMP)  SHORTER EDGE >= 400  STOCK MAX 200'), texts.filter((t) => t.startsWith('ALLOW')).join(' | '));
+  const chainRe = new RegExp(`^CHAIN R150/1320/150 L1395(\\.\\d)? 180DEG: FEWEST ${iF[0].fewest.n} x board ${iF[0].fewest.stock} L\\d+(\\.\\d)? ROUGH \\d+(\\.\\d)? WASTE ${Math.round(iF[0].fewest.waste * 100)}%$`);
+  check(`TEXT: head CHAIN line (radii 150/1320/150, 180°, FEWEST ${iF[0].fewest.n} × ${iF[0].fewest.stock}, waste ${Math.round(iF[0].fewest.waste * 100)} %)`, texts.some((t) => chainRe.test(t)), texts.filter((t) => t.startsWith('CHAIN')).join(' | '));
+  const altRe = new RegExp(`^  ECONOMY ALT ${iF[0].alt.n} x board ${iF[0].alt.stock} L\\d+(\\.\\d)? ROUGH \\d+(\\.\\d)? WASTE ${Math.round(iF[0].alt.waste * 100)}% -> DEFAULT ECONOMY \\(THRESHOLD 45%\\)$`);
+  check(`TEXT: head ECONOMY ALT line (${iF[0].alt.n} × ${iF[0].alt.stock} → DEFAULT ECONOMY, threshold 45 %)`, texts.some((t) => altRe.test(t)), texts.filter((t) => t.startsWith('  ECONOMY')).join(' | '));
+  check('TEXT: leaf line — NO ECONOMY ALT WITHIN 5 PIECES -> DEFAULT FEWEST', texts.some((t) => t === '  NO ECONOMY ALT WITHIN 5 PIECES -> DEFAULT FEWEST'), texts.filter((t) => t.startsWith('  NO')).join(' | '));
+  check('TEXT: CLAMPS (SUGGESTION) line per ring with the piece thickness 93 / 57', texts.some((t) => t === 'CLAMPS (SUGGESTION): UNICLAMP 130 x 130, CLEARANCE 20 FROM THE END CUTS, JAWS 40-98, PIECE THICKNESS 93') && texts.some((t) => t.endsWith('PIECE THICKNESS 57')));
   check('TEXT: flat piece labels print L <rough> x <stock>', texts.some((t) => new RegExp(`^W1 - FRAME HEAD P1 L\\d+(\\.\\d)? x${stockF}$`).test(t)) && texts.some((t) => new RegExp(`^W1 - LEAF TOP P1 L\\d+(\\.\\d)? x${stockL}$`).test(t)), texts.filter((t) => / P1 /.test(t)).join(' | '));
-  check('TEXT: flat piece note prints OUT / IN / CUT codes / finger ends', texts.filter((t) => /^OUT \d+(\.\d)? IN \d+(\.\d)? CUT [JSA]\d+(\.\d)?\/[JSA]\d+(\.\d)? (FINGER BOTH ENDS|FINGER ONE END|NO FINGER)$/.test(t)).length === nF + nL, texts.filter((t) => t.startsWith('OUT')).join(' | '));
-  check('TEXT: cut-code legend line', texts.some((t) => t.startsWith('CUT CODES: J = JOINT FROM SQUARE')));
+  check('TEXT: flat piece note prints OUT / IN / CUT codes (J<deg> joint, Q square springing end, A<deg> apex) / finger ends', texts.filter((t) => /^OUT \d+(\.\d)? IN \d+(\.\d)? CUT (Q|[JA]\d+(\.\d)?)\/(Q|[JA]\d+(\.\d)?) (FINGER BOTH ENDS|FINGER ONE END|NO FINGER)$/.test(t)).length === nF + nL, texts.filter((t) => t.startsWith('OUT')).join(' | '));
+  check('TEXT: cut-code legend line (v4: Q = square)', texts.some((t) => t === 'CUT CODES: J = JOINT FROM SQUARE  Q = SQUARE (SPRINGING FACE ROUTED WITH THE CONTOUR)  A = APEX FROM SQUARE'));
+  const clampPolys = d.polys.filter((p) => p.layer === 'CLAMPS');
+  check(`CLAMPS: two 130 × 130 closed squares per piece (${2 * (nF + nL)})`, clampPolys.length === 2 * (nF + nL) && clampPolys.every((p) => p.closed && p.n === 4 && near(p.bbox[2] - p.bbox[0], 130, 1e-3) && near(p.bbox[3] - p.bbox[1], 130, 1e-3)), String(clampPolys.length));
   const minX = Math.min(...d.polys.map((p) => p.bbox[0])), minY = Math.min(...d.polys.map((p) => p.bbox[1]));
   check('drawing origin: nothing left of / below (0, 0)', minX >= -1e-6 && minY >= -1e-6, `${minX.toFixed(3)}, ${minY.toFixed(3)}`);
   const jsArcs = ents.filter((e) => e.layer === 'CONTOUR').map((e) => archDxf.polyLength(e.pts, true).arcs).sort((a, b) => a - b);
@@ -759,7 +632,7 @@ section('§10.3 pt 8 — cncExport: canExportArchDxf, archParamsForWindow, merge
   const low = cncExport.archParamsForWindow(mk({ casementType: 'arched', casArchShape: 'semi-circle' }, { height: 1400 }), 'L');
   check('H 1400 with rise 600 → readable skip (800 straight < 900)', /leaves 800mm straight below the arch — minimum 900mm/.test(low.skip || ''), low.skip);
   const noStock = profile.withProfiles(null, { ...P, arch: { ...P.arch, stockWidths: [50] } }, () => cncExport.archParamsForWindow(mk({ casementType: 'arched', casArchShape: 'semi-circle' }), 'N'));
-  check('no stock board fits → skip explains which arc needs what', /no stock board fits \(widest 50mm\): frame head arc 1 needs a board >= \d+mm/.test(noStock.skip || ''), noStock.skip);
+  check('no stock board fits → skip explains which member / group needs what (v4 wording)', /^no valid blank plan \(no stock board fits\): frame head chain: no stock board fits \(needs \d+\+ for \d+ pieces, widest 50\); leaf top chain: no stock board fits/.test(noStock.skip || ''), noStock.skip);
   check('no-throw contract: every skip path returned an object', [sash, door, mk({})].every((w) => typeof cncExport.archParamsForWindow(w, 'x') === 'object'));
   // merged export end-to-end: stub the browser download, read the Blob back, probe with ezdxf
   let lastBlob = null, lastName = null, clicks = 0;
@@ -861,25 +734,27 @@ section('§10.3 pt 9 — normaliseToWindowSpec PSW mapping, riseSource, unknown 
   check('buildArchPlan from windowSpec + getCasementProfile() equals the default-profile plan', JSON.stringify(planLive.plans.frameHead.pieces.map((p) => [p.no, p.stock, +p.wReq.toFixed(6)])) === JSON.stringify(planDef.plans.frameHead.pieces.map((p) => [p.no, p.stock, +p.wReq.toFixed(6)])) && planLive.hinge === 'right');
 
   // profile block + migration
-  check('DEFAULT_CASEMENT_PROFILE.arch v3: finger 15/16/3.8, stock D7 [50, 63, 75, 95, 105, 180, 200], contourAllowance 10, maxSegmentAngleDeg 36, pieceRule narrowest, limits, minHaunchRadius 150, patterns',
-    P.arch && P.arch.version === 3 && P.arch.minHaunchRadius === 150 && JSON.stringify(P.arch.patterns.hubRingRatios) === '[0.3,0.6,0.8]' && P.arch.patterns.intersecting.pitch === 450
+  check('DEFAULT_CASEMENT_PROFILE.arch v4: finger 15/16/3.8, stock [63, 75, 95, 105, 120, 150, 180, 200], contourAllowance 10, minPieceLength 400, wasteThreshold 0.45, limits, minHaunchRadius 150, patterns; no maxSegmentAngleDeg / pieceRule; cnc block',
+    P.arch && P.arch.version === 4 && P.arch.minHaunchRadius === 150 && JSON.stringify(P.arch.patterns.hubRingRatios) === '[0.3,0.6,0.8]' && P.arch.patterns.intersecting.pitch === 450
     && P.arch.finger.length === 15 && P.arch.finger.depth === 16 && P.arch.finger.pitch === 3.8
-    && JSON.stringify(P.arch.stockWidths) === JSON.stringify([50, 63, 75, 95, 105, 180, 200]) && P.arch.contourAllowance === 10 && P.arch.maxSegmentAngleDeg === 36
-    && P.arch.pieceRule === 'narrowest' && !('widthAllowance' in P.arch) && !('maxPieces' in P.arch)
-    && JSON.stringify(P.arch.limits) === JSON.stringify({ minWidth: 400, maxWidth: 1500, minStraightBelowRise: 900, minLeafStraightStile: 100 }));
-  const { arch: _drop, ...v11 } = JSON.parse(JSON.stringify(P));
-  void _drop;
+    && JSON.stringify(P.arch.stockWidths) === JSON.stringify([63, 75, 95, 105, 120, 150, 180, 200]) && P.arch.contourAllowance === 10 && P.arch.minPieceLength === 400 && P.arch.wasteThreshold === 0.45
+    && !('maxSegmentAngleDeg' in P.arch) && !('pieceRule' in P.arch) && !('widthAllowance' in P.arch) && !('maxPieces' in P.arch)
+    && JSON.stringify(P.arch.limits) === JSON.stringify({ minWidth: 400, maxWidth: 1500, minStraightBelowRise: 900, minLeafStraightStile: 100 })
+    && P.cnc.minClampLength === 450 && P.cnc.clamp.base === 130 && P.cnc.clampClearance === 20);
+  const { arch: _drop, cnc: _dropC, ...v11 } = JSON.parse(JSON.stringify(P));
+  void _drop; void _dropC;
   const m1 = profile.migrateCasementProfile(v11);
-  check('migrateCasementProfile: v1.1 profile without arch gets the default section', JSON.stringify(m1.arch) === JSON.stringify(P.arch));
-  const m2 = profile.migrateCasementProfile({ ...v11, arch: { version: 3, finger: { pitch: 4.2 }, stockWidths: [150], limits: { maxWidth: 1800 }, patterns: { intersecting: { pitch: 500 } } } });
-  check('migrateCasementProfile: partial v3 arch section merges (pitch 4.2, stock [150], maxWidth 1800, tracery pitch 500, rest default)',
-    m2.arch.finger.length === 15 && m2.arch.finger.pitch === 4.2 && JSON.stringify(m2.arch.stockWidths) === '[150]' && m2.arch.contourAllowance === 10 && m2.arch.maxSegmentAngleDeg === 36
+  check('migrateCasementProfile: v1.1 profile without arch / cnc gets both default sections', JSON.stringify(m1.arch) === JSON.stringify(P.arch) && JSON.stringify(m1.cnc) === JSON.stringify(P.cnc));
+  const m2 = profile.migrateCasementProfile({ ...v11, arch: { version: 4, finger: { pitch: 4.2 }, stockWidths: [150], limits: { maxWidth: 1800 }, patterns: { intersecting: { pitch: 500 } } }, cnc: { clamp: { base: 140 } } });
+  check('migrateCasementProfile: partial v4 arch / cnc sections merge (pitch 4.2, stock [150], maxWidth 1800, tracery pitch 500, clamp base 140, rest default)',
+    m2.arch.finger.length === 15 && m2.arch.finger.pitch === 4.2 && JSON.stringify(m2.arch.stockWidths) === '[150]' && m2.arch.contourAllowance === 10 && m2.arch.minPieceLength === 400 && m2.arch.wasteThreshold === 0.45
     && m2.arch.limits.maxWidth === 1800 && m2.arch.limits.minWidth === 400 && m2.arch.limits.minStraightBelowRise === 900 && m2.arch.minHaunchRadius === 150
-    && m2.arch.patterns.intersecting.pitch === 500 && m2.arch.patterns.intersecting.minMullions === 2 && JSON.stringify(m2.arch.patterns.hubRingRatios) === '[0.3,0.6,0.8]');
-  const m2v2 = profile.migrateCasementProfile({ ...v11, arch: { version: 2, finger: { length: 15, depth: 16, pitch: 3.8 }, stockWidths: [50, 63, 75, 95, 105, 180, 200], contourAllowance: 10, maxSegmentAngleDeg: 36, pieceRule: 'fewest', limits: P.arch.limits } });
-  check('migrateCasementProfile: a stored v2 block (no minHaunchRadius) is replaced whole by the v3 default', JSON.stringify(m2v2.arch) === JSON.stringify(P.arch));
+    && m2.arch.patterns.intersecting.pitch === 500 && m2.arch.patterns.intersecting.minMullions === 2 && JSON.stringify(m2.arch.patterns.hubRingRatios) === '[0.3,0.6,0.8]'
+    && m2.cnc.clamp.base === 140 && m2.cnc.clamp.minThickness === 40 && m2.cnc.minClampLength === 450 && m2.cnc.clampClearance === 20);
+  const m2v3 = profile.migrateCasementProfile({ ...v11, arch: { version: 3, finger: { length: 15, depth: 16, pitch: 3.8 }, stockWidths: [50, 63, 75, 95, 105, 180, 200], contourAllowance: 10, maxSegmentAngleDeg: 36, pieceRule: 'narrowest', minPieceLength: 150, minHaunchRadius: 150, limits: P.arch.limits, patterns: P.arch.patterns } });
+  check('migrateCasementProfile: a stored v3 block (36° rule, pieceRule, 150 warn) is replaced whole by the v4 default', JSON.stringify(m2v3.arch) === JSON.stringify(P.arch));
   const m3 = profile.migrateCasementProfile({ ...v11, arch: { finger: { length: 15, depth: 16, pitch: 3.8 }, stockWidths: [100, 125, 150, 175, 200, 225, 250], widthAllowance: 20, maxPieces: 8 } });
-  check('migrateCasementProfile: night-1 arch block (no version, invented stock list) is replaced whole by the v2 default', JSON.stringify(m3.arch) === JSON.stringify(P.arch));
+  check('migrateCasementProfile: night-1 arch block (no version, invented stock list) is replaced whole by the default', JSON.stringify(m3.arch) === JSON.stringify(P.arch));
   check('migrateCasementProfile: pre-v1 shape still replaced by the default (arch included)', profile.migrateCasementProfile({ frameDepth: 93 }).arch === P.arch);
 }
 

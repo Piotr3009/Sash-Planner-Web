@@ -159,7 +159,9 @@ section('4 — cut list / BOM: S-AH, S-ATR, stiles + jambs to the springing, hea
   const groups = lists.buildGroupedCutList(cut);
   check('grouped cut list: S-AH after the HEAD slot, S-ATR after TR, no "?" group', groups.map((x) => x.symbol).join(' ').startsWith('S-AH JB-L/R IL-L/R EL-L/R SILL CNOS ST-L/R SBS-L/R S-ATR TMR BMR BR') && !groups.some((x) => x.symbol === '?'), groups.map((x) => x.symbol).join(' '));
   check('BOM slots: S-ARCH HEAD → head, S-ARCH TOP RAIL → top_rail', bom.ELEMENT_TO_PART_ID['S-ARCH HEAD'] === 'head' && bom.ELEMENT_TO_PART_ID['S-ARCH TOP RAIL'] === 'top_rail');
-  check('plans: head + top rail planned with the casement arch block (stock, finger, allowance) — pieces > 0, no stock gap', d.arch.plans.head.totalPieces > 0 && d.arch.plans.topRail.totalPieces > 0 && !d.arch.plans.head.noStock && d.arch.plans.head.contourAllowance === CP.arch.contourAllowance);
+  // v4 Block C: the 1000 semi-circle box head (80 face) is BLOCKED by the 400 shorter-edge limit (3 × 180 → 395.5 — BLOCKERS); the top rail plans; the 1200 head plans
+  check('plans (v4): S1000 box head blocked honestly (below minimum length, shorter edge 395.5 < 400), S1000 top rail 2 × 180, S1200 head + top rail planned with the casement arch / cnc blocks', d.arch.plans.head.noStock && d.arch.plans.head.noStockReason === 'below minimum length' && /shorter edge 395(\.\d)? < 400/.test(d.arch.plans.head.reasons[0]) && d.arch.plans.topRail.totalPieces === 2 && !d.arch.plans.topRail.noStock
+    && D.S1200.d.arch.plans.head.totalPieces > 0 && !D.S1200.d.arch.plans.head.noStock && !D.S1200.d.arch.plans.topRail.noStock && d.arch.plans.head.contourAllowance === CP.arch.contourAllowance && d.arch.plans.head.minClampLength === CP.cnc.minClampLength, d.arch.plans.head.reasons.join(' | '));
   // horns: added to the upper stile as before
   const h = derive(psw('H1', 1000, 2200, { archShape: 'semi-circle', horns: 'traditional', hornType: 'traditional' }));
   check('horns: STILES TOP = straight stile + hornExtension 70', near(h.components.sash.find((c) => c.elementName === 'STILES TOP (L)').length, h.arch.geometry.upperStraightStile + 70, 0.05));

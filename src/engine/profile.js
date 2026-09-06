@@ -165,10 +165,16 @@ export const DEFAULT_CASEMENT_PROFILE = {
   // frameHead.face / leafTop.face / leafAtJamb / glassInset above; this block
   // holds only what the segment planner and the CNC drawing need.
   arch: {
-    // Schema version of this block. No UI edits it, so a stored copy with an
-    // older version is replaced by this default (migrateCasementProfile).
+    // Schema version of this block. Up to v3 no UI edited it, so an older
+    // stored copy is replaced whole by this default (migrateCasementProfile);
+    // from v4 the Window Settings "CNC & arches" card edits it, so a stored
+    // v4 block is merged key by key.
     // v3 (arched-casement-v2): minHaunchRadius + bar pattern ratios.
-    version: 3,
+    // v4 (ARCHED-WINDOWS-v4 Block C): segment planner v2 — the stock list,
+    // the hard minimum piece length and the economy threshold; the grain
+    // run-out angle and the D13 piece rule are gone (the chain is planned as
+    // a whole, fewest pieces first).
+    version: 4,
     // Smallest haunch radius of a three-centre (Round below half width) arch,
     // mm (v2 P3): r = max(rise² / halfW, this). Keeps the leaf-top inner ring
     // positive (150 − leafAtJamb 40 − leafTop.face 67 = 43) — a Round arch
@@ -193,32 +199,44 @@ export const DEFAULT_CASEMENT_PROFILE = {
     // depth / pitch — printed on the drawing as FINGER 15/16/3.8.
     finger: { length: 15, depth: 16, pitch: 3.8 },
     // Board widths the planner may pick from (finished piece + allowance must
-    // fit). Workshop stock list (Piotr 05.09, spec D7) — edit here, never in
-    // the planner.
-    stockWidths: [50, 63, 75, 95, 105, 180, 200],
+    // fit). Workshop stock list (Piotr 06.09, v4 C.2: 50 removed, 120 and 150
+    // added); the widest entry is the board cap — there is no separate
+    // maximum. Edit here or on the CNC & arches card, never in the planner.
+    stockWidths: [63, 75, 95, 105, 120, 150, 180, 200],
     // Contour allowance, mm PER SIDE (Piotr 05.09, spec D6): the blank is cut
     // this much outside the finished contour on both edges; the board must
     // contain that band.
     contourAllowance: 10,
-    // Grain run-out limit: no board may span more than this angle of arc
-    // (spec D8) — N_min = ceil(arc angle / this) pieces per arc.
-    maxSegmentAngleDeg: 36,
-    // D13 (OPEN — Piotr has not decided): which feasible piece count is the
-    // default plan. 'narrowest' = narrowest stock board with N <= N_min + 2
-    // (tie -> fewer pieces); 'fewest' = fewest pieces that fit a board. The
-    // other rule's plan is printed on the sheet as ALT. Flip here, no code.
-    pieceRule: 'narrowest',
-    // v3 0.6 (DEFAULT open, BLOCKERS): a finger-jointed piece shorter than
-    // this (finished chord, mm) is flagged on the plan (`shortPieces`) and
-    // the sheet — never blocked. Piotr decides whether a 65–110 mm haunch
-    // piece is acceptable (BLOCKERS 9.3).
-    minPieceLength: 150,
+    // v4 C.1 (Piotr 06.09), HARD: the SHORTER stock edge of every raw piece
+    // (the inner edge of a convex arch) must be at least this long —
+    // joinery: fewer, larger pieces. The machine limit on the overall length
+    // is cnc.minClampLength. A plan that cannot satisfy both is reported
+    // (plan.noStock, reason 'below minimum length'), never split finer.
+    minPieceLength: 400,
+    // v4 C.4 (DEFAULT open, BLOCKERS): the fewest-pieces plan is taken unless
+    // its waste (Σ board area − Σ band area) / Σ board area exceeds this
+    // fraction AND the next piece count passes the limits on a narrower
+    // board — then the next count wins. 1.0 = always the fewest pieces.
+    wasteThreshold: 0.45,
     // Validity limits (spec §3.3 / §5): PSW MIN_WIDTH / MAX_WIDTH, and the PSW
     // arched-sash rules adopted for the casement until Piotr says otherwise —
     // straight part below the arch (height >= rise + this) and the straight
     // stile of the arched leaf. Physical limits (rise vs width per shape) are
     // geometry and live in arch.js.
     limits: { minWidth: 400, maxWidth: 1500, minStraightBelowRise: 900, minLeafStraightStile: 100 },
+  },
+  // ── CNC (ARCHED-WINDOWS-v4 Block C, Piotr 06.09): the Rover A 1532 holds
+  // the arch pieces in Uniclamps, not vacuum pods. minClampLength = the
+  // shortest raw piece the machine can hold — two Uniclamps plus the end cuts
+  // (measured on the piece's overall length, the longer stock edge with the
+  // finger extension). clamp = the Uniclamp footprint drawn on the CLAMPS
+  // layer as a suggestion (base 130 × 130, jaws for a piece thickness 40–98,
+  // Biesse minimum workpiece 140); clampClearance = the distance kept from
+  // the angled end cuts (DEFAULT open, BLOCKERS).
+  cnc: {
+    minClampLength: 450,
+    clamp: { base: 130, minThickness: 40, maxThickness: 98, minPiece: 140 },
+    clampClearance: 20,
   },
   // ── Glazier numbers (ARCHED-WINDOWS-v3 Block 0.2) — the sealed unit's
   // spacer bar width laid out in the pattern, and the edge cover: the
@@ -289,6 +307,8 @@ export function migrateCasementProfile(profile) {
     glass: { ...D.glass, ...(profile.glass || {}), edgeCover: { ...D.glass.edgeCover, ...(profile.glass?.edgeCover || {}) } },
     tracery: { ...D.tracery, ...(profile.tracery || {}) },
     fix: { ...D.fix, ...(profile.fix || {}) },
+    // v4 (ARCHED-WINDOWS-v4 Block C): CNC block (clamp limits), filled from the default
+    cnc: { ...D.cnc, ...(profile.cnc || {}), clamp: { ...D.cnc.clamp, ...(profile.cnc?.clamp || {}) } },
     arch: profile.arch?.version === D.arch.version
       ? {
           ...D.arch, ...profile.arch,
