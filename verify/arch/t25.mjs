@@ -184,6 +184,38 @@ const ENGINE = runC5(P, false);
 const G_BLOCKED = { shape: 'gothic-equilateral', width: 600, height: 1600 };
 
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+section('2c — spec C.5b: the 68-frame table in ARCHED-WINDOWS-v4.md matches the live computation (BLOCKERS §19.6)');
+{
+  const doc = readFileSync(resolve(ROOT, 'docs', 'handover', 'ARCHED-WINDOWS-v4.md'), 'utf8');
+  check('the spec carries a C.5b section re-issued for the 68 frame', /### C\.5b Reference results re-issued for the 68 frame/.test(doc));
+  const flat = doc.replace(/\s+/g, ' ');
+  check(`C.5b states its premises: face ${tF}, land ${P.geometry.land}, leafAtJamb ${oL}, allowance ${A}, finger ${FINGER}`,
+    flat.includes(`land ${P.geometry.land} / leafAtJamb ${oL}`) && flat.includes(`allowance ${A}`) && flat.includes(`finger ${FINGER}`) && flat.includes(`the 68 frame`),
+    `land ${P.geometry.land} / leafAtJamb ${oL} · allowance ${A} · finger ${FINGER}`);
+  for (const c of C5) {
+    const { ind } = ENGINE[c.key];
+    ind.forEach((I, i) => {
+      const fw = I.fewest;
+      const tag = `${c.key}${c.spec.perSide ? ` side ${i + 1}` : ''}`;
+      if (c.spec.perSide && i > 0) return;                     // the doc quotes one side (they mirror)
+      check(`C.5b ${tag}: the doc quotes board ${fw.stock} (${f1(fw.wReq)}) — the live independent projection`,
+        doc.includes(`board ${fw.stock} (${f1(fw.wReq)}`), `looking for "board ${fw.stock} (${f1(fw.wReq)}"`);
+      check(`C.5b ${tag}: the doc quotes the outer edges ${fw.pieces.map((x) => f1(x.outer)).join('/')}`,
+        doc.includes(`outer ${fw.pieces.map((x) => f1(x.outer)).join('/')}`), `outer ${fw.pieces.map((x) => f1(x.outer)).join('/')}`);
+      check(`C.5b ${tag}: the doc quotes the inner edges ${fw.pieces.map((x) => f1(x.inner)).join('/')}`,
+        doc.includes(`inner ${fw.pieces.map((x) => f1(x.inner)).join('/')}`), `inner ${fw.pieces.map((x) => f1(x.inner)).join('/')}`);
+      check(`C.5b ${tag}: the piece COUNT is unchanged from the 57 table (${c.spec.n} × ${c.spec.stock})`,
+        fw.n === c.spec.n && fw.stock === c.spec.stock, `${fw.n} × ${fw.stock}`);
+    });
+  }
+  check('C.5b names the HALF 1500 economy default 4 × 150 (the only plan whose DEFAULT differs from its fewest)',
+    /economy default 4 × 150/.test(doc) && ENGINE['HALF 1500'].ind[0].def.n === 4 && ENGINE['HALF 1500'].ind[0].def.stock === 150,
+    JSON.stringify(ENGINE['HALF 1500'].ind[0].def));
+  check('the original C.5 table is kept as history (57-frame numbers still in the file)', /134\.7/.test(doc) && /Face 57 head/.test(doc));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 section('3 — planner invariants on the engine output');
 {
   const tc = ENGINE['ROUND 1000 rise 250'].plan;

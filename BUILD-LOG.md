@@ -11,6 +11,35 @@ piece` **1** — both green, branch rebased onto `origin/main` keeping the night
 tree: t16 368 · t17_edges 70 · t18 178 · t19 244 · t20 **117** (was 116 — gothic-full-v1 adds one) · t20_bars 32 ·
 t21 120 · t22 77 · t23 81 · t24_stage4 26 · t25 201 · t26 36 · t27 64 = 1614 ALL PASS, build OK.
 
+### STAGE 5 (after the four) — BLOCKERS §19.6 closed: spec C.5 re-issued for the 68 frame ✅
+
+**Verdict ✅** — t25 **225 checks** (was 201) ALL PASS, whole suite t16–t29 = **1822 checks ALL PASS**, build OK.
+
+§19.6 asked for the C.5 reference table to be re-issued for the 68 frame; it needed no decision from Piotr, only
+the arithmetic. `docs/handover/ARCHED-WINDOWS-v4.md` gains **C.5b** (the original C.5 is kept as history — it is
+correct for the frame it was written against), computed with the same independent projection, allowance 10 and
+finger 15, on the live profile:
+
+| arch | pieces × board | W_req at 68 (was at 57) | outer edges | inner edges |
+|---|---|---|---|---|
+| HALF 1000 semi-circle | 3 × 150 | **144.5** (134.7) | 551.0 / 592.1 / 551.0 | 464.4 / 418.8 / 464.4 |
+| ROUND 1000 rise 250 | 2 × 180 | **165.5** (158.3) | 619.5 ×2 | 529.5 ×2 |
+| GOTHIC 1000 per side | 2 × 120 | **119.4** (112.6) | 532.1 / 573.9 | 500.0 / 421.7 |
+| HALF 1500 semi-circle | 3 × 180 | **178.0** (168.1) | 819.4 / 878.7 / 819.4 | 715.4 / 670.9 / 715.4 |
+| tc240 1200 rise 240 | 2 × 180 | **176.8** (170.6) | 697.9 ×2 | 625.9 ×2 |
+
+**Piece counts and boards did not move** — only the required board width, because the head ring grew with the
+frame. HALF 1500 keeps its economy default 4 × 150; 2 pieces still need 211.6 (HALF 1000) and 284.8 (HALF 1500),
+so still no board. t25 §2c regenerates every line from the live profile and asserts the document quotes it, so
+C.5b cannot drift from the engine the way C.5 did.
+
+**Other §19 items were left alone deliberately:** 19.3 (profile snapshot per project), 19.5 (economy rule C.4
+"AND lower waste") need Piotr's decision; 19.7 (Part Registry 68 × 93) is a Supabase data change and this package
+makes none; 19.8 (PSW port) is Piotr's own repo; 19.2 / 19.4 / 19.10 are FYI with nothing to do; 19.1 closed in
+stage 3 and 19.9 is answered as far as measurement can (stage 4) and now waits on eyes.
+
+---
+
 ### STAGE 4 — the 3D after the 68 frame: control ✅ (two gaps found, one fixed by measurement, one referred)
 
 **Verdict ✅** — new gate **t29, 34 checks ALL PASS**; whole suite t16–t29 = **1798 checks ALL PASS**,
