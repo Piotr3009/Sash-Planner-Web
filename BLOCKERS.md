@@ -4,6 +4,51 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-09-06 — NIGHT 7 (zadanie nocne 7) NOT STARTED — entry gate failed (branch `claude/zadanie-nocne-7-glass-dxf-wb0eay`)
+
+### 20. [CRITICAL] `gothic-full-v1` is not in this repository — all four stages of night 7 were stopped before any code
+
+CLAUDE.md opens night 7 with a hard gate: "Sprawdź na starcie, że `gothic-full-v1` jest na `main` … Jeśli nie —
+STOP, wpis w BLOCKERS." Both markers are 0, so nothing was implemented. **No source file was touched tonight.**
+
+**Evidence (in the order it was gathered):**
+
+| # | Check | Expected | Result |
+|---|-------|----------|--------|
+| a | `grep -c "mode = 'full'" src/engine/cnc/traceryExport.js` | > 0 | **0** |
+| b | `grep -c "labels BESIDE the piece" src/engine/cnc/archDxf.js` | > 0 | **0** |
+| c | Both strings anywhere in `src/` + `verify/` | present | **0 hits** |
+| d | `git log -S"<string>" --all` for both strings | a commit that adds them to the engine | **only `0801c78 "Update CLAUDE.md"`** — the strings exist solely inside the gate sentence in CLAUDE.md; the code they look for has never been committed here |
+| e | `git ls-remote --heads origin` | a gothic-full branch | 9 heads, **none** is gothic-full / arch-pieces; remote `main` = `0801c78` = this branch's base (the local `origin/main` ref was stale at `78ac6f5`) |
+
+**The behaviour matches the greps — it is the feature that is missing, not just a renamed string:**
+
+- **"traceria zawsze cała"** — `traceryExport.js:579-584` still resolves the mode by `auto`
+  (`mode = straddles ? 'full' : 'quadrant'`), so a half board is still produced, and line 696 still prints
+  `TRACERY QUADRANT (LEFT HALF - MIRROR FOR THE RIGHT)`. The committed sample
+  `docs/handover/samples/sample_tracery_dwg_R600_quad-hub-spoke.dxf` is exactly such a quadrant board; under
+  "tracery always full" it would have been regenerated as FULL.
+- **"napisy pod kawałkami"** — `archDxf.js:300-303` (`piecesRow`) still writes both label lines ON the piece
+  (centred at `x + roughDrawn / 2`, over the trapezoid band), not beside / under it.
+
+**The other 06.09 package IS in** — `arch-pieces-v1` passes night 6's own entry gate on this tree
+(`pieceStockTrapezoid` 4 in `archDxf.js`, `glazingRebate` 1 in `profile.js`, "Tracery LSP" 0), and the trapezoid /
+pre-cut code carries the 06.09 comments. So one of the two chat packages landed on `main` and the other did not.
+
+**The base is healthy, just one package behind:** the tree is the night-6 tree bit for bit — `node verify/arch/t16.mjs`
+… `t27.mjs` give the night-6 numbers exactly (t16 368, t17_edges 70, t18 178, t19 244, t20 116, t20_bars 32,
+t21 120, t22 77, t23 81, t24_stage4 26, t25 201, t26 36, t27 64 = **1613 checks, ALL PASS**) and `npm run build`
+is green (17.95 s). Nothing is broken; the gate is simply not satisfied.
+
+| # | Item | Ask for Piotr |
+|---|------|---------------|
+| 20.1 | **Re-send / apply `gothic-full-v1`** | The package was delivered in the 06.09 chat and never reached the repo (Piotr pushes by hand — `arch-pieces-v1` from the same chat did land). Apply it to `main`, then night 7 can run against the base its gate describes |
+| 20.2 | **Or: is the gate stale?** | If gothic-full-v1 was in fact applied under different wording, the two grep markers in CLAUDE.md are wrong and must be replaced with markers that really exist — say which two strings to use |
+| 20.3 | **Honest engineering note — the four stages look file-disjoint from the missing package** | gothic-full-v1 touches `traceryExport.js` + `archDxf.js`. Night 7 stage 1 touches `glassDxfExport.js` + two pages, stage 2 the 2D sheets, stage 3 `profile.js` / `calculations.js` (doors), stage 4 `src/3d` + `windowSpecToConfig`. No overlap, so the night could technically run on this base. I did not do it: the gate is explicit and doubled (CLAUDE.md + tonight's start instruction), and two stage gates take baselines — stage 1 "kształtowe bajt w bajt … snapshot z `sample_glass_*`" and stage 2's t19 / t22 rect snapshot rebase — that would be frozen against a base you are about to change. **If you want the night run on this base anyway, one line in the next brief is enough** ("run night 7 without the gothic-full gate"), and the stage-1 / stage-2 baselines then have to be re-checked after gothic-full-v1 is applied |
+| 20.4 | **Nothing from stages 1–4 was started** | Glass DXF for rectangular units, the dimension rule on Leaf / Elements / sash sheets, the door option B (land 43 / `leafAtJamb` 47 — note this also settles §19.1), and the 3D check after the 68 frame (§19.9) all remain open, unchanged |
+
+---
+
 ## 2026-09-06 — ARCHED-WINDOWS-v4 night 6, Stages 1–4 = Blocks C / B / E / F (branch `claude/arched-windows-v4-stages-9diax6`)
 
 Status of the older entries: **§1 D13 (piece rule) → CLOSED by v4 C.3 / C.4** (fewest pieces first, economy

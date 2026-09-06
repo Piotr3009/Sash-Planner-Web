@@ -4,6 +4,61 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-09-06 — NIGHT 7 (zadanie nocne 7) — STOPPED AT THE ENTRY GATE (branch `claude/zadanie-nocne-7-glass-dxf-wb0eay`)
+
+Inputs read in full: `CLAUDE.md` (night-7 brief, all four stages + "NIE RÓB DZIŚ") → `BUILD-LOG.md` (night 6) →
+`BLOCKERS.md` (headers + §16–§19) → the two gate targets `src/engine/cnc/traceryExport.js` and
+`src/engine/cnc/archDxf.js` → `src/utils/glassDxfExport.js` (stage-1 target, read only).
+
+### VERDICT ❌ — night 7 not started; `gothic-full-v1` is not in the repository
+
+The brief's own entry gate fails on both markers, so per CLAUDE.md ("Jeśli nie — STOP, wpis w BLOCKERS") and
+tonight's start instruction, **no stage was implemented and no source file was touched**. Full evidence in
+BLOCKERS §20; the short version:
+
+| Gate | Expected | Got |
+|------|----------|-----|
+| `grep -c "mode = 'full'" src/engine/cnc/traceryExport.js` | > 0 | **0** |
+| `grep -c "labels BESIDE the piece" src/engine/cnc/archDxf.js` | > 0 | **0** |
+
+Neither string is anywhere in `src/` or `verify/`, and `git log -S` over **all** branches finds them in exactly one
+commit — `0801c78 "Update CLAUDE.md"`, i.e. only inside the gate sentence itself. The engine behaviour agrees:
+tracery still resolves `auto` → `quadrant` when the panes do not straddle the axis (`traceryExport.js:579-584`,
+banner line 696), and the committed sample `sample_tracery_dwg_R600_quad-hub-spoke.dxf` is still a half board;
+piece labels still sit ON the piece (`archDxf.js:300-303`). The sibling package from the same 06.09 chat,
+`arch-pieces-v1`, **is** present (night 6's own gate passes: `pieceStockTrapezoid` 4, `glazingRebate` 1,
+"Tracery LSP" 0) — so one chat package reached `main` and the other did not.
+
+### Base health on this branch (run anyway, so the morning starts from facts)
+
+- `node verify/arch/t16.mjs` … `t27.mjs`: t16 368 · t17_edges 70 · t18 178 · t19 244 · t20 116 · t20_bars 32 ·
+  t21 120 · t22 77 · t23 81 · t24_stage4 26 · t25 201 · t26 36 · t27 64 = **1613 checks, ALL PASS**
+  (`npm install`, `pip install ezdxf` 1.4.4).
+- `npm run build`: **OK**, 17.95 s.
+- The numbers are night 6's final numbers exactly — this tree is the night-6 tree, nothing regressed, nothing new
+  landed after it apart from the CLAUDE.md brief.
+
+### What is NOT done (the whole night's scope, unchanged and open)
+
+1. Stage 1 — glass DXF for rectangular units (`glassDxfExport.js` still skips them: "rectangular units go on the
+   glass PDF", line 261); t28 not written.
+2. Stage 2 — the dimension rule (spans below, overall above, heights right) on `CasementLeafDetail2D`,
+   `CasementFrameDetail2D`, Elements grid, `FrontElevation2D`, `SashDetail2D`, `BoxDetail2D`, `GlassDrawing2D`;
+   no snapshot rebase.
+3. Stage 3 — door option B (land 43, `leafAtJamb` 47, leaf 1000 → 906): `DEFAULT_DOOR_PROFILE` untouched, still
+   option A (land 36 / 40 / leaf 920). BLOCKERS §19.1 stays open.
+4. Stage 4 — the 3D control after the 68 frame; t29 not written. BLOCKERS §19.9 stays open.
+
+### Not verified tonight (honest list)
+
+Nothing was opened in a browser, no DXF in VCarve / bSolid, no PDF in a viewer. The harness and the build are the
+only evidence, and both only say the night-6 tree is intact — they say nothing about the four stages, which were
+not attempted. I did not attempt to reconstruct `gothic-full-v1` from its description: rewriting a package Piotr
+already has, from three words in a brief, would be guesswork in exactly the two files the gate protects
+(CLAUDE.md rule 2). It needs to be re-applied from the 06.09 chat.
+
+---
+
 ## 2026-09-06 — ARCHED-WINDOWS-v4 night 6 (branch `claude/arched-windows-v4-stages-9diax6`)
 
 Inputs read in full: `CLAUDE.md` → `docs/handover/ARCHED-WINDOWS-v4.md` → `BLOCKERS.md` (headers + open items) →
