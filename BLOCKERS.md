@@ -84,6 +84,72 @@ in the harness, but it is outside the v4 scope and the night stopped at the gate
 session checklist cannot read ALL PASS, and the cause is this one assertion, not the arch code.
 Note this also makes BLOCKERS §15.6 ("archive from the card: immediate when every batch's pack is
 complete, confirm otherwise") out of date.
+### D. Which v4 stages actually need `arch-pieces-v1` — so night 7 can be re-ordered
+
+I mapped each block against the missing package (17 agents: one analyst per block, three adversarial
+refuters each). Where their conclusions conflicted I re-ran the check myself on the bundled engine
+(`.audit/`, not committed) rather than take a verdict on trust.
+
+| Stage | Block | Needs arch-pieces-v1? | Evidence |
+|---|---|---|---|
+| 1 | **C** — segment planner | **YES, genuinely** | C.3 names `pieceStockTrapezoid` / `pieceStockEdges` as its inputs, and see §E1: the C.5 reference vectors are unreachable from the current primitives |
+| 2 | **B** — glazier PDF | **NO** | mentions the package once, in passing ("as the on-screen sheet since arch-pieces-v1"). Everything it consumes exists: `barEndRows()` `glassBars.js:138-195`, `BAR_ID_PREFIX` `arch.js:957`, the node PDF path already exercised by `t18.mjs:363-383`, the three v3 sample fixtures. `glassPdfExport.js` imports nothing from the piece planner |
+| 3 | **E** — `intersecting` from vertical bars | **NO** | the block names no package artefact. The reference implementation is **already in this repo**, not only in PSW: `src/3d/components/ArchedSashWindow.jsx:933-958` is the rule line for line — `mullions = columns.length ? columns : [-halfW/2, halfW/2]` (:936 = the "0 bars → ±¼" rule), `R = gothicCentreOffset + halfW` else `halfW` (:937-939), `cx = mx − dir·R` (:941), clipped on `archYAt` (:947-950); the "no springing bar for intersecting" note is at :868-872. So it is a PC-file → PC-file port |
+| 4 | **F** — frame 68 | **NO at symbol level**, but see §E2/§E3 | F.1–F.5 touch only profile constants, `casementLayouts.js:34`, the 3D constants and `materialAssignmentStore`. Verified empirically at face 68: no new `ArchError`, no new `plan.noStock`; F.6's own prediction reproduces — casement 1000 × 1500 leaf **920 → 898**, leaf height **1402** |
+
+**Recommendation for night 7, if the package still is not ready:** run **E → B → F.1–F.5**, leave C for
+when arch-pieces-v1 lands. That is three of the four stages. It reverses the spec's order, which is why
+I did not start it tonight on my own: the gate says stop, and re-ordering your stages is your call, not
+mine.
+
+### E. Three things the v4 spec does not account for (found while checking, not guesses)
+
+**E1. [CRITICAL for Stage 1] The C.5 reference vectors do not come out of the current geometry.**
+I ran the spec's five cases through the existing planner (`buildArchGeometry` → `planArchSegments`,
+head ring, profile defaults, face 57 / allowance 10 / finger 15):
+
+```
+                              spec C.5                          current planner
+HALF 1000  semi-circle    3 pieces · 150 (134.7) · 508.8/432    6 pieces · 95 (91.8) · 264.0/224.1
+ROUND 1000 3-centre 250   2 pieces · 180 (158.3) · 572.5/468.9  7 pieces · 95 (89.8) · 303.5/41.6
+HALF 1500  semi-circle    3 pieces · 180 (168.1) · —/681.5      7 pieces · 95 (94.1) · 338.2/304.0
+tc240 1200 3-centre 240   2 pieces · 180 (170.6) · 659.2/—      7 pieces · 95 (87.8) · 349.0/48.1
+GOTHIC 1000 equilateral   4 pieces · 120 (112.6) · 524.1/463.5  shape name 'gothic' does not exist
+```
+
+That gap is structural, not a tolerance: `planArchSegments` floors at `nMin = Math.max(2, …)` **per arc**
+(`arch.js:792`) and only exempts a single-arc ring (`:795`), so a three-centre head can never plan fewer
+than 6 pieces — the spec asks for 2. The `inner 41.6` / `48.1` rows above are exactly the ~100 mm haunch
+triangles you rejected, which is what C.3 is written to fix. Two consequences:
+- the whole-chain partitioner is **new geometry**, not a rename of what exists (one of my own refuters
+  argued the opposite; the numbers above settle it against them);
+- **the C.5 numbers were computed against arch-pieces-v1, so t25 is only writable once that lands.** An
+  independent probe reproduced ROUND 1000 (158.3 / 572.5 / 468.9) and tc240 (170.6 / 659.2) exactly from
+  an equal-arc-length chain split, and HALF 1000 to within ~1 mm — but **GOTHIC 1000 misses by 18.5 mm on
+  the inner edge** (463.5 spec vs 445.0/485.5 by either method). **Ask:** is 463.5 right, and what is the
+  gothic split rule — equal arc length per side, or something else?
+- `gothic` as a shape name does not exist in the engine (`gothic-equilateral` / `gothic-drop`); the
+  rename is on the "NIE RÓB DZIŚ" list, so C.5's label needs mapping when t25 is written.
+
+**E2. [CRITICAL for Stage 4] Editing `DEFAULT_CASEMENT_PROFILE` will not change anything for you — and
+the harnesses will not notice.** F.1 says "everything downstream reads these". It does not: the profile
+is persisted (`windowProfileStore.js` `persist`, key `pc-window-profile`) and on rehydrate
+`migrateCasementProfile` spreads the **stored** blocks over the defaults —
+`elements: { ...D.elements, ...profile.elements }`, same for `geometry` and `deductions`
+(`src/engine/profile.js:271-275`) — then `loadFromCloud()` lets the Supabase tenant copy outrank the
+local cache (`windowProfileStore.js:186-190`). So any tenant with a saved profile keeps face 57 / land 36
+/ leafAtJamb 40 after the change, while every harness reads `DEFAULT_CASEMENT_PROFILE` directly
+(`t16.mjs:51`, `t18.mjs:48`) and would report ALL PASS on a change that is inert in the app.
+The fix is the mechanism you already use for the `arch` block, which carries a schema version and is
+"replaced whole" when older (`profile.js:276-280`): give `elements` / `geometry` / `deductions` the same
+version + replace-whole migration. **Ask:** confirm that, and confirm a stored profile should be
+overwritten (a tenant who deliberately set 57 loses it) — this is F.5's "profile snapshot per project"
+question arriving early, and it now blocks the stage rather than being a design note.
+
+**E3. F.6 as written cannot be done before Block C.** It requires re-baselining the arch plan vectors,
+but those plans are exactly what Block C changes. Doing F first re-baselines `t18`'s arch numbers and the
+`sample_arch_*.dxf` twice. **Ask:** confirm F.6 is narrowed to the straight-window snapshots (casement /
+door rectangular fixtures, the 920 → 898 / 1402 numbers) and the arch plan re-baseline waits for C.
 
 ---
 

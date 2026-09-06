@@ -36,7 +36,29 @@ this branch covers only `BLOCKERS.md` and `BUILD-LOG.md`.
    click), and `t24_stage4.mjs:80` still asserts the old immediate-archive branch. Left untouched —
    out of v4 scope, needs your word. BLOCKERS §C.
 4. **Mapped each v4 block against the missing package** so you can decide what night 7 can do without
-   it. BLOCKERS §D.
+   it (17 agents: an analyst per block plus three adversarial refuters each; where they disagreed I
+   re-ran the check myself on the bundled engine rather than trust a verdict). Result: **only Block C
+   genuinely needs arch-pieces-v1**; B, E and F name no artefact of it, and Block E's reference
+   implementation is already in this repo at `src/3d/components/ArchedSashWindow.jsx:933-958`.
+   BLOCKERS §D.
+5. **Found three things the spec does not account for**, each checked in the running engine, not
+   inferred (BLOCKERS §E):
+   - **E1** the C.5 reference vectors are unreachable from the current code — I ran all five cases:
+     the planner floors at `nMin = Math.max(2, …)` **per arc** (`arch.js:792`), so a three-centre head
+     plans 7 pieces on 95 board where C.5 wants 2 on 180, with inner edges of 41.6 / 48.1 mm (exactly
+     the haunch triangles C.3 exists to remove). The whole-chain partitioner is new geometry, not a
+     rename — and the C.5 numbers were computed against arch-pieces-v1, so **t25 cannot be written
+     until it lands**. The gothic vector also misses by 18.5 mm under either split rule: a question
+     for you, possibly a spec error.
+   - **E2** F.1's "everything downstream reads these" is false: the profile is persisted and
+     `migrateCasementProfile` spreads the **stored** blocks over the defaults
+     (`src/engine/profile.js:271-275`), with the Supabase tenant copy outranking the local cache — so
+     editing `DEFAULT_CASEMENT_PROFILE` is inert for any tenant with a saved profile, while the
+     harnesses read the default directly and would report ALL PASS on a change the app never sees.
+     Block F needs a schema-version migration on `elements` / `geometry` / `deductions`, the way the
+     `arch` block already does it.
+   - **E3** F.6 re-baselines arch plan vectors that Block C is about to change — doing F before C
+     re-baselines them twice.
 
 ### Why I did not build Block C on the existing planner
 
