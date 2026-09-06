@@ -312,7 +312,7 @@ section('4 — glazier DXF: ezdxf round-trip, samples docs/handover/samples/samp
   const rect = specification.normaliseToWindowSpec({ id: 'R', name: 'R', width: 1000, height: 1500 }, { fullConfig: { windowCategory: 'casement', casementLayout: '040L' } });
   const rd = derive(rect);
   check('rectangular casement → skip "not an arched casement", canExportGlassDxf false', /not an arched casement/.test(glassDxf.glassDxfParamsForWindow(rect, rd, 'R').skip || '') && glassDxf.canExportGlassDxf(rect, rd) === false);
-  check('sash → skip "not a casement window"; null derived → skip "could not be calculated"', glassDxf.glassDxfParamsForWindow(specification.normaliseToWindowSpec({ width: 1000, height: 1500 }, { fullConfig: { windowCategory: 'sash' } }), null, 'S').skip === 'not a casement window' && /could not be calculated/.test(glassDxf.glassDxfParamsForWindow(D.V1.spec, null, 'x').skip));
+  check('rectangular sash → skip "not an arched sash"; null derived → skip "could not be calculated"', /not an arched sash/.test(glassDxf.glassDxfParamsForWindow(specification.normaliseToWindowSpec({ width: 1000, height: 1500 }, { fullConfig: { windowCategory: 'sash' } }), {}, 'S').skip) && /could not be calculated/.test(glassDxf.glassDxfParamsForWindow(D.V1.spec, null, 'x').skip));
   windows.push({ windowSpec: rect, derived: rd, name: 'R' });
   const clicksBefore = clicks;
   const m = glassDxf.exportGlassDxfMerged(windows, 'Pack 1');

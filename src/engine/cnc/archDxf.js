@@ -122,7 +122,7 @@ function contourRow(ring, plan, ctx, ox, oy) {
   const tx = rowBB.maxX + C.textGap;
   const lines = [
     `${ctx.winNum ? ctx.winNum + ' - ' : ''}${ring.label}`,
-    `${ctx.shapeLabel.toUpperCase()} W${fmt1(ctx.width)} RISE${fmt1(ctx.rise)}${ctx.height ? ' H' + fmt1(ctx.height) : ''} HINGE ${ctx.hinge === 'right' ? 'R' : 'L'}`,
+    `${ctx.shapeLabel.toUpperCase()} W${fmt1(ctx.width)} RISE${fmt1(ctx.rise)}${ctx.height ? ' H' + fmt1(ctx.height) : ''} ${ctx.hinge ? 'HINGE ' + (ctx.hinge === 'right' ? 'R' : 'L') : 'SASH'}`,
     `FACE ${fmt1(ring.thickness)} OFFSET ${fmt1(ring.offsets.outer)} OUTER L${fmt1(ring.lengths.outer)} INNER L${fmt1(ring.lengths.inner)}`,
     ...planSummary(plan),
     `FINGER ${ctx.finger.length}/${ctx.finger.depth}/${ctx.finger.pitch}`,
@@ -174,16 +174,23 @@ function fitRow(plan, ctx, ox, oy) {
   E.push(polyE('FIT', ringPoly(plan.frameHead)));
   E.push(polyE('FIT', ringPoly(plan.leafTop)));
   E.push(polyE('FIT', chainPoly(plan.glass.arcs)));
-  E.push(...dashedChain('FIT', plan.rebateWall, ARCH_CNC.fitDash, ARCH_CNC.fitGap));
+  if (plan.rebateWall) E.push(...dashedChain('FIT', plan.rebateWall, ARCH_CNC.fitDash, ARCH_CNC.fitGap));
   const rowBB = entitiesBBox(E);
   const C = ARCH_CNC;
   const tx = rowBB.maxX + C.textGap;
   const rr = (arcs) => arcs.map((a) => fmt1(a.r)).join('/');
-  const lines = [
+  // casement: frame ring, rebate wall (dashed), leaf ring, glass; sash (v3 Block 1 F): box head ring,
+  // arched top rail ring at the stile line, glass — the running gap between them, no rebate
+  const lines = plan.rebateWall ? [
     `${ctx.winNum ? ctx.winNum + ' - ' : ''}FIT (ASSEMBLY, NOT A TOOLPATH)`,
     `GAP ${fmt1(plan.fit.gap)} LAP ${fmt1(plan.fit.lap)} (REBATE)`,
     `FRAME R${rr(plan.frameHead.outer)} / ${rr(plan.frameHead.inner)}  REBATE WALL R${rr(plan.rebateWall)} (LAND ${fmt1(plan.fit.land)}, DASHED)`,
     `LEAF R${rr(plan.leafTop.outer)} / ${rr(plan.leafTop.inner)}  GLASS R${rr(plan.glass.arcs)}`,
+  ] : [
+    `${ctx.winNum ? ctx.winNum + ' - ' : ''}FIT (ASSEMBLY, NOT A TOOLPATH)`,
+    `RUNNING GAP ${fmt1(plan.fit.gap)} (HEAD ${fmt1(plan.frameHead.thickness)} FACE, SASH AT THE STILE LINE)`,
+    `HEAD R${rr(plan.frameHead.outer)} / ${rr(plan.frameHead.inner)}`,
+    `TOP RAIL R${rr(plan.leafTop.outer)} / ${rr(plan.leafTop.inner)}  GLASS R${rr(plan.glass.arcs)}`,
   ];
   const blockH = lines.length * C.lineH;
   const height = Math.max(rowBB.maxY - rowBB.minY, blockH);
@@ -251,7 +258,8 @@ function piecesRow(ring, plan, ctx, ox, oy) {
  */
 export function buildArchEntities(plan, winNum = '', ox = 0, oy = 0) {
   if (!plan?.frameHead || !plan?.leafTop || !plan?.plans) throw new ArchError('buildArchEntities needs a plan from buildArchPlan');
-  if (!plan.rebateWall || !plan.fit || !plan.glass?.arcs) throw new ArchError('buildArchEntities needs rebateWall / fit / glass from buildArchGeometry (v3)');
+  if (!plan.fit || !plan.glass?.arcs) throw new ArchError('buildArchEntities needs fit / glass from buildArchGeometry (v3)');
+  if (plan.kind !== 'sash' && !plan.rebateWall) throw new ArchError('buildArchEntities needs rebateWall from buildArchGeometry (v3)');
   if (plan.noStock) throw new ArchError('No stock board fits an arch piece — see the plan options');
   const ctx = {
     winNum: winNum ? String(winNum) : '',
@@ -259,7 +267,7 @@ export function buildArchEntities(plan, winNum = '', ox = 0, oy = 0) {
     width: plan.width,
     rise: plan.rise,
     height: plan.straightHeight != null ? plan.straightHeight + plan.rise : null,
-    hinge: plan.hinge,
+    hinge: plan.kind === 'sash' ? null : plan.hinge,
     finger: plan.finger,
   };
   // Rows are laid out bottom-up so the origin is the drawing's bottom-left;

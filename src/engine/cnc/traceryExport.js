@@ -753,7 +753,7 @@ export function parseTraceryLsp(text) {
 export function buildTraceryForDerived(derived, profile, winNum = '', opts = {}) {
   const A = derived?.arch;
   if (!A?.glassOutline || !A.bars) throw new ArchError('Tracery needs derived.arch (glass outline + bars)');
-  const glassInset = Number(profile?.geometry?.glassInset);
+  const glassInset = Number(opts.glassInset ?? profile?.geometry?.glassInset);
   if (!(glassInset >= 0)) throw new ArchError('Casement profile geometry.glassInset is missing');
   const T = readTraceryProfile(profile);
   const board = boardFromOutline(A.glassOutline, glassInset);

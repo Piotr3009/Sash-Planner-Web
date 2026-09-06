@@ -662,6 +662,8 @@ export default function ConfiguratorPage() {
         casementHinges: isArched ? null : (casHinges ? [...casHinges] : null),
         // Arched casement (PC-native fields read by specification.js archFromSpec).
         casementType: isArched && !isArchedSash ? 'arched' : 'standard',
+        // arched sash (v3 Block 1 I): the 3D's arched branch takes PC's shape + the real rise
+        ...(isArchedSash ? { sashType: 'arched', archHBars: sashArchHB, archVBars: isHubPattern(casArchPattern) ? 0 : sashArchVB, lowerHBars: sashLowerHB } : {}),
         archShape: isArched ? pcArchShape : null,
         archProfile: isArched && isGothicUi ? casArchProfile : null,
         archStart: isArched ? archStartNum : null,

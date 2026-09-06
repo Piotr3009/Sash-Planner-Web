@@ -19,6 +19,57 @@ had no `node_modules`; t18 / t19 need react-dom / jspdf resolvable).
 Stages tonight (Piotr 07.09, gate before each next stage): 1 = Block 0, 2 = Block 1 A–E, 3 = Block 1 F–J +
 Block 3, 4 = Block 4 + Block 6.
 
+### STAGE 3a — Block 1 F–J: arched SASH, drawings / exports / 3D (`archDxf.js`, `cncExport.js`, `glassDxfExport.js`, `traceryExport.js`, `FrontElevation2D.jsx`, `BoxDetail2D.jsx`, `SashDetail2D.jsx`, `GlassDrawing2D.jsx`, `VerticalSection2D.jsx`, `CasementGlassDrawing2D.jsx`, `ArchedSashWindow.jsx` new, `archedSashGeometry.js` new, `App.jsx`, `windowSpecToConfig.js`, `WindowDetailPage.jsx`, `verify/arch/t22.mjs`)
+
+**Understanding:** Stage 2 gave the arched sash an engine; the workshop still needs the two curved members on the
+CNC (box head 80 face, top rail 57), the glazier's upper unit, the tracery board when a pattern is set, the five
+2D sheets with the arc, and a 3D that is not the rectangular sash. Rectangular sash sheets must not move by a byte.
+
+**Baseline first (J):** `verify/arch/t22_baseline.mjs` → `fixtures/rect-sash-sheets.json`: the six rectangular
+fixtures × 7 sheets (elevation, box, upper, lower, glass ×2, section) = 42 SVGs rendered from HEAD **before** any
+sheet was touched (`lib/sashSheets.mjs` bundles the sash sheet tree the way t19 does for the casement).
+
+**Two approaches, one rejected (F):** (a) a second DXF builder for the sash (`sashArchDxf.js`) — rejected: the
+CONTOUR / PIECES / FIT rows are the same drawing with other radii, a copy drifts; (b) `buildSashArchPlan()` in
+`cncExport.js` builds a plan with `kind 'sash'` (head ring + top rail ring from `buildSashArchGeometry`, glass
+outline, `fit.gap` 9, no rebate wall) and `archDxf.js` accepts it — chosen. The FIT text of a sash reads
+`RUNNING GAP 9 (HEAD 80 FACE, SASH AT THE STILE LINE)`; the casement row is unchanged.
+
+**Built:**
+- **F** `archDxf.js` — `plan.kind === 'sash'`: rows `S-ARCH HEAD` / `S-ARCH TOP RAIL`, no hinge text (`SASH`),
+  FIT row without the rebate wall; `cncExport.js` — `buildSashArchPlan`, `archParamsForWindow` accepts a sash
+  (triple never), `downloadDxf(filename, content, mime)`. Samples `sample_sash_arch_1000_semi-circle.dxf`,
+  `_1200_three-centre.dxf`, `_1000_gothic.dxf`.
+- **G** `glassDxfParamsForWindow` / `traceryParamsForWindow` accept `category 'sash'` (upper unit = the engine's
+  `glassOutline`, bands / edge cover / axes from Block 0, glass inset override for the sash rebate);
+  `canExportTracery` for a patterned sash; samples `sample_glass_sash_1000x2200_semi-circle_hub-spoke.dxf`,
+  `sample_tracery_sash_hub.dxf`. `WindowDetailPage`: Arch DXF / Tracery / Glass DXF buttons enabled for
+  `category === 'casement' || windowSpec.arch.shape`.
+- **H** 2D from `derived.arch` ArcChains through `archDrawUtils` (no second geometry): `FrontElevation2D` — head
+  ring band, jambs to the springing, upper sash outline + unit + bars, lower h bars, dims start / rise, R labels,
+  third title line, `data-arch-origin` for the harness; `BoxDetail2D` — head ring, jambs to the springing,
+  `S-ARCH HEAD 80` label; `SashDetail2D` — arched upper sash outline / daylight / unit / bars, springing line,
+  `rise` chain; `GlassDrawing2D` — the upper arched unit delegates to `CasementGlassDrawing2D` (Block 0 glazier
+  sheet: bands, edge line, bar-end table) with a `sash-upper` group; `VerticalSection2D` — `ARCH HEAD` / `ARCH
+  TOP RAIL` labels on the curved members. Every rectangular path is behind `derived.arch?.geometry` checks.
+- **I** `ArchedSashWindow.jsx` ported from PSW (1003 lines, PSW file 1:1 as the base) with an `Outer` wrapper:
+  `resolvePcShape` (PC names first, PSW ids mapped, unknown → semi-circle), props `archRise`,
+  `archMinHaunchRadius`, `pcShape`; the outline builders `arcPtsPC` / `shapeContourPC` / `apexRisePC` read
+  `archedSashGeometry.js` (new, pure: `engineArcs` = `archArcs` + `offsetArcs` → constant band, `engineArcPoints`,
+  `engineApexRise`, `chainTo3D`) and fall back to PSW's sampler when the engine cannot offset the contour.
+  PSW's named-export blocks appended to `ParametricSashWindow.jsx` and `FixFrameWindow.jsx` (export, no copy —
+  nothing above the block changed). `App.jsx` renders `<ArchedSashWindow>` for `sashType 'arched'`, keys
+  `archHBars` / `archVBars` / `lowerHBars` added; `windowSpecToConfig` emits `sashType 'arched'`, `archShape`,
+  `archRise`, `archProfile`, `barPattern`, bars, `archMinHaunchRadius` for an arched sash.
+
+**Verification (t22 75/75 ALL PASS):** §1 42/42 rectangular sheets byte-identical to the fixture; §2 sash DXF
+rows / radii / FIT gap 9, ezdxf round-trip on the three samples; §3 glazier DXF layers + tracery for the upper
+unit; §4 every SVG arc on the five arched sheets sits on an engine ring (centre + radius ±0.01 after the sheet
+transform); §5 3D helper (constant band, rule C start, fallback null, names) + `windowSpecToConfig`; §6 wiring
+grep. The arched sheets were rendered headless (Chromium) and looked at as PNG. `npm run build` OK.
+**Not verified:** the 3D in a browser (no WebGL render in the container — same as night 4), the DXF in VCarve /
+AutoCAD, the PDFs. **Findings → BLOCKERS §13.** **Verdict: ✅ Block 1 F–J** (3D ⚠️ compiled + helper-tested only).
+
 ### 0.4 — tracery export DXF + LSP, the `arka` convention (`src/engine/cnc/traceryExport.js` new, `dxfWriter.js` POINT, `arch.js` patterns, `calculations.js`, `lists.js`, `bom.js`, `cncExport.js`, pages, configurator, 3D props)
 
 **Understanding:** one timber board over the arched unit, cut on the CNC to the pane pattern; the bead R8 runs

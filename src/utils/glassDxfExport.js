@@ -253,9 +253,10 @@ export function buildMergedGlassEntities(items) {
  */
 export function glassDxfParamsForWindow(windowSpec, derived, name) {
   if (!windowSpec) return { skip: 'no data' };
-  if ((windowSpec.category || 'sash') !== 'casement') return { skip: 'not a casement window' };
+  const category = windowSpec.category || 'sash';
+  if (category !== 'casement' && category !== 'sash') return { skip: 'not a casement or sash window' };
   if (!derived) return { skip: 'window could not be calculated' };
-  if (!windowSpec.arch?.shape) return { skip: 'not an arched casement — rectangular units go on the glass PDF' };
+  if (!windowSpec.arch?.shape) return { skip: `not an arched ${category} — rectangular units go on the glass PDF` };
   const units = shapedGlassUnits(windowSpec, derived);
   if (!units.length) return { skip: 'no shaped glass unit' };
   return { params: { units, winNum: String(name || windowSpec.name || '') } };

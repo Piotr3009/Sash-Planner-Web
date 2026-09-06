@@ -10,6 +10,17 @@ Status of the older entries: **§9.1 P9 (900) OPEN → v3 0.6 keeps 900**, **§9
 **§9.3 minimum piece length → v3 0.6 `arch.minPieceLength` 150 (warn)**, **§9.4 F2 OPEN → `minHaunchRadius` 150 kept**,
 §1 D13 / §2 D5 / §3 d50 unchanged. §10.9 (rasteriser) verified in Chromium, §10.10 (R labels) partly fixed — see 11.9.
 
+### 13. Stage 3 — arched sash drawings / exports / 3D (Block 1 F–J): findings and questions
+
+| # | Item | Taken | Ask |
+|---|------|-------|-----|
+| 13.1 | **3D arched sash not seen rendered** | `ArchedSashWindow` ported from PSW, outline rebuilt on `arch.js` (rule C, constant band, real rise), helper asserted in t22 §5; the component compiled (esbuild + `npm run build`) but no WebGL frame was captured in the container | Morning: sash batch → Frame shape Arched → 3D tab; compare the head band with the 2D box sheet |
+| 13.2 | **3D bars follow PSW's own pattern code** | The arched sash 3D draws the pattern with PSW's `useArchedSashBars` (hub ring at PSW ratios, spokes by name) — not from the engine's `derived.arch.bars`; the counts / pattern name are the same, the ring radii can differ by a few mm from the cut list | Accept for the viewer (the cut list / glazier sheets are the engine's), or a later pass that feeds `derived.arch.bars` into the 3D like the casement does |
+| 13.3 | **Box sheet subtitle sits below the viewBox** | `BoxDetail2D` prints its subtitle at a y outside the viewBox on tall windows — pre-existing on HEAD (the rectangular fixture reproduces it byte-for-byte), so left alone to keep the snapshot | Separate fix (viewBox height), not tonight |
+| 13.4 | **Elevation: lower sash top under the arched upper sash** | The lower sash is drawn to the meeting line at H/2 and the upper sash from the meeting line up to the ring; the meeting rail overlap (the two 21.5 halves) is drawn as on the rectangular sash | FYI — check the elevation of a 1000 × 2200 Round sash |
+| 13.5 | **Sash beading on the arched sheets** | No curved bead is drawn on any sash sheet (beading frozen, 12.5); the rectangular parting / staff bead lines stop at the springing | Same package as 12.5 |
+| 13.6 | **Sash 3D fallback to PSW's sampler** | When the engine cannot offset a contour (three-centre with a haunch at the 150 floor and a deep inset), the 3D falls back to PSW's radial sampler for that ring only — the engine refuses the window earlier anyway (ArchError), so this only shows on a rise the configurator rejects | FYI |
+
 ### 12. Stage 2 — arched sash (Block 1 A–E): DEFAULT (open) values and questions
 
 | # | Item | Taken | Ask |

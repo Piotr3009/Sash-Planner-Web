@@ -40,11 +40,25 @@ function fmt(n) {
 export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
   const geom = useMemo(() => {
     const cas = derived?.casement;
-    if (!windowSpec || !cas?.leaves || !group) return null;
+    if (!windowSpec || !group) return null;
     const idx = group.rep;
+    const p = getCasementProfile();
+    // v3 Block 1 H: the arched SASH upper unit takes the arched branch below with no casement data at all
+    if (!cas && derived?.arch?.glassOutline && idx === 0) {
+      const O = derived.arch.glassOutline;
+      const G = readGlassProfile(p, windowSpec.glazing?.type || 'double');
+      const seal = glassEdgeArcs(O, G.edgeCover);
+      const bars = derived.arch.bars || [];
+      const isH = (b) => b.kind === 'straight' && Math.abs(b.from[1] - b.to[1]) < 1e-6 && (b.role === 'h' || b.role === 'springing');
+      const isV = (b) => b.kind === 'straight' && b.role === 'v' && Math.abs(b.from[0] - b.to[0]) < 1e-6;
+      const vList = [...new Set(bars.filter(isV).map((b) => b.from[0]))].sort((a, b) => a - b).map((cx) => ({ cx, left: cx - G.barWidth / 2, right: cx + G.barWidth / 2 }));
+      const hList = [...new Set(bars.filter(isH).map((b) => b.from[1]))].sort((a, b) => b - a).map((y) => { const cy = O.height - y; return { cy, top: cy - G.barWidth / 2, bot: cy + G.barWidth / 2 }; });
+      const endRows = barEndRows(bars, O);
+      return { glassW: O.width, glassH: O.height, vBars: [], hBars: [], arch: { outline: O, seal, bars, vList, hList, label: derived.arch.geometry?.label || 'Arched', spacer: G.barWidth, edgeCover: G.edgeCover, endRows, table: useBarTable(bars) } };
+    }
+    if (!cas?.leaves) return null;
     const mm = cas.leaves[idx];
     if (!mm) return null;
-    const p = getCasementProfile();
     const stile = p.elements.leafStile.face;
     const REBATE = stile - (p.deductions.glass / 2 - stile) - stile + 12.5; // = 12.5, kept explicit
     const glassW = mm.leafW - p.deductions.glass;

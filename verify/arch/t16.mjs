@@ -708,7 +708,7 @@ section('§10.3 pt 8 — cncExport: canExportArchDxf, archParamsForWindow, merge
   const mk = (fc, item = {}) => specification.normaliseToWindowSpec({ width: 1200, height: 2000, name: 'W7', ...item }, { fullConfig: { windowCategory: 'casement', casementLayout: '040L', ...fc } });
   const sash = specification.normaliseToWindowSpec({ width: 1000, height: 1500 }, { fullConfig: { windowCategory: 'sash' } });
   const door = specification.normaliseToWindowSpec({ width: 1000, height: 2100 }, { fullConfig: { windowCategory: 'door' } });
-  check('sash → skip "not a casement window"', cncExport.archParamsForWindow(sash, 'S').skip === 'not a casement window');
+  check('rectangular sash → skip "not an arched sash"; door → skip "not a casement or sash window" (v3: the arched sash exports too)', cncExport.archParamsForWindow(sash, 'S').skip === 'not an arched sash' && cncExport.archParamsForWindow(door, 'D').skip === 'not a casement or sash window');
   check('standard casement → skip "not an arched casement"', cncExport.archParamsForWindow(mk({ casementType: 'standard' }), 'C').skip === 'not an arched casement');
   const ok = cncExport.archParamsForWindow(mk({ casementType: 'arched', casArchShape: 'segmental-arch', casArchHinge: 'right' }), 'W7');
   check('PSW segmental-arch 1200 → params with a three-centre rise 240 plan (P10) + winNum', !ok.skip && ok.params.plan.shape === 'three-centre' && ok.params.plan.rise === 240 && ok.params.winNum === 'W7' && ok.params.plan.hinge === 'right', ok.skip);   // v3 0.4b: hinge value 1:1
@@ -736,7 +736,7 @@ section('§10.3 pt 8 — cncExport: canExportArchDxf, archParamsForWindow, merge
   ];
   const r = cncExport.exportArchDxfMerged(windows, 'Pack 1');
   check('exportArchDxfMerged: exports the 2 arched windows, skips sash + rectangular casement with reasons', r.ok === true && r.exported === 2 && r.skipped.length === 2
-    && r.skipped.some((s) => s.name === 'S' && s.reason === 'not a casement window') && r.skipped.some((s) => s.name === 'C' && s.reason === 'not an arched casement'), JSON.stringify(r));
+    && r.skipped.some((s) => s.name === 'S' && s.reason === 'not an arched sash') && r.skipped.some((s) => s.name === 'C' && s.reason === 'not an arched casement'), JSON.stringify(r));
   check('exportArchDxfMerged: one download named Pack_1_arch.dxf', clicks === 1 && lastName === 'Pack_1_arch.dxf', String(lastName));
   const mergedText = await lastBlob.text();
   const mergedPath = resolve(AUDIT, 'merged_pack.dxf');
@@ -757,10 +757,10 @@ section('§10.3 pt 8 — cncExport: canExportArchDxf, archParamsForWindow, merge
     check('merged: second window stacked exactly 300 mm below the first (MERGE_GAP)', merged.length === one.length + archDxf.buildArchEntities(p2, 'B').length && near(minYA - maxYB, 300, 1e-6), `${(minYA - maxYB).toFixed(1)}`);
   }
   const none = cncExport.exportArchDxfMerged([{ windowSpec: sash, name: 'S' }], 'Pack 2');
-  check('exportArchDxfMerged with no arched window → error + skipped, no download', none.error === 'No arched casements in this pack' && none.skipped.length === 1 && clicks === 1);
+  check('exportArchDxfMerged with no arched window → error + skipped, no download', none.error === 'No arched casements or sashes in this pack' && none.skipped.length === 1 && clicks === 1);
   const single = cncExport.exportArchDxfForWindow(mk({ casementType: 'arched', casArchShape: 'gothic-arch' }), 'Win 3');
   check('exportArchDxfForWindow: download named Win_3_arch.dxf', single.ok === true && lastName === 'Win_3_arch.dxf' && clicks === 2);
-  check('exportArchDxfForWindow on a sash → error, no download', cncExport.exportArchDxfForWindow(sash, 'S').error === 'not a casement window' && clicks === 2);
+  check('exportArchDxfForWindow on a rectangular sash → error, no download', cncExport.exportArchDxfForWindow(sash, 'S').error === 'not an arched sash' && clicks === 2);
   expectThrows('buildArchEntities refuses a plan with no stock', () => archDxf.buildArchEntities(arch.buildArchPlan({ shape: 'semi-circle', width: W, height: 2000 }, { ...PA, arch: { ...ARCH_SECTION, stockWidths: [50] } }), 'X'), /No stock board fits/);
   URL.createObjectURL = origCreate; URL.revokeObjectURL = origRevoke; delete globalThis.document;
 }

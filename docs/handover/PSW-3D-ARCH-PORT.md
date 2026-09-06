@@ -77,3 +77,44 @@ emits the same keys for the detail-page viewers.
 - In PSW: open an arched casement with each of the four PSW shapes and no `archRise` — the
   frame outline extents must equal W × H (the helper asserts this in t19), the gasket must sit
   inside the rebate, the leaf must swing on `opening`.
+
+---
+
+## 6. Arched SASH (ARCHED-WINDOWS-v3 Block 1 I, 07.09.2026)
+
+PC ported PSW's `ArchedSashWindow.jsx` and rebuilt its outline on `arch.js`. Files to copy back
+(PC → PSW `3d-src/src/`) after Piotr's review:
+
+| PC path | PSW path | Note |
+|---|---|---|
+| `src/3d/components/ArchedSashWindow.jsx` | `components/ArchedSashWindow.jsx` | PSW file as the base; `ArchedSashWindowOuter` default export resolves the shape name and passes `pcShape`; `arcPtsPC` / `shapeContourPC` / `apexRisePC` replace the radial sampler for the frame head, the sash outline and the apex rise (PSW's sampler kept as the fallback) |
+| `src/3d/components/archedSashGeometry.js` | `components/archedSashGeometry.js` | new, pure: `PC_TO_PSW_SHAPE`, `resolvePcShape`, `engineArcs` (`archArcs` + `offsetArcs` → constant band), `engineArcPoints`, `engineApexRise`, `chainTo3D`; imports `../../engine/arch.js` |
+| `src/3d/components/ParametricSashWindow.jsx` | `components/ParametricSashWindow.jsx` | PSW's named-export block appended (PSW already has it — diff should be empty there) |
+| `src/3d/components/fix-frame/FixFrameWindow.jsx` | `components/fix-frame/FixFrameWindow.jsx` | PSW's named-export block appended (same) |
+
+### Props (PSW names kept)
+
+`width`, `height`, `archShape` (PSW id or PC name — both resolve), `archProfile`, `archBarPattern`,
+`archHBars`, `archVBars`, `lowerHBars`, colours / glass / ironmongery as the rectangular sash.
+New: `archRise` (mm, `null` → PSW ratio) and `archMinHaunchRadius` (mm, `0` → pure rule, PC passes
+the profile's 150).
+
+### `update3D` / `windowSpecToConfig` keys
+
+`sashType: 'arched'`, `archShape`, `archRise`, `archProfile`, `barPattern`, `archHBars`,
+`archVBars`, `lowerHBars`, `archMinHaunchRadius`. `App.jsx` renders `<ArchedSashWindow>` when
+`config.sashType === 'arched'` (before the plain `ParametricSashWindow`).
+
+### What changes visually
+
+1. Rule C — the head ring starts vertical at the pulley stiles; the band is `HEAD_FACE` 80 wide
+   everywhere (concentric offset, not a radial inset).
+2. Segmental / elliptical draw as three-centre arches (two haunch arcs + crown), rise from
+   `archRise` when given.
+3. The upper sash top rail is a true ring at the stile line (constant `SASH_ARCH_FACE` band).
+4. Bars still come from PSW's `useArchedSashBars` (pattern by name) — see PC BLOCKERS 13.2.
+
+### Checks after the copy
+
+`node verify/arch/t22.mjs` §5 in PC (helper on every shape, fallback, names). In PSW: open an arched
+sash with each radio shape and no `archRise` — extents W × H, head band constant, sash swings.

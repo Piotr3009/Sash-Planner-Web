@@ -48,7 +48,7 @@ const COLOR_MAP = {
 import { buildVentGrilles } from '../engine/lists.js';
 import { RAL_LOOKUP as RAL_COLORS } from '../config.js';
 import { fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from '../engine/casementLayouts.js';
-import { profileBoxDepth, getCasementProfile } from '../engine/profile.js';
+import { profileBoxDepth, getCasementProfile, getWindowProfile } from '../engine/profile.js';
 
 function resolveColor(name, ral) {
   if (!name && !ral) return '#F4F4F2'; // default white
@@ -241,6 +241,18 @@ export function windowSpecToConfig(windowSpec) {
     sashType: 'double',
     splitRatio: '1/4-1/2-1/4',
     headType: 'flat',
+    // arched sash (v3 Block 1 I): the PSW `sashType 'arched'` branch of the shared App with PC's shape + real rise
+    ...(windowSpec.category === 'sash' && windowSpec.arch?.shape && windowSpec.sash?.type !== 'triple' ? {
+      sashType: 'arched',
+      archShape: windowSpec.arch.shape,
+      archRise: Number(windowSpec.arch.rise) || null,
+      archProfile: windowSpec.arch.profile || null,
+      barPattern: windowSpec.arch.bars?.pattern || 'none',
+      archHBars: Number(windowSpec.arch.bars?.h) || 0,
+      archVBars: Number(windowSpec.arch.bars?.v) || 0,
+      lowerHBars: Number(windowSpec.arch.lowerHBars) || 0,
+      archMinHaunchRadius: Number(getWindowProfile()?.sashArch?.minHaunchRadius) || 0,
+    } : {}),
     opening: 0,
     upperOpening: 0,
     showGuides: false,

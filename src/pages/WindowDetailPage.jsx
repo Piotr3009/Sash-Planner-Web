@@ -129,7 +129,7 @@ export default function WindowDetailPage() {
               🛠 CNC Jamb DXF
             </button>
           )}
-          {(windowSpec?.category || 'sash') === 'casement' && (
+          {((windowSpec?.category || 'sash') === 'casement' || !!windowSpec?.arch?.shape) && (
             <button
               onClick={() => {
                 const r = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, () => exportArchDxfForWindow(windowSpec, item.name));
@@ -144,7 +144,7 @@ export default function WindowDetailPage() {
               🛠 Arch DXF
             </button>
           )}
-          {(windowSpec?.category || 'sash') === 'casement' && (() => {
+          {((windowSpec?.category || 'sash') === 'casement' || !!windowSpec?.arch?.shape) && (() => {
             // v3 0.4: tracery board (DXF for VCarve + LSP for AutoCAD) — only with a bar pattern in the arch
             const tr = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, () => traceryParamsForWindow(windowSpec, derived, item?.name));
             const cls = `btn text-sm bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 ${tr.skip ? 'opacity-40 cursor-not-allowed' : ''}`;
@@ -334,7 +334,7 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
             {/* Glazier DXF for shaped (arched) units — arched-casement-v2 C. Same
                 row and style as the PDF export; disabled with the reason on
                 windows without a shaped unit. */}
-            {(windowSpec?.category || 'sash') === 'casement' && (() => {
+            {((windowSpec?.category || 'sash') === 'casement' || !!windowSpec?.arch?.shape) && (() => {
               const r = glassDxfParamsForWindow(windowSpec, derived, item?.name);
               return (
                 <button
