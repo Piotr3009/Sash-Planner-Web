@@ -9,6 +9,21 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 Entry gate re-run after `gothic-full-v1` landed on `main` (e037020): both markers 1 — §20 above is CLOSED, the
 night ran. Open items from the stages:
 
+### 24. Stage 4 — 3D control after the 68 frame: two gaps, both needing YOUR decision
+
+The arched path is healthy: real arcs from `arch.js` on every shape, rings offset by the profile face 68 and
+land 47, arched leaf 898 wide, `Kind: Fixed` still routed to `ArchedCasementWindow`, door post 2 × 68 = 136.
+t29 pins all of it. These two are what is left, and neither can be fixed without a workshop answer.
+
+| # | Item | Found | Ask |
+|---|------|-------|-----|
+| 24.1 | **A circle window's 3D never sees the 68 profile** | `windowSpecToConfig` sends `arch.shape === 'circle'` to `windowCategory: 'fix-only'` with `fixShape: 'circle'` — so the viewer draws a circle, not a rectangle — but that branch passes **no `frameDims`**, and `FixFrameWindow` has no such prop: it uses its own `FRAME_FACE = 64`. The engine meanwhile builds the circle's rings from the casement profile (68). `archedCasementGeometry` cannot take the circle instead: asked for `'circle'` it silently resolves to a semi-circle | **Is a circle's frame the casement's 68 section, or the fix-frame's own 64?** If 68: thread `frameDims` into `FixFrameWindow` (5 call sites + the App prop) — but that file is shared with PSW, and CLAUDE.md reserves the PSW port for you. If 64: the engine's circle rings should read 64, not the casement face |
+| 24.2 | **The 3D casement leaf is 4 mm short (1398 vs 1402)** | 040L 1000 × 1500. The WIDTH is right by construction (`face 68 − rebate 21 + gap 4 = leafAtJamb 51`). The HEIGHT is not: the 3D holds the leaf `BOTTOM_FACE 68 − REBATE_STEP 21 + gap 4 = 51` above the frame bottom (it models the cill like a jamb), the profile puts it at `gapCill 6 + cillVisible 41 = 47`. PRE-EXISTING — at the 57 face it was 1409 vs 1413, the same 4 mm | **Which cill is real: 41 visible with a 6 gap (profile), or a 21 rebate with a 4 gap (3D)?** Fix A: give `frameDims` a `leafBottom` key (default 51 = today's PSW behaviour) fed from `leafFullHeight − leafAtJamb`, and use it in `CasementWindow` + `ArchedCasementWindow`'s `bottomInner` — the same optional-prop pattern night 6 used, PSW unaffected. Fix B: decide the 3D is right and change the profile's cill numbers. NOT done tonight: either one changes how every casement renders, and I could not see the result |
+| 24.3 | **Piotr's screenshot never arrived** | "3D jakieś kwadratowe" is unexplained: the arched path measures correctly, `Kind: Fixed` keeps its arch, and the circle draws as a circle. Nothing was mounted in three.js — t29 calls the geometry helpers directly | Send the screenshot, or say which window it was. If it is not the arch, §24.1 (the circle's 64 frame) is the first suspect |
+| 24.4 | **`sideRightWidth` is set even when `sidePanels: 'left'`** | The door config carries `sideRightWidth: 500` alongside `sidePanels: 'left'`; `DoorWindow` only reads the side named by `sidePanels`, so nothing renders wrong — but the key is misleading | FYI — harmless today |
+
+---
+
 ### 23. Stage 3 — doors option B: what closed and what to watch
 
 | # | Item | Taken | Ask |
@@ -110,7 +125,7 @@ C.1 `arch.minPieceLength` 400 HARD** (was 150 warn); §2 D5 / §3 d50 / §9.1 P9
 | 19.6 | **Spec C.5 table at face 57** | The C.5 reference numbers (134.7 / 158.3 / 112.6 / 168.1 / 170.6) are the 57-frame numbers by the spec's own words ("Face 57 head ring"). t25 keeps them against a schema-1 profile variant built in the harness and checks the live 68 profile against the independent planner; the face-68 numbers are printed in the BUILD-LOG Stage 4 table | Re-issue C.5 for the 68 frame in the next spec revision |
 | 19.7 | **Part Registry 68 × 93** | `materialAssignmentStore` labels the frame head / jambs `68×93` (hint names the old 57×93); the Part Registry (Supabase data) must carry a 68 × 93 raw material — no DB change in this package | Add the 68 × 93 material in Part Registry and assign it to Frame Head / Frame Jambs; old projects keep their 57 × 93 assignment |
 | 19.8 | **PSW still describes a 57 frame** | Until `PSW-FRAME-68-PORT.md` is applied, PSW imports arrive with 57-based geometry; PC re-derives from its own profile (898 leaf), so the PSW estimate drawing and the PC numbers disagree by 11 per jamb | Port PSW (list of lines in the doc) and bump `window.CASEMENT_LAYOUTS_VERSION` to 3 |
-| 19.9 | **3D not seen** | The `frameDims` threading (11 files) builds and its wiring is asserted by t27 §7, but no browser: the 68 frame in the viewer, the door coupling post 136 and the fanlight axis 102 are unverified visually | Open a 1000 × 1500 casement and a door with a side panel in the viewer in the morning |
+| 19.9 | **3D not seen** → measured in night 7 stage 4 (t29), still not LOOKED at; see §24 | The `frameDims` threading (11 files) builds and its wiring is asserted by t27 §7, but no browser: the 68 frame in the viewer, the door coupling post 136 and the fanlight axis 102 are unverified visually | Open a 1000 × 1500 casement and a door with a side panel in the viewer in the morning |
 | 19.10 | **`ArchedDoorWindow.jsx` / `TransomPanel.jsx`** | Not threaded (PC never renders them: arched doors and door transom panels are out of PC's scope, CLAUDE.md); they still read `FRAME_FACE` 57 from `DoorFrame.jsx` | FYI |
 
 ### 18. Stage 3 — intersecting from the vertical bars (Block E): errata and questions

@@ -11,6 +11,64 @@ piece` **1** — both green, branch rebased onto `origin/main` keeping the night
 tree: t16 368 · t17_edges 70 · t18 178 · t19 244 · t20 **117** (was 116 — gothic-full-v1 adds one) · t20_bars 32 ·
 t21 120 · t22 77 · t23 81 · t24_stage4 26 · t25 201 · t26 36 · t27 64 = 1614 ALL PASS, build OK.
 
+### STAGE 4 — the 3D after the 68 frame: control ✅ (two gaps found, one fixed by measurement, one referred)
+
+**Verdict ✅** — new gate **t29, 34 checks ALL PASS**; whole suite t16–t29 = **1798 checks ALL PASS**,
+`npm run build` OK (15.0 s). **No 3D source file was changed** — see "what I did not change" below.
+
+**Piotr's "3D jakieś kwadratowe": the arched path is NOT the cause.** Measured on real configs
+(`normaliseToWindowSpec` → `windowSpecToConfig` → `archedCasementGeometry`, the same call
+`ArchedCasementWindow` makes):
+
+| check | result |
+|---|---|
+| semi-circle 1000 × 1500 | radius **500** from arch.js, **52** outline points, apex above the springing — a real arc |
+| three-centre 1000 × 1500 | **3** radii, **148** points |
+| gothic-equilateral 1000 × 1800 | **2** radii, **100** points |
+| ring 1 (full face) | offset **68** = the profile face |
+| ring 2 (rebated land) | offset **47** = the profile land |
+| ring spans at the springing | `W − 2·68` and `W − 2·47` on every shape |
+| arched leaf width | **898** = 1000 − 2·leafAtJamb 51 |
+| no `frameDims` passed | still the PSW 57 / 36 — the profile only wins when passed, so PSW is unaffected |
+| **Kind: Fixed** on an arch | `casementType 'arched'`, `fixedLeaf true`, shape and `frameDims` kept — it stays on `ArchedCasementWindow`, it does NOT become a rectangle |
+| door + side panel | `frameDims { 68, 43 }` (option B reached the 3D); the post is two abutting jambs = 2 × 68 = **136**, matching the profile and the engine's `zones.posts[0].w` |
+
+A pointed arch drops its apex by MORE than the ring offset (concentric per arc), so t29 measures the ring
+offset as the SPAN at the springing — the invariant that holds for round and pointed shapes alike. My first
+version of that check asserted the apex drop and correctly failed on the gothic; the geometry was right, the
+assertion was wrong.
+
+**GAP 1 — the circle never receives the profile (BLOCKERS §24.1).** `windowSpecToConfig` routes
+`arch.shape === 'circle'` to `windowCategory: 'fix-only'` with `fixShape: 'circle'`, so the viewer does draw a
+CIRCLE (not a rectangle) — but that branch passes **no `frameDims`**, and `FixFrameWindow` has no such prop: it
+carries its own `FRAME_FACE = 64`. So a circle window's 3D frame is 64 wide while its engine rings come from the
+68 casement profile. `archedCasementGeometry` cannot take the circle instead — asked for `'circle'` it silently
+resolves to a semi-circle (t29 §5 pins that), which is exactly why the circle must stay on the fix-frame path.
+
+**GAP 2 — the 3D leaf is 4 mm short in height (BLOCKERS §24.2).** 040L 1000 × 1500: the 3D leaf is
+**898 × 1398**, the engine's is **898 × 1402**. The width is right by construction
+(`W − 2·(face − rebate + gap)` = `W − 2·leafAtJamb`, 68 − 21 + 4 = 51 ✓). The height is not, because the 3D
+holds the leaf `BOTTOM_FACE 68 − REBATE_STEP 21 + gap 4 = 51` above the frame bottom — it models the cill like a
+jamb — while the profile puts it at `gapCill 6 + cillVisible 41 = 47`. **Pre-existing**: at the 57 face it was
+1409 vs 1413, the same 4 mm, so Block F did not cause it.
+
+**What I did NOT change, and why.** Closing gap 2 means teaching the 3D that the cill has its own land and gap
+(41 / 6) instead of a jamb's (47 / 4). That moves the rebate line and the visible cill height on **every**
+casement render, in a component shared with PSW, and the mapping between the two cill models is a workshop fact
+I cannot derive: the profile says 41 shows and the leaf sits 6 above it, the 3D says the leaf laps a 21 rebate
+with a 4 gap. Guessing would change how every window looks — the exact complaint this stage exists to answer.
+So t29 pins the difference with its cause and its size, and BLOCKERS §24.2 carries the two candidate fixes for
+Piotr. Gap 1 is the same shape of decision: is a circle's frame the casement's 68 section or the fix-frame's own
+64? — and threading `frameDims` into `FixFrameWindow` diverges a PSW-shared file, which CLAUDE.md reserves for
+the PSW port.
+
+**Not verified in this stage:** nothing was rendered in a browser or in three.js — R3F components were not
+mounted; every number comes from the geometry helpers and the config mapper called directly in node. The
+viewer's appearance (Piotr's screenshot, which has not arrived) is still unconfirmed, and if "kwadratowe" refers
+to something other than the arch, the circle frame (gap 1) is the first place to look.
+
+---
+
 ### STAGE 3 — doors take option B ✅
 
 **Verdict ✅** — t27 **87 checks** (was 65) ALL PASS, whole suite t16–t28 = **1764 checks ALL PASS**,
