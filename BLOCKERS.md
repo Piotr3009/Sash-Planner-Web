@@ -10,6 +10,20 @@ Status of the older entries: **§9.1 P9 (900) OPEN → v3 0.6 keeps 900**, **§9
 **§9.3 minimum piece length → v3 0.6 `arch.minPieceLength` 150 (warn)**, **§9.4 F2 OPEN → `minHaunchRadius` 150 kept**,
 §1 D13 / §2 D5 / §3 d50 unchanged. §10.9 (rasteriser) verified in Chromium, §10.10 (R labels) partly fixed — see 11.9.
 
+### 15. Stage 4 — cross-cutting (Block 4) and the project archive (Block 6): DEFAULT (open) values and questions
+
+| # | Item | Taken | Ask |
+|---|------|-------|-----|
+| 15.1 | **Sash glazing arch (`headType 'arch'`)** | Kept OUT of the engine (spec DEFAULT open): PSW is inconsistent with itself (2D `min(0.14·W, 150)`, 3D `7 %, 50–80`); PC's 3D and the +10 % price line stay as they were | Keep the glazing arch as a cosmetic 3D / price option, or drop it? |
+| 15.2 | **Curved-member surcharge** | `DEFAULT_PRICING.archedCasement.curvedMemberSurcharge = 0` × 2 members (head + top rail; a circle's two rings) — shown in the breakdown (`curvedMembers`, `curvedPrice`), neutral until set. The arched SASH has no PC price path at all (PSW prices it) | Give the per-member number (lamination + finger joints + CNC); say if the sash needs a PC price |
+| 15.3 | **Blank pieces in the pre-cut** | A curved member is pre-cut as its blank pieces: qty = pieces per arc, length = the planner's rough length (chord + contour band + finger allowance, no extra 20 mm machining), section = stock board × member depth (e.g. `95x93`), grouped by that section like any other timber; the BOM board metres follow. `makeRawResolver(name, { kind: 'blank', stock, depth })` returns that section whatever material is assigned (the assignment names the species / JC line) | Confirm the rough length rule and whether the blank boards should be a separate BOM line per stock width |
+| 15.4 | **PP Curved members section** | Inside the Cut List tab (first card), per window type: window, member, shape, radii, arc length, blank plan (n × stock × depth × rough per arc), finger, short-piece warnings. No PDF export of that card yet (the cut list PDF prints the element groups) | Say whether the section belongs in the Cut List PDF or in the Pre-Cut PDF |
+| 15.5 | **PDFs through the rasteriser** | Elevation / elements / glass PDFs capture the on-screen SVG sheets (`svgNodeToPng`) — the arched and circle sheets go through the same path, verified only by the harness renders, not by opening a PDF | Morning: export the three PDFs of an arched sash, an arched casement and a circle |
+| 15.6 | **Archive rules** | `archived` + `archived_at` on `projects` (SQL file `docs/handover/sql/2026-09-07_projects_archive.sql`, run by hand); archive from the card: immediate when every batch's pack is complete, confirm otherwise; the project page opens read-only (no add / delete batch); packs, cut lists, exports keep working; a pack still assigned to an archived project's batch keeps its assignment (the pack card counts it with the archived project's name missing) | Should archiving also unassign / close the packs, and should windows / the configurator be locked at route level too (today only the buttons are hidden)? |
+| 15.7 | **RLS check for the archive** | No Supabase test helper exists in the repo — manual check: run the SQL, archive a project as tenant A, log in as tenant B: the Archive page must be empty; restore as A: the dashboard shows it again | Do it once after running the SQL |
+| 15.8 | **Parity report** | `PSW-PARITY-REPORT.md` regenerated against PSW 619703e: 23 PASS · 2 documented DIFF · 0 HARD (hinge value 1:1 per 0.4b; import ratios = PSW `RISE_RATIO`; the segmental rise at W 1200 differs — PC builds it as a three-centre with the 150 haunch floor) | FYI |
+| 15.9 | **PSW `fixType` FD30 / FD60** | ignored on import (14.9) | — |
+
 ### 14. Stage 3 — fixed windows in the casement batch (Block 3): DEFAULT (open) values and questions
 
 | # | Item | Taken | Ask |

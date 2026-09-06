@@ -258,7 +258,9 @@ section('3 — cut list, glass unit, paint / seals / weights; rectangular caseme
   check('leaf weight for the hinge selector uses the true glass area and the curved top rail', d.casement.leafWeights[0].weightKg > 0 && d.casement.hardware.hingePicks.length === 1);
   // BOM part mapping for the curved members
   const qtys = bom.buildWindowPartQtys(d, spec, {}, null);
-  check('BOM: C-ARCH HEAD → c_frame_head (mm = 1091 + 20 machining), C-ARCH TOP RAIL → c_sash_top_rail', qtys.c_frame_head?.mm === 1091 + 20 && qtys.c_sash_top_rail?.mm === 950 + 20, JSON.stringify([qtys.c_frame_head, qtys.c_sash_top_rail]));
+  // v3 Block 4: a curved member is bought as its blank pieces — Σ n × rough length per arc (board metres), no longer the arc length + 20
+  const blankMm = (plan) => plan.arcs.reduce((s2, a) => s2 + a.default.n * Math.round(a.default.roughLength), 0);
+  check('BOM: C-ARCH HEAD → c_frame_head (mm = Σ blank pieces × rough length), C-ARCH TOP RAIL → c_sash_top_rail (same rule)', qtys.c_frame_head?.mm === blankMm(d.arch.plans.frameHead) && qtys.c_sash_top_rail?.mm === blankMm(d.arch.plans.leafTop) && qtys.c_frame_head.mm > 1091 + 20, JSON.stringify([qtys.c_frame_head, qtys.c_sash_top_rail]));
   // rectangular casements: byte-identical to the origin/main fixture
   const FX = JSON.parse(readFileSync(resolve(ROOT, 'verify', 'arch', 'fixtures', 'rect-casement-base.json'), 'utf8'));
   for (const [name, c] of Object.entries(FX)) {

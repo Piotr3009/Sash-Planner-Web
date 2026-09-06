@@ -154,54 +154,43 @@ karmi cut listę, PDF-y, rysunki, PP. Nigdy nie licz wymiarów okna w innym miej
 
 ---
 
-## STAN — łuki casement zamknięte (noce 1–4, na `main`)
-v1 geometria + planer + CNC DXF; v2 reguła C, konfigurator Round | Gothic, silnik z krzywymi
-elementami, pręty (proste + wzory PSW), eksporty dla szklarza, 2D z łuków, 3D na `arch.js`.
-Harnessy t16–t19 ALL PASS. Werdykty w `BUILD-LOG.md`, otwarte w `BLOCKERS.md`.
-Spec: `docs/handover/ARCHED-CASEMENT-v1.md`, `-v1-AUDIT.md`, `-v2.md` (historia decyzji).
+## STAN — łuki casement + sash + okna stałe + archiwum (noce 1–5, `main` po merge nocy 5)
+Noce 1–4 (casement): v1 geometria + planer + CNC DXF; v2 reguła C, Round | Gothic, pręty, eksporty dla
+szklarza, 2D, 3D. Noc 5 (ARCHED-WINDOWS-v3, branch `claude/arched-windows-v3-9v0sw7`, cztery etapy):
+Blok 0 (FIT, pasy szklarza 18 / oblamówka 11 / osie, wymiarowanie końców prętów, tracery DXF + LSP wg `arka`,
+zawias 1:1 z PSW, audyt prętów, `minPieceLength`), Blok 1 A–J (sash łukowy: silnik reguła C z głowicą 80,
+`S-AH` / `S-ATR`, wagi z obrysu, DXF + FIT, szklarz, tracery, pięć arkuszy 2D, port `ArchedSashWindow`),
+Blok 3 (okna stałe w partii casement: `casement.kind 'fixed'`, koło = pierścienie `C-FRR` / `C-LFR`, sunburst,
+arkusze koła), Blok 4 (blanki w pre-cut / BOM, sekcja Curved members w PP, dopłata 0, parity 0 HARD),
+Blok 6 (archiwum: SQL w `docs/handover/sql/`, store, ArchivePage, przycisk na karcie, strona read-only).
+Harnessy t16–t24 ALL PASS. Werdykty w `BUILD-LOG.md`, otwarte pytania w `BLOCKERS.md` §11–§15.
+Spec: `docs/handover/ARCHED-WINDOWS-v3.md` (+ v1 / v2 jako historia decyzji).
 
-## ZADANIE NOCNE 5 — ARCHED-WINDOWS-v3: Blok 0 + Blok 1 (A–E)
+## ZADANIE NOCNE 6 — do ustalenia z Piotrem rano
 
-Spec: `@docs/handover/ARCHED-WINDOWS-v3.md`. Czytasz w całości; przy rozbieżności z v1/v2
-wygrywa v3. Rysunek warsztatowy: `docs/handover/workshop/arka_CNC-piotr.dxf` (przeczytaj
-`ezdxf`, nie zgaduj warstw).
-
-Zakres tej nocy — TYLKO:
-- **Blok 0** (casement): 0.1 widok FIT w Arch DXF · 0.2 szklarz: pasy 18, oblamówka 11, osie ·
-  0.3 wymiarowanie końców prętów (od dołu / od wierzchołka po łuku, tabela > 4) · 0.4 eksport
-  **Tracery DXF + LSP** wg konwencji `arka` (pakiet w `docs/handover/workshop/arka-lsp-package/`
-  = książka reguł: warstwy `ARKA_*`, +2 / +10, narożniki 15 po krzywej, przekrój verbatim;
-  traceria = deska z JEDNEJ strony szyby, część `C-TRACERY`; wzory generyczne hub-spoke +
-  preset `quad-hub-spoke` z DWG) · **0.4b zawias 1:1 z PSW — usuń odwracanie wartości z nocy 3** · **0.4c audyt
-  logiki prętów per kształt (t20_bars)** · 0.5 drobne z BLOCKERS §10 · 0.6 decyzje profilu
-- **Blok 1 A–E** (sash łukowy, strona silnika): model + import PSW, konfigurator sash, silnik
-  z regułą C i głowicą 80, wagi z prawdziwego obrysu, cut list `S-AH` / `S-ATR`, harness t21
-- harnessy t20 (Blok 0) i t21 (Blok 1) ALL PASS; t16–t19 nadal ALL PASS; okna prostokątne
-  (sash i casement) snapshot-identyczne
-
-**Nie zaczynaj Bloku 1 F–J (2D/3D sash), Bloku 3 (okna stałe), 4, 6 (archiwum) — to noce 6–7.
-Drzwi, sliding, bifold, front door: poza zakresem (Piotr 07.09).**
-Nie ruszaj `casementLayouts.js`, modułu beading sash (dla łuku: zapisz lukę w BLOCKERS, nie
-generuj listew), listy „NIE RÓB DZIŚ".
-
-Sesja w chmurze, własny branch, commit + push po każdym zamkniętym punkcie (0.1 → 0.6 →
-1A → 1E). Każde **DEFAULT (open)** ze spec = wpis w BLOCKERS z przyjętą wartością.
+Przed kolejną nocą Piotr: (1) klika w przeglądarce listę „NIE zweryfikowane" z końca BUILD-LOG (konfigurator
+Kind / Shape, 3D sash łukowy i koło, Archiwum, karta Curved members), (2) uruchamia SQL
+`docs/handover/sql/2026-09-07_projects_archive.sql` i sprawdza RLS (BLOCKERS 15.7), (3) otwiera próbki DXF / LSP
+w VCarve / AutoCAD, (4) odpowiada na DEFAULT (open) z BLOCKERS §11–§15 (najpilniejsze: 12.1 głowica 80 / inset 89,
+12.4 rise Round sash, 14.1 konstrukcja okna stałego, 14.3 pasowanie koła, 15.3 reguła długości blanku).
+Kandydaci na noc 6: listwy łukowe (moduł beading — osobny pakiet z przekrojem z profilu), pręty PSW w 3D sash
+z silnika (13.2), blokada konfiguratora na projekcie zarchiwizowanym (15.6), `directGlazed` (14.1), PDF karty
+Curved members (15.4).
 
 ## NIE RÓB DZIŚ (zaplanowane, osobne pakiety)
 
 - Drzwi: ramiaki skrzydła 92 mm zamiast 94 (materiał 014); próg 4 zawiasów > 2100 mm.
 - Casement: jamby i head 68 mm zamiast 57 (razem z PSW + bump wersji layoutów).
-- Sash i fix frame łukowe, nadświetla łukowe drzwi (cut list / szyby / 2D / 3D / wzory prętów dla łukowego CASEMENT są zrobione — v2 noce 3–4).
-- Listwy przyszybowe: moduł beading SASH jest zamrożony; casement nie ma listew w silniku W OGÓLE (także proste) — nie wymyślaj rekordów beading dla casement, to osobny pakiet z przekrojem z profilu.
+- Nadświetla łukowe drzwi; drzwi / sliding / bifold / front door poza zakresem (Piotr 07.09).
+- Listwy przyszybowe: moduł beading SASH zamrożony (także łukowe — 12.5, 13.5); casement nie ma listew
+  w silniku W OGÓLE — osobny pakiet z przekrojem z profilu.
 - `EstimateConfiguratorPage.jsx` limit 3000 mm (nierozstrzygnięte).
-- Mullions/ślemienia casement nie trafiają do cut listy (`components.box`) — znana luka silnika, nie tego pakietu.
-- Łuki: zmiana nazw kształtów na `'gothic'` + `profile` (spec §3.4), typy linii (DASHED) w
-  `dxfWriter.js`, złącze głowica/ościeżnica i skrzydło/słupek na linii startu łuku (haunch),
-  BOM z desek planera zamiast długości łuku (BLOCKERS 9.10), pełna listwa na linii startu
-  w hub-spoke (9.7), pionowe pręty użytkownika przy hubach (9.6), `minPieceLength` (9.3),
-  paginacja tabeli w glass PDF przy wielu kształtowych szybach — osobne pakiety.
-
----
+- Mullions/ślemienia casement nie trafiają do cut listy (`components.box`) — znana luka silnika.
+- Łuki: zmiana nazw kształtów na `'gothic'` + `profile` (spec §3.4), typy linii (DASHED) w `dxfWriter.js`,
+  złącze głowica/ościeżnica i skrzydło/słupek na linii startu łuku (haunch), pełna listwa na linii startu
+  w hub-spoke (9.7), pionowe pręty użytkownika przy hubach (9.6), paginacja tabeli w glass PDF.
+- Okno stałe `directGlazed` (14.1), FD30 / FD60 (14.9), offset sunburst per okno w konfiguratorze (14.5).
+- Sash glazing arch (`headType 'arch'`) — poza silnikiem do decyzji Piotra (15.1).
 
 ## Pliki do utrzymywania
 
@@ -213,10 +202,10 @@ Sesja w chmurze, własny branch, commit + push po każdym zamkniętym punkcie (0
 ## Checklist na koniec sesji
 
 - [ ] branch sesji wypchnięty, `main` nietknięty
-- [ ] `node verify/arch/t16.mjs`, `node verify/arch/t17_edges.mjs`, `node verify/arch/t18.mjs`, `node verify/arch/t19.mjs` → ALL PASS (t16 / t18 / t19 wymagają `pip install ezdxf --break-system-packages`)
+- [ ] `node verify/arch/t16.mjs` … `t24_stage4.mjs` (t16, t17_edges, t18, t19, t20, t20_bars, t21, t22, t23, t24_stage4) → ALL PASS (t16 / t18 / t19 / t20 / t22 / t23 wymagają `pip install ezdxf --break-system-packages`)
 - [ ] `npm run build` przechodzi
 - [ ] esbuild OK na każdym dotkniętym pliku, zero polskiego w źródłach
 - [ ] `git diff main --stat` obejmuje TYLKO pliki ze spec §11 (+ verify, docs, BUILD-LOG, BLOCKERS, CLAUDE.md)
-- [ ] `docs/handover/samples/sample_arch_1200_*.dxf` (pięć: semi-circle, gothic ×2, three-centre 390 i 240) + `sample_glass_*.dxf` w repo
-- [ ] BUILD-LOG.md z werdyktami, BLOCKERS.md z D13 / D5 / d50 / P9 / F2 otwartymi + wszystkim, co wyszło w nocy
+- [ ] `docs/handover/samples/`: `sample_arch_1200_*.dxf` (pięć), `sample_glass_*.dxf`, `sample_tracery_*.dxf/.lsp`, `sample_sash_arch_*.dxf`, `sample_circle_800_sunburst.dxf` w repo
+- [ ] BUILD-LOG.md z werdyktami, BLOCKERS.md z D13 / D5 / d50 / P9 / F2 otwartymi + §11–§15 (noc 5) + wszystkim, co wyszło w nocy
 - [ ] okna prostokątne: `verify/arch/t19.mjs §1` bajt w bajt z `rect-casement-sheets.json` (baza: `node verify/arch/t19_baseline.mjs <ref>` PRZED dotknięciem arkuszy)

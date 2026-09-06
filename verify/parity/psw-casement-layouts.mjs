@@ -196,8 +196,8 @@ row('geometry', 'PC geometry constants = PSW hardcodes (FRAME_FACE 57 / BOTTOM_F
 // arched casement constants
 const shapeMap = arch.PSW_ARCH_SHAPE;
 row('arch', 'PSW cas-arch-shape radio values = PC PSW_ARCH_SHAPE keys', sameSet(psw.shapeRadios, Object.keys(shapeMap)), J(Object.keys(shapeMap)), J(psw.shapeRadios));
-row('arch', 'RISE_RATIO per PSW shape = PC ARCH_RISE_RATIO via the shape map', Object.keys(psw.RISE_RATIO).every((k) => Math.abs(psw.RISE_RATIO[k] - arch.ARCH_RISE_RATIO[shapeMap[k]]) < 1e-12),
-  J(Object.fromEntries(Object.keys(psw.RISE_RATIO).map((k) => [k, arch.ARCH_RISE_RATIO[shapeMap[k]]]))), J(psw.RISE_RATIO));
+row('arch', 'RISE_RATIO per PSW shape = PC PSW_ARCH_RISE_RATIO (the import ratio; PC\'s own Round default is 0.325 — v2 P10)', Object.keys(psw.RISE_RATIO).every((k) => Math.abs(psw.RISE_RATIO[k] - arch.PSW_ARCH_RISE_RATIO[k]) < 1e-12),
+  J(Object.fromEntries(Object.keys(psw.RISE_RATIO).map((k) => [k, arch.PSW_ARCH_RISE_RATIO[k]]))), J(psw.RISE_RATIO));
 row('arch', 'GOTHIC_PROFILE_RATIO', Object.keys(psw.GOTHIC_PROFILE_RATIO).every((k) => Math.abs(psw.GOTHIC_PROFILE_RATIO[k] - arch.GOTHIC_PROFILE_RATIO[k]) < 1e-12) && sameSet(Object.keys(psw.GOTHIC_PROFILE_RATIO), Object.keys(arch.GOTHIC_PROFILE_RATIO)),
   J(arch.GOTHIC_PROFILE_RATIO), J(psw.GOTHIC_PROFILE_RATIO));
 row('arch', 'MIN_WIDTH / MAX_WIDTH = profile.arch.limits', P.arch.limits.minWidth === psw.MIN_WIDTH && P.arch.limits.maxWidth === psw.MAX_WIDTH, J([P.arch.limits.minWidth, P.arch.limits.maxWidth]), J([psw.MIN_WIDTH, psw.MAX_WIDTH]));
@@ -208,7 +208,8 @@ row('arch', 'PSW defaults when the radios were never touched: shape / hinge valu
   const leftId = psw.hingeRadios.find((r) => r.id === 'cas-arch-open-left'), rightId = psw.hingeRadios.find((r) => r.id === 'cas-arch-open-right');
   row('arch', 'online-estimate.html: id cas-arch-open-left carries value "right" (and vice versa) — the reversed hinge', leftId?.value === 'right' && rightId?.value === 'left', 'left→right, right→left', J(psw.hingeRadios));
   const mk = (v) => specification.normaliseToWindowSpec({ width: 1200, height: 2000 }, { fullConfig: { windowCategory: 'casement', casementLayout: '040L', casementType: 'arched', casArchShape: 'semi-circle', casArchHinge: v } });
-  row('arch', 'PC inverts on read: value "right" (label Left Hinge) → hinge left; "left" → right; missing → left', mk('right').arch.hinge === 'left' && mk('left').arch.hinge === 'right' && mk(undefined).arch.hinge === 'left', 'left / right / left', `${mk('right').arch.hinge} / ${mk('left').arch.hinge} / ${mk(undefined).arch.hinge}`);
+  // v3 0.4b (Piotr 07.09): the VALUE is the contract — PC keeps it 1:1 (the PSW label wording is a PSW-side question)
+  row('arch', 'PC keeps the hinge VALUE 1:1 (v3 0.4b): "right" → right; "left" → left; missing → right (PSW default)', mk('right').arch.hinge === 'right' && mk('left').arch.hinge === 'left' && mk(undefined).arch.hinge === 'right', 'right / left / right', `${mk('right').arch.hinge} / ${mk('left').arch.hinge} / ${mk(undefined).arch.hinge}`);
   const s = specification.normaliseToWindowSpec({ width: 1200, height: 2000 }, { fullConfig: { windowCategory: 'casement', casementLayout: '040L', casementType: 'arched' } });
   row('arch', 'PC default shape when PSW stored none = PSW default (semi-circle)', s.arch.shape === 'semi-circle', s.arch.shape, psw.archShapeDefault);
 }
@@ -244,7 +245,7 @@ const md = [
   '- `CASEMENT_LAYOUTS_VERSION`, layout codes, default sizes, fanlight / fan2 / triple lists (`js/casement-controller.js` ↔ `casementLayouts.js`).',
   '- Picker metadata: hidden duplicates, display names (`js/casement-type-modal.js`).',
   '- `casementLayoutDef` geometry: the PSW static method is extracted from `js/estimate-renderer.js` and executed next to the PC port for every code at four sizes × two fanlight ratios × two fan2 ratios × two middle sections; panels are compared IN ORDER with x, y, w, h, hinge, plus mullions and transoms (1e-6 mm).',
-  '- Arched casement: shape radio values ↔ `PSW_ARCH_SHAPE`, `RISE_RATIO`, `GOTHIC_PROFILE_RATIO`, width / straight / stile limits ↔ `profile.arch.limits`, the reversed hinge radio (`online-estimate.html`) ↔ the inversion in `specification.js`, PSW defaults when the radios were never touched.',
+  '- Arched casement: shape radio values ↔ `PSW_ARCH_SHAPE`, `RISE_RATIO`, `GOTHIC_PROFILE_RATIO`, width / straight / stile limits ↔ `profile.arch.limits`, the reversed hinge radio (`online-estimate.html`) ↔ PC\'s 1:1 value contract in `specification.js` (v3 0.4b — no inversion), PSW defaults when the radios were never touched.',
   '',
   '## Rows',
   '',

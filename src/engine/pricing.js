@@ -128,6 +128,11 @@ export const DEFAULT_PRICING = Object.freeze({
     firstSqm: 1200,
     perExtraSqm: 600,
     sashAdd: 50,
+    // v3 Block 4 (DEFAULT open): per curved member (arched head + arched top
+    // rail = 2 on an arched casement, 2 rings on a circle) — laminated blank,
+    // finger joints, CNC routing. 0 = visible in the breakdown, neutral in the
+    // price until Piotr sets it.
+    curvedMemberSurcharge: 0,
     patternPrices: {
       intersecting: 250, 'half-hub': 150, 'hub-spoke': 210,
       'double-hub-spoke': 270, 'triple-hub-spoke': 320,
@@ -433,7 +438,6 @@ export function calculateFixOnly(pricing, config, sqm, frameWidth, frameHeight) 
 
   const totalBars = (config.casementHBars || 0) + (config.casementVBars || 0);
   const barsPrice = totalBars * 2 * pricing.pricePerBar;
-
   const additionalPrice = calculateAdditionalOptions(pricing, config, sqm, sqm);
   let subtotal = basePrice + patternPrice + barsPrice + additionalPrice;
 
@@ -474,8 +478,12 @@ export function calculateArchedCasement(pricing, config, sqm, frameWidth, frameH
   const totalBars = (config.casementHBars || 0) + (config.casementVBars || 0);
   const barsPrice = totalBars * 2 * pricing.pricePerBar;
 
+  // v3 Block 4: curved members (head + top rail; a circle's two rings) × surcharge (profile value, default 0)
+  const curvedMembers = Number(config.curvedMembers) || 2;
+  const curvedPrice = curvedMembers * (Number(a.curvedMemberSurcharge) || 0);
+
   const additionalPrice = calculateAdditionalOptions(pricing, config, sqm, sqm);
-  let subtotal = basePrice + patternPrice + barsPrice + additionalPrice;
+  let subtotal = basePrice + patternPrice + barsPrice + curvedPrice + additionalPrice;
 
   if (config.colorType === 'dual') subtotal += subtotal * 0.15;
   else if (config.colorType === 'single' && config.colorSingle && config.colorSingle !== 'white') subtotal += subtotal * 0.10;
@@ -491,7 +499,7 @@ export function calculateArchedCasement(pricing, config, sqm, frameWidth, frameH
     breakdown: {
       windowType: 'arched-casement', shape: config.casArchShape || 'semi-circle',
       frameWidth, frameHeight, sqm: sqm.toFixed(2), basePrice: basePrice.toFixed(2),
-      patternPrice, barsPrice: barsPrice.toFixed(2), additionalOptions: additionalPrice,
+      patternPrice, barsPrice: barsPrice.toFixed(2), curvedMembers, curvedPrice: curvedPrice.toFixed(2), additionalOptions: additionalPrice,
       subtotal: subtotal.toFixed(2), quantity,
       unitPrice: unitPrice.toFixed(2), totalPrice: totalPrice.toFixed(2),
       vatAmount: (totalPrice * pricing.vatRate).toFixed(2),

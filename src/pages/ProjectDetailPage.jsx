@@ -37,11 +37,17 @@ export default function ProjectDetailPage() {
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const assignmentsData = useMaterialAssignmentStore((s) => s.data);
 
+  const archivedProjects = useProjectStore((s) => s.archivedProjects);
+  const loadArchivedProjects = useProjectStore((s) => s.loadArchivedProjects);
+  const restoreProject = useProjectStore((s) => s.restoreProject);
   useEffect(() => {
-    const allProjects = useProjectStore.getState().projects;
-    const found = allProjects.find((p) => p.id === projectId);
+    // v3 Block 6: an archived project opens read-only (from archivedProjects; pulled from the cloud on a cold start)
+    const st = useProjectStore.getState();
+    const found = st.projects.find((p) => p.id === projectId) || st.archivedProjects.find((p) => p.id === projectId);
     if (found) setCurrentProject(found);
-  }, [projectId, projects.length]);
+    else if (!st.archivedLoaded) loadArchivedProjects();
+  }, [projectId, projects.length, archivedProjects.length]);
+  const isArchived = !!currentProject?.archived && currentProject?.id === projectId;
 
   const batches = currentProject?.batches || [];
 
@@ -145,7 +151,18 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
-      <Link to="/dashboard" className="text-xs text-ink-400 hover:text-accent-400 transition-colors">← All Projects</Link>
+      <Link to={isArchived ? '/archive' : '/dashboard'} className="text-xs text-ink-400 hover:text-accent-400 transition-colors">{isArchived ? '← Archive' : '← All Projects'}</Link>
+
+      {/* v3 Block 6: archived project — read-only (packs, cut lists and exports still open) */}
+      {isArchived && (
+        <div className="mt-3 flex items-center justify-between rounded-xl border border-accent-500/30 bg-accent-500/10 px-4 py-2.5">
+          <div className="text-[13px] text-accent-400">
+            <span className="font-semibold">Archived</span>
+            {currentProject.archived_at ? ` on ${new Date(currentProject.archived_at).toLocaleDateString('en-GB')}` : ''} · read-only — batches and windows cannot be added or deleted here.
+          </div>
+          <button onClick={() => restoreProject(projectId)} className="text-[12px] px-3 py-1 rounded-lg border border-accent-500/40 text-accent-400 hover:bg-accent-500/15 transition-colors">Restore to dashboard</button>
+        </div>
+      )}
 
       <div className="flex items-end justify-between mt-2 mb-6">
         <div>
@@ -156,7 +173,7 @@ export default function ProjectDetailPage() {
           <button onClick={() => setShowMaterials(true)} className="btn btn-secondary text-sm">
             📋 Project Materials
           </button>
-          <button onClick={() => setShowAddBatch(true)} className="btn btn-primary">+ Add Batch</button>
+          {!isArchived && <button onClick={() => setShowAddBatch(true)} className="btn btn-primary">+ Add Batch</button>}
         </div>
       </div>
 
@@ -198,8 +215,8 @@ export default function ProjectDetailPage() {
           return (
             <div key={batch.id} className="card p-5 relative group">
               {/* Delete */}
-              <button onClick={() => handleDeleteBatch(batch.id)}
-                className="absolute top-4 right-4 w-7 h-7 rounded-full bg-surface-600 text-ink-400 hover:bg-red-500/20 hover:text-red-400 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+              {!isArchived && <button onClick={() => handleDeleteBatch(batch.id)}
+                className="absolute top-4 right-4 w-7 h-7 rounded-full bg-surface-600 text-ink-400 hover:bg-red-500/20 hover:text-red-400 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">✕</button>}
 
               <div className="flex items-start justify-between mb-4">
                 <div>

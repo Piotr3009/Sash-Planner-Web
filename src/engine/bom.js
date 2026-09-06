@@ -107,7 +107,11 @@ Object.assign(ELEMENT_TO_PART_ID, {
  * purchased section for a part.
  */
 export function makeRawResolver({ assignments, assignmentsData, materials, frameType = 'standard' }) {
-  return (elementName) => {
+  return (elementName, opts) => {
+    // v3 Block 4: a laminated BLANK (curved member) is bought as boards of the
+    // planner's stock width × the member depth, whatever timber is assigned to
+    // the part — the assignment only names the species / supplier line (jc_uuid).
+    if (opts?.kind === 'blank') return `${opts.stock}x${opts.depth}`;
     const pid = ELEMENT_TO_PART_ID[String(elementName).replace(/ \((FIX L|FIX R|C)\)$/, '')] || ELEMENT_TO_PART_ID[elementName];
     const a = pid ? effectiveAssignment(pid, frameType, assignmentsData, assignments) : null;
     const mat = a?.material_id ? (materials || []).find((m) => m.id === a.material_id) : null;

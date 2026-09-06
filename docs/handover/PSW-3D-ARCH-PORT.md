@@ -118,3 +118,32 @@ the profile's 150).
 
 `node verify/arch/t22.mjs` §5 in PC (helper on every shape, fallback, names). In PSW: open an arched
 sash with each radio shape and no `archRise` — extents W × H, head band constant, sash swings.
+
+---
+
+## 7. FIXED windows, the circle, doors (ARCHED-WINDOWS-v3 Block 3 / Block 4, 07.09.2026)
+
+**Fixed rectangle** — no 3D change: `CasementWindow` with `casementHinges ['fixed']` draws its
+own fixed pane (no handle). PC's `windowSpecToConfig` forces layout `040L` + `['fixed']` for
+`casement.kind 'fixed'`.
+
+**Fixed Round / Gothic** — `ArchedCasementWindow` gained one prop:
+
+| Prop | Type | Default | Meaning |
+|---|---|---|---|
+| `fixedLeaf` | boolean | `false` | fixed window: the handle is not drawn and `opening` is forced to 0 |
+
+`App.jsx` passes `fixedLeaf={!!config.fixedLeaf}` and `opening={config.fixedLeaf ? 0 : …}` in
+the arched casement branch. PSW's fix-only arch shapes could use the same component with this
+prop instead of `FixFrameWindow`'s own arch branches (concentric rings, rule C) — a PSW decision.
+
+**Circle** — PC routes a circle fixed window to PSW's `FixFrameWindow` circle branch
+(`windowCategory 'fix-only'`, `fixShape 'circle'`, `fixCircleBarPattern`, `fixCircleBarOffset`,
+`casementHBars` / `casementVBars`). PC's copy of `FixFrameWindow.jsx` is byte-identical to PSW's
+apart from the named-export block at its end (§6) — nothing to port. Note the engine's circle
+(`arch.js buildCircleGeometry`) puts the leaf ring at 40 / 107 and the glass at 94.5 in from the
+frame outer; `FixFrameWindow` draws a single 57 frame ring with the glass behind it (no leaf
+ring) — the viewer and the cut list differ by design here (PSW's product has no leaf).
+
+**Doors** — untouched in v3 (Piotr 07.09: doors, sliding, bifold, front door out of scope). No
+PSW door 3D file changed.

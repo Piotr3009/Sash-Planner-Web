@@ -121,6 +121,9 @@ export const useProjectStore = create((set, get) => ({
 
   // ─── State ───
   projects: [],
+  // Block 6 (v3): archived projects live here, out of the dashboard (loaded on demand by the Archive page)
+  archivedProjects: [],
+  archivedLoaded: false,
   projectsLoaded: false,
   projectsLoading: false,
   projectsError: null,
@@ -216,6 +219,54 @@ export const useProjectStore = create((set, get) => ({
     }));
     cloud.deleteProjectCloud(projectId);
   },
+
+  // ─── ARCHIVE (v3 Block 6) ───
+  // Archive: the project leaves `projects` (dashboard, packs' project lookups)
+  // and lands in `archivedProjects` with `archived_at`; batches / windows /
+  // pack assignments are untouched so the production pack, cut lists and
+  // exports keep working (read-only banner on the project page). Restore is
+  // the exact reverse. Both write the row back to Supabase (best-effort).
+  archiveProject: (projectId) => {
+    const p = get().projects.find((x) => x.id === projectId);
+    if (!p) return null;
+    const archived = { ...p, archived: true, archived_at: new Date().toISOString() };
+    set((s) => ({
+      projects: s.projects.filter((x) => x.id !== projectId),
+      archivedProjects: [archived, ...s.archivedProjects.filter((x) => x.id !== projectId)],
+      currentProject: s.currentProject?.id === projectId ? archived : s.currentProject,
+    }));
+    cloud.saveProject(archived);
+    return archived;
+  },
+
+  restoreProject: (projectId) => {
+    const p = get().archivedProjects.find((x) => x.id === projectId);
+    if (!p) return null;
+    const live = { ...p, archived: false, archived_at: null };
+    set((s) => ({
+      archivedProjects: s.archivedProjects.filter((x) => x.id !== projectId),
+      projects: [...s.projects.filter((x) => x.id !== projectId), live].sort((x, y) => String(x.created_at || '').localeCompare(String(y.created_at || ''))),
+      currentProject: s.currentProject?.id === projectId ? live : s.currentProject,
+    }));
+    cloud.saveProject(live);
+    return live;
+  },
+
+  // Archive page: pull the tenant's archived projects (with batches + windows) from the cloud.
+  // Offline / mock: the in-memory list is the truth.
+  loadArchivedProjects: async () => {
+    try {
+      const rows = await cloud.loadArchivedProjects();
+      if (rows) set({ archivedProjects: rows, archivedLoaded: true });
+      else set({ archivedLoaded: true });
+    } catch (e) {
+      console.error('loadArchivedProjects', e);
+      set({ archivedLoaded: true });
+    }
+  },
+
+  // A project by id from either list (the project page opens archived projects read-only).
+  getProjectById: (projectId) => get().projects.find((p) => p.id === projectId) || get().archivedProjects.find((p) => p.id === projectId) || null,
 
   updateProject: (projectId, patch) => {
     set((s) => {
@@ -882,7 +933,7 @@ export const useProjectStore = create((set, get) => ({
 
   // Clear all in-memory data (call on sign-out so nothing leaks between accounts).
   clearAll: () => set({
-    projects: [], productionPacks: [], currentProject: null, currentBatch: null,
+    projects: [], archivedProjects: [], archivedLoaded: false, productionPacks: [], currentProject: null, currentBatch: null,
     currentWindows: [], selectedWindowId: null, projectsLoaded: false,
   }),
 

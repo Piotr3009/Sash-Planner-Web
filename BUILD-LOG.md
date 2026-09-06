@@ -139,6 +139,66 @@ sheets byte-identical (`derived.casement.kind` is present only on a fixed window
 for the v3 vocabulary (a rectangular sash now skips as "not an arched sash", sunburst in ARCH_BAR_PATTERNS, the
 configurator's save gate reads `shapeBlocked`).
 
+### NIGHT 5 — FINAL VERDICT (all four stages) and the CLAUDE.md checklist
+
+**Gates:** Stage 1 (t16 504 · t17 72 · t18 178 · t19 244 · t20 112 · t20_bars 30), Stage 2 (+ t21 120), Stage 3
+(+ t22 75 · t23 79), Stage 4 (+ t24 26) — every harness ALL PASS on the final tree, `npm run build` green,
+esbuild clean on every touched file, no Polish in sources (Piotr's quotes paraphrased in English).
+Rectangular casement and sash: derived JSON + sheets byte-identical to the HEAD fixtures (t18 / t19 / t20 /
+t21 / t22). t16 / t18 assertions were updated where v3 changed the rule (hinge value 1:1, sash exports,
+sunburst vocabulary, blank board metres in the BOM, the configurator's save gate).
+
+**Checklist:** branch pushed after every stage, `main` untouched · harnesses ALL PASS · build OK · esbuild OK ·
+diff limited to the spec's files + verify / docs / BUILD-LOG / BLOCKERS / CLAUDE.md · samples in
+`docs/handover/samples/` (arch ×5, glass ×4 + merged, tracery DWG / hub / quad / gothic / custom / sash / circle
+DXF + LSP, sash arch ×3, circle arch) · BUILD-LOG per stage · BLOCKERS §11–§15 with every DEFAULT (open) ·
+SQL in `docs/handover/sql/`.
+
+**What was NOT verified tonight (honest list):**
+1. Nothing in a browser: the configurator (Kind / Shape chips, circle height lock, custom hub, arched sash),
+   the 3D (arched sash port, fixed leaf, circle via FixFrameWindow), the Archive page, the dashboard Archive
+   button, the read-only project page, the PP Curved members card.
+2. No CAD: the DXFs (arch, sash, circle, tracery, glazier) were round-tripped through ezdxf and the LSP parsed
+   back, never opened in VCarve / AutoCAD; the LSP never run in AutoCAD.
+3. No PDF opened: the glass / elevation / elements / cut-list PDFs with arched, sash-arched and circle sheets.
+4. Supabase: the archive SQL was not run; RLS not exercised (manual check in BLOCKERS 15.7); cloud writes of
+   `archived` / `archived_at` only grep-checked.
+5. Physical sanity that only Piotr can give: the 80 sash head ring and the 89 inset (12.1), the circle leaf's
+   4 / 17 running fit all round (14.3), the blank rough-length rule (15.3), the sunburst 200 / 6 (14.5).
+
+### STAGE 4 — Block 6 project ARCHIVE + Block 4 cross-cutting (`docs/handover/sql/2026-09-07_projects_archive.sql` new, `cloudSync.js`, `projectStore.js`, `ArchivePage.jsx`, `DashboardPage.jsx`, `ProjectDetailPage.jsx`, `lists.js`, `bom.js`, `pricing.js`, `ProductionPackPage.jsx`, `verify/parity/psw-casement-layouts.mjs`, `PSW-PARITY-REPORT.md`, `PSW-3D-ARCH-PORT.md`, `verify/arch/t24_stage4.mjs`)
+
+**Block 6 — understanding:** Piotr 07.09 — finished projects clutter the dashboard. An archived project leaves
+the dashboard, keeps its batches / windows / packs readable, and can come back.
+**Two approaches, one rejected:** (a) `projects.status = 'archived'` — rejected: `status` is the production
+status the dashboard already reads (`preparation` …) and `loadAll` already filters a boolean `archived`; (b)
+`archived` boolean (made explicit) + `archived_at timestamptz` — chosen, SQL as a separate file, RLS untouched.
+**Built:** SQL migration (idempotent: columns if not exists, backfill, tenant + archived index);
+`cloudSync.saveProject` writes both fields, `loadArchivedProjects()` pulls archived = true with batches +
+windows; store `archivedProjects` / `archiveProject` / `restoreProject` / `loadArchivedProjects` /
+`getProjectById` (both lists), `clearAll` resets; `ArchivePage` table Project · Client · Batches · Windows ·
+Archived on · Restore + search; dashboard card Archive button (immediate when every batch's pack is complete,
+confirm modal otherwise — `ConfirmModal` gained `confirmLabel` / `tone`); project page opens an archived project
+read-only (banner with Restore, no Add Batch / delete batch).
+
+**Block 4 — built:** `lists.js` `CURVED_MEMBER_PLAN` / `buildCurvedMembersForWindow` (rows with radii, pieces,
+per-arc n × stock × rough, finger) and `blankPiecesForRecord` — the pre-cut lists a curved member as its blank
+pieces (qty n, rough length, section stock × depth), never as the arc length; `bom.makeRawResolver(name,
+{ kind: 'blank', stock, depth })`; BOM board metres follow the blanks. PP: `CurvedMembersSection` in the Cut
+List tab (per type); Arch DXF (all) + Tracery DXF / LSP (all) enabled for sash batches / packs (merged exports
+for the arched sash). Pricing: `archedCasement.curvedMemberSurcharge` (0) × 2 members, in the breakdown. Parity
+script updated to the v3 contract (hinge value 1:1, import ratios = PSW `RISE_RATIO`) and the report regenerated
+(23 PASS · 2 DIFF · 0 HARD). Port doc §7 (fixed / circle / doors). Sash glazing arch left out of the engine
+(BLOCKERS 15.1). PDFs: the sheets already reach the PDFs through `svgNodeToPng`, so the arched / circle sheets
+ride the same path (not opened as PDFs tonight — 15.5).
+
+**Verification (t24 26/26 ALL PASS):** §1 store round-trip archive → hidden → restore → visible (offline store, cloud
+disabled), currentProject follows, delete / clearAll; §2 SQL file content, cloud writes, pages grep; §3 blanks
+for an arched casement / arched sash / circle, BOM mm = Σ n × rough, rectangular pre-cut unchanged, PP grep; §4
+pricing neutral at 0 and +80 at 40, parity report, port doc. **Not verified:** the SQL against Supabase (run by
+hand, 15.7), the Archive page / dashboard button / read-only project page in a browser, the PP section on
+screen, the cut-list PDF with blanks. **Verdict: ✅ Block 6, ✅ Block 4** (PDF / browser items ⚠️ unverified).
+
 ### 0.4 — tracery export DXF + LSP, the `arka` convention (`src/engine/cnc/traceryExport.js` new, `dxfWriter.js` POINT, `arch.js` patterns, `calculations.js`, `lists.js`, `bom.js`, `cncExport.js`, pages, configurator, 3D props)
 
 **Understanding:** one timber board over the arched unit, cut on the CNC to the pane pattern; the bead R8 runs
