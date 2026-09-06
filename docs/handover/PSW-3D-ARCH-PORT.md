@@ -147,3 +147,43 @@ ring) — the viewer and the cut list differ by design here (PSW's product has n
 
 **Doors** — untouched in v3 (Piotr 07.09: doors, sliding, bifold, front door out of scope). No
 PSW door 3D file changed.
+
+## 8. Intersecting from the vertical bars (ARCHED-WINDOWS-v4 Block E, 06.09.2026)
+
+**Rule (one engine, casement / sash / fixed):** the user's vertical bars run to the springing line
+and every bar top spawns two tracery arcs (left- and right-curving) with the arch's own radius —
+the glass outline's arc radius (semi-circle: the clear half width; gothic: the concentric radius
+of the outline arcs) — centred on the springing line on the opposite side (`cx = x_bar − dir·R`),
+clipped where they meet the outline; 0 vertical bars → two default columns at ±¼ of the clear
+width; no springing bar. This is PSW's SASH rule (`ArchedSashWindow.jsx` 915–940, `useArchedSashBars`);
+PSW's fix-frame `intersectingData` (pitch mullions, arcs centred on the frame corners) is no longer
+what the casement 3D shows.
+
+**PC 3D change:** `casement/archedCasementGeometry.js` — `PSW_BAR_PATTERN_SETTINGS` lost its
+`intersecting { pitch, minMullions, maxMullions, minRadius }` entry (the engine's `buildArchBars`
+no longer reads it); `ArchedCasementWindow` draws the engine's bar list as before, so the arcs
+follow automatically. `ArchedSashWindow.jsx` (PSW copy) is untouched — its own `isIntersecting`
+branch already IS this rule, with one difference: PSW computes the gothic radius as
+`gothicCentreOffset(halfW, rise) + halfW` on the daylight numbers (905.4 on W 1000), the engine
+takes the exact concentric outline radius (905.5). Visually identical.
+
+**PSW port:** `3d-src/src/components/fix-frame/FixFrameWindow.jsx` `intersectingData` (667–830) is
+the old geometry for fix-only gothic / semi-circle products — replace it with the sash rule above
+(columns from `casementVBars`, default ±¼, arcs `R` = outline radius) when PSW's fix-frame should
+match PC's cut list / tracery; until then a fix-only window ordered from PSW draws different
+tracery in PSW's viewer than PC produces.
+
+## 9. Frame face 68 — `frameDims` prop (ARCHED-WINDOWS-v4 Block F, 06.09.2026)
+
+PC's copies of `casement/CasementFrame.jsx`, `casement/CasementWindow.jsx`,
+`casement/ArchedCasementWindow.jsx`, `door/DoorFrame.jsx`, `door/DoorWindow.jsx` and
+`door/DoorSidePanel.jsx` take an optional `frameDims` prop `{ frameFace, extFace }` (extFace = the
+visible land = face − rebate 21). The module constants `FRAME_FACE = 57` / `EXT_FACE = 36` stay as
+the defaults (`resolveFrameDims(null)` → 57 / 36), so copying the files into PSW changes nothing
+until PSW passes the prop. PC passes `{ 68, 47 }` for casements and `{ 68, 36 }` for doors from
+the profiles (`windowSpecToConfig.js` `casementFrameDims()` / `doorFrameDims()`, the App's
+`update3D({ frameDims })`). `CasementWindow` also hands `geo: { frameFace, bottomFace, mullionW }`
+to `resolveCasementLayout`, so the layout's mullion positions follow the face. Untouched:
+`ArchedDoorWindow.jsx` and `TransomPanel.jsx` (not rendered by PC — arched doors and door transom
+panels are out of PC's scope), `FixFrameWindow.jsx` (PSW's own 64 frame). The full PSW-side list
+of lines is in `PSW-FRAME-68-PORT.md`.

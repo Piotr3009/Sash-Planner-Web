@@ -11,7 +11,7 @@
 
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
-import DoorFrame, { FRAME_FACE, BOTTOM_FACE, FRAME_DEPTH, EXT_DEPTH, REBATE_STEP, GASKET_T, mm } from './DoorFrame';
+import DoorFrame, { resolveFrameDims, FRAME_FACE, BOTTOM_FACE, FRAME_DEPTH, EXT_DEPTH, REBATE_STEP, GASKET_T, mm } from './DoorFrame';
 import DoorPanel from './DoorPanel';
 
 export default function DoorSidePanel({
@@ -36,9 +36,11 @@ export default function DoorSidePanel({
   transomHeight = 0,
   transomVBars = 0,
   transomOpening = false,
+  frameDims = null,       // v4 Block F (PC): { frameFace, extFace } from the door profile; absent → PSW 57 / 36
 }) {
   const colorE = sameColor ? woodColor : woodColorExt;
   const colorI = sameColor ? woodColor : woodColorInt;
+  const { frameFace: FRAME_FACE } = resolveFrameDims(frameDims);
 
   const extMaterial = useMemo(() => new THREE.MeshPhysicalMaterial({
     color: colorE, roughness: 0.72, metalness: 0.02,
@@ -86,6 +88,7 @@ export default function DoorSidePanel({
       <DoorFrame
         width={width}
         height={height + frTransomH}
+        frameDims={frameDims}
         material={extMaterial}
         materialInt={intMaterial}
         sealColour={sealColour}

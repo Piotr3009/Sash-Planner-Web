@@ -607,7 +607,7 @@ export default function ProductionPackPage() {
         {tab === 'elevations' && <ElevationsTab windowsData={windowsData} pp={pp} batch={batch} registerExport={registerExport} />}
         {tab === 'sections'   && <SectionsTab windowsData={windowsData} pp={pp} batch={batch} registerExport={registerExport} />}
         {tab === 'elements'   && <ElementsTab windowsData={windowsData} pp={pp} batch={batch} registerExport={registerExport} />}
-        {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} batch={batch} pp={pp} registerExport={registerExport} />}
+        {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} batch={batch} pp={pp} registerExport={registerExport} exportFormat={exportFormat} />}
         {tab === 'precut'     && <PreCutTab merged={merged} settings={settings} batch={batch} pp={pp} isPPMode={isPPMode} projects={projects} registerExport={registerExport} exportFormat={exportFormat} />}
         {tab === 'cutlist'    && <CutListTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} pp={pp} batch={batch} registerExport={registerExport} exportFormat={exportFormat} />}
         {tab === 'spraying'   && <SprayingTab windowsData={windowsData} batch={batch} pp={pp} registerExport={registerExport} />}
@@ -1190,7 +1190,7 @@ function ElementsTab({ windowsData, pp, batch, registerExport }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: Glass Schedule
 // ═══════════════════════════════════════════════════════════════
-function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) {
+function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport, exportFormat }) {
   // Per-pack PDF reference selection (Piotr 04.08): the tenant LIBRARY lives in
   // Settings (up to 6 images, uploaded once); each pack TICKS up to 3 of them
   // for its Glass PDF header. Selection persists on the pack itself.
@@ -1262,6 +1262,7 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport }) 
       projects,
       refImages,
       companySettings: settingsNow.company || {},
+      format: exportFormat,   // v4 Block B: A3 / A4 follow the pack's export setting
     });
   };
   registerExport('glass', handleExportPDF);

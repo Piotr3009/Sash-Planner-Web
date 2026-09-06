@@ -222,7 +222,14 @@ for (const key of Object.keys(RENDERED)) {
   const W = spec.frame.width, H = spec.frame.height;
   const tolerance = 0.01;
   // — arch CNC DXF (the real export path: cncExport.archParamsForWindow → plan → buildArchEntities)
-  const ap = M.cncExport.archParamsForWindow(spec, key);
+  let ap = M.cncExport.archParamsForWindow(spec, key);
+  if (ap.skip && /below minimum length/.test(ap.skip)) {
+    // v4 Block C: the gothic 1000 leaf top rail is blocked by the 400 mm shorter-edge limit (t25, BLOCKERS) — the
+    // export refuses it honestly; the ONE-CONTOUR comparison below does not depend on the plan, so it runs with the
+    // limit relaxed for this window only.
+    check(`${key}: the default profile skips the CNC export honestly (leaf top rail below the 400 limit)`, /leaf top side 1: 2 pieces fit a 120 board but fall below the minimum length/.test(ap.skip), ap.skip);
+    ap = M.profile.withProfiles(null, { ...P, arch: { ...P.arch, minPieceLength: 0 } }, () => M.cncExport.archParamsForWindow(spec, key));
+  }
   check(`${key}: cncExport.archParamsForWindow gives a plan (no skip)`, !!ap.params?.plan && !ap.skip, ap.skip || '');
   if (!ap.params?.plan) continue;
   const ents = M.archDxf.buildArchEntities(ap.params.plan, ap.params.winNum, 0, 0);
@@ -248,9 +255,13 @@ for (const key of Object.keys(RENDERED)) {
     // rings the sheet shows: head outer (0), leaf outer (leafAtJamb), leaf inner (leafAtJamb + face) — elevation; head outer only — frame
     const shown = sheetName === 'elevation' ? [A.geometry.arcs, A.geometry.leafTop.outer, A.geometry.leafTop.inner] : [A.geometry.arcs];
     const centresDxf = distinctCentres(dxfArch), centresSvg = distinctCentres(rel);
-    check(`${key}: ${sheetName} — arc centres = the DXF ring centres (${centresDxf.length} distinct, same set ±0.01)`,
-      centresDxf.length === centresSvg.length && centresDxf.every((c) => centresSvg.some((d) => near(c[0], d[0]) && near(c[1], d[1]))),
-      `dxf ${JSON.stringify(centresDxf.map((c) => c.map((v) => +v.toFixed(2))))} svg ${JSON.stringify(centresSvg.map((c) => c.map((v) => +v.toFixed(2))))}`);
+    // v4 Block E: the elevation also draws the tracery arcs, whose centres sit on the springing line at column ∓ R
+    // (glass frame → arch frame: x − xg, y = 0) — they are engine centres too, not a second geometry
+    const traceryCentres = sheetName === 'elevation' ? distinctCentres((A.bars || []).filter((b) => b.role === 'tracery').map((b) => ({ cx: b.arc.cx - A.glassOutline.width / 2, cy: 0 }))) : [];
+    const centresExp = [...centresDxf, ...traceryCentres.filter((t) => !centresDxf.some((c) => near(c[0], t[0]) && near(c[1], t[1])))];
+    check(`${key}: ${sheetName} — arc centres = the DXF ring centres${traceryCentres.length ? ` + the ${traceryCentres.length} tracery arc centres` : ''} (${centresExp.length} distinct, same set ±0.01)`,
+      centresExp.length === centresSvg.length && centresExp.every((c) => centresSvg.some((d) => near(c[0], d[0]) && near(c[1], d[1]))),
+      `expected ${JSON.stringify(centresExp.map((c) => c.map((v) => +v.toFixed(2))))} svg ${JSON.stringify(centresSvg.map((c) => c.map((v) => +v.toFixed(2))))}`);
     // every DXF arc of the rings the sheet draws has an SVG twin (centre + radius)
     const wanted = dxfArch.filter((d) => shown.some((chain) => chain.some((a) => near(a.r, d.r, 1e-6))));
     check(`${key}: ${sheetName} — ${wanted.length} DXF ring arcs (head outer${sheetName === 'elevation' ? ', leaf outer, leaf inner' : ''}) each have an SVG arc with the same centre and radius`,
@@ -260,8 +271,8 @@ for (const key of Object.keys(RENDERED)) {
     check(`${key}: ${sheetName} — the land line arcs are the head outer arcs offset by geometry.land ${P.geometry.land} (concentric)`,
       landArcs.length > 0 && landArcs.every((d) => hasCircle(rel, d, tolerance)));
     // every SVG arc is on a DXF centre (nothing drawn from a second geometry)
-    check(`${key}: ${sheetName} — every one of the ${rel.length} SVG arcs sits on a DXF ring centre`,
-      rel.every((a) => centresDxf.some((c) => near(a.cx, c[0]) && near(a.cy, c[1]))));
+    check(`${key}: ${sheetName} — every one of the ${rel.length} SVG arcs sits on a DXF ring centre or a tracery arc centre`,
+      rel.every((a) => centresExp.some((c) => near(a.cx, c[0]) && near(a.cy, c[1]))));
     if (sheetName === 'elevation' && A.bars.some((b) => b.kind === 'arc')) {
       // bar bands: r ± 11 around the glazier-DXF bar axes; glass frame → arch frame through glassOutline.origin
       const gu = M.glassDxf.shapedGlassUnits(spec, derived)[0];
@@ -346,7 +357,7 @@ section('4 — 3D: archedCasementGeometry (ArchedCasementWindow) on every shape 
   check('3D bars: ring arc centred on the window axis at the springing (3D frame), r = 0.3 × glass half width (396)', (() => { const r = hub.bars.find((b) => b.role === 'ring'); return r && near(r.arc.cx, 0, 1e-6) && near(r.arc.cy, hub.springY, 1e-6) && near(r.arc.r, 0.3 * 396, 1e-6); })());
   const got = M.geo3d.archedCasementGeometry({ archShape: 'gothic-equilateral', width: 1000, height: 1800, archRise: 866.0254, barPattern: 'intersecting', hBars: 1, vBars: 2, ...opts });
   const gEngine = RENDERED['gothic-bars'].derived.arch;
-  check('3D bars: gothic intersecting 1H 2V → same count / roles as the engine, tracery arcs centred on the outer frame corners (±500)', got.bars.length === gEngine.bars.length && got.bars.filter((b) => b.role === 'tracery').every((b) => near(Math.abs(b.arc.cx), 500, 1e-6) && near(b.arc.cy, got.springY, 1e-6)));
+  check('3D bars: gothic intersecting 1H 2V → same count / roles as the engine (v4: 2 columns + 4 arcs), tracery arcs with the outline radius centred on the springing line at column ∓ R (3D frame)', got.bars.length === gEngine.bars.length && got.bars.filter((b) => b.role === 'tracery').length === 4 && got.bars.filter((b) => b.role === 'tracery').every((b) => near(b.arc.r, got.radii[0] - (1000 / 2 - got.leaf.xg), 1e-6) && near(b.arc.cy, got.springY, 1e-6) && got.bars.filter((v) => v.role === 'v').some((v) => near(Math.abs(b.arc.cx - v.from[0]), b.arc.r, 1e-6))));   // r = the 3D's own daylight radius (3D leaf face 64 → 908.5, engine 905.5)
   const tc = M.geo3d.archedCasementGeometry({ archShape: 'three-centre', width: 1000, height: 1500, archRise: 200, hBars: 1, vBars: 2, ...opts });
   check('3D bars: three-centre 1H 2V → 3 straight bars, the v bars end on the daylight chain (top y above the springing)', tc.bars.length === 3 && tc.bars.filter((b) => b.role === 'v').every((b) => b.to[1] > tc.springY));
   check('3D: a hub pattern on a three-centre is refused by the engine vocabulary → drawn with no pattern', M.geo3d.archedCasementGeometry({ archShape: 'three-centre', width: 1000, height: 1500, archRise: 200, barPattern: 'hub-spoke', ...opts }).pattern === 'none');

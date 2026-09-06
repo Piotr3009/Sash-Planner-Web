@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
 import { kgPerM, VARIANT_ORDER } from '../engine/profile.js';
 import NumInput from '../components/NumInput.jsx';
 import { CONSTANTS, deriveWindowData } from '../engine/calculations.js';
+import { buildArchPlan, ArchError } from '../engine/arch.js';
 import { normaliseToWindowSpec } from '../engine/specification.js';
 import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
 import SashDetail2D from '../components/drawings/SashDetail2D.jsx';
@@ -708,6 +709,37 @@ function RuleField({ label, value, onCommit, hint, hintVal, sample }) {
   );
 }
 
+// Comma-list input for the stock widths (v4 C.7): keeps its own text while
+// typing, commits on blur / Enter, re-syncs from the profile when not focused.
+function ListInput({ value, onCommit, ...rest }) {
+  const text = Array.isArray(value) ? value.join(', ') : String(value ?? '');
+  const [draft, setDraft] = useState(text);
+  const focused = useRef(false);
+  useEffect(() => { if (!focused.current) setDraft(text); }, [text]);
+  return (
+    <input type="text" value={draft}
+      onFocus={() => { focused.current = true; }}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => { focused.current = false; onCommit(draft); setDraft(text); }}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      {...rest} />
+  );
+}
+
+// One numeric field of the CNC & arches card (v4 C.7): label + NumInput on a profile path.
+function PathField({ label, value, onCommit, hint }) {
+  return (
+    <div>
+      <div className="text-ink-400 mb-1">{label}</div>
+      <div className="flex items-center gap-2">
+        <NumInput value={value} onCommit={onCommit}
+          className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+        {hint && <span className="text-[10px] text-ink-500">{hint}</span>}
+      </div>
+    </div>
+  );
+}
+
 function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
   const casement = useWindowProfileStore((s) => s.casement);
   const setEl = useWindowProfileStore((s) => s.setCasementElementField);
@@ -716,8 +748,11 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
   const setGeo = useWindowProfileStore((s) => s.setCasementGeometry);
   const setLen = useWindowProfileStore((s) => s.setCasementLength);
   const setLeafFace = useWindowProfileStore((s) => s.setCasementLeafFace);
+  const setPath = useWindowProfileStore((s) => s.setCasementPath);
+  const setStockWidths = useWindowProfileStore((s) => s.setCasementStockWidths);
   const resetToDefaults = useWindowProfileStore((s) => s.resetToDefaults);
   const [selected, setSelected] = useState('leaf');
+  const [cncLock, setCncLock] = useState(true);
   const [depthLock, setDepthLock] = useState(true);
   const [elementLock, setElementLock] = useState(true);
   const [frameLock, setFrameLock] = useState(true);
@@ -750,6 +785,24 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
       return null;
     }
   }, [W, H, p]);
+
+  // v4 C.7: the CNC & arches card validates itself on a sample arch — a
+  // semi-circle at the sample width (height = rise + the straight minimum +
+  // 100, always inside the limits) planned with the live profile. The
+  // planner's readable ArchError / no-plan reasons are the validation message.
+  const archValidation = useMemo(() => {
+    if (!p.arch || !p.cnc) return { ok: false, text: 'Profile has no arch / cnc block — reload the page to migrate it' };
+    try {
+      const plan = buildArchPlan({ shape: 'semi-circle', width: W, height: W / 2 + Number(p.arch.limits?.minStraightBelowRise || 0) + 100, hinge: 'left' }, p);
+      const line = (label, pl) => {
+        if (pl.noStock) return `${label}: ${pl.reasons.join('; ')}`;
+        return `${label} ${pl.arcs.map((a) => `${a.default.n} × ${a.default.stock}${a.rule === 'economy' ? ' (economy)' : ''}`).join(' + ')}`;
+      };
+      return { ok: !plan.noStock, text: `Sample semi-circle W${W}: ${line('frame head', plan.plans.frameHead)} · ${line('leaf top', plan.plans.leafTop)}` };
+    } catch (err) {
+      return { ok: false, text: err instanceof ArchError ? err.message : String(err?.message || err) };
+    }
+  }, [W, p]);
 
   // Leaf Detail must show the MAIN leaf, not the fan (groups[0] is the fan in
   // fanlight layouts) — the main light is what the settings describe.
@@ -962,6 +1015,57 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
               </div>
             </fieldset>
           </div>
+
+          {/* ══ v4 C.7 — CNC & arches: the segment planner, the Uniclamp footprint, the tracery numbers ══ */}
+          {p.arch && p.cnc && p.tracery && (
+            <div className={`card p-4 mt-4 ${cncLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs font-semibold text-ink-200">CNC &amp; arches
+                  <span className="text-ink-500 font-normal"> · blank planner limits, stock, finger joint, Uniclamp, tracery</span>
+                </div>
+                <LockToggle locked={cncLock} onToggle={() => setCncLock((x) => !x)} />
+              </div>
+              <fieldset disabled={cncLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${cncLock ? 'opacity-60' : ''}`}>
+                <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Finger joint &amp; blank</div>
+                <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                  <PathField label="Finger length" value={p.arch.finger.length} onCommit={(v) => setPath(['arch', 'finger', 'length'], v)} hint="mm per jointed end" />
+                  <PathField label="Finger groove" value={p.arch.finger.depth} onCommit={(v) => setPath(['arch', 'finger', 'depth'], v)} hint="joint depth" />
+                  <PathField label="Finger pitch" value={p.arch.finger.pitch} onCommit={(v) => setPath(['arch', 'finger', 'pitch'], v)} />
+                  <PathField label="Contour allowance" value={p.arch.contourAllowance} onCommit={(v) => setPath(['arch', 'contourAllowance'], v)} hint="mm per side" />
+                  <PathField label="Glazing rebate" value={g.glazingRebate} onCommit={(v) => setGeo('glazingRebate', v)} hint="mm (tracery board depth)" />
+                </div>
+                <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Stock &amp; limits</div>
+                <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                  <div>
+                    <div className="text-ink-400 mb-1">Stock widths (mm, comma list — the widest is the board cap)</div>
+                    <ListInput value={p.arch.stockWidths} onCommit={(t) => setStockWidths(t)}
+                      className="w-72 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+                  </div>
+                  <PathField label="Min clamp length" value={p.cnc.minClampLength} onCommit={(v) => setPath(['cnc', 'minClampLength'], v)} hint="overall piece, mm" />
+                  <PathField label="Min piece length" value={p.arch.minPieceLength} onCommit={(v) => setPath(['arch', 'minPieceLength'], v)} hint="shorter edge, mm" />
+                  <PathField label="Waste threshold" value={p.arch.wasteThreshold} onCommit={(v) => setPath(['arch', 'wasteThreshold'], v)} hint="0–1 · 1 = always fewest pieces" />
+                </div>
+                <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Uniclamp (CLAMPS layer, suggestion)</div>
+                <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                  <PathField label="Clamp base" value={p.cnc.clamp.base} onCommit={(v) => setPath(['cnc', 'clamp', 'base'], v)} hint="mm square" />
+                  <PathField label="Jaws min thickness" value={p.cnc.clamp.minThickness} onCommit={(v) => setPath(['cnc', 'clamp', 'minThickness'], v)} />
+                  <PathField label="Jaws max thickness" value={p.cnc.clamp.maxThickness} onCommit={(v) => setPath(['cnc', 'clamp', 'maxThickness'], v)} />
+                  <PathField label="Clamp clearance" value={p.cnc.clampClearance} onCommit={(v) => setPath(['cnc', 'clampClearance'], v)} hint="from the end cuts" />
+                </div>
+                <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Tracery board (bead R8 profile)</div>
+                <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                  <PathField label="Pane offset" value={p.tracery.paneOffset} onCommit={(v) => setPath(['tracery', 'paneOffset'], v)} />
+                  <PathField label="Profile width" value={p.tracery.profileWidth} onCommit={(v) => setPath(['tracery', 'profileWidth'], v)} />
+                  <PathField label="Ridge land" value={p.tracery.ridgeLand} onCommit={(v) => setPath(['tracery', 'ridgeLand'], v)} />
+                  <PathField label="Edge land" value={p.tracery.edgeLand} onCommit={(v) => setPath(['tracery', 'edgeLand'], v)} />
+                  <PathField label="Mitre leg" value={p.tracery.mitreLeg} onCommit={(v) => setPath(['tracery', 'mitreLeg'], v)} />
+                </div>
+                <div className={`text-[11px] rounded-lg px-3 py-2 border ${archValidation.ok ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/5' : 'border-amber-500/50 text-amber-400 bg-amber-500/5'}`}>
+                  {archValidation.ok ? '✓ ' : '✗ '}{archValidation.text}
+                </div>
+              </fieldset>
+            </div>
+          )}
         </div>
 
         {/* ══ RIGHT 1/3 — live drawings ══ */}

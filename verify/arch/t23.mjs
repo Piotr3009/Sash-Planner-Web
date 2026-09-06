@@ -17,6 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ROOT, AUDIT, bundleTree, renderSheets, deriveItem } from './lib/sheets.mjs';
+import { independentPlan } from './lib/indPlanner.mjs';
 
 mkdirSync(AUDIT, { recursive: true });
 const SAMPLES = resolve(ROOT, 'docs', 'handover', 'samples');
@@ -33,6 +34,21 @@ const M = await bundleTree(resolve(ROOT, 'src'), 't23', [
 ]);
 const { specification, calculations, arch, profile, archDxf, dxfWriter, cncExport, glassDxf, tracery, glassBars, wsc } = M;
 const CP = profile.DEFAULT_CASEMENT_PROFILE;
+// v4 Block F (frame 68): every frame-driven expectation is computed from the profile with the spec formulas, never read off the engine
+const tF = CP.elements.frameHead.face, oL = CP.deductions.leafAtJamb, tL = CP.elements.leafTop.face, gI = CP.geometry.glassInset, land = CP.geometry.land;
+const glassOff = oL + tL - gI;                                                    // 51 + 67 − 12.5 = 105.5 (was 94.5)
+// the 800 circle: frame ring R / R − face, rebate wall R − land, leaf ring (R − leafAtJamb) / (R − leafAtJamb − leafTop.face), glass R − glassOff
+const R8 = 800 / 2, rFi = R8 - tF, rWall = R8 - land, rLo = R8 - oL, rLi = rLo - tL, rG = R8 - glassOff;   // 400 / 332 / 353 / 349 / 282 / 294.5 (was 343 / 364 / 360 / 293 / 305.5)
+const D8 = 2 * rG;                                                                // clear glass diameter 589 (was 611)
+const rSun = rG - CP.arch.patterns.sunburst.offset;                               // sunburst ring 294.5 − 200 = 94.5 (was 105.5)
+const frameCentre = (R8 + rFi) / 2, leafCentre = (rLo + rLi) / 2;                 // ring centre-line radii 366 / 315.5 (was 371.5 / 326.5)
+const f1 = (v) => { const r = Math.round(v * 10) / 10; return Number.isInteger(r) ? String(r) : r.toFixed(1); };   // one-decimal print of the rows / DXF text
+// independent planner (verify/arch/lib/indPlanner.mjs) on rings built from the formula radii — a closed ring = two half circles (§1 checks the engine's layout)
+const halves = (r) => [{ cx: 0, cy: 0, r, a0: 0, a1: Math.PI, clip0: null, clip1: null }, { cx: 0, cy: 0, r, a0: Math.PI, a1: 2 * Math.PI, clip0: null, clip1: null }];
+const circleRing = (ro, ri) => ({ outer: halves(ro), inner: halves(ri) });
+const IND = { stock: CP.arch.stockWidths, allowance: CP.arch.contourAllowance, finger: CP.arch.finger.length, minClamp: CP.cnc.minClampLength, minPiece: CP.arch.minPieceLength, threshold: CP.arch.wasteThreshold };
+const indFrame8 = independentPlan(circleRing(R8, rFi), IND)[0], indLeaf8 = independentPlan(circleRing(rLo, rLi), IND)[0];
+const leafShort8 = indLeaf8.blocked?.pieces[0].shorter;                           // shorter stock edge of the blocked leaf-ring plan (4 × 180 → 371.3, was 390.1)
 
 let pass = 0, fail = 0;
 const failures = [];
@@ -124,41 +140,45 @@ function stripOpening(d) {
 section('1 — circle geometry + bars (arch.js): rings on the profile faces, planner on full circles, errors');
 {
   const G = arch.buildCircleGeometry({ width: 800, height: 800 }, CP);
-  check('circle 800: R 400 outer, frame ring 400 → 343 (face 57), leaf ring 360 → 293 (40 / 67), glass 305.5 (94.5)',
-    G.shape === 'circle' && near(G.radii[0], 400, 1e-9) && near(G.frameHead.inner[0].r, 343, 1e-9) && near(G.leafTop.outer[0].r, 360, 1e-9) && near(G.leafTop.inner[0].r, 293, 1e-9) && near(G.glass.radius, 305.5, 1e-9));
-  check('circle: two half-arcs 0 → π → 2π centred on the origin, rebate wall R 364 (land 36), fit gap 4 lap 17, start = rise = R',
-    G.arcs.length === 2 && G.arcs.every((a) => a.cx === 0 && a.cy === 0) && near(G.arcs[0].a1, Math.PI, 1e-12) && near(G.arcs[1].a1, 2 * Math.PI, 1e-12) && near(G.rebateWall[0].r, 364, 1e-9) && G.fit.gap === 4 && G.fit.lap === 17 && G.start === 400 && G.rise === 400);
-  check('ring lengths: frame centre 2π·371.5, leaf centre 2π·326.5; ringPoly closes (6 vertices)',
-    near(G.frameHead.lengths.centre, 2 * Math.PI * 371.5, 1e-6) && near(G.leafTop.lengths.centre, 2 * Math.PI * 326.5, 1e-6) && arch.ringPoly(G.frameHead).length === 6);
+  check(`circle 800: R ${R8} outer, frame ring ${R8} → ${rFi} (face ${tF}), leaf ring ${rLo} → ${rLi} (${oL} / ${tL}), glass ${rG} (glassOff ${glassOff})`,
+    G.shape === 'circle' && near(G.radii[0], R8, 1e-9) && near(G.frameHead.inner[0].r, rFi, 1e-9) && near(G.leafTop.outer[0].r, rLo, 1e-9) && near(G.leafTop.inner[0].r, rLi, 1e-9) && near(G.glass.radius, rG, 1e-9));
+  check(`circle: two half-arcs 0 → π → 2π centred on the origin, rebate wall R ${rWall} (land ${land}), fit gap 4 lap ${tF - oL} (face − leafAtJamb), start = rise = R`,
+    G.arcs.length === 2 && G.arcs.every((a) => a.cx === 0 && a.cy === 0) && near(G.arcs[0].a1, Math.PI, 1e-12) && near(G.arcs[1].a1, 2 * Math.PI, 1e-12) && near(G.rebateWall[0].r, rWall, 1e-9) && G.fit.gap === 4 && G.fit.lap === tF - oL && G.start === R8 && G.rise === R8);
+  check(`ring lengths: frame centre 2π·${frameCentre}, leaf centre 2π·${leafCentre} (mean radii); ringPoly closes (6 vertices)`,
+    near(G.frameHead.lengths.centre, 2 * Math.PI * frameCentre, 1e-6) && near(G.leafTop.lengths.centre, 2 * Math.PI * leafCentre, 1e-6) && arch.ringPoly(G.frameHead).length === 6);
   const plan = arch.buildCirclePlan({ width: 800, height: 800 }, CP);
-  check('buildCirclePlan: kind circle, no hinge, frame ring 2 × 180° arcs → 5 pieces each (max 36°), stock found',
-    plan.kind === 'circle' && plan.hinge === null && !plan.noStock && plan.plans.frameHead.arcs.length === 2 && plan.plans.frameHead.arcs.every((a) => near(a.spanDeg, 180, 1e-6) && a.default?.n === 5));
+  // v4 Block C: a circle ring is ONE closed planning group (360°, radial joints only). Block F (frame 68): piece counts / boards come from the
+  // independent planner on the formula rings — the 800 frame ring 400 / 332 needs a wider board than the 57-face ring did (W_req > 180 → 4 × 200),
+  // the 800 LEAF ring 349 / 282 is BLOCKED by the 400 shorter-edge limit (4 × 180 → 371.3) and reported, never split finer (t25, BLOCKERS)
+  check(`buildCirclePlan (v4): kind circle, no hinge, frame ring = one 360° group → ${indFrame8.def?.n} pieces × ${indFrame8.def?.stock} (${indFrame8.rule}, independent planner); leaf ring blocked "below minimum length" (${indLeaf8.blocked?.n} × ${indLeaf8.blocked?.stock}: shorter edge ${f1(leafShort8)} < ${CP.arch.minPieceLength})`,
+    plan.kind === 'circle' && plan.hinge === null && plan.noStock && plan.plans.frameHead.arcs.length === 1 && near(plan.plans.frameHead.arcs[0].spanDeg, 360, 1e-6) && !!indFrame8.def && plan.plans.frameHead.arcs[0].default?.n === indFrame8.def.n && plan.plans.frameHead.arcs[0].default?.stock === indFrame8.def.stock
+    && plan.plans.leafTop.noStock && plan.plans.leafTop.noStockReason === 'below minimum length' && indLeaf8.reason === 'below minimum length' && new RegExp(`piece \\d of ${indLeaf8.blocked?.n}: shorter edge ${f1(leafShort8)} < ${CP.arch.minPieceLength}`).test(plan.plans.leafTop.reasons[0]), plan.plans.leafTop.reasons.join(' | '));
   expectThrows('height ≠ width → readable ArchError', () => arch.buildCircleGeometry({ width: 800, height: 900 }, CP), /height must equal the diameter/);
   expectThrows('diameter below the profile minimum → ArchError', () => arch.buildCircleGeometry({ width: 300, height: 300 }, CP), /outside/);
   const O = arch.buildCircleGlassOutline(G.glass.arcs);
-  check('glass outline: kind circle, 611 × 611, centre (305.5, 305.5), area π·305.5², perimeter 2π·305.5',
-    O.kind === 'circle' && near(O.width, 611, 1e-9) && near(O.centre[0], 305.5, 1e-9) && near(O.area, Math.PI * 305.5 ** 2, 1e-6) && near(O.perimeter, 2 * Math.PI * 305.5, 1e-6));
-  check('glassOutlinePoly: two vertices on the diameter, bulge 1 (two half circles)', JSON.stringify(arch.glassOutlinePoly(O)) === JSON.stringify([[611, 305.5, 1], [0, 305.5, 1]]));
+  check(`glass outline: kind circle, ${D8} × ${D8} (2·(R − glassOff)), centre (${rG}, ${rG}), area π·${rG}², perimeter 2π·${rG}`,
+    O.kind === 'circle' && near(O.width, D8, 1e-9) && near(O.centre[0], rG, 1e-9) && near(O.area, Math.PI * rG ** 2, 1e-6) && near(O.perimeter, 2 * Math.PI * rG, 1e-6));
+  check('glassOutlinePoly: two vertices on the diameter, bulge 1 (two half circles)', JSON.stringify(arch.glassOutlinePoly(O)) === JSON.stringify([[D8, rG, 1], [0, rG, 1]]));
   const B = arch.buildCircleBars({ outline: O, pattern: 'sunburst', h: 1, v: 2 }, CP.arch.patterns);
   const ring = B.bars.filter((b) => b.role === 'ring'), spokes = B.bars.filter((b) => b.role === 'spoke');
-  check('sunburst: ring R 305.5 − 200 = 105.5 (two halves), 6 spokes ring → glass edge, L 200 each, at i·60°',
-    ring.length === 2 && ring.every((b) => near(b.arc.r, 105.5, 1e-9)) && spokes.length === 6 && spokes.every((b) => near(b.length, 200, 0.5)) && near(Math.atan2(spokes[1].to[1] - 305.5, spokes[1].to[0] - 305.5) * 180 / Math.PI, 60, 1e-6));
+  check(`sunburst: ring R ${rG} − ${CP.arch.patterns.sunburst.offset} = ${rSun} (two halves), 6 spokes ring → glass edge, L ${CP.arch.patterns.sunburst.offset} each, at i·60°`,
+    ring.length === 2 && ring.every((b) => near(b.arc.r, rSun, 1e-9)) && spokes.length === 6 && spokes.every((b) => near(b.length, CP.arch.patterns.sunburst.offset, 0.5)) && near(Math.atan2(spokes[1].to[1] - rG, spokes[1].to[0] - rG) * 180 / Math.PI, 60, 1e-6));
   const chords = B.bars.filter((b) => b.role === 'h' || b.role === 'v');
-  check('straight bars are chords: h at the diameter (L 611), v at ±D/6 (L 2·√(r² − (r/3)²))',
-    chords.length === 3 && near(chords[0].length, 611, 0.5) && chords.filter((b) => b.role === 'v').every((b) => near(b.length, 2 * Math.sqrt(305.5 ** 2 - (305.5 / 3) ** 2), 0.5)));
-  check('PSW circleOffset per window: 150 → ring R 155.5', near(arch.buildCircleBars({ outline: O, pattern: 'sunburst', circleOffset: 150 }, CP.arch.patterns).bars[0].arc.r, 155.5, 1e-9));
+  check(`straight bars are chords: h at the diameter (L ${D8}), v at ±D/6 (L 2·√(r² − (r/3)²), r ${rG})`,
+    chords.length === 3 && near(chords[0].length, D8, 0.5) && chords.filter((b) => b.role === 'v').every((b) => near(b.length, 2 * Math.sqrt(rG ** 2 - (rG / 3) ** 2), 0.5)));
+  check(`PSW circleOffset per window: 150 → ring R ${rG - 150}`, near(arch.buildCircleBars({ outline: O, pattern: 'sunburst', circleOffset: 150 }, CP.arch.patterns).bars[0].arc.r, rG - 150, 1e-9));
   expectThrows('a hub pattern on a circle → ArchError (allowed: none, sunburst)', () => arch.buildCircleBars({ outline: O, pattern: 'hub-spoke' }, CP.arch.patterns), /not available on a circle/);
-  const AO = arch.buildGlassOutline(arch.buildArchGeometry({ shape: 'semi-circle', width: 1000, height: 1800 }, CP).glass.arcs, 500 - 94.5, 300);
+  const AO = arch.buildGlassOutline(arch.buildArchGeometry({ shape: 'semi-circle', width: 1000, height: 1800 }, CP).glass.arcs, 500 - glassOff, 300);
   expectThrows('sunburst on an arch → ArchError', () => arch.buildArchBars({ outline: AO, shape: 'semi-circle', pattern: 'sunburst' }, CP.arch.patterns), /not available on a Semi-circle/i);
   check('patternsForShape(circle) = none | sunburst; ARCH_BAR_PATTERNS carries sunburst', JSON.stringify(arch.patternsForShape('circle')) === '["none","sunburst"]' && arch.ARCH_BAR_PATTERNS.includes('sunburst'));
-  check('glassBars on a circle: edge poly 2 vertices bulge 1 at R 294.5; bar-end rows: spoke ends "from apex", chords y / x, rings R',
+  check(`glassBars on a circle: edge poly 2 vertices bulge 1 at R ${rG - 11}; bar-end rows: spoke ends "from apex", chords y ${f1(rG)} / x, rings R ${f1(rSun)}`,
     (() => {
       const ep = glassBars.glassEdgePoly(O, 11);
       const rows = glassBars.barEndRows(B.bars, O);
       const sp = rows.find((r) => r.role === 'spoke' && near(r.angle, 60, 1e-6));
-      return ep.pts.length === 2 && ep.pts.every((p) => p[2] === 1) && near(ep.arcs[0].r, 294.5, 1e-9)
-        && rows.find((r) => r.role === 'h').cells.s === 'y 305.5' && rows.find((r) => r.role === 'ring').cells.s === 'R 105.5'
-        && !!sp && sp.end && near(sp.end.s, 305.5 * Math.PI / 6, 0.05) && sp.end.side === 'right';
+      return ep.pts.length === 2 && ep.pts.every((p) => p[2] === 1) && near(ep.arcs[0].r, rG - 11, 1e-9)
+        && rows.find((r) => r.role === 'h').cells.s === `y ${f1(rG)}` && rows.find((r) => r.role === 'ring').cells.s === `R ${f1(rSun)}`
+        && !!sp && sp.end && near(sp.end.s, rG * Math.PI / 6, 0.05) && sp.end.side === 'right';
     })());
 }
 
@@ -169,21 +189,21 @@ const DC = derive(CIRCLE);
 {
   const box = DC.components.box, sash = DC.components.sash;
   check('windowSpec: category casement, kind fixed, arch.shape circle, rise = start = 400, hinge null', CIRCLE.category === 'casement' && CIRCLE.casement.kind === 'fixed' && CIRCLE.arch.shape === 'circle' && CIRCLE.arch.rise === 400 && CIRCLE.arch.hinge === null);
-  check('box = ONE record C-FRAME RING 57x93, L = 2π·371.5 (centre line), planner notes + "fixed leaf"',
-    box.length === 1 && box[0].elementName === 'C-FRAME RING' && box[0].code === 'C-FRR' && box[0].section === '57x93' && near(box[0].length, 2334.2, 0.05) && /10 pieces/.test(box[0].notes) && /fixed leaf/.test(box[0].notes));
-  check('sash = C-LEAF RING 67x57 L 2π·326.5 (+ C-TRACERY for the sunburst) — no stiles, no rails, no jambs, no cill',
-    sash.map((r) => r.elementName).join(',') === 'C-LEAF RING,C-TRACERY' && sash[0].code === 'C-LFR-P1' && near(sash[0].length, 2051.5, 0.05) && /^18x/.test(sash[1].section));
+  check(`box = ONE record C-FRAME RING ${tF}x${CP.frameDepth}, L = 2π·${frameCentre} (centre line), planner notes (${indFrame8.def?.n} pieces · stock ${indFrame8.def?.stock}) + "fixed leaf"`,
+    box.length === 1 && box[0].elementName === 'C-FRAME RING' && box[0].code === 'C-FRR' && box[0].section === `${tF}x${CP.frameDepth}` && near(box[0].length, 2 * Math.PI * frameCentre, 0.05) && new RegExp(`${indFrame8.def?.n} pieces · stock ${indFrame8.def?.stock}`).test(box[0].notes) && /fixed leaf/.test(box[0].notes));
+  check(`sash = C-LEAF RING ${tL}x${CP.leafDepth} L 2π·${leafCentre} (+ C-TRACERY for the sunburst) — no stiles, no rails, no jambs, no cill`,
+    sash.map((r) => r.elementName).join(',') === 'C-LEAF RING,C-TRACERY' && sash[0].code === 'C-LFR-P1' && near(sash[0].length, 2 * Math.PI * leafCentre, 0.05) && /^18x/.test(sash[1].section));
   check('no hardware: openers 0, hinge / lock picks null, summaries empty, leafWeights null, derived.casement.kind fixed',
     DC.casement.openers === 0 && DC.casement.hardware.hingePicks[0] === null && DC.casement.hardware.lockPicks[0] === null && Object.keys(DC.casement.hardware.hingeSummary).length === 0 && DC.casement.leafWeights[0] === null && DC.casement.kind === 'fixed');
   const g = DC.customGlassUnits[0];
-  check('glass: one unit 611 × 611, kind circle, area π·305.5², poly 2 × bulge 1, bars 8 (ring ×2 + 6 spokes)',
-    DC.customGlassUnits.length === 1 && g.width === 611 && g.shape.kind === 'circle' && near(g.shape.area, Math.PI * 305.5 ** 2, 1e-3) && g.shape.poly.length === 2 && g.shape.bars.length === 8 && g.shape.pattern === 'sunburst');
-  check('derived.arch: shape circle, plans on both rings, tracery full mode 7 panes (hub + 6), glassOutline origin (94.5, 94.5) + centreFrame (400, 400)',
-    DC.arch.shape === 'circle' && DC.arch.plans.frameHead.totalPieces === 10 && DC.arch.tracery?.mode === 'full' && DC.arch.tracery.panes === 7 && near(DC.arch.glassOutline.origin.x, 94.5, 1e-6) && DC.arch.glassOutline.centreFrame.x === 400);
-  check('seals: frame seal = 2π·400 × 1.1 (no jambs, no cill run); paint from π·R² + tracery timber; glass sqm = true area',
-    near(DC.consumables.sealFrame.meters, 2 * Math.PI * 0.4 * 1.1, 0.01) && DC.paint.areaSqm >= 0.5 && near(DC.consumables.glass.sqm, Math.PI * 0.3055 ** 2, 0.01));
-  check('beading: glazing bead = 2π·305.5 × 1.15, astragal = bar run × 1.15 (both faces)',
-    near(DC.components.beading[0].length, Math.round(2 * Math.PI * 305.5 * 1.15), 1) && DC.components.beading.length === 3);
+  check(`glass: one unit ${D8} × ${D8}, kind circle, area π·${rG}², poly 2 × bulge 1, bars 8 (ring ×2 + 6 spokes)`,
+    DC.customGlassUnits.length === 1 && g.width === D8 && g.shape.kind === 'circle' && near(g.shape.area, Math.PI * rG ** 2, 1e-3) && g.shape.poly.length === 2 && g.shape.bars.length === 8 && g.shape.pattern === 'sunburst');
+  check(`derived.arch: shape circle, frame ring plan ${indFrame8.def?.n} pieces (leaf ring blocked by the ${CP.arch.minPieceLength} limit — noted, see t25), tracery full mode 7 panes (hub + 6), glassOutline origin (${glassOff}, ${glassOff}) + centreFrame (${R8}, ${R8})`,
+    DC.arch.shape === 'circle' && DC.arch.plans.frameHead.totalPieces === indFrame8.def?.n && DC.arch.plans.leafTop.noStock && DC.arch.tracery?.mode === 'full' && DC.arch.tracery.panes === 7 && near(DC.arch.glassOutline.origin.x, glassOff, 1e-6) && DC.arch.glassOutline.centreFrame.x === R8);
+  check(`seals: frame seal = 2π·400 × 1.1 (no jambs, no cill run); paint from π·R² + tracery timber; glass sqm = true area π·(${rG} mm)²`,
+    near(DC.consumables.sealFrame.meters, 2 * Math.PI * 0.4 * 1.1, 0.01) && DC.paint.areaSqm >= 0.5 && near(DC.consumables.glass.sqm, Math.PI * (rG / 1000) ** 2, 0.01));
+  check(`beading: glazing bead = 2π·${rG} × 1.15, astragal = bar run × 1.15 (both faces)`,
+    near(DC.components.beading[0].length, Math.round(2 * Math.PI * rG * 1.15), 1) && DC.components.beading.length === 3);
   const noPat = derive(cas('CN', 800, 800, { casementKind: 'fixed', archShape: 'circle' }));
   check('circle without a pattern: no tracery record, bars empty, cut list = the two rings only', noPat.components.sash.length === 1 && noPat.arch.bars.length === 0 && noPat.arch.tracery === null);
   expectThrows('a circle that is not fixed → ArchError', () => derive(cas('CO', 800, 800, { casementKind: 'opening', archShape: 'circle' })), /fixed window/);
@@ -221,7 +241,7 @@ section('5 — import: PSW fix-only product, PC casementKind, errors');
 {
   const c = specification.normaliseToWindowSpec({ id: 'P1', name: 'P1', width: 900, height: 900 }, { fullConfig: { windowType: 'fix-only', fixShape: 'circle', fixCircleBarPattern: 'sunburst', fixCircleOffset: 150, casementHBars: 1 } });
   check('PSW fix-only circle → category casement, kind fixed, shape circle, sunburst, circleOffset 150, h 1', c.category === 'casement' && c.casement.kind === 'fixed' && c.arch.shape === 'circle' && c.arch.bars.pattern === 'sunburst' && c.arch.bars.circleOffset === 150 && c.arch.bars.h === 1);
-  check('… and derives: sunburst ring at R − 150', near(derive(c).arch.bars.find((b) => b.role === 'ring').arc.r, (900 / 2 - 94.5) - 150, 1e-9));
+  check('… and derives: sunburst ring at R − 150', near(derive(c).arch.bars.find((b) => b.role === 'ring').arc.r, (900 / 2 - glassOff) - 150, 1e-9));
   const a = specification.normaliseToWindowSpec({ id: 'P2', name: 'P2', width: 1000, height: 1800 }, { fullConfig: { windowType: 'fix-only', fixShape: 'gothic-arch', fixGothicBars: 'intersecting' } });
   check('PSW fix-only gothic-arch + intersecting → gothic-equilateral fixed, rise 0.866 W, pattern intersecting', a.category === 'casement' && a.casement.kind === 'fixed' && a.arch.shape === 'gothic-equilateral' && near(a.arch.rise, 866.03, 0.01) && a.arch.bars.pattern === 'intersecting');
   const s = specification.normaliseToWindowSpec({ id: 'P3', name: 'P3', width: 1000, height: 1500 }, { fullConfig: { windowType: 'fix-only', fixShape: 'semi-circle', fixSemiBarPattern: 'hub-spoke', fixArchRise: 500 } });
@@ -238,19 +258,25 @@ section('5 — import: PSW fix-only product, PC casementKind, errors');
 // ═══════════════════════════════════════════════════════════════════════════
 section('6 — CNC DXF: circle rings (CONTOUR / PIECES / FIT), FIXED LEAF text, samples');
 {
-  const r = cncExport.archParamsForWindow(CIRCLE, 'CIR');
-  check('archParamsForWindow accepts the circle: plan kind circle, rings FRAME RING / LEAF RING', !r.skip && r.params.plan.kind === 'circle' && r.params.plan.frameHead.label === 'FRAME RING' && r.params.plan.leafTop.label === 'LEAF RING', r.skip);
+  // v4 Block C: the 800 circle's LEAF ring is blocked by the 400 limit → the export skips it honestly; the CNC sample is a 1000 circle
+  const r800 = cncExport.archParamsForWindow(CIRCLE, 'CIR');
+  check(`archParamsForWindow on the 800 circle: skip "below minimum length" naming the leaf ring (${indLeaf8.blocked?.n} pieces on ${indLeaf8.blocked?.stock}, shorter edge ${f1(leafShort8)} < ${CP.arch.minPieceLength} — independent planner)`, new RegExp(`^no valid blank plan \\(below minimum length\\): leaf top chain: ${indLeaf8.blocked?.n} pieces fit a ${indLeaf8.blocked?.stock} board but fall below the minimum length \\(piece \\d of ${indLeaf8.blocked?.n}: shorter edge ${f1(leafShort8)} < ${CP.arch.minPieceLength}`).test(r800.skip || ''), r800.skip);
+  const CIRCLE1000 = cas('CIR', 1000, 1000, { casementKind: 'fixed', archShape: 'circle', archBarPattern: 'sunburst' });
+  const r = cncExport.archParamsForWindow(CIRCLE1000, 'CIR');
+  check('archParamsForWindow accepts the 1000 circle: plan kind circle, rings FRAME RING / LEAF RING, one 360° group per ring', !r.skip && r.params.plan.kind === 'circle' && r.params.plan.frameHead.label === 'FRAME RING' && r.params.plan.leafTop.label === 'LEAF RING' && r.params.plan.plans.frameHead.arcs.length === 1 && r.params.plan.plans.leafTop.arcs.length === 1, r.skip);
   const ents = archDxf.buildArchEntities(r.params.plan, 'CIR', 0, 0);
-  const path = resolve(SAMPLES, 'sample_circle_800_sunburst.dxf');
+  const path = resolve(SAMPLES, 'sample_circle_1000_sunburst.dxf');
   writeFileSync(path, dxfWriter.writeDxf(ents, archDxf.ARCH_LAYERS));
   const p = probe(path);
   const texts = p.texts.map((t) => t.text);
-  check('DXF texts: CIR - FRAME RING / LEAF RING rows, CIRCLE W800 RISE400 H800 FIXED LEAF, no HINGE', texts.some((t) => t === 'CIR - FRAME RING') && texts.some((t) => t === 'CIR - LEAF RING') && texts.some((t) => t.startsWith('CIRCLE W800 RISE400 H800 FIXED LEAF')) && !texts.some((t) => /HINGE/.test(t)));
+  check('DXF texts: CIR - FRAME RING / LEAF RING rows, CIRCLE W1000 RISE500 H1000 FIXED LEAF, RING summary lines, no HINGE', texts.some((t) => t === 'CIR - FRAME RING') && texts.some((t) => t === 'CIR - LEAF RING') && texts.some((t) => t.startsWith('CIRCLE W1000 RISE500 H1000 FIXED LEAF')) && texts.filter((t) => /^RING R\d+ L[\d.]+ 360DEG: FEWEST/.test(t)).length === 2 && !texts.some((t) => /HINGE/.test(t)));
   const fit = p.polys.filter((x) => x.layer === 'FIT');
   const radii = fit.filter((x) => x.closed).flatMap((x) => polyArcs(x.pts.map((pt, i) => [pt[0], pt[1], x.bulges[i]]), true).map((a) => +a.r.toFixed(3)));
-  check('FIT row: closed rings 400 / 343, 360 / 293 and the glass circle 305.5; rebate wall R 364 dashed', [400, 343, 360, 293, 305.5].every((w) => radii.some((x) => near(x, w, 0.01))) && fit.some((x) => !x.closed) && polyArcs(fit.find((x) => !x.closed).pts.map((pt, i) => [pt[0], pt[1], fit.find((x) => !x.closed).bulges[i]]), false).every((a) => near(a.r, 364, 0.05)));
-  check('CONTOUR / PIECES / ASSEMBLY / FINGER present, R12; 24 piece contours (10 + 14)', p.version === 'AC1009' && ['CONTOUR', 'PIECES', 'ASSEMBLY', 'FINGER'].every((l) => p.counts[l]) && p.polys.filter((x) => x.layer === 'PIECES').length === 24);
-  const dl = cncExport.exportArchDxfForWindow(CIRCLE, 'CIR');
+  const R10 = 1000 / 2, fit10 = [R10, R10 - tF, R10 - oL, R10 - oL - tL, R10 - glassOff];   // 500 / 432 / 449 / 382 / 394.5 (was 443 / 460 / 393 / 405.5)
+  check(`FIT row: closed rings ${fit10[0]} / ${fit10[1]}, ${fit10[2]} / ${fit10[3]} and the glass circle ${fit10[4]}; rebate wall R ${R10 - land} dashed`, fit10.every((w) => radii.some((x) => near(x, w, 0.01))) && fit.some((x) => !x.closed) && polyArcs(fit.find((x) => !x.closed).pts.map((pt, i) => [pt[0], pt[1], fit.find((x) => !x.closed).bulges[i]]), false).every((a) => near(a.r, R10 - land, 0.05)));
+  const nPieces = r.params.plan.plans.frameHead.totalPieces + r.params.plan.plans.leafTop.totalPieces;
+  check(`CONTOUR / PIECES / ASSEMBLY / FINGER / CLAMPS present, R12; ${nPieces} piece trapezoids (frame ${r.params.plan.plans.frameHead.totalPieces} + leaf ${r.params.plan.plans.leafTop.totalPieces}), every piece jointed at both ends (closed ring)`, p.version === 'AC1009' && ['CONTOUR', 'PIECES', 'ASSEMBLY', 'FINGER', 'CLAMPS'].every((l) => p.counts[l]) && p.polys.filter((x) => x.layer === 'PIECES').length === nPieces && [...r.params.plan.plans.frameHead.pieces, ...r.params.plan.plans.leafTop.pieces].every((pc) => pc.jointedEnds === 2));
+  const dl = cncExport.exportArchDxfForWindow(CIRCLE1000, 'CIR');
   check('exportArchDxfForWindow → CIR_arch.dxf', dl.ok && lastName === 'CIR_arch.dxf');
   const fixedArch = cas('AF', 1000, 1800, { casementType: 'arched', archShape: 'semi-circle', archStart: 1300, casementKind: 'fixed' });
   const ra = cncExport.archParamsForWindow(fixedArch, 'AF');
@@ -258,7 +284,7 @@ section('6 — CNC DXF: circle rings (CONTOUR / PIECES / FIT), FIXED LEAF text, 
   check('arched FIXED casement: plan.fixed, text FIXED LEAF instead of HINGE L / R', ra.params.plan.fixed === true && ta.some((t) => /FIXED LEAF$/.test(t)) && !ta.some((t) => /HINGE/.test(t)));
   const hinged = cncExport.archParamsForWindow(cas('AH', 1000, 1800, { casementType: 'arched', archShape: 'semi-circle', archStart: 1300, archHinge: 'right' }), 'AH');
   check('hinged arched casement unchanged: HINGE R text', archDxf.buildArchEntities(hinged.params.plan, 'AH', 0, 0).filter((e) => e.type === 'text').some((e) => /HINGE R$/.test(e.str)));
-  const merged = cncExport.exportArchDxfMerged([{ windowSpec: CIRCLE, name: 'CIR' }, { windowSpec: fixedArch, name: 'AF' }, { windowSpec: cas('RR', 600, 1200, { casementKind: 'fixed' }), name: 'RR' }], 'Pack F');
+  const merged = cncExport.exportArchDxfMerged([{ windowSpec: CIRCLE1000, name: 'CIR' }, { windowSpec: fixedArch, name: 'AF' }, { windowSpec: cas('RR', 600, 1200, { casementKind: 'fixed' }), name: 'RR' }], 'Pack F');
   check('merged arch DXF: circle + arched fixed exported, rectangular fixed skipped ("not an arched casement")', merged.ok && merged.exported === 2 && merged.skipped.length === 1 && merged.skipped[0].reason === 'not an arched casement');
 }
 
@@ -274,15 +300,15 @@ section('7 — glazier DXF + tracery DXF / LSP for the circle (samples)');
   const p = probe(path);
   const contour = p.polys.find((x) => x.layer === 'GLASS_CONTOUR');
   const edge = p.polys.find((x) => x.layer === 'GLASS_EDGE');
-  check('GLASS_CONTOUR: closed, 2 vertices, both arcs R 305.5; GLASS_EDGE arcs R 294.5 (cover 11)', !!contour && contour.closed && contour.n === 2 && polyArcs(contour.pts.map((pt, i) => [pt[0], pt[1], contour.bulges[i]]), true).every((a) => near(a.r, 305.5, 0.01)) && polyArcs(edge.pts.map((pt, i) => [pt[0], pt[1], edge.bulges[i]]), true).every((a) => near(a.r, 294.5, 0.01)));
+  check(`GLASS_CONTOUR: closed, 2 vertices, both arcs R ${rG}; GLASS_EDGE arcs R ${rG - 11} (cover 11)`, !!contour && contour.closed && contour.n === 2 && polyArcs(contour.pts.map((pt, i) => [pt[0], pt[1], contour.bulges[i]]), true).every((a) => near(a.r, rG, 0.01)) && polyArcs(edge.pts.map((pt, i) => [pt[0], pt[1], edge.bulges[i]]), true).every((a) => near(a.r, rG - 11, 0.01)));
   const texts = p.texts.map((t) => t.text);
-  check('texts: GLASS CIRCLE, DIAMETER 611 R 305.5, BARS 8 PATTERN SUNBURST, spoke ends from apex', texts.some((t) => /GLASS CIRCLE$/.test(t)) && texts.some((t) => t.startsWith('DIAMETER 611 R 305.5')) && texts.some((t) => /BARS 8 PATTERN SUNBURST/.test(t)) && texts.some((t) => /FROM APEX/.test(t)));
-  check('GLASS_BARS bands: 2 per straight bar + 2 per arc (ring R 105.5 ± 9)', (p.counts.GLASS_BARS?.POLYLINE || 0) === 16 && p.polys.filter((x) => x.layer === 'GLASS_BARS' && x.arcs > 0).length === 4);
+  check(`texts: GLASS CIRCLE, DIAMETER ${f1(D8)} R ${f1(rG)}, BARS 8 PATTERN SUNBURST, spoke ends from apex`, texts.some((t) => /GLASS CIRCLE$/.test(t)) && texts.some((t) => t.startsWith(`DIAMETER ${f1(D8)} R ${f1(rG)}`)) && texts.some((t) => /BARS 8 PATTERN SUNBURST/.test(t)) && texts.some((t) => /FROM APEX/.test(t)));
+  check(`GLASS_BARS bands: 2 per straight bar + 2 per arc (ring R ${rSun} ± 9)`, (p.counts.GLASS_BARS?.POLYLINE || 0) === 16 && p.polys.filter((x) => x.layer === 'GLASS_BARS' && x.arcs > 0).length === 4);
   const tr = cncExport.traceryParamsForWindow(CIRCLE, DC, 'CIR');
   // Piotr 06.09: board = the unit circle + 5.5 all round (rebate 18 − glass 12.5): bbox −5.5 … 616.5
-  check('traceryParamsForWindow: circle → full mode, 7 panes, board = the unit circle + 5.5 (bbox −5.5 … 616.5)', !tr.skip && tr.params.build.geom.mode === 'full' && tr.params.build.geom.panes.length === 7 && near(tr.params.build.geom.bbox.minX, -5.5, 1e-6) && near(tr.params.build.geom.bbox.maxX, 611 + 5.5, 1e-6), tr.skip);
+  check(`traceryParamsForWindow: circle → full mode, 7 panes, board = the unit circle + 5.5 (bbox −5.5 … ${D8 + 5.5})`, !tr.skip && tr.params.build.geom.mode === 'full' && tr.params.build.geom.panes.length === 7 && near(tr.params.build.geom.bbox.minX, -5.5, 1e-6) && near(tr.params.build.geom.bbox.maxX, D8 + 5.5, 1e-6), tr.skip);
   const hubPane = tr.params.build.geom.panes.find((pn) => pn.daylight.edges.length === 2);
-  check('the hub pane is a full circle: rail at R 105.5 − 11 + 2, limit at R 105.5 − 11 + 10 (bar half 11)', !!hubPane && near(hubPane.rail.edges[0].arc.r, 105.5 - 11 + 2, 1e-6) && near(hubPane.limit.edges[0].arc.r, 105.5 - 11 + 10, 1e-6));
+  check(`the hub pane is a full circle: rail at R ${rSun} − 11 + 2, limit at R ${rSun} − 11 + 10 (bar half 11)`, !!hubPane && near(hubPane.rail.edges[0].arc.r, rSun - 11 + 2, 1e-6) && near(hubPane.limit.edges[0].arc.r, rSun - 11 + 10, 1e-6));
   const rt = cncExport.exportTraceryDxfForWindow(CIRCLE, DC, 'CIR');
   writeFileSync(resolve(SAMPLES, 'sample_tracery_circle_800_sunburst.dxf'), await lastBlob.text());
   check('exportTraceryDxfForWindow → CIR_tracery.dxf, 7 panes', rt.ok && rt.panes === 7 && lastName === 'CIR_tracery.dxf');
@@ -300,19 +326,20 @@ section('8 — sheets: circle sheets concentric on the engine radii; fixed recta
 {
   const S = renderSheets(M, CIRCLE, DC);
   const all = [['elevation', S.elevation], ['frame', S.frame], ['leaf', S.leaf[0].svg]];
-  const engineR = [400, 343, 364, 360, 293, 305.5, 105.5 - 11, 105.5 + 11];
+  const engineR = [R8, rFi, rWall, rLo, rLi, rG, rSun - 11, rSun + 11];   // frame ring, rebate wall, leaf ring, glass, sunburst ring band (bar half 11)
   for (const [k, svg] of all) {
     const c = dataAttr(svg, 'data-circle-centre');
     const arcs = svgArcs(svg);
     check(`${k}: circle sheet (Ø 800), no NaN, ${arcs.length} arcs all concentric on the sheet centre, radii ∈ engine set`, /Ø 800/.test(svg) && !/NaN/.test(svg) && !!c && arcs.length >= 6 && arcs.every((a) => near(a.cx, c[0], 0.01) && near(a.cy, c[1], 0.01) && engineR.some((r) => near(a.r, r, 0.01))), arcs.filter((a) => !engineR.some((r) => near(a.r, r, 0.01))).map((a) => a.r.toFixed(2)).join(' '));
   }
-  check('elevation / leaf carry the glass + bars, frame sheet does not; texts name the rings', /R 305.5/.test(S.elevation) && /R 305.5/.test(S.leaf[0].svg) && !/R 305.5/.test(S.frame) && /C-FRAME RING 57 face/.test(S.frame) && /C-LEAF RING 67 face/.test(S.leaf[0].svg));
+  const rGtext = new RegExp(`R ${f1(rG)}`);
+  check(`elevation / leaf carry the glass + bars (R ${f1(rG)}), frame sheet does not; texts name the rings (${tF} / ${tL} face)`, rGtext.test(S.elevation) && rGtext.test(S.leaf[0].svg) && !rGtext.test(S.frame) && new RegExp(`C-FRAME RING ${tF} face`).test(S.frame) && new RegExp(`C-LEAF RING ${tL} face`).test(S.leaf[0].svg));
   const gsvg = S.glass[0].svg;
   const go = dataAttr(gsvg, 'data-arch-origin');
   const garcs = svgArcs(gsvg);
-  const gR = [305.5, 294.5, 105.5 - 9, 105.5 + 9];
-  check('glass sheet: circle unit, arcs concentric on (ox + 305.5, oy + 305.5), radii 305.5 / 294.5 / ring band 96.5 – 114.5, no springing dims',
-    /Circle · Ø 611/.test(gsvg) && garcs.length >= 6 && garcs.every((a) => near(a.cx, go[0] + 305.5, 0.01) && near(a.cy, go[1] + 305.5, 0.01) && gR.some((r) => near(a.r, r, 0.01))) && !/springing/.test(gsvg), garcs.map((a) => a.r.toFixed(1)).join(' '));
+  const gR = [rG, rG - 11, rSun - 9, rSun + 9];   // unit, edge cover 11, sunburst ring band ± 9
+  check(`glass sheet: circle unit, arcs concentric on (ox + ${rG}, oy + ${rG}), radii ${rG} / ${rG - 11} / ring band ${rSun - 9} – ${rSun + 9}, no springing dims`,
+    new RegExp(`Circle · Ø ${D8}`).test(gsvg) && garcs.length >= 6 && garcs.every((a) => near(a.cx, go[0] + rG, 0.01) && near(a.cy, go[1] + rG, 0.01) && gR.some((r) => near(a.r, r, 0.01))) && !/springing/.test(gsvg), garcs.map((a) => a.r.toFixed(1)).join(' '));
   const open = deriveItem(M, { id: 'f', name: 'RF', width: 600, height: 1200 }, { windowCategory: 'casement', casementLayout: '040L' });
   const fixed = deriveItem(M, { id: 'f', name: 'RF', width: 600, height: 1200 }, { windowCategory: 'casement', casementLayout: '040L', casementKind: 'fixed' });
   const So = renderSheets(M, open.spec, open.derived), Sf = renderSheets(M, fixed.spec, fixed.derived);

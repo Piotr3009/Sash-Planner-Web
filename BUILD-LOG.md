@@ -4,6 +4,300 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-09-06 — ARCHED-WINDOWS-v4 night 6 (branch `claude/arched-windows-v4-stages-9diax6`)
+
+Inputs read in full: `CLAUDE.md` → `docs/handover/ARCHED-WINDOWS-v4.md` → `BLOCKERS.md` (headers + open items) →
+`BUILD-LOG.md` (night 5) → `arch.js`, `profile.js`, `archDxf.js`, `dxfWriter.js`, `cncExport.js`, `calculations.js`
+(arch plan wiring), `lists.js` (curved members, pre-cut blanks), `WindowSettingsPage.jsx`, `windowProfileStore.js`,
+`NumInput.jsx`, the t16–t24 harness conventions. Entry gate (CLAUDE.md): `pieceStockTrapezoid` 2, `glazingRebate` 1,
+"Tracery LSP" 0 → arch-pieces-v1 is on `main`. Baseline on the branch start: t16 507, t17 72, t18 178, t19 244,
+t20 116, t20_bars 28, t21 120, t22 75, t23 80, t24 26 — ALL PASS (after `npm install`, `pip install ezdxf`).
+
+Stages tonight (Piotr 06.09, gate before each next stage): 1 = Block C planner v2, 2 = Block B glazier PDF,
+3 = Block E intersecting, 4 = Block F frame 68.
+
+### NIGHT 6 — FINAL VERDICT (all four stages) and the CLAUDE.md checklist
+
+Whole suite on the final tree (`node verify/arch/t16.mjs` … `t27.mjs`): t16 368, t17_edges 70, t18 178, t19 244,
+t20 116, t20_bars 32, t21 120, t22 77, t23 81, t24_stage4 26, t25 201, t26 36, t27 64 — **1613 checks, ALL PASS**;
+`npm run build` OK (16.5 s). Four commits on the session branch (Stage 1 402c58a, Stage 2 222e840, Stage 3 c648a67,
+Stage 4 below); `main` untouched. Every "DEFAULT (open)" is in BLOCKERS §16–§19; every spec erratum (E1–E4, C.5 at
+face 57) is named there.
+
+**Checklist:** branch pushed ✓ · t16–t27 ALL PASS ✓ · build ✓ · esbuild on every touched file ✓ · no Polish added
+to sources ✓ (16 pre-existing Polish comment lines remain in `ParametricSashWindow.jsx`, `App.jsx` lights,
+`DoorElevation2D.jsx`, `casementSectionAssets.js` — older files, not touched tonight beyond the frameDims lines; left
+alone, rule 2) · `git diff main` = the spec §11 files + verify / docs / logs ✓ · samples regenerated from the 68
+profile ✓ (five `sample_arch_1200_*`, five `sample_arch_c5_*` incl. the new `1000_gothic-equilateral`, glass DXFs +
+merged pack, tracery DXFs, `sample_sash_arch_1200_*`, `sample_circle_1000_sunburst`, glass PDFs A4 + A3) ·
+BLOCKERS §19 ✓.
+
+**Honest not-verified list (whole night):** nothing was opened in a browser — the Window Settings "CNC & arches"
+card, the glazier PDF pages in a PDF viewer, the 3D viewer with the 68 frame / 136 post / fanlight axis 102, the
+Production Pack export buttons; no DXF was opened in VCarve / bSolid (ezdxf round-trips only); the Supabase tenant
+profile migration (`frameSchema` 2) ran on synthetic copies in t27, not on Piotr's stored row; PSW is unported (the
+port list is written, not applied); the economy rule C.4 verdict flip on the tc240 leaf (19.5) is reported, not
+resolved.
+
+**Verdict: ✅ night 6 — all four stages closed and gated; open decisions in BLOCKERS 19.1 / 19.3 / 19.5.**
+
+### STAGE 4 — Block F: frame face 68 everywhere, option B (`profile.js`, `casementLayouts.js`, `calculations.js`, `archDxf.js`, `materialAssignmentStore.js`, `windowSpecToConfig.js`, `App.jsx`, `CasementFrame.jsx`, `CasementWindow.jsx`, `ArchedCasementWindow.jsx`, `DoorFrame.jsx`, `DoorWindow.jsx`, `DoorSidePanel.jsx`, `WindowPreview3D.jsx`, `Window3DCaptureRig.jsx`, `ConfiguratorPage.jsx`, `PSW-FRAME-68-PORT.md` new, `PSW-3D-ARCH-PORT.md` §9, `verify/arch/t27.mjs` new, `rect_casement_baseline.mjs` new, `t19_baseline.mjs live`, fixtures re-baselined, t16 / t17 / t18 / t20 / t20_bars / t23 / t24 / t25 / t26 re-vectored)
+
+**Understanding:** Piotr 06.09: head and jambs 57 → 68 on casements AND doors, option B — the rebate stays 21, the
+land grows 36 → 47, gap 4, so `leafAtJamb` 40 → 51; cill unchanged; door post 2 × 68 = 136. Everything downstream
+reads the profile; the 3D reads the profile through a prop with the PSW numbers as defaults; every harness vector
+that carried 57 / 36 / 40 / 114 is recomputed from the profile in the harness; the rectangular casement fixtures are
+re-baselined with the old and new numbers on record.
+
+**Two approaches, one rejected (3D):** (a) replace the constants in `src/3d` with 68 / 47 — rejected: the files are
+1:1 with PSW's 3d-src and PSW is unported; (b) a `frameDims` prop `{ frameFace, extFace }` resolved by
+`resolveFrameDims()` with the module constants as defaults, shadowed per function (TopRail / Stile / Mullion / the
+frame body / the window components), so the PSW copy renders unchanged and PC passes the profile — chosen.
+**Stored profiles:** Piotr's tenant profile (Supabase + localStorage) carries 57 / 36 / 40 / 87 / 54;
+`migrateCasementProfile` does not overwrite user values, so without a migration the app would keep showing 920 in
+the morning. Added `frameSchema: 2` on the default and a key-by-key move for schema-1 copies: a value moves ONLY
+when it still equals the OLD default; a hand edit stays; a schema-2 copy is never re-migrated (DEFAULT (open),
+BLOCKERS 19.2).
+
+**Built:** `DEFAULT_CASEMENT_PROFILE` frameHead / frameJamb 68, land 47, leafAtJamb 51, leafFullHeight 98,
+fanFromAxis 65, `frameSchema 2` + `migrateFrameSchema`; `DEFAULT_DOOR_PROFILE` faces 68, `couplingPost 136`,
+`transomDeduct 136` (2 × jamb face), door land / leafAtJamb 36 / 40 unchanged (spec: face + post only — BLOCKERS
+19.1); `casementLayouts.js` `frameFace 68` + `CASEMENT_LAYOUTS_VERSION 3` and NOTHING else (t16 §10.3 pt 10 now
+strips comments and requires exactly those two code lines to differ from the merge-base); `calculations.js` door
+fallbacks read `DEFAULT_DOOR_PROFILE` (no `?? 57` / `?? 114`); `archDxf.js` joint-plane dedup key normalises −0 (a
+real bug: the gothic 1000 head now plans as one board per side, its apex plane at x = −3e-13 printed "-0.000" and
+was drawn twice — found by t25); `materialAssignmentStore` frame head / jambs `68×93` with a hint naming the old
+57×93 (kept in Part Registry for older projects — a data task, 19.7); 3D `frameDims` threaded through 11 files
+(`windowSpecToConfig.casementFrameDims()` = profile face / land, `doorFrameDims()`; App state + `update3D`
+setter + bucket capture / restore; `CasementWindow` also hands `geo` to `resolveCasementLayout`); `ArchedDoorWindow`
+/ `TransomPanel` untouched (not rendered by PC). `docs/handover/PSW-FRAME-68-PORT.md`: the PSW lines
+(`estimate-renderer.js` 1503 / 2017, `casement-controller.js` 54 version + 153 / 417 innerH + the 91 → 102 fan axis
+offset, `casement-type-modal.js` 378, 3d-src `CasementFrame.jsx` / `DoorFrame.jsx` 12–13).
+
+**Numbers, old → new (all from the profile formulas, printed by `rect_casement_baseline.mjs` and t27):**
+
+| window | formula | face 57 | face 68 |
+|---|---|---|---|
+| 040L 1000 × 1500 leaf | `(W − 2·leafAtJamb) × (H − leafFullHeight)` | 920 × 1413 | **898 × 1402** |
+| 040L 1000 × 1500 glass | `leaf − 2·(67 − 12.5)` | 811 × 1304 | 789 × 1293 |
+| head / jambs section, jamb length | `${face}x93`, `H − jambDeduct` | 57x93, 1500 | 68x93, 1500 |
+| 052L 1200 × 1500 (fan) | fixture R2 | 543 × 449.5 | 532 × 446.2 |
+| 120 1200 × 1200 / 180L 1500 × 1200 | fixtures R3 / R4 | 543 × 1113 / 588.4 × 1113 | 532 × 1102 / 579.6 × 1102 |
+| glass offset / half width W 1000 | `oL + tL − gI`, `(W − 2·off)/2` | 94.5 / 405.5 | 105.5 / 394.5 |
+| three-centre W 1200 rise 240 rings | `r − off`, `R − off` | 93 / 1263 · 110 / 1280 · 43 / 1213 · 55.5 / 1225.5 | 82 / 1252 · 99 / 1269 · 32 / 1202 · 44.5 / 1214.5 |
+| gothic 1200 inner apex | `√((1200 − tF)² − 600²)` | 972.86 | 959.91 |
+| fan axis offset (top) | `frameFace + 34` | 91 | 102 |
+| door 1000 × 2100 leaf | `(W − 2·40) × (H − 87)` | 920 × 2013 | 920 × 2013 (unchanged by design) |
+| door coupling post | `2 × jamb face` | 114x93 | 136x93 |
+| circle 800 frame ring plan | independent planner | 4 × 180 | **4 × 200** (W_req 182.3) |
+| gothic 1000 leaf top rail | independent planner | blocked (2 × 120 / side, edge 386.2) | **plans: 1 × 200 / side** |
+| gothic 600 × 1600 leaf | independent planner | plans (1 × 150, edge 418.8) | blocked (edge 397.0 < 400) |
+| tc240 1200 head / leaf | independent planner | 2 × 180 → economy 3 × 150 / 2 × 180 fewest | 2 × 180 fewest (no alt) / fewest 1 × 200 → economy 2 × 180 (19.5) |
+
+**Verification:** every harness vector with 57 / 36 / 40 / 114 recomputed in the harness from the profile object
+(t16, t17_edges, t18, t20, t20_bars, t23, t24, t25, t26 — one literal "profile = spec" check each, the rest formulas
+or `indPlanner`); t25 §2 runs the spec C.5 table on a schema-1 variant built in the harness (the spec says "face 57
+head ring") AND the live profile against the independent planner; t27 new (64): profile = spec F + option-B
+identities, 040L 1000 × 1500 through `normaliseToWindowSpec` → `deriveWindowData` (leaf / glass / cut list) with
+the old numbers reproduced through the variant and restored, migration matrix (old defaults move, hand edit kept,
+schema-2 untouched, idempotent), layouts, doors (post 136x93, french leaves), `windowSpecToConfig.frameDims`,
+`resolveFrameDims` defaults 57 / 36 + the threading asserted in all 11 files, engine grep gate (no bare 57 / 36 /
+40 / 114 in casement / door code, sash + CNC allow-list), materials labels, fixture provenance. Fixtures:
+`rect-casement-base.json` + `rect-casement-sheets.json` re-baselined from the live tree at c648a67 (`ref: live`),
+sash fixtures untouched (t22 77 ALL PASS proves the sash side). Suite t16–t27 ALL PASS (1613), build OK.
+**Not verified:** anything on screen (3D with the 68 frame, the settings card, the PDFs), VCarve / bSolid, Piotr's
+stored profile row (migration exercised on synthetic copies only), PSW (unported).
+**Verdict: ✅ Stage 4 (Block F).**
+
+### STAGE 3 — Block E: `intersecting` from the vertical bars (`arch.js`, `profile.js`, `3d/casement/archedCasementGeometry.js`, `PSW-3D-ARCH-PORT.md` §8, t18 / t19 / t20_bars re-vectored)
+
+**Understanding:** Piotr 06.09 (SS1 = PSW arched sash): the tracery arcs must spring from the tops of the
+vertical bars. PSW's sash does this (`ArchedSashWindow.jsx` 915–940, `useArchedSashBars`: columns = the V bars,
+default ±halfW/2, R = gothic ? c + halfW : halfW on the daylight numbers, arcs centred at column − dir·R, a
+quarter turn, clipped at the profile); PSW's fix-frame `intersectingData` (pitch mullions, arcs centred on the
+frame corners) is independent geometry and v3 ported the wrong one. One rule for casement / sash / fixed.
+
+**Two approaches, one rejected:** (a) port PSW's sash code as-is, radius from the two-centre formula on the glass
+numbers — rejected: the glass outline is the frame's arcs offset concentrically (exact radius 905.5 on gothic
+1000), PSW's formula gives 905.4 — a second geometry by 0.1 mm; (b) R = the glass outline's own arc radius
+(`outline.arcs[0].r`: semi-circle → the clear half width 405.5, gothic → the concentric radius) — chosen; the
+harness ports PSW's sampler and shows it lands on the same arcs within 0.2 mm.
+
+**Built:** `buildArchBars` intersecting branch — columns = the user's v bars at equal divisions of the clear
+width, to the SPRINGING (no bar to the outline any more); 0 → two default columns at ±¼ of the clear width; two
+`tracery` arcs per column, centre `(x − dir·R, springing)`, radius R, clipped with `traceryHit` (first meeting with
+the outline, a quarter turn at most); no springing bar; `counts.v` stays the user's number, `columns` lists the
+column x's. `readPatternSettings` reads `hubRingRatios` only — the profile's `arch.patterns.intersecting { pitch,
+minMullions, maxMullions, minRadius }` and the 3D fallback `PSW_BAR_PATTERN_SETTINGS.intersecting` are gone
+(`frameHalfWidth` stays in the signature, unused). 2D sheets, glazier DXF / PDF, tracery board and the casement 3D
+read `derived.arch.bars` — no other change; the PC copy of `ArchedSashWindow.jsx` already carries PSW's own
+version of this rule. `PATTERNS_FOR_SHAPE` unchanged (intersecting on semi-circle / gothic only).
+
+**Numbers (spec E vectors):** gothic 1000 × 1900, 3 V → 6 arcs, each starting at a column x (202.75 / 405.5 /
+608.25 in the glass frame), R = 905.5 (the glass radius; the spec's "R = 1000" is the FRAME radius c + halfW on
+the frame numbers — errata E4, BLOCKERS 18.1), ends on the outline; semi-circle 1000, 2 V → 4 arcs R 405.5 ✓; 0 V
+→ columns at ±202.75 ✓ (= Wg/4 = 811/4). Tracery board: gothic intersecting 0 V → 4 panes (full mode, no
+collapsed pane), 1 H 2 V → 5 panes.
+
+**Verification:** t20_bars 32/32 (§1: 16 shape × pattern × h × v cases with the new column rule; §3 rewritten —
+PSW sash rule ported on the glass numbers, vertex for vertex within 0.2 mm on five windows incl. the spec's three;
+no springing bar; no settings left), t18 178/178 (intersecting checks re-vectored, profile block without
+intersecting), t19 246/246 (elevation SVG arcs = ring centres + tracery centres, 3D casement bars = engine list
+with the 3D's own daylight radius 908.5), t20 116 (tracery samples regenerated: `sample_tracery_gothic.dxf`),
+t22 77, t23 81, t26 36 (glass PDF sample regenerated with the new gothic arcs). Whole suite t16–t26 ALL PASS,
+`npm run build` OK.
+**Not verified:** the arcs on screen / in the 3D viewer (no browser); PSW's fix-frame viewer still shows the old
+`intersectingData` for fix-only products until PSW ports the rule (PSW-3D-ARCH-PORT.md §8).
+**Verdict: ✅ Stage 3 (Block E).**
+
+### STAGE 2 — Block B: glazier PDF layout (`glassPdfExport.js`, `ProductionPackPage.jsx`, `verify/arch/t26.mjs` new, t18 §6)
+
+**Understanding:** Piotr 06.09 (SS2) — the per-unit bar table next to the drawing made the drawing unreadable.
+The shaped cell must give the drawing the whole cell, put the title + spec under it, the bar-spacing chain at the
+bottom and the overall width at the top (the on-screen sheet's convention since arch-pieces-v1), with ids only
+beside the bars; the numbers move to bars pages at the end, one block per shaped unit with a window thumbnail.
+Rectangular units must not change by a byte; A3 / A4 follow the pack's export setting.
+
+**Two approaches, one rejected:** (a) keep the v3 header bar at the top of every cell and squeeze the bars table
+under the drawing on A3 only — rejected: the drawing scale is what Piotr complained about, and A4 is the batch
+default; (b) a v4 shaped cell (drawing first, bottom band with title + up to two spec lines, dimensions in the
+margins) and separate bars pages — chosen; the rectangular cell keeps the v3 header bar and its whole call
+sequence (byte identity is asserted against the previous commit).
+
+**Built:**
+- `drawShapedGlass` v4: bottom band (title 5 pt + spec 4.5 pt, spec = unit spec · `arched · R … · rise … ·
+  springing …`, wrapped to the cell, ≤ 2 lines), drawing area = the rest at max scale with 8–9 mm margins for the
+  dimensions; outline fill + edge-cover line + spacer bands + bar axes as v3; ids only beside the bar ends; chain
+  H at the BOTTOM (vertical bar / mullion x positions from the bottom-left corner, extension lines up to the
+  outline's bottom edge), overall width at the TOP (extension lines from the springing corners), chain V on the
+  left (h bars, springing, apex), overall height + rise tick on the right; circles: no springing tick, the chord
+  chains from the diameter. The v3 note line and the in-cell bar table are gone.
+- Bars pages: `paginateBars` (block height = max(thumbnail 35 + 2, title 6 + (rows + 1) × 3.2 + 2) + 6 — a pure
+  function of the row count so the header's "page / total" is known before drawing; a block that does not fit
+  moves whole to the next page, never breaks inside a table), `drawWindowThumb` (the frame's outer contour —
+  straight part + the arch chain from `derived.arch.geometry.arcs` / a circle — with the shaped unit filled at
+  `derived.arch.glassOutline.origin`, ≤ 45 × 35 mm), `drawBarsBlock` (title `n · WINDOW — LOCATION GLASS — arched
+  · R … · k bars`, table ID · s from apex / position · L · angle / R from `glassBars.barEndRows` — the same rows as
+  the sheet and the glazier DXF). Page heading `GLAZING BARS — POSITIONS PER SHAPED UNIT (ids as on the drawings)`.
+- `exportGlassPDF({ …, format })`: `setPageFormat` (a4 297 × 210 / a3 420 × 297, unknown → a4); pagination = 1
+  schedule + ⌈units / 4⌉ drawing pages + bars pages; `thumb` per shaped item. `ProductionPackPage` Glass tab passes
+  `exportFormat` (the pack's A3 / A4 switch); the single-window export stays A4.
+- The schedule page (page 1) is untouched: the Shape column and the per-unit line (positions for ≤ 4 bars, `k bars
+  — see table` above) stay as v3 (t18 §6 asserts them).
+
+**Verification (t26 36/36 ALL PASS):** the three v3 samples (semi hub-spoke 1000 × 1500 start 1000, three-centre
+1H 2V 1000 × 1500 start 1300, gothic intersecting 1000 × 1800) rendered through jsPDF in node with the `text` /
+`lines` calls captured on the instance (jsPDF `initialized` plugin event): page count 1 + 1 + 1; one filled outline
+per unit on the drawing page; every id inside its outline; no "from apex" / row text on the drawing pages; title +
+spec under the outline; "811 mm" centred above; the bar chain (283.9 / 243.3 / 283.8 …) below the outline and above
+the title; no text bbox overlapping the outline bbox (dimensions, title, spec — ids excluded); bars page: heading,
+every id and every s / L / angle cell of every unit, 3 stroked frame thumbnails ≤ 35 mm + 3 filled units; 9 hub-
+spoke units → 3 drawing + 3 bars pages, every block's rows on its title's page; rectangular-only export (2 casements
++ 1 sash) byte-identical to commit 402c58a (CreationDate and jsPDF's /ID hash masked); A3 MediaBox 1190.55 × 841.89,
+A4 841.89 × 595.28, unknown → A4, A3 cells scale up; PP passes the format. t18 §6 re-vectored (3 pages).
+Samples: `docs/handover/samples/sample_glass_order_arched.pdf` (A4) and `_a3.pdf`; pages 2–3 rasterised with
+PyMuPDF and looked at (layout as specified). Whole suite t16–t26 ALL PASS, `npm run build` OK.
+**Not verified:** the PDF in a viewer other than PyMuPDF's raster (font metrics of the bbox check are jsPDF's own
+`getTextWidth`); the A3 print; the springing-bar ids `S1 / S2` sit on the outline edge next to the right dimension
+line (cosmetic, as in v3 — BLOCKERS 17.3).
+**Verdict: ✅ Stage 2 (Block B)** — t26 + t16–t25 ALL PASS, build green.
+
+### STAGE 1 — Block C: segment planner v2 (`profile.js`, `arch.js`, `archDxf.js`, `cncExport.js`, `calculations.js`, `ConfiguratorPage.jsx`, `lists.js`, `windowProfileStore.js`, `WindowSettingsPage.jsx`, `verify/arch/t25.mjs` new, `verify/arch/lib/indPlanner.mjs` new, t16 / t17 / t18 / t19 / t20 / t21 / t22 / t23 / t24 re-vectored)
+
+**Understanding:** the v1 planner cut every arc of the chain on its own (a joint at every tangent point) with a 36°
+grain-run-out rule, which produced the ~100 mm haunch triangles Piotr rejected. v4: the WHOLE chain (springing →
+springing) is partitioned by outer arc length into N equal pieces — a piece may carry a haunch and part of the crown
+(the CNC cuts the compound curve from one board); a gothic is split at the apex first. Two HARD limits replace the
+36° rule: overall length ≥ `cnc.minClampLength` 450 (Rover A 1532: two Uniclamps + end cuts) and the shorter stock
+edge ≥ `arch.minPieceLength` 400; the board cap is the widest entry of the new stock list `63 75 95 105 120 150 180 200`.
+Fewest pieces first; an economy alternative (N + 1 … N + 3 on a narrower board) wins when the fewest plan wastes
+more than `arch.wasteThreshold` 0.45 of its boards. CLAMPS layer with two Uniclamp footprints per flat piece; a
+"CNC & arches" card edits every number.
+
+**Two approaches, one rejected:**
+- Springing end of the RAW piece: (a) keep the v1 horizontal cut on the springing line — rejected: on a tilted
+  compound piece (three-centre 1000 × 250, piece axis 26.6° to the horizontal) the horizontal cut runs the board
+  215 mm past the frame edge (outer 829 / inner 379) and FAILS the 400 limit on a plan the spec declares valid;
+  (b) cut the raw springing end SQUARE to the piece axis at the band extent and let the CNC rout the horizontal
+  springing face with the contour (it is part of the CONTOUR polyline since v1) — chosen; cut code `Q`; the spec's
+  C.5 verdicts hold. Logged as a DEFAULT (open) decision, BLOCKERS 16.3.
+- Board placement on the band: centred (arch-pieces-v1) kept; the flush-inner alternative would lengthen the
+  shorter edge (sash 1000 head 395.5 → 410, circle 800 leaf 390 → 400) — not changed silently, BLOCKERS 16.4.
+
+**Built:**
+- `profile.js` — `arch.version 4`: `stockWidths [63, 75, 95, 105, 120, 150, 180, 200]`, `minPieceLength 400` (hard),
+  `wasteThreshold 0.45`; `maxSegmentAngleDeg` and `pieceRule` (D13) removed — D13 is closed by v4 C.3/C.4. New block
+  `cnc { minClampLength 450, clamp { base 130, minThickness 40, maxThickness 98, minPiece 140 }, clampClearance 20 }`.
+  Migration: a stored v3 arch block is replaced whole, a v4 block merges key by key (the card edits it from now on),
+  `cnc` filled from the default.
+- `arch.js` — `ringGroups` (chain / gothic sides / closed ring), `partitionGroup` (N equal by outer arc length,
+  chord axis u + outward normal b, band projection with `arcsExtent`, end planes: radial / vertical apex axis /
+  square springing), `piecePoly` / `pieceBandPoly` / `pieceJoints` / `pieceEndEdge` / `pieceStockTrapezoid` /
+  `pieceStockEdges` generalised to arc ARRAYS per piece, `bulgePolyArea` (exact band area), `planArchSegments(ring,
+  arch, cnc)` with the two limits, fewest + economy, `noStockReason` 'no stock board fits' | 'below minimum length'
+  and readable `reasons`; `buildArchPlan` / `buildCirclePlan` carry `cnc`, `depths` (93 / 57) and `blank` (limits).
+  The v1 `partitionArc` / `pickOption` / `PIECE_RULES` / `endCut` are gone (superseded, no caller left).
+- `archDxf.js` — layer `CLAMPS` (colour 3): `clampFootprints` — two `clamp.base` squares per flat piece, centred
+  across the board, `clampClearance` from both end-cut LINES over the square's whole height (the joint planes lie 15
+  inside the rough ends), pushed to the two ends; one square + warning when the room is under 2 × base, none +
+  warning under 1 × base; thickness warning when the member depth is outside the jaws (the sash box head 164 →
+  `WARNING: PIECE THICKNESS 164 OUTSIDE THE UNICLAMP JAWS 40-98`). Text block per ring: `CHAIN / SIDE n / RING
+  R… L… …DEG: FEWEST n x board s L… ROUGH … WASTE p%`, `ECONOMY ALT … -> DEFAULT FEWEST|ECONOMY (THRESHOLD 45%)`
+  or `NO ECONOMY ALT WITHIN N PIECES`, `LIMITS: OVERALL >= 450 (CLAMP)  SHORTER EDGE >= 400  STOCK MAX 200`,
+  `CLAMPS (SUGGESTION): UNICLAMP 130 x 130, CLEARANCE 20 …, PIECE THICKNESS 93`; cut codes `J<deg>` / `Q` / `A<deg>`.
+- `cncExport.js` — `buildSashArchPlan` passes `cnc` + depths (box depth / sash depth from the sash profile);
+  `archParamsForWindow` skip = `no valid blank plan (<reason>): <member> <group>: …` with the failing piece named.
+  `calculations.js` (3 call sites), `ConfiguratorPage.jsx`, `lists.js` (cut code `Q`) follow.
+- Settings: `windowProfileStore.setCasementPath(path, value)` (roots arch / cnc / tracery / geometry, finite numbers
+  only) + `setCasementStockWidths(text)` (comma list → sorted positive numbers, empty refused); `WindowSettingsPage`
+  casement page gets the **CNC & arches** card (lock toggle like the others): finger length / groove / pitch,
+  contour allowance, glazing rebate, stock widths, min clamp length, min piece length, waste threshold, Uniclamp
+  base / jaws / clearance, tracery paneOffset / profileWidth / ridgeLand / edgeLand / mitreLeg, and a validation
+  line = the live plan of a semi-circle at the sample width (`✓ frame head 3 × 150 · leaf top 2 × 200` or the
+  planner's reason / `ArchError`). No spinner arrows (global CSS rule).
+
+**Numbers (independent sampler in `lib/indPlanner.mjs`, 800 points per arc, head ring face 57, allowance 10, finger 15):**
+| arch | fewest (spec C.5) | W_req mine / spec | economy default @ 0.45 | raw edges of the fewest plan (outer / inner) |
+|---|---|---|---|---|
+| HALF 1000 | 3 × 150 ✓ | 135.0 / 134.7 | 3 × 150 (4 × 120 fails 450: rough 441.7) | 553.8 / 467.2 · 597.6 / 424.3 · 553.8 / 467.2 |
+| ROUND 1000 rise 250 | 2 × 180 ✓ | 155.7 / 158.3 | 2 × 180 (3 × 150 fails 400) | 621.9 / 531.9 ×2 |
+| GOTHIC 1000 (per side) | 2 × 120 ✓ | 108.8 / 112.6 | 2 × 120 (3 × 95 fails 450) | 533.5 / 501.4 · 580.6 / 428.5 |
+| HALF 1500 | 3 × 180 ✓ | 168.5 / 168.1 | **4 × 150** (waste 63 % > 45 %, alt 55 %) | 884.2 / 676.4 ×3 |
+| tc240 1200 | 2 × 180 ✓ | 166.6 / 170.6 | **3 × 150** (waste 61 %, alt 55 %) | 968.4 / 446.4 ×2 |
+Stock capped at 105: none of the five has a plan — a board fits at 5 / 6 / 3-per-side / 6 / 7 pieces and the
+overall length then fails 450 (339 / 230 / 369 / 416 / 233). **Spec errata E3:** the C.5 edge lengths (508.8 / 432,
+572.5 / 468.9, …) are the allowance-band chords of v1 (`L` / `L_in`), not raw-piece edges, and its W_req differ from
+the sampler by up to 4 mm; the piece counts and boards agree exactly — BLOCKERS 16.1. Circle: one closed group per
+ring (800 frame 4 × 180; 1000 frame 6 × 150 economy / leaf 5 × 180 economy). 2D contours, glazier exports and
+the 3D are untouched (the planner feeds the CNC DXF, cut list notes, pre-cut, BOM, PP only).
+
+**Consequences of the hard limits (honest report, BLOCKERS 16.2 — the engine reports, never splits finer):**
+- gothic 1000 LEAF top rail: 2 per side on 120 → shorter edge 386.2 < 400 → no valid plan (the head is fine);
+- circle 800 LEAF ring: 4 × 180 → 390.1 < 400 → no plan (frame ring 4 × 180 fine);
+- arched SASH 1000 semi-circle box head (80 face): 3 × 180 → 395.5 < 400; gothic 1000 sash head likewise;
+- every W 400 arch and the W 470 elliptical: no piece can reach 450 (semi-circle outer length 628) → no plan;
+- the Arch DXF export skips these with `no valid blank plan (below minimum length): …`; cut list notes say
+  `no stock board fits`; the PP curved row flags the reasons. Piotr can lower the limits on the new card.
+Harness samples moved off the blocked sizes: sash CNC samples 1200 (`sample_sash_arch_1200_semi-circle.dxf`,
+`_1200_gothic.dxf` — the stale 1000 files deleted), circle CNC sample 1000 (`sample_circle_1000_sunburst.dxf`, the
+800 CNC file deleted; the 800 glass / tracery samples stay — no planner in them); t19's gothic 1000 contour
+comparison runs with `minPieceLength 0` after asserting the honest skip.
+
+**Verification:** t25 121/121 (profile v4 + migration; C.5 fewest plans = spec; W_req / raw edges / waste vs the
+independent sampler ±0.5 / ±0.005; cap-105 blocks with the reason; invariants — compound pieces, apex split, closed
+ring, one-board plan, band inside the trapezoid; economy rule at thresholds 1.0 / 0 / 0.45; DXF CLAMPS on four
+regenerated samples via ezdxf — 2 squares per piece, 130 × 130, centred, ≥ 20 (+15 finger) from the cuts, text
+lines, cut codes with Q, thickness warning on the sash head; pre-cut / PP / export skips; settings card + store
+grep). Re-vectored: t16 367 (planner sections against `lib/indPlanner.mjs`, closed forms for single-arc middle
+pieces, sample DXF texts, migration), t17 70, t18 178, t19 246, t20 116, t20_bars 28, t21 120, t22 77, t23 81,
+t24 26 — ALL PASS. `npm run build` OK. esbuild on every touched file, `grep -F` after every write.
+**Not verified:** the card in a browser (no UI run in the container — structural grep + esbuild only), the DXF in
+VCarve / bSolid (CLAMPS placement is a suggestion; whether the Uniclamp really sits under the piece that way is
+Piotr's call), the economy threshold on real jobs (0.45 fires on most semi-circles with a feasible alternative —
+BLOCKERS 16.5), the square springing end on the CNC (16.3).
+**Verdict: ✅ Stage 1 (Block C)** — t25 + t16–t24 ALL PASS, build green; ⚠️ the limits block four common sizes
+(listed above) until Piotr confirms the numbers or the edge model.
+
 ## 2026-09-07 — ARCHED-WINDOWS-v3 night 5 (branch `claude/arched-windows-v3-9v0sw7`)
 
 Inputs read in full: `CLAUDE.md` → `docs/handover/ARCHED-WINDOWS-v3.md` → `BLOCKERS.md` → `BUILD-LOG.md`

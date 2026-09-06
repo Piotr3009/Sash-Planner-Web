@@ -51,6 +51,9 @@ execFileSync('npx', ['-y', 'esbuild@0.25.0', ENTRY, '--bundle', '--format=esm', 
 const M = await import(pathToFileURL(BUNDLE).href);
 const { arch, profile, specification, calculations, glassDxf } = M;
 const P = profile.DEFAULT_CASEMENT_PROFILE;
+// profile numbers behind the spec E vectors (v4 Block F): glass offset from the frame outer = leafAtJamb + leafTop.face − glassInset (51 + 67 − 12.5 = 105.5, was 94.5)
+const glassOff = P.deductions.leafAtJamb + P.elements.leafTop.face - P.geometry.glassInset;
+const xgS = (1000 - 2 * glassOff) / 2;   // clear half width of the W 1000 semi-circle = the intersecting arc radius: 394.5 (spec quotes 405.5 at the 57 face)
 
 let pass = 0, fail = 0;
 const failures = [];
@@ -104,14 +107,19 @@ for (const S of SHAPES) {
       if (!hub) {
         const user = vBars.filter((b) => !(pattern === 'intersecting'));
         if (pattern === 'intersecting') {
-          // intersecting: the tracery mullions run to the springing (PSW: bottom → springY, the arcs take
-          // over above); the user's own v bars are kept as well (PSW, BLOCKERS 9.6) and end on the outline
-          const mull = vBars.filter((b) => near(Math.max(b.from[1], b.to[1]), O.springing, 1e-6));
-          const userV = vBars.filter((b) => !near(Math.max(b.from[1], b.to[1]), O.springing, 1e-6));
-          const nExp = Math.max(2, Math.min(4, Math.round(O.width / 450)));
-          if (mull.length !== nExp) issues.push(`intersecting mullions ${mull.length} ≠ ${nExp}`);
-          if (userV.length !== v) issues.push(`intersecting user v ${userV.length} ≠ ${v}`);
-          for (const b of userV) { const top = b.to[1] >= b.from[1] ? b.to : b.from; if (!(distToChain(O.arcs, top) < 0.01)) issues.push(`${b.id} top end off the outline`); }
+          // v4 Block E (PSW sash rule): the user's v bars ARE the tracery columns — equal divisions of the clear
+          // width up to the springing (0 → two default columns at ±¼); two arcs per column, nothing else vertical
+          const nExp = v > 0 ? v : 2;
+          const xsExp = v > 0 ? [...Array(v)].map((_, i) => O.width * (i + 1) / (v + 1)) : [O.width / 4, 3 * O.width / 4];
+          if (vBars.length !== nExp) issues.push(`intersecting columns ${vBars.length} ≠ ${nExp}`);
+          vBars.forEach((b, i) => {
+            if (!near(b.from[0], xsExp[i], 1e-6)) issues.push(`${b.id} at x ${b.from[0].toFixed(1)} ≠ ${xsExp[i].toFixed(1)}`);
+            if (!(near(Math.max(b.from[1], b.to[1]), O.springing, 1e-6) && near(Math.min(b.from[1], b.to[1]), 0, 1e-6))) issues.push(`${b.id} does not run glass bottom → springing`);
+          });
+          const trac = bars.filter((b) => b.role === 'tracery');
+          if (trac.length !== 2 * nExp) issues.push(`tracery arcs ${trac.length} ≠ ${2 * nExp}`);
+          if (!trac.every((b) => near(b.arc.r, O.arcs[0].r, 1e-6))) issues.push('tracery radius ≠ outline radius');
+          if (bars.some((b) => b.role === 'springing')) issues.push('springing bar on an intersecting unit');
         } else {
           if (user.length !== v) issues.push(`v count ${user.length} ≠ ${v}`);
           for (const b of user) {
@@ -208,63 +216,79 @@ section('2 — pattern availability 1:1 with PSW (price-calculator.js 990–995,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-section('3 — intersecting on a gothic = PSW intersectingData (FixFrameWindow.jsx 667–700), vertex for vertex');
+section('3 — intersecting = the PSW SASH rule (ArchedSashWindow.jsx 915–940) on the glass outline, vertex for vertex; spec E vectors');
 {
-  // PSW sampling, copied (3D units → mm: mm(x) = x / 1000 there; here everything in mm, halfW = frame half width,
-  // iHalfW = inner half width, springY = 0, archYAtX = the inner arch limit)
-  function pswArcPts(cx, mulX, iHalfW, archYAtX, springY) {
-    const r = Math.abs(mulX - cx);
-    if (r < 30) return [];
-    const startAngle = Math.acos(Math.min(1, Math.max(-1, (mulX - cx) / r)));
-    const goingRight = cx < 0;
-    const pts = [];
-    for (let i = 0; i <= 48; i++) {
-      const t = i / 48;
-      const angle = goingRight ? startAngle + t * (Math.PI / 2) : startAngle - t * (Math.PI / 2);
-      const px = cx + r * Math.cos(angle);
-      const py = springY + r * Math.sin(angle);
-      if (py < springY - 2) continue;
-      const limit = archYAtX(Math.max(-iHalfW, Math.min(iHalfW, px)));
-      if (py > limit) break;
-      if (Math.abs(px) > iHalfW) break;
-      pts.push([px, py]);
-    }
-    return pts;
-  }
-  for (const [name, W, H, f] of [['G1', 1000, 1900, { archShape: 'gothic-equilateral' }], ['G2', 1400, 2400, { archShape: 'gothic-equilateral' }], ['G3', 1000, 1700, { archShape: 'gothic-drop', archProfile: 'drop' }]]) {
-    const d = derive(pcItem(name, W, H, { ...f, archBarPattern: 'intersecting' }));
-    const O = d.arch.glassOutline, xg = O.width / 2, hw = W / 2;
-    const tracery = d.arch.bars.filter((b) => b.role === 'tracery');
-    const mullions = d.arch.bars.filter((b) => b.role === 'v');
-    const nExp = Math.max(2, Math.min(4, Math.round(O.width / 450)));
-    check(`${name}: mullions n = clamp(round(Wg / 450), 2, 4) = ${nExp}, evenly across the clear width, up to the springing`, mullions.length === nExp && mullions.every((b, i) => near(b.from[0], O.width * (i + 1) / (nExp + 1), 1e-6) && near(Math.max(b.from[1], b.to[1]), O.springing, 1e-6)));
-    // PSW frame: x centred on the axis, springing at 0; PC glass frame → subtract xg / springing
-    const archYAtX = (x) => (arch.chainYAtX(O.arcs, x + xg) ?? O.springing) - O.springing;
-    let vertsChecked = 0, vertsOff = 0, arcsMatched = 0;
-    for (const b of mullions) {
-      const mulX = b.from[0] - xg;
-      for (const cx of [-hw, hw]) {
-        const pts = pswArcPts(cx, mulX, xg, archYAtX, 0);
-        if (pts.length < 3) continue;
-        // the PC arc with the same centre / radius
-        const r = Math.abs(mulX - cx);
-        const pc = tracery.find((t) => near(t.arc.cx - xg, cx, 1e-6) && near(t.arc.r, r, 1e-6));
-        if (!pc) { vertsOff += pts.length; continue; }
-        arcsMatched++;
-        for (const p of pts) {
-          vertsChecked++;
-          const ang = Math.atan2(p[1] + O.springing - pc.arc.cy, p[0] + xg - pc.arc.cx);
-          const onCircle = near(Math.hypot(p[0] + xg - pc.arc.cx, p[1] + O.springing - pc.arc.cy), pc.arc.r, 0.01);
-          const step = (Math.PI / 2) / 48;
-          const inRange = ang >= pc.arc.a0 - step - 1e-9 && ang <= pc.arc.a1 + step + 1e-9;
-          if (!(onCircle && inRange)) vertsOff++;
+  // PSW useArchedSashBars, ported on the GLASS numbers (halfW = clear half width, rise = glass apex − springing,
+  // springY = springing, x centred on the axis): columns = the user's V bars (default [−halfW/2, halfW/2]);
+  // R = gothic ? gothicCentreOffset(halfW, rise) + halfW : halfW; arc centred at mx − dir·R, 64 samples over a
+  // quarter turn, dropped below the springing, stopped where |px| > halfW or above the profile.
+  // PSW's gothic R is the two-centre formula on the glass numbers (905.4 on W 1000) — the true outline is the
+  // frame's arcs offset concentrically (905.5): PC takes the exact outline radius, so the comparison allows 0.2.
+  const gothicCentreOffset = (halfW, rise) => Math.max(0, (rise * rise - halfW * halfW) / (2 * halfW));
+  function pswSashArcs({ gothic, halfW, rise, springY, columns, profileAt }) {
+    const R = gothic ? gothicCentreOffset(halfW, rise) + halfW : halfW;
+    const out = [];
+    for (const mx of columns) {
+      for (const dir of [1, -1]) {
+        const cx = mx - dir * R;
+        if (Math.abs(cx) > halfW * 3) continue;
+        const pts = [];
+        for (let i = 0; i <= 64; i++) {
+          const t = i / 64;
+          const a0 = dir > 0 ? 0 : Math.PI;
+          const a = a0 + dir * t * (Math.PI / 2);
+          const px = cx + R * Math.cos(a), py = springY + R * Math.sin(a);
+          if (py < springY) continue;
+          if (Math.abs(px) > halfW) break;
+          if (py > profileAt(px)) break;
+          pts.push([px, py]);
         }
+        if (pts.length >= 3) out.push({ mx, dir, cx, R, pts });
       }
     }
-    check(`${name}: ${arcsMatched} PSW arcs (centres ±W/2 on the springing, r = |mullion − corner|) exist in PC; ${vertsChecked} PSW sample vertices on the PC arcs within range (±1 step)`, arcsMatched === tracery.length && vertsChecked > 0 && vertsOff === 0, `off ${vertsOff}, PC tracery ${tracery.length}`);
-    // PC stops each arc exactly on the outline; PSW stops at the last sample below it — PC end must be on the chain
-    check(`${name}: every PC tracery arc ends ON the outline (distance < 0.01) and starts on the springing`, tracery.every((t) => { const end = t.arc.cx < xg ? t.to : t.from; const start = t.arc.cx < xg ? t.from : t.to; return distToChain(O.arcs, end) < 0.01 && near(start[1], O.springing, 1e-6); }));
+    return { R, arcs: out };
   }
+  const CASES = [
+    ['G3 (spec: gothic 1000 × 1900, 3 V → 6 arcs)', 1000, 1900, { archShape: 'gothic-equilateral', casementVBars: 3 }, { arcs: 6 }],
+    [`S2 (spec: semi-circle 1000, 2 V → 4 arcs R ${xgS} = (1000 − 2·${glassOff})/2; 405.5 at the 57 face)`, 1000, 1500, { archShape: 'three-centre', archStart: 1000, casementVBars: 2 }, { arcs: 4, R: xgS }],
+    [`S0 (spec: 0 V → columns at ±${xgS / 2} = ±Wg/4; ±202.75 at the 57 face)`, 1000, 1500, { archShape: 'three-centre', archStart: 1000 }, { arcs: 4, R: xgS, columns: [-xgS / 2, xgS / 2] }],
+    ['G2 1400 × 2400', 1400, 2400, { archShape: 'gothic-equilateral', casementVBars: 2 }, { arcs: 4 }],
+    ['GD 1000 × 1700 drop', 1000, 1700, { archShape: 'gothic-drop', archProfile: 'drop', casementVBars: 1 }, { arcs: 2 }],
+  ];
+  for (const [name, W, H, f, exp] of CASES) {
+    const d = derive(pcItem(name.split(' ')[0], W, H, { ...f, archBarPattern: 'intersecting' }));
+    const O = d.arch.glassOutline, xg = O.width / 2;
+    const gothic = f.archShape.startsWith('gothic');
+    const tracery = d.arch.bars.filter((b) => b.role === 'tracery');
+    const columns = d.arch.bars.filter((b) => b.role === 'v').map((b) => b.from[0] - xg);
+    const Rg = O.arcs[0].r;
+    check(`${name}: ${exp.arcs} arcs, each starting at a column x on the springing, ending on the outline, R = outline radius ${Rg.toFixed(1)}${exp.R ? ` (= the clear half width ${exp.R})` : ' (spec quotes the FRAME radius — errata E4)'}`,
+      tracery.length === exp.arcs && (exp.R == null || near(Rg, exp.R, 1e-6)) && tracery.every((b) => {
+        const start = near(b.arc.a0, 0, 1e-9) ? b.from : b.to, end = start === b.from ? b.to : b.from;
+        return near(b.arc.r, Rg, 1e-6) && near(start[1], O.springing, 1e-6) && columns.some((c) => near(c + xg, start[0], 1e-6)) && distToChain(O.arcs, end) < 0.01 && near(b.arc.cy, O.springing, 1e-9) && near(Math.abs(b.arc.cx - start[0]), Rg, 1e-6);
+      }), `${tracery.length} arcs, R ${tracery.map((b) => b.arc.r.toFixed(1)).join('/')}`);
+    if (exp.columns) check(`${name}: default columns at ${exp.columns.join(' / ')} from the axis (= ±Wg/4 = ±${(O.width / 4).toFixed(2)})`, columns.length === 2 && columns.every((c, i) => near(c, exp.columns[i], 0.01)), columns.map((c) => c.toFixed(2)).join(' '));
+    // PSW port vertex for vertex
+    const profileAt = (x) => (arch.chainYAtX(O.arcs, x + xg) ?? O.springing);
+    const psw = pswSashArcs({ gothic, halfW: xg, rise: O.apex - O.springing, springY: O.springing, columns, profileAt });
+    let matched = 0, off = 0, verts = 0;
+    for (const pa of psw.arcs) {
+      const pc = tracery.find((b) => near(b.arc.cx - xg, pa.cx, 0.2) && near(b.arc.r, pa.R, 0.2));
+      if (!pc) continue;
+      matched++;
+      for (const p of pa.pts) {
+        verts++;
+        const dx = p[0] + xg - pc.arc.cx, dy = p[1] - pc.arc.cy;
+        const onCircle = near(Math.hypot(dx, dy), pc.arc.r, 0.2);
+        const ang = Math.atan2(dy, dx), step = (Math.PI / 2) / 64;
+        const inRange = ang >= pc.arc.a0 - step - 1e-9 && ang <= pc.arc.a1 + step + 1e-9;
+        if (!(onCircle && inRange)) off++;
+      }
+    }
+    check(`${name}: PSW sash rule (R ${psw.R.toFixed(1)}) → ${psw.arcs.length} arcs, all present in PC; ${verts} PSW sample vertices on the PC arcs within 0.2 mm / one step`, matched === psw.arcs.length && matched === tracery.length && verts > 0 && off === 0, `matched ${matched}/${psw.arcs.length}, off ${off}`);
+  }
+  check('intersecting keeps no springing bar (PSW 23.08: the columns flow into the arcs) and the h bars stay below the springing', (() => { const d = derive(pcItem('GH', 1000, 2000, { archShape: 'gothic-equilateral', archBarPattern: 'intersecting', casementHBars: 2 })); return !d.arch.bars.some((b) => b.role === 'springing') && d.arch.bars.filter((b) => b.role === 'h').every((b) => b.from[1] < d.arch.glassOutline.springing); })());
+  check('no intersecting settings left in the profile / 3D fallback (pitch, mullion clamp, minRadius gone)', !('intersecting' in P.arch.patterns) && !readFileSync(resolve(ROOT, 'src', '3d', 'components', 'casement', 'archedCasementGeometry.js'), 'utf8').includes('minMullions'));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

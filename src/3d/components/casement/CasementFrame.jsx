@@ -22,6 +22,17 @@ const BOTTOM_FACE = 68;
 const BOTTOM_EXT_OUTER = 36;
 const BOTTOM_INNER_FACE = BOTTOM_FACE - REBATE_STEP;
 
+// v4 Block F (PC, ARCHED-WINDOWS-v4): the frame face and its visible land
+// (EXT_FACE = face − rebate) come from the workshop profile through the
+// `frameDims` prop { frameFace, extFace }. The constants above stay as the
+// defaults so the PSW copy of this file renders unchanged until ported.
+export const DEFAULT_FRAME_DIMS = Object.freeze({ frameFace: FRAME_FACE, extFace: EXT_FACE });
+export function resolveFrameDims(dims) {
+  const frameFace = Number(dims?.frameFace) > 0 ? Number(dims.frameFace) : FRAME_FACE;
+  const extFace = Number(dims?.extFace) > 0 ? Number(dims.extFace) : EXT_FACE;
+  return { frameFace, extFace };
+}
+
 const halfD = mm(FRAME_DEPTH) / 2;
 
 // Gasket (seal) on rebate surface
@@ -110,7 +121,8 @@ function BottomRail({ width, cuts, mat, matInt, debugColors }) {
 }
 
 // ═══ Top Rail ═══
-function TopRail({ width, cuts, mat, matInt, debugColors }) {
+function TopRail({ width, cuts, mat, matInt, debugColors, frameDims = null }) {
+  const { frameFace: FRAME_FACE } = resolveFrameDims(frameDims);
   const len = mm(width);
   // EXT part: upper area (0 to EXT_DEPTH, above rebate)
   const extShape = useMemo(() => {
@@ -118,7 +130,7 @@ function TopRail({ width, cuts, mat, matInt, debugColors }) {
     s.moveTo(0, mm(REBATE_STEP)); s.lineTo(0, mm(FRAME_FACE));
     s.lineTo(mm(EXT_DEPTH), mm(FRAME_FACE)); s.lineTo(mm(EXT_DEPTH), mm(REBATE_STEP)); s.closePath();
     return s;
-  }, []);
+  }, [FRAME_FACE]);
   const extSettings = useMemo(() => ({ depth: len, bevelEnabled: false }), [len]);
   // INT part: full-height rectangle (EXT_DEPTH to FRAME_DEPTH)
   const intFlat = useMemo(() => {
@@ -126,7 +138,7 @@ function TopRail({ width, cuts, mat, matInt, debugColors }) {
     s.moveTo(mm(EXT_DEPTH), 0); s.lineTo(mm(EXT_DEPTH), mm(FRAME_FACE));
     s.lineTo(mm(FRAME_DEPTH), mm(FRAME_FACE)); s.lineTo(mm(FRAME_DEPTH), 0); s.closePath();
     return s;
-  }, []);
+  }, [FRAME_FACE]);
   const intRounded = useMemo(() => {
     const s = new THREE.Shape();
     s.moveTo(mm(EXT_DEPTH), 0); s.lineTo(mm(EXT_DEPTH), mm(FRAME_FACE));
@@ -134,7 +146,7 @@ function TopRail({ width, cuts, mat, matInt, debugColors }) {
     s.lineTo(mm(FRAME_DEPTH), R);
     s.quadraticCurveTo(mm(FRAME_DEPTH), 0, mm(FRAME_DEPTH) - R, 0); s.closePath();
     return s;
-  }, []);
+  }, [FRAME_FACE]);
   const debugMatExt = useMemo(() => debugColors
     ? new THREE.MeshStandardMaterial({ color: '#9b59b6', opacity: 0.85, transparent: true }) : null, [debugColors]);
   const debugMatInt = useMemo(() => debugColors
@@ -153,7 +165,8 @@ function TopRail({ width, cuts, mat, matInt, debugColors }) {
 }
 
 // ═══ Stile ═══
-function Stile({ frameHeight, side, intCuts, mat, matInt, debugColors }) {
+function Stile({ frameHeight, side, intCuts, mat, matInt, debugColors, frameDims = null }) {
+  const { frameFace: FRAME_FACE, extFace: EXT_FACE } = resolveFrameDims(frameDims);
   const extTopCut = mm(frameHeight - FRAME_FACE + REBATE_STEP);
   const extShape = useMemo(() => {
     const s = new THREE.Shape();
@@ -161,7 +174,7 @@ function Stile({ frameHeight, side, intCuts, mat, matInt, debugColors }) {
     s.lineTo(mm(EXT_DEPTH), extTopCut); s.lineTo(0, extTopCut); s.closePath();
     return s;
   }, [extTopCut]);
-  const extSettings = useMemo(() => ({ depth: mm(EXT_FACE), bevelEnabled: false }), []);
+  const extSettings = useMemo(() => ({ depth: mm(EXT_FACE), bevelEnabled: false }), [EXT_FACE]);
   const extX = side === 'left' ? 0 : mm(REBATE_STEP);
 
   // INT segmented
@@ -209,7 +222,8 @@ function Stile({ frameHeight, side, intCuts, mat, matInt, debugColors }) {
 }
 
 // ═══ Mullion ═══
-function Mullion({ startY = 0, endY = 1200, touchesBottom = true, touchesTop = true, intCuts, mat, matInt, debugColors }) {
+function Mullion({ startY = 0, endY = 1200, touchesBottom = true, touchesTop = true, intCuts, mat, matInt, debugColors, frameDims = null }) {
+  const { frameFace: FRAME_FACE } = resolveFrameDims(frameDims);
   const hMm = endY - startY;
   const h = mm(hMm);
   const extendBottom = (!touchesBottom) ? mm(REBATE_STEP) : 0;
@@ -230,7 +244,7 @@ function Mullion({ startY = 0, endY = 1200, touchesBottom = true, touchesTop = t
     }
     s.closePath();
     return s;
-  }, [hMm, touchesBottom, touchesTop, extendBottom, extendTop]);
+  }, [hMm, touchesBottom, touchesTop, extendBottom, extendTop, FRAME_FACE]);
   const extSettings = useMemo(() => ({ depth: mm(MULLION_EXT_FACE), bevelEnabled: false }), []);
 
   const intStartYLocal = touchesBottom ? mm(BOTTOM_FACE) : -extendBottom;
@@ -333,7 +347,9 @@ function Transom({ transomWidth, intCuts, mat, matInt, debugColors }) {
 export default function CasementFrame({
   width = 800, height = 1200, material, materialInt, sealColour = 'black',
   mullions = [], transoms = [], debugColors = false,
+  frameDims = null,   // v4 Block F: { frameFace, extFace } from the profile (PC); absent → 57 / 36
 }) {
+  const { frameFace: FRAME_FACE, extFace: EXT_FACE } = resolveFrameDims(frameDims);
   const W = mm(width);
   const H = mm(height);
 
@@ -362,7 +378,7 @@ export default function CasementFrame({
       cuts.push({ start: mm(m.x - MULLION_W / 2), end: mm(m.x + MULLION_W / 2) });
     });
     return cuts;
-  }, [width, mullObjs]);
+  }, [width, mullObjs, FRAME_FACE]);
 
   // ─── Cuts for left stile INT ───
   // Stile INT runs from BOTTOM_FACE to height-FRAME_FACE. Flat where transoms cross.
@@ -389,7 +405,7 @@ export default function CasementFrame({
       }
     });
     return cuts;
-  }, [transObjs, width]);
+  }, [transObjs, width, FRAME_FACE]);
 
   const rightStileCuts = useMemo(() => {
     const cuts = [];
@@ -404,7 +420,7 @@ export default function CasementFrame({
       }
     });
     return cuts;
-  }, [transObjs, width]);
+  }, [transObjs, width, FRAME_FACE]);
 
   // ─── Cuts for mullion INT ───
   function getMullionCuts(mObj) {
@@ -450,13 +466,13 @@ export default function CasementFrame({
         <BottomRail width={width} cuts={railCuts} mat={material} matInt={materialInt} debugColors={debugColors} />
       </group>
       <group position={[0, H / 2 - mm(FRAME_FACE), 0]}>
-        <TopRail width={width} cuts={railCuts} mat={material} matInt={materialInt} debugColors={debugColors} />
+        <TopRail width={width} cuts={railCuts} mat={material} matInt={materialInt} debugColors={debugColors} frameDims={frameDims} />
       </group>
       <group position={[-W / 2, -H / 2, 0]}>
-        <Stile frameHeight={height} side="left" intCuts={leftStileCuts} mat={material} matInt={materialInt} debugColors={debugColors} />
+        <Stile frameHeight={height} side="left" intCuts={leftStileCuts} mat={material} matInt={materialInt} debugColors={debugColors} frameDims={frameDims} />
       </group>
       <group position={[W / 2 - mm(FRAME_FACE), -H / 2, 0]}>
-        <Stile frameHeight={height} side="right" intCuts={rightStileCuts} mat={material} matInt={materialInt} debugColors={debugColors} />
+        <Stile frameHeight={height} side="right" intCuts={rightStileCuts} mat={material} matInt={materialInt} debugColors={debugColors} frameDims={frameDims} />
       </group>
 
       {mullObjs.map((mObj, i) => {
@@ -464,7 +480,7 @@ export default function CasementFrame({
         const y = mm(mObj.startY);
         return (
           <group key={`mull-${i}`} position={[x, -H / 2 + y, 0]}>
-            <Mullion startY={mObj.startY} endY={mObj.endY}
+            <Mullion startY={mObj.startY} endY={mObj.endY} frameDims={frameDims}
               touchesBottom={mObj.touchesBottom !== false}
               touchesTop={mObj.touchesTop !== false}
               intCuts={getMullionCuts(mObj)}

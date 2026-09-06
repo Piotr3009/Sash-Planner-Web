@@ -27,11 +27,14 @@
 // group previously offered a single structure (140L) while 3 lights had four
 // (130/131/132/133) — the gap was structural, not hinge-related, since panes
 // are already clickable in the picker.
-export const CASEMENT_LAYOUTS_VERSION = 2;
+// v3 (ARCHED-WINDOWS-v4 Block F, 06.09): FRAME_FACE 57 → 68 (head and jambs,
+// option B: rebate 21, land 47). Panel order and layout codes untouched. PSW
+// still hardcodes 57 until ported — see docs/handover/PSW-FRAME-68-PORT.md.
+export const CASEMENT_LAYOUTS_VERSION = 3;
 
-// PSW hardcodes: FRAME_FACE = 57, BOTTOM_FACE = 68, MULLION_W = 68
+// PSW hardcodes: FRAME_FACE = 57 (PC v3: 68), BOTTOM_FACE = 68, MULLION_W = 68
 export const CASEMENT_GEO_DEFAULTS = Object.freeze({
-  frameFace: 57,
+  frameFace: 68,
   bottomFace: 68,
   mullionW: 68,
 });
@@ -51,10 +54,10 @@ export function clampFanRatio(fanMm, innerH) {
 // User input = transom AXIS measured from the frame TOP (production truth).
 // Internally layouts still speak PSW zone-ratios; these helpers are the ONLY
 // place that maps between the two.
-//   top-anchored fan:    axis = frameFace + zone + MEMBER/2   → offset 91
+//   top-anchored fan:    axis = frameFace + zone + MEMBER/2   → offset 102 (frame 68)
 //   bottom-anchored fan2: axis = H − (bottomFace + zone + MEMBER/2) → offset 102
 const MEMBER_W = 68;
-export const FAN_AXIS_OFFSET_TOP = CASEMENT_GEO_DEFAULTS.frameFace + MEMBER_W / 2;      // 91
+export const FAN_AXIS_OFFSET_TOP = CASEMENT_GEO_DEFAULTS.frameFace + MEMBER_W / 2;      // 102
 export const FAN_AXIS_OFFSET_BOTTOM = CASEMENT_GEO_DEFAULTS.bottomFace + MEMBER_W / 2;  // 102
 
 export function fanAxisToRatio(axisT, innerH) {
