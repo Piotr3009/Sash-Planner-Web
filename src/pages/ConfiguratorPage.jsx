@@ -469,7 +469,8 @@ export default function ConfiguratorPage() {
   // isCasement is also derived below with the other effective values; this
   // early copy exists because the dimension inputs are constrained by it.
   const isCasementBatch = batch?.type === 'casement';
-  const isArchedSash = isSash && sashType !== 'triple' && sashFrameShape === 'arched';
+  // batch.type read directly: `isSash` is declared much later in this component (TDZ crash on render, 06.09)
+  const isArchedSash = batch?.type === 'sash' && sashType !== 'triple' && sashFrameShape === 'arched';
   const isArched = (isCasementBatch && casFrameShape === 'arched') || isArchedSash;
   // v3 Block 3: fixed window (kind) and the circle (shape chip; frame shape stays 'standard')
   const isFixedCas = isCasementBatch && casKind === 'fixed';
