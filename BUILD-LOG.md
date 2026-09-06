@@ -11,6 +11,59 @@ piece` **1** — both green, branch rebased onto `origin/main` keeping the night
 tree: t16 368 · t17_edges 70 · t18 178 · t19 244 · t20 **117** (was 116 — gothic-full-v1 adds one) · t20_bars 32 ·
 t21 120 · t22 77 · t23 81 · t24_stage4 26 · t25 201 · t26 36 · t27 64 = 1614 ALL PASS, build OK.
 
+### STAGE 3 — doors take option B ✅
+
+**Verdict ✅** — t27 **87 checks** (was 65) ALL PASS, whole suite t16–t28 = **1764 checks ALL PASS**,
+`npm run build` OK (16.0 s), esbuild clean on the three touched sources, all four door 2D sheets render without
+NaN for single / french / single + side panel.
+
+**The change** (`DEFAULT_DOOR_PROFILE` in `src/engine/profile.js` — four numbers, nothing else):
+the REBATE is the invariant and the wider face buys land, exactly as the casement frame already works.
+`land = jamb face − rebate = 68 − 25 = 43`. Option A left the door with a 32 mm rebate step (68 − 36) on a
+frame whose rebate is 25 — that mismatch is what BLOCKERS §19.1 asked about; it is now closed.
+
+**Old and new numbers — produced BY the harness (t27 §5b re-derives the `d733414` tree and prints the table), not
+by hand:**
+
+| | before (option A) | after (option B) |
+|---|---|---|
+| profile `geometry.land` | 36 | **43** = face 68 − rebate 25 |
+| profile `deductions.leafAtJamb` | 40 | **47** = land 43 + gap 4 |
+| profile `deductions.leafFullHeight` | 87 | **94** = leafAtJamb 47 + gapCill 6 + cillVisible 41 |
+| profile `deductions.leafNoThreshold` | 46 | **53** = leafAtJamb 47 + gapCill 6 |
+| **door 1000 × 2100** leaf | 920 × 2013 | **906 × 2006** |
+| **french 1200 × 2100** leaf (each of two) | 563 × 2013 | **556 × 2006** |
+| door leaf x inside its frame | 40 | **47** |
+| side panel 400 leaf | 320 | **306** |
+| door without a threshold, 2100 | 2054 high | **2047** high |
+| coupling post visible band, outward (land + land) | 72 | **86** |
+| coupling post visible band, inward (land + face) | 104 | **111** |
+
+`leafAtMullionAxis` stays **17** (= mullionLand 26 / 2 + gap 4) — the mullion land did not move, same as the
+casement. The rebate stays **25** (casement 21 + 4). The coupling post stays **136** (2 × jamb face). Door cut-list
+SECTIONS are byte-identical before and after (t27 §5b): option B moves lengths, never stock.
+
+**Everything followed the profile — no engine edit was needed.** `deriveDoorWindow` already takes
+`edge = ded.leafAtJamb`, `clearW = frameWidth − 2·edge`, `leafW = isFrench ? (clearW + overlap)/2 : clearW`,
+`panelLeaves = f.w − 2·edge`, `leafH = frameHeight − (hasTimberCill ? leafFullHeight : leafNoThreshold)` and the
+post band from `geo.land` / `els.frameHead.face`. The only source edits outside the profile are two comments
+(`calculations.js` "40 = land 36 + gap 4" → 47 / 43, `windowSpecToConfig.js` "68 / 36" → "68 / 43").
+
+**No migration needed, unlike the casement.** `setDoorProfile()` has no call site anywhere in the app, so
+`getDoorProfile()` always returns `DEFAULT_DOOR_PROFILE` — there is no stored door profile in Supabase or
+localStorage to migrate (the casement needed `migrateCasementProfile` precisely because its profile IS stored).
+
+**Gate note:** the brief names "t14 / t27"; there is no t14 in this repository (`verify/arch` holds t16–t28), so
+t27 is the door gate. Its §1 now derives every door number from the profile formula and §5b diffs the whole set
+against `d733414`.
+
+**Not verified in this stage:** no browser and no 3D viewer — the door frame's 68 face with a 43 land, and the
+136 post's new 86 / 111 visible band, are asserted numerically and rendered server-side, not looked at. Pricing
+and BOM were not re-checked against the 14 mm narrower leaf (they read the engine rows, so they follow, but no
+quote was compared).
+
+---
+
 ### STAGE 2 — one dimension rule on every sheet ✅
 
 **Verdict ✅** — t19 **280** (was 244) and t22 **118** (was 77) ALL PASS with the new rule gate, whole suite

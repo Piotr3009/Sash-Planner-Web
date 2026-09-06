@@ -22,7 +22,7 @@
  * Run: node verify/arch/t27.mjs
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, mkdirSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ROOT, bundleTree, deriveItem } from './lib/sheets.mjs';
 import { checkDimRule } from './lib/dimRule.mjs';
@@ -44,6 +44,7 @@ const M = await bundleTree(resolve(ROOT, 'src'), 't27-live', [
 ]);
 const P = M.profile.DEFAULT_CASEMENT_PROFILE;
 const DP = M.profile.DEFAULT_DOOR_PROFILE;
+const DOOR_PREV = 'd733414';   // Stage 2 commit — the doors before option B
 const G = P.geometry, D = P.deductions, E = P.elements;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -58,10 +59,23 @@ check('identity: leafAtJamb = land + gap', D.leafAtJamb === G.land + G.gap);
 check('identity: leafFullHeight = leafAtJamb + gapCill + cillVisible (top layer + cill layer)', D.leafFullHeight === D.leafAtJamb + G.gapCill + G.cillVisible);
 check('identity: fanFromAxis = leafAtJamb + gapFanTransom + transomLandAbove', D.fanFromAxis === D.leafAtJamb + G.gapFanTransom + G.transomLandAbove);
 check('identity: lowerFromAxis = transomLandBelow + gap + gapCill + cillVisible (untouched by the frame)', D.lowerFromAxis === G.transomLandBelow + G.gap + G.gapCill + G.cillVisible);
-check('door: frameHead 68 / frameJamb 68 / couplingPost 136 / transomDeduct 136; land 36 / leafAtJamb 40 / leafFullHeight 87 unchanged (spec F: face + post only)',
-  DP.elements.frameHead.face === 68 && DP.elements.frameJamb.face === 68 && DP.couplingPost.width === 136 && DP.lengths.transomDeduct === 136 && DP.geometry.land === 36 && DP.deductions.leafAtJamb === 40 && DP.deductions.leafFullHeight === 87);
+// night 7 stage 3: doors take option B too (BLOCKERS §19.1 closed). Every number
+// below is the FORMULA, evaluated from the profile — never a literal read back
+// from the engine.
+const dGeo = DP.geometry, dDed = DP.deductions;
+const dLand = DP.elements.frameJamb.face - dGeo.rebate;                 // 68 − 25 = 43
+const dEdge = dLand + dGeo.gap;                                          // 43 + 4 = 47
+const dFullH = dEdge + dGeo.gapCill + dGeo.cillVisible;                  // 47 + 6 + 41 = 94
+const dNoThr = dEdge + dGeo.gapCill;                                     // 47 + 6 = 53
+check('door: frameHead 68 / frameJamb 68 / couplingPost 136 / transomDeduct 136', DP.elements.frameHead.face === 68 && DP.elements.frameJamb.face === 68 && DP.couplingPost.width === 136 && DP.lengths.transomDeduct === 136);
 check('door identities: couplingPost = 2 × jamb face, transomDeduct = 2 × jamb face', DP.couplingPost.width === 2 * DP.elements.frameJamb.face && DP.lengths.transomDeduct === 2 * DP.elements.frameJamb.face);
-check('door: leafAtJamb = land + gap still holds (36 + 4 = 40) — the door land did NOT follow the face (BLOCKERS §19)', DP.deductions.leafAtJamb === DP.geometry.land + DP.geometry.gap && DP.geometry.land + DP.geometry.rebate !== DP.elements.frameHead.face);
+check(`door OPTION B: land = jamb face − rebate = ${DP.elements.frameJamb.face} − ${dGeo.rebate} = ${dLand} (was 36)`, dGeo.land === dLand, String(dGeo.land));
+check(`door OPTION B: leafAtJamb = land + gap = ${dLand} + ${dGeo.gap} = ${dEdge} (was 40)`, dDed.leafAtJamb === dEdge, String(dDed.leafAtJamb));
+check(`door OPTION B: leafFullHeight = leafAtJamb + gapCill + cillVisible = ${dEdge} + ${dGeo.gapCill} + ${dGeo.cillVisible} = ${dFullH} (was 87)`, dDed.leafFullHeight === dFullH, String(dDed.leafFullHeight));
+check(`door OPTION B: leafNoThreshold = leafAtJamb + gapCill = ${dEdge} + ${dGeo.gapCill} = ${dNoThr} (was 46)`, dDed.leafNoThreshold === dNoThr, String(dDed.leafNoThreshold));
+check('door OPTION B: land + rebate = frame face — the same invariant the casement frame keeps (the rebate, not the land, is fixed)', dGeo.land + dGeo.rebate === DP.elements.frameHead.face);
+check('door: the rebate itself did NOT move (25 = casement 21 + 4)', dGeo.rebate === 25 && dGeo.rebate === G.rebate + 4);
+check(`door: leafAtMullionAxis unchanged = mullionLand/2 + gap = ${dGeo.mullionLand / 2} + ${dGeo.gap} = ${dGeo.mullionLand / 2 + dGeo.gap}`, dDed.leafAtMullionAxis === dGeo.mullionLand / 2 + dGeo.gap);
 
 // ═══════════════════════════════════════════════════════════════════════════
 section('2 — casement 040L 1000 × 1500: leaf, glass, cut list from the profile formulas; old numbers via a schema-1 variant');
@@ -150,13 +164,13 @@ section('4 — casementLayouts: frameFace = the profile face, version 3, fan-axi
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-section('5 — doors: faces 68, coupling post 136, door land / leafAtJamb unchanged');
+section('5 — doors: faces 68, coupling post 136, OPTION B land 43 / leafAtJamb 47 (night 7 stage 3)');
 {
   const item = { id: 'd1', width: 1000, height: 2100, name: 'D1' };
   const { spec, derived } = deriveItem(M, item, { windowCategory: 'door', doorType: 'single-external', sidePanels: 'left', sideLeftWidth: 400, thresholdType: 'standard' });
   const dL = DP.deductions, dE = DP.elements;
   const dLeafW = 1000 - 2 * dL.leafAtJamb, dLeafH = 2100 - dL.leafFullHeight;
-  console.log(`  door formula: leaf = (1000 − 2·${dL.leafAtJamb}) × (2100 − ${dL.leafFullHeight}) = ${dLeafW} × ${dLeafH} (door land 36 unchanged → the leaf width did not move)`);
+  console.log(`  door formula: leaf = (1000 − 2·${dL.leafAtJamb}) × (2100 − ${dL.leafFullHeight}) = ${dLeafW} × ${dLeafH} (option B: land ${DP.geometry.land} = face ${dE.frameJamb.face} − rebate ${DP.geometry.rebate})`);
   const lf = derived.door?.leaves?.[0];
   check(`single door 1000 × 2100: leaf ${dLeafW} × ${dLeafH}`, lf && near(lf.w, dLeafW) && near(lf.h, dLeafH), JSON.stringify(lf));
   const cut = M.lists.buildCutListForWindow(derived, spec);
@@ -174,6 +188,64 @@ section('5 — doors: faces 68, coupling post 136, door land / leafAtJamb unchan
   check(`french 1200: each leaf = (1200 − 2·${dL.leafAtJamb} + overlap ${DP.frenchOverlap}) / 2 = ${fLeaf}`, fr.derived.door?.leaves?.length === 2 && fr.derived.door.leaves.every((l) => near(l.w, fLeaf)), JSON.stringify(fr.derived.door?.leaves));
   const frCut = M.lists.buildCutListForWindow(fr.derived, fr.spec);
   check(`french 1200: D-FRAME HEAD ${secFrame} — the 68 face on every door type`, frCut.find((r) => (r.name || r.element || r.elementName) === 'D-FRAME HEAD')?.section === secFrame);
+  // leaf POSITION follows the land too: the leaf starts one leafAtJamb inside the
+  // door frame, and that frame starts after the 400 side panel
+  check(`single door with a 400 side panel: leaf x = 400 + leafAtJamb = ${400 + dL.leafAtJamb} (was 440)`, near(lf.x, 400 + dL.leafAtJamb), String(lf?.x));
+  const frLeaves = fr.derived.door.leaves;
+  check(`french 1200: leaves at x ${dL.leafAtJamb} and ${1200 - dL.leafAtJamb - fLeaf} (the pair stays symmetric about the frame centre)`,
+    near(frLeaves[0].x, dL.leafAtJamb) && near(frLeaves[1].x, 1200 - dL.leafAtJamb - fLeaf), JSON.stringify(frLeaves.map((l) => l.x)));
+  // threshold 'none' takes leafNoThreshold instead of leafFullHeight
+  const noThr = deriveItem(M, { id: 'd3', width: 1000, height: 2100, name: 'D3' }, { windowCategory: 'door', doorType: 'single-external', thresholdType: 'none' });
+  check(`door without a threshold: leaf height = 2100 − leafNoThreshold ${dL.leafNoThreshold} = ${2100 - dL.leafNoThreshold} (was 2054)`,
+    near(noThr.derived.door.leaves[0].h, 2100 - dL.leafNoThreshold), JSON.stringify(noThr.derived.door.leaves[0]));
+  // the coupling post's visible band (door.zones.posts) is land + land outward,
+  // land + frame face inward — both follow the land, so both moved with option B
+  const po = derived.door?.zones?.posts?.[0];
+  check(`coupling post visible band (outward) = land + land = ${2 * DP.geometry.land} (was 72), post ${DP.couplingPost.width} wide centred on the joint`,
+    po && near(po.visW, 2 * DP.geometry.land) && near(po.w, DP.couplingPost.width) && near(po.x, po.axis - DP.couplingPost.width / 2), JSON.stringify(po));
+  const inw = deriveItem(M, { id: 'd4', width: 1000, height: 2100, name: 'D4' }, { windowCategory: 'door', doorType: 'single-external', sidePanels: 'left', sideLeftWidth: 400, thresholdType: 'standard', doorOpenDirection: 'inward' });
+  const ipo = inw.derived.door?.zones?.posts?.[0];
+  check(`coupling post visible band (INWARD) = land + frame face = ${DP.geometry.land} + ${dE.frameHead.face} = ${DP.geometry.land + dE.frameHead.face} (was 104)`,
+    inw.derived.door.inward === true && ipo && near(ipo.visW, DP.geometry.land + dE.frameHead.face), JSON.stringify([inw.derived.door.inward, ipo]));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+section('5b — doors option B: every number against the tree before the change (' + DOOR_PREV + ')');
+{
+  // The old tree is rebuilt and derived the same way, so the BUILD-LOG table is
+  // produced BY the harness, not by hand arithmetic.
+  const OLDTREE = resolve(ROOT, '.audit', 'tree-door-prev');
+  rmSync(OLDTREE, { recursive: true, force: true });
+  mkdirSync(OLDTREE, { recursive: true });
+  execFileSync('bash', ['-lc', `git archive ${DOOR_PREV} src | tar -x -C "${OLDTREE}"`], { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit'] });
+  const OLD = await bundleTree(resolve(OLDTREE, 'src'), 't27-doorprev');
+  const ODP = OLD.profile.DEFAULT_DOOR_PROFILE;
+  const doorOf = (T, w, h, fc) => deriveItem(T, { id: 'x', width: w, height: h, name: 'X' }, { windowCategory: 'door', ...fc }).derived.door;
+  const FC1 = { doorType: 'single-external', thresholdType: 'standard' };
+  const FCF = { doorType: 'french', thresholdType: 'standard' };
+  const nowSingle = doorOf(M, 1000, 2100, FC1), oldSingle = doorOf(OLD, 1000, 2100, FC1);
+  const nowFrench = doorOf(M, 1200, 2100, FCF), oldFrench = doorOf(OLD, 1200, 2100, FCF);
+  const rows = [
+    ['profile land', ODP.geometry.land, DP.geometry.land, 36, 43],
+    ['profile leafAtJamb', ODP.deductions.leafAtJamb, DP.deductions.leafAtJamb, 40, 47],
+    ['profile leafFullHeight', ODP.deductions.leafFullHeight, DP.deductions.leafFullHeight, 87, 94],
+    ['profile leafNoThreshold', ODP.deductions.leafNoThreshold, DP.deductions.leafNoThreshold, 46, 53],
+    ['door 1000 leaf width', oldSingle.leaves[0].w, nowSingle.leaves[0].w, 920, 906],
+    ['door 2100 leaf height', oldSingle.leaves[0].h, nowSingle.leaves[0].h, 2013, 2006],
+    ['french 1200 leaf width', oldFrench.leaves[0].w, nowFrench.leaves[0].w, 563, 556],
+    ['french 1200 leaf height', oldFrench.leaves[0].h, nowFrench.leaves[0].h, 2013, 2006],
+  ];
+  for (const [what, was, now, expWas, expNow] of rows) {
+    console.log(`  ${what.padEnd(24)} ${String(was).padStart(6)} → ${String(now).padStart(6)}`);
+    check(`${what}: ${expWas} → ${expNow}`, near(was, expWas) && near(now, expNow), `${was} → ${now}`);
+  }
+  check('the OLD tree really carried option A (land 36, rebate step 68 − 36 = 32 ≠ rebate 25)', ODP.geometry.land === 36 && ODP.elements.frameHead.face - ODP.geometry.land !== ODP.geometry.rebate);
+  check('the NEW tree carries option B (land 43, rebate step 68 − 43 = 25 = the rebate)', DP.elements.frameHead.face - DP.geometry.land === DP.geometry.rebate);
+  // nothing else moved: the frame sections and the post are untouched by the land
+  const cutNow = M.lists.buildCutListForWindow(deriveItem(M, { id: 'z', width: 1000, height: 2100, name: 'Z' }, { windowCategory: 'door', ...FC1 }).derived, deriveItem(M, { id: 'z', width: 1000, height: 2100, name: 'Z' }, { windowCategory: 'door', ...FC1 }).spec);
+  const cutOld = OLD.lists.buildCutListForWindow(deriveItem(OLD, { id: 'z', width: 1000, height: 2100, name: 'Z' }, { windowCategory: 'door', ...FC1 }).derived, deriveItem(OLD, { id: 'z', width: 1000, height: 2100, name: 'Z' }, { windowCategory: 'door', ...FC1 }).spec);
+  const secs = (c) => c.map((r) => r.section).join(' ');
+  check('door cut-list SECTIONS unchanged by option B (the land moves lengths, not stock)', secs(cutNow) === secs(cutOld), `${secs(cutNow)} vs ${secs(cutOld)}`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

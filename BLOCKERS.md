@@ -9,6 +9,19 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 Entry gate re-run after `gothic-full-v1` landed on `main` (e037020): both markers 1 — §20 above is CLOSED, the
 night ran. Open items from the stages:
 
+### 23. Stage 3 — doors option B: what closed and what to watch
+
+| # | Item | Taken | Ask |
+|---|------|-------|-----|
+| 23.1 | **§19.1 CLOSED** | Doors follow option B: land 43 (= face 68 − rebate 25), leafAtJamb 47, leafFullHeight 94, leafNoThreshold 53. A 1000 door leaf is 906 (was 920), french 1200 gives two 556 leaves (were 563) | Done — this was the open question from night 6 |
+| 23.2 | **The door numbers are 43 / 47, not the casement's 47 / 51** | CLAUDE.md's "NIE RÓB DZIŚ" line said "land 47 / leafAtJamb 51 (opcja B także dla drzwi)", which are the CASEMENT numbers; the door rebate is 25, not 21, so option B gives 43 / 47. The stage-3 brief in the same file states 43 / 47 and that is what was built | FYI — the two lines in CLAUDE.md disagreed; the stage brief won |
+| 23.3 | **Quoted doors change by 14 mm** | Any existing project re-opens with a 906 leaf instead of 920 (and 2006 instead of 2013 high) — the same live re-derive issue as §19.3, now with doors in it | Same decision as §19.3: live re-derive, or a profile snapshot per project |
+| 23.4 | **No door profile is stored** | `setDoorProfile()` has no call site, so there is no stored copy to migrate and no schema bump was made. If door settings ever reach Window Settings / Supabase, they will need the `migrateCasementProfile` treatment | FYI |
+| 23.5 | **Coupling post band changed** | Outward 72 → 86, inward 104 → 111 (`door.zones.posts[].visW`). The 2D door sheets and the 3D read it from the profile, so both follow | FYI — worth a look at a door with a side panel in the viewer |
+| 23.6 | **Pricing / BOM not re-checked** | They consume the engine rows, so the narrower leaf flows through, but no quote was compared before and after | Spot-check one door quote in the morning |
+
+---
+
 ### 22. Stage 2 — one dimension rule on every sheet: decisions taken
 
 | # | Item | Taken | Ask |
@@ -89,7 +102,7 @@ C.1 `arch.minPieceLength` 400 HARD** (was 150 warn); §2 D5 / §3 d50 / §9.1 P9
 
 | # | Item | Taken | Ask |
 |---|------|-------|-----|
-| 19.1 | **Door land / leafAtJamb** | Spec F: doors change the face (68) and the coupling post (136) only — `DEFAULT_DOOR_PROFILE.geometry.land` stays 36, `deductions.leafAtJamb` 40, so a 1000 door leaf is still 920 and a 68 door jamb shows 36 with a 32 rebate step (68 − 36), not the casement's 21. Physically odd: the same 68 × 93 section rebated 21 on a casement and 32 on a door | Should the door follow option B too (land 47, leafAtJamb 51, leafFullHeight 98, coupling post visible band 47 + 47)? One line in the profile + t27 §5 re-vector |
+| 19.1 | **Door land / leafAtJamb** → **CLOSED 06.09 by night 7 stage 3** (land 43 / leafAtJamb 47; see §23) | Spec F: doors change the face (68) and the coupling post (136) only — `DEFAULT_DOOR_PROFILE.geometry.land` stays 36, `deductions.leafAtJamb` 40, so a 1000 door leaf is still 920 and a 68 door jamb shows 36 with a 32 rebate step (68 − 36), not the casement's 21. Physically odd: the same 68 × 93 section rebated 21 on a casement and 32 on a door | Should the door follow option B too (land 47, leafAtJamb 51, leafFullHeight 98, coupling post visible band 47 + 47)? One line in the profile + t27 §5 re-vector |
 | 19.2 | **Stored profile migration (`frameSchema` 2)** | Piotr's tenant profile in Supabase / localStorage still holds 57 / 36 / 40 / 87 / 54. `migrateCasementProfile` now moves each of those keys to the new default ONLY when it still equals the old default; a hand-edited value stays; a copy already marked `frameSchema 2` is never touched. The migrated profile is saved back by the store on its next sync | FYI — if the workshop had deliberately set a 57 jamb in Window Settings it stays 57 (by design); press "Reset to defaults" to take the whole 68 set |
 | 19.3 | **Profile snapshot per project (spec F.5 design note)** | Not built. A profile change re-derives every existing window live — the 06.09 change turns a quoted 920 leaf into 898 on the next open of an old project. `deriveWindowData()` is the single source of truth by design; freezing numbers per project would need a `profileSnapshot` stored with the project (the batch already carries `_profileSnapshot.casement` — unused by the engine) and an engine entry point that takes the snapshot instead of the active profile | Decide: (a) live re-derive (today), (b) snapshot at project creation with a "re-derive with the current profile" button, (c) snapshot at production-pack release only |
 | 19.4 | **Circle 800 frame ring now needs a 200 board** | Frame ring 400 / 332 (was 400 / 343): the independent planner and the engine both give W_req 182.3 > 180 for 4 pieces → **4 × 200** (was 4 × 180); 5 and 6 pieces fit 150 but fail the 400 shorter-edge limit, so no economy alternative. The leaf ring (349 / 282) stays blocked (4 × 180 → shorter edge 371.3 < 400; was 390.1) | FYI — a real material change for the workshop (the widest board on every 800 circle) |

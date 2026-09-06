@@ -143,7 +143,7 @@ export function windowSpecToConfig(windowSpec) {
     const dual = col.type === 'dual';
     return {
       windowCategory: 'door',
-      // v4 Block F: the door frame face / land from the door profile (68 / 36)
+      // v4 Block F + night 7 stage 3: the door frame face / land from the door profile (68 / 43)
       frameDims: doorFrameDims(),
       width: windowSpec.frame?.width || 900,
       height: windowSpec.frame?.height || 2100,
@@ -285,7 +285,7 @@ export function windowSpecToConfig(windowSpec) {
 // ─── Frame dims for the 3D (ARCHED-WINDOWS-v4 Block F) ───
 // The 3D components carry the PSW constants (57 / 36) as defaults; PC hands
 // them the profile numbers: frameFace = head / jamb face, extFace = visible
-// land (face − rebate). Doors keep their own profile (face 68, land 36).
+// land (face − rebate). Doors keep their own profile (face 68, land 43).
 export function casementFrameDims() {
   const p = getCasementProfile();
   return { frameFace: p.elements.frameHead.face, extFace: p.geometry.land };
