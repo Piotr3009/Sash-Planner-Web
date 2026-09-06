@@ -9,6 +9,19 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 Entry gate re-run after `gothic-full-v1` landed on `main` (e037020): both markers 1 — §20 above is CLOSED, the
 night ran. Open items from the stages:
 
+### 22. Stage 2 — one dimension rule on every sheet: decisions taken
+
+| # | Item | Taken | Ask |
+|---|------|-------|-----|
+| 22.1 | **Vertical chains go LEFT, heights go RIGHT** | The brief names three placements (spacings / axes bottom, overall width top, heights right) and is silent on which side a VERTICAL chain takes. The reference glass sheet puts it on the LEFT with the overall height on the right, so the frame sheet was mirrored to match (its chain was on the right, its arch / transom height dims on the left) | Confirm the left-hand vertical chain on the frame sheet; the alternative is chain right + heights left, which would then differ from the glass and leaf sheets |
+| 22.2 | **`BoxDetail2D` left untouched** | Its `Y` mapping is y-up, so the member chain was ALWAYS along the bottom, the inner width at the top and the height chain on the right — it already satisfied all three rules. t22 §1b asserts that, before and after, rather than churning the sheet | FYI — if you expected the box sheet to change, it had nothing to change |
+| 22.3 | **Elements grid needed no code** | `ElementsTab` in `ProductionPackPage` renders `CasementFrameDetail2D` / `CasementLeafDetail2D` / `BoxDetail2D` / `SashDetail2D` directly, and the Elements PDF rasterises those same SVGs — the rule arrives with the components | FYI |
+| 22.4 | **Radius callouts are exempt** | `R 500` labels sit ON the arc in the theme's dim colour; the rule governs dimension lines, not annotations, so the gate ignores strings starting with `R ` | Confirm — otherwise every arch sheet would have to move its radius labels below the drawing, far from the arc they describe |
+| 22.5 | **The frame chain sits 34·ts under the frame, not the glass sheet's 24·ts** | At 24·ts a chain leader label (14 up, 17 tall) printed over the `C-CILL` label inside the frame. 34·ts is derived from those two theme numbers, so it holds at any sheet size | FYI |
+| 22.6 | **Nothing was seen in a browser** | The proof is server-rendered SVG: viewBox unchanged on every sheet, rule satisfied, zero new label overlaps and zero new texts outside the viewBox across 11 window shapes | Look at Leaf / Frame / Elements in the morning and say whether the new placement reads right |
+
+---
+
 ### 21. Stage 1 — glass DXF for every unit: erratum and decisions taken
 
 | # | Item | Taken | Ask |

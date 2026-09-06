@@ -11,6 +11,76 @@ piece` **1** — both green, branch rebased onto `origin/main` keeping the night
 tree: t16 368 · t17_edges 70 · t18 178 · t19 244 · t20 **117** (was 116 — gothic-full-v1 adds one) · t20_bars 32 ·
 t21 120 · t22 77 · t23 81 · t24_stage4 26 · t25 201 · t26 36 · t27 64 = 1614 ALL PASS, build OK.
 
+### STAGE 2 — one dimension rule on every sheet ✅
+
+**Verdict ✅** — t19 **280** (was 244) and t22 **118** (was 77) ALL PASS with the new rule gate, whole suite
+t16–t28 = **1742 checks ALL PASS**, `npm run build` OK (16.5 s), esbuild clean on all five touched sheets,
+no Polish in sources.
+
+**The rule** (as `CasementGlassDrawing2D` already implemented it — the sheet Piotr called right): spacing chains
+and axis dims along the **BOTTOM**, the overall **width at the TOP**, **heights on the RIGHT**. arch-pieces-v1 had
+applied it to the casement elevation and glass sheets only (the comment in t19 §1 records that); this stage brings
+the rest in line.
+
+| Sheet | Before | After |
+|-------|--------|-------|
+| `CasementLeafDetail2D` | chain TOP, overall width BOTTOM | chain BOTTOM, width TOP (height / arch dims already right) |
+| `CasementFrameDetail2D` | chain TOP, vertical chain RIGHT, width BOTTOM, arch + transom axis dims LEFT | chain BOTTOM, vertical chain LEFT, width TOP, arch start / rise + transom axes RIGHT |
+| `FrontElevation2D` (sash) | width BOTTOM, arch start / rise LEFT | width TOP, arch dims RIGHT, overall height steps outside them |
+| `SashDetail2D` | chain TOP, width BOTTOM | chain BOTTOM (below the horns on an upper sash), width TOP |
+| `GlassDrawing2D` (sash) | chain TOP, width BOTTOM | chain BOTTOM, width TOP |
+| `BoxDetail2D` | — | **unchanged**: its `Y` is y-up, so the chain was always at the bottom, the inner width at the top and the height chain on the right — it already satisfied the rule (t22 §1b proves it, before and after) |
+| Elements grid (PP) | — | **no separate change**: `ElementsTab` renders these very components (Frame / Leaf / Box / Sash) and the Elements PDF rasterises the same SVGs, so it inherits the rule |
+
+**What moved, in sheet coordinates** (040L 1000 × 1500 casement, 1000 × 1500 sash 6x6):
+
+| Sheet | Label | y/x before → after |
+|-------|-------|--------------------|
+| casement leaf | overall width `898` | y 1684 → **151** |
+| casement leaf | chain stile `67` | y 163 → **1663** |
+| casement frame | overall width `1000` | y 1902 → **142** |
+| casement frame | chain land `47` | y 159 → **1816** |
+| casement frame | overall height `1500` | unchanged (x 1520) |
+| sash elevation | width `1000` | y 1809 → **75** |
+| sash upper | overall width `822` | y 848 → **73** |
+| sash glass | width `733 mm` | y 878 → **146** |
+
+**Scale unchanged:** every viewBox is byte-identical before and after — leaf 1430.76 × 1962.8, frame 1900 × 2100,
+elevation 1720 × 2010, upper 1134.36 × 983.42, glass 1143.48 × 1022.98, box 2020 × 2520. Two intermediate versions
+of this stage grew the leaf and frame sheets by a chain band; both were reverted once measurement showed the bottom
+now needs LESS room than the overall width did (28·ts vs 60·ts), and the frame's computed bottom band is floored at
+the old `DM`.
+
+**Layout numbers derived, not tuned:** the frame's chain sits at `34·ts` under the frame because a chain leader
+label reaches `leaderV 14` up and is `dimSmall 17` tall — at `24·ts` (the glass sheet's value, which has no member
+labels) it printed over the `C-CILL` label inside the frame at every size. The mullion axis dims then step below
+the chain (`chainY + 30·ts + DM·0.3·i`) and the bottom band grows with their count so the title always clears.
+
+**New gate — `verify/arch/lib/dimRule.mjs`** (used by t19 §1b, t22 §1b, t27 §9): reads the RENDERED sheet, tells
+the overall dims from the chains by dim size, tells horizontal from vertical dims by rotation, recognises a vertical
+chain's upright leader labels by their proximity to that chain's rotated labels, and ignores `R …` radius callouts
+(annotations on the arc, not dimension lines). It is a real gate, not a tautology: t19 §1b re-renders the sheets
+from **0d211fd** and asserts the rule REJECTS the old frame and leaf sheets while ACCEPTING the elevation and glass
+sheets it already governed.
+
+**Collision evidence** (rotation-aware text-box overlap, live vs `0d211fd`): 0 new overlapping label pairs and 0 new
+texts outside the viewBox on casement 040L / 131 / 133 / 144 / arched and on sash 1000×1500 6x6 / 1200×2000 9x9 /
+arched 1000×2200 / wide 2000×900 / tall 500×2400 / 600×900. One PRE-EXISTING overlap on the multi-light frame
+sheets disappeared. The first cut of the frame sheet did introduce three collisions (`26` over `C-CILL`, `551.5`
+over `axis 611.5` / `axis 1188.5`); they are what drove the 34·ts / axis-below-chain layout above.
+
+**Fixtures re-baselined** (deliberate, per CLAUDE.md): `rect-casement-sheets.json` via
+`node verify/arch/t19_baseline.mjs live` and `rect-sash-sheets.json` via `node verify/arch/t22_baseline.mjs`.
+`rect-casement-base.json` and `rect-sash-base.json` (ENGINE data) were NOT touched — no engine number changed in
+this stage. t27 §9's guard was narrowed accordingly: it now requires the sash ENGINE fixture to be clean and adds a
+check that the re-baselined sash sheets really carry the new placement.
+
+**Not verified in this stage:** nothing was opened in a browser and no PDF was opened in a viewer — the evidence is
+the server-rendered SVG (react-dom/server), its viewBox, its text positions and the overlap analysis. Whether the
+new layout *looks* right to Piotr is a morning judgement; the geometry is what the harness can prove.
+
+---
+
 ### STAGE 1 — glass DXF carries EVERY glass unit ✅
 
 **Verdict ✅** — t28 **50 checks ALL PASS**, whole suite t16–t28 = **1664 checks ALL PASS**, `npm run build` OK

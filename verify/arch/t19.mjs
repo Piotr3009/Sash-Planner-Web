@@ -23,9 +23,13 @@
  *
  * Run: node verify/arch/t19.mjs
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdirSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { ROOT, bundleTree, renderSheets, deriveItem } from './lib/sheets.mjs';
+import { checkDimRule } from './lib/dimRule.mjs';
+
+const DIM_PREV = '0d211fd';   // Stage 1 commit — the sheets before the dimensions moved
 
 const M = await bundleTree(resolve(ROOT, 'src'), 't19', [
   ['archDxf', 'engine/cnc/archDxf.js'],
@@ -150,6 +154,46 @@ section('1 — rectangular casements: every sheet byte-identical to the pre-nigh
       Object.values(same).every(Boolean) && !/data-arch-origin| A /.test(now.elevation + now.frame), JSON.stringify(same));
   }
   check('22 sheets compared', sheets === 22, String(sheets));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+section('1b — dimension placement rule (night 7 stage 2): chains BOTTOM, overall width TOP, height RIGHT');
+{
+  // arch-pieces-v1 had already moved the elevation and the glass sheet; night 7
+  // stage 2 adds the frame and the leaf sheets, so ALL FOUR follow one rule now.
+  // checkDimRule reads the rendered sheet: large dim texts are the overall dims,
+  // small upright ones the horizontal chains / axis dims, and a vertical chain's
+  // upright leader labels are recognised by sitting beside its rotated labels.
+  const FX = JSON.parse(readFileSync(resolve(ROOT, 'verify', 'arch', 'fixtures', 'rect-casement-base.json'), 'utf8'));
+  const CASES = [
+    ...Object.entries(FX).map(([name, c]) => [name, { id: 'fx_' + name, width: c.input.width, height: c.input.height, name }, { windowCategory: 'casement', ...c.input.fc }]),
+    ['133 fanlights', { id: 'L133', width: 1800, height: 1500, name: 'L133' }, { windowCategory: 'casement', casementLayout: '133' }],
+    ['144 four lights', { id: 'L144', width: 2400, height: 1500, name: 'L144' }, { windowCategory: 'casement', casementLayout: '144' }],
+  ];
+  let sheetsChecked = 0;
+  for (const [tag, item, fc] of CASES) {
+    const { spec, derived } = deriveItem(M, item, fc);
+    const S = renderSheets(M, spec, derived);
+    const named = [['elevation', S.elevation], ['frame', S.frame],
+      ...S.leaf.map((l, i) => [`leaf ${i + 1}`, l.svg]), ...S.glass.map((g, i) => [`glass ${i + 1}`, g.svg])];
+    for (const [sheet, svg] of named) {
+      const r = checkDimRule(svg);
+      sheetsChecked++;
+      check(`${tag} ${sheet}: overall width TOP (y ${r.widthY?.toFixed(0)}), height RIGHT (x ${r.heightX?.toFixed(0)}), ${r.bottom} horizontal dim(s) along the bottom`, r.ok, r.why);
+    }
+  }
+  check(`${sheetsChecked} casement sheets checked against the rule`, sheetsChecked >= 22, String(sheetsChecked));
+  // the rule is a real gate: the pre-stage tree fails it on the two sheets Piotr named
+  const OLDTREE = resolve(ROOT, '.audit', 'tree-dimrule-prev');
+  rmSync(OLDTREE, { recursive: true, force: true });
+  mkdirSync(OLDTREE, { recursive: true });
+  execFileSync('bash', ['-lc', `git archive ${DIM_PREV} src | tar -x -C "${OLDTREE}"`], { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit'] });
+  const OLD = await bundleTree(resolve(OLDTREE, 'src'), 't19-dimprev');
+  const { spec: os, derived: od } = deriveItem(OLD, { id: 'fx_R1', width: 1000, height: 1500, name: 'R1' }, { windowCategory: 'casement', casementLayout: '040L', casementHBars: 1, casementVBars: 2 });
+  const OS = renderSheets(OLD, os, od);
+  check(`the rule REJECTS the pre-stage frame + leaf sheets (${DIM_PREV}) and accepts the elevation + glass it already governed`,
+    !checkDimRule(OS.frame).ok && !checkDimRule(OS.leaf[0].svg).ok && checkDimRule(OS.elevation).ok && checkDimRule(OS.glass[0].svg).ok,
+    `${checkDimRule(OS.frame).ok} / ${checkDimRule(OS.leaf[0].svg).ok} / ${checkDimRule(OS.elevation).ok} / ${checkDimRule(OS.glass[0].svg).ok}`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -25,6 +25,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ROOT, bundleTree, deriveItem } from './lib/sheets.mjs';
+import { checkDimRule } from './lib/dimRule.mjs';
 
 let pass = 0, fail = 0;
 const failures = [];
@@ -274,12 +275,16 @@ section('9 — materials labels, fixtures re-baselined from the live tree');
   check(`fixture rect-casement-sheets.json provenance: ref "live" from ${sheets.commit?.slice(0, 7)}, 4 windows`, sheets.ref === 'live' && typeof sheets.commit === 'string' && sheets.commit.length === 40 && Object.keys(sheets.sheets || {}).length === 4);
   const elev = sheets.sheets?.R1?.elevation || '';
   check(`R1 elevation sheet carries the 898 leaf (text "${leafW}") and not 920`, elev.includes(String(leafW)) && !/\b920\b/.test(elev));
-  // the sash fixtures were re-baselined earlier on this branch (night-6 Stage 2 sheet layout); Block F must not
-  // touch them again: clean in the working tree, and the sash profile still carries its own 57 stiles (t22 is the snapshot proof)
+  // The sash ENGINE fixture must stay untouched — no night since Block F has changed a
+  // sash number. The sash SHEETS fixture was deliberately re-baselined in night 7 stage 2
+  // (the dimensions moved: chains to the bottom, overall width to the top), so it is no
+  // longer part of this guard; t22 §1 is its byte-identity proof and §1b the rule proof.
   const sash = JSON.parse(readFileSync(resolve(ROOT, 'verify', 'arch', 'fixtures', 'rect-sash-sheets.json'), 'utf8'));
-  const sashWt = execFileSync('git', ['status', '--porcelain', '--', 'verify/arch/fixtures/rect-sash-base.json', 'verify/arch/fixtures/rect-sash-sheets.json'], { cwd: ROOT, encoding: 'utf8' }).trim();
+  const sashWt = execFileSync('git', ['status', '--porcelain', '--', 'verify/arch/fixtures/rect-sash-base.json'], { cwd: ROOT, encoding: 'utf8' }).trim();
   const SP = M.profile.DEFAULT_SASH_PROFILE;
-  check('sash fixtures untouched by Block F (clean in the working tree, 6 sash windows); sash profile stiles / top rail face 57 unchanged (sash is not in Block F)', sashWt === '' && Object.keys(sash).length === 6 && SP.elements.stiles.face === 57 && SP.elements.topRail.face === 57, `${sashWt} / ${Object.keys(sash).length} / ${SP.elements.stiles.face}`);
+  check('sash ENGINE fixture untouched (rect-sash-base.json clean), 6 sash windows in the sheets fixture; sash profile stiles / top rail face 57 unchanged (sash is not in Block F)', sashWt === '' && Object.keys(sash).length === 6 && SP.elements.stiles.face === 57 && SP.elements.topRail.face === 57, `${sashWt} / ${Object.keys(sash).length} / ${SP.elements.stiles.face}`);
+  // and the re-baselined sash sheets really carry the new placement
+  check('rect-sash-sheets.json re-baselined with the night-7 rule (upper sash: no chain label above the overall width)', checkDimRule(sash.std_2x2.upper).ok, checkDimRule(sash.std_2x2.upper).why);
   const port = readFileSync(resolve(ROOT, 'docs', 'handover', 'PSW-FRAME-68-PORT.md'), 'utf8');
   check('docs/handover/PSW-FRAME-68-PORT.md: estimate-renderer FRAME_FACE lines, casement-controller version 3 + innerH, 3D constants, 898 × 1402 check', /estimate-renderer\.js/.test(port) && /1503/.test(port) && /CASEMENT_LAYOUTS_VERSION = 3/.test(port) && /CasementFrame\.jsx/.test(port) && /DoorFrame\.jsx/.test(port) && /898/.test(port) && /1402/.test(port));
 }

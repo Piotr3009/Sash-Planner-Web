@@ -16,6 +16,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { bundleSashTree, renderSashSheets, ROOT, AUDIT } from './lib/sashSheets.mjs';
+import { checkDimRule } from './lib/dimRule.mjs';
 
 mkdirSync(AUDIT, { recursive: true });
 const SAMPLES = resolve(ROOT, 'docs', 'handover', 'samples');
@@ -118,6 +119,33 @@ section('1 — rectangular sash sheets: byte-identical to the HEAD fixture (elev
     const live = renderSashSheets(M, spec, derive(spec));
     const diff = Object.keys(sheets).filter((k) => live[k] !== sheets[k]);
     check(`rectangular ${name}: ${Object.keys(sheets).length} sheets identical`, diff.length === 0, diff.join(', '));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+section('1b — dimension placement rule (night 7 stage 2) on the sash sheets');
+{
+  // elevation / upper / lower / glass follow the casement glass sheet's rule now;
+  // the BOX sheet already did (its Y is y-up: the chain was always at the bottom,
+  // the inner width at the top, the height chain on the right) and is untouched.
+  const FXB = JSON.parse(readFileSync(resolve(ROOT, 'verify', 'arch', 'fixtures', 'rect-sash-base.json'), 'utf8'));
+  let n = 0;
+  for (const [name, c] of Object.entries(FXB)) {
+    const spec = specification.normaliseToWindowSpec({ id: 'fx_' + name, name, width: c.input.width, height: c.input.height }, { fullConfig: c.input.fc });
+    const S = renderSashSheets(M, spec, derive(spec));
+    for (const k of ['elevation', 'upper', 'lower', 'glassUpper', 'glassLower', 'box']) {
+      const r = checkDimRule(S[k]);
+      n++;
+      check(`${name} ${k}: overall width TOP (y ${r.widthY?.toFixed(0)}), height RIGHT (x ${r.heightX?.toFixed(0)}), ${r.bottom} horizontal dim(s) along the bottom`, r.ok, r.why);
+    }
+  }
+  check(`${n} sash sheets checked against the rule`, n >= 30, String(n));
+  // the arched sash (the same window section 2 uses; CASES is declared below)
+  const arched = psw('SS', 1000, 2200, { archShape: 'semi-circle', archBarPattern: 'hub-spoke', archHBars: 1, lowerHBars: 2 });
+  const SA = renderSashSheets(M, arched, derive(arched));
+  for (const k of ['elevation', 'upper', 'lower', 'glassLower']) {
+    const r = checkDimRule(SA[k]);
+    check(`arched sash SS ${k}: follows the rule and renders without NaN`, r.ok && !/NaN|Infinity/.test(SA[k]), r.why);
   }
 }
 

@@ -231,8 +231,9 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
 
         {/* ── DIMENSIONS ── */}
 
-        {/* Top chain: 11 | seg | 18 | seg | 11 */}
-        <DimChainH y={oy - 24 * ts} extFrom={oy - 4 * ts}
+        {/* Bottom chain: 11 | seg | 18 | seg | 11 — bar spacings run along the
+            BOTTOM edge (Piotr 06.09, as on the casement glass sheet) */}
+        <DimChainH y={oy + d.glassH + 24 * ts} extFrom={oy + d.glassH + 4 * ts}
           cuts={d.hCuts.map(cx => ox + cx)}
           vbw={totalW} minSegment={SPACER_BAR * 1.5} fmt={fmt} />
 
@@ -241,9 +242,9 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
           cuts={d.vCuts.map(cy => oy + cy)}
           vbw={totalW} minSegment={SPACER_BAR * 1.5} fmt={fmt} />
 
-        {/* Overall width — bottom */}
-        <DimH y={oy + d.glassH + DM * 0.8} x1={ox} x2={ox + d.glassW}
-          extFrom={oy + d.glassH} label={`${fmt(d.glassW)} mm`} vbw={totalW} />
+        {/* Overall width — top (Piotr 06.09) */}
+        <DimH y={oy - 30 * ts} x1={ox} x2={ox + d.glassW}
+          extFrom={oy} label={`${fmt(d.glassW)} mm`} vbw={totalW} />
 
         {/* Overall height — right */}
         <DimV x={ox + d.glassW + DM * 0.8} y1={oy} y2={oy + d.glassH}
