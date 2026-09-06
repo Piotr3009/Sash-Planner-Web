@@ -18,6 +18,8 @@ import { jsPDF } from 'jspdf';
 import { buildGlassListForWindow } from '../engine/lists.js';
 import { computeGlassBarPositions } from '../components/drawings/drawingUtils.jsx';
 import { chainYAtX } from '../engine/arch.js';
+import { getCasementProfile } from '../engine/profile.js';
+import { readGlassProfile, barBandCurves, glassEdgeArcs, barEndRows, useBarTable } from '../engine/glassBars.js';
 
 // ─── COLORS (RGB 0-255) ───
 const C = {
@@ -101,23 +103,17 @@ function shapeLabel(shape) {
  * clear height (y, unit bottom → apex) — P6, one line for the schedule.
  */
 function shapeBarText(shape) {
-  const W = shape.outline?.width || 0, H = shape.outline?.height || 0;
+  const H = shape.outline?.height || 0;
   const parts = [`springing ${fmt(shape.springing)} (${pct(shape.springing, H)})`];
-  for (const b of shape.bars || []) {
-    if (b.kind === 'arc') {
-      const a = b.arc;
-      parts.push(b.role === 'ring'
-        ? `${b.id} ring R ${fmt(a.r)}`
-        : `${b.id} ${b.role} R ${fmt(a.r)} c (${fmt(a.cx)}, ${fmt(a.cy)})`);
-      continue;
-    }
-    const [x0, y0] = b.from, [x1, y1] = b.to;
-    if (b.role === 'v' || Math.abs(x1 - x0) < 1e-6) parts.push(`${b.id} x ${fmt(x0)} (${pct(x0, W)}) to y ${fmt(Math.max(y0, y1))}`);
-    else if (b.role === 'h' || b.role === 'springing' || Math.abs(y1 - y0) < 1e-6) parts.push(`${b.id} y ${fmt(y0)} (${pct(y0, H)}) x ${fmt(Math.min(x0, x1))}-${fmt(Math.max(x0, x1))}`);
-    else parts.push(`${b.id} ${b.role} ${fmt(Math.atan2(y1 - y0, x1 - x0) * DEG)}° from (${fmt(x0)}, ${fmt(y0)}) L ${fmt(b.length)}`);
-  }
+  const bars = shape.bars || [];
+  // v3 0.3: the bar-end dimensioning rows (glassBars.js) — the same numbers as
+  // the sheet and the DXF; with more than 4 bars the rows go in the table
+  // under the drawing and the header only counts them.
+  if (useBarTable(bars)) parts.push(`${bars.length} bars — see table`);
+  else for (const r of barEndRows(bars, shape.outline)) parts.push(r.label);
   return parts.join(' · ');
 }
+void DEG;
 
 /** Cubic Bézier segments (≤ 90° each) of a counter-clockwise arc, unit frame (y up). */
 function arcBeziers(a) {
@@ -148,6 +144,12 @@ function outlineLines(outline, sc) {
     lines.push([c1[0] * sc - cur[0], -c1[1] * sc - cur[1], c2[0] * sc - cur[0], -c2[1] * sc - cur[1], p[0] * sc - cur[0], -p[1] * sc - cur[1]]);
     cur = [p[0] * sc, -p[1] * sc];
   };
+  if (outline.kind === 'circle') {
+    // circle (v3 Block 3): start at the right end of the horizontal diameter, no straight edge
+    to(outline.width, outline.springing);
+    for (const a of outline.arcs) for (const seg of arcBeziers(a)) bez(seg.c1, seg.c2, seg.p3);
+    return lines;
+  }
   to(outline.width, 0);
   to(outline.width, outline.springing);
   for (const a of outline.arcs) for (const seg of arcBeziers(a)) bez(seg.c1, seg.c2, seg.p3);
@@ -695,11 +697,15 @@ function drawShapedGlass(doc, cx, cy, cw, ch, g) {
   doc.setLineWidth(LW.cellIn);
   doc.line(cx + 0.3, cy + headH, cx + cw - 0.3, cy + headH);
 
+  // v3 0.3: bar-end table under the drawing when there are more than 4 bars
+  const endRows = useBarTable(bars) ? barEndRows(bars, o) : [];
+  const TABLE_ROW = 2.4;
+  const tableH = endRows.length ? (endRows.length + 1) * TABLE_ROW + 2 : 0;
   const dMargin = { l: 10, t: 8, r: 10, b: 8 };
   const areaX = cx + 2;
   const areaY = cy + headH + 2;
   const areaW = cw - 4;
-  const areaH = ch - headH - 6;
+  const areaH = ch - headH - 6 - tableH;
   const availW = areaW - dMargin.l - dMargin.r;
   const availH = areaH - dMargin.t - dMargin.b;
   const sc = Math.min(availW / o.width, availH / o.height);
@@ -715,10 +721,45 @@ function drawShapedGlass(doc, cx, cy, cw, ch, g) {
   doc.setLineWidth(LW.outline);
   doc.lines(outlineLines(o, sc), gx, oyBottom, [1, 1], 'FD', true);
 
-  // Bar axes
+  // v3 0.2: edge cover line (profile glass.edgeCover per glass type) + spacer bands (glass.barWidth) — the DXF geometry
+  const G = readGlassProfile(getCasementProfile(), g.type || 'double');
   dc(doc, C.glass);
   doc.setLineWidth(LW.seal);
+  doc.setLineDashPattern([0.8, 0.5], 0);
+  const edgeArcs = glassEdgeArcs(o, G.edgeCover);
+  const edgeOutline = { width: o.width - 2 * G.edgeCover, springing: o.springing - G.edgeCover, arcs: edgeArcs.map((a) => ({ ...a, cx: a.cx - G.edgeCover, cy: a.cy - G.edgeCover })) };
+  doc.lines(outlineLines(edgeOutline, sc), gx + G.edgeCover * sc, oyBottom - G.edgeCover * sc, [1, 1], 'S', true);
+  doc.setLineDashPattern([], 0);
+  for (const b of bars) for (const c of barBandCurves(b, G.barWidth / 2)) drawBarAxis(doc, c.kind === 'arc' ? { kind: 'arc', arc: c.arc } : { kind: 'straight', from: c.from, to: c.to }, gx, oyBottom, sc);
+  // Bar axes
+  dc(doc, C.dim);
+  doc.setLineWidth(LW.ext);
+  doc.setLineDashPattern([0.5, 0.4], 0);
   for (const b of bars) drawBarAxis(doc, b, gx, oyBottom, sc);
+  doc.setLineDashPattern([], 0);
+  // bar ids beside the ends that lie on the arch (the numbers are in the header line or the table)
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(4.5);
+  tc(doc, C.dim);
+  for (const b of bars) {
+    const end = b.kind === 'arc' ? (b.role === 'ring' ? [b.arc.cx, b.arc.cy + b.arc.r] : [b.to, b.from].find((e) => e[1] > o.springing + 0.01) || b.to) : (b.to[1] >= b.from[1] ? b.to : b.from);
+    doc.text(b.id, gx + end[0] * sc + 0.6, oyBottom - end[1] * sc + 1.6);
+  }
+  // v3 0.3: the table (id · s from apex / position · L · angle / R)
+  if (endRows.length) {
+    const ty = areaY + areaH + 2;
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(4.5);
+    tc(doc, C.dark);
+    const colX = [areaX + 1, areaX + 8, areaX + areaW * 0.62, areaX + areaW * 0.76];
+    ['ID', 's from apex / position', 'L', 'angle / R'].forEach((h, i) => doc.text(h, colX[i], ty + TABLE_ROW * 0.8));
+    doc.setFont('courier', 'normal');
+    tc(doc, C.dim);
+    endRows.forEach((r, i) => {
+      const y = ty + TABLE_ROW * (i + 1.8);
+      [r.id, r.cells.s, r.cells.L, r.cells.angle].forEach((v, k) => doc.text(String(v), colX[k], y));
+    });
+  }
 
   // ── CHAIN H (top): vertical bar / mullion x positions ──
   const xs = [...new Set(bars.filter((b) => b.kind === 'straight' && Math.abs(b.to[0] - b.from[0]) < 1e-6).map((b) => Math.round(b.from[0] * 10) / 10))].sort((a, b) => a - b);
@@ -870,7 +911,7 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
           barsH: r.barsH,
           // shaped unit (arched casement): outline + bar list for the Shape
           // column, the mm + % line and the drawing cell
-          shape: r.shape?.kind === 'arched' ? r.shape : null,
+          shape: r.shape?.kind === 'arched' || r.shape?.kind === 'circle' ? r.shape : null,
           sashW,
           sashH,
           faces: derived?.sashDims,

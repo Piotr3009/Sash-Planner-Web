@@ -61,6 +61,19 @@ export const DEFAULT_SASH_PROFILE = {
     jambHeight: 108,  // jamb L = frame H − this
     headWidth: 0,     // head L = frame W − this
   },
+  // ── Arched sash (ARCHED-WINDOWS-v3 Block 1, night 5) ─────────────────────
+  // The box head is an arched RING headFace deep (PSW ArchedSashWindow.jsx
+  // HEAD_FACE 80 — DEFAULT (open), BLOCKERS); the upper sash's arched top rail
+  // sits deductions.sashWidth / 2 inside the frame contour (rule C: the ring
+  // meets the stile line) with the face of elements.topRail. Limits from PSW
+  // price-calculator.js (MIN_WIDTH / MAX_WIDTH / MIN_STRAIGHT / MIN_UPPER_STILE).
+  // The blank planner numbers (stock, finger, allowance) are the CNC's and live
+  // once, in the casement profile `arch` block.
+  sashArch: {
+    headFace: 80,
+    minHaunchRadius: 150,
+    limits: { minWidth: 400, maxWidth: 1500, minStraightBelowRise: 900, minUpperStile: 100 },
+  },
 };
 
 // Timber density calibrated from the legacy kg/m constants
@@ -166,6 +179,11 @@ export const DEFAULT_CASEMENT_PROFILE = {
     patterns: {
       hubRingRatios: [0.3, 0.6, 0.8],
       intersecting: { pitch: 450, minMullions: 2, maxMullions: 4, minRadius: 30 },
+      // v3 Block 3: sunburst in a CIRCLE fixed window (PSW 3d-src FixFrameWindow
+      // CircleFrame): one ring `offset` mm inside the clear circle, `spokes`
+      // spokes from the ring to the glass edge. PSW's per-window offset
+      // (fixCircleOffset, default 200) is imported; this is the PC default.
+      sunburst: { offset: 200, spokes: 6 },
     },
     // Finger-joint profile of the Stark d50 head (D5): finger length / joint
     // depth / pitch — printed on the drawing as FINGER 15/16/3.8.
@@ -186,6 +204,11 @@ export const DEFAULT_CASEMENT_PROFILE = {
     // (tie -> fewer pieces); 'fewest' = fewest pieces that fit a board. The
     // other rule's plan is printed on the sheet as ALT. Flip here, no code.
     pieceRule: 'narrowest',
+    // v3 0.6 (DEFAULT open, BLOCKERS): a finger-jointed piece shorter than
+    // this (finished chord, mm) is flagged on the plan (`shortPieces`) and
+    // the sheet — never blocked. Piotr decides whether a 65–110 mm haunch
+    // piece is acceptable (BLOCKERS 9.3).
+    minPieceLength: 150,
     // Validity limits (spec §3.3 / §5): PSW MIN_WIDTH / MAX_WIDTH, and the PSW
     // arched-sash rules adopted for the casement until Piotr says otherwise —
     // straight part below the arch (height >= rise + this) and the straight
@@ -193,6 +216,37 @@ export const DEFAULT_CASEMENT_PROFILE = {
     // geometry and live in arch.js.
     limits: { minWidth: 400, maxWidth: 1500, minStraightBelowRise: 900, minLeafStraightStile: 100 },
   },
+  // ── Glazier numbers (ARCHED-WINDOWS-v3 Block 0.2) — the sealed unit's
+  // spacer bar width laid out in the pattern, and the edge cover: the
+  // perimeter spacer / seal band inside the unit contour. DEFAULT (open,
+  // BLOCKERS): 11 for every glass type until Piotr gives the triple value.
+  glass: {
+    barWidth: 18,
+    edgeCover: { default: 11, double: 11, double_slim: 11, triple: 11, single: 11, passive: 11 },
+  },
+  // ── Timber tracery over the arched unit (v3 Block 0.4, numbers from
+  // docs/handover/workshop/arka_CNC-piotr.dxf): bead profile R8 along every
+  // pane opening — pane outline +paneOffset is the VCarve rail, +paneOffset +
+  // profileWidth the bead limit; ridgeLand = timber left between two beads on
+  // a bar (bar width = 2·(paneOffset + profileWidth) + ridgeLand = 22),
+  // edgeLand = timber outside the bead at the board edge (edge margin =
+  // paneOffset + profileWidth + edgeLand = 18). mitreLeg = corner guide leg
+  // along each edge. sides = boards per window (tracery on ONE side, Piotr).
+  tracery: {
+    paneOffset: 2,
+    profileWidth: 8,
+    ridgeLand: 2,
+    edgeLand: 8,
+    mitreLeg: 15,
+    sides: 1,
+    boardThickness: 18,   // DEFAULT (open): the tracery board thickness for the cut list section
+  },
+  // ── FIXED windows in the casement batch (ARCHED-WINDOWS-v3 Block 3, Piotr
+  // 07.09): a fixed window is the casement frame + a NON-OPENING
+  // leaf (same members, no hardware). DEFAULT (open, BLOCKERS): 'fixedLeaf';
+  // 'directGlazed' (glass straight into the frame rebate, no leaf) has no
+  // rebate numbers in this profile yet — the engine refuses it readably.
+  fix: { construction: 'fixedLeaf' },
   rounding: 0.1,       // mm — CNC-ready, one decimal
 };
 
@@ -226,6 +280,11 @@ export function migrateCasementProfile(profile) {
     // widthAllowance / maxPieces, invented stock list) is replaced whole.
     // v1.4 (arched-casement-v2): version 3 adds minHaunchRadius + patterns;
     // a stored v2 block is replaced whole (no UI edits this block yet).
+    // v3 (arched-windows-v3): glazier block + tracery block, filled from the
+    // default for older stored copies (no UI edits them yet).
+    glass: { ...D.glass, ...(profile.glass || {}), edgeCover: { ...D.glass.edgeCover, ...(profile.glass?.edgeCover || {}) } },
+    tracery: { ...D.tracery, ...(profile.tracery || {}) },
+    fix: { ...D.fix, ...(profile.fix || {}) },
     arch: profile.arch?.version === D.arch.version
       ? {
           ...D.arch, ...profile.arch,
@@ -234,6 +293,7 @@ export function migrateCasementProfile(profile) {
           patterns: {
             ...D.arch.patterns, ...(profile.arch.patterns || {}),
             intersecting: { ...D.arch.patterns.intersecting, ...(profile.arch.patterns?.intersecting || {}) },
+            sunburst: { ...D.arch.patterns.sunburst, ...(profile.arch.patterns?.sunburst || {}) },
           },
         }
       : D.arch,
@@ -345,6 +405,10 @@ export function normalizeSashProfile(p) {
   if (!p || !p.deductions) return p;
   if (!p.glassMakeup) {
     p.glassMakeup = { ...DEFAULT_SASH_PROFILE.glassMakeup };
+  }
+  // v3: arched-sash block for stored profiles (no UI edits it yet)
+  if (!p.sashArch) {
+    p.sashArch = { ...DEFAULT_SASH_PROFILE.sashArch, limits: { ...DEFAULT_SASH_PROFILE.sashArch.limits } };
   }
   if (p.dedSchema !== 2) {
     const mr = Number(p.elements?.meetingRail?.face) || DEFAULT_SASH_PROFILE.elements.meetingRail.face;

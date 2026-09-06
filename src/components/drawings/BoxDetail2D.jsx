@@ -4,6 +4,8 @@
 import { useMemo, useState } from 'react';
 import { FONT, DimH, DimV, DimChainH, DimChainV, tfs } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
+// Arched sash (v3 Block 1 H): the box head is the engine's ring (derived.arch.geometry.head), jambs stop at the springing
+import { archToSheet, ringBandD, arcLabelPoint, radiiText } from './archDrawUtils.js';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
 
@@ -48,12 +50,13 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
     const fw = windowSpec.frame.width;
     const fh = windowSpec.frame.height;
     const innerW = fw - 2 * BOX.jambW_top;
-    return { fw, fh, innerW };
+    const A = derived.arch && !derived.casement ? derived.arch : null;
+    return { fw, fh, innerW, A };
   }, [windowSpec, derived]);
 
   if (!d) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
 
-  const { fw, fh } = d;
+  const { fw, fh, A } = d;
   const layoutSc = Math.max(fw, fh) / 500;
   const DM = 60 * layoutSc;
   const M = 80 * layoutSc;
@@ -68,27 +71,33 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
   // External: jamb narrows at the sill nose via an arc (real external profile).
   // Internal: staff-bead face — liners run straight full height, no arc; the
   // sill is a plain band between the liners with one straight top line.
+  const jt = A ? A.geometry.start : fh;                 // arched: jambs stop at the springing
   const rJamb = isInternal
-    ? `M ${X(fw - BOX.jambW_top)} ${Y(0)} L ${X(fw - BOX.jambW_top)} ${Y(fh)} L ${X(fw)} ${Y(fh)} L ${X(fw)} ${Y(0)} Z`
+    ? `M ${X(fw - BOX.jambW_top)} ${Y(0)} L ${X(fw - BOX.jambW_top)} ${Y(jt)} L ${X(fw)} ${Y(jt)} L ${X(fw)} ${Y(0)} Z`
     : [
         `M ${X(fw - BOX.jambW_bottom)} ${Y(0)}`,
         `L ${X(fw - BOX.jambW_bottom)} ${Y(BOX.sillTop)}`,
         bulgeArc(X(fw - BOX.jambW_bottom), Y(BOX.sillTop), X(fw - BOX.jambW_top), Y(BOX.sillCurveTop), BOX.bulge),
-        `L ${X(fw - BOX.jambW_top)} ${Y(fh)}`,
-        `L ${X(fw)} ${Y(fh)}`, `L ${X(fw)} ${Y(0)}`, 'Z',
+        `L ${X(fw - BOX.jambW_top)} ${Y(jt)}`,
+        `L ${X(fw)} ${Y(jt)}`, `L ${X(fw)} ${Y(0)}`, 'Z',
       ].join(' ');
 
   const lJamb = isInternal
-    ? `M ${X(BOX.jambW_top)} ${Y(0)} L ${X(BOX.jambW_top)} ${Y(fh)} L ${X(0)} ${Y(fh)} L ${X(0)} ${Y(0)} Z`
+    ? `M ${X(BOX.jambW_top)} ${Y(0)} L ${X(BOX.jambW_top)} ${Y(jt)} L ${X(0)} ${Y(jt)} L ${X(0)} ${Y(0)} Z`
     : [
         `M ${X(BOX.jambW_bottom)} ${Y(0)}`,
         `L ${X(BOX.jambW_bottom)} ${Y(BOX.sillTop)}`,
         bulgeArc(X(BOX.jambW_bottom), Y(BOX.sillTop), X(BOX.jambW_top), Y(BOX.sillCurveTop), -BOX.bulge),
-        `L ${X(BOX.jambW_top)} ${Y(fh)}`,
-        `L ${X(0)} ${Y(fh)}`, `L ${X(0)} ${Y(0)}`, 'Z',
+        `L ${X(BOX.jambW_top)} ${Y(jt)}`,
+        `L ${X(0)} ${Y(jt)}`, `L ${X(0)} ${Y(0)}`, 'Z',
       ].join(' ');
 
-  const head = `M ${X(BOX.jambW_top)} ${Y(fh)} L ${X(fw - BOX.jambW_top)} ${Y(fh)} L ${X(fw - BOX.jambW_top)} ${Y(fh - BOX.headH)} L ${X(BOX.jambW_top)} ${Y(fh - BOX.headH)} Z`;
+  // arched: the head is the engine's ring (outer contour → headFace inner), serialised from the ArcChains
+  const txA = A ? archToSheet(fw, A.geometry.rise, ox, oy) : null;
+  const head = A
+    ? ringBandD(A.geometry.head.outer, A.geometry.head.inner, txA)
+    : `M ${X(BOX.jambW_top)} ${Y(fh)} L ${X(fw - BOX.jambW_top)} ${Y(fh)} L ${X(fw - BOX.jambW_top)} ${Y(fh - BOX.headH)} L ${X(BOX.jambW_top)} ${Y(fh - BOX.headH)} Z`;
+  const archRadii = A ? A.geometry.arcs.map((a) => ({ r: a.r, at: arcLabelPoint(a, txA, 14 * layoutSc) })) : [];
   const sill = isInternal
     ? `M ${X(BOX.jambW_top)} ${Y(0)} L ${X(fw - BOX.jambW_top)} ${Y(0)} L ${X(fw - BOX.jambW_top)} ${Y(BOX.sillTop)} L ${X(BOX.jambW_top)} ${Y(BOX.sillTop)} Z`
     : `M ${X(BOX.jambW_bottom)} ${Y(0)} L ${X(fw - BOX.jambW_bottom)} ${Y(0)} L ${X(fw - BOX.jambW_bottom)} ${Y(BOX.sillNose)} L ${X(BOX.jambW_bottom)} ${Y(BOX.sillNose)} Z`;
@@ -118,7 +127,8 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
       <div onClick={isExternalExpand ? handleExpand : () => setExpanded(!expanded)} className="cursor-pointer"
         style={{ maxHeight: (expanded && !isExternalExpand) ? 'none' : '65vh', overflow: 'auto' }}>
         <svg viewBox={`0 0 ${totalW} ${totalH}`} xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-auto" style={{ background: COLORS.bg }}>
+          className="w-full h-auto" style={{ background: COLORS.bg }}
+          data-arch-origin={A ? `${ox},${oy}` : undefined}>
 
           {/* Frame geometry */}
           <path d={rJamb} fill={COL.frameFill} stroke={COL.frame} strokeWidth={STROKES.frame} {...NS} />
@@ -154,11 +164,23 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
             transform={`rotate(90, ${X(fw - BOX.jambW_bottom / 2)}, ${Y(fh / 2)})`}>
             {linerPrefix} JAMB LINER (R)
           </text>
-          <text x={X(fw / 2)} y={Y(fh - BOX.headH / 2) + 8 * totalW / VIEWBOX_REF} fill={COL.label}
+          <text x={X(fw / 2)} y={A ? Y(fh - A.geometry.head.thickness / 2) + 8 * totalW / VIEWBOX_REF : Y(fh - BOX.headH / 2) + 8 * totalW / VIEWBOX_REF} fill={COL.label}
             fontSize={tfs(SIZES.label, totalW)} fontWeight={WEIGHTS.label}
             fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}>
-            {linerPrefix} HEAD LINER
+            {A ? `S-ARCH HEAD ${Math.round(A.geometry.head.thickness)}` : `${linerPrefix} HEAD LINER`}
           </text>
+          {A && (
+            <g>
+              <line x1={X(-20 * layoutSc)} y1={Y(A.geometry.start)} x2={X(fw + 20 * layoutSc)} y2={Y(A.geometry.start)}
+                stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={`${8 * layoutSc},${3 * layoutSc},${2 * layoutSc},${3 * layoutSc}`} />
+              <DimV x={X(0) - DM * 1.8} y1={Y(A.geometry.start)} y2={Y(0)} extFrom={X(0)} label={`start ${Math.round(A.geometry.start * 10) / 10}`} small vbw={totalW} />
+              <DimV x={X(0) - DM * 1.8} y1={Y(fh)} y2={Y(A.geometry.start)} extFrom={X(0)} label={`rise ${Math.round(A.geometry.rise * 10) / 10}`} small vbw={totalW} />
+              {archRadii.map((rl, k) => (
+                <text key={`r-${k}`} x={rl.at[0]} y={rl.at[1]} fill={COL.dim} fontSize={tfs(SIZES.dimSmall, totalW)}
+                  fontFamily={FONT.family} textAnchor="middle" fontWeight={WEIGHTS.dim}>{`R ${Math.round(rl.r * 10) / 10}`}</text>
+              ))}
+            </g>
+          )}
           <text x={X(fw / 2)} y={Y((isInternal ? BOX.sillTop : BOX.sillNose) / 2) + 8 * totalW / VIEWBOX_REF} fill={COL.label}
             fontSize={tfs(SIZES.label, totalW)} fontWeight={WEIGHTS.label}
             fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}>
@@ -179,12 +201,14 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
           <DimH y={Y(fh) - DM * 1.2} x1={X(BOX.jambW_top)} x2={X(fw - BOX.jambW_top)}
             extFrom={Y(fh)} label={`${innerDim} (inner)`} small vbw={totalW} />
           <DimChainV x={X(fw) + DM * 1.3} extFrom={X(fw)} vbw={totalW}
-            cuts={[Y(0), Y(BOX.sillTop), Y(fh - BOX.headH), Y(fh)]}
-            labels={isInternal
+            cuts={A ? [Y(0), Y(BOX.sillTop), Y(A.geometry.start), Y(fh)] : [Y(0), Y(BOX.sillTop), Y(fh - BOX.headH), Y(fh)]}
+            labels={A
+              ? [BOX.sillTop, Math.round((A.geometry.start - BOX.sillTop) * 10) / 10, Math.round(A.geometry.rise * 10) / 10]
+              : isInternal
               ? [cillHDim, fh - cillHDim - intHeadDim, intHeadDim]
               : [BOX.sillTop, fh - BOX.sillTop - extHeadDim, extHeadDim]} />
-          <DimV x={X(0) - DM} y1={Y(fh)} y2={Y(fh - BOX.headH)}
-            extFrom={X(0)} label={`${headDim}`} small vbw={totalW} />
+          <DimV x={X(0) - DM} y1={Y(fh)} y2={A ? Y(fh - A.geometry.head.thickness) : Y(fh - BOX.headH)}
+            extFrom={X(0)} label={A ? `${Math.round(A.geometry.head.thickness)}` : `${headDim}`} small vbw={totalW} />
           {!isInternal && (
             <>
               <DimV x={X(fw) + DM * 2.5} y1={Y(0)} y2={Y(BOX.sillNose)}
@@ -241,7 +265,7 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
           <text x={totalW / 2} y={totalH + 14 * totalW / VIEWBOX_REF} fill={COL.title}
             fontSize={tfs(SIZES.subtitle, totalW)}
             fontFamily={FONT.family} textAnchor="middle">
-            {fw} × {fh} mm
+            {fw} × {fh} mm{A ? ` · ${A.geometry.label} · ${radiiText(A.geometry.arcs)}` : ''}
           </text>
         </svg>
       </div>

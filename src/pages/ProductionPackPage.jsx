@@ -25,8 +25,7 @@ import {
   buildPrecutForWindow,
   buildGlassListForWindow,
   buildHardwareList,
-  buildVentGrilles,
-} from '../engine/lists.js';
+  buildVentGrilles, buildCurvedMembersForWindow } from '../engine/lists.js';
 import { optimisePrecut } from '../engine/optimizer.js';
 import { exportGlassPDF, prepGlassRefImages } from '../utils/glassPdfExport.js';
 import { uploadGlassRef } from '../services/glassRefs.js';
@@ -56,7 +55,7 @@ import { groupCasementGlass } from '../components/drawings/casementDrawUtils.js'
 import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 import Window3DCaptureRig from '../components/viewer/Window3DCaptureRig.jsx';
 import ImageLightbox from '../components/ImageLightbox.jsx';
-import { exportCncJambsMerged, exportArchDxfMerged } from '../utils/cncExport.js';
+import { exportCncJambsMerged, exportArchDxfMerged, exportTraceryMerged } from '../utils/cncExport.js';
 import { exportGlassDxfMerged } from '../utils/glassDxfExport.js';
 
 // ─── Tab config ───
@@ -512,7 +511,7 @@ export default function ProductionPackPage() {
                 🛠 CNC Jamb DXF (all)
               </button>
             )}
-            {(pp?.type || batch?.type || 'sash') === 'casement' && (
+            {['casement', 'sash'].includes(pp?.type || batch?.type || 'sash') && (
               <button
                 onClick={() => {
                   const r = exportArchDxfMerged(
@@ -524,12 +523,30 @@ export default function ProductionPackPage() {
                     alert(`Arch DXF exported (${r.exported} windows).\nSkipped ${r.skipped.length}: ${r.skipped.map((s) => `${s.name} (${s.reason})`).join(', ')}`);
                   }
                 }}
-                title="One DXF with every arched casement's frame head + leaf top, stacked 300mm apart (VCarve)"
+                title="One DXF with every arched casement's frame head + leaf top / arched sash's box head + top rail, stacked 300mm apart (VCarve)"
                 className="btn btn-secondary text-xs px-4"
               >
                 🛠 Arch DXF (all)
               </button>
             )}
+            {['casement', 'sash'].includes(pp?.type || batch?.type || 'sash') && ['dxf', 'lsp'].map((kind) => (
+              <button key={`tracery-${kind}`}
+                onClick={() => {
+                  const r = exportTraceryMerged(
+                    (windowsData || []).map((wd) => ({ windowSpec: wd.windowSpec, derived: wd.derived, name: wd.win?.name })),
+                    pp?.name || batch?.label || 'pack', kind,
+                  );
+                  if (r.error) { alert(`Tracery ${kind.toUpperCase()}: ${r.error}`); return; }
+                  if (r.skipped?.length) {
+                    alert(`Tracery ${kind.toUpperCase()} exported (${r.exported} windows).\nSkipped ${r.skipped.length}: ${r.skipped.map((s) => `${s.name} (${s.reason})`).join(', ')}`);
+                  }
+                }}
+                title={`One ${kind.toUpperCase()} with every arched window's tracery board (bar pattern in the arch), stacked 300mm apart`}
+                className="btn btn-secondary text-xs px-4"
+              >
+                🪟 Tracery {kind.toUpperCase()} (all)
+              </button>
+            ))}
           </div>
         </div>
       </header>
@@ -592,7 +609,7 @@ export default function ProductionPackPage() {
         {tab === 'elements'   && <ElementsTab windowsData={windowsData} pp={pp} batch={batch} registerExport={registerExport} />}
         {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} batch={batch} pp={pp} registerExport={registerExport} />}
         {tab === 'precut'     && <PreCutTab merged={merged} settings={settings} batch={batch} pp={pp} isPPMode={isPPMode} projects={projects} registerExport={registerExport} exportFormat={exportFormat} />}
-        {tab === 'cutlist'    && <CutListTab merged={merged} isPPMode={isPPMode} pp={pp} batch={batch} registerExport={registerExport} exportFormat={exportFormat} />}
+        {tab === 'cutlist'    && <CutListTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} pp={pp} batch={batch} registerExport={registerExport} exportFormat={exportFormat} />}
         {tab === 'spraying'   && <SprayingTab windowsData={windowsData} batch={batch} pp={pp} registerExport={registerExport} />}
         {tab === 'bom'        && <BOMTab merged={merged} batch={batch} pp={pp} isPPMode={isPPMode} windowsData={windowsData} registerExport={registerExport} />}
       </main>
@@ -1759,7 +1776,59 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
 // ═══════════════════════════════════════════════════════════════
 // TAB: Cut List — grouped by element, symbols, mirror, sorted
 // ═══════════════════════════════════════════════════════════════
-function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat }) {
+// ── Curved members (v3 Block 4): per pack / batch, one row per curved member with the blank plan ──
+function CurvedMembersSection({ windowsData }) {
+  const rows = useMemo(() => (windowsData || [])
+    .filter((wd) => wd.derived && wd.windowSpec)
+    .flatMap((wd) => buildCurvedMembersForWindow(wd.derived, wd.windowSpec).map((r) => ({ ...r, windowName: wd.win?.name || r.windowName, type: wd.windowSpec.category || 'sash' }))), [windowsData]);
+  if (!rows.length) return null;
+  const byType = {};
+  rows.forEach((r) => { (byType[r.type] = byType[r.type] || []).push(r); });
+  const fmtR = (radii) => (radii.length ? `R ${radii.join(' / ')}` : '—');
+  return (
+    <div className="card overflow-hidden">
+      <div className="px-4 py-3 border-b border-surface-500 bg-surface-800 flex items-center justify-between">
+        <div>
+          <div className="text-sm font-semibold text-ink-50">Curved members</div>
+          <div className="text-[10px] text-ink-400 mt-0.5">Laminated blanks: pieces × stock board × rough length per member — the pre-cut list carries the same pieces; the Arch DXF has the contours</div>
+        </div>
+        <div className="text-[11px] text-ink-400">{rows.length} member{rows.length !== 1 ? 's' : ''} · {rows.reduce((n, r) => n + r.pieces * (r.quantity || 1), 0)} pieces</div>
+      </div>
+      {Object.entries(byType).map(([type, list]) => (
+        <div key={type}>
+          <div className="px-4 py-1.5 text-[10px] uppercase tracking-wide text-ink-400 bg-surface-700/40 border-b border-surface-600">{type}</div>
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="text-left text-[10px] uppercase tracking-wide text-ink-400 border-b border-surface-600">
+                <th className="px-4 py-1.5">Window</th><th className="px-2 py-1.5">Member</th><th className="px-2 py-1.5">Shape</th><th className="px-2 py-1.5">Radii</th>
+                <th className="px-2 py-1.5 text-right">Arc L</th><th className="px-2 py-1.5">Blank plan (pieces × stock × rough)</th><th className="px-2 py-1.5">Finger</th><th className="px-2 py-1.5">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((r, i) => (
+                <tr key={`${r.windowId}-${r.elementName}-${i}`} className="border-b border-surface-600/60">
+                  <td className="px-4 py-1.5 text-ink-100 font-medium">{r.windowName}</td>
+                  <td className="px-2 py-1.5"><span className="font-mono text-accent-400">{r.code}</span> <span className="text-ink-200">{r.elementName}</span> <span className="text-ink-500">{r.section}</span></td>
+                  <td className="px-2 py-1.5 text-ink-300">{r.shape}</td>
+                  <td className="px-2 py-1.5 text-ink-300 tabular-nums">{fmtR(r.radii)}</td>
+                  <td className="px-2 py-1.5 text-right text-ink-200 tabular-nums">{Math.round(r.length)}</td>
+                  <td className="px-2 py-1.5 text-ink-200 tabular-nums">
+                    {r.noStock ? <span className="text-red-400">no stock board fits</span>
+                      : r.arcs.map((a, k) => <span key={k} className="mr-2">{a.n} × {a.stock}×{r.depth} × {a.roughLength}{r.arcs.length > 1 ? ` (arc ${k + 1}, ${a.spanDeg}°)` : ''}</span>)}
+                  </td>
+                  <td className="px-2 py-1.5 text-ink-400 tabular-nums">{r.finger ? `${r.finger.length}/${r.finger.depth}/${r.finger.pitch}` : '—'}</td>
+                  <td className="px-2 py-1.5 text-ink-500">{r.shortPieces.length ? `${r.shortPieces.length} short piece(s)` : ''}{r.quantity > 1 ? ` × ${r.quantity}` : ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat, windowsData }) {
   // Material assignment lookup
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const getMaterialById = useMaterialStore((s) => s.getMaterialById);
@@ -1865,6 +1934,7 @@ function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat 
 
   return (
     <div className="space-y-4">
+      <CurvedMembersSection windowsData={windowsData} />
       {byElement.map((group) => {
         const sym = group.symbolInfo;
         // Find finished section from SASH_WINDOW_PARTS if available

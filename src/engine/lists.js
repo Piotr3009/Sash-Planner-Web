@@ -9,7 +9,7 @@
 import { CONSTANTS, deriveWindowData } from './calculations.js';
 import { CASEMENT_HINGE_SLOTS, CASEMENT_LOCK_SLOTS } from './casementHardware.js';
 import { GLASS_MAKEUP, glassGas } from './specification.js';
-import { profileRawForSection, getWindowProfile } from './profile.js';
+import { profileRawForSection, getWindowProfile, getCasementProfile } from './profile.js';
 // Pure helper (no React) — shared with the 2D drawings so panel, PDF and
 // sketch all count bars the same way.
 import { casementBarCounts, casementPaneFinish } from '../components/drawings/casementDrawUtils.js';
@@ -98,6 +98,88 @@ export function buildCutListForWindow(derived, windowSpec) {
 // resolveRaw?: (elementName) => rawSectionString|null — raw stock taken from the
 // ASSIGNED MATERIAL's size (e.g. '150 x 38mm' → '150x38'); falls back to the
 // legacy chain (sectionMap / profile raw) when absent. Optional → zero regression.
+// ── Curved members (ARCHED-WINDOWS-v3 Block 4) ─────────────────────────────
+// A curved member is glued from straight boards on finger joints and routed
+// afterwards (arch.js planArchSegments): what the workshop CUTS is the blank
+// pieces — stock board width × rough length × pieces — never the arc length.
+// Cut-list element name → the blank plan on derived.arch.plans.
+export const CURVED_MEMBER_PLAN = Object.freeze({
+  'C-ARCH HEAD': 'frameHead', 'C-FRAME RING': 'frameHead',
+  'C-ARCH TOP RAIL': 'leafTop', 'C-LEAF RING': 'leafTop',
+  'S-ARCH HEAD': 'frameHead', 'S-ARCH TOP RAIL': 'leafTop',
+});
+export const isCurvedMember = (elementName) => CURVED_MEMBER_PLAN[String(elementName)] !== undefined;
+
+/** The blank plan of a curved cut-list record, or null (no arch on the window / no plan). */
+export function curvedPlanFor(derived, elementName) {
+  const key = CURVED_MEMBER_PLAN[String(elementName)];
+  const plans = derived?.arch?.plans;
+  if (!key || !plans) return null;
+  return plans[key] || (key === 'frameHead' ? plans.head : plans.topRail) || null;
+}
+
+/**
+ * Curved members of one window for the production pack: one row per member
+ * with the ring radii and the blank plan (pieces × stock × rough length,
+ * finger joint). `depth` = the member's finished depth (the blank's thickness).
+ */
+export function buildCurvedMembersForWindow(derived, windowSpec) {
+  if (!derived?.arch?.plans) return [];
+  const rows = [];
+  const all = [...(derived.components?.box || []), ...(derived.components?.sash || [])];
+  for (const c of all) {
+    const plan = curvedPlanFor(derived, c.elementName);
+    if (!plan) continue;
+    const depth = Number(String(c.section).split('x')[1]) || null;
+    const geomKey = CURVED_MEMBER_PLAN[c.elementName];
+    const ring = derived.arch.geometry?.[geomKey] || derived.arch.geometry?.[geomKey === 'frameHead' ? 'head' : 'topRail'] || null;
+    rows.push({
+      windowId: c.windowId, windowName: c.windowName || windowSpec?.name || '',
+      elementName: c.elementName, code: c.code || '', section: c.section, depth,
+      length: c.length, quantity: c.quantity || 1,
+      shape: derived.arch.shape,
+      radii: ring ? ring.outer.map((a) => Math.round(a.r * 10) / 10) : [],
+      pieces: plan.totalPieces,
+      noStock: !!plan.noStock,
+      arcs: (plan.arcs || []).map((a) => ({ n: a.default?.n ?? null, stock: a.default?.stock ?? null, roughLength: a.default?.roughLength != null ? Math.round(a.default.roughLength) : null, chord: a.default?.chordLength != null ? Math.round(a.default.chordLength) : null, spanDeg: Math.round(a.spanDeg) })),
+      shortPieces: plan.shortPieces || [],
+      // the finger profile lives on the casement profile (buildArchPlan copies it; derived plans do not)
+      finger: plan.finger || getCasementProfile()?.arch?.finger || null,
+    });
+  }
+  return rows;
+}
+
+/**
+ * Blank pieces of a curved record for the pre-cut list: one item per arc
+ * option (n pieces of stock × depth, rough length = chord + finger allowance
+ * from the planner — no extra machining allowance, the contour band is already
+ * in the rough length). `resolveRaw(name, { kind: 'blank', stock, depth })`
+ * lets Material Assignments override the raw section; default = stock × depth.
+ */
+export function blankPiecesForRecord(c, plan, resolveRaw) {
+  const depth = Number(String(c.section).split('x')[1]) || 0;
+  const out = [];
+  for (const a of plan.arcs || []) {
+    const d = a.default;
+    if (!d || !d.stock) continue;
+    const raw = resolveRaw?.(c.elementName, { kind: 'blank', stock: d.stock, depth }) || `${d.stock}x${depth}`;
+    out.push({
+      elementName: c.elementName,
+      length: Math.round(d.roughLength),
+      finishedLength: Math.round(d.chordLength),
+      section: raw,
+      finishedSection: c.section,
+      quantity: d.n * (c.quantity || 1),
+      windowId: c.windowId,
+      windowName: c.windowName,
+      blank: true,
+      note: `blank piece of ${c.elementName} arc ${a.index + 1} · ${d.n} per member · finger-jointed`,
+    });
+  }
+  return out;
+}
+
 export function buildPrecutForWindow(derived, windowSpec, settingsArg, resolveRaw) {
   if (derived?.unsupported) return [];
   const settings = settingsWithDefaults(settingsArg);
@@ -107,7 +189,18 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg, resolveRa
 
   // Sash precut groups by section (mapped via settings.sectionMap to raw)
   const bySection = new Map();
+  // v3 Block 4: a curved member is pre-cut as its blank pieces (stock × depth × rough length)
+  const pushBlanks = (c) => {
+    const plan = curvedPlanFor(derived, c.elementName);
+    if (!plan) return false;
+    for (const it of blankPiecesForRecord(c, plan, resolveRaw)) {
+      if (!bySection.has(it.section)) bySection.set(it.section, []);
+      bySection.get(it.section).push(it);
+    }
+    return true;
+  };
   derived.components.sash.forEach((c) => {
+    if (pushBlanks(c)) return;
     const raw = resolveRaw?.(c.elementName) || settings?.sectionMap?.[c.section] || profileRawForSection(c.section) || c.section;
     if (!raw) return;
     if (!bySection.has(raw)) bySection.set(raw, []);
@@ -131,6 +224,7 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg, resolveRa
   const byMaterial = new Map();
   derived.components.box.forEach((c) => {
     if (c.section == null) return;
+    if (pushBlanks(c)) return;   // v3 Block 4: curved head / ring → blank pieces
     // Casement frame members (C-*): same raw-keyed list as the rest of the
     // casement timber, so one material assigned across frame + mullions +
     // leaves lands in ONE group and the optimizer cuts it from the same bars.
@@ -473,6 +567,8 @@ export const MIRROR_PAIRS = {
 export const CUT_LIST_ORDER = [
   // ── BOX ──
   { match: 'HEAD',                      symbol: 'HEAD',    label: 'Head' },
+  // Arched sash (arched-windows-v3 Block 1 D): curved box head, length = ring centre-line arc
+  { match: 'S-ARCH HEAD',               symbol: 'S-AH',    label: 'Arched Box Head' },
   { match: 'JAMB LEFT',                 symbol: 'JB-L/R',  label: 'Jambs (pair)',                isPair: true },
   { match: 'INTERNAL JAMB LINER (L)',   symbol: 'IL-L/R',  label: 'Internal Jamb Liner (pair)',  isPair: true },
   { match: 'EXTERNAL JAMB LINER (L)',   symbol: 'EL-L/R',  label: 'External Jamb Liner (pair)',  isPair: true },
@@ -484,6 +580,7 @@ export const CUT_LIST_ORDER = [
   { match: 'STILES TOP (L)',            symbol: 'ST-L/R',  label: 'Stiles Top (pair)',           isPair: true },
   { match: 'STILES BOTTOM SASH (L)',    symbol: 'SBS-L/R', label: 'Stiles Bottom Sash (pair)',   isPair: true },
   { match: 'TOP RAIL',                  symbol: 'TR',      label: 'Top Rail' },
+  { match: 'S-ARCH TOP RAIL',           symbol: 'S-ATR',   label: 'Arched Top Rail' },
   { match: 'TOP MEET RAIL',             symbol: 'TMR',     label: 'Top Meet Rail' },
   { match: 'BOTTOM MEET RAIL',          symbol: 'BMR',     label: 'Bottom Meet Rail' },
   { match: 'BOTTOM RAIL',               symbol: 'BR',      label: 'Bottom Rail' },
@@ -491,6 +588,8 @@ export const CUT_LIST_ORDER = [
   { match: 'C-FRAME HEAD',              symbol: 'C-FH',    label: 'Frame Head' },
   // Arched casement (arched-casement-v2): curved head / leaf top rail, length = arc length at the member centre line
   { match: 'C-ARCH HEAD',               symbol: 'C-AH',    label: 'Arched Frame Head' },
+  // v3 Block 3: circle fixed window — the frame and the leaf are full rings
+  { match: 'C-FRAME RING',              symbol: 'C-FRR',   label: 'Frame Ring (circle)' },
   { match: 'C-FRAME JAMB (L)',          symbol: 'C-J-L/R', label: 'Frame Jambs (pair)',          isPair: true },
   { match: 'C-FRAME CILL',              symbol: 'C-CILL',  label: 'Frame Cill' },
   { match: 'C-MULLION',                 symbol: 'C-M',     label: 'Mullion' },
@@ -498,7 +597,10 @@ export const CUT_LIST_ORDER = [
   { match: 'C-STILE (L)',               symbol: 'C-ST-L/R', label: 'Leaf Stiles (pair)',         isPair: true },
   { match: 'C-TOP RAIL',                symbol: 'C-TR',    label: 'Leaf Top Rail' },
   { match: 'C-ARCH TOP RAIL',           symbol: 'C-ATR',   label: 'Arched Leaf Top Rail' },
+  { match: 'C-LEAF RING',               symbol: 'C-LFR',   label: 'Leaf Ring (circle)' },
   { match: 'C-BOTTOM RAIL',             symbol: 'C-BR',    label: 'Leaf Bottom Rail' },
+  // v3 0.4: timber tracery board over the arched unit (one board, one side; section = thickness x blank W, length = blank H)
+  { match: 'C-TRACERY',                 symbol: 'C-TRY',   label: 'Tracery Board' },
   // ── DOOR (frame first, then dividers, then leaves, then side panels).
   //    French leaves share the single-leaf element names: identical lengths
   //    consolidate into one row (qty summed), pairs merge per window. ──

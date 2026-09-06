@@ -23,6 +23,7 @@ import { computeBarPositions, DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs 
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 import { casementBarCounts, casementRoleName, paneTitle } from './casementDrawUtils.js';
 import { archToSheet, glassToSheet, archedOutlineD, ringBandD, barBandD, arcLabelPoint, isHaunchArc, radiiText } from './archDrawUtils.js';
+import CircleFixedDrawing2D from './CircleFixedDrawing2D.jsx';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
 const BAR_WIDTH = 22;
@@ -122,6 +123,8 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
   }, [windowSpec, derived, group]);
 
   if (!geom) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
+  // v3 Block 3: circle fixed window → ring sheet (after the hooks above)
+  if (derived?.arch?.shape === 'circle') return <CircleFixedDrawing2D windowSpec={windowSpec} derived={derived} projectNumber={projectNumber} view="leaf" />;
 
   const layoutSc = Math.max(geom.leafW, geom.leafH) / 500;
   const sw = (n) => n * layoutSc;
@@ -162,7 +165,8 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
       barsD: arch.bars.map((b) => barBandD(b, txG, BAR_WIDTH / 2)),
       clipId,
       // haunch / gothic arcs: label outside near the corner; crown / semi-circle: inside the daylight
-      radii: arch.leafOuter.map((a, k) => ({ r: a.r, at: isHaunchArc(a) ? arcLabelPoint(a, txL, sw(10)) : arcLabelPoint(arch.leafInner[k], txL, -sw(16)) })),
+      // v3 0.5: every R label inside the daylight (a haunch label outside collided with the top-rail 67 chain dim on three-centre sheets)
+      radii: arch.leafOuter.map((a, k) => ({ r: a.r, at: arcLabelPoint(arch.leafInner[k], txL, isHaunchArc(a) ? -sw(22) : -sw(16)) })),
       springY: Y(arch.springingY),
       topY: arch.springingY,
     };

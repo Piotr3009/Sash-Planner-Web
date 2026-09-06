@@ -23,15 +23,19 @@ export default function VerticalSection2D({ windowSpec, derived }) {
     const topRail = CONSTANTS.TOP_RAIL_WIDTH;
     const botRail = CONSTANTS.BOTTOM_RAIL_WIDTH;
     const meetRail = CONSTANTS.MEETING_RAIL_WIDTH;
-    const topH = derived.topSashHeight;
     const botH = derived.bottomSashHeight;
+    // Arched sash (v3 Block 1 H): the section runs on the window axis — the box head is the ring face
+    // (80), the top rail the arched rail, the upper glass the unit apex height
+    const A = derived.arch && !derived.casement ? derived.arch : null;
+    const headH = A ? A.geometry.head.thickness : hw;
+    const topH = A ? A.geometry.topRail.apex.outer + A.geometry.upperStraightStile : derived.topSashHeight;
     const blocks = [];
     let y = 0;
-    blocks.push({ y, h: hw, w: depth, label: 'HEAD', fill: 0.15 });
-    y += hw + PROFILE.gap;
-    blocks.push({ y, h: topRail, w: PROFILE.sashDepth, label: 'TOP RAIL', fill: 0.1 });
+    blocks.push({ y, h: headH, w: depth, label: A ? 'ARCH HEAD' : 'HEAD', fill: 0.15 });
+    y += headH + PROFILE.gap;
+    blocks.push({ y, h: topRail, w: PROFILE.sashDepth, label: A ? 'ARCH TOP RAIL' : 'TOP RAIL', fill: 0.1 });
     y += topRail;
-    const upperGlassH = topH - topRail - meetRail;
+    const upperGlassH = A ? A.glassOutline.height : topH - topRail - meetRail;
     blocks.push({ y, h: upperGlassH, w: PROFILE.glassDepth, label: 'UPPER GLASS', isGlass: true });
     y += upperGlassH;
     blocks.push({ y, h: meetRail, w: PROFILE.sashDepth, label: 'MEETING RAIL', fill: 0.12 });
@@ -87,7 +91,7 @@ export default function VerticalSection2D({ windowSpec, derived }) {
         <DimH y={d.totalStackH + DIM_OFFSET} x1={0} x2={d.depth} extFrom={d.totalStackH} label={`Depth: ${d.depth} mm`} vbw={totalW} />
         <TitleBlock x={d.depth / 2} y={d.totalStackH + DIM_OFFSET * 2 + 20}
           title="VERTICAL SECTION"
-          subtitle={`Frame ${d.fw}×${d.fh}mm · Top sash ${d.topH}mm · Bottom sash ${d.botH}mm`} vbw={totalW} />
+          subtitle={`Frame ${d.fw}×${d.fh}mm · Top sash ${Math.round(d.topH * 10) / 10}mm · Bottom sash ${d.botH}mm`} vbw={totalW} />
       </svg>
     </div>
   );

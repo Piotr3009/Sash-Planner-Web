@@ -98,8 +98,52 @@ function dbProjectToMem(p, clientsById) {
     address: p.address || '',
     status: p.status,
     created_at: p.created_at,
+    // Block 6 (v3): archive flag + timestamp (docs/handover/sql/2026-09-07_projects_archive.sql)
+    archived: !!p.archived,
+    archived_at: p.archived_at || null,
     batches: [],
   };
+}
+
+/**
+ * Block 6 (v3): the archived projects of the tenant WITH their batches and
+ * windows (the Archive page counts them; PP / cut lists / exports keep working
+ * on an archived project). Same mappers as loadAll; null when offline.
+ */
+export async function loadArchivedProjects() {
+  if (!enabled()) return null;
+  const tenantId = await currentTenantId();
+  if (!tenantId) return null;
+  const [projectsRes, clientsRes] = await Promise.all([
+    supabase.from('projects').select('*').eq('archived', true).order('archived_at', { ascending: false }),
+    supabase.from('clients').select('*'),
+  ]);
+  if (projectsRes.error) { console.error('loadArchivedProjects', projectsRes.error); return null; }
+  const rows = projectsRes.data || [];
+  if (!rows.length) return [];
+  const ids = rows.map((p) => p.id);
+  const batchesRes = await supabase.from('batches').select('*').in('project_id', ids).order('created_at', { ascending: true });
+  if (batchesRes.error) { console.error('loadArchivedProjects batches', batchesRes.error); return null; }
+  const batchIds = (batchesRes.data || []).map((b) => b.id);
+  const windowsRes = batchIds.length
+    ? await supabase.from('windows').select('*').in('batch_id', batchIds).order('sort_order', { ascending: true })
+    : { data: [] };
+  if (windowsRes.error) { console.error('loadArchivedProjects windows', windowsRes.error); return null; }
+  const windowsByBatch = {};
+  (windowsRes.data || []).forEach((w) => { (windowsByBatch[w.batch_id] = windowsByBatch[w.batch_id] || []).push(dbWindowToMem(w)); });
+  const batchesByProject = {};
+  (batchesRes.data || []).forEach((b) => {
+    const mem = dbBatchToMem(b);
+    mem.windows = windowsByBatch[b.id] || [];
+    (batchesByProject[b.project_id] = batchesByProject[b.project_id] || []).push(mem);
+  });
+  const clientsById = {};
+  (clientsRes.data || []).forEach((c) => { clientsById[c.id] = c; });
+  return rows.map((p) => {
+    const mem = dbProjectToMem(p, clientsById);
+    mem.batches = batchesByProject[p.id] || [];
+    return mem;
+  });
 }
 
 function dbBatchToMem(b) {
@@ -183,6 +227,8 @@ export async function saveProject(p) {
   bg(supabase.from('projects').upsert({
     id: p.id, tenant_id: tenantId, created_by: uid, name: p.name, project_number: p.project_number,
     client_id: p.client_id || null, address: p.address || null, status: p.status || 'preparation',
+    // Block 6 (v3): archive state travels with the row (archived_at null while active)
+    archived: !!p.archived, archived_at: p.archived ? (p.archived_at || new Date().toISOString()) : null,
   }), 'saveProject');
 }
 

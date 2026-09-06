@@ -5,6 +5,8 @@ import { useMemo, useState } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
 import { computeBarPositions, DimChainH, DimChainV, DimH, DimV, tfs, HORN_DEF, buildHornPath } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
+// Arched sash (v3 Block 1 H): the upper sash outline / daylight / unit / bars are the engine's ArcChains
+import { archToSheet, glassToSheet, archedOutlineD, barBandD, arcLabelPoint, isHaunchArc, radiiText } from './archDrawUtils.js';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
 
@@ -79,9 +81,19 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
     });
     const hasHorns = !!windowSpec.sash?.horns;
     const hornExt = hasHorns ? (windowSpec.sash?.hornExtension || derived?.sashDims?.horn || 70) : 0;
+    // arched upper sash: height = top rail ring apex above the springing + the straight stile; no grid bars
+    const A = isUpper && derived.arch && !derived.casement ? derived.arch : null;
+    if (A) {
+      const G = A.geometry;
+      const apex = G.topRail.apex.outer;
+      const archSashH = apex + G.upperStraightStile;
+      return { sashW, sashH: archSashH, stile, topEdge: topRail, botEdge, glassX, glassY, glassW, glassH,
+        rebateX, rebateY, rebateW, rebateH, vBars: [], hBars: [], v: 0, h: 0, paneW, paneH,
+        isUpper, hasHorns, hornExt, gridMode, A, apex };
+    }
     return { sashW, sashH, stile, topEdge, botEdge, glassX, glassY, glassW, glassH,
       rebateX, rebateY, rebateW, rebateH, vBars, hBars, v, h, paneW, paneH,
-      isUpper, hasHorns, hornExt, gridMode };
+      isUpper, hasHorns, hornExt, gridMode, A: null };
   }, [windowSpec, derived, type]);
 
   if (!geom) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
@@ -117,7 +129,24 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
   const titleText = `${label} — Front${projNum ? ` — ${projNum}` : ''} — ${winName}`;
   const glassType = windowSpec?.glass?.type || 'double';
   const glassFinish = windowSpec?.glass?.finish || 'clear';
-  const subtitleText = `${geom.gridMode} · ${glassType} / ${glassFinish}`;
+  const A = geom.A;
+  const subtitleText = A
+    ? `arched · ${A.geometry.label} · rise ${fmt(geom.apex)} · stile ${fmt(A.geometry.upperStraightStile)} · S-ATR ${fmt(A.geometry.topRail.lengths.centre)} · ${A.pattern !== 'none' ? A.pattern : `${A.barCounts?.h || 0}H × ${A.barCounts?.v || 0}V`}`
+    : `${geom.gridMode} · ${glassType} / ${glassFinish}`;
+  // arched paths (sheet coords): outline = top rail ring outer + stiles, daylight = ring inner, unit + bars from the glass frame
+  const AP = A ? (() => {
+    const G = A.geometry, O = A.glassOutline;
+    const txS = archToSheet(geom.sashW, geom.apex, ox, oy);
+    const txG = glassToSheet(ox + (geom.sashW - O.width) / 2, oy + geom.apex - G.glass.apex, O.height);
+    return {
+      outerD: archedOutlineD(G.topRail.outer, txS, Y(geom.sashH)),
+      daylightD: archedOutlineD(G.topRail.inner, txS, Y(geom.sashH - geom.botEdge)),
+      unitD: archedOutlineD(O.arcs, txG, oy + geom.apex - G.glass.apex + O.height),
+      barsD: (A.bars || []).map((b) => barBandD(b, txG, BAR_WIDTH / 2)),
+      radii: G.topRail.outer.map((a, k) => ({ r: a.r, at: arcLabelPoint(G.topRail.inner[k], txS, isHaunchArc(a) ? -sw(22) : -sw(16)) })),
+      springY: Y(geom.apex),
+    };
+  })() : null;
 
   // Top dim chain
   const topCuts = [0, geom.stile];
@@ -128,7 +157,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
   const topExtLineEnd = oy - 4 * ts;
 
   // Left dim chain
-  const leftCuts = [0, geom.topEdge];
+  const leftCuts = geom.A ? [0, geom.apex] : [0, geom.topEdge];
   geom.hBars.forEach(hb => { leftCuts.push(hb.top); leftCuts.push(hb.bot); });
   leftCuts.push(geom.sashH - geom.botEdge);
   leftCuts.push(geom.sashH);
@@ -146,9 +175,9 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
   topLabels[topLabels.length - 1] = fmt(stileDim);
   if (topLabels.length === 3) topLabels[1] = fmt(geom.sashW - 2 * stileDim);
   const leftLabels = Array(leftCuts.length - 1).fill(undefined);
-  leftLabels[0] = fmt(topEdgeDim);
+  leftLabels[0] = geom.A ? `rise ${fmt(geom.apex)}` : fmt(topEdgeDim);
   leftLabels[leftLabels.length - 1] = fmt(botEdgeDim);
-  if (leftLabels.length === 3) leftLabels[1] = fmt(geom.sashH - topEdgeDim - botEdgeDim);
+  if (leftLabels.length === 3) leftLabels[1] = geom.A ? fmt(geom.sashH - geom.apex - botEdgeDim) : fmt(geom.sashH - topEdgeDim - botEdgeDim);
 
   return (
     <div className="w-full relative">
@@ -160,8 +189,24 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
       <div onClick={isExternalExpand ? handleExpand : () => setExpanded(!expanded)} className="cursor-pointer"
         style={{ maxHeight: (expanded && !isExternalExpand) ? 'none' : '65vh', overflow: 'auto' }}>
         <svg viewBox={`0 0 ${totalW} ${totalH}`} xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-auto" style={{ background: COLORS.bg }}>
+          className="w-full h-auto" style={{ background: COLORS.bg }}
+          data-arch-origin={AP ? `${ox},${oy}` : undefined}>
 
+          {AP ? (
+            <g>
+              {/* arched upper sash: outline, daylight (ring inner), the unit edge and the bars — all from derived.arch */}
+              <path d={AP.outerD} fill={C.bgFill} stroke={C.outer} strokeWidth={STROKES.outer} {...NS} />
+              <path d={AP.daylightD} fill={C.glassFill} fillOpacity={0.06} stroke={C.outer} strokeWidth={STROKES.outer} {...NS} />
+              <path d={AP.unitD} fill="none" stroke={C.rebate} strokeWidth={STROKES.rebate} {...NS} strokeOpacity={0.5} strokeDasharray={`${sw(4)},${sw(3)}`} />
+              {AP.barsD.map((d, k) => <path key={`ab-${k}`} d={d} fill="none" stroke={C.outer} strokeWidth={STROKES.bar} {...NS} />)}
+              <line x1={X(-10 * layoutSc)} y1={AP.springY} x2={X(geom.sashW + 10 * layoutSc)} y2={AP.springY}
+                stroke={C.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={`${sw(8)},${sw(3)},${sw(2)},${sw(3)}`} />
+              {AP.radii.map((rl, k) => (
+                <text key={`r-${k}`} x={rl.at[0]} y={rl.at[1]} fill={C.dim} fontSize={tfs(SIZES.dimSmall, totalW)}
+                  fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.dim}>{`R ${fmt(rl.r)}`}</text>
+              ))}
+            </g>
+          ) : (<>
           {/* Outer sash */}
           <rect x={X(0)} y={Y(0)} width={geom.sashW} height={geom.sashH}
             fill={C.bgFill} stroke={C.outer} strokeWidth={STROKES.outer} {...NS} />
@@ -175,6 +220,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
           <rect x={X(geom.glassX)} y={Y(geom.glassY)} width={geom.glassW} height={geom.glassH}
             fill={C.glassFill} fillOpacity={0.06}
             stroke={C.outer} strokeWidth={STROKES.outer} {...NS} />
+          </>)}
 
           {/* Horns — real profile from 3D HornMesh (upper sash only; none → nothing) */}
           {geom.isUpper && geom.hasHorns && HORN_DEF[windowSpec.sash?.hornType] && (
@@ -297,7 +343,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
           </text>
           <text x={X(geom.sashW / 2)} y={Y(geom.topEdge / 2 + 3)}
             fill={C.label} fontSize={tfs(SIZES.label, totalW)} fontFamily={FONT_FAMILY} fontWeight={WEIGHTS.label} textAnchor="middle">
-            {geom.isUpper ? 'TOP RAIL' : 'MEETING RAIL'}
+            {geom.isUpper ? (A ? 'ARCH TOP RAIL' : 'TOP RAIL') : 'MEETING RAIL'}
           </text>
           <text x={X(geom.stile / 2)} y={Y(geom.sashH / 2)}
             fill={C.label} fontSize={tfs(SIZES.label, totalW)} fontFamily={FONT_FAMILY} fontWeight={WEIGHTS.label} textAnchor="middle"

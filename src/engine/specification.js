@@ -44,8 +44,8 @@ export const glassGas = (type) => (type === 'single' || type === 'passive') ? ''
 import { FAN_AXIS_OFFSET_TOP, FAN_AXIS_OFFSET_BOTTOM } from './casementLayouts.js';
 import { profileBoxDepth } from './profile.js';
 import {
-  PSW_ARCH_SHAPE, PSW_ARCH_RISE_RATIO, LEGACY_ARCH_SHAPES, ARCH_RISE_RATIO, GOTHIC_PROFILE_RATIO,
-  ARCH_BAR_PATTERNS, isArchShape, isRoundShape, resolveRoundShape, ArchError,
+  PSW_ARCH_SHAPE, PSW_ARCH_RISE_RATIO, PSW_SASH_RADIO_SHAPE, LEGACY_ARCH_SHAPES, ARCH_RISE_RATIO, GOTHIC_PROFILE_RATIO,
+  ARCH_BAR_PATTERNS, isArchShape, isRoundShape, resolveRoundShape, ArchError, CIRCLE_SHAPE, patternsForShape,
 } from './arch.js';
 
 function customBarsFromSpec(spec, item) {
@@ -83,9 +83,9 @@ function customBarsFromSpec(spec, item) {
  *   casementType 'arched', casArchShape (gothic-arch | semi-circle |
  *   segmental-arch | elliptical-arch), casArchHinge ('right' | 'left').
  * PSW form (online-estimate.html 887–888): the radio LABELLED "Left Hinge"
- * carries value="right" and vice versa — the stored value is the OPPOSITE of
- * what the customer chose. PC stores the meaning, so the value is inverted
- * here, once, on read (same policy as the door hinge/open-direction fix).
+ * carries value="right". Since v3 0.4b the VALUE is taken 1:1 (identity
+ * mapping, Piotr 07.09) — both 3Ds render the same estimate identically; the
+ * label wording is a PSW-side question (BLOCKERS).
  * PC-native items carry archShape / archStart / archRise / archRiseSource /
  * archHinge / archProfile / archBarPattern directly, in PC vocabulary.
  *
@@ -104,10 +104,102 @@ function customBarsFromSpec(spec, item) {
  * frame size (mm).
  */
 export function archFromSpec(item, fc, width, height) {
-  const pcShapeRaw = item?.archShape || fc.archShape;
-  const pswShape = item?.casArchShape || fc.casArchShape;
-  const isArched = (item?.casementType || fc.casementType) === 'arched' || !!pcShapeRaw;
+  let pcShapeRaw = item?.archShape || fc.archShape;
+  let pswShape = item?.casArchShape || fc.casArchShape;
+  // v3 Block 3 — FIXED window in the casement batch: PC-native `casementKind
+  // 'fixed'` + the same arch fields (archShape 'circle' for the circle), or the
+  // PSW fix-only product: `fixShape` (rectangle | circle | the PSW arch ids),
+  // `fixArchRise`, `fixSemiBarPattern` / `fixGothicBars` / `fixCircleBarPattern`,
+  // `fixCircleOffset` (estimate-renderer.js 418–435, price-calculator.js 411–435).
+  const fixed = casementKindFromSpec(item, fc) === 'fixed';
+  const fixShape = fixed ? (item?.fixShape || fc.fixShape || null) : null;
+  if (fixed && fixShape && fixShape !== 'rectangle' && !pcShapeRaw && !pswShape) {
+    if (fixShape === CIRCLE_SHAPE) pcShapeRaw = CIRCLE_SHAPE;
+    else pswShape = fixShape;                                            // PSW arch id — archFieldsFromSpec validates it
+  }
+  if (pcShapeRaw === CIRCLE_SHAPE) return circleFromSpec(item, fc, width, height);
+  const isArched = (item?.casementType || fc.casementType) === 'arched' || !!pcShapeRaw || (fixed && !!pswShape);
   if (!isArched) return null;
+  const fcFix = fixed ? {
+    ...fc,
+    archRise: fc.archRise ?? fc.fixArchRise,
+    archBarPattern: fc.archBarPattern || firstPattern(fc.fixSemiBarPattern, fc.fixGothicBars),
+  } : fc;
+  return archFieldsFromSpec(item, fcFix, width, height, { pcShapeRaw, pswShape, category: 'casement' });
+}
+
+const firstPattern = (...vals) => vals.find((v) => v && v !== 'none') || null;
+
+/** 'opening' | 'fixed' — PC `casementKind`, or PSW's fix-only product (`windowType 'fix-only'`). */
+export function casementKindFromSpec(item, fc) {
+  const raw = item?.casementKind || fc?.casementKind || ((item?.windowType || fc?.windowType) === 'fix-only' ? 'fixed' : null);
+  return raw === 'fixed' ? 'fixed' : 'opening';
+}
+
+/**
+ * Circle fixed window (v3 Block 3): the arch object with shape 'circle' —
+ * rise = start = W / 2 (the horizontal diameter), no hinge, no profile;
+ * bars: the straight counts + the pattern (none | sunburst) + PSW's
+ * `fixCircleOffset` as `circleOffset` (null → profile arch.patterns.sunburst.offset).
+ */
+export function circleFromSpec(item, fc, width, height) {
+  const name = item?.name || item?.window_number || '?';
+  const W = Number(width), H = Number(height);
+  if (!(W > 0)) throw new ArchError(`Circle window "${name}" has no width (diameter)`);
+  if (H > 0 && Math.abs(H - W) > 0.5) throw new ArchError(`Circle window "${name}" is ${W} wide but ${H} high — the height must equal the diameter`);
+  const pattern = item?.archBarPattern || fc.archBarPattern || firstPattern(item?.fixCircleBarPattern, fc.fixCircleBarPattern) || 'none';
+  if (!patternsForShape(CIRCLE_SHAPE).includes(pattern)) throw new ArchError(`Bar pattern "${pattern}" is not available on a circle window "${name}" (allowed: ${patternsForShape(CIRCLE_SHAPE).join(', ')})`);
+  const offRaw = item?.fixCircleOffset ?? fc.fixCircleOffset;
+  const circleOffset = offRaw == null || offRaw === '' ? null : Number(offRaw);
+  return {
+    shape: CIRCLE_SHAPE,
+    profile: null,
+    rise: W / 2,
+    start: W / 2,
+    riseSource: 'circle',
+    hinge: null,
+    bars: {
+      pattern,
+      h: Number(item?.casementHBars ?? fc.casementHBars) || 0,
+      v: Number(item?.casementVBars ?? fc.casementVBars) || 0,
+      spokes: 0,
+      rings: [],
+      circleOffset: Number.isFinite(circleOffset) && circleOffset > 0 ? circleOffset : null,
+    },
+  };
+}
+
+/**
+ * Arched SASH fields (ARCHED-WINDOWS-v3 Block 1 A). PSW: `sashType 'arched-group'`
+ * with `archShape` = the PSW shape id (semi-circle | gothic-arch | elliptical-arch
+ * | segmental-arch, price-calculator.js SHAPE_FROM_RADIO) or the raw radio value
+ * (semicircular | gothic | elliptical | segmental), `archRise`, `archProfile`,
+ * `archBarPattern`, `archHBars` / `archVBars` (upper straight bars), `lowerHBars`
+ * (estimate-manager.js 682–692). PC-native: `frameShape 'arched'` + the same PC
+ * fields as the casement (archShape in PC vocabulary, archStart, …). Returns the
+ * casement's arch object plus `lowerHBars`; no hinge. Null when not arched.
+ */
+export function sashArchFromSpec(item, fc, width, height) {
+  const sashType = item?.sashType || fc.sashType;
+  const frameShape = item?.frameShape || fc.frameShape;
+  const raw = item?.archShape || fc.archShape || null;
+  const isArched = sashType === 'arched-group' || frameShape === 'arched';
+  if (!isArched) return null;
+  let pcShapeRaw = null, pswShape = null;
+  if (raw) {
+    if (PSW_ARCH_SHAPE[raw]) pswShape = raw;
+    else if (PSW_SASH_RADIO_SHAPE[raw]) pswShape = PSW_SASH_RADIO_SHAPE[raw];
+    else pcShapeRaw = raw;
+  }
+  const a = archFieldsFromSpec(item, fc, width, height, { pcShapeRaw, pswShape, category: 'sash' });
+  a.hinge = null;
+  a.bars.h = Number(item?.archHBars ?? fc.archHBars ?? item?.casementHBars ?? fc.casementHBars) || 0;
+  a.bars.v = Number(item?.archVBars ?? fc.archVBars ?? item?.casementVBars ?? fc.casementVBars) || 0;
+  a.lowerHBars = Number(item?.lowerHBars ?? fc.lowerHBars) || 0;
+  return a;
+}
+
+function archFieldsFromSpec(item, fc, width, height, { pcShapeRaw, pswShape, category }) {
   const name = item?.name || item?.window_number || '?';
   const profileRaw = item?.archProfile || fc.archProfile || item?.casArchProfile || fc.casArchProfile || null;
   const legacy = pcShapeRaw ? LEGACY_ARCH_SHAPES[pcShapeRaw] : null;
@@ -149,19 +241,24 @@ export function archFromSpec(item, fc, width, height) {
   }
   if (isRoundShape(shape) && Number.isFinite(rise)) shape = resolveRoundShape(W, rise);   // v2 §2.2, may throw "use Gothic"
   const start = Number.isFinite(rise) && H > 0 ? H - rise : null;
-  let hinge;
-  if (item?.archHinge || fc.archHinge) hinge = (item?.archHinge || fc.archHinge) === 'right' ? 'right' : 'left';
-  else {
-    // casArchHinge = stored config; 'cas-arch-opening' = the raw form field
-    const psw = item?.casArchHinge || fc.casArchHinge || fc['cas-arch-opening'] || 'right';   // PSW default value = "Left Hinge" label
-    hinge = psw === 'right' ? 'left' : 'right';                           // inverted: label is the truth
-  }
+  void category;
+  // Hinge (v3 0.4b, Piotr 07.09 "PSW–PC musi sie zgadzac 1 do 1"): the VALUE is
+  // the contract — PSW's 3D passes casArchHinge straight to hingeDirection and
+  // PC's 3D is the same component, so PC keeps it as is. (The PSW radio
+  // labelled "Left Hinge" carries value="right" — a PSW-side question, BLOCKERS.)
+  const hingeRaw = item?.archHinge || fc.archHinge || item?.casArchHinge || fc.casArchHinge || fc['cas-arch-opening'] || 'right';
+  const hinge = hingeRaw === 'left' ? 'left' : 'right';
   const pattern = item?.archBarPattern || fc.archBarPattern || 'none';
   if (!ARCH_BAR_PATTERNS.includes(pattern)) throw new ArchError(`Unknown arch bar pattern "${pattern}" on window "${name}"`);
+  const ringsRaw = item?.archRings ?? fc.archRings;
   const bars = {
     pattern,
     h: Number(item?.casementHBars ?? fc.casementHBars) || 0,   // straight bars below the springing
     v: Number(item?.casementVBars ?? fc.casementVBars) || 0,   // straight bars across the clear width
+    // v3 0.4 custom hub: spoke count + ring fractions (only read when pattern === 'custom')
+    spokes: Number(item?.archSpokes ?? fc.archSpokes) || 0,
+    rings: Array.isArray(ringsRaw) ? ringsRaw.map(Number).filter((k) => k > 0 && k < 1)
+      : typeof ringsRaw === 'string' ? ringsRaw.split(/[,\s]+/).map(Number).filter((k) => k > 0 && k < 1) : [],
   };
   return { shape, profile, rise, start, riseSource, hinge, bars };
 }
@@ -211,7 +308,8 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
   // once, so every consumer downstream (drawings, 3D, engine, PP) sees exactly
   // one value. Without this the engine derived doors while the drawings fell
   // through to the sash component and rendered NaN coordinates (Piotr 05.08).
-  const rawCategory = item?.windowCategory || fc.windowCategory || 'sash';
+  // v3 Block 3: PSW's fix-only product lives in PC's casement batch (Piotr 07.09).
+  const rawCategory = item?.windowCategory || ((item?.windowType || fc.windowType) === 'fix-only' ? 'casement' : fc.windowCategory) || 'sash';
   const category = rawCategory === 'doors' ? 'door' : rawCategory;
   const isDoorCategory = category === 'door';
   // Frame depth — stored on the window; legacy windows fall back to the profile
@@ -254,6 +352,8 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       }
     },
     casement: {
+      // v3 Block 3: 'opening' (default) | 'fixed' — a fixed leaf: no hardware, no opening symbol
+      kind: casementKindFromSpec(item, fc),
       layout: item?.casementLayout || fc.casementLayout || '040L',
       hinges: Array.isArray(item?.casementHinges) ? item.casementHinges
         : Array.isArray(fc.casementHinges) ? fc.casementHinges : null,
@@ -286,8 +386,9 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
         fan2V: Number(item?.casementFan2VBars ?? fc.casementFan2VBars) || 0,
       },
     },
-    // ── Arched casement (arched-casement-v1) — null unless casementType 'arched'
-    arch: archFromSpec(item, fc, width, height),
+    // ── Arched casement (arched-casement-v1) — null unless casementType 'arched';
+    //    arched sash (arched-windows-v3 Block 1) — null unless sashType 'arched-group' / frameShape 'arched'
+    arch: category === 'sash' ? sashArchFromSpec(item, fc, width, height) : archFromSpec(item, fc, width, height),
     // ── Doors (PSW parity, Piotr 04.08) ─────────────────────────────────
     // Field names and value vocabularies match the PSW door-controller 1:1 so
     // a future PSW→PC import maps straight across. Two known PSW bugs are NOT

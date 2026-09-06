@@ -197,9 +197,11 @@ section('2 — bars on the glass outline (spec §2.3 / §3 vectors), glass frame
   check('intersecting on a semi-circle: same construction, 2 mullions + 4 tracery arcs, ends on the outline', si.bars.filter((b) => b.role === 'tracery').length === 4 && si.bars.filter((b) => b.role === 'tracery').every((b) => onOutline(b.arc.cx < 0 ? b.to : b.from, si.glassOutline)));
   expectThrows('hub-spoke on a three-centre → readable (PATTERNS_FOR_SHAPE: three-centre takes none)', () => derive(pcItem('B8', 1000, 1500, { archShape: 'three-centre', archStart: 1300, archBarPattern: 'hub-spoke' })), /Bar pattern "hub-spoke" is not available on a Three-centre arch \(allowed: none\)/);
   expectThrows('intersecting on a three-centre → readable', () => derive(pcItem('B9', 1000, 1500, { archShape: 'three-centre', archStart: 1300, archBarPattern: 'intersecting' })), /not available on a Three-centre arch/);
-  check('PATTERNS_FOR_SHAPE = PSW price-calculator.js 990–995 (semi-circle six, gothic none | intersecting, three-centre none)',
-    JSON.stringify(arch.PATTERNS_FOR_SHAPE['semi-circle']) === JSON.stringify(['none', 'half-hub', 'hub-spoke', 'double-hub-spoke', 'triple-hub-spoke', 'intersecting'])
-    && JSON.stringify(arch.PATTERNS_FOR_SHAPE['gothic-equilateral']) === '["none","intersecting"]' && JSON.stringify(arch.PATTERNS_FOR_SHAPE['gothic-drop']) === '["none","intersecting"]' && JSON.stringify(arch.PATTERNS_FOR_SHAPE['three-centre']) === '["none"]');
+  check('PSW_PATTERNS_FOR_SHAPE = PSW price-calculator.js 990–995 (semi-circle six, gothic none | intersecting, three-centre none); PC adds quad-hub-spoke + custom on the semi-circle only (v3 0.4)',
+    JSON.stringify(arch.PSW_PATTERNS_FOR_SHAPE['semi-circle']) === JSON.stringify(['none', 'half-hub', 'hub-spoke', 'double-hub-spoke', 'triple-hub-spoke', 'intersecting'])
+    && JSON.stringify(arch.PSW_PATTERNS_FOR_SHAPE['gothic-equilateral']) === '["none","intersecting"]' && JSON.stringify(arch.PSW_PATTERNS_FOR_SHAPE['gothic-drop']) === '["none","intersecting"]' && JSON.stringify(arch.PSW_PATTERNS_FOR_SHAPE['three-centre']) === '["none"]'
+    && JSON.stringify(arch.PATTERNS_FOR_SHAPE['semi-circle']) === JSON.stringify([...arch.PSW_PATTERNS_FOR_SHAPE['semi-circle'], 'quad-hub-spoke', 'custom'])
+    && JSON.stringify(arch.PATTERNS_FOR_SHAPE['gothic-equilateral']) === '["none","intersecting"]' && JSON.stringify(arch.PATTERNS_FOR_SHAPE['three-centre']) === '["none"]');
   // three-centre straight bars: the v-bar top follows the arc chain (haunch / crown)
   const tc = D.V1.d.arch;
   const tv = tc.bars;
@@ -256,7 +258,9 @@ section('3 — cut list, glass unit, paint / seals / weights; rectangular caseme
   check('leaf weight for the hinge selector uses the true glass area and the curved top rail', d.casement.leafWeights[0].weightKg > 0 && d.casement.hardware.hingePicks.length === 1);
   // BOM part mapping for the curved members
   const qtys = bom.buildWindowPartQtys(d, spec, {}, null);
-  check('BOM: C-ARCH HEAD → c_frame_head (mm = 1091 + 20 machining), C-ARCH TOP RAIL → c_sash_top_rail', qtys.c_frame_head?.mm === 1091 + 20 && qtys.c_sash_top_rail?.mm === 950 + 20, JSON.stringify([qtys.c_frame_head, qtys.c_sash_top_rail]));
+  // v3 Block 4: a curved member is bought as its blank pieces — Σ n × rough length per arc (board metres), no longer the arc length + 20
+  const blankMm = (plan) => plan.arcs.reduce((s2, a) => s2 + a.default.n * Math.round(a.default.roughLength), 0);
+  check('BOM: C-ARCH HEAD → c_frame_head (mm = Σ blank pieces × rough length), C-ARCH TOP RAIL → c_sash_top_rail (same rule)', qtys.c_frame_head?.mm === blankMm(d.arch.plans.frameHead) && qtys.c_sash_top_rail?.mm === blankMm(d.arch.plans.leafTop) && qtys.c_frame_head.mm > 1091 + 20, JSON.stringify([qtys.c_frame_head, qtys.c_sash_top_rail]));
   // rectangular casements: byte-identical to the origin/main fixture
   const FX = JSON.parse(readFileSync(resolve(ROOT, 'verify', 'arch', 'fixtures', 'rect-casement-base.json'), 'utf8'));
   for (const [name, c] of Object.entries(FX)) {
@@ -291,10 +295,10 @@ section('4 — glazier DXF: ezdxf round-trip, samples docs/handover/samples/samp
     writeFileSync(path, text);
     const p = probe(path);
     const contour = p.polys.filter((x) => x.layer === 'GLASS_CONTOUR');
-    const bars = p.polys.filter((x) => x.layer === 'GLASS_BARS');
+    const bars = p.polys.filter((x) => x.layer === 'GLASS_BAR_AXES');   // v3 0.2: axes moved, GLASS_BARS = bands
     const sh = d.customGlassUnits[0].shape;
     const nArcs = sh.outline.arcs.length;
-    check(`${c.name}: R12, layers GLASS_CONTOUR / GLASS_BARS / GLASS_TEXT`, p.version === 'AC1009' && ['GLASS_CONTOUR', 'GLASS_BARS', 'GLASS_TEXT'].every((l) => p.layers.includes(l)));
+    check(`${c.name}: R12, layers GLASS_CONTOUR / GLASS_EDGE / GLASS_BARS / GLASS_BAR_AXES / GLASS_TEXT`, p.version === 'AC1009' && ['GLASS_CONTOUR', 'GLASS_EDGE', 'GLASS_BARS', 'GLASS_BAR_AXES', 'GLASS_TEXT'].every((l) => p.layers.includes(l)));
     check(`${c.name}: contour closed, ${nArcs + 3} vertices (one per arc end + 3 corners), bulge count = number of arcs (${nArcs})`, contour.length === 1 && contour[0].closed && contour[0].n === nArcs + 3 && contour[0].bulges.filter((b) => b).length === nArcs, `${contour[0]?.n} / ${contour[0]?.bulges.filter((b) => b).length}`);
     expectNear(`${c.name}: contour arc length (ezdxf) = glass arch length`, contour[0].arcs, sh.outline.archLength, 0.01);
     expectNear(`${c.name}: contour straight length = Wg + 2 × springing`, contour[0].straight, sh.outline.width + 2 * sh.outline.springing, 0.01);
@@ -304,13 +308,13 @@ section('4 — glazier DXF: ezdxf round-trip, samples docs/handover/samples/samp
     const arcBars = bars.filter((b) => b.arcs > 0).length;
     check(`${c.name}: curved bars carry a bulge (${sh.bars.filter((b) => b.kind === 'arc').length})`, arcBars === sh.bars.filter((b) => b.kind === 'arc').length);
     const texts = p.texts.map((t) => t.text);
-    check(`${c.name}: TEXT block — unit line, W × H / RISE / SPRINGING / R line, spec line, one line per bar`, texts.some((t) => t === `${c.name} - G1 GLASS ${sh.archShape.toUpperCase()}`) && texts.some((t) => t.startsWith(`W${sh.outline.width} x H`) && t.includes('RISE') && t.includes(' R ')) && texts.filter((t) => /^(V|H|S|R|K|T)\d+ /.test(t)).length === sh.bars.length, texts.slice(0, 5).join(' | '));
+    check(`${c.name}: TEXT block — unit line, W × H / RISE / SPRINGING / R line, spec line, one line per bar`, texts.some((t) => t === `${c.name} - G1 GLASS ${sh.archShape.toUpperCase()}`) && texts.some((t) => t.startsWith(`W${sh.outline.width} x H`) && t.includes('RISE') && t.includes(' R ')) && texts.filter((t) => /^(V|H|S|R|K|T)\d+ /.test(t)).length === 2 * sh.bars.length, texts.slice(0, 5).join(' | '));   // v3 0.3: geometry line + bar-end row per bar
     check(`${c.name}: TEXT lines = unitTextLines (module-side)`, glassDxf.unitTextLines({ id: 'G1', row: lists.buildGlassListForWindow(d, c.spec)[0], shape: sh }, c.name).every((l) => texts.includes(l)));
   }
   const rect = specification.normaliseToWindowSpec({ id: 'R', name: 'R', width: 1000, height: 1500 }, { fullConfig: { windowCategory: 'casement', casementLayout: '040L' } });
   const rd = derive(rect);
   check('rectangular casement → skip "not an arched casement", canExportGlassDxf false', /not an arched casement/.test(glassDxf.glassDxfParamsForWindow(rect, rd, 'R').skip || '') && glassDxf.canExportGlassDxf(rect, rd) === false);
-  check('sash → skip "not a casement window"; null derived → skip "could not be calculated"', glassDxf.glassDxfParamsForWindow(specification.normaliseToWindowSpec({ width: 1000, height: 1500 }, { fullConfig: { windowCategory: 'sash' } }), null, 'S').skip === 'not a casement window' && /could not be calculated/.test(glassDxf.glassDxfParamsForWindow(D.V1.spec, null, 'x').skip));
+  check('rectangular sash → skip "not an arched sash"; null derived → skip "could not be calculated"', /not an arched sash/.test(glassDxf.glassDxfParamsForWindow(specification.normaliseToWindowSpec({ width: 1000, height: 1500 }, { fullConfig: { windowCategory: 'sash' } }), {}, 'S').skip) && /could not be calculated/.test(glassDxf.glassDxfParamsForWindow(D.V1.spec, null, 'x').skip));
   windows.push({ windowSpec: rect, derived: rd, name: 'R' });
   const clicksBefore = clicks;
   const m = glassDxf.exportGlassDxfMerged(windows, 'Pack 1');
@@ -352,7 +356,7 @@ section('5 — PSW import (P10) and v1-era migration');
   check('v1 item with archRise only (no archStart) → rise 300 custom, start 1200', v1.arch.rise === 300 && v1.arch.riseSource === 'custom' && v1.arch.start === 1200);
   const auto = specification.normaliseToWindowSpec({ width: 1000, height: 1500, windowCategory: 'casement', casementType: 'arched', archShape: 'three-centre', archStart: 1175, archRiseSource: 'ratio' });
   check('v2 item saved on Auto (archStart 1175, riseSource ratio) → rise 325, riseSource ratio kept', auto.arch.rise === 325 && auto.arch.riseSource === 'ratio');
-  check('PSW hinge inversion still applies (casArchHinge right → hinge left)', a.arch.hinge === 'left');
+  check('v3 0.4b: PSW hinge value taken 1:1 (casArchHinge right → hinge right, identity mapping)', a.arch.hinge === 'right');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -370,8 +374,9 @@ section('6 — glass PDF (jsPDF in node): Shape column, mm + % line, shaped draw
     check('PDF built, 2 pages (table + 4 drawings)', bytes.length > 10000 && (txt.match(/\/Type \/Page[^s]/g) || []).length === 2);
     const has = (s) => txt.includes(s);
     check('Shape column header + "rect" for the rectangular row + "arched · R 55.5/1305.5" for the three-centre unit', has('(Shape)') && has('(rect)') && has('arched · R 55.5/1305.5'));
-    check('mm + % line: "springing 1198.5 \\(92%\\)" and "V1 x 270.3 \\(33%\\)"', has('springing 1198.5 \\(92%\\)') && has('V1 x 270.3 \\(33%\\)'));
-    check('hub-spoke row: ring + spokes listed, bars cell shortened to "hub ast"', has('R1 ring R 121.7') && has('(hub ast)'));
+    // v3 0.3: the header line prints the bar-end rows (x from the corner · s from apex · L) instead of x (%) / y pairs
+    check('mm + % line: "springing 1198.5 \\(92%\\)" and the V1 row "V1 x 270.3 " with "from apex" and "L 1297"', has('springing 1198.5 \\(92%\\)') && has('V1 x 270.3 ') && has('from apex') && has('L 1297'));
+    check('hub-spoke row (7 bars): "7 bars \u2014 see table", table rows "R1 R 121.7" and bars cell shortened to "hub ast"', has('7 bars') && has('see table') && has('R 121.7') && has('(hub ast)'));
     check('shaped drawing cell: "rise 105.5", overall "811 mm" / "1304 mm", Bézier curve operators present', has('rise 105.5') && has('811 mm') && has('1304 mm') && (txt.match(/ c\n/g) || []).length >= 6);
   } catch (e) {
     check('glass PDF section ran (jsPDF loadable in node)', false, String(e?.message || e));
@@ -381,7 +386,7 @@ section('6 — glass PDF (jsPDF in node): Shape column, mm + % line, shaped draw
 // ═══════════════════════════════════════════════════════════════════════════
 section('7 — profile v3 block and vocabulary');
 check('profile.arch v3: minHaunchRadius 150, hubRingRatios [0.3, 0.6, 0.8], intersecting { 450, 2, 4, 30 }', P.arch.version === 3 && P.arch.minHaunchRadius === 150 && JSON.stringify(P.arch.patterns.hubRingRatios) === '[0.3,0.6,0.8]' && JSON.stringify(P.arch.patterns.intersecting) === '{"pitch":450,"minMullions":2,"maxMullions":4,"minRadius":30}');
-check('ARCH_BAR_PATTERNS vocabulary (six values) and labels', JSON.stringify(arch.ARCH_BAR_PATTERNS) === '["none","half-hub","hub-spoke","double-hub-spoke","triple-hub-spoke","intersecting"]' && arch.ARCH_BAR_PATTERNS.every((p) => typeof arch.ARCH_BAR_PATTERN_LABELS[p] === 'string'));
+check('ARCH_BAR_PATTERNS vocabulary (PSW six + v3 quad-hub-spoke + custom + Block 3 sunburst) and labels', JSON.stringify(arch.ARCH_BAR_PATTERNS) === '["none","half-hub","hub-spoke","double-hub-spoke","triple-hub-spoke","quad-hub-spoke","custom","intersecting","sunburst"]' && arch.ARCH_BAR_PATTERNS.every((p) => typeof arch.ARCH_BAR_PATTERN_LABELS[p] === 'string'));
 expectThrows('unknown pattern in an item throws at normalisation', () => pcItem('X', 1000, 1500, { archShape: 'three-centre', archStart: 1000, archBarPattern: 'star' }), /Unknown arch bar pattern "star"/);
 check('CUT_LIST_ORDER: C-AH directly after C-FH, C-ATR directly after C-TR', (() => { const s = lists.CUT_LIST_ORDER.map((x) => x.symbol); return s[s.indexOf('C-FH') + 1] === 'C-AH' && s[s.indexOf('C-TR') + 1] === 'C-ATR'; })());
 check('bom ELEMENT_TO_PART_ID maps both curved members', bom.ELEMENT_TO_PART_ID['C-ARCH HEAD'] === 'c_frame_head' && bom.ELEMENT_TO_PART_ID['C-ARCH TOP RAIL'] === 'c_sash_top_rail');
@@ -392,8 +397,8 @@ section('8 — structural evidence (source text, not behaviour): store whitelist
   const store = readFileSync(resolve(ROOT, 'src', 'stores', 'projectStore.js'), 'utf8');
   check('projectStore.js: both window builders copy archStart and archBarPattern', (store.match(/archStart: windowConfig\.archStart/g) || []).length === 2 && (store.match(/archBarPattern: windowConfig\.archBarPattern/g) || []).length === 2);
   const cfg = readFileSync(resolve(ROOT, 'src', 'pages', 'ConfiguratorPage.jsx'), 'utf8');
-  check('ConfiguratorPage.jsx: chips Round | Gothic, "Arch starts at (mm from cill)", Auto and Half, pattern chips from PATTERNS_FOR_SHAPE, Save gated by archError', cfg.includes("{ value: 'round', label: 'Round' }, { value: 'gothic', label: 'Gothic' }") && cfg.includes('Arch starts at (mm from cill)') && cfg.includes('archHalfStart') && cfg.includes('archAutoStart') && cfg.includes('PATTERNS_FOR_SHAPE[pcArchShape]') && cfg.includes('disabled={!!(isArched && archError)}'));
-  check('ConfiguratorPage.jsx: no segmental / three-centre chips left, saves archStart + archBarPattern', !cfg.includes("value: 'segmental'") && !cfg.includes("value: 'three-centre'") && cfg.includes('archStart: isArched ? archStartNum : null') && cfg.includes('archBarPattern: isArched ? casArchPattern : null'));
+  check('ConfiguratorPage.jsx: chips Round | Gothic, "Arch starts at (mm from cill)", Auto and Half, pattern chips from PATTERNS_FOR_SHAPE, Save gated by archError', cfg.includes("{ value: 'round', label: 'Round' }, { value: 'gothic', label: 'Gothic' }") && cfg.includes('Arch starts at (mm from cill)') && cfg.includes('archHalfStart') && cfg.includes('archAutoStart') && cfg.includes('PATTERNS_FOR_SHAPE[pcArchShape]') && cfg.includes('disabled={shapeBlocked}') && cfg.includes('const shapeBlocked = (isArched || isCircle) && !!archError;'));
+  check('ConfiguratorPage.jsx: no segmental / three-centre chips left, saves archStart + archBarPattern', !cfg.includes("value: 'segmental'") && !cfg.includes("value: 'three-centre'") && cfg.includes('archStart: isArched ? archStartNum : null') && cfg.includes('archBarPattern: isArched || isCircle ? casArchPattern : null'));
   check('samples present: five arch DXFs (no segmental) + three glass DXFs + merged', ['sample_arch_1200_semi-circle.dxf', 'sample_arch_1200_gothic-equilateral.dxf', 'sample_arch_1200_gothic-drop.dxf', 'sample_arch_1200_three-centre.dxf', 'sample_arch_1200_three-centre-rise240.dxf', 'sample_glass_1000x1500_three-centre_start1300.dxf', 'sample_glass_1000x1500_semi-circle_hub-spoke.dxf', 'sample_glass_1000x1800_gothic_intersecting.dxf', 'sample_glass_pack_merged.dxf'].every((f) => { try { readFileSync(resolve(SAMPLES, f)); return true; } catch { return false; } }));
 }
 

@@ -48,7 +48,7 @@ const COLOR_MAP = {
 import { buildVentGrilles } from '../engine/lists.js';
 import { RAL_LOOKUP as RAL_COLORS } from '../config.js';
 import { fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from '../engine/casementLayouts.js';
-import { profileBoxDepth, getCasementProfile } from '../engine/profile.js';
+import { profileBoxDepth, getCasementProfile, getWindowProfile } from '../engine/profile.js';
 
 function resolveColor(name, ral) {
   if (!name && !ral) return '#F4F4F2'; // default white
@@ -80,6 +80,21 @@ export function windowSpecToConfig(windowSpec) {
   // Casement windows route to CasementWindow via casementProps; width/height
   // stay top-level for the shared camera auto-fit in the viewer Scenes.
   if ((windowSpec.category || 'sash') === 'casement') {
+    // v3 Block 3: circle fixed window → PSW's fix-frame viewer (FixFrameWindow circle branch)
+    if (windowSpec.arch?.shape === 'circle') {
+      const cp = windowSpecToCasementProps(windowSpec);
+      return {
+        windowCategory: 'fix-only',
+        width: cp.width, height: cp.width, extWidth: cp.width, extHeight: cp.width,
+        fixShape: 'circle', fixType: 'standard',
+        fixCircleBarPattern: windowSpec.arch.bars?.pattern === 'sunburst' ? 'sunburst' : 'none',
+        fixCircleBarOffset: Number(windowSpec.arch.bars?.circleOffset) || Number(getCasementProfile().arch?.patterns?.sunburst?.offset) || 200,
+        casementHBars: cp.hBars, casementVBars: cp.vBars,
+        woodColor: cp.woodColor, woodColorExt: cp.woodColorExt, woodColorInt: cp.woodColorInt, sameColor: cp.sameColor,
+        spacerColor: cp.spacerColor, glassFinish: cp.glassFinish, doubleGlazing: cp.glassType !== 'triple',
+        showGuides: false,
+      };
+    }
     const casementProps = windowSpecToCasementProps(windowSpec);
     // Arched casement (arched-casement-v2 night 4, F): ArchedCasementWindow now
     // draws the arch from arch.js and accepts the PC shape names, the typed rise,
@@ -96,6 +111,8 @@ export function windowSpecToConfig(windowSpec) {
       barPattern: arch.bars?.pattern || 'none',
       archMinHaunchRadius: Number(archProfileSettings?.minHaunchRadius) || 0,
       archPatterns: archProfileSettings?.patterns || null,
+      archSpokes: Number(arch.bars?.spokes) || null,
+      archRings: Array.isArray(arch.bars?.rings) && arch.bars.rings.length ? [...arch.bars.rings] : null,
     } : { casementType: 'standard' };
     return {
       windowCategory: 'casement',
@@ -108,6 +125,8 @@ export function windowSpecToConfig(windowSpec) {
       extHeight: casementProps.height,
       casementProps,
       ...archConfig,
+      // v3 Block 3: fixed leaf — no handle, no opening
+      fixedLeaf: windowSpec.casement?.kind === 'fixed',
     };
   }
 
@@ -239,6 +258,18 @@ export function windowSpecToConfig(windowSpec) {
     sashType: 'double',
     splitRatio: '1/4-1/2-1/4',
     headType: 'flat',
+    // arched sash (v3 Block 1 I): the PSW `sashType 'arched'` branch of the shared App with PC's shape + real rise
+    ...(windowSpec.category === 'sash' && windowSpec.arch?.shape && windowSpec.sash?.type !== 'triple' ? {
+      sashType: 'arched',
+      archShape: windowSpec.arch.shape,
+      archRise: Number(windowSpec.arch.rise) || null,
+      archProfile: windowSpec.arch.profile || null,
+      barPattern: windowSpec.arch.bars?.pattern || 'none',
+      archHBars: Number(windowSpec.arch.bars?.h) || 0,
+      archVBars: Number(windowSpec.arch.bars?.v) || 0,
+      lowerHBars: Number(windowSpec.arch.lowerHBars) || 0,
+      archMinHaunchRadius: Number(getWindowProfile()?.sashArch?.minHaunchRadius) || 0,
+    } : {}),
     opening: 0,
     upperOpening: 0,
     showGuides: false,
@@ -262,8 +293,8 @@ export function windowSpecToCasementProps(windowSpec) {
   const isDual = color.type === 'dual';
   return {
     width, height,
-    layout: cas.layout || '040L',
-    casementHinges: Array.isArray(cas.hinges) ? cas.hinges : null,
+    layout: cas.kind === 'fixed' ? '040L' : (cas.layout || '040L'),
+    casementHinges: cas.kind === 'fixed' ? ['fixed'] : Array.isArray(cas.hinges) ? cas.hinges : null,
     fanlightRatio: fanAxisToRatio(cas.fanlightHeight, innerH),
     fan2Ratio: fan2AxisToRatio(cas.fan2Height, height, innerH),
     middleSection: Number(cas.middleWidth) || 0,

@@ -3310,3 +3310,32 @@ function HornMesh({ material, depth = 57, type = 'A' }) {
     </mesh>
   );
 }
+// Named exports (PSW parity, arched sash reuses this geometry — added for ARCHED-WINDOWS-v3 Block 1 I)
+export {
+  mm,
+  Sash,
+  GlassPane,
+  GlazingBars,
+  LowerBottomRail,
+  SashStileCore,
+  SashRailCore,
+  ExternalStileBead,
+  InternalOvoloStileBead,
+  ExternalRailBead,
+  InternalOvoloRailBead,
+  PulleySet,
+  JambWithPartingBead,
+  ExternalBoxElement,
+  InternalBoxElement,
+  StaffBead,
+  StaffBeadHorizontal,
+  TraditionalSill,
+  MullionPost,
+  HornMesh,
+  HandleMesh,
+  FingerLift,
+  FitchFastenerBody,
+  FitchFastenerKeep,
+  DimensionGuide,
+};
+

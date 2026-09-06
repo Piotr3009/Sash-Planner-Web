@@ -34,7 +34,10 @@ function getProjectCardHeight(batchCount) {
 }
 
 // ─── Confirmation modal ───
-function ConfirmModal({ title, message, onConfirm, onCancel }) {
+function ConfirmModal({ title, message, onConfirm, onCancel, confirmLabel = 'Delete', tone = 'danger' }) {
+  const confirmCls = tone === 'danger'
+    ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'
+    : 'bg-accent-500/20 text-accent-400 border border-accent-500/30 hover:bg-accent-500/30';
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onCancel}>
       <div className="absolute inset-0 bg-black/60" />
@@ -43,7 +46,7 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
         <div className="text-[13px] text-ink-300 mb-4">{message}</div>
         <div className="flex gap-2 justify-end">
           <button onClick={onCancel} className="btn btn-secondary text-[13px] px-4">Cancel</button>
-          <button onClick={onConfirm} className="text-[13px] px-4 py-1.5 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors">Delete</button>
+          <button onClick={onConfirm} className={`text-[13px] px-4 py-1.5 rounded-lg transition-colors ${confirmCls}`}>{confirmLabel}</button>
         </div>
       </div>
     </div>
@@ -355,6 +358,7 @@ export default function DashboardPage() {
   const getPackForBatch = useProjectStore((s) => s.getProductionPackForBatch);
   const updateProductionPack = useProjectStore((s) => s.updateProductionPack);
   const deleteProject = useProjectStore((s) => s.deleteProject);
+  const archiveProject = useProjectStore((s) => s.archiveProject);   // v3 Block 6
   const deleteProductionPack = useProjectStore((s) => s.deleteProductionPack);
   const containerRef = useRef(null);
 
@@ -441,6 +445,24 @@ export default function DashboardPage() {
     });
   };
 
+  // v3 Block 6: Archive — straight away once every batch's pack is complete, with a confirm otherwise
+  const packStatusFor = (project, batch) => productionPacks.find((pp) =>
+    pp.assignments.some((a) => a.projectId === project.id && a.batchId === batch.id))?.status;
+  const handleArchiveProject = (e, project) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const batches = project.batches || [];
+    const open = batches.filter((batch) => packStatusFor(project, batch) !== 'complete').length;
+    if (open === 0) { archiveProject(project.id); return; }
+    setConfirmAction({
+      title: `Archive "${project.name}"?`,
+      message: `${open} of ${batches.length} batches ${open === 1 ? 'is' : 'are'} not complete. The project leaves the dashboard (packs, cut lists and exports stay readable in the Archive); you can restore it any time.`,
+      confirmLabel: 'Archive',
+      tone: 'accent',
+      onConfirm: () => { archiveProject(project.id); setConfirmAction(null); },
+    });
+  };
+
   const handleDeletePP = (e, pp) => {
     e.preventDefault();
     e.stopPropagation();
@@ -514,11 +536,23 @@ export default function DashboardPage() {
                         to={`/projects/${project.id}`}
                         className="card p-3 block hover:border-accent-500/40 transition-all overflow-hidden h-full"
                       >
-                        <div className="text-[13px] font-semibold text-ink-50 truncate pr-10">{project.name}</div>
+                        <div className="text-[13px] font-semibold text-ink-50 truncate pr-14">{project.name}</div>
                         <div className="text-[11px] text-ink-400 mt-0.5">{project.project_number}</div>
                         <div className="text-[11px] text-ink-200 mt-1 truncate">{project.client}</div>
                         <div className="text-[10px] text-ink-400 mt-1 truncate">{project.address}</div>
                       </Link>
+                      {/* Archive button (v3 Block 6) */}
+                      <button
+                        onClick={(e) => handleArchiveProject(e, project)}
+                        className="absolute top-2 right-14 w-5 h-5 rounded flex items-center justify-center text-ink-400 hover:text-accent-400 hover:bg-accent-500/10 opacity-0 group-hover:opacity-100 transition-all"
+                        title="Archive project (leaves the dashboard, stays readable in the Archive)"
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="2" y="3" width="20" height="5" rx="1" />
+                          <path d="M4 8v11a2 2 0 002 2h12a2 2 0 002-2V8" />
+                          <path d="M10 12h4" />
+                        </svg>
+                      </button>
                       {/* Edit button */}
                       <button
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditProject(project); }}
@@ -777,6 +811,8 @@ export default function DashboardPage() {
           message={confirmAction.message}
           onConfirm={confirmAction.onConfirm}
           onCancel={() => setConfirmAction(null)}
+          confirmLabel={confirmAction.confirmLabel}
+          tone={confirmAction.tone}
         />
       )}
 

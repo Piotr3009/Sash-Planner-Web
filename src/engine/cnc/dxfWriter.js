@@ -15,6 +15,7 @@
  * Entity model (from jambDxf.js):
  *   { type:'poly', layer, closed, pts:[[x,y,bulge],...] }
  *   { type:'circle', layer, cx, cy, r }
+ *   { type:'point', layer, x, y }                       (v3 tracery: arc centres)
  *   { type:'text', layer, x, y, h, str, rot, halign, valign }
  */
 
@@ -58,6 +59,10 @@ export function writeDxf(entities, layers) {
         if (b) put(42, fmt(b));
       }
       put(0, 'SEQEND'); put(8, e.layer);
+    } else if (e.type === 'point') {
+      // v3 tracery: ARKA_CENTRE arc centres (R12 POINT, no handles)
+      put(0, 'POINT'); put(8, e.layer);
+      put(10, fmt(e.x)); put(20, fmt(e.y)); put(30, 0);
     } else if (e.type === 'circle') {
       put(0, 'CIRCLE'); put(8, e.layer);
       put(10, fmt(e.cx)); put(20, fmt(e.cy)); put(30, 0);

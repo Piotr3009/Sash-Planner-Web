@@ -63,6 +63,15 @@ export const LEGACY_ARCH_SHAPES = Object.freeze({
   'segmental': { shape: 'three-centre', riseRatio: 0.20 },
 });
 
+// PSW sash form radio values (online-estimate.html 453–465: arch-style) → PSW shape ids
+// (price-calculator.js SHAPE_FROM_RADIO); the saved config carries the id, older rows the radio.
+export const PSW_SASH_RADIO_SHAPE = Object.freeze({
+  semicircular: 'semi-circle',
+  gothic: 'gothic-arch',
+  elliptical: 'elliptical-arch',
+  segmental: 'segmental-arch',
+});
+
 // PSW casArchShape → PC shape (P10). PSW "elliptical" is drawn as an ellipse
 // in the 3D preview; a workshop cannot rout an ellipse from concentric arcs,
 // so it is built as the classic three-centre approximation. PSW "segmental"
@@ -115,8 +124,13 @@ export function isArchShape(shape) { return ARCH_SHAPES.includes(shape); }
 // ── Glazing bar patterns in the arch (P5) — vocabulary and availability per
 // shape, one copy in PC (PSW keeps two: price-calculator.js PATTERNS_FOR_SHAPE
 // lines 990–995 and the 3D). Geometry: buildArchBars below.
+// v3 0.4: the PSW patterns plus the workshop preset `quad-hub-spoke` (from
+// arka_CNC-piotr.dxf: 5 spokes = 45°, rings 1/3 · 2/3, the vertical spoke
+// runs through the hub) and `custom` (spoke count 3–9, ring list) — every hub
+// pattern is one generic hubSpoke({ spokes, rings, hubVertical }).
 export const ARCH_BAR_PATTERNS = Object.freeze([
-  'none', 'half-hub', 'hub-spoke', 'double-hub-spoke', 'triple-hub-spoke', 'intersecting',
+  'none', 'half-hub', 'hub-spoke', 'double-hub-spoke', 'triple-hub-spoke', 'quad-hub-spoke', 'custom', 'intersecting',
+  'sunburst',   // v3 Block 3: circle only (buildCircleBars)
 ]);
 export const ARCH_BAR_PATTERN_LABELS = Object.freeze({
   'none': 'None',
@@ -124,17 +138,48 @@ export const ARCH_BAR_PATTERN_LABELS = Object.freeze({
   'hub-spoke': 'Hub & spoke',
   'double-hub-spoke': 'Double hub & spoke',
   'triple-hub-spoke': 'Triple hub & spoke',
+  'quad-hub-spoke': 'Quad hub & spoke (workshop)',
+  'custom': 'Custom hub',
   'intersecting': 'Intersecting',
+  'sunburst': 'Sunburst',
 });
-export const HUB_PATTERNS = Object.freeze(['half-hub', 'hub-spoke', 'double-hub-spoke', 'triple-hub-spoke']);
+export const HUB_PATTERNS = Object.freeze(['half-hub', 'hub-spoke', 'double-hub-spoke', 'triple-hub-spoke', 'quad-hub-spoke', 'custom']);
 export const isHubPattern = (pattern) => HUB_PATTERNS.includes(pattern);
-export const PATTERNS_FOR_SHAPE = Object.freeze({
+// PSW price-calculator.js PATTERNS_FOR_SHAPE (990–995) — the customer-facing set, 1:1
+export const PSW_PATTERNS_FOR_SHAPE = Object.freeze({
   'semi-circle': ['none', 'half-hub', 'hub-spoke', 'double-hub-spoke', 'triple-hub-spoke', 'intersecting'],
   'gothic-equilateral': ['none', 'intersecting'],
   'gothic-drop': ['none', 'intersecting'],
   'three-centre': ['none'],
 });
+// PC adds the workshop preset and the custom hub on the semi-circle only (hubs need one centre)
+export const PC_EXTRA_PATTERNS = Object.freeze({ 'semi-circle': ['quad-hub-spoke', 'custom'] });
+export const PATTERNS_FOR_SHAPE = Object.freeze({
+  'semi-circle': [...PSW_PATTERNS_FOR_SHAPE['semi-circle'], ...PC_EXTRA_PATTERNS['semi-circle']],
+  'gothic-equilateral': PSW_PATTERNS_FOR_SHAPE['gothic-equilateral'],
+  'gothic-drop': PSW_PATTERNS_FOR_SHAPE['gothic-drop'],
+  'three-centre': PSW_PATTERNS_FOR_SHAPE['three-centre'],
+  // v3 Block 3: the circle fixed window (PSW fix-circle-bars: none | sunburst)
+  'circle': ['none', 'sunburst'],
+});
 export function patternsForShape(shape) { return PATTERNS_FOR_SHAPE[shape] || ['none']; }
+// ── Circle (v3 Block 3): a FIXED window whose frame and leaf are full rings ──
+export const CIRCLE_SHAPE = 'circle';
+export const isCircleShape = (shape) => shape === CIRCLE_SHAPE;
+/** True for every shape the arch module builds (arches + the circle). */
+export const isShapedShape = (shape) => isArchShape(shape) || isCircleShape(shape);
+// Hub presets: spokes evenly from 0 to π (the two end spokes ARE the springing
+// bar), rings as fractions of the clear half width (PSW presets read the
+// profile hubRingRatios; the workshop preset carries the DWG's thirds),
+// hubVertical = the 90° spoke continues through the hub to the springing line.
+export const HUB_PRESETS = Object.freeze({
+  'half-hub': { spokes: 0, rings: 1, hubVertical: false },
+  'hub-spoke': { spokes: 4, rings: 1, hubVertical: false },
+  'double-hub-spoke': { spokes: 6, rings: 2, hubVertical: false },
+  'triple-hub-spoke': { spokes: 8, rings: 3, hubVertical: false },
+  'quad-hub-spoke': { spokes: 5, ringRatios: [1 / 3, 2 / 3], hubVertical: true },
+});
+export const CUSTOM_HUB_LIMITS = Object.freeze({ minSpokes: 3, maxSpokes: 9, maxRings: 4 });
 
 const r1 = (v) => Math.round(v * 10) / 10;
 
@@ -426,6 +471,13 @@ export function buildArchGeometry({ shape, width, height, rise }, profile) {
   const leafTop = buildRing(base, leafInset, leafInset + tLeaf, 'LEAF TOP');
   const glassOffset = leafInset + tLeaf - glassInset;
   const glassArcs = offsetArcs(base, glassOffset);
+  // Rebate wall (v3 0.1 FIT view): the frame land ends here; the leaf outer
+  // contour sits `geometry.gap` inside it and laps the frame timber by
+  // frameHead.face − leafAtJamb (57 − 40 = 17 on the default profile).
+  const land = Number(profile.geometry.land);
+  const gap = Number(profile.geometry.gap);
+  if (!(land > 0 && gap >= 0)) throw new ArchError('Casement profile geometry.land / geometry.gap are missing');
+  const rebateWall = offsetArcs(base, land);
   return {
     shape,
     label: ARCH_SHAPE_LABELS[shape],
@@ -438,10 +490,73 @@ export function buildArchGeometry({ shape, width, height, rise }, profile) {
     minHaunchRadius,
     radii: base.map((a) => a.r),                // outer radius per arc (1 / 2 / 3 values)
     arcs: base,
-    offsets: { frameInner: tFrame, leafOuter: leafInset, leafInner: leafInset + tLeaf, glass: glassOffset },
+    offsets: { frameInner: tFrame, leafOuter: leafInset, leafInner: leafInset + tLeaf, glass: glassOffset, land },
     frameHead,
     leafTop,
+    rebateWall,                                 // arcs at R − land (the leaf outer sits gap mm inside it)
+    fit: { gap, lap: tFrame - leafInset, land },
     glass: { arcs: glassArcs, length: arcsLength(glassArcs), apex: arcsExtent(glassArcs, [0, 1]).max, halfWidth: W / 2 - glassOffset },
+  };
+}
+
+/**
+ * Arched SASH geometry (ARCHED-WINDOWS-v3 Block 1 C, rule C — DEFAULT (open)):
+ * the box head is a ring 0 → sashArch.headFace (80) on the frame contour; the
+ * upper sash's arched top rail is a ring sashInset → sashInset + topRail.face,
+ * sashInset = deductions.sashWidth / 2 (89: the ring meets the stile line —
+ * concentric, rule C); the glass line = sashInset + topRail.face − glassRebate.
+ * Vertical layout (PSW price-calculator.js metricsFor, adopted): the arch
+ * starts at H − rise from the cill, the meeting line sits at H / 2, so the
+ * upper sash's straight stile above the meeting line = H/2 − rise (≥
+ * limits.minUpperStile); the STILES TOP piece runs to the meeting rail bottom:
+ * H/2 − rise + meetingRail / 2.
+ * Every number is read from the sash profile (sashArch, deductions.sashWidth,
+ * elements.topRail / meetingRail); `glassRebate` = the rebate depth per side.
+ */
+export function buildSashArchGeometry({ shape, width, height, rise }, sashProfile, glassRebate) {
+  const SA = sashProfile?.sashArch;
+  if (!SA?.limits || !(Number(SA.headFace) > 0)) throw new ArchError('Sash profile sashArch (headFace / limits) is missing');
+  const L = readArchLimits({ ...SA.limits, minLeafStraightStile: SA.limits.minUpperStile });
+  const minHaunchRadius = readMinHaunchRadius(SA);
+  const W = Number(width), H = Number(height);
+  const h = resolveArchRise(shape, W, rise, L);
+  const straightHeight = H - h;
+  if (!(straightHeight >= L.minStraightBelowRise)) {
+    throw new ArchError(`Arch rise ${r1(h)}mm in a ${r1(H)}mm high window leaves ${r1(straightHeight)}mm straight below the arch — minimum ${L.minStraightBelowRise}mm (height >= rise + ${L.minStraightBelowRise})`);
+  }
+  const meet = Number(sashProfile.elements?.meetingRail?.face);
+  const topFace = Number(sashProfile.elements?.topRail?.face);
+  const sashInset = Number(sashProfile.deductions?.sashWidth) / 2;
+  const rebate = Number(glassRebate);
+  if (!(meet > 0 && topFace > 0 && sashInset > 0 && rebate >= 0)) throw new ArchError('Sash profile elements.meetingRail / topRail, deductions.sashWidth or the glass rebate are missing');
+  const upperStileClear = H / 2 - h;                       // springing → meeting line (PSW rule)
+  if (!(upperStileClear >= L.minLeafStraightStile)) {
+    throw new ArchError(`Straight stile of the arched upper sash is ${r1(upperStileClear)}mm (H/2 − rise) — minimum ${L.minLeafStraightStile}mm`);
+  }
+  const base = archArcs(shape, W, h, { minHaunchRadius });
+  const head = buildRing(base, 0, Number(SA.headFace), 'S-ARCH HEAD');
+  const topRail = buildRing(base, sashInset, sashInset + topFace, 'S-ARCH TOP RAIL');
+  const glassOffset = sashInset + topFace - rebate;
+  const glassArcs = offsetArcs(base, glassOffset);
+  return {
+    shape,
+    label: ARCH_SHAPE_LABELS[shape],
+    width: W,
+    height: H,
+    rise: h,
+    start: straightHeight,
+    straightHeight,
+    limits: L,
+    minHaunchRadius,
+    radii: base.map((a) => a.r),
+    arcs: base,
+    offsets: { headInner: Number(SA.headFace), sashOuter: sashInset, sashInner: sashInset + topFace, glass: glassOffset },
+    head,
+    topRail,
+    glass: { arcs: glassArcs, length: arcsLength(glassArcs), apex: arcsExtent(glassArcs, [0, 1]).max, halfWidth: W / 2 - glassOffset },
+    upperStileClear,
+    upperStraightStile: upperStileClear + meet / 2,       // STILES TOP piece: springing → meeting rail bottom
+    meetingLine: H / 2,
   };
 }
 
@@ -622,7 +737,8 @@ function readPlannerSettings(opts) {
   if (!PIECE_RULES.includes(pieceRule)) throw new ArchError(`Casement profile arch.pieceRule must be one of ${PIECE_RULES.join(' | ')}, got "${pieceRule}"`);
   const fingerLength = Number(opts?.finger?.length);
   if (!(fingerLength >= 0)) throw new ArchError('Casement profile arch.finger.length is missing (mm per jointed end)');
-  return { stockWidths, allowance, maxDeg, maxAngle: maxDeg * Math.PI / 180, pieceRule, fingerLength };
+  const minPieceLength = Number(opts?.minPieceLength) || 0;    // v3 0.6: warn only (0 = no warning)
+  return { stockWidths, allowance, maxDeg, maxAngle: maxDeg * Math.PI / 180, pieceRule, fingerLength, minPieceLength };
 }
 
 /** D13 selection among the feasible options of one arc (see banner, rule 7). */
@@ -701,10 +817,16 @@ export function planArchSegments(ring, opts) {
     if (!a.default) continue;
     for (const p of a.default.pieces) pieces.push({ ...p, no: pieces.length + 1, stock: a.default.stock });
   }
+  // v3 0.6: short pieces are flagged, never blocked (profile arch.minPieceLength, DEFAULT open)
+  const shortPieces = S.minPieceLength > 0
+    ? pieces.filter((p) => p.L < S.minPieceLength).map((p) => `piece ${p.no} (arc ${p.arc + 1}) is ${r1(p.L)} mm long - below minPieceLength ${S.minPieceLength}`)
+    : [];
   return {
     arcs,
     pieces,
     totalPieces: pieces.length,
+    shortPieces,
+    minPieceLength: S.minPieceLength,
     noStock: arcs.some((a) => !a.default),
     stockWidths: [...S.stockWidths],
     contourAllowance: S.allowance,
@@ -823,6 +945,8 @@ export function buildGlassOutline(glassArcs, halfWidth, straightBelow) {
  */
 export function glassOutlinePoly(outline) {
   const { width: Wg, arcs } = outline;
+  // circle (v3 Block 3): two vertices on the horizontal diameter, bulge 1 = half circles
+  if (outline.kind === CIRCLE_SHAPE) return [[Wg, outline.centre[1], 1], [0, outline.centre[1], 1]];
   const pts = [[0, 0, 0], [Wg, 0, 0]];
   for (const a of arcs) pts.push([...arcPoint(a, a.a0), arcBulge(a)]);
   const last = arcs[arcs.length - 1];
@@ -885,6 +1009,9 @@ function traceryHit(arcs, c, r, side) {
  * Patterns — PSW 3d-src FixFrameWindow.jsx `semiBarPattern` (lines 847–1030)
  * and `intersectingData` (667–830) ported on the glass outline:
  *   half-hub           springing bar + ring 1, nothing else
+ *   quad-hub-spoke     workshop preset (arka_CNC-piotr.dxf): rings 1/3 · 2/3 of xg,
+ *                      5 spokes (45°), the vertical spoke runs through the hub
+ *   custom             { spokes 3–9, rings [fractions] } from the window spec
  *   hub-spoke          ring 1 (0.3·xg), 4 spokes at i/3·π from the ring to the
  *                      outline — the two end spokes lie ON the springing line and
  *                      are the springing bar; ring-end verticals below the line;
@@ -900,7 +1027,7 @@ function traceryHit(arcs, c, r, side) {
  * Output: [{ id, kind: 'straight'|'arc', role, from, to, arc?, length }], lengths
  * rounded to 0.5 mm; roles v | h | springing | ring | spoke | tracery.
  */
-export function buildArchBars({ outline, shape, pattern = 'none', h = 0, v = 0, frameHalfWidth }, patternOpts) {
+export function buildArchBars({ outline, shape, pattern = 'none', h = 0, v = 0, frameHalfWidth, spokes, rings }, patternOpts) {
   const pat = pattern || 'none';
   if (!ARCH_BAR_PATTERNS.includes(pat)) throw new ArchError(`Unknown arch bar pattern "${pattern}"`);
   const allowed = patternsForShape(shape);
@@ -932,27 +1059,40 @@ export function buildArchBars({ outline, shape, pattern = 'none', h = 0, v = 0, 
   if (hub) {
     const S = readPatternSettings(patternOpts);
     if (arcs.length !== 1) throw new ArchError(`Hub patterns need a semi-circle outline (one arc), got ${arcs.length} arcs`);
-    const nRings = pat === 'triple-hub-spoke' ? 3 : pat === 'double-hub-spoke' ? 2 : 1;
-    const rings = S.ratios.slice(0, nRings).map((k) => k * xg);
-    const c = [xg, ys];
-    if (pat === 'half-hub') {
-      straight('springing', 0, ys, Wg, ys);
-      arcBar('ring', { cx: c[0], cy: c[1], r: rings[0], a0: 0, a1: Math.PI });
+    // generic hubSpoke({ spokes, rings, hubVertical }) — presets or the user's custom numbers
+    let def;
+    if (pat === 'custom') {
+      const n = Math.floor(Number(spokes));
+      const rr = Array.isArray(rings) ? rings.map(Number) : [];
+      if (!(n >= CUSTOM_HUB_LIMITS.minSpokes && n <= CUSTOM_HUB_LIMITS.maxSpokes)) throw new ArchError(`Custom hub: spoke count must be ${CUSTOM_HUB_LIMITS.minSpokes}–${CUSTOM_HUB_LIMITS.maxSpokes}, got "${spokes}"`);
+      if (!rr.length || rr.length > CUSTOM_HUB_LIMITS.maxRings || !rr.every((k) => k > 0 && k < 1)) throw new ArchError(`Custom hub: rings must be 1–${CUSTOM_HUB_LIMITS.maxRings} fractions of the half width (0 < k < 1), got "${rings}"`);
+      def = { spokes: n, ringRatios: [...rr].sort((a, b) => a - b), hubVertical: false };
     } else {
-      for (const rk of rings) arcBar('ring', { cx: c[0], cy: c[1], r: rk, a0: 0, a1: Math.PI });
-      const spokeCount = nRings === 3 ? 8 : nRings === 2 ? 6 : 4;
-      const bounds = [...rings, arcs[0].r];                          // ring → ring → outline (semi-circle radius = xg)
-      for (let i = 0; i < spokeCount; i++) {
-        const ang = (i / (spokeCount - 1)) * Math.PI;
-        const onLine = i === 0 || i === spokeCount - 1;             // the end spokes lie on the springing line
+      const P = HUB_PRESETS[pat];
+      def = { spokes: P.spokes, ringRatios: P.ringRatios || S.ratios.slice(0, P.rings), hubVertical: P.hubVertical };
+    }
+    const ringR = def.ringRatios.map((k) => k * xg);
+    const c = [xg, ys];
+    if (def.spokes === 0) {
+      straight('springing', 0, ys, Wg, ys);                            // half-hub: the springing bar + ring 1
+      arcBar('ring', { cx: c[0], cy: c[1], r: ringR[0], a0: 0, a1: Math.PI });
+    } else {
+      for (const rk of ringR) arcBar('ring', { cx: c[0], cy: c[1], r: rk, a0: 0, a1: Math.PI });
+      const bounds = [...ringR, arcs[0].r];                           // ring → ring → outline (semi-circle radius = xg)
+      for (let i = 0; i < def.spokes; i++) {
+        const ang = (i / (def.spokes - 1)) * Math.PI;
+        const onLine = i === 0 || i === def.spokes - 1;               // the end spokes lie on the springing line
         const ca = Math.cos(ang), sa = Math.sin(ang);
         for (let k = 0; k < bounds.length - 1; k++) {
           const r0 = bounds[k], r1s = bounds[k + 1];
           straight(onLine ? 'springing' : 'spoke', c[0] + r0 * ca, c[1] + r0 * sa, c[0] + r1s * ca, c[1] + r1s * sa);
         }
+        // workshop preset: the vertical spoke continues through the hub to the springing line (DWG)
+        if (def.hubVertical && Math.abs(ang - Math.PI / 2) < 1e-9) straight('spoke', c[0], c[1], c[0], c[1] + ringR[0]);
       }
       // PSW 875–886: every ring end continues straight down to the glass bottom
-      for (const rk of rings) {
+      for (const rk of ringR) {
+        if (!(ys > 0)) break;
         straight('v', xg - rk, 0, xg - rk, ys);
         straight('v', xg + rk, 0, xg + rk, ys);
       }
@@ -990,5 +1130,183 @@ export function buildArchBars({ outline, shape, pattern = 'none', h = 0, v = 0, 
     bars,
     totalLength: bars.reduce((s, b) => s + b.length, 0),
     byRole: bars.reduce((m, b) => { m[b.role] = (m[b.role] || 0) + 1; return m; }, {}),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CIRCLE — fixed window (ARCHED-WINDOWS-v3 Block 3, Piotr 07.09)
+//
+// The frame and the leaf are full rings, no springing, no straight member:
+// the "arch frame" here has its origin at the CIRCLE CENTRE (the chains of
+// an arch start on the springing line; a circle's two half-arcs start on the
+// horizontal diameter at (R, 0) and run counter-clockwise — upper half 0 → π,
+// lower half π → 2π — so every chain helper (offsetArcs, buildRing, ringPoly,
+// planArchSegments, chainPoly) works unchanged). Radii per the casement
+// profile faces exactly like the arch: frame ring 0 → frameHead.face, leaf
+// ring leafAtJamb → leafAtJamb + leafTop.face, glass at leafInner − glassInset
+// (800 circle: 400 / 343, 360 / 293, glass 305.5).
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Two half-arcs of a full circle, radius r, centre (0, 0): upper 0 → π, lower π → 2π. */
+export function circleArcs(r) {
+  const R = Number(r);
+  if (!(R > 0)) throw new ArchError(`Circle radius must be positive, got ${r}`);
+  return [{ cx: 0, cy: 0, r: R, a0: 0, a1: Math.PI }, { cx: 0, cy: 0, r: R, a0: Math.PI, a1: 2 * Math.PI }];
+}
+
+/**
+ * Circle geometry from the casement profile — the same fields as
+ * buildArchGeometry so the CNC drawing, the FIT row and the sheets read one
+ * object. `height` must equal `width` (the configurator locks it); `rise`
+ * and `start` are the radius (the horizontal diameter sits at H / 2).
+ */
+export function buildCircleGeometry({ width, height }, profile) {
+  if (!profile?.elements?.frameHead || !profile?.elements?.leafTop || !profile?.deductions || !profile?.geometry) {
+    throw new ArchError('Casement profile is missing the frameHead / leafTop / deductions / geometry sections');
+  }
+  const L = readArchLimits(profile.arch?.limits);
+  const W = Number(width);
+  if (!(W >= L.minWidth && W <= L.maxWidth)) throw new ArchError(`Circle diameter ${r1(W)}mm is outside ${L.minWidth}–${L.maxWidth}mm`);
+  if (height != null && height !== '' && Math.abs(Number(height) - W) > 0.5) {
+    throw new ArchError(`A circle window is ${r1(W)} wide but ${r1(Number(height))} high — the height must equal the diameter`);
+  }
+  const R = W / 2;
+  const base = circleArcs(R);
+  const tFrame = Number(profile.elements.frameHead.face);
+  const leafInset = Number(profile.deductions.leafAtJamb);
+  const tLeaf = Number(profile.elements.leafTop.face);
+  const glassInset = Number(profile.geometry.glassInset);
+  const land = Number(profile.geometry.land);
+  const gap = Number(profile.geometry.gap);
+  if (!(land > 0 && gap >= 0)) throw new ArchError('Casement profile geometry.land / geometry.gap are missing');
+  const glassOffset = leafInset + tLeaf - glassInset;
+  if (!(R - glassOffset > 0)) throw new ArchError(`Circle diameter ${r1(W)}mm leaves no glass (offset ${r1(glassOffset)} per side)`);
+  const frameHead = buildRing(base, 0, tFrame, 'FRAME RING');
+  const leafTop = buildRing(base, leafInset, leafInset + tLeaf, 'LEAF RING');
+  const glassArcs = offsetArcs(base, glassOffset);
+  return {
+    shape: CIRCLE_SHAPE,
+    label: 'Circle',
+    width: W,
+    rise: R,
+    start: R,                                   // the horizontal diameter from the cill line
+    straightHeight: R,
+    leafStraightStile: 0,
+    limits: L,
+    minHaunchRadius: null,
+    radii: [R],
+    arcs: base,
+    offsets: { frameInner: tFrame, leafOuter: leafInset, leafInner: leafInset + tLeaf, glass: glassOffset, land },
+    frameHead,
+    leafTop,
+    rebateWall: offsetArcs(base, land),
+    fit: { gap, lap: tFrame - leafInset, land },
+    glass: { arcs: glassArcs, length: arcsLength(glassArcs), apex: R - glassOffset, halfWidth: R - glassOffset, radius: R - glassOffset },
+  };
+}
+
+/**
+ * Glass outline of a circle unit in the GLASS frame (unit bottom-left, y up):
+ * the two half-arcs centred at (rg, rg). `springing` = rg (the horizontal
+ * diameter) so the shared helpers that move the outline back to the arch
+ * frame (glassEdgeArcs) land on the circle centre; `kind: 'circle'` tells
+ * the contour helpers there is no straight edge.
+ */
+export function buildCircleGlassOutline(glassArcs) {
+  const rg = glassArcs[0].r;
+  const arcs = glassArcs.map((a) => ({ ...a, cx: a.cx + rg, cy: a.cy + rg }));
+  return {
+    kind: CIRCLE_SHAPE,
+    width: 2 * rg,
+    height: 2 * rg,
+    springing: rg,
+    apex: 2 * rg,
+    rise: rg,
+    radius: rg,
+    centre: [rg, rg],
+    arcs,
+    radii: [rg],
+    archLength: 2 * Math.PI * rg,
+    archArea: Math.PI * rg * rg,
+    area: Math.PI * rg * rg,
+    perimeter: 2 * Math.PI * rg,
+  };
+}
+
+/**
+ * Glazing bars in a circle unit (v3 Block 3), glass frame — PSW 3d-src
+ * FixFrameWindow.jsx CircleFrame ported on the exact circle:
+ *   h / v      chords at equal divisions of the diameter (PSW: −rInner + D·i/(n+1))
+ *   sunburst   one ring at rg − offset (profile arch.patterns.sunburst.offset,
+ *              or the window's circleOffset), `spokes` spokes from the ring
+ *              to the glass edge at i·360°/spokes from the right (PSW: angle
+ *              i/6·2π); the user's h / v are drawn as chords across the ring
+ *              (PSW draws them too)
+ */
+export function buildCircleBars({ outline, pattern = 'none', h = 0, v = 0, circleOffset }, patternOpts) {
+  const pat = pattern || 'none';
+  if (!patternsForShape(CIRCLE_SHAPE).includes(pat)) throw new ArchError(`Bar pattern "${pat}" is not available on a circle (allowed: ${patternsForShape(CIRCLE_SHAPE).join(', ')})`);
+  const rg = outline.radius, [cx, cy] = outline.centre;
+  const nH = Math.max(0, Math.floor(Number(h) || 0));
+  const nV = Math.max(0, Math.floor(Number(v) || 0));
+  const bars = [];
+  const r05 = (val) => Math.round(val * 2) / 2;
+  const straight = (role, x0, y0, x1, y1) => bars.push({ kind: 'straight', role, from: [x0, y0], to: [x1, y1], length: r05(Math.hypot(x1 - x0, y1 - y0)) });
+  const chord = (d) => Math.sqrt(Math.max(0, rg * rg - d * d));          // half chord at distance d from the centre
+  for (let j = 1; j <= nH; j++) {
+    const y = -rg + (2 * rg * j) / (nH + 1);
+    const hc = chord(y);
+    if (hc > 1e-6) straight('h', cx - hc, cy + y, cx + hc, cy + y);
+  }
+  for (let i = 1; i <= nV; i++) {
+    const x = -rg + (2 * rg * i) / (nV + 1);
+    const hc = chord(x);
+    if (hc > 1e-6) straight('v', cx + x, cy - hc, cx + x, cy + hc);
+  }
+  if (pat === 'sunburst') {
+    const S = patternOpts?.sunburst || {};
+    const offset = Number(circleOffset ?? S.offset);
+    const n = Math.floor(Number(S.spokes));
+    if (!(offset > 0)) throw new ArchError('Casement profile arch.patterns.sunburst.offset is missing (ring inset from the glass edge, mm)');
+    if (!(n >= 3)) throw new ArchError('Casement profile arch.patterns.sunburst.spokes is missing (>= 3)');
+    const rr = rg - offset;
+    if (!(rr > 30)) throw new ArchError(`Sunburst ring radius ${r1(rr)}mm is too small (glass R ${r1(rg)} − offset ${r1(offset)}; PSW hides it below 30)`);
+    bars.push({ kind: 'arc', role: 'ring', arc: { cx, cy, r: rr, a0: 0, a1: Math.PI }, from: [cx + rr, cy], to: [cx - rr, cy], length: r05(Math.PI * rr) });
+    bars.push({ kind: 'arc', role: 'ring', arc: { cx, cy, r: rr, a0: Math.PI, a1: 2 * Math.PI }, from: [cx - rr, cy], to: [cx + rr, cy], length: r05(Math.PI * rr) });
+    for (let i = 0; i < n; i++) {
+      const ang = (i / n) * 2 * Math.PI;
+      const ca = Math.cos(ang), sa = Math.sin(ang);
+      straight('spoke', cx + rr * ca, cy + rr * sa, cx + rg * ca, cy + rg * sa);
+    }
+  }
+  const counters = {};
+  for (const b of bars) {
+    const pfx = BAR_ID_PREFIX[b.role] || 'B';
+    counters[pfx] = (counters[pfx] || 0) + 1;
+    b.id = `${pfx}${counters[pfx]}`;
+  }
+  return {
+    pattern: pat,
+    counts: { h: nH, v: nV },
+    bars,
+    totalLength: bars.reduce((s, b) => s + b.length, 0),
+    byRole: bars.reduce((m, b) => { m[b.role] = (m[b.role] || 0) + 1; return m; }, {}),
+  };
+}
+
+/** Circle plan for the CNC drawing (same shape as buildArchPlan; kind 'circle', no hinge). */
+export function buildCirclePlan(input, profile) {
+  if (!profile?.arch) throw new ArchError('Casement profile has no "arch" section (stock widths / finger joint)');
+  const geometry = buildCircleGeometry(input, profile);
+  const frameHead = planArchSegments(geometry.frameHead, profile.arch);
+  const leafTop = planArchSegments(geometry.leafTop, profile.arch);
+  return {
+    ...geometry,
+    kind: 'circle',
+    hinge: null,
+    finger: { ...profile.arch.finger },
+    blank: { contourAllowance: frameHead.contourAllowance, maxSegmentAngleDeg: frameHead.maxSegmentAngleDeg, pieceRule: frameHead.pieceRule },
+    plans: { frameHead, leafTop },
+    noStock: frameHead.noStock || leafTop.noStock,
   };
 }

@@ -65,6 +65,12 @@ export function archedOutlineD(arcs, tx, yBottom) {
   return `M ${num(e[0])} ${num(yBottom)} H ${num(s[0])} V ${num(s[1])} ${chainArcsD(arcs, tx)} Z`;
 }
 
+/** Closed contour of a chain that returns to its start (v3 Block 3: the two half-arcs of a circle) — no straight edge. */
+export function closedChainD(arcs, tx) {
+  const s = chainStart(arcs, tx);
+  return `M ${pt(s)} ${chainArcsD(arcs, tx)} Z`;
+}
+
 /** Closed band between two chains of the same ring (outer forward, inner backward), cut on the springing line — ringPoly for SVG. */
 export function ringBandD(outer, inner, tx) {
   const os = chainStart(outer, tx);

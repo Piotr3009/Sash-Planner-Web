@@ -22,6 +22,7 @@ import { computeBarPositions, DimH, DimV, TitleBlock, Label, tfs } from './drawi
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, DIMS, VIEWBOX_REF } from './drawingTheme.js';
 import { casementBarCounts } from './casementDrawUtils.js';
 import { archToSheet, glassToSheet, archedOutlineD, barBandD, arcLabelPoint, radiiText } from './archDrawUtils.js';
+import CircleFixedDrawing2D from './CircleFixedDrawing2D.jsx';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
 const BAR_WIDTH = 22;
@@ -84,6 +85,8 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
   }, [windowSpec, derived]);
 
   if (!geom) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
+  // v3 Block 3: a circle fixed window has no straight member — its own sheet (after the hooks above)
+  if (derived?.arch?.shape === 'circle') return <CircleFixedDrawing2D windowSpec={windowSpec} derived={derived} projectNumber={projectNumber} view="elevation" />;
 
   const { fw, fh, g } = geom;
 
@@ -130,7 +133,7 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
   const projNum = projectNumber || '';
   const titleText = `Front Elevation${projNum ? ` — ${projNum}` : ''} — ${winName}`;
   const subtitleText = arch
-    ? `Casement ${derived.casement.layout} · arched · ${fw} × ${fh} mm · exterior view`
+    ? `Casement · arched · ${fw} × ${fh} mm · exterior view`
     : `Casement ${derived.casement.layout} · ${fw} × ${fh} mm · exterior view`;
   const archLine = arch ? `${arch.AG.label} · start ${fmt(arch.start)} · rise ${fmt(arch.rise)} · ${radiiText(arch.outer)}` : '';
   const titleY = oy + fh + DM + TITLE_AREA * 0.5;

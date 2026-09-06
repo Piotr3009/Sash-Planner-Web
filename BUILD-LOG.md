@@ -4,6 +4,422 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-09-07 — ARCHED-WINDOWS-v3 night 5 (branch `claude/arched-windows-v3-9v0sw7`)
+
+Inputs read in full: `CLAUDE.md` → `docs/handover/ARCHED-WINDOWS-v3.md` → `BLOCKERS.md` → `BUILD-LOG.md`
+(night 4) → `arka_CNC-piotr.dxf` through ezdxf (every entity dumped, see 0.4) → the `arka-lsp-package`
+README / JSON / LSP (offsets and section only) → `arch.js`, `archDxf.js`, `dxfWriter.js`, `glassDxfExport.js`,
+`glassPdfExport.js`, `CasementGlassDrawing2D.jsx`, `archDrawUtils.js`, `profile.js`, `calculations.js`
+(casement + sash branches), `specification.js`, `lists.js`, `cncExport.js`, the t18 / t19 harness conventions,
+PSW `price-calculator.js` 940–1075, `online-estimate.html` (arch radios, hinge radio, fix bars),
+`estimate-manager.js` 675–700, `ArchedSashWindow.jsx` 95–120 / 340–420. Baseline on the branch start
+(`origin/main`): t16 504/504, t17 72/72, t18 178/178, t19 241/241 ALL PASS (after `npm install` — the container
+had no `node_modules`; t18 / t19 need react-dom / jspdf resolvable).
+
+Stages tonight (Piotr 07.09, gate before each next stage): 1 = Block 0, 2 = Block 1 A–E, 3 = Block 1 F–J +
+Block 3, 4 = Block 4 + Block 6.
+
+### STAGE 3a — Block 1 F–J: arched SASH, drawings / exports / 3D (`archDxf.js`, `cncExport.js`, `glassDxfExport.js`, `traceryExport.js`, `FrontElevation2D.jsx`, `BoxDetail2D.jsx`, `SashDetail2D.jsx`, `GlassDrawing2D.jsx`, `VerticalSection2D.jsx`, `CasementGlassDrawing2D.jsx`, `ArchedSashWindow.jsx` new, `archedSashGeometry.js` new, `App.jsx`, `windowSpecToConfig.js`, `WindowDetailPage.jsx`, `verify/arch/t22.mjs`)
+
+**Understanding:** Stage 2 gave the arched sash an engine; the workshop still needs the two curved members on the
+CNC (box head 80 face, top rail 57), the glazier's upper unit, the tracery board when a pattern is set, the five
+2D sheets with the arc, and a 3D that is not the rectangular sash. Rectangular sash sheets must not move by a byte.
+
+**Baseline first (J):** `verify/arch/t22_baseline.mjs` → `fixtures/rect-sash-sheets.json`: the six rectangular
+fixtures × 7 sheets (elevation, box, upper, lower, glass ×2, section) = 42 SVGs rendered from HEAD **before** any
+sheet was touched (`lib/sashSheets.mjs` bundles the sash sheet tree the way t19 does for the casement).
+
+**Two approaches, one rejected (F):** (a) a second DXF builder for the sash (`sashArchDxf.js`) — rejected: the
+CONTOUR / PIECES / FIT rows are the same drawing with other radii, a copy drifts; (b) `buildSashArchPlan()` in
+`cncExport.js` builds a plan with `kind 'sash'` (head ring + top rail ring from `buildSashArchGeometry`, glass
+outline, `fit.gap` 9, no rebate wall) and `archDxf.js` accepts it — chosen. The FIT text of a sash reads
+`RUNNING GAP 9 (HEAD 80 FACE, SASH AT THE STILE LINE)`; the casement row is unchanged.
+
+**Built:**
+- **F** `archDxf.js` — `plan.kind === 'sash'`: rows `S-ARCH HEAD` / `S-ARCH TOP RAIL`, no hinge text (`SASH`),
+  FIT row without the rebate wall; `cncExport.js` — `buildSashArchPlan`, `archParamsForWindow` accepts a sash
+  (triple never), `downloadDxf(filename, content, mime)`. Samples `sample_sash_arch_1000_semi-circle.dxf`,
+  `_1200_three-centre.dxf`, `_1000_gothic.dxf`.
+- **G** `glassDxfParamsForWindow` / `traceryParamsForWindow` accept `category 'sash'` (upper unit = the engine's
+  `glassOutline`, bands / edge cover / axes from Block 0, glass inset override for the sash rebate);
+  `canExportTracery` for a patterned sash; samples `sample_glass_sash_1000x2200_semi-circle_hub-spoke.dxf`,
+  `sample_tracery_sash_hub.dxf`. `WindowDetailPage`: Arch DXF / Tracery / Glass DXF buttons enabled for
+  `category === 'casement' || windowSpec.arch.shape`.
+- **H** 2D from `derived.arch` ArcChains through `archDrawUtils` (no second geometry): `FrontElevation2D` — head
+  ring band, jambs to the springing, upper sash outline + unit + bars, lower h bars, dims start / rise, R labels,
+  third title line, `data-arch-origin` for the harness; `BoxDetail2D` — head ring, jambs to the springing,
+  `S-ARCH HEAD 80` label; `SashDetail2D` — arched upper sash outline / daylight / unit / bars, springing line,
+  `rise` chain; `GlassDrawing2D` — the upper arched unit delegates to `CasementGlassDrawing2D` (Block 0 glazier
+  sheet: bands, edge line, bar-end table) with a `sash-upper` group; `VerticalSection2D` — `ARCH HEAD` / `ARCH
+  TOP RAIL` labels on the curved members. Every rectangular path is behind `derived.arch?.geometry` checks.
+- **I** `ArchedSashWindow.jsx` ported from PSW (1003 lines, PSW file 1:1 as the base) with an `Outer` wrapper:
+  `resolvePcShape` (PC names first, PSW ids mapped, unknown → semi-circle), props `archRise`,
+  `archMinHaunchRadius`, `pcShape`; the outline builders `arcPtsPC` / `shapeContourPC` / `apexRisePC` read
+  `archedSashGeometry.js` (new, pure: `engineArcs` = `archArcs` + `offsetArcs` → constant band, `engineArcPoints`,
+  `engineApexRise`, `chainTo3D`) and fall back to PSW's sampler when the engine cannot offset the contour.
+  PSW's named-export blocks appended to `ParametricSashWindow.jsx` and `FixFrameWindow.jsx` (export, no copy —
+  nothing above the block changed). `App.jsx` renders `<ArchedSashWindow>` for `sashType 'arched'`, keys
+  `archHBars` / `archVBars` / `lowerHBars` added; `windowSpecToConfig` emits `sashType 'arched'`, `archShape`,
+  `archRise`, `archProfile`, `barPattern`, bars, `archMinHaunchRadius` for an arched sash.
+
+**Verification (t22 75/75 ALL PASS):** §1 42/42 rectangular sheets byte-identical to the fixture; §2 sash DXF
+rows / radii / FIT gap 9, ezdxf round-trip on the three samples; §3 glazier DXF layers + tracery for the upper
+unit; §4 every SVG arc on the five arched sheets sits on an engine ring (centre + radius ±0.01 after the sheet
+transform); §5 3D helper (constant band, rule C start, fallback null, names) + `windowSpecToConfig`; §6 wiring
+grep. The arched sheets were rendered headless (Chromium) and looked at as PNG. `npm run build` OK.
+**Not verified:** the 3D in a browser (no WebGL render in the container — same as night 4), the DXF in VCarve /
+AutoCAD, the PDFs. **Findings → BLOCKERS §13.** **Verdict: ✅ Block 1 F–J** (3D ⚠️ compiled + helper-tested only).
+
+### STAGE 3b — Block 3: FIXED windows in the casement batch (`profile.js`, `arch.js`, `specification.js`, `calculations.js`, `lists.js`, `bom.js`, `glassBars.js`, `traceryExport.js`, `archDxf.js`, `cncExport.js`, `glassDxfExport.js`, `glassPdfExport.js`, `projectStore.js`, `ConfiguratorPage.jsx`, `windowSpecToConfig.js`, `App.jsx`, `ArchedCasementWindow.jsx`, `archDrawUtils.js`, `CircleFixedDrawing2D.jsx` new, four casement sheets, `verify/arch/t23.mjs`)
+
+**Understanding:** Piotr 07.09 — a fixed window "podchodzi pod casement batch, ale jednak nie casement": the casement
+frame + a leaf that never opens ("leaf tylko"), no hinges, no handle, no opening symbol; shapes rectangle / Round /
+Gothic / circle. PSW sells it as the fix-only product (`fixShape`, `fixType`, `fixArchRise`, `fixCircleBarPattern`,
+`fixCircleOffset`, `fixSemiBarPattern` / `fixGothicBars`).
+
+**Two approaches, one rejected:** (a) a fourth engine (`deriveFixWindow`) with its own members — rejected: the fixed
+leaf IS the casement leaf (same sections, same deductions), a copy drifts; (b) `casement.kind 'fixed'` inside
+`deriveCasementWindow`: the layout is forced to `040L` with `casementHinges ['fixed']`, so the existing dummy-sash
+path (no hardware picks, no opener) does the work and every number stays the hinged casement's — chosen. The circle
+is the one new geometry: the frame and the leaf are full rings, so `arch.js` gets `circleArcs` (two half-arcs,
+centre at the origin — every chain helper, the ring builder and the segment planner work unchanged) and
+`buildCircleGeometry` on the same profile faces as the arch.
+
+**Built:**
+- Data: `casement.kind` ('opening' | 'fixed'; PSW `windowType 'fix-only'` → casement batch + fixed), `archFromSpec`
+  reads the PSW fix fields (`fixShape` rectangle / circle / arch ids, `fixArchRise`, the three pattern fields,
+  `fixCircleOffset` → `bars.circleOffset`), `circleFromSpec` (shape 'circle', rise = start = W/2, hinge null, pattern
+  none | sunburst). Store whitelist `casementKind`, `fixCircleOffset`.
+- Profile: `fix.construction 'fixedLeaf'` (DEFAULT open; `directGlazed` refused readably — no rebate numbers),
+  `arch.patterns.sunburst { offset 200, spokes 6 }` (PSW CircleFrame), `migrateCasementProfile` fills both.
+- Engine: fixed → `040L` + `['fixed']`, notes `fixed leaf`, `derived.casement.kind`; circle → `buildCircleGeometry`
+  (800: frame 400 → 343, leaf 360 → 293, glass 305.5, rebate wall 364), `C-FRAME RING` (`C-FRR`, 57x93, centre
+  2π·371.5) and `C-LEAF RING` (`C-LFR`, 67x57, 2π·326.5) instead of head / jambs / cill / stiles / rails, glass unit
+  `kind 'circle'` (611 × 611, true area), `buildCircleBars` (chords h / v as PSW, sunburst = ring at R − offset + 6
+  spokes to the glass edge), tracery on the circle board (full mode), seal = ring circumference, paint π·R².
+  Cut list / BOM rows for the two rings (head / top-rail stock).
+- Glazier: `glassBars.js` circle branches (edge poly two half circles, bar ends measured from the top of the circle,
+  chords by x / y), glazier DXF (`DIAMETER 611 R 305.5`), glass PDF outline path, `CasementGlassDrawing2D` circle
+  contour + centre lines. Tracery: `boardFromOutline` circle board, full mode; two fixes in the arrangement —
+  overlapping-piece dedupe keyed by the mid-point (the two halves of a circle share both ends) and `offsetFace` on
+  a single merged full-circle edge (hub pane, board).
+- CNC: `buildCirclePlan` (kind 'circle'), `archDxf` prints `FIXED LEAF` instead of `HINGE L / R` (also for a fixed
+  arched casement: `plan.fixed`), FIT row with the rings + the dashed rebate wall; `archParamsForWindow` routes the
+  circle. Samples `sample_circle_800_sunburst.dxf`, `sample_glass_circle_800_sunburst.dxf`,
+  `sample_tracery_circle_800_sunburst.dxf` / `.lsp`.
+- 2D: `CircleFixedDrawing2D` (elevation / frame / leaf views: rings, rebate wall, glass, bars, centre lines, radii, Ø
+  dims, blank-plan text) — the three casement sheets delegate a circle to it after their hooks; the rectangular /
+  arched sheets are untouched apart from the pane role text (`P1 fixed`).
+- 3D: fixed → `casementHinges ['fixed']` (CasementWindow's own fixed pane) / `fixedLeaf` prop on
+  `ArchedCasementWindow` (no handle, opening 0); circle → PSW's `FixFrameWindow` circle branch (PC's copy is already
+  1:1 with PSW — the "raise it" in the spec was stale) via `windowCategory 'fix-only'`.
+- Configurator: Kind chips Opening | Fixed; Fixed → Shape chips Rectangle | Round | Gothic | Circle (Round / Gothic
+  reuse the shared arch controls without a hinge side; the layout picker is hidden), circle locks the height to the
+  width and shows the ring radii, pattern chips none | sunburst; `buildCirclePlan` errors block the save.
+
+**Verification (t23 79/79 ALL PASS):** §1 circle geometry (400 / 343 / 360 / 293 / 305.5, planner 2 × 5 pieces, errors
+for H ≠ W and W < 400, sunburst ring 105.5 + 6 spokes L 200 at 60°, chords, per-window offset, hub-on-circle and
+sunburst-on-arch refused); §2 engine circle 800 (two ring records, no hardware, glass true area, tracery 7 panes,
+seals / paint / beading); §3 rectangle fixed = 040L stripped JSON byte-equal; §4 arched fixed = arched casement
+stripped JSON byte-equal (+ gothic); §5 PSW fix-only circle / gothic / semi-circle / rectangle imports, PC kind,
+import errors; §6 CNC DXF ezdxf round-trip (rows, FIXED LEAF, FIT radii, dashed wall, 24 piece contours, merged
+export); §7 glazier DXF (contour 2 × bulge 1 R 305.5, edge 294.5, bands) + tracery DXF / LSP round trip (7 panes,
+hub rail / limit radii); §8 sheets: every SVG arc of the three circle sheets concentric on the sheet centre with an
+engine radius, glass sheet likewise, fixed rectangle without the opening symbol and otherwise identical; §9 3D
+config; §10 wiring grep. Rendered the circle elevation / leaf / glass sheets headless and looked at them.
+**Not verified:** the configurator and the 3D in a browser, the DXFs in VCarve, the fixed window inside the
+production pack / PDFs beyond the engine records. **Verdict: ✅ Block 3** with the DEFAULT (open) entries in
+BLOCKERS §14 (2D circle case ✅, 3D fixed leaf ⚠️ compiled only).
+
+### STAGE 3 GATE — ✅ ALL PASS
+
+t16 504 · t17 72 · t18 178 · t19 244 · t20 112 · t20_bars 30 · t21 120 · t22 75 · t23 79 · `npm run build` OK.
+Rectangular casement (t18 / t19 / t20 fixtures) and rectangular sash (t21 / t22 fixtures) derived JSON and
+sheets byte-identical (`derived.casement.kind` is present only on a fixed window). t16 / t18 assertions updated
+for the v3 vocabulary (a rectangular sash now skips as "not an arched sash", sunburst in ARCH_BAR_PATTERNS, the
+configurator's save gate reads `shapeBlocked`).
+
+### NIGHT 5 — FINAL VERDICT (all four stages) and the CLAUDE.md checklist
+
+**Gates:** Stage 1 (t16 504 · t17 72 · t18 178 · t19 244 · t20 112 · t20_bars 30), Stage 2 (+ t21 120), Stage 3
+(+ t22 75 · t23 79), Stage 4 (+ t24 26) — every harness ALL PASS on the final tree, `npm run build` green,
+esbuild clean on every touched file, no Polish in sources (Piotr's quotes paraphrased in English).
+Rectangular casement and sash: derived JSON + sheets byte-identical to the HEAD fixtures (t18 / t19 / t20 /
+t21 / t22). t16 / t18 assertions were updated where v3 changed the rule (hinge value 1:1, sash exports,
+sunburst vocabulary, blank board metres in the BOM, the configurator's save gate).
+
+**Checklist:** branch pushed after every stage, `main` untouched · harnesses ALL PASS · build OK · esbuild OK ·
+diff limited to the spec's files + verify / docs / BUILD-LOG / BLOCKERS / CLAUDE.md · samples in
+`docs/handover/samples/` (arch ×5, glass ×4 + merged, tracery DWG / hub / quad / gothic / custom / sash / circle
+DXF + LSP, sash arch ×3, circle arch) · BUILD-LOG per stage · BLOCKERS §11–§15 with every DEFAULT (open) ·
+SQL in `docs/handover/sql/`.
+
+**What was NOT verified tonight (honest list):**
+1. Nothing in a browser: the configurator (Kind / Shape chips, circle height lock, custom hub, arched sash),
+   the 3D (arched sash port, fixed leaf, circle via FixFrameWindow), the Archive page, the dashboard Archive
+   button, the read-only project page, the PP Curved members card.
+2. No CAD: the DXFs (arch, sash, circle, tracery, glazier) were round-tripped through ezdxf and the LSP parsed
+   back, never opened in VCarve / AutoCAD; the LSP never run in AutoCAD.
+3. No PDF opened: the glass / elevation / elements / cut-list PDFs with arched, sash-arched and circle sheets.
+4. Supabase: the archive SQL was not run; RLS not exercised (manual check in BLOCKERS 15.7); cloud writes of
+   `archived` / `archived_at` only grep-checked.
+5. Physical sanity that only Piotr can give: the 80 sash head ring and the 89 inset (12.1), the circle leaf's
+   4 / 17 running fit all round (14.3), the blank rough-length rule (15.3), the sunburst 200 / 6 (14.5).
+
+### STAGE 4 — Block 6 project ARCHIVE + Block 4 cross-cutting (`docs/handover/sql/2026-09-07_projects_archive.sql` new, `cloudSync.js`, `projectStore.js`, `ArchivePage.jsx`, `DashboardPage.jsx`, `ProjectDetailPage.jsx`, `lists.js`, `bom.js`, `pricing.js`, `ProductionPackPage.jsx`, `verify/parity/psw-casement-layouts.mjs`, `PSW-PARITY-REPORT.md`, `PSW-3D-ARCH-PORT.md`, `verify/arch/t24_stage4.mjs`)
+
+**Block 6 — understanding:** Piotr 07.09 — finished projects clutter the dashboard. An archived project leaves
+the dashboard, keeps its batches / windows / packs readable, and can come back.
+**Two approaches, one rejected:** (a) `projects.status = 'archived'` — rejected: `status` is the production
+status the dashboard already reads (`preparation` …) and `loadAll` already filters a boolean `archived`; (b)
+`archived` boolean (made explicit) + `archived_at timestamptz` — chosen, SQL as a separate file, RLS untouched.
+**Built:** SQL migration (idempotent: columns if not exists, backfill, tenant + archived index);
+`cloudSync.saveProject` writes both fields, `loadArchivedProjects()` pulls archived = true with batches +
+windows; store `archivedProjects` / `archiveProject` / `restoreProject` / `loadArchivedProjects` /
+`getProjectById` (both lists), `clearAll` resets; `ArchivePage` table Project · Client · Batches · Windows ·
+Archived on · Restore + search; dashboard card Archive button (immediate when every batch's pack is complete,
+confirm modal otherwise — `ConfirmModal` gained `confirmLabel` / `tone`); project page opens an archived project
+read-only (banner with Restore, no Add Batch / delete batch).
+
+**Block 4 — built:** `lists.js` `CURVED_MEMBER_PLAN` / `buildCurvedMembersForWindow` (rows with radii, pieces,
+per-arc n × stock × rough, finger) and `blankPiecesForRecord` — the pre-cut lists a curved member as its blank
+pieces (qty n, rough length, section stock × depth), never as the arc length; `bom.makeRawResolver(name,
+{ kind: 'blank', stock, depth })`; BOM board metres follow the blanks. PP: `CurvedMembersSection` in the Cut
+List tab (per type); Arch DXF (all) + Tracery DXF / LSP (all) enabled for sash batches / packs (merged exports
+for the arched sash). Pricing: `archedCasement.curvedMemberSurcharge` (0) × 2 members, in the breakdown. Parity
+script updated to the v3 contract (hinge value 1:1, import ratios = PSW `RISE_RATIO`) and the report regenerated
+(23 PASS · 2 DIFF · 0 HARD). Port doc §7 (fixed / circle / doors). Sash glazing arch left out of the engine
+(BLOCKERS 15.1). PDFs: the sheets already reach the PDFs through `svgNodeToPng`, so the arched / circle sheets
+ride the same path (not opened as PDFs tonight — 15.5).
+
+**Verification (t24 26/26 ALL PASS):** §1 store round-trip archive → hidden → restore → visible (offline store, cloud
+disabled), currentProject follows, delete / clearAll; §2 SQL file content, cloud writes, pages grep; §3 blanks
+for an arched casement / arched sash / circle, BOM mm = Σ n × rough, rectangular pre-cut unchanged, PP grep; §4
+pricing neutral at 0 and +80 at 40, parity report, port doc. **Not verified:** the SQL against Supabase (run by
+hand, 15.7), the Archive page / dashboard button / read-only project page in a browser, the PP section on
+screen, the cut-list PDF with blanks. **Verdict: ✅ Block 6, ✅ Block 4** (PDF / browser items ⚠️ unverified).
+
+### 0.4 — tracery export DXF + LSP, the `arka` convention (`src/engine/cnc/traceryExport.js` new, `dxfWriter.js` POINT, `arch.js` patterns, `calculations.js`, `lists.js`, `bom.js`, `cncExport.js`, pages, configurator, 3D props)
+
+**Understanding:** one timber board over the arched unit, cut on the CNC to the pane pattern; the bead R8 runs
+along every opening. The workshop DWG (one quadrant, R 600, quad-hub-spoke) is the thing to reproduce; the
+package explains the offsets (+2 rail / +10 limit / 22 bar / 18 margin) and the section; its mitre legs are
+placed the wrong way round.
+
+**Read from the DWG (ezdxf, not memory):** centre (−3227.6189, 1606.5905); board OUTLINE 4D6 R 600 to
+x = centre + 7; panes 4D3 (hub R 189), 4CD / 4D0 (R 211–389), 4C5 / 4C8 (R 411–582), all bottoms at
+centre + 18, hub cut at centre − 11; +2 (PANE) and +10 (FRONT_HINGES_3MM) as concentric offsets; 20 MITRE
+polylines (19 corners, 581 + 587 one corner in two halves), e.g. 51A apex (−3510.4607, 1888.0181) → legs
+(−3499.8541, 1877.4115) along the 45° spoke edge and (−3520.8413, 1877.1854) along the R 399 arc — both INTO
+pane 4D2; section LINE 4E9 (6 mm) + ARC 4EA (R 8, 90°) on layer 0 = the package polyline `(0,0) → bulge
+−0.4142 → (8,8) → (8,14)` after translation (asserted in t20 §4 — the section is NOT a DWG/package difference).
+
+**Two approaches, one rejected:** (a) analytic panes per pattern (sectors of rings for hubs, lens shapes for
+intersecting) — rejected: a second geometry per pattern and nothing for straight bars crossing a haunch;
+(b) a planar arrangement of lines + circular arcs (split at intersections, overlapping pieces merged, stubs
+pruned, faces walked with the interior on the left), each face offset edge-wise (bar edge barWidth/2, board
+edge edgeMargin; arcs keep their centre, corners = intersection of the offset edges nearest the original
+corner, vanishing edges dropped) — chosen: pattern-agnostic, exact arcs, the DWG falls out of it.
+
+**Built:**
+- `traceryExport.js`: curves, `intersections` (line/line, line/circle, circle/circle incl. T-junctions),
+  `arrangementFaces`, `offsetFace`, `cornerGuides` (tangent difference > 0.5°, legs 15 mm along the curve
+  into the pane, bulge kept), `boardFromOutline` (daylight = unit inset by `glassInset`), `barCurves`,
+  `buildTraceryGeometry` (mode auto: quadrant when no pane straddles the axis — the axis becomes a bar edge
+  and the cut a board edge 18 − 11 = 7 past it, exactly the DWG's 4D6; else full), `buildTraceryEntities`
+  (layers `ARKA_OUTLINE · ARKA_PANE · ARKA_FRONT_HINGES_3MM · ARKA_MITRE · ARKA_SECTION · ARKA_PANE_ZEWN_REF ·
+  ARKA_CENTRE · ARKA_INFO_NO_CUT`, section outside the board with `START`, texts incl. `NOT A TOOLPATH` and
+  warnings), `writeTraceryLsp` (`(defun c:ARKA …)`, insertion point prompt Enter = 0,0, `-LAYER`, `entmake`
+  LWPOLYLINE 90/70/10/42, POINT, TEXT — plain AutoLISP), `parseTraceryLsp` (harness), `buildTraceryForDerived`.
+- Profile `tracery { paneOffset 2, profileWidth 8, ridgeLand 2, edgeLand 8, mitreLeg 15, sides 1,
+  boardThickness 18 }` → bar 22 / margin 18 / limit +10 derived, never typed twice.
+- Patterns (`arch.js`): generic `hubSpoke({ spokes, rings, hubVertical })` behind every hub preset
+  (`HUB_PRESETS`: half-hub 0/1, hub-spoke 4/1, double 6/2, triple 8/3 from the profile ratios,
+  **quad-hub-spoke 5 / [1/3, 2/3] + hub vertical** from the DWG) and `custom` (spokes 3–9, ring list from the
+  window: `archSpokes` / `archRings`); `PSW_PATTERNS_FOR_SHAPE` kept 1:1, `PC_EXTRA_PATTERNS` only on the
+  semi-circle. Ring-end verticals skipped on a zero-height springing (fanlight board).
+- Engine: `derived.arch.tracery { mode, panes, areas, bbox, warnings }`, `C-TRACERY` (`C-TRY-P1`) record,
+  paint + tracery face; `CUT_LIST_ORDER` `C-TRY`; BOM slot `c_tracery` (+ part list). Export:
+  `traceryParamsForWindow` / `exportTraceryDxfForWindow` / `exportTraceryLspForWindow` / `exportTraceryMerged`;
+  buttons `Tracery DXF` / `Tracery LSP` next to `Arch DXF` (disabled with the reason when no pattern),
+  `Tracery DXF (all)` / `LSP (all)` on the pack. Configurator: the two presets in the chip row, custom UI.
+  3D: `archSpokes` / `archRings` through App.jsx → ArchedCasementWindow → geometry helper (which now falls
+  back to straight bars instead of throwing on bad bar data).
+
+**Verification (t20 §4–§6, ALL PASS):** DWG reproduction — quadrant, 5 panes, 19 guides, pane radii 189 /
+211–389 / 411–582 ±0.5 (the DWG's own hub arc is 0.32 off its circle), the 5 OUTLINE panes, 5 PANE and
+5 FRONT_HINGES_3MM contours vertex for vertex ±0.5, +2 / +10 concentric exactly, every DWG MITRE matched
+(apex ±0.5, legs ±1 mm — corner 51A to 0.02), legs 15.00 along the curve, section verbatim = DWG = package
+DXF, board to +7, ZEWN_REF R 598; DXF read back by ezdxf (8 layers, counts), LSP parsed back = the same
+45 entities. Engine windows: hub-spoke full 6 panes, quad-hub-spoke + 1V full 13, gothic intersecting,
+custom 7 / [0.25, 0.55] — no collapse, panes inside the board; single + merged exports; samples written.
+esbuild OK on every file, eslint no-undef clean, `npm run build` OK. Not verified: AutoCAD / VCarve (no CAD
+here — BLOCKERS 11.16), a click-through of the buttons. **Verdict: ✅ 0.4** with DEFAULT (open) entries
+11.4–11.8 / 11.12 / 11.13.
+
+### 0.4b — hinge value 1:1 with PSW (`specification.js`)
+
+Inversion removed: `hinge = value === 'left' ? 'left' : 'right'` (PSW default value `right`). t16 (7
+assertions) / t18 (1) rewritten for the identity; t20 §7 asserts it and greps the old ternary away. PSW
+label wording logged as 11.11. **Verdict: ✅ 0.4b**
+
+### 0.4c — bar logic audit (`verify/arch/t20_bars.mjs`, ALL PASS 30)
+
+208 shape × pattern × 0–3 h × 0–3 v cases (semi-circle 8 patterns, three-centre 1, gothic ×2 2): every user
+vertical ends on the outline (< 0.01), the gothic centre bar at the apex, h bars strictly between the glass
+bottom and the springing at the requested count (also at the profile's minimum straight height; 10 mm below
+→ readable ArchError), hub ring-end verticals bottom → springing, no bar end outside the unit, bar run =
+Σ lengths, beading = run × 1.15. PSW `PATTERNS_FOR_SHAPE` literal (990–995) = `PSW_PATTERNS_FOR_SHAPE`,
+re-read from the live clone; fix radios none | sunburst / none | patternA read from `online-estimate.html`
+(Block 3 vocabulary). `intersecting`: the PSW sampling loop (FixFrameWindow.jsx 667–700) copied — every
+PSW vertex lies on a PC arc within its range (±1 step) for W 1000 / 1400 equilateral and 1000 drop; PC ends
+exactly on the outline. Elevation / leaf sheet / glazier DXF: same bar count, DXF axes = engine ends.
+**No PC bug found**; two PSW-behaviour questions logged (11.6, 11.12). **Verdict: ✅ 0.4c**
+
+### 0.5 — small fixes from BLOCKERS §10
+
+Leaf sheet R labels inside the daylight (haunch label collided with the `67` chain); arched elevation subtitle
+without the layout code; 3D guides `rise … mm` + `start … mm`; rasteriser: the clipPath elevation rendered
+through an `<img>` data URL in headless Chromium (bars clipped) — jsPDF itself not run in a browser. t19
+244/244 (rectangular snapshot untouched). **Verdict: ✅ 0.5** (PDF page: morning, 11.10)
+
+### 0.6 — profile decisions
+
+`arch.minPieceLength` 150 (new, warn only: `plan.shortPieces`), the rest confirmed unchanged (t20 §7).
+**Verdict: ✅ 0.6** (all DEFAULT (open), BLOCKERS 11.2 / 11.3)
+
+### STAGE 1 GATE — ✅ ALL PASS
+
+t16 504 · t17 72 · t18 178 · t19 244 · t20 112 · t20_bars 30 · `npm run build` OK · rectangular casements
+byte-identical (t18 §3, t19 §1, t20 §6). Assertions rewritten tonight because the spec changed the rule:
+t16 hinge ×7, t18 layers / text lines / PDF header / hinge / vocabulary / pattern table, t19 bar-end format
+(x·y pairs gone) and the `GLASS_BAR_AXES` layer — each one names the v3 item.
+
+### 0.2 + 0.3 — glazier DXF bands / edge / axes, bar-end dimensioning (`glassBars.js` new, `glassDxfExport.js`, `CasementGlassDrawing2D.jsx`, `glassPdfExport.js`, `profile.js`)
+
+**Understanding:** the glazier lays an 18 mm spacer bar in the pattern and a perimeter spacer 11 mm inside the
+contour; today the DXF gave him axes only and the sheet printed x·y pairs he cannot measure on a curve. Three
+consumers (sheet, PDF, DXF) must show the same bands, the same edge line and the same bar-end numbers.
+
+**Two approaches, one rejected:** (a) extend each consumer in place (three copies of the band / offset / apex
+arc-length maths) — rejected, night 4 already paid for that with `archDrawUtils.js`; (b) one pure module
+`src/engine/glassBars.js` (band curves, edge chain through `offsetArcs` in the arch frame, arc length from the
+apex, the dimensioning rows + labels + table cells) and three thin consumers — chosen. New file outside the
+spec's list, logged in BLOCKERS.
+
+**Built:**
+- Profile: `DEFAULT_CASEMENT_PROFILE.glass = { barWidth 18, edgeCover { default 11, double, double_slim,
+  triple, single, passive: 11 } }` (DEFAULT (open): 11 for every type until Piotr gives the triple value) +
+  `tracery` block for 0.4; `migrateCasementProfile` fills both from the default for stored copies.
+- DXF layers `GLASS_CONTOUR · GLASS_EDGE · GLASS_BARS (bands, ±barWidth/2, bulge on arcs) · GLASS_BAR_AXES ·
+  GLASS_TEXT`; the text block keeps the geometry line per bar and adds the bar-end rows (`BAR ENDS: ID  S FROM
+  APEX / POSITION  L  ANGLE / R`, degree sign → `DEG`, R12 is ASCII).
+- Dimensioning (0.3): vertical bar `x from the bottom-left · s from apex L/R · L`; spoke `s from apex · angle
+  from the hub · L` (a ring→ring segment prints its radial extent `r 121.7-243.3` instead); ring `R · centre`;
+  h / springing `y from the bottom corners`; tracery `R · s from apex`. More than 4 bars → ids beside the bars,
+  the numbers in a table under the drawing (sheet: 4 columns, `MGN_TABLE` grows the viewBox; PDF: same table
+  under the sketch in the cell, header line says `N bars — see table`; DXF: the rows in GLASS_TEXT). The
+  x·y pairs of night 4 are gone (t19 asserts the regex `>x · y<` no longer matches).
+- Sheet / PDF draw the edge line and the bands from the profile numbers (PDF: edge dashed, bands solid, axes
+  dotted, ids at the arch ends).
+- Rectangular branch of the sheet untouched (t19 §1 snapshot byte-identical).
+
+**Verification:** esbuild OK on all five files · t16 504/504 · t18 178/178 (assertions updated: axes now on
+`GLASS_BAR_AXES`, two TEXT lines per bar, PDF header "V1 x 270.3 … from apex … L 1297", hub row "7 bars — see
+table") · t19 244/244 (assertions updated: the sheet prints exactly the module's labels / table cells; every
+straight or tracery end on the arch carries an `s from apex`) · three sheets rendered through headless
+Chromium and looked at (hub-spoke 7 bars, triple hub + 1H 34 bars with the table, gothic intersecting 9
+bars): bands, dashed edge, ids beside the ends, table readable. Not verified: the PDF opened in a viewer
+(built in node, text asserted by string search only); the triple `edgeCover` value is a placeholder.
+**Verdict: ✅ 0.2 / 0.3** (t20 adds the SVG ↔ DXF band / edge arc comparison ±0.01).
+
+### STAGE 2 — Block 1 A–E: arched SASH, engine side (`profile.js`, `arch.js`, `specification.js`, `calculations.js`, `lists.js`, `bom.js`, `projectStore.js`, `ConfiguratorPage.jsx`, `verify/arch/t21.mjs`, fixture `rect-sash-base.json`)
+
+**Understanding:** PSW's flagship arched product is a double-hung sash whose box head and upper sash top rail are
+curved; the lower sash is square and stops at the arch start. PC needs the same object as the casement
+(`windowSpec.arch` + `lowerHBars`), the PSW import names, a configurator switch, an engine branch that keeps the
+rectangular sash byte-identical, the two curved members in the cut list, and the true-outline weights that feed
+the balance.
+
+**Baseline first:** `verify/arch/fixtures/rect-sash-base.json` — six rectangular sash windows (standard 2×2,
+slim + horns, triple 6×6, heritage single 4×4, triple-glazed 9×9 with a wider cill, glazing-arch head type)
+derived from HEAD before any sash edit: derived / cut / glass / precut JSON. t21 §6 re-derives them.
+
+**Two approaches, one rejected (vertical layout):** (a) re-derive PC's rectangular top / bottom gaps from the
+135 deduction and place the arch on top of them — rejected: the split of 135 is not written anywhere and the
+concentric ring must meet the stile line anyway; (b) PSW's explicit rule (price-calculator.js metricsFor: arch
+starts at H − rise, meeting line at H/2, `MIN_UPPER_STILE` on H/2 − rise) + the concentric rings at the profile
+offsets — chosen and logged as DEFAULT (open).
+
+**Built:**
+- Profile: `DEFAULT_SASH_PROFILE.sashArch { headFace 80, minHaunchRadius 150, limits { 400, 1500, 900,
+  minUpperStile 100 } }` (`normalizeSashProfile` fills stored copies). Blank planner / pattern numbers are read
+  from the casement `arch` block (one place for the CNC's numbers).
+- `buildSashArchGeometry` (arch.js): head ring 0 → 80; top rail ring `sashWidth/2` (89) → 89 + topRail.face
+  (57); glass line 89 + 57 − 12.5 = 133.5; rule C (all chains start vertical at the stile line); `upperStileClear
+  = H/2 − rise ≥ 100`, `upperStraightStile = clear + MR/2` (the STILES TOP piece to the meeting rail bottom).
+- Import (`specification.js`): `sashArchFromSpec` — `sashType 'arched-group'` or `frameShape 'arched'`; PSW ids
+  and the radio names (`PSW_SASH_RADIO_SHAPE`: semicircular / gothic / elliptical / segmental → P10 shapes),
+  `archRise`, `archProfile`, `archBarPattern`, `archHBars` / `archVBars`, `lowerHBars` (`lowerVBars` ignored:
+  lower straight h only). Shared `archFieldsFromSpec` with the casement; the arch object is null on every
+  rectangular sash; `arch.hinge` null.
+- Engine (sash branch of `deriveWindowData`, conditional on `arch.shape`, never for a triple): `S-ARCH HEAD`
+  (`80x164`, head ring centre-line length, planner notes) replaces HEAD; jambs = start − (jambHeight − 80);
+  head liners dropped, jamb liners to the springing; `S-ARCH TOP RAIL` (57x57, ring centre) replaces TOP RAIL;
+  STILES TOP = straight stile (+ horns); meeting rails, lower sash, cill untouched. Upper unit = arched outline
+  in the glass frame (springing = stile clear − MR/2 + rebate), bars = upper straight + pattern
+  (`buildArchBars`), lower h bars = equal divisions of the lower daylight; `customGlassUnits` = [upper arched,
+  lower rectangular (sash − 89 × lower − 108)]. Weights from the true outline: `upperKg` / `lowerKg` / `total`
+  (timber Σ length × kg/m of the finished section + glass area × kg/m²); paint from W × start + arch area; seal
+  6070 with the upper sash's equivalent height. `derived.arch` carries geometry, plans, bars, lowerBars,
+  upperSash, glassOutline (+ origin in frame coordinates).
+- Cut list: `S-AH` after HEAD, `S-ATR` after TR; BOM slots head / top_rail. Store whitelist: `frameShape`,
+  `archHBars`, `archVBars`, `lowerHBars`. Configurator: Sash Type → Frame shape Standard | Arched; the arch
+  shape / start controls extracted into `archControls` shared with the casement; Glazing Bars section for the
+  arched sash (upper h / v, pattern chips per shape, custom hub, lower h) replaces the Georgian grid chips; the
+  3D stays the rectangular sash until Stage 3 (I).
+
+**Verification (t21 120/120):** 9 vectors W 1000 / 1200 / 1500 × semi-circle / three-centre (start = H − 0.3 W)
+/ gothic: rings 0 → 80 / 89 → 146 / 133.5 concentric, rule C, semi-circle closed forms (S-AH π(R − 40), S-ATR
+π(R − 117.5)), stile rule; PSW parity: rise = ratio × W (±0.5, PSW rounds), `minHeightFor` = PC's own limits
+(derives at the minimum, throws 10 below with the 900 / 100 message); import mapping incl. radio names; cut
+list / BOM / grouped order; weights vs the closed-form area (π R²/2 + Wg × springing); rectangular fixture
+6/6 identical + a triple with an arched flag identical to the plain triple. Rendered nothing (no 2D yet).
+**Finding (sash F2):** PSW's segmental default (rise 0.20 W) cannot be built as a rule-C sash — the top rail
+ring at 146 with the 150 haunch floor leaves an inner radius 4 → readable ArchError; at W 1000 a Round sash needs
+rise > ~279 (BLOCKERS 12.4). Not verified: the configurator in a browser, the arched sash in any drawing / 3D /
+export (Stage 3). **Verdict: ✅ Stage 2 (A–E)** with the DEFAULT (open) entries 12.1–12.6.
+
+### STAGE 2 GATE — ✅ ALL PASS
+
+t16 504 · t17 72 · t18 178 · t19 244 · t20 112 · t20_bars 30 · t21 120 · `npm run build` OK.
+
+### 0.1 — FIT view in the arch CNC DXF (`arch.js`, `archDxf.js`)
+
+**Understanding:** Piotr overlaid the frame ring and the leaf ring by hand and read the 17 mm rebate lap as an
+error. A row that draws frame ring, rebate wall, leaf ring and glass outline concentric in their assembly
+position makes the 4 mm running gap and the 17 mm lap readable without overlaying anything.
+
+**Two approaches, one rejected:** (a) draw the FIT view in `cncExport.js` from `getCasementProfile()` — rejected:
+a second place reading `geometry.land` / `gap`, and the harness could not reach it without the browser wrapper;
+(b) `buildArchGeometry` gains `rebateWall` (= `offsetArcs(base, geometry.land)`) and `fit { gap, lap, land }`,
+`archDxf.js` draws them — chosen (one contour source, rule 11 of CLAUDE.md: land / gap / faces from the profile).
+
+**Built:** layer `FIT` (colour 4) first in `ARCH_LAYERS`; `fitRow()` = `ringPoly(frameHead)`, `ringPoly(leafTop)`,
+closed glass chain, rebate wall as 20 / 10 mm dashes (`dashedChain`, 2-vertex bulge polylines — `dxfWriter` has
+no linetypes and adding them is on the "not today" list); text block `FIT (ASSEMBLY, NOT A TOOLPATH)` · `GAP 4
+LAP 17 (REBATE)` · frame / wall / leaf / glass radii. The row is the TOP row of the drawing (rows are stacked
+bottom-up, FIT pushed last); CONTOUR / PIECES rows untouched. `buildArchEntities` refuses a plan without the v3
+fields instead of drawing a partial FIT.
+
+**Verification:** esbuild OK (`arch.js`, `archDxf.js`) · W 1200 semi-circle: frame 600 / 543, rebate wall 564,
+leaf 560 / 493, glass 505.5, gap 4, lap 17 — the spec's verified numbers · `.audit/fit_1200.dxf` read back by
+ezdxf: layer `FIT` present, 63 FIT entities (3 closed rings + 60 dashes) · t16 504/504 still ALL PASS.
+Not verified: the DXF opened in VCarve / AutoCAD (no CAD in the container). **Verdict: ✅ 0.1** (t20 §1 asserts the
+numbers again through the export path).
+
+---
+
 ## 2026-09-06 — arched-casement-v2 night 4: D + E + F + t19 (branch `claude/arched-casement-v2-def-enkyue`)
 
 Inputs read in full, in this order: `CLAUDE.md` → `ARCHED-CASEMENT-v2.md` §4 (+ §0–2 for the data model) →

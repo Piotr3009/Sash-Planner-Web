@@ -8,7 +8,10 @@
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
 import { computeBarPositions, DimH, DimV, TitleBlock, tfs, HORN_DEF, HORN_W, buildHornPath } from './drawingUtils.jsx';
-import { COLORS, FONT_FAMILY, SIZES, STROKES, VIEWBOX_REF } from './drawingTheme.js';
+import { COLORS, FONT_FAMILY, SIZES, STROKES, VIEWBOX_REF, WEIGHTS } from './drawingTheme.js';
+// Arched sash (ARCHED-WINDOWS-v3 Block 1 H): every arc is the engine's ArcChain (derived.arch) serialised
+// by archDrawUtils — box head ring, upper sash top rail ring, upper glass outline, bars — never re-derived here.
+import { archToSheet, glassToSheet, archedOutlineD, ringBandD, barBandD, arcLabelPoint, isHaunchArc, radiiText } from './archDrawUtils.js';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
 
@@ -91,24 +94,26 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
       vCount: pattern.v, hCount: pattern.h, barW: BAR_WIDTH,
     });
 
+    // arched sash: the engine's rings / outline / bars (null on every rectangular sash)
+    const A = derived.arch && !derived.casement ? derived.arch : null;
     return {
       fw, fh, sashW, topSashH, botSashH,
       stile, topRail, meetRail, botRail,
       uGlassX, uGlassY, uGlassW, uGlassH, uBars,
       lGlassX, lGlassY, lGlassW, lGlassH, lBars,
-      gridMode,
+      gridMode, A,
     };
   }, [windowSpec, derived]);
 
   if (!geom) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
 
-  const { fw, fh, sashW, topSashH, botSashH } = geom;
+  const { fw, fh, sashW, topSashH, botSashH, A } = geom;
 
   // ─── Layout (SVG Y-down) ───
   const layoutSc = Math.max(fw, fh) / 500;
   const DM = 60 * layoutSc;
-  const M = 60 * layoutSc;
-  const TITLE_AREA = 50 * layoutSc;
+  const M = A ? 110 * layoutSc : 60 * layoutSc;          // arched: room for the start / rise dims on the left
+  const TITLE_AREA = (A ? 75 : 50) * layoutSc;             // arched: third title line
   const totalW = M + fw + DM * 2 + M;
   const totalH = M + fh + DM + TITLE_AREA;
 
@@ -129,12 +134,13 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
   // Y-flip helper: real y → SVG y  (y=0 = sill bottom, y=fh = head top)
   const SY = (y) => oy + (fh - y);
 
+  const jambTop = A ? geom.A.geometry.start : fh;                      // arched: the jambs stop at the springing
   const rJamb = [
     `M ${ox + fw - BOX.jambW_bottom} ${SY(0)}`,
     `L ${ox + fw - BOX.jambW_bottom} ${SY(BOX.sillTop)}`,
     bulgeArc(ox + fw - BOX.jambW_bottom, SY(BOX.sillTop), ox + fw - BOX.jambW_top, SY(BOX.sillCurveTop), BOX.bulge),
-    `L ${ox + fw - BOX.jambW_top} ${SY(fh)}`,
-    `L ${ox + fw} ${SY(fh)}`,
+    `L ${ox + fw - BOX.jambW_top} ${SY(jambTop)}`,
+    `L ${ox + fw} ${SY(jambTop)}`,
     `L ${ox + fw} ${SY(0)}`, 'Z',
   ].join(' ');
 
@@ -142,12 +148,30 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
     `M ${ox + BOX.jambW_bottom} ${SY(0)}`,
     `L ${ox + BOX.jambW_bottom} ${SY(BOX.sillTop)}`,
     bulgeArc(ox + BOX.jambW_bottom, SY(BOX.sillTop), ox + BOX.jambW_top, SY(BOX.sillCurveTop), -BOX.bulge),
-    `L ${ox + BOX.jambW_top} ${SY(fh)}`,
-    `L ${ox} ${SY(fh)}`,
+    `L ${ox + BOX.jambW_top} ${SY(jambTop)}`,
+    `L ${ox} ${SY(jambTop)}`,
     `L ${ox} ${SY(0)}`, 'Z',
   ].join(' ');
 
-  const head = [
+  // ── Arched sash: box head ring, jambs to the springing, upper sash outline + arched unit ──
+  const AP = A ? (() => {
+    const G = A.geometry, O = A.glassOutline;
+    const txF = archToSheet(fw, G.rise, ox, oy);                       // arch frame → sheet (apex at oy)
+    const txG = glassToSheet(ox + O.origin.x, SY(O.origin.y + O.height), O.height);
+    const upperBottom = lowerSashY + meetRail;                          // upper sash bottom = lower sash top + MR overlap
+    return {
+      headD: ringBandD(G.head.outer, G.head.inner, txF),
+      sashD: archedOutlineD(G.topRail.outer, txF, upperBottom),
+      daylightD: archedOutlineD(G.topRail.inner, txF, upperBottom - meetRail),
+      unitD: archedOutlineD(O.arcs, txG, SY(O.origin.y)),
+      barsD: (A.bars || []).map((b) => barBandD(b, txG, BAR_WIDTH / 2)),
+      lowerBars: (A.lowerBars?.positions || []).map((yFromTop) => lowerSashY + geom.lGlassY + yFromTop),
+      radii: G.arcs.map((a) => ({ r: a.r, at: arcLabelPoint(a, txF, isHaunchArc(a) ? 14 * layoutSc : 14 * layoutSc) })),
+      springY: SY(G.start),
+      G, O,
+    };
+  })() : null;
+  const head = A ? AP.headD : [
     `M ${ox + BOX.jambW_top} ${SY(fh)}`,
     `L ${ox + fw - BOX.jambW_top} ${SY(fh)}`,
     `L ${ox + fw - BOX.jambW_top} ${SY(fh - BOX.headH)}`,
@@ -185,12 +209,14 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
   const winName = windowSpec?.name || 'Window';
   const projNum = projectNumber || '';
   const titleText = `Front Elevation${projNum ? ` — ${projNum}` : ''} — ${winName}`;
-  const subtitleText = `${fw} × ${fh} mm`;
+  const subtitleText = A ? `${fw} × ${fh} mm · arched sash` : `${fw} × ${fh} mm`;
+  const archLine = A ? `${A.geometry.label} · start ${fmt(A.geometry.start)} · rise ${fmt(A.geometry.rise)} · ${radiiText(A.geometry.arcs)} · head ${fmt(A.geometry.head.thickness)}` : '';
 
   return (
     <div className="w-full">
       <svg viewBox={`0 0 ${totalW} ${totalH}`} xmlns="http://www.w3.org/2000/svg"
-        className="w-full h-auto" style={{ background: COLORS.bg }}>
+        className="w-full h-auto" style={{ background: COLORS.bg }}
+        data-arch-origin={AP ? `${ox},${oy}` : undefined}>
 
         {/* ── BOX FRAME ── */}
         <path d={rJamb} fill={COL.frameFill} stroke={COL.frame} strokeWidth={STROKES.frame} {...NS} />
@@ -226,6 +252,15 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
         })()}
 
         {/* ── UPPER SASH (no outer rect — edges hidden behind head & jambs) ── */}
+        {AP ? (
+          <g>
+            {/* arched upper sash: outline (top rail ring outer + stiles), daylight, the unit and its bars */}
+            <path d={AP.sashD} fill="none" stroke={COL.sash} strokeWidth={STROKES.sash} {...NS} />
+            <path d={AP.unitD} fill={COL.glass} fillOpacity={COL.glassOpacity} stroke={COL.glass} strokeWidth={STROKES.glassLight} {...NS} />
+            <path d={AP.daylightD} fill="none" stroke={COL.sash} strokeWidth={STROKES.glassLight} {...NS} strokeOpacity={0.6} />
+            {AP.barsD.map((d, k) => <path key={`uab-${k}`} d={d} fill="none" stroke={COL.bar} strokeWidth={STROKES.bar} {...NS} />)}
+          </g>
+        ) : (<>
         {/* Upper glass */}
         <rect x={sashX + geom.uGlassX} y={upperSashY + geom.uGlassY}
           width={geom.uGlassW} height={geom.uGlassH}
@@ -233,6 +268,7 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
           stroke={COL.glass} strokeWidth={STROKES.glassLight} {...NS} />
         {/* Upper bars */}
         {renderBars(geom.uBars, sashX, upperSashY, geom.uGlassX, geom.uGlassY, geom.uGlassW, geom.uGlassH)}
+        </>)}
 
         {/* ── LOWER SASH (only bottom edge visible) ── */}
         {/* Lower glass */}
@@ -242,6 +278,11 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
           stroke={COL.glass} strokeWidth={STROKES.glassLight} {...NS} />
         {/* Lower bars */}
         {renderBars(geom.lBars, sashX, lowerSashY, geom.lGlassX, geom.lGlassY, geom.lGlassW, geom.lGlassH)}
+        {/* arched sash: lower straight h bars (engine positions) */}
+        {AP && AP.lowerBars.map((y, k) => (
+          <rect key={`lhb-${k}`} x={sashX + geom.lGlassX} y={y - BAR_WIDTH / 2} width={geom.lGlassW} height={BAR_WIDTH}
+            fill="none" stroke={COL.bar} strokeWidth={STROKES.bar} {...NS} />
+        ))}
         {/* Lower sash bottom edge (visible — sits in front of sill) */}
         <line x1={sashX} y1={lowerSashY + botSashH} x2={sashX + sashW} y2={lowerSashY + botSashH}
           stroke={COL.sash} strokeWidth={STROKES.sash} {...NS} />
@@ -266,6 +307,20 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
           );
         })()}
 
+        {/* ── ARCHED SASH: springing line, start / rise dims, radii ── */}
+        {AP && (
+          <g>
+            <line x1={ox - DM * 0.2} y1={AP.springY} x2={ox + fw + DM * 0.2} y2={AP.springY}
+              stroke={COL.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={`${8 * layoutSc},${3 * layoutSc},${2 * layoutSc},${3 * layoutSc}`} />
+            <DimV x={ox - DM * 0.8} y1={AP.springY} y2={SY(0)} extFrom={ox} label={`start ${fmt(AP.G.start)}`} small vbw={totalW} />
+            <DimV x={ox - DM * 0.8} y1={oy} y2={AP.springY} extFrom={ox} label={`rise ${fmt(AP.G.rise)}`} small vbw={totalW} />
+            {AP.radii.map((rl, k) => (
+              <text key={`r-${k}`} x={rl.at[0]} y={rl.at[1]} fill={COL.dim} fontSize={tfs(SIZES.dimSmall, totalW)}
+                fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.dim}>{`R ${fmt(rl.r)}`}</text>
+            ))}
+          </g>
+        )}
+
         {/* ── DIM LINES — overall only ── */}
         <DimH y={oy + fh + DM * 0.8}
           x1={ox} x2={ox + fw}
@@ -283,6 +338,10 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
           title={titleText}
           subtitle={subtitleText}
           vbw={totalW} />
+        {A && (
+          <text x={totalW / 2} y={oy + fh + DM + TITLE_AREA * 0.5 + 40 * (totalW / VIEWBOX_REF)} fill={COLORS.subtitle} fontSize={SIZES.subtitle * (totalW / VIEWBOX_REF)}
+            fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>{archLine}</text>
+        )}
       </svg>
     </div>
   );

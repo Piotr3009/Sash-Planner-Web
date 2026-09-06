@@ -24,8 +24,10 @@ import {
   buildJambEntities, buildMergedJambEntities, CNC_LAYERS, jambVentCount,
 } from '../engine/cnc/jambDxf.js';
 import { buildArchEntities, buildMergedArchEntities, ARCH_LAYERS } from '../engine/cnc/archDxf.js';
-import { buildArchPlan, isArchShape, ArchError } from '../engine/arch.js';
-import { getCasementProfile } from '../engine/profile.js';
+import { buildTraceryForDerived, writeTraceryLsp, TRACERY_LAYERS, boardBBox } from '../engine/cnc/traceryExport.js';
+import { buildArchPlan, buildCirclePlan, buildSashArchGeometry, planArchSegments, isArchShape, isCircleShape, ArchError } from '../engine/arch.js';
+import { getCasementProfile, getWindowProfile } from '../engine/profile.js';
+import { CONSTANTS } from '../engine/calculations.js';
 import { writeDxf } from '../engine/cnc/dxfWriter.js';
 import { buildVentGrilles } from '../engine/lists.js';
 
@@ -36,8 +38,8 @@ const FRAME_TO_CNC = { standard: 'standard', slim: 'slim', triple: 'triple' };
 // one browser download path for every DXF the app writes.
 export const safeName = (s) => String(s || 'window').replace(/[^\w.-]+/g, '_');
 
-export function downloadDxf(filename, content) {
-  const blob = new Blob([content], { type: 'application/dxf' });
+export function downloadDxf(filename, content, mime = 'application/dxf') {
+  const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -121,23 +123,55 @@ export function exportCncJambsMerged(windows, fileLabel) {
  * Geometry errors (rise / width limits, member face larger than the rise,
  * no stock board) come back as readable `skip` reasons — never as throws.
  */
+/**
+ * Arched SASH plan in the shape buildArchEntities expects (v3 Block 1 F): the box
+ * head ring as `frameHead`, the upper sash top rail ring as `leafTop`, blank plans
+ * from the casement arch block, no hinge, no rebate wall (running gap instead).
+ */
+export function buildSashArchPlan(input, sashProfile, casementProfile) {
+  if (!casementProfile?.arch) throw new ArchError('Casement profile has no "arch" section (stock widths / finger joint)');
+  const SA = buildSashArchGeometry(input, sashProfile, CONSTANTS.GLASS_REBATE);
+  const frameHead = planArchSegments(SA.head, casementProfile.arch);
+  const leafTop = planArchSegments(SA.topRail, casementProfile.arch);
+  return {
+    ...SA,
+    kind: 'sash',
+    frameHead: SA.head,
+    leafTop: SA.topRail,
+    hinge: null,
+    rebateWall: null,
+    fit: { gap: SA.offsets.sashOuter - SA.offsets.headInner, lap: null, land: null },
+    finger: { ...casementProfile.arch.finger },
+    blank: { contourAllowance: frameHead.contourAllowance, maxSegmentAngleDeg: frameHead.maxSegmentAngleDeg, pieceRule: frameHead.pieceRule },
+    plans: { frameHead, leafTop },
+    noStock: frameHead.noStock || leafTop.noStock,
+  };
+}
+
 export function archParamsForWindow(windowSpec, name) {
   if (!windowSpec) return { skip: 'no data' };
-  if ((windowSpec.category || 'sash') !== 'casement') return { skip: 'not a casement window' };
+  const category = windowSpec.category || 'sash';
+  if (category !== 'casement' && category !== 'sash') return { skip: 'not a casement or sash window' };
   const a = windowSpec.arch;
-  if (!a?.shape) return { skip: 'not an arched casement' };
-  if (!isArchShape(a.shape)) return { skip: `unsupported arch shape "${a.shape}"` };
+  if (!a?.shape) return { skip: category === 'sash' ? 'not an arched sash' : 'not an arched casement' };
+  if (!isArchShape(a.shape) && !isCircleShape(a.shape)) return { skip: `unsupported arch shape "${a.shape}"` };
+  if (category === 'sash' && windowSpec.sash?.type === 'triple') return { skip: 'triple sash is not arched' };
+  const fixed = category === 'casement' && windowSpec.casement?.kind === 'fixed';
   try {
-    const plan = buildArchPlan({
-      shape: a.shape,
-      width: windowSpec.frame?.width,
-      height: windowSpec.frame?.height,
-      rise: a.rise,
-      hinge: a.hinge,
-    }, getCasementProfile());
+    const plan = category === 'sash'
+      ? buildSashArchPlan({ shape: a.shape, width: windowSpec.frame?.width, height: windowSpec.frame?.height, rise: a.rise }, getWindowProfile(), getCasementProfile())
+      : isCircleShape(a.shape)
+      ? buildCirclePlan({ width: windowSpec.frame?.width, height: windowSpec.frame?.height }, getCasementProfile())
+      : { ...buildArchPlan({
+        shape: a.shape,
+        width: windowSpec.frame?.width,
+        height: windowSpec.frame?.height,
+        rise: a.rise,
+        hinge: a.hinge,
+      }, getCasementProfile()), fixed };
     if (plan.noStock) {
       const needs = [];
-      for (const [label, pl] of [['frame head', plan.plans.frameHead], ['leaf top', plan.plans.leafTop]]) {
+      for (const [label, pl] of [[plan.kind === 'sash' ? 'box head' : 'frame head', plan.plans.frameHead], [plan.kind === 'sash' ? 'top rail' : 'leaf top', plan.plans.leafTop]]) {
         for (const arc of pl.arcs) {
           if (arc.default) continue;
           const narrowest = arc.options[arc.options.length - 1];
@@ -181,8 +215,90 @@ export function exportArchDxfMerged(windows, fileLabel) {
     if (r.skip) skipped.push({ name: w.name || '?', reason: r.skip });
     else items.push({ plan: r.params.plan, winNum: r.params.winNum });
   }
-  if (!items.length) return { error: 'No arched casements in this pack', skipped };
+  if (!items.length) return { error: 'No arched casements or sashes in this pack', skipped };
   const ents = buildMergedArchEntities(items);
   downloadDxf(`${safeName(fileLabel || 'pack')}_arch.dxf`, writeDxf(ents, ARCH_LAYERS));
   return { ok: true, exported: items.length, skipped };
+}
+
+// ─── Tracery DXF + LSP (arched-windows-v3 Block 0.4) ────────────────────────
+
+/**
+ * Map one PC window onto the tracery generator (glass frame, same frame as
+ * the glazier DXF). Returns { params: { build, winNum } } or { skip: reason }:
+ * only an arched casement WITH a bar pattern has a tracery board.
+ */
+export function traceryParamsForWindow(windowSpec, derived, name) {
+  if (!windowSpec) return { skip: 'no data' };
+  const category = windowSpec.category || 'sash';
+  if (category !== 'casement' && category !== 'sash') return { skip: 'not a casement or sash window' };
+  if (!windowSpec.arch?.shape) return { skip: category === 'sash' ? 'not an arched sash' : 'not an arched casement' };
+  if (!derived?.arch) return { skip: 'window could not be calculated' };
+  if (!derived.arch.pattern || derived.arch.pattern === 'none') return { skip: 'no bar pattern in the arch — the tracery is the pattern cut from one board' };
+  try {
+    // sash (v3 Block 1 G): the upper unit sits GLASS_REBATE deep in the sash rebate; the CNC numbers are the casement profile's
+    const build = buildTraceryForDerived(derived, getCasementProfile(), String(name || windowSpec.name || ''), category === 'sash' ? { glassInset: CONSTANTS.GLASS_REBATE } : {});
+    return { params: { build, winNum: String(name || windowSpec.name || '') } };
+  } catch (e) {
+    if (e instanceof ArchError) return { skip: e.message };
+    throw e;
+  }
+}
+
+export function canExportTracery(windowSpec, derived) {
+  return !traceryParamsForWindow(windowSpec, derived, '').skip;
+}
+
+/** Single window → {name}_tracery.dxf. Returns { ok, panes, mode, warnings } or { error }. */
+export function exportTraceryDxfForWindow(windowSpec, derived, name) {
+  const r = traceryParamsForWindow(windowSpec, derived, name);
+  if (r.skip) return { error: r.skip };
+  const { build, winNum } = r.params;
+  downloadDxf(`${safeName(winNum)}_tracery.dxf`, writeDxf(build.entities, TRACERY_LAYERS));
+  return { ok: true, panes: build.geom.panes.length, mode: build.geom.mode, warnings: build.geom.warnings };
+}
+
+/** Single window → {name}_tracery.lsp (the same entity list as the DXF). */
+export function exportTraceryLspForWindow(windowSpec, derived, name) {
+  const r = traceryParamsForWindow(windowSpec, derived, name);
+  if (r.skip) return { error: r.skip };
+  const { build, winNum } = r.params;
+  downloadDxf(`${safeName(winNum)}_tracery.lsp`, writeTraceryLsp(build.entities, TRACERY_LAYERS, build.info), 'text/plain');
+  return { ok: true, panes: build.geom.panes.length, mode: build.geom.mode, warnings: build.geom.warnings };
+}
+
+/** Entity lists of many windows stacked top-down 300 mm apart (same convention as the arch / glass files). */
+export function buildMergedTraceryEntities(builds) {
+  const all = [];
+  let cursorY = 0;
+  for (const b of builds) {
+    const bb = boardBBox(b.geom.board.pts);
+    const oy = cursorY - bb.maxY;
+    for (const e of b.entities) {
+      if (e.type === 'poly') all.push({ ...e, pts: e.pts.map(([x, y, bu]) => [x, y + oy, bu]) });
+      else all.push({ ...e, y: e.y + oy });
+    }
+    cursorY = oy + bb.minY - 300;
+  }
+  return all;
+}
+
+/**
+ * Many windows (PP or batch) → one merged tracery DXF or LSP.
+ * windows: [{ windowSpec, derived, name }], kind: 'dxf' | 'lsp'
+ */
+export function exportTraceryMerged(windows, fileLabel, kind = 'dxf') {
+  const builds = [];
+  const skipped = [];
+  for (const w of windows || []) {
+    const r = traceryParamsForWindow(w.windowSpec, w.derived, w.name);
+    if (r.skip) skipped.push({ name: w.name || '?', reason: r.skip });
+    else builds.push(r.params.build);
+  }
+  if (!builds.length) return { error: 'No arched window with a bar pattern in this pack', skipped };
+  const ents = buildMergedTraceryEntities(builds);
+  const base = safeName(fileLabel || 'pack');
+  if (kind === 'lsp') downloadDxf(`${base}_tracery.lsp`, writeTraceryLsp(ents, TRACERY_LAYERS, { winNum: base, pattern: 'pack' }), 'text/plain');
+  else downloadDxf(`${base}_tracery.dxf`, writeDxf(ents, TRACERY_LAYERS));
+  return { ok: true, exported: builds.length, skipped };
 }

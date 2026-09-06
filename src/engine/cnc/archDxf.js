@@ -9,6 +9,9 @@
  *   LEAF TOP    (ring leafAtJamb → leafAtJamb + leafTop.face)
  *
  * Rows, top to bottom (200 mm apart, like the jamb pieces):
+ *   0. FIT — frame ring, rebate wall (dashed), leaf ring, glass outline in
+ *      their assembly position (v3 0.1): the 4 mm gap and the 17 mm lap read
+ *      directly; not a toolpath
  *   1. FRAME HEAD — CONTOUR: the finished member routed from the glued blank;
  *                   ASSEMBLY: the boards of the default plan in their glued
  *                   position; FINGER: joint faces; TEXT: plan summary
@@ -25,10 +28,11 @@
  * profile numbers are printed on the TEXT layer. dxfWriter has no linetypes
  * (every layer is CONTINUOUS), so the zone lines are plain short polylines.
  */
-import { ArchError, piecePoly, pieceJoints, ringPoly } from '../arch.js';
+import { ArchError, piecePoly, pieceJoints, ringPoly, arcPoint, arcBulge } from '../arch.js';
 import { entitiesBBox, MERGE_GAP } from './jambDxf.js';
 
 export const ARCH_LAYERS = Object.freeze([
+  { name: 'FIT',      color: 4 },   // assembly view: frame ring, rebate wall, leaf ring, glass — concentric (v3 0.1)
   { name: 'CONTOUR',  color: 7 },   // finished member outline (rout after glue-up)
   { name: 'ASSEMBLY', color: 8 },   // stock boards (assembled + flat)
   { name: 'PIECES',   color: 5 },   // piece contours laid flat
@@ -44,6 +48,8 @@ export const ARCH_CNC = Object.freeze({
   lineH: 22,         // text line pitch
   textGap: 100,      // text block offset from the drawing on the right
   textBlockW: 900,   // reserved width for the text block
+  fitDash: 20,       // rebate wall on the FIT row: dash length (dxfWriter has no linetypes — plain short arcs)
+  fitGap: 10,        // … and the gap between dashes
 });
 
 const R1 = (v) => Math.round(v * 10) / 10;
@@ -116,12 +122,75 @@ function contourRow(ring, plan, ctx, ox, oy) {
   const tx = rowBB.maxX + C.textGap;
   const lines = [
     `${ctx.winNum ? ctx.winNum + ' - ' : ''}${ring.label}`,
-    `${ctx.shapeLabel.toUpperCase()} W${fmt1(ctx.width)} RISE${fmt1(ctx.rise)}${ctx.height ? ' H' + fmt1(ctx.height) : ''} HINGE ${ctx.hinge === 'right' ? 'R' : 'L'}`,
+    `${ctx.shapeLabel.toUpperCase()} W${fmt1(ctx.width)} RISE${fmt1(ctx.rise)}${ctx.height ? ' H' + fmt1(ctx.height) : ''} ${ctx.fixed ? 'FIXED LEAF' : ctx.hinge ? 'HINGE ' + (ctx.hinge === 'right' ? 'R' : 'L') : 'SASH'}`,
     `FACE ${fmt1(ring.thickness)} OFFSET ${fmt1(ring.offsets.outer)} OUTER L${fmt1(ring.lengths.outer)} INNER L${fmt1(ring.lengths.inner)}`,
     ...planSummary(plan),
     `FINGER ${ctx.finger.length}/${ctx.finger.depth}/${ctx.finger.pitch}`,
     `ALLOWANCE ${fmt1(plan.contourAllowance)} PER SIDE  MAX SEGMENT ${fmt1(plan.maxSegmentAngleDeg)} DEG  RULE ${String(plan.pieceRule).toUpperCase()}`,
     'CUT CODES: J = JOINT FROM SQUARE  S = ARCH-START, AXIS TO HORIZONTAL  A = APEX FROM SQUARE',
+  ];
+  const blockH = lines.length * C.lineH;
+  const height = Math.max(rowBB.maxY - rowBB.minY, blockH);
+  const top = rowBB.minY + height;
+  lines.forEach((str, i) => E.push(noteE('TEXT', tx, top - (i + 1) * C.lineH + (C.lineH - C.textH) / 2, C.textH, str)));
+  return {
+    entities: shiftEntities(E, ox - rowBB.minX, oy - rowBB.minY),
+    width: (rowBB.maxX - rowBB.minX) + C.textGap + C.textBlockW,
+    height,
+  };
+}
+
+/** Closed bulge polyline of an arc chain (counter-clockwise) shut along the arch-start line. */
+function chainPoly(arcs) {
+  const pts = [];
+  for (const a of arcs) pts.push([...arcPoint(a, a.a0), arcBulge(a)]);
+  const last = arcs[arcs.length - 1];
+  pts.push([...arcPoint(last, last.a1), 0]);
+  return pts;
+}
+
+/** Dashed rendering of an arc chain: short 2-vertex bulge polylines, dash / gap in mm along the arc. */
+function dashedChain(layer, arcs, dash, gap) {
+  const E = [];
+  for (const a of arcs) {
+    const step = (dash + gap) / a.r, dAng = dash / a.r;
+    for (let t = a.a0; t < a.a1 - 1e-9; t += step) {
+      const t1 = Math.min(t + dAng, a.a1);
+      E.push(polyE(layer, [[...arcPoint(a, t), Math.tan((t1 - t) / 4)], [...arcPoint(a, t1), 0]], false));
+    }
+  }
+  return E;
+}
+
+/**
+ * FIT row (v3 0.1): the frame ring, the rebate wall (R − land, dashed), the
+ * leaf ring and the glass outline drawn CONCENTRIC in their assembly
+ * position, so the running gap between the rebate wall and the leaf and the
+ * rebate lap (frame timber under the leaf) can be read directly. The
+ * CONTOUR / PIECES rows stay per piece for the CNC.
+ */
+function fitRow(plan, ctx, ox, oy) {
+  const E = [];
+  E.push(polyE('FIT', ringPoly(plan.frameHead)));
+  E.push(polyE('FIT', ringPoly(plan.leafTop)));
+  E.push(polyE('FIT', chainPoly(plan.glass.arcs)));
+  if (plan.rebateWall) E.push(...dashedChain('FIT', plan.rebateWall, ARCH_CNC.fitDash, ARCH_CNC.fitGap));
+  const rowBB = entitiesBBox(E);
+  const C = ARCH_CNC;
+  const tx = rowBB.maxX + C.textGap;
+  const rr = (arcs) => arcs.map((a) => fmt1(a.r)).join('/');
+  // casement: frame ring, rebate wall (dashed), leaf ring, glass; sash (v3 Block 1 F): box head ring,
+  // arched top rail ring at the stile line, glass — the running gap between them, no rebate
+  const lines = plan.rebateWall ? [
+    `${ctx.winNum ? ctx.winNum + ' - ' : ''}FIT (ASSEMBLY, NOT A TOOLPATH)`,
+    `GAP ${fmt1(plan.fit.gap)} LAP ${fmt1(plan.fit.lap)} (REBATE)`,
+    `FRAME R${rr(plan.frameHead.outer)} / ${rr(plan.frameHead.inner)}  REBATE WALL R${rr(plan.rebateWall)} (LAND ${fmt1(plan.fit.land)}, DASHED)`,
+    `LEAF R${rr(plan.leafTop.outer)} / ${rr(plan.leafTop.inner)}  GLASS R${rr(plan.glass.arcs)}`,
+  ] : [
+    `${ctx.winNum ? ctx.winNum + ' - ' : ''}FIT (ASSEMBLY, NOT A TOOLPATH)`,
+    `RUNNING GAP ${fmt1(plan.fit.gap)} (HEAD ${fmt1(plan.frameHead.thickness)} FACE, SASH AT THE STILE LINE)`,
+    `HEAD R${rr(plan.frameHead.outer)} / ${rr(plan.frameHead.inner)}`,
+    `TOP RAIL R${rr(plan.leafTop.outer)} / ${rr(plan.leafTop.inner)}  GLASS R${rr(plan.glass.arcs)}`,
   ];
   const blockH = lines.length * C.lineH;
   const height = Math.max(rowBB.maxY - rowBB.minY, blockH);
@@ -189,6 +258,8 @@ function piecesRow(ring, plan, ctx, ox, oy) {
  */
 export function buildArchEntities(plan, winNum = '', ox = 0, oy = 0) {
   if (!plan?.frameHead || !plan?.leafTop || !plan?.plans) throw new ArchError('buildArchEntities needs a plan from buildArchPlan');
+  if (!plan.fit || !plan.glass?.arcs) throw new ArchError('buildArchEntities needs fit / glass from buildArchGeometry (v3)');
+  if (plan.kind !== 'sash' && !plan.rebateWall) throw new ArchError('buildArchEntities needs rebateWall from buildArchGeometry (v3)');
   if (plan.noStock) throw new ArchError('No stock board fits an arch piece — see the plan options');
   const ctx = {
     winNum: winNum ? String(winNum) : '',
@@ -196,17 +267,19 @@ export function buildArchEntities(plan, winNum = '', ox = 0, oy = 0) {
     width: plan.width,
     rise: plan.rise,
     height: plan.straightHeight != null ? plan.straightHeight + plan.rise : null,
-    hinge: plan.hinge,
+    hinge: plan.kind === 'sash' || plan.fixed ? null : plan.hinge,
+    fixed: !!plan.fixed || plan.kind === 'circle',   // v3 Block 3: fixed leaf (no hinge side)
     finger: plan.finger,
   };
   // Rows are laid out bottom-up so the origin is the drawing's bottom-left;
-  // the reading order top-down is: FRAME HEAD contour, FRAME HEAD pieces,
-  // LEAF TOP contour, LEAF TOP pieces.
+  // the reading order top-down is: FIT (assembly), FRAME HEAD contour,
+  // FRAME HEAD pieces, LEAF TOP contour, LEAF TOP pieces.
   const rows = [
     (x, y) => piecesRow(plan.leafTop, plan.plans.leafTop, ctx, x, y),
     (x, y) => contourRow(plan.leafTop, plan.plans.leafTop, ctx, x, y),
     (x, y) => piecesRow(plan.frameHead, plan.plans.frameHead, ctx, x, y),
     (x, y) => contourRow(plan.frameHead, plan.plans.frameHead, ctx, x, y),
+    (x, y) => fitRow(plan, ctx, x, y),
   ];
   const E = [];
   let y = oy;

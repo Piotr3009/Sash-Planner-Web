@@ -45,6 +45,7 @@ export const ELEMENT_TO_PART_ID = {
   'INTERNAL JAMB LINER (L)': 'int_jamb_liner', 'INTERNAL JAMB LINER (R)': 'int_jamb_liner',
   'EXTERNAL JAMB LINER (L)': 'ext_jamb_liner', 'EXTERNAL JAMB LINER (R)': 'ext_jamb_liner',
   'TOP RAIL': 'top_rail', 'BOTTOM RAIL': 'bottom_rail',
+  'S-ARCH HEAD': 'head', 'S-ARCH TOP RAIL': 'top_rail',   // arched sash (v3 Block 1): same material slots, arc lengths
   'STILES TOP (L)': 'stiles_top_sash', 'STILES TOP (R)': 'stiles_top_sash',
   'STILES BOTTOM SASH (L)': 'stiles_bottom_sash', 'STILES BOTTOM SASH (R)': 'stiles_bottom_sash',
   'TOP MEET RAIL': 'top_meet_rail', 'BOTTOM MEET RAIL': 'bottom_meet_rail',
@@ -79,6 +80,7 @@ Object.assign(ELEMENT_TO_PART_ID, {
   'MULLION (L)': 'mullion',
   'MULLION (R)': 'mullion',
   'C-FRAME HEAD': 'c_frame_head',
+  'C-TRACERY': 'c_tracery',            // v3 0.4: tracery board (material line in the BOM)
   'C-FRAME CILL': 'c_frame_cill',
   'C-FRAME JAMB (L)': 'c_frame_jamb',
   'C-FRAME JAMB (R)': 'c_frame_jamb',
@@ -91,6 +93,8 @@ Object.assign(ELEMENT_TO_PART_ID, {
   // silently dropped the arch timber.
   'C-ARCH HEAD': 'c_frame_head',
   'C-ARCH TOP RAIL': 'c_sash_top_rail',
+  'C-FRAME RING': 'c_frame_head',      // v3 Block 3: circle rings take the head / top-rail stock
+  'C-LEAF RING': 'c_sash_top_rail',
   'C-BOTTOM RAIL': 'c_sash_bottom_rail',
   'C-MULLION': 'c_mullion',
   'C-TRANSOM': 'c_transom',
@@ -103,7 +107,11 @@ Object.assign(ELEMENT_TO_PART_ID, {
  * purchased section for a part.
  */
 export function makeRawResolver({ assignments, assignmentsData, materials, frameType = 'standard' }) {
-  return (elementName) => {
+  return (elementName, opts) => {
+    // v3 Block 4: a laminated BLANK (curved member) is bought as boards of the
+    // planner's stock width × the member depth, whatever timber is assigned to
+    // the part — the assignment only names the species / supplier line (jc_uuid).
+    if (opts?.kind === 'blank') return `${opts.stock}x${opts.depth}`;
     const pid = ELEMENT_TO_PART_ID[String(elementName).replace(/ \((FIX L|FIX R|C)\)$/, '')] || ELEMENT_TO_PART_ID[elementName];
     const a = pid ? effectiveAssignment(pid, frameType, assignmentsData, assignments) : null;
     const mat = a?.material_id ? (materials || []).find((m) => m.id === a.material_id) : null;

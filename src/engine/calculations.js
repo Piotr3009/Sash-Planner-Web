@@ -1,7 +1,8 @@
 import { resolveCasementLayout, fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from './casementLayouts.js';
 import { selectCasementHinges, summariseHinges, selectCasementLocks, summariseLocks } from './casementHardware.js';
-import { getWindowProfile, getCasementProfile, getDoorProfile, profileSashDepth, profileBoardWidth, boardWidthForDepth, kgPerM } from './profile.js';
-import { buildArchGeometry, planArchSegments, buildGlassOutline, buildArchBars, glassOutlinePoly, chainAreaAboveLine, ArchError } from './arch.js';
+import { getWindowProfile, getCasementProfile, getDoorProfile, profileSashDepth, profileBoardWidth, boardWidthForDepth, profileBoxDepth, kgPerM } from './profile.js';
+import { buildArchGeometry, buildSashArchGeometry, planArchSegments, buildGlassOutline, buildArchBars, glassOutlinePoly, chainAreaAboveLine, ArchError, isCircleShape, buildCircleGeometry, buildCircleGlassOutline, buildCircleBars } from './arch.js';
+import { buildTraceryForDerived } from './cnc/traceryExport.js';
 
 /**
  * calculations.js - ETAP 3
@@ -595,7 +596,17 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     //    is the straight engine. Invalid arch numbers throw an ArchError —
     //    never a silent rectangle (every caller catches and shows the reason).
     const archSpec = windowSpec.arch && windowSpec.arch.shape ? windowSpec.arch : null;
-    const layout = archSpec ? (archSpec.hinge === 'right' ? '040R' : '040L') : (cas.layout || '040L');
+    // ── Fixed window (v3 Block 3, Piotr 07.09): the casement frame
+    //    + a NON-OPENING leaf — one panel (040L) whose hinge is 'fixed', so the
+    //    hardware selectors return nothing and the leaf is a dummy sash; the
+    //    circle is its own geometry (rings, no straight member). The profile
+    //    switch fix.construction only knows 'fixedLeaf' tonight (BLOCKERS).
+    const isFixed = cas.kind === 'fixed';
+    const isCircle = !!archSpec && isCircleShape(archSpec.shape);
+    if (isCircle && !isFixed) throw new ArchError('A circle window is a fixed window — set casementKind "fixed"');
+    const fixConstruction = p.fix?.construction || 'fixedLeaf';
+    if (isFixed && fixConstruction !== 'fixedLeaf') throw new ArchError(`Casement profile fix.construction "${fixConstruction}" is not implemented — only 'fixedLeaf' (frame + non-opening leaf) has workshop numbers`);
+    const layout = isFixed ? '040L' : archSpec ? (archSpec.hinge === 'right' ? '040R' : '040L') : (cas.layout || '040L');
 
     // Layout geometry driven by the PROFILE faces (57 / 68 / 68 defaults —
     // numerically identical to the PSW visual geometry, so 3D/2D/import agree).
@@ -611,7 +622,7 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
         fanlightRatio: fanAxisToRatio(cas.fanlightHeight, innerH),
         fan2Ratio: fan2AxisToRatio(cas.fan2Height, frameHeight, innerH),
         middleSectionMm: Number(cas.middleWidth) || 0,
-        casementHinges: archSpec ? null : cas.hinges,
+        casementHinges: isFixed ? ['fixed'] : archSpec ? null : cas.hinges,
         geo: GEO,
     });
 
@@ -640,8 +651,22 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     };
 
     // ── Arch geometry, blank plans, glass outline and bars — profile numbers only ──
-    let AG = null, archPlans = null, archOutline = null, archBars = null, glassBottomEdge = null;
-    if (archSpec) {
+    let AG = null, archPlans = null, archOutline = null, archBars = null, glassBottomEdge = null, archTracery = null;
+    if (isCircle) {
+        // circle (v3 Block 3): frame ring + leaf ring on the profile faces, the
+        // glass a full circle at leafInner − glassInset, bars = chords + sunburst
+        AG = buildCircleGeometry({ width: frameWidth, height: frameHeight }, p);
+        archPlans = { frameHead: planArchSegments(AG.frameHead, p.arch), leafTop: planArchSegments(AG.leafTop, p.arch) };
+        archOutline = buildCircleGlassOutline(AG.glass.arcs);
+        glassBottomEdge = frameHeight / 2 - AG.glass.radius;
+        archBars = buildCircleBars({
+            outline: archOutline, pattern: archSpec.bars?.pattern || 'none',
+            h: casBars.h, v: casBars.v, circleOffset: archSpec.bars?.circleOffset,
+        }, p.arch?.patterns);
+        if (archBars.pattern !== 'none' && p.tracery) {
+            archTracery = buildTraceryForDerived({ arch: { glassOutline: archOutline, bars: archBars.bars, pattern: archBars.pattern } }, p, windowSpec.name || '');
+        }
+    } else if (archSpec) {
         if (glassInset == null) throw new ArchError('Casement profile geometry.glassInset is missing — required for the arched glass outline');
         AG = buildArchGeometry({ shape: archSpec.shape, width: frameWidth, height: frameHeight, rise: archSpec.rise }, p);
         archPlans = { frameHead: planArchSegments(AG.frameHead, p.arch), leafTop: planArchSegments(AG.leafTop, p.arch) };
@@ -653,7 +678,13 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
         archBars = buildArchBars({
             outline: archOutline, shape: AG.shape, pattern: archSpec.bars?.pattern || 'none',
             h: casBars.h, v: casBars.v, frameHalfWidth: frameWidth / 2,
+            spokes: archSpec.bars?.spokes, rings: archSpec.bars?.rings,
         }, p.arch?.patterns);
+        // v3 0.4: the timber tracery (one board, one side) over the unit when a
+        // pattern is set — geometry from traceryExport.js on the same bar list
+        if (archBars.pattern !== 'none' && p.tracery) {
+            archTracery = buildTraceryForDerived({ arch: { glassOutline: archOutline, bars: archBars.bars, pattern: archBars.pattern } }, p, windowSpec.name || '');
+        }
     }
 
     // Record helper: profile rounding (0.1) + element letter code on top of
@@ -677,7 +708,10 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
         return `R ${radii} · ${plan.totalPieces} pieces · stock ${plan.arcs.map((a) => a.default.stock).join('/')}`;
     };
     const jambLen = R((archSpec ? AG.start : frameHeight) - (p.lengths.jambDeduct || 0));
-    const box = [
+    const box = isCircle ? [
+        // circle: the whole frame is ONE ring (finger-jointed blank, planner notes)
+        mk('box', 'C-FRAME RING', secFrame, AG.frameHead.lengths.centre, 1, 'C-FRR', `${archNotes(archPlans.frameHead, AG.frameHead)} · fixed leaf`),
+    ] : [
         archSpec
             ? mk('box', 'C-ARCH HEAD', secFrame, AG.frameHead.lengths.centre, 1, 'C-AH', archNotes(archPlans.frameHead, AG.frameHead))
             : mk('box', 'C-FRAME HEAD', secFrame, R(frameWidth - (p.lengths.headDeduct || 0)), 1, 'C-H'),
@@ -733,7 +767,7 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
             heightNote = 'UNCONFIRMED middle-tier deduction';
         }
         return { leafW: R(leafW), leafH: R(leafH), heightNote };
-    });
+    }).map((s) => (isCircle ? { leafW: R(2 * AG.leafTop.outer[0].r), leafH: R(2 * AG.leafTop.outer[0].r), heightNote: '' } : s));
 
     // ── Leaf rectangles (mm, origin = frame top-left, exterior view) ──
     const leafRects = paneBounds.map((b, i) => {
@@ -844,9 +878,22 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     layoutDef.panels.forEach((pn, i) => {
         const s = leafSizes[i];
         const pcode = `P${i + 1}`;
-        const dummy = pn.hinge === 'fixed' ? 'dummy sash' : '';
+        const dummy = pn.hinge === 'fixed' ? (isFixed ? 'fixed leaf' : 'dummy sash') : '';
         const noteBase = [dummy, s.heightNote].filter(Boolean).join(' · ');
         const fnL = hingeFn(pn.hinge, 'L'), fnR = hingeFn(pn.hinge, 'R');
+        if (isCircle) {
+            // circle: the leaf is ONE ring — no stiles, no rails
+            sash.push(mk('sash', 'C-LEAF RING', secLeaf, AG.leafTop.lengths.centre, 1, `C-LFR-${pcode}`,
+                [archNotes(archPlans.leafTop, AG.leafTop), noteBase].filter(Boolean).join(' · ')));
+            if (archTracery) {
+                const T = archTracery.T, bb = archTracery.geom.bbox;
+                const allow = Number(p.arch?.contourAllowance) || 0;
+                const blankW = R(bb.maxX - bb.minX + 2 * allow), blankH = R(bb.maxY - bb.minY + 2 * allow);
+                sash.push(mk('sash', 'C-TRACERY', `${T.boardThickness}x${blankW}`, blankH, T.sides, `C-TRY-${pcode}`,
+                    `blank ${blankW} x ${blankH} · ${archBars.pattern} · ${archTracery.geom.panes.length} panes · ${archTracery.geom.mode}`));
+            }
+            return;
+        }
         // Arched leaf: the stiles run from the leaf bottom to the springing line
         // (straight part only) and the top rail is the curved member.
         const stileLen = R((archSpec ? AG.leafStraightStile : s.leafH) - (p.lengths.stileDeduct || 0));
@@ -863,6 +910,15 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
         }
         sash.push(mk('sash', 'C-BOTTOM RAIL', secLeaf, R(s.leafW - (p.lengths.bottomRailDeduct || 0)), 1, `C-BR-${pcode}`,
             [pn.hinge === 'top' ? 'lock' : '', noteBase].filter(Boolean).join(' · ')));
+        // v3 0.4: tracery board — qty = sides, section = board thickness x blank W,
+        // length = blank H (bounding box of the board outline + contourAllowance)
+        if (archSpec && archTracery) {
+            const T = archTracery.T, bb = archTracery.geom.bbox;
+            const allow = Number(p.arch?.contourAllowance) || 0;
+            const blankW = R(bb.maxX - bb.minX + 2 * allow), blankH = R(bb.maxY - bb.minY + 2 * allow);
+            sash.push(mk('sash', 'C-TRACERY', `${T.boardThickness}x${blankW}`, blankH, T.sides, `C-TRY-${pcode}`,
+                `blank ${blankW} x ${blankH} · ${archBars.pattern} · ${archTracery.geom.panes.length} panes · ${archTracery.geom.mode}`));
+        }
     });
 
     // ── Glass: one 24 mm unit per pane (fixed = dummy sash, same math) ──
@@ -873,11 +929,11 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
             // the glass frame (origin = unit bottom-left, y up) for the glazier.
             width: R(archOutline.width),
             height: R(archOutline.height),
-            location: 'arched leaf',
+            location: isCircle ? 'circle leaf' : 'arched leaf',
             role: 'main',
             qty: 1,
             shape: {
-                kind: 'arched',
+                kind: isCircle ? 'circle' : 'arched',
                 archShape: AG.shape,
                 outline: archOutline,
                 poly: glassOutlinePoly(archOutline),
@@ -925,7 +981,7 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
         const s = leafSizes[i];
         // Arched leaf: the timber run is 2 straight stiles + bottom rail + the
         // curved top rail at its centre line; the pane weight from the true area.
-        const leafRun = archSpec ? (2 * AG.leafStraightStile + s.leafW + AG.leafTop.lengths.centre) : (2 * s.leafH + 2 * s.leafW);
+        const leafRun = isCircle ? AG.leafTop.lengths.centre : archSpec ? (2 * AG.leafStraightStile + s.leafW + AG.leafTop.lengths.centre) : (2 * s.leafH + 2 * s.leafW);
         const frameKg = kgPerM(els.leafStile.face, ld) * (leafRun / 1000);
         const paneArea = archSpec ? archOutline.area : paneGlass[i].width * paneGlass[i].height;
         const paneKg = (paneArea / 1e6) * glassKgPerSqm;
@@ -979,9 +1035,10 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     const SEAL_F = 1.10;
     // Arched: the seal follows the true frame outline — two jambs to the
     // springing + the head arc (outer edge), plus the cill for the frame seal.
-    const jambRun = archSpec ? 2 * AG.start : 2 * frameHeight;
+    // circle: the seal is the ring's outer circumference — no jambs, no cill run
+    const jambRun = isCircle ? 0 : archSpec ? 2 * AG.start : 2 * frameHeight;
     const headRun = archSpec ? AG.frameHead.lengths.outer : frameWidth;
-    const casSealFrameM = Math.round(((jambRun + headRun + frameWidth) * SEAL_F / 1000) * 100) / 100;
+    const casSealFrameM = Math.round(((jambRun + headRun + (isCircle ? 0 : frameWidth)) * SEAL_F / 1000) * 100) / 100;
     const casSealHjM = Math.round(((jambRun + headRun) * SEAL_F / 1000) * 100) / 100;
     const casSealColour = (cas.sealColour || windowSpec.sealColour || 'black').toLowerCase();
 
@@ -996,6 +1053,9 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
         glazingItems: [],
         customGlassUnits: paneGlass,
         casement: {
+            // v3 Block 3: present only on a fixed window (absent, not 'opening', so a
+            // rectangular casement's derived JSON is unchanged — t18 / t20 fixtures)
+            ...(isFixed ? { kind: 'fixed' } : {}),
             layout, layoutDef, openers, panes: layoutDef.panels.length,
             leafWeights,
             hardware: { hingePicks, hingeSummary, sideOpeners, lockPicks, lockSummary },
@@ -1018,11 +1078,14 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
                 barCounts: archBars.counts,
                 barTotalLength: archBars.totalLength,
                 pattern: archBars.pattern,
+                tracery: archTracery ? { mode: archTracery.geom.mode, panes: archTracery.geom.panes.length, areas: archTracery.geom.areas, bbox: archTracery.geom.bbox, warnings: archTracery.geom.warnings } : null,
                 glassOutline: {
                     ...archOutline,
                     // glass-frame origin in FRAME coordinates (mm from the frame's
                     // outer bottom-left corner, y up) = the unit's bottom-left corner
                     origin: { x: R(frameWidth / 2 - AG.glass.halfWidth), y: R(glassBottomEdge) },
+                    // circle: the glass centre in frame coordinates
+                    ...(isCircle ? { centreFrame: { x: R(frameWidth / 2), y: R(frameHeight / 2) } } : {}),
                 },
             },
         } : {}),
@@ -1032,8 +1095,11 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
             glass: R(glassKg),
             total: R((timberKg + glassKg) * wMargin),
         },
-        paint: archSpec
-            ? paintFromAreaSqm(round((frameWidth * AG.start + chainAreaAboveLine(AG.arcs)) / 1_000_000))
+        // v3 0.4: the tracery face (board minus panes, one side) adds to the paint area
+        paint: isCircle
+            ? paintFromAreaSqm(round((Math.PI * (frameWidth / 2) ** 2 + (archTracery ? archTracery.geom.areas.timber * archTracery.T.sides : 0)) / 1_000_000))
+            : archSpec
+            ? paintFromAreaSqm(round((frameWidth * AG.start + chainAreaAboveLine(AG.arcs) + (archTracery ? archTracery.geom.areas.timber * archTracery.T.sides : 0)) / 1_000_000))
             : calculatePaint(frameWidth, frameHeight),
         consumables: {
             glass: { type: windowSpec.glazing?.type || 'double', sqm: Math.round(glassSqm * 100) / 100 },
@@ -1347,9 +1413,116 @@ export function deriveWindowData(windowSpec, settings = {}) {
     );
 
     // Triple sash: counterweights balance only the centre (opening) section
-    const weights = calculateWeights(windowSpec, tripleSections ? tripleSections.center : sashWidth, topSashHeight, bottomSashHeight);
-    const paint = calculatePaint(frameWidth, frameHeight);
-    const consumables = calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight);
+    let weights = calculateWeights(windowSpec, tripleSections ? tripleSections.center : sashWidth, topSashHeight, bottomSashHeight);
+    let paint = calculatePaint(frameWidth, frameHeight);
+    let consumables = calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight);
+
+    // ── Arched sash (ARCHED-WINDOWS-v3 Block 1 C): the box head and the upper
+    //    sash's top rail become rings on the frame contour (arch.js, rule C);
+    //    stiles run to the springing, the meeting rail and the lower sash are
+    //    untouched. Everything below is conditional — a rectangular sash is
+    //    JSON-identical to before (verify/arch/t21.mjs).
+    const sashArchSpec = windowSpec.arch && windowSpec.arch.shape ? windowSpec.arch : null;
+    let sashArch = null;
+    if (sashArchSpec && !isTripleSash) {
+        const prof = getWindowProfile();
+        const cp = getCasementProfile();                     // blank planner + pattern numbers live once, here
+        const SA = buildSashArchGeometry({ shape: sashArchSpec.shape, width: frameWidth, height: frameHeight, rise: sashArchSpec.rise }, prof, CONSTANTS.GLASS_REBATE);
+        const plans = { head: planArchSegments(SA.head, cp.arch), topRail: planArchSegments(SA.topRail, cp.arch) };
+        const R = (v) => Math.round(v * 10) / 10;
+        const f = sashFaces();
+        // upper glass: bottom edge = meeting rail bottom + meeting rail face − rebate, springing at H − rise
+        const straightBelow = SA.upperStileClear - f.meet / 2 + CONSTANTS.GLASS_REBATE;
+        const outline = buildGlassOutline(SA.glass.arcs, SA.glass.halfWidth, straightBelow);
+        const bars = buildArchBars({
+            outline, shape: SA.shape, pattern: sashArchSpec.bars?.pattern || 'none',
+            h: sashArchSpec.bars?.h || 0, v: sashArchSpec.bars?.v || 0, frameHalfWidth: frameWidth / 2,
+            spokes: sashArchSpec.bars?.spokes, rings: sashArchSpec.bars?.rings,
+        }, cp.arch?.patterns);
+        // lower sash: straight horizontals only (PSW arch-lower-h-bars), equal divisions of the lower
+        // daylight height; the lower UNIT row keeps the double-hung rule (sash − 89, lower − 108)
+        const lowerGlassH = bottomSashHeight - f.meet - f.bottom;
+        const lowerGlassW = sashWidth - 2 * f.stile;
+        const lowerUnitW = sashWidth - (2 * f.stile - 2 * CONSTANTS.GLASS_REBATE);
+        const lowerUnitH = bottomSashHeight - (f.meet + f.bottom - 2 * CONSTANTS.GLASS_REBATE);
+        const nLower = Math.max(0, Math.floor(Number(sashArchSpec.lowerHBars) || 0));
+        const lowerBars = { h: nLower, positions: Array.from({ length: nLower }, (_, j) => R(lowerGlassH * (j + 1) / (nLower + 1))), glassW: R(lowerGlassW), glassH: R(lowerGlassH) };
+        const archNotes = (plan, ring) => {
+            const radii = ring.outer.map((a) => Math.round(a.r)).join('/');
+            if (plan.noStock) return `R ${radii} · no stock board fits`;
+            return `R ${radii} · ${plan.totalPieces} pieces · stock ${plan.arcs.map((a) => a.default.stock).join('/')}`;
+        };
+        const hornExtra = windowSpec.sash?.horns ? Number(windowSpec.sash?.hornExtension ?? prof.hornExtension ?? settings?.hornExtensionDefault ?? 70) : 0;
+        const sd = sashDepthFor(windowSpec.frame?.type);
+        const bw = windowSpec.frame?.type ? profileBoardWidth(windowSpec.frame.type) : boxBoardWidthFor(windowSpec.frame?.depth);
+        const boxDepth = profileBoxDepth(windowSpec.frame?.type);
+        const headFace = Number(prof.sashArch.headFace);
+        // records: the arched members replace their straight twins, the stiles / jambs stop at the springing
+        const rec = (group, name, section, length, qty, notes = '') => { const r = createComponentRecord(windowSpec, group, name, section, length, qty, notes); r.length = R(length); return r; };
+        const upperStile = SA.upperStraightStile + hornExtra;
+        const sashOut = [];
+        for (const c of sashComponents) {
+            if (c.elementName === 'TOP RAIL') sashOut.push(rec('sash', 'S-ARCH TOP RAIL', c.section, SA.topRail.lengths.centre, 1, archNotes(plans.topRail, SA.topRail)));
+            else if (c.elementName === 'STILES TOP (L)' || c.elementName === 'STILES TOP (R)') sashOut.push(rec('sash', c.elementName, c.section, upperStile, 1, 'to the springing'));
+            else sashOut.push(c);
+        }
+        // DEFAULT (open, BLOCKERS): jambs = start − (jambHeight − headFace) — the head zone of the rectangular
+        // deduction is the ring now; head liners are not generated on an arched head; jamb liners to the springing
+        const jambLen = SA.start - (prof.deductions.jambHeight - headFace);
+        const boxOut = [];
+        for (const c of boxComponents) {
+            if (c.elementName === 'HEAD') boxOut.push(rec('box', 'S-ARCH HEAD', `${headFace}x${boxDepth}`, SA.head.lengths.centre, 1, archNotes(plans.head, SA.head)));
+            else if (c.elementName === 'JAMB LEFT' || c.elementName === 'JAMB RIGHT') boxOut.push(rec('box', c.elementName, c.section, jambLen, 1, 'to the springing'));
+            else if (c.elementName === 'INTERNAL HEAD LINER' || c.elementName === 'EXTERNAL HEAD LINER') continue;
+            else if (c.elementName.includes('JAMB LINER')) boxOut.push(rec('box', c.elementName, c.section, SA.start - (c.elementName.startsWith('INTERNAL') ? prof.elements.intJambLiner.deduction : prof.elements.extJambLiner.deduction), 1, 'to the springing'));
+            else boxOut.push(c);
+        }
+        void bw;
+        // weights from the true outline (balance / cord): upper timber = stiles + arched top rail (centre line) + meeting rail, glass = outline area
+        const kg = { stile: kgPerM(f.stile, sd), topRail: kgPerM(f.top, sd), meet: kgPerM(f.meet, sd), bottom: kgPerM(f.bottom, sd) };
+        const glassType = windowSpec.glazing?.type || 'double';
+        const kgPerSqm = GLASS_KG_PER_SQM[glassType] || GLASS_KG_PER_SQM['double'];
+        const upperTimber = 2 * (SA.upperStraightStile / 1000) * kg.stile + (SA.topRail.lengths.centre / 1000) * kg.topRail + (sashWidth / 1000) * kg.meet;
+        const upperGlass = (outline.area / 1e6) * kgPerSqm;
+        const lowerTimber = 2 * (bottomSashHeight / 1000) * kg.stile + (sashWidth / 1000) * kg.bottom + (sashWidth / 1000) * kg.meet;
+        const lowerGlass = ((lowerGlassW * lowerGlassH) / 1e6) * kgPerSqm;
+        weights = {
+            timber: round(upperTimber + lowerTimber),
+            glass: round(upperGlass + lowerGlass),
+            total: round((upperTimber + lowerTimber + upperGlass + lowerGlass) * 1.05),
+            glassType, kgPerSqm,
+            upperKg: round((upperTimber + upperGlass) * 1.05),
+            lowerKg: round((lowerTimber + lowerGlass) * 1.05),
+            upperGlassArea: round(outline.area / 1e6),
+        };
+        // paint from the true frame outline; seal 6070 with the upper sash's true perimeter (equivalent height)
+        paint = paintFromAreaSqm(round((frameWidth * SA.start + chainAreaAboveLine(SA.arcs)) / 1_000_000));
+        const upperEquivH = (2 * SA.upperStraightStile + SA.topRail.lengths.centre - sashWidth) / 2;
+        consumables = { ...consumables, seal6070: { meters: round((sashWidth * 4 + upperEquivH * 4 + bottomSashHeight * 4) * 1.10 / 1000) } };
+        sashComponents.length = 0; sashComponents.push(...sashOut);
+        boxComponents.length = 0; boxComponents.push(...boxOut);
+        sashArch = {
+            shape: SA.shape,
+            geometry: SA,
+            plans,
+            bars: bars.bars,
+            barCounts: bars.counts,
+            barTotalLength: bars.totalLength,
+            pattern: bars.pattern,
+            lowerBars,
+            upperSash: { straightStile: R(SA.upperStraightStile), stileClear: R(SA.upperStileClear), topRailLength: R(SA.topRail.lengths.centre), width: sashWidth },
+            glassOutline: {
+                ...outline,
+                // glass-frame origin in FRAME coordinates (frame bottom-left, y up): unit bottom-left corner
+                origin: { x: R(frameWidth / 2 - SA.glass.halfWidth), y: R(SA.start - straightBelow) },
+            },
+            customGlassUnits: [
+                { width: R(outline.width), height: R(outline.height), location: 'upper', role: 'main', qty: 1,
+                  shape: { kind: 'arched', archShape: SA.shape, outline, poly: glassOutlinePoly(outline), springing: R(outline.springing), apex: R(outline.apex), rise: R(outline.rise), radii: outline.radii.map(R), area: outline.area, perimeter: outline.perimeter, bars: bars.bars, pattern: bars.pattern, barCounts: bars.counts } },
+                { width: R(lowerUnitW), height: R(lowerUnitH), location: 'lower', role: 'main', qty: 1 },
+            ],
+        };
+    }
 
     return {
         category: 'sash',
@@ -1385,6 +1558,8 @@ export function deriveWindowData(windowSpec, settings = {}) {
         weights,
         paint,
         consumables,
+        // arched sash (v3 Block 1): absent on a rectangular sash
+        ...(sashArch ? { arch: sashArch, customGlassUnits: sashArch.customGlassUnits } : {}),
     };
 }
 

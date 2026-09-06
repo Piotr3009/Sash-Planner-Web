@@ -10,6 +10,7 @@ import { CONSTANTS } from '../../engine/calculations.js';
 import { buildGlassListForWindow } from '../../engine/lists.js';
 import { STROKE, COLORS, FONT, SIZES, WEIGHTS, STROKES, VIEWBOX_REF,
   DimH, DimV, DimChainH, DimChainV, tfs, computeGlassBarPositions } from './drawingUtils.jsx';
+import CasementGlassDrawing2D from './CasementGlassDrawing2D.jsx';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
 const SPACER_BAR = 18;
@@ -36,7 +37,11 @@ function segmentsBetween(from, to, cutPairs) {
 }
 
 export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) {
+  // Arched sash (v3 Block 1 H): the upper unit is the engine's arched outline — the same sheet the
+  // arched casement uses (outline, edge cover, spacer bands, bar-end dimensioning). Lower sash: rectangular below.
+  const archedUpper = type === 'upper' && !!derived?.arch?.glassOutline && !derived?.casement;
   const d = useMemo(() => {
+    if (archedUpper) return null;
     if (!windowSpec || !derived) return null;
     const isUpper = type === 'upper';
     const sashW = derived.sashWidth;
@@ -129,6 +134,10 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
       glassType, glassFinish, spacerColour, spacerType, isFrosted, isUpper };
   }, [windowSpec, derived, type]);
 
+  if (archedUpper) {
+    const finish = (windowSpec?.glazing?.finish === 'frosted' && (windowSpec?.glazing?.frostedLocation || 'bottom') === 'both') ? 'frosted' : 'clear';
+    return <CasementGlassDrawing2D windowSpec={windowSpec} derived={derived} group={{ rep: 0, key: 'sash-upper', panes: ['upper'], finish }} />;
+  }
   if (!d) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
 
   // Layout
