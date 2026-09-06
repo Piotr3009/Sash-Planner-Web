@@ -150,6 +150,39 @@ question arriving early, and it now blocks the stage rather than being a design 
 but those plans are exactly what Block C changes. Doing F first re-baselines `t18`'s arch numbers and the
 `sample_arch_*.dxf` twice. **Ask:** confirm F.6 is narrowed to the straight-window snapshots (casement /
 door rectangular fixtures, the 920 → 898 / 1402 numbers) and the arch plan re-baseline waits for C.
+### F. What unblocks night 7 — pick one of two routes
+
+**Route 1 (preferred): push arch-pieces-v1 to `main`.** Nothing else is needed; the night runs as v4
+specifies, with §E1–E3 answered along the way.
+
+**Route 2: tell me to build arch-pieces-v1 first, and answer these seven.** They are the decisions the
+chat package already took that the code cannot recover. Numbered, priority-tagged:
+
+1. **[CRITICAL]** `pieceStockTrapezoid(piece)` — what does it return? My reading of C.5/C.6 is the flat
+   board footprint as four corners (or `{ length, width, angle0, angle1 }`) whose two parallel edges are
+   the outer (rough) and inner stock edges. Confirm the shape and the field names.
+2. **[CRITICAL]** `pieceStockEdges(piece)` — outer and inner edge **lengths**, or their end points?
+   And is the inner edge the band's inner **chord** or its projected **span**? They differ by ~1 mm on a
+   compound piece (468.9 vs 470.1 on ROUND 1000) and C.5 quotes 468.9, i.e. the span.
+3. **[CRITICAL]** The gothic split rule — §E1: 463.5 does not come out of an equal-arc-length split
+   (445.0) nor of the per-side engine partition (483.0 / 445.0). Which rule gives 463.5?
+4. **[HIGH]** `geometry.glazingRebate = 18` — this is the tracery-into-timber rebate that replaces
+   `glassInset 12.5` for the tracery board (`traceryExport.js:774-777`). Confirm it applies to the
+   tracery board only, and that `glassInset 12.5` stays for the leaf glass rebate.
+5. **[HIGH]** ASSEMBLY vs PIECES — CLAUDE.md's STAN line says "proste trapezy (PIECES) i sklejony blank
+   (ASSEMBLY), długość surowa = krawędź deski + palec". Today `ASSEMBLY` draws stock rectangles
+   (`archDxf.js:37`) and `PIECES` draws the curved contour (`:38`). Confirm the new split: PIECES = the
+   flat trapezoids to cut, ASSEMBLY = the glued-up blank with the finger joints marked.
+6. **[MEDIUM]** Rough length — is the finger added at **every** jointed end (today
+   `p.L + finger × p.jointedEnds`, `arch.js:775`), or once per piece?
+7. **[MEDIUM]** LSP removal scope — just the button (`WindowDetailPage.jsx:160-162`), or also
+   `exportTraceryLspForWindow` / `writeTraceryLsp` (`cncExport.js:262,301`,
+   `src/engine/cnc/traceryExport.js`) and the eight `.lsp` files in `docs/handover/samples/`?
+   (v4 §0 says "No LISP output anywhere", which reads as all of it.)
+
+Answer 1–3 and I can write Block C and a t25 whose vectors I derive from the formulas rather than from
+C.5; answer 4–7 and the rest of arch-pieces-v1 follows. Either route, **say whether night 7 may run
+E → B → F.1–F.5 first** (§D) instead of holding the whole night on Stage 1.
 
 ---
 
