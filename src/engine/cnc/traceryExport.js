@@ -540,7 +540,15 @@ export function boardFromOutline(outline, glassInset) {
  */
 export function barCurves(bars, extend = 0) {
   return (bars || []).map((b) => {
-    if (b.kind === 'arc') return arcCurve([b.arc.cx, b.arc.cy], b.arc.r, b.arc.a0, b.arc.a1, 'bar');
+    if (b.kind === 'arc') {
+      // intersecting / tracery arcs also end on the GLASS outline: lengthen both ends by the same
+      // distance (as an angle, extend / r) so they reach the board edge and split the panes;
+      // rings and springing-bar ends only run into a bar band, which is harmless
+      const r = b.arc.r || 1;
+      const da = extend > 0 ? extend / r : 0;
+      const dir = b.arc.a1 >= b.arc.a0 ? 1 : -1;
+      return arcCurve([b.arc.cx, b.arc.cy], r, b.arc.a0 - dir * da, b.arc.a1 + dir * da, 'bar');
+    }
     if (!(extend > 0)) return lineCurve(b.from, b.to, 'bar');
     const dx = b.to[0] - b.from[0], dy = b.to[1] - b.from[1];
     const len = Math.hypot(dx, dy) || 1;
@@ -579,8 +587,10 @@ export function buildTraceryGeometry(board, bars, T, opts = {}) {
   let mode = opts.mode || 'auto';
   const axis = board.axisX;
   if (mode === 'auto') {
-    const straddles = fullPanes.some((f) => { const b = faceBounds(f); return b.minX < axis - 0.01 && b.maxX > axis + 0.01; });
-    mode = straddles ? 'full' : 'quadrant';
+    // Piotr 06.09: always the WHOLE board. The DWG quadrant was an AutoCAD drawing habit, and
+    // a centre bar on the axis made the half board come out as one pane (gothic, 1 V bar).
+    // 'quadrant' stays available as an explicit option.
+    mode = 'full';
   }
   let faces, boardLoop;
   if (mode === 'quadrant') {

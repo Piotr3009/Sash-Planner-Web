@@ -297,9 +297,10 @@ function piecesRow(ring, plan, ctx, ox, oy, warningsOut = []) {
     if (fp.warning) warningsOut.push(fp.warning);
     const fingerTxt = pc.jointedEnds === 2 ? 'FINGER BOTH ENDS' : pc.jointedEnds === 1 ? 'FINGER ONE END' : 'NO FINGER';
     const roughDrawn = Math.max(...trap.map((q) => q[0])) - minX;      // rough length = drawn width incl. fingers
-    E.push(labelE('TEXT', x + roughDrawn / 2, oy + pc.stock / 2 + C.noteH, C.textH,
+    // Piotr 06.09: labels BESIDE the piece, never on it — two lines under the trapezoid
+    E.push(labelE('TEXT', x + roughDrawn / 2, oy - C.textH - C.noteH, C.textH,
       `${ctx.winNum ? ctx.winNum + ' - ' : ''}${label} L${fmt1(roughDrawn)} x${pc.stock}`));
-    E.push(labelE('TEXT', x + roughDrawn / 2, oy + C.noteH, C.noteH,
+    E.push(labelE('TEXT', x + roughDrawn / 2, oy - 2 * C.textH - 2 * C.noteH, C.noteH,
       `OUT ${fmt1(L)} IN ${fmt1(pc.innerEdge ?? pc.Lin)} CUT ${cutCode(cutEnd)}/${cutCode(cutStart)} ${fingerTxt}`));
     x += roughDrawn + C.pieceGap;
     rowH = Math.max(rowH, pc.stock);

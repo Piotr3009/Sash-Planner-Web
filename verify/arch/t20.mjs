@@ -281,8 +281,12 @@ print(json.dumps(out))
   const bars = tracery.barCurves(barSet.bars).map((cv) => (cv.kind === 'line'
     ? tracery.lineCurve([cv.p[0] - R + c[0], cv.p[1] + c[1]], [cv.q[0] - R + c[0], cv.q[1] + c[1]], 'bar')
     : tracery.arcCurve([cv.c[0] - R + c[0], cv.c[1] + c[1]], cv.r, cv.a0, cv.a1, 'bar')));
-  const geom = tracery.buildTraceryGeometry(board, bars, T, { mode: 'auto' });
-  check('mode auto → quadrant (no pane straddles the axis: hub vertical + 90° spoke), 5 panes, 19 corner guides, no warnings', geom.mode === 'quadrant' && geom.panes.length === 5 && geom.guides.length === 19 && geom.warnings.length === 0, `${geom.mode} ${geom.panes.length} ${geom.guides.length} ${geom.warnings.join('; ')}`);
+  // Piotr 06.09: auto = FULL board everywhere (the half gothic read as a failure); the DWG is a quadrant,
+  // so the DWG comparison asks for 'quadrant' explicitly — and auto is asserted to be full.
+  const geomAuto = tracery.buildTraceryGeometry(board, bars, T, { mode: 'auto' });
+  check('mode auto → full (whole board; quadrant only on request)', geomAuto.mode === 'full' && geomAuto.panes.length === 10 && geomAuto.warnings.length === 0, `${geomAuto.mode} ${geomAuto.panes.length} ${geomAuto.warnings.join('; ')}`);
+  const geom = tracery.buildTraceryGeometry(board, bars, T, { mode: 'quadrant' });
+  check('mode quadrant on request (the DWG): 5 panes, 19 corner guides, no warnings', geom.mode === 'quadrant' && geom.panes.length === 5 && geom.guides.length === 19 && geom.warnings.length === 0, `${geom.mode} ${geom.panes.length} ${geom.guides.length} ${geom.warnings.join('; ')}`);
   const rad = (pts) => polyArcs(pts, true).map((a) => +a.r.toFixed(2)).sort((a, b) => a - b);
   const paneRadii = geom.panes.map((p) => rad(p.daylight.pts));
   const flat = paneRadii.flat().sort((a, b) => a - b);

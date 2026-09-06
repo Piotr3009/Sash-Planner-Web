@@ -809,8 +809,9 @@ section('§10.3 pt 10 — jambDxf.js unchanged; casementLayouts.js differs from 
     for (let i = 0; i < Math.max(oldCode.length, newCode.length); i++) if (oldCode[i] !== newCode[i]) changed.push([oldCode[i], newCode[i]]);
     const allowed = (o, n) => (/^export const CASEMENT_LAYOUTS_VERSION = \d+;$/.test(o) && /^export const CASEMENT_LAYOUTS_VERSION = \d+;$/.test(n))
       || (/^\s*frameFace: \d+,$/.test(o) && /^\s*frameFace: \d+,$/.test(n));
-    check(`casementLayouts.js code (comments stripped) differs from the merge-base in exactly 2 lines: frameFace 57 → ${layouts.CASEMENT_GEO_DEFAULTS.frameFace}, version 2 → ${layouts.CASEMENT_LAYOUTS_VERSION} — panel order / layout defs untouched`,
-      oldCode.length === newCode.length && changed.length === 2 && changed.every(([o, n]) => allowed(o, n)), JSON.stringify(changed));
+    check(`casementLayouts.js code (comments stripped) differs from the merge-base only in frameFace / version (0 lines once merged): frameFace 57 → ${layouts.CASEMENT_GEO_DEFAULTS.frameFace}, version 2 → ${layouts.CASEMENT_LAYOUTS_VERSION} — panel order / layout defs untouched`,
+      // 0 changed lines once the 68 change is merged (merge-base already has it), 2 while on the session branch
+      oldCode.length === newCode.length && (changed.length === 0 || changed.length === 2) && changed.every(([o, n]) => allowed(o, n)), JSON.stringify(changed));
     check('casementLayouts.js: frameFace = the casement profile frameHead.face (68), version 3', layouts.CASEMENT_GEO_DEFAULTS.frameFace === tF && layouts.CASEMENT_LAYOUTS_VERSION === 3);
   }
 }
