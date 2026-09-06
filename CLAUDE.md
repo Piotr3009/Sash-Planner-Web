@@ -154,69 +154,57 @@ karmi cut listę, PDF-y, rysunki, PP. Nigdy nie licz wymiarów okna w innym miej
 
 ---
 
-## STAN — noc 6 (v4) zamknięta na branchu sesji: Etap 1 (Blok C, planer v2) ✅ t25 · Etap 2 (Blok B, PDF szklarza) ✅ t26 · Etap 3 (Blok E, intersecting z prętów) ✅ t20_bars · Etap 4 (Blok F, rama 68) ✅ t27 — t16–t27 ALL PASS, build OK
-Planer v2: cały łańcuch dzielony po długości łuku (kawałki przez granice łuków, gotyk w wierzchołku, koło jako
-jeden zamknięty pierścień), dwa twarde limity `cnc.minClampLength 450` / `arch.minPieceLength 400`, deski
-`63…200`, najmniej kawałków + alternatywa ekonomiczna (`arch.wasteThreshold 0.45`), koniec surowego kawałka na
-linii startu cięty PROSTOPADLE (`Q`, CNC frezuje czoło), warstwa `CLAMPS`, karta „CNC & arches" w Window Settings.
-Skutki limitów (uczciwie raportowane, BLOCKERS §16): gotyk 1000 skrzydło, koło 800 skrzydło, sash 1000 głowica,
-W 400 — bez planu (eksport pomija z powodem). Niezależny planer harnessów: `verify/arch/lib/indPlanner.mjs`.
-PDF szklarza v4: komórka = rysunek na max skali, tytuł + spec pod nim, łańcuch prętów na dole, szerokość na górze,
-same ID; strony prętów na końcu (miniaturka okna + tabela ID · s od wierzchołka / pozycja · L · kąt / R), A3/A4
-z ustawienia paczki; prostokąty bajt w bajt jak przed (t26). Otwarte: BLOCKERS §17.
-Intersecting v4: pręty pionowe do linii startu (0 → kolumny ±¼), z każdego szczytu dwa łuki o promieniu łuku SZKŁA
-(półkole 405.5, gotyk 905.5 — spec „R = 1000" to promień ramy, errata E4), bez pręta na linii startu; klucze
-`arch.patterns.intersecting` usunięte z profilu. Otwarte: BLOCKERS §18.
-Rama 68 (opcja B, Blok F): profil casement `frameHead/frameJamb.face 68`, `land 47`, `rebate 21`, `leafAtJamb 51`,
-`leafFullHeight 98`, `fanFromAxis 65`, `frameSchema 2` (migracja zapisanych profili 57 → 68 klucz po kluczu, tylko
-wartości równe starym domyślnym); drzwi face 68, słupek sprzęgający 136, `transomDeduct 136`, land drzwi 36 bez
-zmian (BLOCKERS 19.1); `casementLayouts` FRAME_FACE 68 + wersja 3 (t16 §10.3 pt 10 pilnuje: tylko te dwie linie);
-3D przez `frameDims` (stałe 57 / 36 zostają domyślnymi PSW); fixtures prostokątne przebazowane (1000 × 1500:
-skrzydło 920 × 1413 → 898 × 1402; `verify/arch/rect_casement_baseline.mjs`, `t19_baseline.mjs live`); wszystkie
-wektory harnessów liczone z profilu; port PSW w `docs/handover/PSW-FRAME-68-PORT.md`. Skutki: koło 800 rama
-4 × 200 (było 180), gotyk 1000 skrzydło PLANUJE się (1 × 200 na stronę), gotyk 600 × 1600 skrzydło blokuje limit
-400, skrzydło tc240 1200 przez regułę C.4 na 2 × 180 mimo wyższego odpadu (19.5). Otwarte: BLOCKERS §19.
+## STAN — noce 1–6 na `main` (łuki casement/sash/stałe, archiwum, planer v2, PDF szklarza, rama 68)
+Plus paczki z czatu 06.09: `arch-pieces-v1` (trapezy, Pre-Cut per kawałek, wręb 18, wymiary) i
+`gothic-full-v1` (traceria zawsze cała, łuki maswerku do krawędzi deski, napisy pod kawałkami).
+Harnessy t16–t27 ALL PASS. Spec historyczne w `docs/handover/`.
 
-## STAN poprzedni — łuki: casement + sash + okna stałe + archiwum (noce 1–5), paczka arch-pieces-v1 (06.09) na `main`
-Kawałki łuków = proste trapezy (PIECES) i sklejony blank (ASSEMBLY), długość surowa = krawędź
-deski + palec; traceria do drewna (`glazingRebate 18`); Pre-Cut per kawałek; wymiary: odległości
-prętów na dole, całość na górze; LSP usunięty. Harnessy t16–t24 ALL PASS. Spec historyczne:
-`docs/handover/ARCHED-CASEMENT-v1/v2.md`, `ARCHED-WINDOWS-v3.md`.
+## ZADANIE NOCNE 7 — poprawki po przeglądzie Piotra (06.09), cztery bramkowane etapy
 
-## ZADANIE NOCNE 6 — ARCHED-WINDOWS-v4: cztery bramkowane etapy w jedną noc — **WYKONANE (06/07.09)**
-
-Cztery etapy zamknięte na branchu sesji, werdykty w `BUILD-LOG.md` (STAGE 1–4 + FINAL), pytania w `BLOCKERS.md`
-§16–§19. Rano: merge do `main`; port PSW wg `docs/handover/PSW-FRAME-68-PORT.md` (w tym
-`window.CASEMENT_LAYOUTS_VERSION = 3`); materiał 68 × 93 w Part Registry (19.7); decyzje: land drzwi (19.1),
-snapshot profilu per projekt (19.3), reguła C.4 „AND niższy odpad" (19.5). Treść zadania jak zlecono:
-
-Spec: `@docs/handover/ARCHED-WINDOWS-v4.md`. Czytasz w całości; przy rozbieżności ze starszymi
-wygrywa v4. Zanim ruszysz, sprawdź, że paczka arch-pieces-v1 jest na `main`:
-`grep -c pieceStockTrapezoid src/engine/arch.js` > 0, `grep -c glazingRebate src/engine/profile.js`
-> 0, brak przycisku „Tracery LSP". Jeśli nie — STOP, wpis w BLOCKERS, koniec sesji.
+Sprawdź na starcie, że `gothic-full-v1` jest na `main`: `grep -c "mode = 'full'" src/engine/cnc/traceryExport.js` > 0
+i `grep -c "labels BESIDE the piece" src/engine/cnc/archDxf.js` > 0. Jeśli nie — STOP, wpis w BLOCKERS.
 
 **Etapy — następny startuje TYLKO po ALL PASS poprzedniego i zielonym `npm run build`:**
-1. **Blok C — planer kawałków v2:** dwa limity (`cnc.minClampLength 450` na całą długość,
-   `arch.minPieceLength 400` na krótszą krawędź, oba twarde), deski `63 75 95 105 120 150 180 200`,
-   kawałki przez granice łuków (haunch + korona w jednym), gotyk dzielony w wierzchołku, reguła
-   ekonomiczna z progiem odpadu, warstwa `CLAMPS` (Uniclamp 130 × 130, nie ssawki), karta
-   „CNC & arches" w Window Settings.
-   Bramka: t25 z wektorami ze spec C.5 (policzone niezależnie) + t16–t24.
-2. **Blok B — PDF szklarza:** rysunek na całą komórkę, tabele prętów na osobnych stronach na końcu
-   z miniaturką okna i nazwą; na rysunku same ID. Bramka: t26.
-3. **Blok E — intersecting z prętów pionowych** (reguła z PSW sash, jeden silnik dla casement /
-   sash / stałych). Bramka: t20_bars, t22, t23.
-4. **Blok F — rama 68 wszędzie (opcja B):** face 68, land 47, `leafAtJamb 51`, cill bez zmian,
-   słupek drzwi 136, `casementLayouts` FRAME_FACE + bump wersji, 3D z profilu, instrukcja portu
-   do PSW. Bramka: wszystkie harnessy z wektorami przeliczonymi Z WZORÓW (nie z kodu), snapshoty
-   casement/drzwi przebazowane z wpisem starych i nowych liczb w BUILD-LOG.
 
-Etap nie przechodzi — naprawiasz, nie przeskakujesz. Kończą się możliwości — zamykasz etap czysto,
-werdykt, BLOCKERS, koniec.
+1. **Glass DXF: wszystkie szyby, także prostokątne** (`src/utils/glassDxfExport.js`, `WindowDetailPage`,
+   `ProductionPackPage`). Dziś eksport pomija jednostki bez łuku („rectangular units go on the glass PDF")
+   — Piotr: szklarz dostaje JEDEN plik ze wszystkimi szybami. Prostokąt = kontur 4 linie, oblamówka 11
+   (`profile.glass.edgeCover`), pręty jako pasy 18 z osiami na `GLASS_BAR_AXES`, tekst z nazwą okna,
+   numerem jednostki, W × H, pozycjami prętów (od dolnych narożników). Per okno i zbiorczo (batch / pack)
+   ten sam układ warstw co dla kształtowych; jednostki ułożone w rzędach jak dziś. Pomijane jest tylko
+   okno bez szkła. Przycisk aktywny dla każdego okna casement/sash z co najmniej jedną szybą.
+   Bramka: t28 — okno prostokątne 040L 1000 × 1500 → 1 jednostka, kontur 789 × 1293 (wg profilu 68),
+   pasy 2 × 18 przy 1H/1V, oblamówka; okno 133 → 3 jednostki; pack z 1 prostym + 1 łukowym → obie;
+   kształtowe bajt w bajt jak przed etapem (snapshot z `sample_glass_*`).
 
-Bez LISP-a, bez rekordów listew, `casementLayouts.js` tylko stała FRAME_FACE + wersja, drzwi tylko
-face/słupek. Sesja w chmurze, własny branch, commit + push po każdym zamkniętym punkcie. Każde
-**DEFAULT (open)** = wpis w BLOCKERS.
+2. **Wymiary spójnie na wszystkich arkuszach** (Piotr: „na szkle pięknie, na Leaf / Elements nie").
+   Reguła z arch-pieces-v1: odległości między prętami / osie **na dole**, wymiar całkowity **na górze**,
+   wysokości po prawej. Zastosować w `CasementLeafDetail2D`, `CasementFrameDetail2D`, arkuszu Elements
+   (grid), oraz w sash: `FrontElevation2D`, `SashDetail2D`, `BoxDetail2D`, `GlassDrawing2D`. Nie zmieniać
+   niczego poza pozycją wymiarów; tytuły i skala bez zmian. Bramka: t19/t22 snapshoty prostokątne
+   przebazowane z wpisem w BUILD-LOG (co się przesunęło), arkusze łukowe renderują bez NaN, żaden tekst
+   poza viewBox (istniejący guard).
+
+3. **Drzwi — opcja B jak w casement** (`DEFAULT_DOOR_PROFILE`): face 68 już jest; wręb drzwi zostaje
+   **25** (casement 21 + 4), więc land = 68 − 25 = **43**, `leafAtJamb` = 43 + 4 = **47**
+   (dziś 36 / 40 = opcja A, zostawiona przez noc 6 bo spec mówił „face + post only" — BLOCKERS §19).
+   Skrzydło 1000 → 906 (było 920). Panele boczne, french overlap, słupek 136 — przelicz z profilu.
+   Bramka: harness drzwi (t14 / t27) z wektorami przeliczonymi Z WZORÓW z profilu, nie z kodu; wpis
+   w BUILD-LOG ze starymi i nowymi liczbami dla drzwi 1000 × 2100 i french 1200 × 2100.
+
+4. **3D po zmianie ramy 68 — kontrola** (Piotr: „3D view jakieś kwadratowe zamiast pokazywać, co
+   naprawdę się dzieje"; screen jeszcze nie dotarł). Sprawdź `windowSpecToConfig` + `update3D` →
+   `App.jsx` → `CasementFrame` / `ArchedCasementWindow` / `archedCasementGeometry.js` / `DoorFrame`:
+   czy `frameDims` (face 68, land 47, leafAtJamb 51, post 136) docierają do KAŻDEGO komponentu, czy
+   łukowy casement dalej używa `arch.js` (nie fallbacku prostokątnego), czy przy `Kind: Fixed` i przy
+   kole nie wraca prostokąt. Napisz t29: geometria helperów 3D dla 040L 1000 × 1500 (leaf 898 × 1402),
+   łuk semi 1000 (pierścienie od 68), koło 800, drzwi z panelami (post 136) — wymiary siatek = liczby
+   z profilu ±0,5. Każdą rozbieżność napraw; jeśli helper daje prostokąt dla łuku — to jest ten błąd.
+
+Bez LISP-a, bez listew, `casementLayouts.js` nietknięty, `calculations.js` tylko drzwi (etap 3).
+Sesja w chmurze, własny branch, commit + push po każdym zamkniętym punkcie; przy ostrzeżeniu o limicie
+dokończ punkt, harness, commit, push, werdykt, koniec. Każde DEFAULT (open) = wpis w BLOCKERS.
+Na koniec checklista i szczery werdykt z listą tego, czego nie zweryfikowałeś (przeglądarka, VCarve, PDF).
 
 ## NIE RÓB DZIŚ (zaplanowane, osobne pakiety)
 
