@@ -208,4 +208,3 @@ Curved members (15.4).
 - [ ] `git diff main --stat` obejmuje TYLKO pliki ze spec §11 (+ verify, docs, BUILD-LOG, BLOCKERS, CLAUDE.md)
 - [ ] `docs/handover/samples/`: `sample_arch_1200_*.dxf` (pięć), `sample_glass_*.dxf`, `sample_tracery_*.dxf/.lsp`, `sample_sash_arch_*.dxf`, `sample_circle_800_sunburst.dxf` w repo
 - [ ] BUILD-LOG.md z werdyktami, BLOCKERS.md z D13 / D5 / d50 / P9 / F2 otwartymi + §11–§15 (noc 5) + wszystkim, co wyszło w nocy
-- [ ] okna prostokątne: `verify/arch/t19.mjs §1` bajt w bajt z `rect-casement-sheets.json` (baza: `node verify/arch/t19_baseline.mjs <ref>` PRZED dotknięciem arkuszy)
