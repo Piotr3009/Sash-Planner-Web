@@ -341,12 +341,26 @@ section('4 — glazier DXF: ezdxf round-trip, samples docs/handover/samples/samp
   }
   const rect = specification.normaliseToWindowSpec({ id: 'R', name: 'R', width: 1000, height: 1500 }, { fullConfig: { windowCategory: 'casement', casementLayout: '040L' } });
   const rd = derive(rect);
-  check('rectangular casement → skip "not an arched casement", canExportGlassDxf false', /not an arched casement/.test(glassDxf.glassDxfParamsForWindow(rect, rd, 'R').skip || '') && glassDxf.canExportGlassDxf(rect, rd) === false);
-  check('rectangular sash → skip "not an arched sash"; null derived → skip "could not be calculated"', /not an arched sash/.test(glassDxf.glassDxfParamsForWindow(specification.normaliseToWindowSpec({ width: 1000, height: 1500 }, { fullConfig: { windowCategory: 'sash' } }), {}, 'S').skip) && /could not be calculated/.test(glassDxf.glassDxfParamsForWindow(D.V1.spec, null, 'x').skip));
+  // night 7 stage 1: a rectangular window is EXPORTED now (one file with all the
+  // glass), it is no longer skipped — the reason string is gone with the skip
+  check('rectangular casement → exported, ONE rectangular unit 789 x 1293, canExportGlassDxf true (was: skipped "not an arched casement")',
+    !glassDxf.glassDxfParamsForWindow(rect, rd, 'R').skip && glassDxf.canExportGlassDxf(rect, rd) === true &&
+    glassDxf.glassUnitsForWindow(rect, rd).length === 1 && near(glassDxf.glassUnitsForWindow(rect, rd)[0].rect.width, 1000 - 2 * oL - P.deductions.glass, 0.01),
+    JSON.stringify(glassDxf.glassDxfParamsForWindow(rect, rd, 'R').skip || glassDxf.glassUnitsForWindow(rect, rd).map((u) => [u.rect.width, u.rect.height])));
+  {
+    const rectSash = specification.normaliseToWindowSpec({ width: 1000, height: 1500 }, { fullConfig: { windowCategory: 'sash' } });
+    const sd = derive(rectSash);
+    check('rectangular sash → exported, 2 units (upper + lower); a derived with no rows → "no glass unit"; null derived → "could not be calculated"',
+      !glassDxf.glassDxfParamsForWindow(rectSash, sd, 'S').skip && glassDxf.glassUnitsForWindow(rectSash, sd).length === 2 &&
+      glassDxf.glassDxfParamsForWindow(rectSash, {}, 'S').skip === 'no glass unit' &&
+      /could not be calculated/.test(glassDxf.glassDxfParamsForWindow(D.V1.spec, null, 'x').skip),
+      JSON.stringify(glassDxf.glassUnitsForWindow(rectSash, sd).map((u) => [u.rect?.width, u.rect?.height])));
+  }
   windows.push({ windowSpec: rect, derived: rd, name: 'R' });
   const clicksBefore = clicks;
   const m = glassDxf.exportGlassDxfMerged(windows, 'Pack 1');
-  check('merged: 3 windows / 3 units exported, rectangular window skipped with its reason, one download Pack_1_glass.dxf', m.ok && m.exported === 3 && m.units === 3 && m.skipped.length === 1 && m.skipped[0].name === 'R' && lastName === 'Pack_1_glass.dxf' && clicks === clicksBefore + 1, JSON.stringify(m));
+  check('merged: 4 windows / 4 units exported, NOTHING skipped (the rectangular window is in the file now), one download Pack_1_glass.dxf',
+    m.ok && m.exported === 4 && m.units === 4 && m.skipped.length === 0 && lastName === 'Pack_1_glass.dxf' && clicks === clicksBefore + 1, JSON.stringify(m));
   const mergedPath = resolve(SAMPLES, 'sample_glass_pack_merged.dxf');
   writeFileSync(mergedPath, await lastBlob.text());
   const pm = probe(mergedPath);
@@ -356,13 +370,21 @@ section('4 — glazier DXF: ezdxf round-trip, samples docs/handover/samples/samp
   // (1293 / 1293 / 1574.18; were 1304 / 1304 / 1587.41 at the 57 face) — stacked 300 apart from y = 0 downwards
   const hts = [(1300 - glassBottom) + (200 - glassOff), (1000 - glassBottom) + (1000 - 2 * glassOff) / 2, (1800 - 1000 * Math.sqrt(3) / 2 - glassBottom) + Math.sqrt((1000 - glassOff) ** 2 - 500 ** 2)];
   const bottoms = [-hts[0], -hts[0] - 300 - hts[1], -hts[0] - 300 - hts[1] - 300 - hts[2]];
-  check(`merged: 3 contours stacked top-down exactly 300 mm apart on their TRUE extents (arc apex, not the springing vertices) — bottoms at ${bottoms.map((b) => b.toFixed(1)).join(' / ')}`,
-    mc.length === 3 && mc.every((c, i) => near(c.bbox[1], bottoms[i], 0.01)), mc.map((c) => c.bbox.map((v) => v.toFixed(1)).join(',')).join(' | '));
+  // night 7 stage 1: the rectangular window R (leaf glass 789 x 1293) is the 4th
+  // block, stacked under GO1 by the same 300 gap — the three arched bottoms are
+  // UNCHANGED, which is the regression that matters here
+  const rectH = 1500 - P.deductions.leafFullHeight - P.deductions.glass;
+  const bottoms4 = [...bottoms, bottoms[2] - 300 - rectH];
+  check(`merged: 4 contours stacked top-down exactly 300 mm apart on their TRUE extents (arc apex, not the springing vertices) — bottoms at ${bottoms4.map((b) => b.toFixed(1)).join(' / ')}`,
+    mc.length === 4 && mc.every((c, i) => near(c.bbox[1], bottoms4[i], 0.01)), mc.map((c) => c.bbox.map((v) => v.toFixed(1)).join(',')).join(' | '));
   const pb = glassDxf.polyBBox([[0, 0, 0], [811, 0, 0], [811, 898.5, 1], [0, 898.5, 0]], true);
   check('polyBBox: a semi-circle contour (bulge 1) reaches the apex 1304, not the vertex top 898.5', near(pb.maxY, 1304, 1e-6) && near(pb.minY, 0, 1e-9) && near(pb.maxX, 811, 1e-9));
   check('merged: labels TC1 / SC1 / GO1 in the TEXT layer', ['TC1', 'SC1', 'GO1'].every((n) => pm.texts.some((t) => t.text.startsWith(`${n} - G1 GLASS`))));
-  const none = glassDxf.exportGlassDxfMerged([{ windowSpec: rect, derived: rd, name: 'R' }], 'Pack 2');
-  check('merged with no shaped unit → error + skipped, no download', none.error === 'No shaped glass units in this pack' && none.skipped.length === 1 && clicks === clicksBefore + 1);
+  // a pack with nothing to export is now a pack with NO GLASS at all (a door):
+  // a rectangular window is legitimate glass and exports
+  const door = specification.normaliseToWindowSpec({ id: 'D', name: 'D', width: 1000, height: 2100 }, { fullConfig: { windowCategory: 'door', doorLayout: 'D01' } });
+  const none = glassDxf.exportGlassDxfMerged([{ windowSpec: door, derived: derive(door), name: 'D' }], 'Pack 2');
+  check('merged with no glass at all (a door) → error + skipped, no download', none.error === 'No glass units in this pack' && none.skipped.length === 1 && clicks === clicksBefore + 1, JSON.stringify(none));
   URL.createObjectURL = origCreate; URL.revokeObjectURL = origRevoke; delete globalThis.document;
 }
 

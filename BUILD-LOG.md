@@ -4,6 +4,74 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-09-06 — NIGHT 7 (zadanie nocne 7), Stage 1 (branch `claude/zadanie-nocne-7-glass-dxf-wb0eay`)
+
+Entry gate re-run after Piotr put `gothic-full-v1` on `main` (e037020): `mode = 'full'` **1**, `labels BESIDE the
+piece` **1** — both green, branch rebased onto `origin/main` keeping the night-7 stop entry. Baseline on the rebased
+tree: t16 368 · t17_edges 70 · t18 178 · t19 244 · t20 **117** (was 116 — gothic-full-v1 adds one) · t20_bars 32 ·
+t21 120 · t22 77 · t23 81 · t24_stage4 26 · t25 201 · t26 36 · t27 64 = 1614 ALL PASS, build OK.
+
+### STAGE 1 — glass DXF carries EVERY glass unit ✅
+
+**Verdict ✅** — t28 **50 checks ALL PASS**, whole suite t16–t28 = **1664 checks ALL PASS**, `npm run build` OK
+(18.3 s), esbuild clean on all three touched sources, no Polish in sources.
+
+What changed (`src/utils/glassDxfExport.js`, `WindowDetailPage.jsx`, `ProductionPackPage.jsx`):
+
+- `glassUnitsForWindow()` replaces `shapedGlassUnits()` as the export's entry point: every ordered row becomes a
+  unit, shaped or rectangular, in row order, `qty > 1` repeated. `shapedGlassUnits()` stays exported (t19–t23 use it).
+- `buildRectUnitEntities()` — contour = 4 lines, `GLASS_EDGE` inset by `profile.glass.edgeCover` (11) all round,
+  each bar an axis on `GLASS_BAR_AXES` plus a band `profile.glass.barWidth` (18) wide on `GLASS_BARS`. Bands run the
+  full unit, unclipped at crossings, exactly like the shaped bands. Nothing is hard-coded: 11 and 18 are read from
+  the profile through the existing `readGlassProfile` / `barBandCurves`.
+- `rectBarsForRow()` — bar placement has the **two sources the glass PDF already uses**, so the DXF and the PDF can
+  never print different numbers for the same unit: casement / triple rows split the glass equally from the engine
+  counts (`barsV` / `barsH`), double-hung rows keep the sash-frame placement (grid pattern →
+  `computeGlassBarPositions`, whose `cy` runs from the glass top and is mirrored into the y-up DXF frame).
+- Text block: window name, unit id, `W x H` + location, glass spec, bar count, one line per bar, and
+  `BAR AXES FROM THE BOTTOM CORNERS` with FROM LEFT / FROM RIGHT and FROM BOTTOM / FROM TOP per bar.
+- Skips: only "no data" / "not a casement or sash window" / "window could not be calculated" / **"no glass unit"**.
+  The old `not an arched … — rectangular units go on the glass PDF` skip is gone; the pack error is now
+  `No glass units in this pack`. The Window Detail button renders for every casement / sash window.
+
+Numbers asserted from the profile (not read back from the code): 040L 1000 × 1500 → **1 unit 789 × 1293**
+(`W − 2·leafAtJamb 51 − glass 109`, `H − leafFullHeight 98 − glass 109`), edge line (11,11)–(778,1282), bands at
+385.5 / 403.5 and 637.5 / 655.5, axes at 394.5 and 646.5.
+
+**Intended behaviour changes, with the old and new numbers (re-vectored harness assertions):**
+
+| Case | Before | After |
+|------|--------|-------|
+| rectangular casement 040L 1000 × 1500 | skipped: "not an arched casement" | exported, 1 unit 789 × 1293 |
+| rectangular sash 1000 × 1500 | skipped: "not an arched sash" | exported, 2 units 733 × 612.5 |
+| arched sash SS 1000 × 2200 (t22) | 1 unit (arched upper) | **2 units** — arched upper + rectangular lower 733 × 962.5 |
+| t18 pack of 3 arched + 1 rectangular | 3 windows / 3 units, 1 skipped | **4 windows / 4 units, 0 skipped**; the 4th contour bottom −6353.2 (the three arched bottoms −1293.0 / −2886.0 / −4760.2 are UNCHANGED) |
+| pack with nothing exportable | a rectangular window | a window with no glass at all (a door) |
+
+**Shaped output unchanged** — t28 §5 rebuilds the four all-shaped sample windows (semi-circle hub-spoke,
+three-centre 1H 2V, gothic intersecting, circle 800 sunburst) through both trees and compares the **serialised DXF
+byte for byte against `30a8012`**: identical. The arched sash is the one mixed window and its file legitimately
+grows by the lower unit, so there the SHAPED unit's own entity set is compared byte for byte instead: identical.
+
+**Samples:** new `sample_glass_rect_1000x1500_040L.dxf` and `sample_glass_pack_mixed.dxf`;
+`sample_glass_pack_merged.dxf` and `sample_glass_sash_1000x2200_semi-circle_hub-spoke.dxf` regenerated with their
+new rectangular units. **Not from this stage:** `sample_arch_*.dxf`, `sample_arch_c5_*.dxf`,
+`sample_circle_1000_sunburst.dxf`, `sample_sash_arch_1200_*.dxf` and `sample_tracery_gothic.dxf` also changed —
+that is **gothic-full-v1** (e037020) which moved the piece labels below the piece (TEXT y 100 → −25, 10 → −50) and
+made the tracery always full; the code landed on `main` without regenerating the samples, and running the harness
+brought them up to date. The two glass-order PDFs were reverted (jsPDF timestamp noise only).
+
+**Not verified in this stage:** nothing was opened in a browser (the Window Detail / Production Pack buttons, the
+alert texts), and no DXF was opened in VCarve or bSolid — the evidence is the ezdxf round-trip (layers, contour
+789 × 1293, edge 767 × 1271, 2 axes + 4 band edges) and the byte-identity comparison.
+
+**Erratum (BLOCKERS §20.5):** the brief's gate says "okno 133 → 3 jednostki". Layout `133` is "3 Lights +
+Fanlights", so the engine orders **6** units (3 fanlights 434.3 × 337.2 + 3 lights 434.3 × 815.8). t28 asserts the
+engine's 6 and additionally checks layout `130` (3 lights, no fanlights) → 3 units, which is what the brief's
+number describes.
+
+---
+
 ## 2026-09-06 — NIGHT 7 (zadanie nocne 7) — STOPPED AT THE ENTRY GATE (branch `claude/zadanie-nocne-7-glass-dxf-wb0eay`)
 
 Inputs read in full: `CLAUDE.md` (night-7 brief, all four stages + "NIE RÓB DZIŚ") → `BUILD-LOG.md` (night 6) →

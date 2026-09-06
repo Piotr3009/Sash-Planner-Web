@@ -4,9 +4,26 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-09-06 — NIGHT 7 (zadanie nocne 7), stages on the rebased branch `claude/zadanie-nocne-7-glass-dxf-wb0eay`
+
+Entry gate re-run after `gothic-full-v1` landed on `main` (e037020): both markers 1 — §20 above is CLOSED, the
+night ran. Open items from the stages:
+
+### 21. Stage 1 — glass DXF for every unit: erratum and decisions taken
+
+| # | Item | Taken | Ask |
+|---|------|-------|-----|
+| 21.1 | **Brief erratum: "okno 133 → 3 jednostki"** | Layout `133` is "3 Lights + Fanlights" (`casementLayouts.js` LAYOUT_NAMES), so the engine orders **6** units: 3 fanlights 434.3 × 337.2 + 3 lights 434.3 × 815.8. t28 asserts the engine's 6, and additionally `130` (3 lights, no fanlights) → 3 units — the layout the brief's number actually describes | FYI — the engine is right; no code follows the brief's 3 |
+| 21.2 | **The arched sash file grows** | `sample_glass_sash_1000x2200_semi-circle_hub-spoke.dxf` now carries 2 units: the arched upper AND the rectangular lower 733 × 962.5 the glazier previously only saw on the PDF. This is the point of the stage ("ONE file with all the glass"), so the gate's "kształtowe bajt w bajt" was verified as: whole-file identity for the four ALL-shaped windows, and per-unit entity identity for the shaped unit of this mixed window | FYI — confirm in the morning that the glazier wants the lower unit in the same DXF (it is what the brief says) |
+| 21.3 | **Bands are not clipped at crossings** | A vertical band runs the full height of the unit and a horizontal band the full width; they cross. The shaped path (`barBandCurves`) has always drawn whole bands, and the glazier reads one continuous bar — the glass PDF sketch, by contrast, breaks them at the crossing | Should the DXF break the bands at the crossings like the PDF sketch does? Not done — the shaped units would have to change too |
+| 21.4 | **Double-hung bar rule** | Sash units keep the sash-frame placement (wood bar centres, `computeGlassBarPositions`): 6x6 on a 733 wide unit gives axes 244.8 / 488.2, NOT the equal splits 244.3 / 488.7 a casement would give. This matches the glass PDF and the 2D sheets exactly | FYI — the two documents now agree by construction |
+| 21.5 | **Samples the stage did NOT produce** | `sample_arch_*`, `sample_arch_c5_*`, `sample_circle_1000_sunburst`, `sample_sash_arch_1200_*`, `sample_tracery_gothic` changed on this branch because **gothic-full-v1** (e037020) landed without regenerating them (labels moved below the piece, tracery always full); the harness run refreshed them | FYI — the repo's samples now match the code again |
+
+---
+
 ## 2026-09-06 — NIGHT 7 (zadanie nocne 7) NOT STARTED — entry gate failed (branch `claude/zadanie-nocne-7-glass-dxf-wb0eay`)
 
-### 20. [CRITICAL] `gothic-full-v1` is not in this repository — all four stages of night 7 were stopped before any code
+### 20. [CRITICAL → CLOSED 06.09 by e037020] `gothic-full-v1` was not in this repository — the first night-7 attempt stopped before any code
 
 CLAUDE.md opens night 7 with a hard gate: "Sprawdź na starcie, że `gothic-full-v1` jest na `main` … Jeśli nie —
 STOP, wpis w BLOCKERS." Both markers are 0, so nothing was implemented. **No source file was touched tonight.**

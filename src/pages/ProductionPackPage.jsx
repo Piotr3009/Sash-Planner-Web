@@ -459,9 +459,9 @@ export default function ProductionPackPage() {
             {tab === 'glass' && (
               <button
                 onClick={() => {
-                  // Glazier DXF (arched-casement-v2 C): every shaped unit of the
-                  // pack in one file, {label}_glass.dxf; rectangular-only windows
-                  // are listed as skipped, never guessed.
+                  // Glazier DXF: EVERY glass unit of the pack in one file,
+                  // {label}_glass.dxf — shaped and rectangular alike (night 7
+                  // stage 1); only a window with no glass is listed as skipped.
                   const r = exportGlassDxfMerged(
                     (windowsData || []).map((wd) => ({ windowSpec: wd.windowSpec, derived: wd.derived, name: wd.win?.name })),
                     pp?.name || batch?.label || 'pack',
@@ -471,7 +471,7 @@ export default function ProductionPackPage() {
                     alert(`Glass DXF exported (${r.exported} windows, ${r.units} units).\nSkipped ${r.skipped.length}: ${r.skipped.map((s) => `${s.name} (${s.reason})`).join(', ')}`);
                   }
                 }}
-                title="One DXF with the exact contour + bar axes of every shaped (arched) glass unit, stacked 300mm apart"
+                title="One DXF with the exact contour, edge cover and bar axes of every glass unit in the pack, stacked 300mm apart"
                 className="btn btn-secondary text-xs px-4"
               >
                 📐 Glass DXF (all)

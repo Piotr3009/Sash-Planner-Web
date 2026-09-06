@@ -173,7 +173,10 @@ section('3 — glazier DXF + tracery for the arched upper unit');
   const units = glassDxf.shapedGlassUnits(spec, d);
   check('shapedGlassUnits: one shaped unit (the upper), rows: upper arched + lower rect', units.length === 1 && units[0].row.location === 'upper' && units[0].shape.kind === 'arched');
   const r = glassDxf.exportGlassDxfForWindow(spec, d, 'SS');
-  check('exportGlassDxfForWindow accepts the sash → SS_glass.dxf, 1 unit', r.ok && r.units === 1 && lastName === 'SS_glass.dxf');
+  // night 7 stage 1: the arched sash carries BOTH units now — the arched upper
+  // and the rectangular lower the glazier used to get only on the PDF
+  check('exportGlassDxfForWindow accepts the sash → SS_glass.dxf, 2 units (arched upper + rectangular lower; was 1)',
+    r.ok && r.units === 2 && lastName === 'SS_glass.dxf', JSON.stringify(r));
   const text = await lastBlob.text();
   const path = resolve(SAMPLES, 'sample_glass_sash_1000x2200_semi-circle_hub-spoke.dxf');
   writeFileSync(path, text);
@@ -271,7 +274,11 @@ section('6 — structural evidence (grep)');
   check('ArchedSashWindow: engine contour builders (arcPtsPC / shapeContourPC / apexRisePC), PSW samplers kept as fallback', asw.includes('arcPtsPC') && asw.includes('shapeContourPC') && asw.includes('apexRisePC') && asw.includes('function archArcPoints(') && asw.includes("from './archedSashGeometry.js'"));
   check('PSW named export blocks present in ParametricSashWindow / FixFrameWindow (port, not copy)', par.includes('\nexport {\n  mm,\n  Sash,') && fix.includes('NAMED EXPORTS'));
   const wdp = readFileSync(resolve(ROOT, 'src', 'pages', 'WindowDetailPage.jsx'), 'utf8');
-  check('WindowDetailPage: Arch DXF / Tracery / Glass DXF buttons also for an arched sash', (wdp.match(/\|\| !!windowSpec\?\.arch\?\.shape\)/g) || []).length >= 3);
+  // Arch DXF + Tracery stay gated on the arch; the Glass DXF button is wider
+  // since night 7 stage 1 (every casement / sash window with glass)
+  check('WindowDetailPage: Arch DXF / Tracery for an arched sash, Glass DXF for every casement / sash',
+    (wdp.match(/\|\| !!windowSpec\?\.arch\?\.shape\)/g) || []).length >= 2 && wdp.includes("['casement', 'sash'].includes(windowSpec?.category || 'sash')"),
+    String((wdp.match(/\|\| !!windowSpec\?\.arch\?\.shape\)/g) || []).length));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
