@@ -72,6 +72,8 @@ export function glassEdgeArcs(outline, cover) {
 export function glassEdgePoly(outline, cover) {
   const arcs = glassEdgeArcs(outline, cover);
   const Wg = outline.width;
+  // circle (v3 Block 3): two half circles on the horizontal diameter
+  if (outline.kind === 'circle') return { arcs, pts: [[Wg - cover, outline.centre[1], 1], [cover, outline.centre[1], 1]] };
   const pts = [[cover, cover, 0], [Wg - cover, cover, 0]];
   for (const a of arcs) pts.push([...arcPoint(a, a.a0), Math.tan((a.a1 - a.a0) / 4)]);
   const last = arcs[arcs.length - 1];
@@ -101,6 +103,14 @@ export function chainLengthTo(arcs, point, tol = 0.05) {
 
 /** Arc length from the apex (x = axis) to a point on the outline chain: { s, side: 'left' | 'right' }, or null. */
 export function arcLengthFromApex(outline, point, tol = 0.05) {
+  if (outline.kind === 'circle') {
+    // circle: arc length from the top of the circle, the short way round
+    const [cx, cy] = outline.centre;
+    if (Math.abs(Math.hypot(point[0] - cx, point[1] - cy) - outline.radius) > tol) return null;
+    let d = Math.abs(Math.atan2(point[1] - cy, point[0] - cx) - Math.PI / 2);
+    if (d > Math.PI) d = 2 * Math.PI - d;
+    return { s: outline.radius * d, side: point[0] < cx - 1e-6 ? 'left' : point[0] > cx + 1e-6 ? 'right' : (point[1] < cy ? 'bottom' : 'apex') };
+  }
   const s = chainLengthTo(outline.arcs, point, tol);
   if (s == null) return null;
   const half = arcsLength(outline.arcs) / 2;                  // the chains are symmetric about the axis
@@ -108,7 +118,9 @@ export function arcLengthFromApex(outline, point, tol = 0.05) {
   return { s: Math.abs(s - half), side: point[0] < xg - 1e-6 ? 'left' : point[0] > xg + 1e-6 ? 'right' : 'apex' };
 }
 
-const onArch = (p, outline, eps = 0.01) => p[1] > outline.springing + eps;
+const onArch = (p, outline, eps = 0.01) => (outline.kind === 'circle'
+  ? Math.abs(Math.hypot(p[0] - outline.centre[0], p[1] - outline.centre[1]) - outline.radius) <= 0.05
+  : p[1] > outline.springing + eps);
 
 /**
  * Bar-end dimensioning (0.3) for one bar list on one outline — the numbers
@@ -126,7 +138,7 @@ const onArch = (p, outline, eps = 0.01) => p[1] > outline.springing + eps;
 export function barEndRows(bars, outline) {
   const xg = outline.width / 2;
   const f = (v) => { const r = r1(v); return Number.isInteger(r) ? String(r) : r.toFixed(1); };
-  const endText = (e) => (e ? `${f(e.s)} from apex${e.side === 'apex' ? '' : ' ' + e.side[0].toUpperCase()}` : null);
+  const endText = (e) => (e ? `${f(e.s)} from apex${e.side === 'apex' ? '' : e.side === 'bottom' ? ' (bottom)' : ' ' + e.side[0].toUpperCase()}` : null);
   return (bars || []).map((b) => {
     const row = { id: b.id, role: b.role, kind: b.kind, L: b.length, from: null, end: null, angle: null, r: null, centre: null };
     if (b.kind === 'arc') {
@@ -145,6 +157,13 @@ export function barEndRows(bars, outline) {
     }
     const [x0, y0] = b.from, [x1, y1] = b.to;
     const vertical = Math.abs(x1 - x0) < 1e-6, horizontal = Math.abs(y1 - y0) < 1e-6;
+    if (vertical && outline.kind === 'circle') {
+      // circle chord: x from the unit's left edge, both ends on the circle
+      row.from = { axis: 'x', value: x0 };
+      row.label = `${b.id} x ${f(x0)} · L ${f(b.length)}`;
+      row.cells = { s: `x ${f(x0)}`, L: f(b.length), angle: '90°' };
+      return row;
+    }
     if (vertical) {
       row.from = { axis: 'x', value: x0 };
       const top = y0 > y1 ? b.from : b.to;

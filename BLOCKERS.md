@@ -10,6 +10,22 @@ Status of the older entries: **§9.1 P9 (900) OPEN → v3 0.6 keeps 900**, **§9
 **§9.3 minimum piece length → v3 0.6 `arch.minPieceLength` 150 (warn)**, **§9.4 F2 OPEN → `minHaunchRadius` 150 kept**,
 §1 D13 / §2 D5 / §3 d50 unchanged. §10.9 (rasteriser) verified in Chromium, §10.10 (R labels) partly fixed — see 11.9.
 
+### 14. Stage 3 — fixed windows in the casement batch (Block 3): DEFAULT (open) values and questions
+
+| # | Item | Taken | Ask |
+|---|------|-------|-----|
+| 14.1 | **Construction of a fixed window** | `fix.construction: 'fixedLeaf'` — casement frame + a non-opening leaf with the casement leaf sections (67 × 57), glass in the leaf rebate as today. `'directGlazed'` (glass straight into the frame rebate, no leaf) is refused with a readable error: the profile has no direct-glazing rebate numbers | Confirm the fixed leaf; if the workshop glazes small fixed lights direct, give the frame rebate / glass inset and it becomes the second construction |
+| 14.2 | **Cut list names for a fixed window** | Existing `C-*` names with the note `fixed leaf` (grouping and PP stay); the circle adds `C-FRAME RING` (`C-FRR`) and `C-LEAF RING` (`C-LFR`) — there is no straight member to name | Say if the fixed leaf should be a separate group on the sheet (`C-FIX *`) |
+| 14.3 | **Circle radii** | Frame ring 0 → 57 (frameHead.face), leaf ring 40 → 107 (leafAtJamb + leafTop.face), glass at 94.5 (− glassInset), rebate wall at 36: the arch offsets on a full circle. 800 circle: R 400 / 343, 360 / 293, glass 305.5 | Confirm the 4 mm running gap and the 17 mm lap hold all round a circle leaf (it cannot be lifted in like a square leaf — is it screwed through the frame ring?) |
+| 14.4 | **Circle blank plan** | Each half-circle of a ring is planned like an arch arc (max 36° per board → 5 pieces per half, 10 per frame ring, 14 per leaf ring at R 360 on 95 stock) — the two halves meet on the horizontal diameter with a finger joint like every other piece | Say if the workshop glues a circle from fewer, wider segments (D8 / D13 for full circles) |
+| 14.5 | **Sunburst geometry** | PSW's `CircleFrame`: ring at glass R − 200 (profile `arch.patterns.sunburst.offset`, or the imported `fixCircleOffset`), 6 spokes at 0° / 60° / … from the right, spokes from the ring to the glass edge; user h / v bars are chords through the hub (PSW draws them too). No configurator field for the offset yet (profile default 200) | Confirm 200 / 6; ask if the offset should be per window in the configurator |
+| 14.6 | **Circle glazing** | Glass unit 611 × 611 kind `circle`, true area π·R²; the edge cover 11 and the 18 spacer bands as Block 0; bar ends are measured from the TOP of the circle along the edge (`s from apex`) | Confirm the glazier reads a circle from the apex |
+| 14.7 | **Circle limits** | Diameter within the arch limits 400–1500 (profile `arch.limits`); height locked to the width in the configurator and refused at import when different | Give a circle-specific minimum if 400 is too small for two rings (leaf ring inner 93 at 400) |
+| 14.8 | **Fixed leaf weight / hardware** | Zero hardware, no hinge / lock picks, `leafWeights` null (no balance, no hinge limit) — the fixed leaf's timber still counts in `weights.timber` | FYI |
+| 14.9 | **PSW `fixType` fd30 / fd60** | Imported nowhere — PC has no fire-rated construction; the value is ignored silently (BLOCKERS, not an error) | Say whether FD30 / FD60 are products PC must plan (glass spec, intumescent) |
+| 14.10 | **3D of a fixed window** | Rectangle: `CasementWindow` with `casementHinges ['fixed']` (its own fixed pane, no handle); Round / Gothic: `ArchedCasementWindow` with `fixedLeaf` (handle removed, opening 0); circle: PSW's `FixFrameWindow` circle branch (frame 57 face, PSW's own bars). Not seen rendered in a browser | Morning: casement batch → Kind Fixed → each shape → 3D tab |
+| 14.11 | **Circle sheets** | `CircleFixedDrawing2D` (elevation / frame / leaf) replaces the three rectangular sheets for a circle; the glass sheet draws the circle contour. The frame / leaf sheets show the ring radii, the blank plan text and Ø dims — no cut-length chains (there is no straight member) | Say what else the workshop wants on a ring sheet (piece angles? finger positions?) |
+
 ### 13. Stage 3 — arched sash drawings / exports / 3D (Block 1 F–J): findings and questions
 
 | # | Item | Taken | Ask |

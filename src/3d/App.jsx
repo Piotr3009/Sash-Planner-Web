@@ -459,7 +459,8 @@ function Scene({ config, isMobile }) {
                 archSpokes={config.archSpokes || null}
                 archRings={config.archRings || null}
                 hingeDirection={config.casArchHinge || 'left'}
-                opening={config.casementOpening || 0}
+                opening={config.fixedLeaf ? 0 : (config.casementOpening || 0)}
+                fixedLeaf={!!config.fixedLeaf}
                 woodColor={config.woodColor}
                 woodColorExt={config.woodColorExt}
                 woodColorInt={config.woodColorInt}

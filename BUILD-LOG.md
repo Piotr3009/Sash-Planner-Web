@@ -70,6 +70,75 @@ grep. The arched sheets were rendered headless (Chromium) and looked at as PNG. 
 **Not verified:** the 3D in a browser (no WebGL render in the container — same as night 4), the DXF in VCarve /
 AutoCAD, the PDFs. **Findings → BLOCKERS §13.** **Verdict: ✅ Block 1 F–J** (3D ⚠️ compiled + helper-tested only).
 
+### STAGE 3b — Block 3: FIXED windows in the casement batch (`profile.js`, `arch.js`, `specification.js`, `calculations.js`, `lists.js`, `bom.js`, `glassBars.js`, `traceryExport.js`, `archDxf.js`, `cncExport.js`, `glassDxfExport.js`, `glassPdfExport.js`, `projectStore.js`, `ConfiguratorPage.jsx`, `windowSpecToConfig.js`, `App.jsx`, `ArchedCasementWindow.jsx`, `archDrawUtils.js`, `CircleFixedDrawing2D.jsx` new, four casement sheets, `verify/arch/t23.mjs`)
+
+**Understanding:** Piotr 07.09 — a fixed window "podchodzi pod casement batch, ale jednak nie casement": the casement
+frame + a leaf that never opens ("leaf tylko"), no hinges, no handle, no opening symbol; shapes rectangle / Round /
+Gothic / circle. PSW sells it as the fix-only product (`fixShape`, `fixType`, `fixArchRise`, `fixCircleBarPattern`,
+`fixCircleOffset`, `fixSemiBarPattern` / `fixGothicBars`).
+
+**Two approaches, one rejected:** (a) a fourth engine (`deriveFixWindow`) with its own members — rejected: the fixed
+leaf IS the casement leaf (same sections, same deductions), a copy drifts; (b) `casement.kind 'fixed'` inside
+`deriveCasementWindow`: the layout is forced to `040L` with `casementHinges ['fixed']`, so the existing dummy-sash
+path (no hardware picks, no opener) does the work and every number stays the hinged casement's — chosen. The circle
+is the one new geometry: the frame and the leaf are full rings, so `arch.js` gets `circleArcs` (two half-arcs,
+centre at the origin — every chain helper, the ring builder and the segment planner work unchanged) and
+`buildCircleGeometry` on the same profile faces as the arch.
+
+**Built:**
+- Data: `casement.kind` ('opening' | 'fixed'; PSW `windowType 'fix-only'` → casement batch + fixed), `archFromSpec`
+  reads the PSW fix fields (`fixShape` rectangle / circle / arch ids, `fixArchRise`, the three pattern fields,
+  `fixCircleOffset` → `bars.circleOffset`), `circleFromSpec` (shape 'circle', rise = start = W/2, hinge null, pattern
+  none | sunburst). Store whitelist `casementKind`, `fixCircleOffset`.
+- Profile: `fix.construction 'fixedLeaf'` (DEFAULT open; `directGlazed` refused readably — no rebate numbers),
+  `arch.patterns.sunburst { offset 200, spokes 6 }` (PSW CircleFrame), `migrateCasementProfile` fills both.
+- Engine: fixed → `040L` + `['fixed']`, notes `fixed leaf`, `derived.casement.kind`; circle → `buildCircleGeometry`
+  (800: frame 400 → 343, leaf 360 → 293, glass 305.5, rebate wall 364), `C-FRAME RING` (`C-FRR`, 57x93, centre
+  2π·371.5) and `C-LEAF RING` (`C-LFR`, 67x57, 2π·326.5) instead of head / jambs / cill / stiles / rails, glass unit
+  `kind 'circle'` (611 × 611, true area), `buildCircleBars` (chords h / v as PSW, sunburst = ring at R − offset + 6
+  spokes to the glass edge), tracery on the circle board (full mode), seal = ring circumference, paint π·R².
+  Cut list / BOM rows for the two rings (head / top-rail stock).
+- Glazier: `glassBars.js` circle branches (edge poly two half circles, bar ends measured from the top of the circle,
+  chords by x / y), glazier DXF (`DIAMETER 611 R 305.5`), glass PDF outline path, `CasementGlassDrawing2D` circle
+  contour + centre lines. Tracery: `boardFromOutline` circle board, full mode; two fixes in the arrangement —
+  overlapping-piece dedupe keyed by the mid-point (the two halves of a circle share both ends) and `offsetFace` on
+  a single merged full-circle edge (hub pane, board).
+- CNC: `buildCirclePlan` (kind 'circle'), `archDxf` prints `FIXED LEAF` instead of `HINGE L / R` (also for a fixed
+  arched casement: `plan.fixed`), FIT row with the rings + the dashed rebate wall; `archParamsForWindow` routes the
+  circle. Samples `sample_circle_800_sunburst.dxf`, `sample_glass_circle_800_sunburst.dxf`,
+  `sample_tracery_circle_800_sunburst.dxf` / `.lsp`.
+- 2D: `CircleFixedDrawing2D` (elevation / frame / leaf views: rings, rebate wall, glass, bars, centre lines, radii, Ø
+  dims, blank-plan text) — the three casement sheets delegate a circle to it after their hooks; the rectangular /
+  arched sheets are untouched apart from the pane role text (`P1 fixed`).
+- 3D: fixed → `casementHinges ['fixed']` (CasementWindow's own fixed pane) / `fixedLeaf` prop on
+  `ArchedCasementWindow` (no handle, opening 0); circle → PSW's `FixFrameWindow` circle branch (PC's copy is already
+  1:1 with PSW — the "raise it" in the spec was stale) via `windowCategory 'fix-only'`.
+- Configurator: Kind chips Opening | Fixed; Fixed → Shape chips Rectangle | Round | Gothic | Circle (Round / Gothic
+  reuse the shared arch controls without a hinge side; the layout picker is hidden), circle locks the height to the
+  width and shows the ring radii, pattern chips none | sunburst; `buildCirclePlan` errors block the save.
+
+**Verification (t23 79/79 ALL PASS):** §1 circle geometry (400 / 343 / 360 / 293 / 305.5, planner 2 × 5 pieces, errors
+for H ≠ W and W < 400, sunburst ring 105.5 + 6 spokes L 200 at 60°, chords, per-window offset, hub-on-circle and
+sunburst-on-arch refused); §2 engine circle 800 (two ring records, no hardware, glass true area, tracery 7 panes,
+seals / paint / beading); §3 rectangle fixed = 040L stripped JSON byte-equal; §4 arched fixed = arched casement
+stripped JSON byte-equal (+ gothic); §5 PSW fix-only circle / gothic / semi-circle / rectangle imports, PC kind,
+import errors; §6 CNC DXF ezdxf round-trip (rows, FIXED LEAF, FIT radii, dashed wall, 24 piece contours, merged
+export); §7 glazier DXF (contour 2 × bulge 1 R 305.5, edge 294.5, bands) + tracery DXF / LSP round trip (7 panes,
+hub rail / limit radii); §8 sheets: every SVG arc of the three circle sheets concentric on the sheet centre with an
+engine radius, glass sheet likewise, fixed rectangle without the opening symbol and otherwise identical; §9 3D
+config; §10 wiring grep. Rendered the circle elevation / leaf / glass sheets headless and looked at them.
+**Not verified:** the configurator and the 3D in a browser, the DXFs in VCarve, the fixed window inside the
+production pack / PDFs beyond the engine records. **Verdict: ✅ Block 3** with the DEFAULT (open) entries in
+BLOCKERS §14 (2D circle case ✅, 3D fixed leaf ⚠️ compiled only).
+
+### STAGE 3 GATE — ✅ ALL PASS
+
+t16 504 · t17 72 · t18 178 · t19 244 · t20 112 · t20_bars 30 · t21 120 · t22 75 · t23 79 · `npm run build` OK.
+Rectangular casement (t18 / t19 / t20 fixtures) and rectangular sash (t21 / t22 fixtures) derived JSON and
+sheets byte-identical (`derived.casement.kind` is present only on a fixed window). t16 / t18 assertions updated
+for the v3 vocabulary (a rectangular sash now skips as "not an arched sash", sunburst in ARCH_BAR_PATTERNS, the
+configurator's save gate reads `shapeBlocked`).
+
 ### 0.4 — tracery export DXF + LSP, the `arka` convention (`src/engine/cnc/traceryExport.js` new, `dxfWriter.js` POINT, `arch.js` patterns, `calculations.js`, `lists.js`, `bom.js`, `cncExport.js`, pages, configurator, 3D props)
 
 **Understanding:** one timber board over the arched unit, cut on the CNC to the pane pattern; the bead R8 runs

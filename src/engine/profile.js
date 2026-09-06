@@ -179,6 +179,11 @@ export const DEFAULT_CASEMENT_PROFILE = {
     patterns: {
       hubRingRatios: [0.3, 0.6, 0.8],
       intersecting: { pitch: 450, minMullions: 2, maxMullions: 4, minRadius: 30 },
+      // v3 Block 3: sunburst in a CIRCLE fixed window (PSW 3d-src FixFrameWindow
+      // CircleFrame): one ring `offset` mm inside the clear circle, `spokes`
+      // spokes from the ring to the glass edge. PSW's per-window offset
+      // (fixCircleOffset, default 200) is imported; this is the PC default.
+      sunburst: { offset: 200, spokes: 6 },
     },
     // Finger-joint profile of the Stark d50 head (D5): finger length / joint
     // depth / pitch — printed on the drawing as FINGER 15/16/3.8.
@@ -236,6 +241,12 @@ export const DEFAULT_CASEMENT_PROFILE = {
     sides: 1,
     boardThickness: 18,   // DEFAULT (open): the tracery board thickness for the cut list section
   },
+  // ── FIXED windows in the casement batch (ARCHED-WINDOWS-v3 Block 3, Piotr
+  // 07.09): a fixed window is the casement frame + a NON-OPENING
+  // leaf (same members, no hardware). DEFAULT (open, BLOCKERS): 'fixedLeaf';
+  // 'directGlazed' (glass straight into the frame rebate, no leaf) has no
+  // rebate numbers in this profile yet — the engine refuses it readably.
+  fix: { construction: 'fixedLeaf' },
   rounding: 0.1,       // mm — CNC-ready, one decimal
 };
 
@@ -273,6 +284,7 @@ export function migrateCasementProfile(profile) {
     // default for older stored copies (no UI edits them yet).
     glass: { ...D.glass, ...(profile.glass || {}), edgeCover: { ...D.glass.edgeCover, ...(profile.glass?.edgeCover || {}) } },
     tracery: { ...D.tracery, ...(profile.tracery || {}) },
+    fix: { ...D.fix, ...(profile.fix || {}) },
     arch: profile.arch?.version === D.arch.version
       ? {
           ...D.arch, ...profile.arch,
@@ -281,6 +293,7 @@ export function migrateCasementProfile(profile) {
           patterns: {
             ...D.arch.patterns, ...(profile.arch.patterns || {}),
             intersecting: { ...D.arch.patterns.intersecting, ...(profile.arch.patterns?.intersecting || {}) },
+            sunburst: { ...D.arch.patterns.sunburst, ...(profile.arch.patterns?.sunburst || {}) },
           },
         }
       : D.arch,

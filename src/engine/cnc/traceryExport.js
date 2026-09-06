@@ -237,7 +237,9 @@ export function arrangementFaces(curves) {
   const segKey = (s) => {
     const [a, b] = s.a.id < s.b.id ? [s.a, s.b] : [s.b, s.a];
     const g = s.curve.kind === 'line' ? 'l' : `a${s.curve.c[0].toFixed(4)},${s.curve.c[1].toFixed(4)},${s.curve.r.toFixed(4)}`;
-    return `${a.id}|${b.id}|${g}`;
+    // the mid-point tells the two halves of a full circle (same ends, same circle) apart
+    const m = pointAt(s.curve, 0.5);
+    return `${a.id}|${b.id}|${g}|${m[0].toFixed(3)},${m[1].toFixed(3)}`;
   };
   const uniq = new Map();
   for (const s of segs) {
@@ -386,6 +388,18 @@ function mergeCoCurve(edges) {
 export function offsetFace(face, dOf) {
   let edges = mergeCoCurve(face.edges).map((e) => ({ e, off: offsetEdge(e, dOf(e)), corner: e.from }));
   if (edges.some((x) => !x.off)) return null;
+  // a full circle (v3 Block 3: the circle board, a sunburst hub): one merged arc edge → two half circles
+  if (edges.length === 1 && edges[0].off.kind === 'arc') {
+    const off = edges[0].off, tag = edges[0].e.curve.tag;
+    if (!(off.r > 1e-6)) return null;
+    const P = [off.c[0] + off.r, off.c[1]], Q = [off.c[0] - off.r, off.c[1]];
+    const b = off.ccw ? 1 : -1;
+    const out = [
+      { kind: 'arc', from: P, to: Q, bulge: b, arc: { c: off.c, r: off.r, ccw: off.ccw }, tag },
+      { kind: 'arc', from: Q, to: P, bulge: b, arc: { c: off.c, r: off.r, ccw: off.ccw }, tag },
+    ];
+    return { edges: out, pts: out.map((d) => [d.from[0], d.from[1], d.bulge]), ok: true, dropped: 0 };
+  }
   let dropped = 0;
   for (let iter = 0; iter < 50; iter++) {
     const n = edges.length;
@@ -498,6 +512,10 @@ export function cornerGuides(contour, leg) {
 export function boardFromOutline(outline, glassInset) {
   const Wg = outline.width, ys = outline.springing;
   const arcs = glassEdgeArcs(outline, glassInset);
+  // circle (v3 Block 3): the board is the full daylight circle — no straight edge
+  if (outline.kind === 'circle') {
+    return { curves: arcs.map((a) => arcCurve([a.cx, a.cy], a.r, a.a0, a.a1, 'board')), axisX: Wg / 2, centres: arcs.map((a) => [a.cx, a.cy]), circle: true };
+  }
   const curves = [
     lineCurve([glassInset, glassInset], [Wg - glassInset, glassInset], 'board'),
     lineCurve([Wg - glassInset, glassInset], [Wg - glassInset, ys], 'board'),
@@ -757,7 +775,8 @@ export function buildTraceryForDerived(derived, profile, winNum = '', opts = {})
   if (!(glassInset >= 0)) throw new ArchError('Casement profile geometry.glassInset is missing');
   const T = readTraceryProfile(profile);
   const board = boardFromOutline(A.glassOutline, glassInset);
-  const geom = buildTraceryGeometry(board, barCurves(A.bars), T, opts);
+  // a circle board is always cut whole (no springing line to mirror about)
+  const geom = buildTraceryGeometry(board, barCurves(A.bars), T, board.circle ? { ...opts, mode: 'full' } : opts);
   const by = A.bars.reduce((m, b) => { m[b.role] = (m[b.role] || 0) + 1; return m; }, {});
   const info = {
     winNum, pattern: A.pattern, spokes: (by.spoke || 0) + (by.springing || 0), rings: by.ring || 0,

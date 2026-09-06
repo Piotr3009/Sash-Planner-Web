@@ -19,6 +19,7 @@ import { offsetArcs } from '../../engine/arch.js';
 import { DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 import { archToSheet, archedOutlineD, ringBandD, arcLabelPoint, radiiText } from './archDrawUtils.js';
+import CircleFixedDrawing2D from './CircleFixedDrawing2D.jsx';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
 
@@ -65,6 +66,8 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
   }, [windowSpec, derived]);
 
   if (!geom) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
+  // v3 Block 3: circle fixed window → ring sheet (after the hooks above)
+  if (derived?.arch?.shape === 'circle') return <CircleFixedDrawing2D windowSpec={windowSpec} derived={derived} projectNumber={projectNumber} view="frame" />;
 
   const { fw, fh, g } = geom;
   const layoutSc = Math.max(fw, fh) / 500;

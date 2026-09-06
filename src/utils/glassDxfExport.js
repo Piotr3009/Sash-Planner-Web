@@ -117,7 +117,7 @@ export function shapedGlassUnits(windowSpec, derived) {
   const rows = buildGlassListForWindow(derived, windowSpec) || [];
   const out = [];
   for (const r of rows) {
-    if (r?.shape?.kind !== 'arched' || !Array.isArray(r.shape.poly)) continue;
+    if ((r?.shape?.kind !== 'arched' && r?.shape?.kind !== 'circle') || !Array.isArray(r.shape.poly)) continue;
     const qty = Math.max(1, Math.round(Number(r.quantity ?? r.qty ?? 1)));
     for (let n = 0; n < qty; n++) out.push({ id: `G${out.length + 1}`, row: r, shape: r.shape });
   }
@@ -154,7 +154,9 @@ export function unitTextLines(unit, winName) {
   const name = winName ? `${winName} - ` : '';
   const lines = [
     `${name}${unit.id} GLASS ${String(shape.archShape || 'arched').toUpperCase()}`,
-    `W${fmt1(row.width)} x H${fmt1(row.height)} RISE ${fmt1(shape.rise)} SPRINGING ${fmt1(shape.springing)} R ${shape.radii.map(fmt1).join('/')}`,
+    shape.kind === 'circle'
+      ? `DIAMETER ${fmt1(row.width)} R ${fmt1(shape.radii[0])} (CIRCLE)`
+      : `W${fmt1(row.width)} x H${fmt1(row.height)} RISE ${fmt1(shape.rise)} SPRINGING ${fmt1(shape.springing)} R ${shape.radii.map(fmt1).join('/')}`,
     [row.type, row.makeup, row.spec, row.coating === 'soft_coat' ? 'SOFT COAT' : null, row.gas, row.finish, row.spacer ? `SPACER ${row.spacer}` : null]
       .filter(Boolean).map((s) => String(s).toUpperCase()).join(' '),
   ];

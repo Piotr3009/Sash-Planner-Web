@@ -563,6 +563,9 @@ export const useProjectStore = create((set, get) => ({
       // arched-windows-v3 0.4: custom hub (spoke count, ring fractions)
       archSpokes: windowConfig.archSpokes ?? null,
       archRings: Array.isArray(windowConfig.archRings) ? windowConfig.archRings : null,
+      // arched-windows-v3 Block 3: fixed window in the casement batch (kind, PSW circle sunburst offset)
+      casementKind: windowConfig.casementKind || 'opening',
+      fixCircleOffset: windowConfig.fixCircleOffset ?? null,
       // arched-windows-v3 Block 1: arched sash (frame shape, upper straight bars, lower h bars)
       frameShape: windowConfig.frameShape || 'standard',
       archHBars: windowConfig.archHBars ?? null,
@@ -728,6 +731,9 @@ export const useProjectStore = create((set, get) => ({
       // arched-windows-v3 0.4: custom hub (spoke count, ring fractions)
       archSpokes: windowConfig.archSpokes ?? null,
       archRings: Array.isArray(windowConfig.archRings) ? windowConfig.archRings : null,
+      // arched-windows-v3 Block 3: fixed window in the casement batch (kind, PSW circle sunburst offset)
+      casementKind: windowConfig.casementKind || 'opening',
+      fixCircleOffset: windowConfig.fixCircleOffset ?? null,
       // arched-windows-v3 Block 1: arched sash (frame shape, upper straight bars, lower h bars)
       frameShape: windowConfig.frameShape || 'standard',
       archHBars: windowConfig.archHBars ?? null,

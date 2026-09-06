@@ -494,6 +494,8 @@ export const CUT_LIST_ORDER = [
   { match: 'C-FRAME HEAD',              symbol: 'C-FH',    label: 'Frame Head' },
   // Arched casement (arched-casement-v2): curved head / leaf top rail, length = arc length at the member centre line
   { match: 'C-ARCH HEAD',               symbol: 'C-AH',    label: 'Arched Frame Head' },
+  // v3 Block 3: circle fixed window — the frame and the leaf are full rings
+  { match: 'C-FRAME RING',              symbol: 'C-FRR',   label: 'Frame Ring (circle)' },
   { match: 'C-FRAME JAMB (L)',          symbol: 'C-J-L/R', label: 'Frame Jambs (pair)',          isPair: true },
   { match: 'C-FRAME CILL',              symbol: 'C-CILL',  label: 'Frame Cill' },
   { match: 'C-MULLION',                 symbol: 'C-M',     label: 'Mullion' },
@@ -501,6 +503,7 @@ export const CUT_LIST_ORDER = [
   { match: 'C-STILE (L)',               symbol: 'C-ST-L/R', label: 'Leaf Stiles (pair)',         isPair: true },
   { match: 'C-TOP RAIL',                symbol: 'C-TR',    label: 'Leaf Top Rail' },
   { match: 'C-ARCH TOP RAIL',           symbol: 'C-ATR',   label: 'Arched Leaf Top Rail' },
+  { match: 'C-LEAF RING',               symbol: 'C-LFR',   label: 'Leaf Ring (circle)' },
   { match: 'C-BOTTOM RAIL',             symbol: 'C-BR',    label: 'Leaf Bottom Rail' },
   // v3 0.4: timber tracery board over the arched unit (one board, one side; section = thickness x blank W, length = blank H)
   { match: 'C-TRACERY',                 symbol: 'C-TRY',   label: 'Tracery Board' },

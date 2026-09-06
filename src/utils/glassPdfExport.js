@@ -144,6 +144,12 @@ function outlineLines(outline, sc) {
     lines.push([c1[0] * sc - cur[0], -c1[1] * sc - cur[1], c2[0] * sc - cur[0], -c2[1] * sc - cur[1], p[0] * sc - cur[0], -p[1] * sc - cur[1]]);
     cur = [p[0] * sc, -p[1] * sc];
   };
+  if (outline.kind === 'circle') {
+    // circle (v3 Block 3): start at the right end of the horizontal diameter, no straight edge
+    to(outline.width, outline.springing);
+    for (const a of outline.arcs) for (const seg of arcBeziers(a)) bez(seg.c1, seg.c2, seg.p3);
+    return lines;
+  }
   to(outline.width, 0);
   to(outline.width, outline.springing);
   for (const a of outline.arcs) for (const seg of arcBeziers(a)) bez(seg.c1, seg.c2, seg.p3);
@@ -905,7 +911,7 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
           barsH: r.barsH,
           // shaped unit (arched casement): outline + bar list for the Shape
           // column, the mm + % line and the drawing cell
-          shape: r.shape?.kind === 'arched' ? r.shape : null,
+          shape: r.shape?.kind === 'arched' || r.shape?.kind === 'circle' ? r.shape : null,
           sashW,
           sashH,
           faces: derived?.sashDims,

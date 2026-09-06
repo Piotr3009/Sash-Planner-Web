@@ -251,6 +251,7 @@ export default function ArchedCasementWindow({
   archRings = null,       // v3 0.4: custom hub ring fractions (PC)
   hingeDirection = 'left',
   opening = 0.3,
+  fixedLeaf = false,      // v3 Block 3 (PC): fixed window — no handle, the leaf never opens
   woodColor = '#F6F6F6',
   woodColorExt = '#F6F6F6',
   woodColorInt = '#F6F6F6',
@@ -346,7 +347,7 @@ export default function ArchedCasementWindow({
   // ── Leaf placement / opening ──
   const leafWm = G ? mm(G.leaf.width) : 0;
   const leafZ = halfD - mm(EXT_DEPTH) + mm(GASKET_T) + mm(SASH_DEPTH) / 2;
-  const clampedOpening = Math.max(0, Math.min(1, opening));
+  const clampedOpening = fixedLeaf ? 0 : Math.max(0, Math.min(1, opening));
   const angleRad = THREE.MathUtils.degToRad(clampedOpening * MAX_ANGLE);
 
   // ── Handle (CasementPanel logic): opposite stile, interior face ──
@@ -376,13 +377,15 @@ export default function ArchedCasementWindow({
       {G.bars.map((b) => (b.kind === 'arc'
         ? <ArcBar key={b.id} bar={b} matExt={extMat} matInt={intMat} spacerMat={spacerMat} />
         : <StraightBar key={b.id} bar={b} profiles={profiles} matExt={extMat} matInt={intMat} spacerMat={spacerMat} glassHalfWidth={G.leaf.xg} />))}
-      <group position={handlePos} rotation={handleRot} scale={[handleScale, handleScale, handleScale]}>
-        <WindowCasementHandle
-          rotationDeg={hingeDirection === 'left' ? -handleDeg : handleDeg}
-          metalColor={handleColors.metalColor}
-          lockColor={handleColors.lockColor}
-        />
-      </group>
+      {!fixedLeaf && (
+        <group position={handlePos} rotation={handleRot} scale={[handleScale, handleScale, handleScale]}>
+          <WindowCasementHandle
+            rotationDeg={hingeDirection === 'left' ? -handleDeg : handleDeg}
+            metalColor={handleColors.metalColor}
+            lockColor={handleColors.lockColor}
+          />
+        </group>
+      )}
     </group>
   ) : null;
 

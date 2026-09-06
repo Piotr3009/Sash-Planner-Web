@@ -25,7 +25,7 @@ import {
 } from '../engine/cnc/jambDxf.js';
 import { buildArchEntities, buildMergedArchEntities, ARCH_LAYERS } from '../engine/cnc/archDxf.js';
 import { buildTraceryForDerived, writeTraceryLsp, TRACERY_LAYERS, boardBBox } from '../engine/cnc/traceryExport.js';
-import { buildArchPlan, buildSashArchGeometry, planArchSegments, isArchShape, ArchError } from '../engine/arch.js';
+import { buildArchPlan, buildCirclePlan, buildSashArchGeometry, planArchSegments, isArchShape, isCircleShape, ArchError } from '../engine/arch.js';
 import { getCasementProfile, getWindowProfile } from '../engine/profile.js';
 import { CONSTANTS } from '../engine/calculations.js';
 import { writeDxf } from '../engine/cnc/dxfWriter.js';
@@ -154,18 +154,21 @@ export function archParamsForWindow(windowSpec, name) {
   if (category !== 'casement' && category !== 'sash') return { skip: 'not a casement or sash window' };
   const a = windowSpec.arch;
   if (!a?.shape) return { skip: category === 'sash' ? 'not an arched sash' : 'not an arched casement' };
-  if (!isArchShape(a.shape)) return { skip: `unsupported arch shape "${a.shape}"` };
+  if (!isArchShape(a.shape) && !isCircleShape(a.shape)) return { skip: `unsupported arch shape "${a.shape}"` };
   if (category === 'sash' && windowSpec.sash?.type === 'triple') return { skip: 'triple sash is not arched' };
+  const fixed = category === 'casement' && windowSpec.casement?.kind === 'fixed';
   try {
     const plan = category === 'sash'
       ? buildSashArchPlan({ shape: a.shape, width: windowSpec.frame?.width, height: windowSpec.frame?.height, rise: a.rise }, getWindowProfile(), getCasementProfile())
-      : buildArchPlan({
+      : isCircleShape(a.shape)
+      ? buildCirclePlan({ width: windowSpec.frame?.width, height: windowSpec.frame?.height }, getCasementProfile())
+      : { ...buildArchPlan({
         shape: a.shape,
         width: windowSpec.frame?.width,
         height: windowSpec.frame?.height,
         rise: a.rise,
         hinge: a.hinge,
-      }, getCasementProfile());
+      }, getCasementProfile()), fixed };
     if (plan.noStock) {
       const needs = [];
       for (const [label, pl] of [[plan.kind === 'sash' ? 'box head' : 'frame head', plan.plans.frameHead], [plan.kind === 'sash' ? 'top rail' : 'leaf top', plan.plans.leafTop]]) {

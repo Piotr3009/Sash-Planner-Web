@@ -25,7 +25,7 @@ import { readGlassProfile, glassEdgeArcs, barEndRows, useBarTable } from '../../
 import { DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 import { casementBarCounts } from './casementDrawUtils.js';
-import { glassToSheet, archedOutlineD, barBandD, arcLabelPoint, barArcLabelPoint, isHaunchArc, radiiText, onCurve } from './archDrawUtils.js';
+import { glassToSheet, archedOutlineD, barBandD, arcLabelPoint, barArcLabelPoint, isHaunchArc, radiiText, onCurve, closedChainD } from './archDrawUtils.js';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
 const WOOD_BAR = 22;
@@ -186,18 +186,26 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
         endLabels.push({ at: barArcLabelPoint(b.arc, txG, O.width / 2, inward), anchor: 'middle', text: labelFor(b) });
       }
     }
+    const circle = O.kind === 'circle';   // v3 Block 3: no straight edge, no springing line
     AP = {
-      unitD: archedOutlineD(O.arcs, txG, Y(glassH)),
-      sealD: archedOutlineD(arch.seal, txG, Y(glassH - arch.edgeCover)),
+      unitD: circle ? closedChainD(O.arcs, txG) : archedOutlineD(O.arcs, txG, Y(glassH)),
+      sealD: circle ? closedChainD(arch.seal, txG) : archedOutlineD(arch.seal, txG, Y(glassH - arch.edgeCover)),
       barsD: arch.bars.map((b) => barBandD(b, txG, arch.spacer / 2)),
-      radii: O.arcs.map((a) => ({ r: a.r, at: isHaunchArc(a) ? arcLabelPoint(a, txG, sw(10)) : arcLabelPoint(a, txG, -sw(16)) })),
-      springY: Y(glassH - O.springing),
+      radii: circle
+        ? [{ r: O.arcs[0].r, at: arcLabelPoint(O.arcs[0], txG, -sw(16)) }]
+        : O.arcs.map((a) => ({ r: a.r, at: isHaunchArc(a) ? arcLabelPoint(a, txG, sw(10)) : arcLabelPoint(a, txG, -sw(16)) })),
+      springY: circle ? null : Y(glassH - O.springing),
+      centre: circle ? txG(...O.centre) : null,
       endLabels,
     };
   }
   const annFs = tfs(SIZES.dimSmall, totalW);
   const endFs = tfs(SIZES.notch, totalW);
-  const archLine = arch ? `${arch.label} · springing ${fmt(arch.outline.springing)} · rise ${fmt(arch.outline.rise)} · ${radiiText(arch.outline.arcs)} · ${arch.bars.length} bars · edge ${fmt(arch.edgeCover)} · spacer ${fmt(arch.spacer)}` : '';
+  const archLine = arch
+    ? (arch.outline.kind === 'circle'
+      ? `Circle · Ø ${fmt(arch.outline.width)} · R ${fmt(arch.outline.radius)} · ${arch.bars.length} bars · edge ${fmt(arch.edgeCover)} · spacer ${fmt(arch.spacer)}`
+      : `${arch.label} · springing ${fmt(arch.outline.springing)} · rise ${fmt(arch.outline.rise)} · ${radiiText(arch.outline.arcs)} · ${arch.bars.length} bars · edge ${fmt(arch.edgeCover)} · spacer ${fmt(arch.spacer)}`)
+    : '';
   const tableTop = oy + glassH + MGN_BOT;
   const tableFs = tfs(SIZES.dimSmall, totalW);
   const titleY = tableTop + MGN_TABLE + MGN_TITLE * 0.35;
@@ -283,6 +291,7 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
         {/* Arched: springing line, springing / rise dims, glass radii, bar ends on the curve (E) */}
         {AP && (
           <g>
+            {AP.springY != null && <>
             <line x1={X(0) - sw(10)} y1={AP.springY} x2={X(glassW) + sw(10)} y2={AP.springY}
               stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS}
               strokeDasharray={`${sw(8)},${sw(3)},${sw(2)},${sw(3)}`} />
@@ -290,6 +299,15 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
               label={`springing ${fmt(arch.outline.springing)}`} small vbw={totalW} />
             <DimV x={ox + glassW + 34 * ts} y1={Y(0)} y2={AP.springY} extFrom={X(glassW)}
               label={`rise ${fmt(arch.outline.rise)}`} small vbw={totalW} />
+            </>}
+            {AP.centre && <>
+            <line x1={X(0) - sw(10)} y1={AP.centre[1]} x2={X(glassW) + sw(10)} y2={AP.centre[1]}
+              stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS}
+              strokeDasharray={`${sw(8)},${sw(3)},${sw(2)},${sw(3)}`} />
+            <line x1={AP.centre[0]} y1={Y(0) - sw(10)} x2={AP.centre[0]} y2={Y(glassH) + sw(10)}
+              stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS}
+              strokeDasharray={`${sw(8)},${sw(3)},${sw(2)},${sw(3)}`} />
+            </>}
             {AP.radii.map((rl, k) => (
               <text key={`r-${k}`} x={rl.at[0]} y={rl.at[1]} fill={COLORS.dim} fontSize={annFs}
                 fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.dim}>{`R ${fmt(rl.r)}`}</text>

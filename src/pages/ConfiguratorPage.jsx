@@ -9,7 +9,7 @@ import { buildVentGrilles } from '../engine/lists.js';
 import { FAN_AXIS_OFFSET_TOP, FAN_AXIS_OFFSET_BOTTOM } from '../engine/casementLayouts.js';
 import {
   GOTHIC_PROFILE_RATIO, ROUND_AUTO_RATIO, LEGACY_ARCH_SHAPES, PATTERNS_FOR_SHAPE, ARCH_BAR_PATTERN_LABELS,
-  isHubPattern, isGothicShape, resolveRoundShape, buildArchPlan, buildSashArchGeometry, planArchSegments,
+  isHubPattern, isGothicShape, resolveRoundShape, buildArchPlan, buildSashArchGeometry, planArchSegments, buildCirclePlan,
 } from '../engine/arch.js';
 import { getCasementProfile, getWindowProfile } from '../engine/profile.js';
 import { CONSTANTS } from '../engine/calculations.js';
@@ -125,6 +125,11 @@ const CAS_FRAME_SHAPES = [{ value: 'standard', label: 'Standard' }, { value: 'ar
 const CAS_ARCH_SHAPES = [{ value: 'round', label: 'Round' }, { value: 'gothic', label: 'Gothic' }];
 const CAS_GOTHIC_PROFILES = [{ value: 'equilateral', label: 'Equilateral' }, { value: 'drop', label: 'Drop' }, { value: 'shallow', label: 'Shallow' }];
 const CAS_ARCH_HINGES = [{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }];
+// v3 Block 3 — FIXED window in the casement batch (Piotr 07.09): the
+// casement frame + a non-opening leaf, no hardware. Kind chips + shape chips
+// (Rectangle | Round | Gothic | Circle); the circle's height = its diameter.
+const CAS_KINDS = [{ value: 'opening', label: 'Opening' }, { value: 'fixed', label: 'Fixed' }];
+const CAS_FIX_SHAPES = [{ value: 'rectangle', label: 'Rectangle' }, { value: 'round', label: 'Round' }, { value: 'gothic', label: 'Gothic' }, { value: 'circle', label: 'Circle' }];
 const gothicPcShape = (profile) => (profile === 'equilateral' ? 'gothic-equilateral' : 'gothic-drop');
 // Saved PC shape → chip: gothic-* → Gothic; semi-circle / three-centre and the v1-era 'segmental' → Round.
 const pcArchToUi = (pc) => (isGothicShape(pc) ? 'gothic' : 'round');
@@ -229,6 +234,8 @@ export default function ConfiguratorPage() {
   const [casLayout, setCasLayout] = useState('040L');
   const [casHinges, setCasHinges] = useState(null);
   const [casFrameShape, setCasFrameShape] = useState('standard');
+  const [casKind, setCasKind] = useState('opening');            // v3 Block 3: 'opening' | 'fixed'
+  const [casFixShape, setCasFixShape] = useState('rectangle');  // v3 Block 3: fixed window shape chip
   const [casArchShapeUi, setCasArchShapeUi] = useState('round');
   const [casArchProfile, setCasArchProfile] = useState('equilateral');
   const [casArchStart, setCasArchStart] = useState('');        // mm from the cill (v2 P4)
@@ -330,7 +337,9 @@ export default function ConfiguratorPage() {
     // Casement fields (harmless no-ops for sash windows)
     setCasLayout(w.casementLayout || '040L');
     setCasHinges(Array.isArray(w.casementHinges) ? w.casementHinges : null);
-    setCasFrameShape(w.casementType === 'arched' ? 'arched' : 'standard');
+    setCasFrameShape(w.casementType === 'arched' && w.archShape !== 'circle' ? 'arched' : 'standard');
+    setCasKind(w.casementKind === 'fixed' ? 'fixed' : 'opening');
+    setCasFixShape(w.archShape === 'circle' ? 'circle' : w.casementType === 'arched' ? (isGothicShape(w.archShape) ? 'gothic' : 'round') : 'rectangle');
     setCasArchShapeUi(pcArchToUi(w.archShape));
     setCasArchProfile(w.archShape === 'gothic-drop' ? (w.archProfile === 'shallow' ? 'shallow' : 'drop') : (w.archProfile || 'equilateral'));
     // v2: the arch start from the cill; a v1 window carries archRise only
@@ -462,9 +471,22 @@ export default function ConfiguratorPage() {
   const isCasementBatch = batch?.type === 'casement';
   const isArchedSash = isSash && sashType !== 'triple' && sashFrameShape === 'arched';
   const isArched = (isCasementBatch && casFrameShape === 'arched') || isArchedSash;
-  const archLimits = isArched ? ((isArchedSash ? getWindowProfile()?.sashArch?.limits : getCasementProfile()?.arch?.limits) || {}) : null;
+  // v3 Block 3: fixed window (kind) and the circle (shape chip; frame shape stays 'standard')
+  const isFixedCas = isCasementBatch && casKind === 'fixed';
+  const isCircle = isFixedCas && casFixShape === 'circle';
+  const archLimits = isArched || isCircle ? ((isArchedSash ? getWindowProfile()?.sashArch?.limits : getCasementProfile()?.arch?.limits) || {}) : null;
   const extW = Number(inW) || 400;
-  const extH = Number(inH) || 400;
+  const extH = isCircle ? extW : (Number(inH) || 400);
+  // the circle's height is its diameter — the height input follows the width
+  useEffect(() => {
+    if (isCircle && Number(inH) !== Number(inW)) setInH(Number(inW) || 400);
+  }, [isCircle, inW, inH]);
+  // the fixed shape chip drives the arch controls: Round / Gothic = the arched casement without a hinge
+  const pickFixShape = (v) => {
+    setCasFixShape(v);
+    if (v === 'round' || v === 'gothic') { setCasFrameShape('arched'); setCasArchShapeUi(v); }
+    else setCasFrameShape('standard');
+  };
 
   // ── Arched casement (v2): Round | Gothic, arch start measured from the cill ──
   const isGothicUi = casArchShapeUi === 'gothic';
@@ -473,7 +495,9 @@ export default function ConfiguratorPage() {
   const archAutoStart = Math.round(extH - (isGothicUi ? gothicRatio : ROUND_AUTO_RATIO) * extW);
   const archHalfStart = Math.round(extH - extW / 2);           // semi-circle: rise = W/2
   const minStraight = archLimits?.minStraightBelowRise || 900;
-  const dimConstraints = isArched
+  const dimConstraints = isCircle
+    ? { minW: archLimits.minWidth || 400, maxW: archLimits.maxWidth || 1500, minH: archLimits.minWidth || 400, maxH: archLimits.maxWidth || 1500 }
+    : isArched
     ? {
         minW: archLimits.minWidth || 400, maxW: archLimits.maxWidth || 1500,
         // Gothic: the start is derived, so the height must leave the straight part
@@ -507,14 +531,14 @@ export default function ConfiguratorPage() {
     catch (e) { return { shape: null, error: e?.message || String(e) }; }
   }, [isArched, isGothicUi, casArchProfile, extW, archRiseNum]);
   const pcArchShape = archShapeResolved.shape;
-  const archPatterns = PATTERNS_FOR_SHAPE[pcArchShape] || PATTERNS_FOR_SHAPE['three-centre'];   // frozen arrays: stable effect deps
+  const archPatterns = isCircle ? PATTERNS_FOR_SHAPE.circle : (PATTERNS_FOR_SHAPE[pcArchShape] || PATTERNS_FOR_SHAPE['three-centre']);   // frozen arrays: stable effect deps
   // v3 0.4 custom hub: ring list parsed once (fractions 0 < k < 1, sorted); saved only while the pattern is custom
   const casArchRings = useMemo(() => String(casArchRingsText).split(/[,\s]+/).map(Number).filter((k) => k > 0 && k < 1).sort((a, b) => a - b), [casArchRingsText]);
   const isCustomHub = isArched && casArchPattern === 'custom';
   useEffect(() => {
     // a pattern the resolved shape does not offer (e.g. a hub on a three-centre) falls back to none
-    if (isArched && !archPatterns.includes(casArchPattern)) setCasArchPattern('none');
-  }, [isArched, archPatterns, casArchPattern]);
+    if ((isArched || isCircle) && !archPatterns.includes(casArchPattern)) setCasArchPattern('none');
+  }, [isArched, isCircle, archPatterns, casArchPattern]);
   const archPlan = useMemo(() => {
     if (!isArched) return null;
     if (archShapeResolved.error) return { error: archShapeResolved.error };
@@ -531,7 +555,14 @@ export default function ConfiguratorPage() {
       return { error: e?.message || String(e) };
     }
   }, [isArched, isArchedSash, archShapeResolved, pcArchShape, extW, extH, archRiseNum, casArchHinge]);
-  const archError = archPlan?.error || null;
+  // v3 Block 3: circle plan (frame ring + leaf ring on the profile faces) — errors block the save like an arch
+  const circlePlan = useMemo(() => {
+    if (!isCircle) return null;
+    try { return buildCirclePlan({ width: extW, height: extW }, getCasementProfile()); }
+    catch (e) { return { error: e?.message || String(e) }; }
+  }, [isCircle, extW]);
+  const archError = archPlan?.error || circlePlan?.error || null;
+  const shapeBlocked = (isArched || isCircle) && !!archError;
   // Radii are results: "R 150 / 1400 / 150" (three-centre), "R 500" (semi-circle), "R 1000" (gothic, both arcs equal)
   const archRadiiText = (() => {
     if (!archPlan || archPlan.error) return '—';
@@ -646,9 +677,26 @@ export default function ConfiguratorPage() {
       });
       return;
     }
+    if (isCircle) {
+      // circle fixed window: PSW's fix-frame viewer (FixFrameWindow circle branch, shared 1:1)
+      window.update3D({
+        windowCategory: 'fix-only', extWidth: extW, extHeight: extW,
+        fixShape: 'circle', fixType: 'standard',
+        fixCircleBarPattern: casArchPattern === 'sunburst' ? 'sunburst' : 'none',
+        fixCircleBarOffset: getCasementProfile().arch?.patterns?.sunburst?.offset || 200,
+        casementHBars: casHB, casementVBars: casVB,
+        woodColor, woodColorExt: isSingle ? woodColor : woodColorExt,
+        woodColorInt: isSingle ? woodColor : woodColorInt, sameColor: isSingle,
+        doubleGlazing: glassType !== 'triple', spacerColor,
+        glassFinish: gFin,
+      });
+      return;
+    }
     if (isCasement) {
       window.update3D({
         windowCategory: 'casement', extWidth: extW, extHeight: extH,
+        // v3 Block 3: fixed leaf — no handle, opening locked, the single pane fixed
+        fixedLeaf: isFixedCas,
         // 3D reads casArchShape / casArchHinge (archShape below is the PC field);
         // the component accepts the PC shape names and draws the typed rise (F)
         casArchShape: isArched ? pcArchShape : 'semi-circle',
@@ -658,19 +706,19 @@ export default function ConfiguratorPage() {
         archRings: isCustomHub ? casArchRings : null,
         archMinHaunchRadius: getCasementProfile().arch.minHaunchRadius,
         archPatterns: getCasementProfile().arch.patterns,
-        casementLayout: isArched ? (casArchHinge === 'right' ? '040R' : '040L') : casLayout,
-        casementHinges: isArched ? null : (casHinges ? [...casHinges] : null),
+        casementLayout: isFixedCas ? '040L' : isArched ? (casArchHinge === 'right' ? '040R' : '040L') : casLayout,
+        casementHinges: isFixedCas ? ['fixed'] : isArched ? null : (casHinges ? [...casHinges] : null),
         // Arched casement (PC-native fields read by specification.js archFromSpec).
         casementType: isArched && !isArchedSash ? 'arched' : 'standard',
         // arched sash (v3 Block 1 I): the 3D's arched branch takes PC's shape + the real rise
         ...(isArchedSash ? { sashType: 'arched', archHBars: sashArchHB, archVBars: isHubPattern(casArchPattern) ? 0 : sashArchVB, lowerHBars: sashLowerHB } : {}),
-        archShape: isArched ? pcArchShape : null,
+        archShape: isCircle ? 'circle' : isArched ? pcArchShape : null,
         archProfile: isArched && isGothicUi ? casArchProfile : null,
         archStart: isArched ? archStartNum : null,
         archRise: isArched ? archRiseNum : null,
         archRiseSource: isArched ? casArchRiseSource : null,
         archHinge: isArched ? casArchHinge : null,
-        archBarPattern: isArched ? casArchPattern : null,
+        archBarPattern: isArched || isCircle ? casArchPattern : null,
         casementMiddleWidth: casCalc.isTriple ? casCalc.midEff : 0,
         fanlightRatio: casCalc.fanRatio,
         casementFan2Ratio: casCalc.fan2Ratio,
@@ -705,7 +753,7 @@ export default function ConfiguratorPage() {
       spacerColor, sashType, splitRatio, headType, openingType: opening,
       boxType: frameType === 'slim' ? 'slim' : 'standard', boxDepth: frameDepth,
     });
-  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, isArched, pcArchShape, isGothicUi, casArchProfile, casArchRiseSource, archStartNum, archRiseNum, casArchHinge, casArchPattern, isCustomHub, casArchSpokes, casArchRings, isArchedSash, sashArchHB, sashArchVB, sashLowerHB, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType]);
+  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, isArched, isFixedCas, isCircle, pcArchShape, isGothicUi, casArchProfile, casArchRiseSource, archStartNum, archRiseNum, casArchHinge, casArchPattern, isCustomHub, casArchSpokes, casArchRings, isArchedSash, sashArchHB, sashArchVB, sashLowerHB, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType]);
   useEffect(() => { sync(); }, [sync]);
 
   // ─── B4: Listen for 3D ready event and re-sync ───
@@ -733,8 +781,10 @@ export default function ConfiguratorPage() {
       ventRoomType, ventSoleWindow,
       frameType, frameDepth, pas24, childRestrictor,
       ...(isCasement ? {
-        casementLayout: isArched ? (casArchHinge === 'right' ? '040R' : '040L') : casLayout,
-        casementHinges: isArched ? null : (casHinges ? [...casHinges] : null),
+        casementLayout: isFixedCas ? '040L' : isArched ? (casArchHinge === 'right' ? '040R' : '040L') : casLayout,
+        casementHinges: isFixedCas ? null : isArched ? null : (casHinges ? [...casHinges] : null),
+        // v3 Block 3: fixed window in the casement batch; the circle is archShape 'circle' (no casementType)
+        casementKind: isFixedCas ? 'fixed' : 'opening',
         // Arched casement (PC-native fields read by specification.js archFromSpec).
         casementType: isArched && !isArchedSash ? 'arched' : 'standard',
         // arched sash (v3 Block 1): frame shape + straight bar counts in the PSW names
@@ -742,14 +792,14 @@ export default function ConfiguratorPage() {
         archHBars: isArchedSash ? sashArchHB : null,
         archVBars: isArchedSash ? (isHubPattern(casArchPattern) ? 0 : sashArchVB) : null,
         lowerHBars: isArchedSash ? sashLowerHB : null,
-        archShape: isArched ? pcArchShape : null,
+        archShape: isCircle ? 'circle' : isArched ? pcArchShape : null,
         archProfile: isArched && isGothicUi ? casArchProfile : null,
         // v2: the start from the cill is what the joiner typed; archRise = H − start is kept for compatibility
         archStart: isArched ? archStartNum : null,
         archRise: isArched ? archRiseNum : null,
         archRiseSource: isArched ? casArchRiseSource : null,
         archHinge: isArched ? casArchHinge : null,
-        archBarPattern: isArched ? casArchPattern : null,
+        archBarPattern: isArched || isCircle ? casArchPattern : null,
         archSpokes: isCustomHub ? casArchSpokes : null,
         archRings: isCustomHub ? casArchRings : null,
         fanlightAxis: casCalc.hasFan ? casCalc.fanEff : null,
@@ -869,9 +919,9 @@ export default function ConfiguratorPage() {
             className={`px-3 py-2 border-2 rounded-lg text-sm w-56 bg-surface-800 ${winName.trim() ? 'border-accent-500 text-ink-50' : 'border-status-danger/50 text-ink-200'}`} />
           <button
             onClick={save}
-            disabled={!!(isArched && archError)}
-            title={isArched && archError ? `Arch: ${archError}` : undefined}
-            className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'} ${isArched && archError ? 'opacity-40 cursor-not-allowed' : ''}`}
+            disabled={shapeBlocked}
+            title={shapeBlocked ? `${isCircle ? 'Circle' : 'Arch'}: ${archError}` : undefined}
+            className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'} ${shapeBlocked ? 'opacity-40 cursor-not-allowed' : ''}`}
           >
             {isEditMode ? '✓ Update Window' : '✓ Save to Batch'}
           </button>
@@ -889,8 +939,26 @@ export default function ConfiguratorPage() {
           )}
 
           {isCasement && <Sec t="Window Type">
-            <Lbl>Frame shape</Lbl><HChips o={CAS_FRAME_SHAPES} v={casFrameShape} c={setCasFrameShape} />
-            {!isArched && (
+            <Lbl>Kind</Lbl><HChips o={CAS_KINDS} v={casKind} c={(v) => { setCasKind(v); if (v === 'fixed') pickFixShape(casFixShape); else { setCasFrameShape('standard'); } }} />
+            {isFixedCas && <>
+              <Lbl>Shape</Lbl><HChips o={CAS_FIX_SHAPES} v={casFixShape} c={pickFixShape} />
+              {isCircle && (
+                <div className="text-[11px] text-ink-300 bg-surface-700/50 border border-surface-500 rounded-lg px-3 py-2 mt-1 mb-2">
+                  Circle: the height equals the diameter (width). Frame ring {getCasementProfile()?.elements?.frameHead?.face}, leaf ring inside it — both finger-jointed blanks.
+                  Diameter {dimConstraints.minW}–{dimConstraints.maxW}.
+                  {circlePlan && !circlePlan.error && <> Radii <span className="text-accent-400 font-medium">R {Math.round(circlePlan.frameHead.outer[0].r)} / {Math.round(circlePlan.frameHead.inner[0].r)} · leaf R {Math.round(circlePlan.leafTop.outer[0].r)} / {Math.round(circlePlan.leafTop.inner[0].r)}</span></>}
+                </div>
+              )}
+              {!isCircle && (
+                <div className="text-[11px] text-ink-300 bg-surface-700/50 border border-surface-500 rounded-lg px-3 py-2 mt-1 mb-2">
+                  Fixed leaf: the casement frame + a non-opening leaf (same members), no hinges, no handle.
+                </div>
+              )}
+            </>}
+            {!isFixedCas && <>
+              <Lbl>Frame shape</Lbl><HChips o={CAS_FRAME_SHAPES} v={casFrameShape} c={setCasFrameShape} />
+            </>}
+            {!isArched && !isFixedCas && (
               <CasementLayoutPicker
                 layout={casLayout}
                 casementHinges={casHinges}
@@ -900,7 +968,7 @@ export default function ConfiguratorPage() {
             )}
             {isArched && <>
               {archControls}
-              <Lbl>Hinge side</Lbl><HChips o={CAS_ARCH_HINGES} v={casArchHinge} c={setCasArchHinge} />
+              {!isFixedCas && <><Lbl>Hinge side</Lbl><HChips o={CAS_ARCH_HINGES} v={casArchHinge} c={setCasArchHinge} /></>}
               <div className="text-[11px] text-ink-300 bg-surface-700/50 border border-surface-500 rounded-lg px-3 py-2 mt-1">
                 Single leaf. Lights, layout card and fanlight bars are hidden while Arched is on.
                 Width {dimConstraints.minW}–{dimConstraints.maxW}, arch start at least {minStraight} from the cill.
@@ -987,6 +1055,11 @@ export default function ConfiguratorPage() {
             {!(isArched && isHubPattern(casArchPattern)) && <>
               <Lbl>Main — vertical</Lbl><HChips o={CAS_BAR_COUNTS} v={casVB} c={setCasVB} />
             </>}
+            {isCircle && <>
+              <Lbl>Pattern in the circle</Lbl>
+              <HChips o={archPatterns.map((p) => ({ value: p, label: ARCH_BAR_PATTERN_LABELS[p] || p }))} v={casArchPattern} c={setCasArchPattern} />
+              <div className="text-[11px] text-ink-500 mb-2">Sunburst = a ring {getCasementProfile()?.arch?.patterns?.sunburst?.offset} in from the glass edge with {getCasementProfile()?.arch?.patterns?.sunburst?.spokes} spokes (PSW); the straight bars are chords.</div>
+            </>}
             {isArched && <>
               <Lbl>Pattern in the arch</Lbl>
               <HChips o={archPatterns.map((p) => ({ value: p, label: ARCH_BAR_PATTERN_LABELS[p] || p }))} v={casArchPattern} c={setCasArchPattern} />
@@ -1013,7 +1086,7 @@ export default function ConfiguratorPage() {
               <Lbl>Fanlight 2 — horizontal</Lbl><HChips o={CAS_FAN_BAR_COUNTS} v={casFan2HB} c={setCasFan2HB} />
               <Lbl>Fanlight 2 — vertical</Lbl><HChips o={CAS_FAN_BAR_COUNTS} v={casFan2VB} c={setCasFan2VB} />
             </>}
-            {((casHB + casVB + casFanHB + casFanVB + casFan2HB + casFan2VB) > 0 || (isArched && casArchPattern !== 'none')) && (
+            {((casHB + casVB + casFanHB + casFanVB + casFan2HB + casFan2VB) > 0 || ((isArched || isCircle) && casArchPattern !== 'none')) && (
               <><Lbl>Bar type</Lbl><HChips o={BAR_TYPE_OPTIONS} v={casBarType} c={setCasBarType} /></>
             )}
           </Sec>}

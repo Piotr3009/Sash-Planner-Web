@@ -45,7 +45,7 @@ import { FAN_AXIS_OFFSET_TOP, FAN_AXIS_OFFSET_BOTTOM } from './casementLayouts.j
 import { profileBoxDepth } from './profile.js';
 import {
   PSW_ARCH_SHAPE, PSW_ARCH_RISE_RATIO, PSW_SASH_RADIO_SHAPE, LEGACY_ARCH_SHAPES, ARCH_RISE_RATIO, GOTHIC_PROFILE_RATIO,
-  ARCH_BAR_PATTERNS, isArchShape, isRoundShape, resolveRoundShape, ArchError,
+  ARCH_BAR_PATTERNS, isArchShape, isRoundShape, resolveRoundShape, ArchError, CIRCLE_SHAPE, patternsForShape,
 } from './arch.js';
 
 function customBarsFromSpec(spec, item) {
@@ -104,11 +104,69 @@ function customBarsFromSpec(spec, item) {
  * frame size (mm).
  */
 export function archFromSpec(item, fc, width, height) {
-  const pcShapeRaw = item?.archShape || fc.archShape;
-  const pswShape = item?.casArchShape || fc.casArchShape;
-  const isArched = (item?.casementType || fc.casementType) === 'arched' || !!pcShapeRaw;
+  let pcShapeRaw = item?.archShape || fc.archShape;
+  let pswShape = item?.casArchShape || fc.casArchShape;
+  // v3 Block 3 — FIXED window in the casement batch: PC-native `casementKind
+  // 'fixed'` + the same arch fields (archShape 'circle' for the circle), or the
+  // PSW fix-only product: `fixShape` (rectangle | circle | the PSW arch ids),
+  // `fixArchRise`, `fixSemiBarPattern` / `fixGothicBars` / `fixCircleBarPattern`,
+  // `fixCircleOffset` (estimate-renderer.js 418–435, price-calculator.js 411–435).
+  const fixed = casementKindFromSpec(item, fc) === 'fixed';
+  const fixShape = fixed ? (item?.fixShape || fc.fixShape || null) : null;
+  if (fixed && fixShape && fixShape !== 'rectangle' && !pcShapeRaw && !pswShape) {
+    if (fixShape === CIRCLE_SHAPE) pcShapeRaw = CIRCLE_SHAPE;
+    else pswShape = fixShape;                                            // PSW arch id — archFieldsFromSpec validates it
+  }
+  if (pcShapeRaw === CIRCLE_SHAPE) return circleFromSpec(item, fc, width, height);
+  const isArched = (item?.casementType || fc.casementType) === 'arched' || !!pcShapeRaw || (fixed && !!pswShape);
   if (!isArched) return null;
-  return archFieldsFromSpec(item, fc, width, height, { pcShapeRaw, pswShape, category: 'casement' });
+  const fcFix = fixed ? {
+    ...fc,
+    archRise: fc.archRise ?? fc.fixArchRise,
+    archBarPattern: fc.archBarPattern || firstPattern(fc.fixSemiBarPattern, fc.fixGothicBars),
+  } : fc;
+  return archFieldsFromSpec(item, fcFix, width, height, { pcShapeRaw, pswShape, category: 'casement' });
+}
+
+const firstPattern = (...vals) => vals.find((v) => v && v !== 'none') || null;
+
+/** 'opening' | 'fixed' — PC `casementKind`, or PSW's fix-only product (`windowType 'fix-only'`). */
+export function casementKindFromSpec(item, fc) {
+  const raw = item?.casementKind || fc?.casementKind || ((item?.windowType || fc?.windowType) === 'fix-only' ? 'fixed' : null);
+  return raw === 'fixed' ? 'fixed' : 'opening';
+}
+
+/**
+ * Circle fixed window (v3 Block 3): the arch object with shape 'circle' —
+ * rise = start = W / 2 (the horizontal diameter), no hinge, no profile;
+ * bars: the straight counts + the pattern (none | sunburst) + PSW's
+ * `fixCircleOffset` as `circleOffset` (null → profile arch.patterns.sunburst.offset).
+ */
+export function circleFromSpec(item, fc, width, height) {
+  const name = item?.name || item?.window_number || '?';
+  const W = Number(width), H = Number(height);
+  if (!(W > 0)) throw new ArchError(`Circle window "${name}" has no width (diameter)`);
+  if (H > 0 && Math.abs(H - W) > 0.5) throw new ArchError(`Circle window "${name}" is ${W} wide but ${H} high — the height must equal the diameter`);
+  const pattern = item?.archBarPattern || fc.archBarPattern || firstPattern(item?.fixCircleBarPattern, fc.fixCircleBarPattern) || 'none';
+  if (!patternsForShape(CIRCLE_SHAPE).includes(pattern)) throw new ArchError(`Bar pattern "${pattern}" is not available on a circle window "${name}" (allowed: ${patternsForShape(CIRCLE_SHAPE).join(', ')})`);
+  const offRaw = item?.fixCircleOffset ?? fc.fixCircleOffset;
+  const circleOffset = offRaw == null || offRaw === '' ? null : Number(offRaw);
+  return {
+    shape: CIRCLE_SHAPE,
+    profile: null,
+    rise: W / 2,
+    start: W / 2,
+    riseSource: 'circle',
+    hinge: null,
+    bars: {
+      pattern,
+      h: Number(item?.casementHBars ?? fc.casementHBars) || 0,
+      v: Number(item?.casementVBars ?? fc.casementVBars) || 0,
+      spokes: 0,
+      rings: [],
+      circleOffset: Number.isFinite(circleOffset) && circleOffset > 0 ? circleOffset : null,
+    },
+  };
 }
 
 /**
@@ -250,7 +308,8 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
   // once, so every consumer downstream (drawings, 3D, engine, PP) sees exactly
   // one value. Without this the engine derived doors while the drawings fell
   // through to the sash component and rendered NaN coordinates (Piotr 05.08).
-  const rawCategory = item?.windowCategory || fc.windowCategory || 'sash';
+  // v3 Block 3: PSW's fix-only product lives in PC's casement batch (Piotr 07.09).
+  const rawCategory = item?.windowCategory || ((item?.windowType || fc.windowType) === 'fix-only' ? 'casement' : fc.windowCategory) || 'sash';
   const category = rawCategory === 'doors' ? 'door' : rawCategory;
   const isDoorCategory = category === 'door';
   // Frame depth — stored on the window; legacy windows fall back to the profile
@@ -293,6 +352,8 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       }
     },
     casement: {
+      // v3 Block 3: 'opening' (default) | 'fixed' — a fixed leaf: no hardware, no opening symbol
+      kind: casementKindFromSpec(item, fc),
       layout: item?.casementLayout || fc.casementLayout || '040L',
       hinges: Array.isArray(item?.casementHinges) ? item.casementHinges
         : Array.isArray(fc.casementHinges) ? fc.casementHinges : null,

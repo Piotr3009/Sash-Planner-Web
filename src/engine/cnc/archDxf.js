@@ -122,7 +122,7 @@ function contourRow(ring, plan, ctx, ox, oy) {
   const tx = rowBB.maxX + C.textGap;
   const lines = [
     `${ctx.winNum ? ctx.winNum + ' - ' : ''}${ring.label}`,
-    `${ctx.shapeLabel.toUpperCase()} W${fmt1(ctx.width)} RISE${fmt1(ctx.rise)}${ctx.height ? ' H' + fmt1(ctx.height) : ''} ${ctx.hinge ? 'HINGE ' + (ctx.hinge === 'right' ? 'R' : 'L') : 'SASH'}`,
+    `${ctx.shapeLabel.toUpperCase()} W${fmt1(ctx.width)} RISE${fmt1(ctx.rise)}${ctx.height ? ' H' + fmt1(ctx.height) : ''} ${ctx.fixed ? 'FIXED LEAF' : ctx.hinge ? 'HINGE ' + (ctx.hinge === 'right' ? 'R' : 'L') : 'SASH'}`,
     `FACE ${fmt1(ring.thickness)} OFFSET ${fmt1(ring.offsets.outer)} OUTER L${fmt1(ring.lengths.outer)} INNER L${fmt1(ring.lengths.inner)}`,
     ...planSummary(plan),
     `FINGER ${ctx.finger.length}/${ctx.finger.depth}/${ctx.finger.pitch}`,
@@ -267,7 +267,8 @@ export function buildArchEntities(plan, winNum = '', ox = 0, oy = 0) {
     width: plan.width,
     rise: plan.rise,
     height: plan.straightHeight != null ? plan.straightHeight + plan.rise : null,
-    hinge: plan.kind === 'sash' ? null : plan.hinge,
+    hinge: plan.kind === 'sash' || plan.fixed ? null : plan.hinge,
+    fixed: !!plan.fixed || plan.kind === 'circle',   // v3 Block 3: fixed leaf (no hinge side)
     finger: plan.finger,
   };
   // Rows are laid out bottom-up so the origin is the drawing's bottom-left;

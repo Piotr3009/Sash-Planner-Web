@@ -93,6 +93,8 @@ Object.assign(ELEMENT_TO_PART_ID, {
   // silently dropped the arch timber.
   'C-ARCH HEAD': 'c_frame_head',
   'C-ARCH TOP RAIL': 'c_sash_top_rail',
+  'C-FRAME RING': 'c_frame_head',      // v3 Block 3: circle rings take the head / top-rail stock
+  'C-LEAF RING': 'c_sash_top_rail',
   'C-BOTTOM RAIL': 'c_sash_bottom_rail',
   'C-MULLION': 'c_mullion',
   'C-TRANSOM': 'c_transom',
