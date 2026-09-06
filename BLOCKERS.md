@@ -10,6 +10,17 @@ Status of the older entries: **§1 D13 (piece rule) → CLOSED by v4 C.3 / C.4**
 alternative above the waste threshold — `pieceRule` removed from the profile); **§9.3 minimum piece length → v4
 C.1 `arch.minPieceLength` 400 HARD** (was 150 warn); §2 D5 / §3 d50 / §9.1 P9 / §9.4 F2 unchanged.
 
+### 17. Stage 2 — glazier PDF layout (Block B): DEFAULT (open) values and questions
+
+| # | Item | Taken | Ask |
+|---|------|-------|-----|
+| 17.1 | **Window thumbnail on the bars page** | The frame's OUTER contour (straight part + the arch chain, or the circle) with the shaped unit filled at its place — no members, mullions or the lower sash unit drawn (a 35 mm sketch to recognise the window, not an elevation sheet). Sash windows: the box contour with the upper unit filled | Enough to identify the window, or should the leaf / lower unit outlines be added? |
+| 17.2 | **Schedule page (page 1) per-unit line** | Kept as v3: springing + the bar positions for ≤ 4 bars, `k bars — see table` above — "table" now means the bars page | Drop the positions from the schedule line now that the bars pages carry them? |
+| 17.3 | **Springing bar ids on the drawing** | `S1 / S2` (hub patterns) sit at the outline's springing corners, next to the right-hand overall-height dimension line (as in v3) | Move the springing ids inside the unit, or drop them from the drawing (they stay in the table)? |
+| 17.4 | **Bars page order / grouping** | Blocks in schedule order (unit index), one table per unit even when two units of one window are identical (qty 2 = two blocks) | Merge identical units into one block with "× n"? |
+| 17.5 | **A3 for the single-window export** | The Window Detail page's glass PDF stays A4 (it has no format switch); the pack's export follows the pack setting | FYI |
+| 17.6 | **Block taller than a page** | Never happens with the engine's patterns (≤ 20 rows ≈ 74 mm); a block taller than the content height would still start on a fresh page and overflow, not break | FYI |
+
 ### 16. Stage 1 — segment planner v2 (Block C): DEFAULT (open) values, spec errata, consequences
 
 | # | Item | Taken | Ask |

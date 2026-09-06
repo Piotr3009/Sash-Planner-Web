@@ -373,7 +373,8 @@ section('6 — glass PDF (jsPDF in node): Shape column, mm + % line, shaped draw
     const bytes = Buffer.from(buf);
     writeFileSync(resolve(AUDIT, 't18_glass.pdf'), bytes);
     const txt = bytes.toString('latin1');
-    check('PDF built, 2 pages (table + 4 drawings)', bytes.length > 10000 && (txt.match(/\/Type \/Page[^s]/g) || []).length === 2);
+    // v4 Block B: + one bars page (three shaped units with bars fit one page: 3 + 7 + 3 rows)
+    check('PDF built, 3 pages (table + 4 drawings + bars page)', bytes.length > 10000 && (txt.match(/\/Type \/Page[^s]/g) || []).length === 3);
     const has = (s) => txt.includes(s);
     check('Shape column header + "rect" for the rectangular row + "arched · R 55.5/1305.5" for the three-centre unit', has('(Shape)') && has('(rect)') && has('arched · R 55.5/1305.5'));
     // v3 0.3: the header line prints the bar-end rows (x from the corner · s from apex · L) instead of x (%) / y pairs

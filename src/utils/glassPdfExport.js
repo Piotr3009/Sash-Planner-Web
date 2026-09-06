@@ -13,6 +13,17 @@
  * the clear width / height (P6); the drawing cell draws the true outline
  * (exact arcs as cubic Béziers) and the bar axes from the engine's bar list.
  * Rectangular units are unchanged.
+ *
+ * ARCHED-WINDOWS-v4 Block B (Piotr 06.09, SS2): the per-unit bar table next to
+ * the drawing made the drawing unreadable. A shaped drawing cell now holds the
+ * drawing at the largest scale the cell allows, the title + spec lines UNDER
+ * it, the bar-spacing chain at the BOTTOM and the overall width at the TOP
+ * (as the on-screen glass sheet); the bars carry their ids only. The numbers
+ * (ID · s from apex / position · L · angle / R) move to BARS PAGES at the end
+ * of the document — one block per shaped unit with bars: a thumbnail of the
+ * WINDOW elevation (~35 mm), the window name + unit id, the table; blocks
+ * stack, a page breaks between blocks, never inside a table. A3 / A4 follow
+ * the pack's export setting (`format`).
  */
 import { jsPDF } from 'jspdf';
 import { buildGlassListForWindow } from '../engine/lists.js';
@@ -52,8 +63,14 @@ const LW = {
   tableLine:0.15,
 };
 
-// ─── PAGE ───
+// ─── PAGE ─── (v4: A4 landscape by default, A3 landscape on the pack's export setting)
+const PAGE_SIZES = { a4: { w: 297, h: 210 }, a3: { w: 420, h: 297 } };
 const PG = { w: 297, h: 210, bx: 8, by: 8 };
+function setPageFormat(format) {
+  const size = PAGE_SIZES[String(format || 'a4').toLowerCase()] || PAGE_SIZES.a4;
+  PG.w = size.w; PG.h = size.h;
+  return PAGE_SIZES[String(format || 'a4').toLowerCase()] ? String(format).toLowerCase() : 'a4';
+}
 const HEADER_H = 20;
 const FOOTER_H = 8;
 const TABLE_ROW_H = 6;
@@ -447,6 +464,17 @@ function drawTable(doc, items, startY) {
 
 // ─── SINGLE GLASS DRAWING ───
 
+const cellTitle = (g) => `${g.index} · ${g.windowName} — ${String(g.sash || '').toUpperCase()} GLASS`;
+const cellSpec = (g) => [
+  `${g.type}${g.makeup ? ' ' + g.makeup : ''}`,
+  g.spec,
+  coatingLabel(g.coating),
+  gasLabel(g.gas),
+  g.finish,
+  `spacer: ${g.spacer} (${g.spacerType === 'alu' ? 'aluminium' : 'warm edge'})`,
+  g.bars && g.bars !== 'none' ? `bars: ${g.bars}` : '',
+].filter(Boolean).join(' · ');
+
 function drawGlass(doc, cx, cy, cw, ch, g) {
   // Cell double border
   dc(doc, C.black);
@@ -455,30 +483,21 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
   doc.setLineWidth(LW.cellIn);
   doc.rect(cx + 0.3, cy + 0.3, cw - 0.6, ch - 0.6);
 
+  // Shaped unit (arched casement / sash / circle): v4 cell — drawing first, title + spec under it
+  if (g.shape) { drawShapedGlass(doc, cx, cy, cw, ch, g); return; }
+
   // Title bar — left: name, right: spec (same size)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(5);
   tc(doc, C.black);
-  doc.text(`${g.index} · ${g.windowName} — ${String(g.sash || '').toUpperCase()} GLASS`, cx + 2, cy + 4);
+  doc.text(cellTitle(g), cx + 2, cy + 4);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(5);
   tc(doc, C.glass);
-  const specLine = [
-    `${g.type}${g.makeup ? ' ' + g.makeup : ''}`,
-    g.spec,
-    coatingLabel(g.coating),
-    gasLabel(g.gas),
-    g.finish,
-    `spacer: ${g.spacer} (${g.spacerType === 'alu' ? 'aluminium' : 'warm edge'})`,
-    g.bars && g.bars !== 'none' ? `bars: ${g.bars}` : '',
-  ].filter(Boolean).join(' · ');
-  doc.text(specLine, cx + cw - 2, cy + 4, { align: 'right' });
+  doc.text(cellSpec(g), cx + cw - 2, cy + 4, { align: 'right' });
   dc(doc, C.black);
   doc.setLineWidth(LW.cellIn);
   doc.line(cx + 0.3, cy + 6, cx + cw - 0.3, cy + 6);
-
-  // Shaped unit (arched casement): true outline + bar axes, own dimensions
-  if (g.shape) { drawShapedGlass(doc, cx, cy, cw, ch, g); return; }
 
   // Drawing area — no bottom text, maximized
   const dMargin = { l: 10, t: 8, r: 10, b: 8 };
@@ -673,46 +692,62 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
 
 }
 
-// ─── SHAPED GLASS DRAWING (arched casement) ───
-// Same cell frame as drawGlass; the outline is the exact glass shape (arcs as
-// cubic Béziers, ≤ 90° per segment), the bars are the engine's bar axes, the
-// dimensions: chain H on top (vertical bar x's), chain V on the left (h bars,
-// springing, apex), overall W below and H on the right, radii + rise line under
-// the title. No edge-seal offset on shaped units (the glazier's edge detail
-// follows the outline; the DXF is the cutting reference).
+// ─── SHAPED GLASS DRAWING (arched casement / sash upper unit / circle) — v4 Block B ───
+// The drawing fills the cell at the largest scale its dimensions allow; the
+// title line and the spec line sit UNDER it; the bar-spacing chain (vertical
+// bar / mullion x positions) runs along the BOTTOM edge, the overall width
+// along the TOP; the left chain carries the h bars / springing / apex and the
+// right edge the overall height + rise. Bars show their ids only — the
+// numbers are on the bars pages. Bands (spacer width), edge line and axes as
+// in v3 (the DXF geometry).
+const SHAPED_CELL = {
+  titleH: 3.4,        // title line band (5 pt)
+  specLineH: 2.8,     // spec line pitch (4.5 pt)
+  bandPad: 1.4,
+  margin: { l: 9, t: 8, r: 9, b: 8 },   // room for the dimensions around the outline
+};
+
+/** Spec line of a shaped cell: the unit spec + the shape (radii, rise, springing). */
+function shapedSpec(g) {
+  const shape = g.shape;
+  const radii = [...new Set((shape.radii || []).map((r) => fmt(r)))];
+  const shapeTxt = shape.outline?.kind === 'circle'
+    ? `circle · R ${radii.join('/')}`
+    : `arched · R ${radii.join('/')} · rise ${fmt(shape.rise)} · springing ${fmt(shape.springing)}`;
+  return `${cellSpec(g)} · ${shapeTxt}`;
+}
+
 function drawShapedGlass(doc, cx, cy, cw, ch, g) {
   const shape = g.shape;
   const o = shape.outline;
   const bars = shape.bars || [];
-  // second header line: radii, rise, springing, bars in mm + %
-  const headTop = cy + 6;
-  const note = `R ${(shape.radii || []).map(fmt).join(' / ')} · rise ${fmt(shape.rise)} · ${shapeBarText(shape)}`;
-  doc.setFont('helvetica', 'normal');
+  const S = SHAPED_CELL;
+  // ── bottom band: title + spec (wrapped to the cell width, at most 2 lines) ──
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(4.5);
-  tc(doc, C.dark);
-  const noteLines = doc.splitTextToSize(note, cw - 4).slice(0, 2);
-  noteLines.forEach((l, i) => doc.text(l, cx + 2, headTop + 2.6 + i * 2.6));
-  const headH = 6 + noteLines.length * 2.6 + 0.8;
+  const specLines = doc.splitTextToSize(shapedSpec(g), cw - 4).slice(0, 2);
+  const bandH = S.bandPad + S.titleH + specLines.length * S.specLineH + S.bandPad;
+  const bandTop = cy + ch - bandH;
   dc(doc, C.black);
   doc.setLineWidth(LW.cellIn);
-  doc.line(cx + 0.3, cy + headH, cx + cw - 0.3, cy + headH);
+  doc.line(cx + 0.3, bandTop, cx + cw - 0.3, bandTop);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(5);
+  tc(doc, C.black);
+  doc.text(cellTitle(g), cx + 2, bandTop + S.bandPad + 2.6);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(4.5);
+  tc(doc, C.glass);
+  specLines.forEach((l, i) => doc.text(l, cx + 2, bandTop + S.bandPad + S.titleH + 2.2 + i * S.specLineH));
 
-  // v3 0.3: bar-end table under the drawing when there are more than 4 bars
-  const endRows = useBarTable(bars) ? barEndRows(bars, o) : [];
-  const TABLE_ROW = 2.4;
-  const tableH = endRows.length ? (endRows.length + 1) * TABLE_ROW + 2 : 0;
-  const dMargin = { l: 10, t: 8, r: 10, b: 8 };
-  const areaX = cx + 2;
-  const areaY = cy + headH + 2;
-  const areaW = cw - 4;
-  const areaH = ch - headH - 6 - tableH;
-  const availW = areaW - dMargin.l - dMargin.r;
-  const availH = areaH - dMargin.t - dMargin.b;
+  // ── drawing area: everything above the band, dimensions in the margins ──
+  const areaX = cx + 2, areaY = cy + 2, areaW = cw - 4, areaH = bandTop - cy - 3;
+  const availW = areaW - S.margin.l - S.margin.r;
+  const availH = areaH - S.margin.t - S.margin.b;
   const sc = Math.min(availW / o.width, availH / o.height);
-  const gw = o.width * sc;
-  const gh = o.height * sc;
-  const gx = areaX + dMargin.l + (availW - gw) / 2;
-  const gy = areaY + dMargin.t + (availH - gh) / 2;
+  const gw = o.width * sc, gh = o.height * sc;
+  const gx = areaX + S.margin.l + (availW - gw) / 2;
+  const gy = areaY + S.margin.t + (availH - gh) / 2;
   const oyBottom = gy + gh;
 
   // Outline (fill + stroke)
@@ -727,7 +762,7 @@ function drawShapedGlass(doc, cx, cy, cw, ch, g) {
   doc.setLineWidth(LW.seal);
   doc.setLineDashPattern([0.8, 0.5], 0);
   const edgeArcs = glassEdgeArcs(o, G.edgeCover);
-  const edgeOutline = { width: o.width - 2 * G.edgeCover, springing: o.springing - G.edgeCover, arcs: edgeArcs.map((a) => ({ ...a, cx: a.cx - G.edgeCover, cy: a.cy - G.edgeCover })) };
+  const edgeOutline = { kind: o.kind, width: o.width - 2 * G.edgeCover, springing: o.springing - G.edgeCover, arcs: edgeArcs.map((a) => ({ ...a, cx: a.cx - G.edgeCover, cy: a.cy - G.edgeCover })) };
   doc.lines(outlineLines(edgeOutline, sc), gx + G.edgeCover * sc, oyBottom - G.edgeCover * sc, [1, 1], 'S', true);
   doc.setLineDashPattern([], 0);
   for (const b of bars) for (const c of barBandCurves(b, G.barWidth / 2)) drawBarAxis(doc, c.kind === 'arc' ? { kind: 'arc', arc: c.arc } : { kind: 'straight', from: c.from, to: c.to }, gx, oyBottom, sc);
@@ -737,7 +772,7 @@ function drawShapedGlass(doc, cx, cy, cw, ch, g) {
   doc.setLineDashPattern([0.5, 0.4], 0);
   for (const b of bars) drawBarAxis(doc, b, gx, oyBottom, sc);
   doc.setLineDashPattern([], 0);
-  // bar ids beside the ends that lie on the arch (the numbers are in the header line or the table)
+  // ids only, beside the end that lies on the arch (the numbers are on the bars pages)
   doc.setFont('courier', 'bold');
   doc.setFontSize(4.5);
   tc(doc, C.dim);
@@ -745,26 +780,12 @@ function drawShapedGlass(doc, cx, cy, cw, ch, g) {
     const end = b.kind === 'arc' ? (b.role === 'ring' ? [b.arc.cx, b.arc.cy + b.arc.r] : [b.to, b.from].find((e) => e[1] > o.springing + 0.01) || b.to) : (b.to[1] >= b.from[1] ? b.to : b.from);
     doc.text(b.id, gx + end[0] * sc + 0.6, oyBottom - end[1] * sc + 1.6);
   }
-  // v3 0.3: the table (id · s from apex / position · L · angle / R)
-  if (endRows.length) {
-    const ty = areaY + areaH + 2;
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(4.5);
-    tc(doc, C.dark);
-    const colX = [areaX + 1, areaX + 8, areaX + areaW * 0.62, areaX + areaW * 0.76];
-    ['ID', 's from apex / position', 'L', 'angle / R'].forEach((h, i) => doc.text(h, colX[i], ty + TABLE_ROW * 0.8));
-    doc.setFont('courier', 'normal');
-    tc(doc, C.dim);
-    endRows.forEach((r, i) => {
-      const y = ty + TABLE_ROW * (i + 1.8);
-      [r.id, r.cells.s, r.cells.L, r.cells.angle].forEach((v, k) => doc.text(String(v), colX[k], y));
-    });
-  }
 
-  // ── CHAIN H (top): vertical bar / mullion x positions ──
+  const isCircle = o.kind === 'circle';
+  // ── CHAIN H (BOTTOM): vertical bar / mullion x positions from the bottom-left corner ──
   const xs = [...new Set(bars.filter((b) => b.kind === 'straight' && Math.abs(b.to[0] - b.from[0]) < 1e-6).map((b) => Math.round(b.from[0] * 10) / 10))].sort((a, b) => a - b);
   const hCuts = [0, ...xs.filter((v) => v > 0 && v < o.width), o.width];
-  const chainY = gy - 4;
+  const chainY = oyBottom + 4;
   dc(doc, C.dim);
   doc.setLineWidth(LW.dimLine);
   doc.line(gx, chainY, gx + gw, chainY);
@@ -774,8 +795,9 @@ function drawShapedGlass(doc, cx, cy, cw, ch, g) {
     doc.line(px, chainY - 1.2, px, chainY + 1.2);
     doc.setLineWidth(LW.ext);
     doc.setLineDashPattern([0.5, 0.4], 0);
-    const yTop = chainYAtX(o.arcs, cut) ?? o.springing;          // outline height at this x
-    doc.line(px, chainY + 1.2, px, oyBottom - yTop * sc);
+    // extension line from the chain up to the outline's bottom edge (a circle: to the chord's lower end)
+    const yBot = isCircle ? (o.centre[1] - Math.sqrt(Math.max(0, o.radius * o.radius - (cut - o.centre[0]) ** 2))) : 0;
+    doc.line(px, chainY - 1.2, px, oyBottom - yBot * sc);
     doc.setLineDashPattern([], 0);
   });
   doc.setFont('courier', 'bold');
@@ -783,12 +805,12 @@ function drawShapedGlass(doc, cx, cy, cw, ch, g) {
   tc(doc, C.dim);
   for (let i = 0; i < hCuts.length - 1; i++) {
     const midX = gx + (hCuts[i] + hCuts[i + 1]) / 2 * sc;
-    doc.text(fmt(hCuts[i + 1] - hCuts[i]), midX, chainY - 1.8, { align: 'center' });
+    doc.text(fmt(hCuts[i + 1] - hCuts[i]), midX, chainY + 3.4, { align: 'center' });
   }
 
   // ── CHAIN V (left): horizontal bars, springing, apex ──
   const ys = [...new Set(bars.filter((b) => b.kind === 'straight' && Math.abs(b.to[1] - b.from[1]) < 1e-6).map((b) => Math.round(b.from[1] * 10) / 10))];
-  const vCuts = [...new Set([0, ...ys.filter((v) => v > 0 && v < o.height), Math.round(o.springing * 10) / 10, o.height])].sort((a, b) => a - b);
+  const vCuts = [...new Set([0, ...ys.filter((v) => v > 0 && v < o.height), ...(isCircle ? [] : [Math.round(o.springing * 10) / 10]), o.height])].sort((a, b) => a - b);
   const chainX = gx - 4;
   dc(doc, C.dim);
   doc.setLineWidth(LW.dimLine);
@@ -807,29 +829,137 @@ function drawShapedGlass(doc, cx, cy, cw, ch, g) {
     doc.text(fmt(vCuts[i + 1] - vCuts[i]), chainX - 1.8, midY, { angle: 90, align: 'center' });
   }
 
-  // ── OVERALL WIDTH (bottom) / HEIGHT (right) ──
-  const owY = oyBottom + 4;
+  // ── OVERALL WIDTH (TOP) / HEIGHT (right) ──
+  const owY = gy - 4;
   dc(doc, C.dim);
   doc.setLineWidth(LW.dimOver);
   doc.line(gx, owY, gx + gw, owY);
   doc.line(gx, owY - 1.2, gx, owY + 1.2);
   doc.line(gx + gw, owY - 1.2, gx + gw, owY + 1.2);
+  doc.setLineWidth(LW.ext);
+  doc.setLineDashPattern([0.5, 0.4], 0);
+  // extension lines from the outline's widest points (springing corners; a circle: the diameter ends)
+  const yWide = isCircle ? o.centre[1] : o.springing;
+  doc.line(gx, owY + 1.2, gx, oyBottom - yWide * sc);
+  doc.line(gx + gw, owY + 1.2, gx + gw, oyBottom - yWide * sc);
+  doc.setLineDashPattern([], 0);
   doc.setFont('courier', 'bold');
   doc.setFontSize(6);
   tc(doc, C.dim);
-  doc.text(`${fmt(o.width)} mm`, gx + gw / 2, owY + 3.5, { align: 'center' });
+  doc.text(`${fmt(o.width)} mm`, gx + gw / 2, owY - 1.8, { align: 'center' });
   const ohX = gx + gw + 4;
   doc.setLineWidth(LW.dimOver);
   doc.line(ohX, gy, ohX, oyBottom);
   doc.line(ohX - 1.2, gy, ohX + 1.2, gy);
   doc.line(ohX - 1.2, oyBottom, ohX + 1.2, oyBottom);
   doc.text(`${fmt(o.height)} mm`, ohX + 3.5, gy + gh / 2, { angle: 90, align: 'center' });
-  // springing tick on the right (rise above it)
-  const spY = oyBottom - o.springing * sc;
-  doc.setLineWidth(LW.tick);
-  doc.line(ohX - 1.2, spY, ohX + 1.2, spY);
+  if (!isCircle) {
+    // springing tick on the right (rise above it)
+    const spY = oyBottom - o.springing * sc;
+    doc.setLineWidth(LW.tick);
+    doc.line(ohX - 1.2, spY, ohX + 1.2, spY);
+    doc.setFontSize(5);
+    doc.text(`rise ${fmt(shape.rise)}`, ohX + 3.5, (gy + spY) / 2, { angle: 90, align: 'center' });
+  }
+}
+
+// ─── BARS PAGES (v4 Block B) ───
+// One block per shaped unit with bars: the window thumbnail, the title, the
+// bar-end table. Layout numbers in mm; the block height is a pure function
+// of the row count so the pagination can be counted before drawing (the
+// header prints "page / total").
+const BARS = {
+  thumbH: 35,         // window elevation thumbnail height
+  thumbW: 45,         // … and its widest allowed width
+  gap: 4,             // between the thumbnail and the table
+  rowH: 3.2,
+  titleH: 6,
+  blockGap: 6,
+  colW: [12, 62, 22, 30],   // ID · s from apex / position · L · angle / R
+};
+
+/** Rows of a unit's bar table — the glazier's numbers, one source (glassBars.js). */
+const barsRowsOf = (g) => barEndRows(g.shape?.bars || [], g.shape.outline);
+
+/** Height of one bars block (thumbnail vs table, whichever is taller) + the gap below it. */
+function barsBlockHeight(g) {
+  const rows = barsRowsOf(g).length;
+  const tableH = BARS.titleH + (rows + 1) * BARS.rowH + 2;
+  return Math.max(BARS.thumbH + 2, tableH) + BARS.blockGap;
+}
+
+/** Pagination of the bars blocks: pages = arrays of items; a block never breaks (it moves whole to the next page). */
+function paginateBars(items, contentH) {
+  const pages = [];
+  let page = [], used = 0;
+  for (const g of items) {
+    const h = barsBlockHeight(g);
+    if (page.length && used + h > contentH) { pages.push(page); page = []; used = 0; }
+    page.push(g);
+    used += h;
+  }
+  if (page.length) pages.push(page);
+  return pages;
+}
+
+/**
+ * Window elevation thumbnail: the frame's outer contour (straight part +
+ * the arch chain, or the circle) with the shaped unit filled at its place.
+ * `t` = { W, H, start, arcs (outer, arch frame), kind, origin, centreFrame }.
+ */
+function drawWindowThumb(doc, t, o, x, yTop, maxW, maxH) {
+  if (!t || !(t.W > 0) || !(t.H > 0)) return 0;
+  const sc = Math.min(maxW / t.W, maxH / t.H);
+  const w = t.W * sc, h = t.H * sc;
+  const ox = x, oyBottom = yTop + h;
+  dc(doc, C.black);
+  doc.setLineWidth(LW.seal);
+  if (t.kind === 'circle') {
+    doc.circle(ox + w / 2, oyBottom - h / 2, (t.W / 2) * sc, 'S');
+  } else {
+    // bottom-left → bottom-right → right springing → outer arcs → left springing → close (frame frame, y up)
+    const arcs = (t.arcs || []).map((a) => ({ ...a, cx: a.cx + t.W / 2, cy: a.cy + t.start }));
+    const frame = { width: t.W, springing: t.start, arcs };
+    doc.lines(outlineLines(frame, sc), ox, oyBottom, [1, 1], 'S', true);
+  }
+  // the shaped unit at its origin in the frame
+  if (o && t.origin) {
+    fc(doc, C.glassFill);
+    dc(doc, C.glass);
+    doc.setLineWidth(LW.outline);
+    doc.lines(outlineLines(o, sc), ox + t.origin.x * sc, oyBottom - t.origin.y * sc, [1, 1], 'FD', true);
+  }
+  return w;
+}
+
+/** One bars block at (x, yTop); returns the block height used. */
+function drawBarsBlock(doc, g, x, yTop, w) {
+  const rows = barsRowsOf(g);
+  const thumbW = drawWindowThumb(doc, g.thumb, g.shape.outline, x, yTop, BARS.thumbW, BARS.thumbH);
+  const tx = x + (thumbW ? thumbW + BARS.gap : 0);
+  // title: unit index · window name — location · shape
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6);
+  tc(doc, C.black);
+  doc.text(`${cellTitle(g)} — ${(g.thumb && g.thumb.kind === 'circle') ? 'circle' : 'arched'} · R ${[...new Set((g.shape.radii || []).map(fmt))].join('/')} · ${rows.length} bar${rows.length === 1 ? '' : 's'}`, tx, yTop + 3.2);
+  // table header
+  const colX = [tx, tx + BARS.colW[0], tx + BARS.colW[0] + BARS.colW[1], tx + BARS.colW[0] + BARS.colW[1] + BARS.colW[2]];
+  let y = yTop + BARS.titleH;
+  doc.setFont('courier', 'bold');
   doc.setFontSize(5);
-  doc.text(`rise ${fmt(shape.rise)}`, ohX + 3.5, (gy + spY) / 2, { angle: 90, align: 'center' });
+  tc(doc, C.dark);
+  ['ID', 's from apex / position', 'L', 'angle / R'].forEach((hd, i) => doc.text(hd, colX[i], y + 2.2));
+  dc(doc, C.grayL);
+  doc.setLineWidth(LW.tableLine);
+  doc.line(tx, y + BARS.rowH, Math.min(tx + BARS.colW.reduce((a, b) => a + b, 0), x + w), y + BARS.rowH);
+  y += BARS.rowH;
+  doc.setFont('courier', 'normal');
+  tc(doc, C.dim);
+  rows.forEach((r) => {
+    [r.id, r.cells.s, r.cells.L, r.cells.angle].forEach((v, k) => doc.text(String(v), colX[k], y + 2.2));
+    y += BARS.rowH;
+  });
+  return barsBlockHeight(g);
 }
 
 // ─── FOOTER ───
@@ -854,7 +984,8 @@ function drawFooter(doc, info, pageNum, totalPages) {
 
 // ─── MAIN EXPORT ───
 
-export function exportGlassPDF({ batch, windowsData, projects = [], companySettings = {}, refImages = [], returnDoc = false }) {
+export function exportGlassPDF({ batch, windowsData, projects = [], companySettings = {}, refImages = [], returnDoc = false, format = 'a4' }) {
+  const pageFormat = setPageFormat(format);
   const glassItems = [];
   let idx = 1;
 
@@ -912,6 +1043,16 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
           // shaped unit (arched casement): outline + bar list for the Shape
           // column, the mm + % line and the drawing cell
           shape: r.shape?.kind === 'arched' || r.shape?.kind === 'circle' ? r.shape : null,
+          // v4 bars pages: the window elevation thumbnail — outer contour (arch chain / circle) + the unit's origin
+          thumb: (r.shape?.kind === 'arched' || r.shape?.kind === 'circle') && derived.arch?.geometry ? {
+            W: Number(windowSpec.frame?.width) || 0,
+            H: Number(windowSpec.frame?.height) || 0,
+            start: derived.arch.geometry.start,
+            arcs: derived.arch.geometry.arcs,
+            kind: derived.arch.geometry.shape,
+            origin: derived.arch.glassOutline?.origin || null,
+            centreFrame: derived.arch.glassOutline?.centreFrame || null,
+          } : null,
           sashW,
           sashH,
           faces: derived?.sashDims,
@@ -922,9 +1063,12 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
 
   if (!glassItems.length) return null;
 
-  // Pagination: page 1 = table, page 2+ = 6 drawings each
+  // Pagination: page 1 = table, page 2+ = 4 drawings each, then the bars pages (v4) — one block per shaped unit with bars
   const drawPages = Math.ceil(glassItems.length / 4);
-  const totalPages = 1 + drawPages;
+  const barsItems = glassItems.filter((g) => g.shape && (g.shape.bars || []).length);
+  const barsContentH = PG.h - 2 * PG.by - HEADER_H - FOOTER_H - 6;
+  const barsPages = paginateBars(barsItems, barsContentH);
+  const totalPages = 1 + drawPages + barsPages.length;
 
   const info = {
     companyName: companySettings.companyName || 'COMPANY NAME',
@@ -942,7 +1086,7 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
     revision: 'A',
   };
 
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: pageFormat });
 
   // ─ PAGE 1: TABLE ─
   drawPageBorder(doc);
@@ -978,6 +1122,21 @@ export function exportGlassPDF({ batch, windowsData, projects = [], companySetti
 
     drawFooter(doc, info, pg + 2, totalPages);
   }
+
+  // ─ BARS PAGES (v4): thumbnail + name + table per shaped unit, blocks stacked, never a break inside a table ─
+  barsPages.forEach((pageItems, bi) => {
+    const pageNum = 2 + drawPages + bi;
+    doc.addPage();
+    drawPageBorder(doc);
+    drawHeader(doc, info, pageNum, totalPages);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(4.5);
+    tc(doc, C.grayL);
+    doc.text('GLAZING BARS — POSITIONS PER SHAPED UNIT (ids as on the drawings)', PG.bx + 3, contentTop + 3);
+    let y = contentTop + 6;
+    for (const g of pageItems) y += drawBarsBlock(doc, g, PG.bx + 3, y, drawAreaW - 2);
+    drawFooter(doc, info, pageNum, totalPages);
+  });
 
   const filename = `Glass_Order_${(info.batchName || 'batch').replace(/[^a-zA-Z0-9-]/g, '_')}_${info.date.replace(/\//g, '-')}.pdf`;
   if (returnDoc) return doc.output('arraybuffer');

@@ -16,6 +16,58 @@ t20 116, t20_bars 28, t21 120, t22 75, t23 80, t24 26 — ALL PASS (after `npm i
 Stages tonight (Piotr 06.09, gate before each next stage): 1 = Block C planner v2, 2 = Block B glazier PDF,
 3 = Block E intersecting, 4 = Block F frame 68.
 
+### STAGE 2 — Block B: glazier PDF layout (`glassPdfExport.js`, `ProductionPackPage.jsx`, `verify/arch/t26.mjs` new, t18 §6)
+
+**Understanding:** Piotr 06.09 (SS2) — the per-unit bar table next to the drawing made the drawing unreadable.
+The shaped cell must give the drawing the whole cell, put the title + spec under it, the bar-spacing chain at the
+bottom and the overall width at the top (the on-screen sheet's convention since arch-pieces-v1), with ids only
+beside the bars; the numbers move to bars pages at the end, one block per shaped unit with a window thumbnail.
+Rectangular units must not change by a byte; A3 / A4 follow the pack's export setting.
+
+**Two approaches, one rejected:** (a) keep the v3 header bar at the top of every cell and squeeze the bars table
+under the drawing on A3 only — rejected: the drawing scale is what Piotr complained about, and A4 is the batch
+default; (b) a v4 shaped cell (drawing first, bottom band with title + up to two spec lines, dimensions in the
+margins) and separate bars pages — chosen; the rectangular cell keeps the v3 header bar and its whole call
+sequence (byte identity is asserted against the previous commit).
+
+**Built:**
+- `drawShapedGlass` v4: bottom band (title 5 pt + spec 4.5 pt, spec = unit spec · `arched · R … · rise … ·
+  springing …`, wrapped to the cell, ≤ 2 lines), drawing area = the rest at max scale with 8–9 mm margins for the
+  dimensions; outline fill + edge-cover line + spacer bands + bar axes as v3; ids only beside the bar ends; chain
+  H at the BOTTOM (vertical bar / mullion x positions from the bottom-left corner, extension lines up to the
+  outline's bottom edge), overall width at the TOP (extension lines from the springing corners), chain V on the
+  left (h bars, springing, apex), overall height + rise tick on the right; circles: no springing tick, the chord
+  chains from the diameter. The v3 note line and the in-cell bar table are gone.
+- Bars pages: `paginateBars` (block height = max(thumbnail 35 + 2, title 6 + (rows + 1) × 3.2 + 2) + 6 — a pure
+  function of the row count so the header's "page / total" is known before drawing; a block that does not fit
+  moves whole to the next page, never breaks inside a table), `drawWindowThumb` (the frame's outer contour —
+  straight part + the arch chain from `derived.arch.geometry.arcs` / a circle — with the shaped unit filled at
+  `derived.arch.glassOutline.origin`, ≤ 45 × 35 mm), `drawBarsBlock` (title `n · WINDOW — LOCATION GLASS — arched
+  · R … · k bars`, table ID · s from apex / position · L · angle / R from `glassBars.barEndRows` — the same rows as
+  the sheet and the glazier DXF). Page heading `GLAZING BARS — POSITIONS PER SHAPED UNIT (ids as on the drawings)`.
+- `exportGlassPDF({ …, format })`: `setPageFormat` (a4 297 × 210 / a3 420 × 297, unknown → a4); pagination = 1
+  schedule + ⌈units / 4⌉ drawing pages + bars pages; `thumb` per shaped item. `ProductionPackPage` Glass tab passes
+  `exportFormat` (the pack's A3 / A4 switch); the single-window export stays A4.
+- The schedule page (page 1) is untouched: the Shape column and the per-unit line (positions for ≤ 4 bars, `k bars
+  — see table` above) stay as v3 (t18 §6 asserts them).
+
+**Verification (t26 36/36 ALL PASS):** the three v3 samples (semi hub-spoke 1000 × 1500 start 1000, three-centre
+1H 2V 1000 × 1500 start 1300, gothic intersecting 1000 × 1800) rendered through jsPDF in node with the `text` /
+`lines` calls captured on the instance (jsPDF `initialized` plugin event): page count 1 + 1 + 1; one filled outline
+per unit on the drawing page; every id inside its outline; no "from apex" / row text on the drawing pages; title +
+spec under the outline; "811 mm" centred above; the bar chain (283.9 / 243.3 / 283.8 …) below the outline and above
+the title; no text bbox overlapping the outline bbox (dimensions, title, spec — ids excluded); bars page: heading,
+every id and every s / L / angle cell of every unit, 3 stroked frame thumbnails ≤ 35 mm + 3 filled units; 9 hub-
+spoke units → 3 drawing + 3 bars pages, every block's rows on its title's page; rectangular-only export (2 casements
++ 1 sash) byte-identical to commit 402c58a (CreationDate and jsPDF's /ID hash masked); A3 MediaBox 1190.55 × 841.89,
+A4 841.89 × 595.28, unknown → A4, A3 cells scale up; PP passes the format. t18 §6 re-vectored (3 pages).
+Samples: `docs/handover/samples/sample_glass_order_arched.pdf` (A4) and `_a3.pdf`; pages 2–3 rasterised with
+PyMuPDF and looked at (layout as specified). Whole suite t16–t26 ALL PASS, `npm run build` OK.
+**Not verified:** the PDF in a viewer other than PyMuPDF's raster (font metrics of the bbox check are jsPDF's own
+`getTextWidth`); the A3 print; the springing-bar ids `S1 / S2` sit on the outline edge next to the right dimension
+line (cosmetic, as in v3 — BLOCKERS 17.3).
+**Verdict: ✅ Stage 2 (Block B)** — t26 + t16–t25 ALL PASS, build green.
+
 ### STAGE 1 — Block C: segment planner v2 (`profile.js`, `arch.js`, `archDxf.js`, `cncExport.js`, `calculations.js`, `ConfiguratorPage.jsx`, `lists.js`, `windowProfileStore.js`, `WindowSettingsPage.jsx`, `verify/arch/t25.mjs` new, `verify/arch/lib/indPlanner.mjs` new, t16 / t17 / t18 / t19 / t20 / t21 / t22 / t23 / t24 re-vectored)
 
 **Understanding:** the v1 planner cut every arc of the chain on its own (a joint at every tangent point) with a 36°
