@@ -16,6 +16,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { bundleSashTree, renderSashSheets, ROOT, AUDIT } from './lib/sashSheets.mjs';
+import { checkDimRule } from './lib/dimRule.mjs';
 
 mkdirSync(AUDIT, { recursive: true });
 const SAMPLES = resolve(ROOT, 'docs', 'handover', 'samples');
@@ -122,6 +123,33 @@ section('1 — rectangular sash sheets: byte-identical to the HEAD fixture (elev
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+section('1b — dimension placement rule (night 7 stage 2) on the sash sheets');
+{
+  // elevation / upper / lower / glass follow the casement glass sheet's rule now;
+  // the BOX sheet already did (its Y is y-up: the chain was always at the bottom,
+  // the inner width at the top, the height chain on the right) and is untouched.
+  const FXB = JSON.parse(readFileSync(resolve(ROOT, 'verify', 'arch', 'fixtures', 'rect-sash-base.json'), 'utf8'));
+  let n = 0;
+  for (const [name, c] of Object.entries(FXB)) {
+    const spec = specification.normaliseToWindowSpec({ id: 'fx_' + name, name, width: c.input.width, height: c.input.height }, { fullConfig: c.input.fc });
+    const S = renderSashSheets(M, spec, derive(spec));
+    for (const k of ['elevation', 'upper', 'lower', 'glassUpper', 'glassLower', 'box']) {
+      const r = checkDimRule(S[k]);
+      n++;
+      check(`${name} ${k}: overall width TOP (y ${r.widthY?.toFixed(0)}), height RIGHT (x ${r.heightX?.toFixed(0)}), ${r.bottom} horizontal dim(s) along the bottom`, r.ok, r.why);
+    }
+  }
+  check(`${n} sash sheets checked against the rule`, n >= 30, String(n));
+  // the arched sash (the same window section 2 uses; CASES is declared below)
+  const arched = psw('SS', 1000, 2200, { archShape: 'semi-circle', archBarPattern: 'hub-spoke', archHBars: 1, lowerHBars: 2 });
+  const SA = renderSashSheets(M, arched, derive(arched));
+  for (const k of ['elevation', 'upper', 'lower', 'glassLower']) {
+    const r = checkDimRule(SA[k]);
+    check(`arched sash SS ${k}: follows the rule and renders without NaN`, r.ok && !/NaN|Infinity/.test(SA[k]), r.why);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 section('2 — sash arch DXF: S-ARCH HEAD / S-ARCH TOP RAIL rows, FIT running gap, ezdxf round-trip, samples');
 const CASES = [
   ['semi-circle', psw('SS', 1000, 2200, { archShape: 'semi-circle', archBarPattern: 'hub-spoke', archHBars: 1, lowerHBars: 2 })],
@@ -173,7 +201,10 @@ section('3 — glazier DXF + tracery for the arched upper unit');
   const units = glassDxf.shapedGlassUnits(spec, d);
   check('shapedGlassUnits: one shaped unit (the upper), rows: upper arched + lower rect', units.length === 1 && units[0].row.location === 'upper' && units[0].shape.kind === 'arched');
   const r = glassDxf.exportGlassDxfForWindow(spec, d, 'SS');
-  check('exportGlassDxfForWindow accepts the sash → SS_glass.dxf, 1 unit', r.ok && r.units === 1 && lastName === 'SS_glass.dxf');
+  // night 7 stage 1: the arched sash carries BOTH units now — the arched upper
+  // and the rectangular lower the glazier used to get only on the PDF
+  check('exportGlassDxfForWindow accepts the sash → SS_glass.dxf, 2 units (arched upper + rectangular lower; was 1)',
+    r.ok && r.units === 2 && lastName === 'SS_glass.dxf', JSON.stringify(r));
   const text = await lastBlob.text();
   const path = resolve(SAMPLES, 'sample_glass_sash_1000x2200_semi-circle_hub-spoke.dxf');
   writeFileSync(path, text);
@@ -271,7 +302,11 @@ section('6 — structural evidence (grep)');
   check('ArchedSashWindow: engine contour builders (arcPtsPC / shapeContourPC / apexRisePC), PSW samplers kept as fallback', asw.includes('arcPtsPC') && asw.includes('shapeContourPC') && asw.includes('apexRisePC') && asw.includes('function archArcPoints(') && asw.includes("from './archedSashGeometry.js'"));
   check('PSW named export blocks present in ParametricSashWindow / FixFrameWindow (port, not copy)', par.includes('\nexport {\n  mm,\n  Sash,') && fix.includes('NAMED EXPORTS'));
   const wdp = readFileSync(resolve(ROOT, 'src', 'pages', 'WindowDetailPage.jsx'), 'utf8');
-  check('WindowDetailPage: Arch DXF / Tracery / Glass DXF buttons also for an arched sash', (wdp.match(/\|\| !!windowSpec\?\.arch\?\.shape\)/g) || []).length >= 3);
+  // Arch DXF + Tracery stay gated on the arch; the Glass DXF button is wider
+  // since night 7 stage 1 (every casement / sash window with glass)
+  check('WindowDetailPage: Arch DXF / Tracery for an arched sash, Glass DXF for every casement / sash',
+    (wdp.match(/\|\| !!windowSpec\?\.arch\?\.shape\)/g) || []).length >= 2 && wdp.includes("['casement', 'sash'].includes(windowSpec?.category || 'sash')"),
+    String((wdp.match(/\|\| !!windowSpec\?\.arch\?\.shape\)/g) || []).length));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

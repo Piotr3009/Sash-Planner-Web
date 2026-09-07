@@ -112,7 +112,7 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
   // ─── Layout (SVG Y-down) ───
   const layoutSc = Math.max(fw, fh) / 500;
   const DM = 60 * layoutSc;
-  const M = A ? 110 * layoutSc : 60 * layoutSc;          // arched: room for the start / rise dims on the left
+  const M = A ? 110 * layoutSc : 60 * layoutSc;          // arched: room for the start / rise dims on the right
   const TITLE_AREA = (A ? 75 : 50) * layoutSc;             // arched: third title line
   const totalW = M + fw + DM * 2 + M;
   const totalH = M + fh + DM + TITLE_AREA;
@@ -312,8 +312,8 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
           <g>
             <line x1={ox - DM * 0.2} y1={AP.springY} x2={ox + fw + DM * 0.2} y2={AP.springY}
               stroke={COL.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={`${8 * layoutSc},${3 * layoutSc},${2 * layoutSc},${3 * layoutSc}`} />
-            <DimV x={ox - DM * 0.8} y1={AP.springY} y2={SY(0)} extFrom={ox} label={`start ${fmt(AP.G.start)}`} small vbw={totalW} />
-            <DimV x={ox - DM * 0.8} y1={oy} y2={AP.springY} extFrom={ox} label={`rise ${fmt(AP.G.rise)}`} small vbw={totalW} />
+            <DimV x={ox + fw + DM * 0.8} y1={AP.springY} y2={SY(0)} extFrom={ox + fw} label={`start ${fmt(AP.G.start)}`} small vbw={totalW} />
+            <DimV x={ox + fw + DM * 0.8} y1={oy} y2={AP.springY} extFrom={ox + fw} label={`rise ${fmt(AP.G.rise)}`} small vbw={totalW} />
             {AP.radii.map((rl, k) => (
               <text key={`r-${k}`} x={rl.at[0]} y={rl.at[1]} fill={COL.dim} fontSize={tfs(SIZES.dimSmall, totalW)}
                 fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.dim}>{`R ${fmt(rl.r)}`}</text>
@@ -321,12 +321,13 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
           </g>
         )}
 
-        {/* ── DIM LINES — overall only ── */}
-        <DimH y={oy + fh + DM * 0.8}
+        {/* ── DIM LINES — overall only: width at the TOP, height on the RIGHT
+             outside the arch start / rise dims that now sit there ── */}
+        <DimH y={oy - DM * 0.5}
           x1={ox} x2={ox + fw}
-          extFrom={oy + fh}
+          extFrom={oy}
           label={fmt(fw)} vbw={totalW} />
-        <DimV x={ox + fw + DM * 0.8}
+        <DimV x={ox + fw + DM * (A ? 1.6 : 0.8)}
           y1={oy} y2={oy + fh}
           extFrom={ox + fw}
           label={fmt(fh)} vbw={totalW} />

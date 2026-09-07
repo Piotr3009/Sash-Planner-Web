@@ -153,8 +153,11 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
   geom.vBars.forEach(vb => { topCuts.push(vb.left); topCuts.push(vb.right); });
   topCuts.push(geom.sashW - geom.stile);
   topCuts.push(geom.sashW);
-  const topDimY = oy - 24 * ts;
-  const topExtLineEnd = oy - 4 * ts;
+  // Piotr 06.09 (night 7 stage 2): the bar / rail chain runs along the BOTTOM
+  // edge — below the horns on an upper sash — and the overall width sits at the TOP
+  const chainBaseY = oy + geom.sashH + (geom.isUpper && geom.hasHorns ? geom.hornExt : 0);
+  const topDimY = chainBaseY + 24 * ts;
+  const topExtLineEnd = chainBaseY + 4 * ts;
 
   // Left dim chain
   const leftCuts = geom.A ? [0, geom.apex] : [0, geom.topEdge];
@@ -364,10 +367,10 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
             cuts={leftCuts.map(cy => Y(cy))} labels={leftLabels}
             vbw={totalW} minSegment={BAR_WIDTH * 2} fmt={fmt} />
 
-          {/* Overall dims */}
-          <DimH y={Y(geom.sashH) + 24 * ts}
+          {/* Overall dims — width at the TOP, height on the RIGHT (Piotr 06.09) */}
+          <DimH y={oy - 30 * ts}
             x1={X(0)} x2={X(geom.sashW)}
-            extFrom={Y(geom.sashH) + 12 * ts}
+            extFrom={Y(0)}
             label={fmt(geom.sashW)} vbw={totalW} />
           <DimV x={X(geom.sashW) + 24 * ts}
             y1={Y(0)} y2={Y(geom.sashH)}

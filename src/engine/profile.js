@@ -397,11 +397,10 @@ export const DEFAULT_DOOR_PROFILE = Object.freeze({
   // = 136 wide (v4 Block F; was 114) with TWO rebates — the panel leaf laps
   // one side, the door leaf the other (Piotr 09.08; replaces the two abutting
   // jambs the 3D instantiates). Outward: both rebates face the exterior, so
-  // land + land = 72 shows from outside. Inward: the door rebate flips to the
+  // land + land = 86 shows from outside. Inward: the door rebate flips to the
   // interior (3D mirrors the door frame on Z, DoorWindow.jsx:615) so the door
-  // side shows its full 68 face — visible band becomes 36 + 68 = 104, offset
-  // towards the door. The door land stays 36 (spec F: doors change face and
-  // post only — BLOCKERS §19).
+  // side shows its full 68 face — visible band becomes 43 + 68 = 111, offset
+  // towards the door (was 72 / 104 on the 36 land).
   couplingPost: { width: 136 },
   // Coupled transom (PSW/3D convention): the frame gets TALLER by the transom
   // height — frame.height stays the DOOR zone height. Internal rail 68 (same
@@ -409,9 +408,13 @@ export const DEFAULT_DOOR_PROFILE = Object.freeze({
   // fan cavity above the rail = transomHeight − 68. Opening fanlights carry a
   // 64mm sash (3D TRANSOM_SASH_STILE) — engine support for that sash pending.
   transom: { rail: 68, fanStile: 64 },
+  // Night 7 stage 3 — OPTION B for doors, the rule the casement frame already
+  // follows: the REBATE is the invariant, the land is what the wider face buys.
+  // land = face − rebate = 68 − 25 = 43 (was 36 against the old 57 face, which
+  // left a 32mm rebate step on the 68 frame — BLOCKERS §19.1).
   geometry: {
-    land: 36,
-    rebate: 25,           // casement 21 + 4mm deeper
+    land: 43,             // = frameJamb face 68 − rebate 25
+    rebate: 25,           // casement 21 + 4mm deeper — unchanged, it is the invariant
     gap: 4,
     mullionLand: 26,
     gapCill: 6,
@@ -419,10 +422,10 @@ export const DEFAULT_DOOR_PROFILE = Object.freeze({
     glassInset: 12.5,
   },
   deductions: {
-    leafAtJamb: 40,          // land 36 + gap 4
-    leafAtMullionAxis: 17,   // half-land 13 + gap 4
-    leafFullHeight: 87,      // with a cill/threshold present
-    leafNoThreshold: 46,     // threshold 'none': no bottom member to deduct
+    leafAtJamb: 47,          // land 43 + gap 4 (was 40)
+    leafAtMullionAxis: 17,   // half-land 13 + gap 4 — the mullion land did not move
+    leafFullHeight: 94,      // leafAtJamb 47 + gapCill 6 + cillVisible 41 (was 87)
+    leafNoThreshold: 53,     // leafAtJamb 47 + gapCill 6 — threshold 'none' (was 46)
   },
   lengths: {
     headDeduct: 0,

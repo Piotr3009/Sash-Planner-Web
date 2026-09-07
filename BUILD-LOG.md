@@ -4,6 +4,339 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-09-06 — NIGHT 7 (zadanie nocne 7), Stage 1 (branch `claude/zadanie-nocne-7-glass-dxf-wb0eay`)
+
+Entry gate re-run after Piotr put `gothic-full-v1` on `main` (e037020): `mode = 'full'` **1**, `labels BESIDE the
+piece` **1** — both green, branch rebased onto `origin/main` keeping the night-7 stop entry. Baseline on the rebased
+tree: t16 368 · t17_edges 70 · t18 178 · t19 244 · t20 **117** (was 116 — gothic-full-v1 adds one) · t20_bars 32 ·
+t21 120 · t22 77 · t23 81 · t24_stage4 26 · t25 201 · t26 36 · t27 64 = 1614 ALL PASS, build OK.
+
+### STAGE 5 (after the four) — BLOCKERS §19.6 closed: spec C.5 re-issued for the 68 frame ✅
+
+**Verdict ✅** — t25 **225 checks** (was 201) ALL PASS, whole suite t16–t29 = **1822 checks ALL PASS**, build OK.
+
+§19.6 asked for the C.5 reference table to be re-issued for the 68 frame; it needed no decision from Piotr, only
+the arithmetic. `docs/handover/ARCHED-WINDOWS-v4.md` gains **C.5b** (the original C.5 is kept as history — it is
+correct for the frame it was written against), computed with the same independent projection, allowance 10 and
+finger 15, on the live profile:
+
+| arch | pieces × board | W_req at 68 (was at 57) | outer edges | inner edges |
+|---|---|---|---|---|
+| HALF 1000 semi-circle | 3 × 150 | **144.5** (134.7) | 551.0 / 592.1 / 551.0 | 464.4 / 418.8 / 464.4 |
+| ROUND 1000 rise 250 | 2 × 180 | **165.5** (158.3) | 619.5 ×2 | 529.5 ×2 |
+| GOTHIC 1000 per side | 2 × 120 | **119.4** (112.6) | 532.1 / 573.9 | 500.0 / 421.7 |
+| HALF 1500 semi-circle | 3 × 180 | **178.0** (168.1) | 819.4 / 878.7 / 819.4 | 715.4 / 670.9 / 715.4 |
+| tc240 1200 rise 240 | 2 × 180 | **176.8** (170.6) | 697.9 ×2 | 625.9 ×2 |
+
+**Piece counts and boards did not move** — only the required board width, because the head ring grew with the
+frame. HALF 1500 keeps its economy default 4 × 150; 2 pieces still need 211.6 (HALF 1000) and 284.8 (HALF 1500),
+so still no board. t25 §2c regenerates every line from the live profile and asserts the document quotes it, so
+C.5b cannot drift from the engine the way C.5 did.
+
+**Other §19 items were left alone deliberately:** 19.3 (profile snapshot per project), 19.5 (economy rule C.4
+"AND lower waste") need Piotr's decision; 19.7 (Part Registry 68 × 93) is a Supabase data change and this package
+makes none; 19.8 (PSW port) is Piotr's own repo; 19.2 / 19.4 / 19.10 are FYI with nothing to do; 19.1 closed in
+stage 3 and 19.9 is answered as far as measurement can (stage 4) and now waits on eyes.
+
+---
+
+### STAGE 4 — the 3D after the 68 frame: control ✅ (two gaps found, one fixed by measurement, one referred)
+
+**Verdict ✅** — new gate **t29, 34 checks ALL PASS**; whole suite t16–t29 = **1798 checks ALL PASS**,
+`npm run build` OK (15.0 s). **No 3D source file was changed** — see "what I did not change" below.
+
+**Piotr's "3D jakieś kwadratowe": the arched path is NOT the cause.** Measured on real configs
+(`normaliseToWindowSpec` → `windowSpecToConfig` → `archedCasementGeometry`, the same call
+`ArchedCasementWindow` makes):
+
+| check | result |
+|---|---|
+| semi-circle 1000 × 1500 | radius **500** from arch.js, **52** outline points, apex above the springing — a real arc |
+| three-centre 1000 × 1500 | **3** radii, **148** points |
+| gothic-equilateral 1000 × 1800 | **2** radii, **100** points |
+| ring 1 (full face) | offset **68** = the profile face |
+| ring 2 (rebated land) | offset **47** = the profile land |
+| ring spans at the springing | `W − 2·68` and `W − 2·47` on every shape |
+| arched leaf width | **898** = 1000 − 2·leafAtJamb 51 |
+| no `frameDims` passed | still the PSW 57 / 36 — the profile only wins when passed, so PSW is unaffected |
+| **Kind: Fixed** on an arch | `casementType 'arched'`, `fixedLeaf true`, shape and `frameDims` kept — it stays on `ArchedCasementWindow`, it does NOT become a rectangle |
+| door + side panel | `frameDims { 68, 43 }` (option B reached the 3D); the post is two abutting jambs = 2 × 68 = **136**, matching the profile and the engine's `zones.posts[0].w` |
+
+A pointed arch drops its apex by MORE than the ring offset (concentric per arc), so t29 measures the ring
+offset as the SPAN at the springing — the invariant that holds for round and pointed shapes alike. My first
+version of that check asserted the apex drop and correctly failed on the gothic; the geometry was right, the
+assertion was wrong.
+
+**GAP 1 — the circle never receives the profile (BLOCKERS §24.1).** `windowSpecToConfig` routes
+`arch.shape === 'circle'` to `windowCategory: 'fix-only'` with `fixShape: 'circle'`, so the viewer does draw a
+CIRCLE (not a rectangle) — but that branch passes **no `frameDims`**, and `FixFrameWindow` has no such prop: it
+carries its own `FRAME_FACE = 64`. So a circle window's 3D frame is 64 wide while its engine rings come from the
+68 casement profile. `archedCasementGeometry` cannot take the circle instead — asked for `'circle'` it silently
+resolves to a semi-circle (t29 §5 pins that), which is exactly why the circle must stay on the fix-frame path.
+
+**GAP 2 — the 3D leaf is 4 mm short in height (BLOCKERS §24.2).** 040L 1000 × 1500: the 3D leaf is
+**898 × 1398**, the engine's is **898 × 1402**. The width is right by construction
+(`W − 2·(face − rebate + gap)` = `W − 2·leafAtJamb`, 68 − 21 + 4 = 51 ✓). The height is not, because the 3D
+holds the leaf `BOTTOM_FACE 68 − REBATE_STEP 21 + gap 4 = 51` above the frame bottom — it models the cill like a
+jamb — while the profile puts it at `gapCill 6 + cillVisible 41 = 47`. **Pre-existing**: at the 57 face it was
+1409 vs 1413, the same 4 mm, so Block F did not cause it.
+
+**What I did NOT change, and why.** Closing gap 2 means teaching the 3D that the cill has its own land and gap
+(41 / 6) instead of a jamb's (47 / 4). That moves the rebate line and the visible cill height on **every**
+casement render, in a component shared with PSW, and the mapping between the two cill models is a workshop fact
+I cannot derive: the profile says 41 shows and the leaf sits 6 above it, the 3D says the leaf laps a 21 rebate
+with a 4 gap. Guessing would change how every window looks — the exact complaint this stage exists to answer.
+So t29 pins the difference with its cause and its size, and BLOCKERS §24.2 carries the two candidate fixes for
+Piotr. Gap 1 is the same shape of decision: is a circle's frame the casement's 68 section or the fix-frame's own
+64? — and threading `frameDims` into `FixFrameWindow` diverges a PSW-shared file, which CLAUDE.md reserves for
+the PSW port.
+
+**Not verified in this stage:** nothing was rendered in a browser or in three.js — R3F components were not
+mounted; every number comes from the geometry helpers and the config mapper called directly in node. The
+viewer's appearance (Piotr's screenshot, which has not arrived) is still unconfirmed, and if "kwadratowe" refers
+to something other than the arch, the circle frame (gap 1) is the first place to look.
+
+---
+
+### STAGE 3 — doors take option B ✅
+
+**Verdict ✅** — t27 **87 checks** (was 65) ALL PASS, whole suite t16–t28 = **1764 checks ALL PASS**,
+`npm run build` OK (16.0 s), esbuild clean on the three touched sources, all four door 2D sheets render without
+NaN for single / french / single + side panel.
+
+**The change** (`DEFAULT_DOOR_PROFILE` in `src/engine/profile.js` — four numbers, nothing else):
+the REBATE is the invariant and the wider face buys land, exactly as the casement frame already works.
+`land = jamb face − rebate = 68 − 25 = 43`. Option A left the door with a 32 mm rebate step (68 − 36) on a
+frame whose rebate is 25 — that mismatch is what BLOCKERS §19.1 asked about; it is now closed.
+
+**Old and new numbers — produced BY the harness (t27 §5b re-derives the `d733414` tree and prints the table), not
+by hand:**
+
+| | before (option A) | after (option B) |
+|---|---|---|
+| profile `geometry.land` | 36 | **43** = face 68 − rebate 25 |
+| profile `deductions.leafAtJamb` | 40 | **47** = land 43 + gap 4 |
+| profile `deductions.leafFullHeight` | 87 | **94** = leafAtJamb 47 + gapCill 6 + cillVisible 41 |
+| profile `deductions.leafNoThreshold` | 46 | **53** = leafAtJamb 47 + gapCill 6 |
+| **door 1000 × 2100** leaf | 920 × 2013 | **906 × 2006** |
+| **french 1200 × 2100** leaf (each of two) | 563 × 2013 | **556 × 2006** |
+| door leaf x inside its frame | 40 | **47** |
+| side panel 400 leaf | 320 | **306** |
+| door without a threshold, 2100 | 2054 high | **2047** high |
+| coupling post visible band, outward (land + land) | 72 | **86** |
+| coupling post visible band, inward (land + face) | 104 | **111** |
+
+`leafAtMullionAxis` stays **17** (= mullionLand 26 / 2 + gap 4) — the mullion land did not move, same as the
+casement. The rebate stays **25** (casement 21 + 4). The coupling post stays **136** (2 × jamb face). Door cut-list
+SECTIONS are byte-identical before and after (t27 §5b): option B moves lengths, never stock.
+
+**Everything followed the profile — no engine edit was needed.** `deriveDoorWindow` already takes
+`edge = ded.leafAtJamb`, `clearW = frameWidth − 2·edge`, `leafW = isFrench ? (clearW + overlap)/2 : clearW`,
+`panelLeaves = f.w − 2·edge`, `leafH = frameHeight − (hasTimberCill ? leafFullHeight : leafNoThreshold)` and the
+post band from `geo.land` / `els.frameHead.face`. The only source edits outside the profile are two comments
+(`calculations.js` "40 = land 36 + gap 4" → 47 / 43, `windowSpecToConfig.js` "68 / 36" → "68 / 43").
+
+**No migration needed, unlike the casement.** `setDoorProfile()` has no call site anywhere in the app, so
+`getDoorProfile()` always returns `DEFAULT_DOOR_PROFILE` — there is no stored door profile in Supabase or
+localStorage to migrate (the casement needed `migrateCasementProfile` precisely because its profile IS stored).
+
+**Gate note:** the brief names "t14 / t27"; there is no t14 in this repository (`verify/arch` holds t16–t28), so
+t27 is the door gate. Its §1 now derives every door number from the profile formula and §5b diffs the whole set
+against `d733414`.
+
+**Not verified in this stage:** no browser and no 3D viewer — the door frame's 68 face with a 43 land, and the
+136 post's new 86 / 111 visible band, are asserted numerically and rendered server-side, not looked at. Pricing
+and BOM were not re-checked against the 14 mm narrower leaf (they read the engine rows, so they follow, but no
+quote was compared).
+
+---
+
+### STAGE 2 — one dimension rule on every sheet ✅
+
+**Verdict ✅** — t19 **280** (was 244) and t22 **118** (was 77) ALL PASS with the new rule gate, whole suite
+t16–t28 = **1742 checks ALL PASS**, `npm run build` OK (16.5 s), esbuild clean on all five touched sheets,
+no Polish in sources.
+
+**The rule** (as `CasementGlassDrawing2D` already implemented it — the sheet Piotr called right): spacing chains
+and axis dims along the **BOTTOM**, the overall **width at the TOP**, **heights on the RIGHT**. arch-pieces-v1 had
+applied it to the casement elevation and glass sheets only (the comment in t19 §1 records that); this stage brings
+the rest in line.
+
+| Sheet | Before | After |
+|-------|--------|-------|
+| `CasementLeafDetail2D` | chain TOP, overall width BOTTOM | chain BOTTOM, width TOP (height / arch dims already right) |
+| `CasementFrameDetail2D` | chain TOP, vertical chain RIGHT, width BOTTOM, arch + transom axis dims LEFT | chain BOTTOM, vertical chain LEFT, width TOP, arch start / rise + transom axes RIGHT |
+| `FrontElevation2D` (sash) | width BOTTOM, arch start / rise LEFT | width TOP, arch dims RIGHT, overall height steps outside them |
+| `SashDetail2D` | chain TOP, width BOTTOM | chain BOTTOM (below the horns on an upper sash), width TOP |
+| `GlassDrawing2D` (sash) | chain TOP, width BOTTOM | chain BOTTOM, width TOP |
+| `BoxDetail2D` | — | **unchanged**: its `Y` is y-up, so the chain was always at the bottom, the inner width at the top and the height chain on the right — it already satisfied the rule (t22 §1b proves it, before and after) |
+| Elements grid (PP) | — | **no separate change**: `ElementsTab` renders these very components (Frame / Leaf / Box / Sash) and the Elements PDF rasterises the same SVGs, so it inherits the rule |
+
+**What moved, in sheet coordinates** (040L 1000 × 1500 casement, 1000 × 1500 sash 6x6):
+
+| Sheet | Label | y/x before → after |
+|-------|-------|--------------------|
+| casement leaf | overall width `898` | y 1684 → **151** |
+| casement leaf | chain stile `67` | y 163 → **1663** |
+| casement frame | overall width `1000` | y 1902 → **142** |
+| casement frame | chain land `47` | y 159 → **1816** |
+| casement frame | overall height `1500` | unchanged (x 1520) |
+| sash elevation | width `1000` | y 1809 → **75** |
+| sash upper | overall width `822` | y 848 → **73** |
+| sash glass | width `733 mm` | y 878 → **146** |
+
+**Scale unchanged:** every viewBox is byte-identical before and after — leaf 1430.76 × 1962.8, frame 1900 × 2100,
+elevation 1720 × 2010, upper 1134.36 × 983.42, glass 1143.48 × 1022.98, box 2020 × 2520. Two intermediate versions
+of this stage grew the leaf and frame sheets by a chain band; both were reverted once measurement showed the bottom
+now needs LESS room than the overall width did (28·ts vs 60·ts), and the frame's computed bottom band is floored at
+the old `DM`.
+
+**Layout numbers derived, not tuned:** the frame's chain sits at `34·ts` under the frame because a chain leader
+label reaches `leaderV 14` up and is `dimSmall 17` tall — at `24·ts` (the glass sheet's value, which has no member
+labels) it printed over the `C-CILL` label inside the frame at every size. The mullion axis dims then step below
+the chain (`chainY + 30·ts + DM·0.3·i`) and the bottom band grows with their count so the title always clears.
+
+**New gate — `verify/arch/lib/dimRule.mjs`** (used by t19 §1b, t22 §1b, t27 §9): reads the RENDERED sheet, tells
+the overall dims from the chains by dim size, tells horizontal from vertical dims by rotation, recognises a vertical
+chain's upright leader labels by their proximity to that chain's rotated labels, and ignores `R …` radius callouts
+(annotations on the arc, not dimension lines). It is a real gate, not a tautology: t19 §1b re-renders the sheets
+from **0d211fd** and asserts the rule REJECTS the old frame and leaf sheets while ACCEPTING the elevation and glass
+sheets it already governed.
+
+**Collision evidence** (rotation-aware text-box overlap, live vs `0d211fd`): 0 new overlapping label pairs and 0 new
+texts outside the viewBox on casement 040L / 131 / 133 / 144 / arched and on sash 1000×1500 6x6 / 1200×2000 9x9 /
+arched 1000×2200 / wide 2000×900 / tall 500×2400 / 600×900. One PRE-EXISTING overlap on the multi-light frame
+sheets disappeared. The first cut of the frame sheet did introduce three collisions (`26` over `C-CILL`, `551.5`
+over `axis 611.5` / `axis 1188.5`); they are what drove the 34·ts / axis-below-chain layout above.
+
+**Fixtures re-baselined** (deliberate, per CLAUDE.md): `rect-casement-sheets.json` via
+`node verify/arch/t19_baseline.mjs live` and `rect-sash-sheets.json` via `node verify/arch/t22_baseline.mjs`.
+`rect-casement-base.json` and `rect-sash-base.json` (ENGINE data) were NOT touched — no engine number changed in
+this stage. t27 §9's guard was narrowed accordingly: it now requires the sash ENGINE fixture to be clean and adds a
+check that the re-baselined sash sheets really carry the new placement.
+
+**Not verified in this stage:** nothing was opened in a browser and no PDF was opened in a viewer — the evidence is
+the server-rendered SVG (react-dom/server), its viewBox, its text positions and the overlap analysis. Whether the
+new layout *looks* right to Piotr is a morning judgement; the geometry is what the harness can prove.
+
+---
+
+### STAGE 1 — glass DXF carries EVERY glass unit ✅
+
+**Verdict ✅** — t28 **50 checks ALL PASS**, whole suite t16–t28 = **1664 checks ALL PASS**, `npm run build` OK
+(18.3 s), esbuild clean on all three touched sources, no Polish in sources.
+
+What changed (`src/utils/glassDxfExport.js`, `WindowDetailPage.jsx`, `ProductionPackPage.jsx`):
+
+- `glassUnitsForWindow()` replaces `shapedGlassUnits()` as the export's entry point: every ordered row becomes a
+  unit, shaped or rectangular, in row order, `qty > 1` repeated. `shapedGlassUnits()` stays exported (t19–t23 use it).
+- `buildRectUnitEntities()` — contour = 4 lines, `GLASS_EDGE` inset by `profile.glass.edgeCover` (11) all round,
+  each bar an axis on `GLASS_BAR_AXES` plus a band `profile.glass.barWidth` (18) wide on `GLASS_BARS`. Bands run the
+  full unit, unclipped at crossings, exactly like the shaped bands. Nothing is hard-coded: 11 and 18 are read from
+  the profile through the existing `readGlassProfile` / `barBandCurves`.
+- `rectBarsForRow()` — bar placement has the **two sources the glass PDF already uses**, so the DXF and the PDF can
+  never print different numbers for the same unit: casement / triple rows split the glass equally from the engine
+  counts (`barsV` / `barsH`), double-hung rows keep the sash-frame placement (grid pattern →
+  `computeGlassBarPositions`, whose `cy` runs from the glass top and is mirrored into the y-up DXF frame).
+- Text block: window name, unit id, `W x H` + location, glass spec, bar count, one line per bar, and
+  `BAR AXES FROM THE BOTTOM CORNERS` with FROM LEFT / FROM RIGHT and FROM BOTTOM / FROM TOP per bar.
+- Skips: only "no data" / "not a casement or sash window" / "window could not be calculated" / **"no glass unit"**.
+  The old `not an arched … — rectangular units go on the glass PDF` skip is gone; the pack error is now
+  `No glass units in this pack`. The Window Detail button renders for every casement / sash window.
+
+Numbers asserted from the profile (not read back from the code): 040L 1000 × 1500 → **1 unit 789 × 1293**
+(`W − 2·leafAtJamb 51 − glass 109`, `H − leafFullHeight 98 − glass 109`), edge line (11,11)–(778,1282), bands at
+385.5 / 403.5 and 637.5 / 655.5, axes at 394.5 and 646.5.
+
+**Intended behaviour changes, with the old and new numbers (re-vectored harness assertions):**
+
+| Case | Before | After |
+|------|--------|-------|
+| rectangular casement 040L 1000 × 1500 | skipped: "not an arched casement" | exported, 1 unit 789 × 1293 |
+| rectangular sash 1000 × 1500 | skipped: "not an arched sash" | exported, 2 units 733 × 612.5 |
+| arched sash SS 1000 × 2200 (t22) | 1 unit (arched upper) | **2 units** — arched upper + rectangular lower 733 × 962.5 |
+| t18 pack of 3 arched + 1 rectangular | 3 windows / 3 units, 1 skipped | **4 windows / 4 units, 0 skipped**; the 4th contour bottom −6353.2 (the three arched bottoms −1293.0 / −2886.0 / −4760.2 are UNCHANGED) |
+| pack with nothing exportable | a rectangular window | a window with no glass at all (a door) |
+
+**Shaped output unchanged** — t28 §5 rebuilds the four all-shaped sample windows (semi-circle hub-spoke,
+three-centre 1H 2V, gothic intersecting, circle 800 sunburst) through both trees and compares the **serialised DXF
+byte for byte against `30a8012`**: identical. The arched sash is the one mixed window and its file legitimately
+grows by the lower unit, so there the SHAPED unit's own entity set is compared byte for byte instead: identical.
+
+**Samples:** new `sample_glass_rect_1000x1500_040L.dxf` and `sample_glass_pack_mixed.dxf`;
+`sample_glass_pack_merged.dxf` and `sample_glass_sash_1000x2200_semi-circle_hub-spoke.dxf` regenerated with their
+new rectangular units. **Not from this stage:** `sample_arch_*.dxf`, `sample_arch_c5_*.dxf`,
+`sample_circle_1000_sunburst.dxf`, `sample_sash_arch_1200_*.dxf` and `sample_tracery_gothic.dxf` also changed —
+that is **gothic-full-v1** (e037020) which moved the piece labels below the piece (TEXT y 100 → −25, 10 → −50) and
+made the tracery always full; the code landed on `main` without regenerating the samples, and running the harness
+brought them up to date. The two glass-order PDFs were reverted (jsPDF timestamp noise only).
+
+**Not verified in this stage:** nothing was opened in a browser (the Window Detail / Production Pack buttons, the
+alert texts), and no DXF was opened in VCarve or bSolid — the evidence is the ezdxf round-trip (layers, contour
+789 × 1293, edge 767 × 1271, 2 axes + 4 band edges) and the byte-identity comparison.
+
+**Erratum (BLOCKERS §20.5):** the brief's gate says "okno 133 → 3 jednostki". Layout `133` is "3 Lights +
+Fanlights", so the engine orders **6** units (3 fanlights 434.3 × 337.2 + 3 lights 434.3 × 815.8). t28 asserts the
+engine's 6 and additionally checks layout `130` (3 lights, no fanlights) → 3 units, which is what the brief's
+number describes.
+
+---
+
+## 2026-09-06 — NIGHT 7 (zadanie nocne 7) — STOPPED AT THE ENTRY GATE (branch `claude/zadanie-nocne-7-glass-dxf-wb0eay`)
+
+Inputs read in full: `CLAUDE.md` (night-7 brief, all four stages + "NIE RÓB DZIŚ") → `BUILD-LOG.md` (night 6) →
+`BLOCKERS.md` (headers + §16–§19) → the two gate targets `src/engine/cnc/traceryExport.js` and
+`src/engine/cnc/archDxf.js` → `src/utils/glassDxfExport.js` (stage-1 target, read only).
+
+### VERDICT ❌ — night 7 not started; `gothic-full-v1` is not in the repository
+
+The brief's own entry gate fails on both markers, so per CLAUDE.md ("Jeśli nie — STOP, wpis w BLOCKERS") and
+tonight's start instruction, **no stage was implemented and no source file was touched**. Full evidence in
+BLOCKERS §20; the short version:
+
+| Gate | Expected | Got |
+|------|----------|-----|
+| `grep -c "mode = 'full'" src/engine/cnc/traceryExport.js` | > 0 | **0** |
+| `grep -c "labels BESIDE the piece" src/engine/cnc/archDxf.js` | > 0 | **0** |
+
+Neither string is anywhere in `src/` or `verify/`, and `git log -S` over **all** branches finds them in exactly one
+commit — `0801c78 "Update CLAUDE.md"`, i.e. only inside the gate sentence itself. The engine behaviour agrees:
+tracery still resolves `auto` → `quadrant` when the panes do not straddle the axis (`traceryExport.js:579-584`,
+banner line 696), and the committed sample `sample_tracery_dwg_R600_quad-hub-spoke.dxf` is still a half board;
+piece labels still sit ON the piece (`archDxf.js:300-303`). The sibling package from the same 06.09 chat,
+`arch-pieces-v1`, **is** present (night 6's own gate passes: `pieceStockTrapezoid` 4, `glazingRebate` 1,
+"Tracery LSP" 0) — so one chat package reached `main` and the other did not.
+
+### Base health on this branch (run anyway, so the morning starts from facts)
+
+- `node verify/arch/t16.mjs` … `t27.mjs`: t16 368 · t17_edges 70 · t18 178 · t19 244 · t20 116 · t20_bars 32 ·
+  t21 120 · t22 77 · t23 81 · t24_stage4 26 · t25 201 · t26 36 · t27 64 = **1613 checks, ALL PASS**
+  (`npm install`, `pip install ezdxf` 1.4.4).
+- `npm run build`: **OK**, 17.95 s.
+- The numbers are night 6's final numbers exactly — this tree is the night-6 tree, nothing regressed, nothing new
+  landed after it apart from the CLAUDE.md brief.
+
+### What is NOT done (the whole night's scope, unchanged and open)
+
+1. Stage 1 — glass DXF for rectangular units (`glassDxfExport.js` still skips them: "rectangular units go on the
+   glass PDF", line 261); t28 not written.
+2. Stage 2 — the dimension rule (spans below, overall above, heights right) on `CasementLeafDetail2D`,
+   `CasementFrameDetail2D`, Elements grid, `FrontElevation2D`, `SashDetail2D`, `BoxDetail2D`, `GlassDrawing2D`;
+   no snapshot rebase.
+3. Stage 3 — door option B (land 43, `leafAtJamb` 47, leaf 1000 → 906): `DEFAULT_DOOR_PROFILE` untouched, still
+   option A (land 36 / 40 / leaf 920). BLOCKERS §19.1 stays open.
+4. Stage 4 — the 3D control after the 68 frame; t29 not written. BLOCKERS §19.9 stays open.
+
+### Not verified tonight (honest list)
+
+Nothing was opened in a browser, no DXF in VCarve / bSolid, no PDF in a viewer. The harness and the build are the
+only evidence, and both only say the night-6 tree is intact — they say nothing about the four stages, which were
+not attempted. I did not attempt to reconstruct `gothic-full-v1` from its description: rewriting a package Piotr
+already has, from three words in a brief, would be guesswork in exactly the two files the gate protects
+(CLAUDE.md rule 2). It needs to be re-applied from the 06.09 chat.
+
+---
+
 ## 2026-09-06 — ARCHED-WINDOWS-v4 night 6 (branch `claude/arched-windows-v4-stages-9diax6`)
 
 Inputs read in full: `CLAUDE.md` → `docs/handover/ARCHED-WINDOWS-v4.md` → `BLOCKERS.md` (headers + open items) →

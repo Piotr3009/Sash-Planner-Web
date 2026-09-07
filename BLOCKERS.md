@@ -4,6 +4,109 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-09-06 — NIGHT 7 (zadanie nocne 7), stages on the rebased branch `claude/zadanie-nocne-7-glass-dxf-wb0eay`
+
+Entry gate re-run after `gothic-full-v1` landed on `main` (e037020): both markers 1 — §20 above is CLOSED, the
+night ran. Open items from the stages:
+
+### 24. Stage 4 — 3D control after the 68 frame: two gaps, both needing YOUR decision
+
+The arched path is healthy: real arcs from `arch.js` on every shape, rings offset by the profile face 68 and
+land 47, arched leaf 898 wide, `Kind: Fixed` still routed to `ArchedCasementWindow`, door post 2 × 68 = 136.
+t29 pins all of it. These two are what is left, and neither can be fixed without a workshop answer.
+
+| # | Item | Found | Ask |
+|---|------|-------|-----|
+| 24.1 | **A circle window's 3D never sees the 68 profile** | `windowSpecToConfig` sends `arch.shape === 'circle'` to `windowCategory: 'fix-only'` with `fixShape: 'circle'` — so the viewer draws a circle, not a rectangle — but that branch passes **no `frameDims`**, and `FixFrameWindow` has no such prop: it uses its own `FRAME_FACE = 64`. The engine meanwhile builds the circle's rings from the casement profile (68). `archedCasementGeometry` cannot take the circle instead: asked for `'circle'` it silently resolves to a semi-circle | **Is a circle's frame the casement's 68 section, or the fix-frame's own 64?** If 68: thread `frameDims` into `FixFrameWindow` (5 call sites + the App prop) — but that file is shared with PSW, and CLAUDE.md reserves the PSW port for you. If 64: the engine's circle rings should read 64, not the casement face |
+| 24.2 | **The 3D casement leaf is 4 mm short (1398 vs 1402)** | 040L 1000 × 1500. The WIDTH is right by construction (`face 68 − rebate 21 + gap 4 = leafAtJamb 51`). The HEIGHT is not: the 3D holds the leaf `BOTTOM_FACE 68 − REBATE_STEP 21 + gap 4 = 51` above the frame bottom (it models the cill like a jamb), the profile puts it at `gapCill 6 + cillVisible 41 = 47`. PRE-EXISTING — at the 57 face it was 1409 vs 1413, the same 4 mm | **Which cill is real: 41 visible with a 6 gap (profile), or a 21 rebate with a 4 gap (3D)?** Fix A: give `frameDims` a `leafBottom` key (default 51 = today's PSW behaviour) fed from `leafFullHeight − leafAtJamb`, and use it in `CasementWindow` + `ArchedCasementWindow`'s `bottomInner` — the same optional-prop pattern night 6 used, PSW unaffected. Fix B: decide the 3D is right and change the profile's cill numbers. NOT done tonight: either one changes how every casement renders, and I could not see the result |
+| 24.3 | **Piotr's screenshot never arrived** | "3D jakieś kwadratowe" is unexplained: the arched path measures correctly, `Kind: Fixed` keeps its arch, and the circle draws as a circle. Nothing was mounted in three.js — t29 calls the geometry helpers directly | Send the screenshot, or say which window it was. If it is not the arch, §24.1 (the circle's 64 frame) is the first suspect |
+| 24.4 | **`sideRightWidth` is set even when `sidePanels: 'left'`** | The door config carries `sideRightWidth: 500` alongside `sidePanels: 'left'`; `DoorWindow` only reads the side named by `sidePanels`, so nothing renders wrong — but the key is misleading | FYI — harmless today |
+
+---
+
+### 23. Stage 3 — doors option B: what closed and what to watch
+
+| # | Item | Taken | Ask |
+|---|------|-------|-----|
+| 23.1 | **§19.1 CLOSED** | Doors follow option B: land 43 (= face 68 − rebate 25), leafAtJamb 47, leafFullHeight 94, leafNoThreshold 53. A 1000 door leaf is 906 (was 920), french 1200 gives two 556 leaves (were 563) | Done — this was the open question from night 6 |
+| 23.2 | **The door numbers are 43 / 47, not the casement's 47 / 51** | CLAUDE.md's "NIE RÓB DZIŚ" line said "land 47 / leafAtJamb 51 (opcja B także dla drzwi)", which are the CASEMENT numbers; the door rebate is 25, not 21, so option B gives 43 / 47. The stage-3 brief in the same file states 43 / 47 and that is what was built | FYI — the two lines in CLAUDE.md disagreed; the stage brief won |
+| 23.3 | **Quoted doors change by 14 mm** | Any existing project re-opens with a 906 leaf instead of 920 (and 2006 instead of 2013 high) — the same live re-derive issue as §19.3, now with doors in it | Same decision as §19.3: live re-derive, or a profile snapshot per project |
+| 23.4 | **No door profile is stored** | `setDoorProfile()` has no call site, so there is no stored copy to migrate and no schema bump was made. If door settings ever reach Window Settings / Supabase, they will need the `migrateCasementProfile` treatment | FYI |
+| 23.5 | **Coupling post band changed** | Outward 72 → 86, inward 104 → 111 (`door.zones.posts[].visW`). The 2D door sheets and the 3D read it from the profile, so both follow | FYI — worth a look at a door with a side panel in the viewer |
+| 23.6 | **Pricing / BOM not re-checked** | They consume the engine rows, so the narrower leaf flows through, but no quote was compared before and after | Spot-check one door quote in the morning |
+
+---
+
+### 22. Stage 2 — one dimension rule on every sheet: decisions taken
+
+| # | Item | Taken | Ask |
+|---|------|-------|-----|
+| 22.1 | **Vertical chains go LEFT, heights go RIGHT** | The brief names three placements (spacings / axes bottom, overall width top, heights right) and is silent on which side a VERTICAL chain takes. The reference glass sheet puts it on the LEFT with the overall height on the right, so the frame sheet was mirrored to match (its chain was on the right, its arch / transom height dims on the left) | Confirm the left-hand vertical chain on the frame sheet; the alternative is chain right + heights left, which would then differ from the glass and leaf sheets |
+| 22.2 | **`BoxDetail2D` left untouched** | Its `Y` mapping is y-up, so the member chain was ALWAYS along the bottom, the inner width at the top and the height chain on the right — it already satisfied all three rules. t22 §1b asserts that, before and after, rather than churning the sheet | FYI — if you expected the box sheet to change, it had nothing to change |
+| 22.3 | **Elements grid needed no code** | `ElementsTab` in `ProductionPackPage` renders `CasementFrameDetail2D` / `CasementLeafDetail2D` / `BoxDetail2D` / `SashDetail2D` directly, and the Elements PDF rasterises those same SVGs — the rule arrives with the components | FYI |
+| 22.4 | **Radius callouts are exempt** | `R 500` labels sit ON the arc in the theme's dim colour; the rule governs dimension lines, not annotations, so the gate ignores strings starting with `R ` | Confirm — otherwise every arch sheet would have to move its radius labels below the drawing, far from the arc they describe |
+| 22.5 | **The frame chain sits 34·ts under the frame, not the glass sheet's 24·ts** | At 24·ts a chain leader label (14 up, 17 tall) printed over the `C-CILL` label inside the frame. 34·ts is derived from those two theme numbers, so it holds at any sheet size | FYI |
+| 22.6 | **Nothing was seen in a browser** | The proof is server-rendered SVG: viewBox unchanged on every sheet, rule satisfied, zero new label overlaps and zero new texts outside the viewBox across 11 window shapes | Look at Leaf / Frame / Elements in the morning and say whether the new placement reads right |
+
+---
+
+### 21. Stage 1 — glass DXF for every unit: erratum and decisions taken
+
+| # | Item | Taken | Ask |
+|---|------|-------|-----|
+| 21.1 | **Brief erratum: "okno 133 → 3 jednostki"** | Layout `133` is "3 Lights + Fanlights" (`casementLayouts.js` LAYOUT_NAMES), so the engine orders **6** units: 3 fanlights 434.3 × 337.2 + 3 lights 434.3 × 815.8. t28 asserts the engine's 6, and additionally `130` (3 lights, no fanlights) → 3 units — the layout the brief's number actually describes | FYI — the engine is right; no code follows the brief's 3 |
+| 21.2 | **The arched sash file grows** | `sample_glass_sash_1000x2200_semi-circle_hub-spoke.dxf` now carries 2 units: the arched upper AND the rectangular lower 733 × 962.5 the glazier previously only saw on the PDF. This is the point of the stage ("ONE file with all the glass"), so the gate's "kształtowe bajt w bajt" was verified as: whole-file identity for the four ALL-shaped windows, and per-unit entity identity for the shaped unit of this mixed window | FYI — confirm in the morning that the glazier wants the lower unit in the same DXF (it is what the brief says) |
+| 21.3 | **Bands are not clipped at crossings** | A vertical band runs the full height of the unit and a horizontal band the full width; they cross. The shaped path (`barBandCurves`) has always drawn whole bands, and the glazier reads one continuous bar — the glass PDF sketch, by contrast, breaks them at the crossing | Should the DXF break the bands at the crossings like the PDF sketch does? Not done — the shaped units would have to change too |
+| 21.4 | **Double-hung bar rule** | Sash units keep the sash-frame placement (wood bar centres, `computeGlassBarPositions`): 6x6 on a 733 wide unit gives axes 244.8 / 488.2, NOT the equal splits 244.3 / 488.7 a casement would give. This matches the glass PDF and the 2D sheets exactly | FYI — the two documents now agree by construction |
+| 21.5 | **Samples the stage did NOT produce** | `sample_arch_*`, `sample_arch_c5_*`, `sample_circle_1000_sunburst`, `sample_sash_arch_1200_*`, `sample_tracery_gothic` changed on this branch because **gothic-full-v1** (e037020) landed without regenerating them (labels moved below the piece, tracery always full); the harness run refreshed them | FYI — the repo's samples now match the code again |
+
+---
+
+## 2026-09-06 — NIGHT 7 (zadanie nocne 7) NOT STARTED — entry gate failed (branch `claude/zadanie-nocne-7-glass-dxf-wb0eay`)
+
+### 20. [CRITICAL → CLOSED 06.09 by e037020] `gothic-full-v1` was not in this repository — the first night-7 attempt stopped before any code
+
+CLAUDE.md opens night 7 with a hard gate: "Sprawdź na starcie, że `gothic-full-v1` jest na `main` … Jeśli nie —
+STOP, wpis w BLOCKERS." Both markers are 0, so nothing was implemented. **No source file was touched tonight.**
+
+**Evidence (in the order it was gathered):**
+
+| # | Check | Expected | Result |
+|---|-------|----------|--------|
+| a | `grep -c "mode = 'full'" src/engine/cnc/traceryExport.js` | > 0 | **0** |
+| b | `grep -c "labels BESIDE the piece" src/engine/cnc/archDxf.js` | > 0 | **0** |
+| c | Both strings anywhere in `src/` + `verify/` | present | **0 hits** |
+| d | `git log -S"<string>" --all` for both strings | a commit that adds them to the engine | **only `0801c78 "Update CLAUDE.md"`** — the strings exist solely inside the gate sentence in CLAUDE.md; the code they look for has never been committed here |
+| e | `git ls-remote --heads origin` | a gothic-full branch | 9 heads, **none** is gothic-full / arch-pieces; remote `main` = `0801c78` = this branch's base (the local `origin/main` ref was stale at `78ac6f5`) |
+
+**The behaviour matches the greps — it is the feature that is missing, not just a renamed string:**
+
+- **"traceria zawsze cała"** — `traceryExport.js:579-584` still resolves the mode by `auto`
+  (`mode = straddles ? 'full' : 'quadrant'`), so a half board is still produced, and line 696 still prints
+  `TRACERY QUADRANT (LEFT HALF - MIRROR FOR THE RIGHT)`. The committed sample
+  `docs/handover/samples/sample_tracery_dwg_R600_quad-hub-spoke.dxf` is exactly such a quadrant board; under
+  "tracery always full" it would have been regenerated as FULL.
+- **"napisy pod kawałkami"** — `archDxf.js:300-303` (`piecesRow`) still writes both label lines ON the piece
+  (centred at `x + roughDrawn / 2`, over the trapezoid band), not beside / under it.
+
+**The other 06.09 package IS in** — `arch-pieces-v1` passes night 6's own entry gate on this tree
+(`pieceStockTrapezoid` 4 in `archDxf.js`, `glazingRebate` 1 in `profile.js`, "Tracery LSP" 0), and the trapezoid /
+pre-cut code carries the 06.09 comments. So one of the two chat packages landed on `main` and the other did not.
+
+**The base is healthy, just one package behind:** the tree is the night-6 tree bit for bit — `node verify/arch/t16.mjs`
+… `t27.mjs` give the night-6 numbers exactly (t16 368, t17_edges 70, t18 178, t19 244, t20 116, t20_bars 32,
+t21 120, t22 77, t23 81, t24_stage4 26, t25 201, t26 36, t27 64 = **1613 checks, ALL PASS**) and `npm run build`
+is green (17.95 s). Nothing is broken; the gate is simply not satisfied.
+
+| # | Item | Ask for Piotr |
+|---|------|---------------|
+| 20.1 | **Re-send / apply `gothic-full-v1`** | The package was delivered in the 06.09 chat and never reached the repo (Piotr pushes by hand — `arch-pieces-v1` from the same chat did land). Apply it to `main`, then night 7 can run against the base its gate describes |
+| 20.2 | **Or: is the gate stale?** | If gothic-full-v1 was in fact applied under different wording, the two grep markers in CLAUDE.md are wrong and must be replaced with markers that really exist — say which two strings to use |
+| 20.3 | **Honest engineering note — the four stages look file-disjoint from the missing package** | gothic-full-v1 touches `traceryExport.js` + `archDxf.js`. Night 7 stage 1 touches `glassDxfExport.js` + two pages, stage 2 the 2D sheets, stage 3 `profile.js` / `calculations.js` (doors), stage 4 `src/3d` + `windowSpecToConfig`. No overlap, so the night could technically run on this base. I did not do it: the gate is explicit and doubled (CLAUDE.md + tonight's start instruction), and two stage gates take baselines — stage 1 "kształtowe bajt w bajt … snapshot z `sample_glass_*`" and stage 2's t19 / t22 rect snapshot rebase — that would be frozen against a base you are about to change. **If you want the night run on this base anyway, one line in the next brief is enough** ("run night 7 without the gothic-full gate"), and the stage-1 / stage-2 baselines then have to be re-checked after gothic-full-v1 is applied |
+| 20.4 | **Nothing from stages 1–4 was started** | Glass DXF for rectangular units, the dimension rule on Leaf / Elements / sash sheets, the door option B (land 43 / `leafAtJamb` 47 — note this also settles §19.1), and the 3D check after the 68 frame (§19.9) all remain open, unchanged |
+
+---
+
 ## 2026-09-06 — ARCHED-WINDOWS-v4 night 6, Stages 1–4 = Blocks C / B / E / F (branch `claude/arched-windows-v4-stages-9diax6`)
 
 Status of the older entries: **§1 D13 (piece rule) → CLOSED by v4 C.3 / C.4** (fewest pieces first, economy
@@ -14,15 +117,15 @@ C.1 `arch.minPieceLength` 400 HARD** (was 150 warn); §2 D5 / §3 d50 / §9.1 P9
 
 | # | Item | Taken | Ask |
 |---|------|-------|-----|
-| 19.1 | **Door land / leafAtJamb** | Spec F: doors change the face (68) and the coupling post (136) only — `DEFAULT_DOOR_PROFILE.geometry.land` stays 36, `deductions.leafAtJamb` 40, so a 1000 door leaf is still 920 and a 68 door jamb shows 36 with a 32 rebate step (68 − 36), not the casement's 21. Physically odd: the same 68 × 93 section rebated 21 on a casement and 32 on a door | Should the door follow option B too (land 47, leafAtJamb 51, leafFullHeight 98, coupling post visible band 47 + 47)? One line in the profile + t27 §5 re-vector |
+| 19.1 | **Door land / leafAtJamb** → **CLOSED 06.09 by night 7 stage 3** (land 43 / leafAtJamb 47; see §23) | Spec F: doors change the face (68) and the coupling post (136) only — `DEFAULT_DOOR_PROFILE.geometry.land` stays 36, `deductions.leafAtJamb` 40, so a 1000 door leaf is still 920 and a 68 door jamb shows 36 with a 32 rebate step (68 − 36), not the casement's 21. Physically odd: the same 68 × 93 section rebated 21 on a casement and 32 on a door | Should the door follow option B too (land 47, leafAtJamb 51, leafFullHeight 98, coupling post visible band 47 + 47)? One line in the profile + t27 §5 re-vector |
 | 19.2 | **Stored profile migration (`frameSchema` 2)** | Piotr's tenant profile in Supabase / localStorage still holds 57 / 36 / 40 / 87 / 54. `migrateCasementProfile` now moves each of those keys to the new default ONLY when it still equals the old default; a hand-edited value stays; a copy already marked `frameSchema 2` is never touched. The migrated profile is saved back by the store on its next sync | FYI — if the workshop had deliberately set a 57 jamb in Window Settings it stays 57 (by design); press "Reset to defaults" to take the whole 68 set |
 | 19.3 | **Profile snapshot per project (spec F.5 design note)** | Not built. A profile change re-derives every existing window live — the 06.09 change turns a quoted 920 leaf into 898 on the next open of an old project. `deriveWindowData()` is the single source of truth by design; freezing numbers per project would need a `profileSnapshot` stored with the project (the batch already carries `_profileSnapshot.casement` — unused by the engine) and an engine entry point that takes the snapshot instead of the active profile | Decide: (a) live re-derive (today), (b) snapshot at project creation with a "re-derive with the current profile" button, (c) snapshot at production-pack release only |
 | 19.4 | **Circle 800 frame ring now needs a 200 board** | Frame ring 400 / 332 (was 400 / 343): the independent planner and the engine both give W_req 182.3 > 180 for 4 pieces → **4 × 200** (was 4 × 180); 5 and 6 pieces fit 150 but fail the 400 shorter-edge limit, so no economy alternative. The leaf ring (349 / 282) stays blocked (4 × 180 → shorter edge 371.3 < 400; was 390.1) | FYI — a real material change for the workshop (the widest board on every 800 circle) |
 | 19.5 | **Economy rule C.4 with the smaller leaf ring** | 1200 three-centre rise 240 LEAF top rail at face 68: fewest = ONE 200 board (W_req 199.0, waste 56 %), the C.4 rule then takes 2 × 180 (a narrower board, waste 57.2 % — HIGHER). The rule as written compares board width, not waste; the engine and the harness follow it literally. Head: 2 × 180 fewest, no alternative (was 2 × 180 → economy 3 × 150 at face 57) | Add "AND lower waste" to C.4? (`fewest.waste > threshold && alt.waste < fewest.waste`) — a one-line change in `arch.js` + `indPlanner.mjs`, not made tonight (rule is DEFAULT (open) §16.2) |
-| 19.6 | **Spec C.5 table at face 57** | The C.5 reference numbers (134.7 / 158.3 / 112.6 / 168.1 / 170.6) are the 57-frame numbers by the spec's own words ("Face 57 head ring"). t25 keeps them against a schema-1 profile variant built in the harness and checks the live 68 profile against the independent planner; the face-68 numbers are printed in the BUILD-LOG Stage 4 table | Re-issue C.5 for the 68 frame in the next spec revision |
+| 19.6 | **Spec C.5 table at face 57** → **CLOSED 06.09 by night 7** (C.5b added to the spec, gated by t25 §2c) | The C.5 reference numbers (134.7 / 158.3 / 112.6 / 168.1 / 170.6) are the 57-frame numbers by the spec's own words ("Face 57 head ring"). t25 keeps them against a schema-1 profile variant built in the harness and checks the live 68 profile against the independent planner; the face-68 numbers are printed in the BUILD-LOG Stage 4 table | Re-issue C.5 for the 68 frame in the next spec revision |
 | 19.7 | **Part Registry 68 × 93** | `materialAssignmentStore` labels the frame head / jambs `68×93` (hint names the old 57×93); the Part Registry (Supabase data) must carry a 68 × 93 raw material — no DB change in this package | Add the 68 × 93 material in Part Registry and assign it to Frame Head / Frame Jambs; old projects keep their 57 × 93 assignment |
 | 19.8 | **PSW still describes a 57 frame** | Until `PSW-FRAME-68-PORT.md` is applied, PSW imports arrive with 57-based geometry; PC re-derives from its own profile (898 leaf), so the PSW estimate drawing and the PC numbers disagree by 11 per jamb | Port PSW (list of lines in the doc) and bump `window.CASEMENT_LAYOUTS_VERSION` to 3 |
-| 19.9 | **3D not seen** | The `frameDims` threading (11 files) builds and its wiring is asserted by t27 §7, but no browser: the 68 frame in the viewer, the door coupling post 136 and the fanlight axis 102 are unverified visually | Open a 1000 × 1500 casement and a door with a side panel in the viewer in the morning |
+| 19.9 | **3D not seen** → measured in night 7 stage 4 (t29), still not LOOKED at; see §24 | The `frameDims` threading (11 files) builds and its wiring is asserted by t27 §7, but no browser: the 68 frame in the viewer, the door coupling post 136 and the fanlight axis 102 are unverified visually | Open a 1000 × 1500 casement and a door with a side panel in the viewer in the morning |
 | 19.10 | **`ArchedDoorWindow.jsx` / `TransomPanel.jsx`** | Not threaded (PC never renders them: arched doors and door transom panels are out of PC's scope, CLAUDE.md); they still read `FRAME_FACE` 57 from `DoorFrame.jsx` | FYI |
 
 ### 18. Stage 3 — intersecting from the vertical bars (Block E): errata and questions

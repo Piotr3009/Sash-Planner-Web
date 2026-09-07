@@ -75,12 +75,26 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
   const DM = 70 * layoutSc;
   const M = 80 * layoutSc;
   const TITLE_AREA = (geom.arch ? 75 : 50) * layoutSc;   // arched: third title line
+  // right-hand stack (Piotr 06.09): arch start / rise and the transom axis dims
+  // moved to the right, so the overall height steps outside them
+  const rightInner = (geom.arch ? 1 : 0) + geom.transoms.length;
+  const overallVOff = DM * (1.15 + 0.35 * Math.max(0, rightInner - 1));
   const totalW = M + fw + DM * 2 + M;
-  const totalH = M + fh + DM + TITLE_AREA;
   const ox = M, oy = M;
   const X = (x) => ox + x;
   const Y = (y) => oy + y;
   const ts = totalW / VIEWBOX_REF;
+  // Bottom annotation band (Piotr 06.09): the member chain sits closest to the
+  // frame, the mullion axis dims below it, the title below both. 34·ts keeps the
+  // chain's leader labels (leaderV 14 up, text dimSmall 17 tall) clear of the
+  // cill label INSIDE the frame at any sheet size — 24·ts would touch it.
+  const nAxis = geom.mullions.filter((mu) => mu.full).length;
+  const chainY = oy + fh + 34 * ts;
+  const axisY = (i) => chainY + 30 * ts + DM * 0.3 * i;
+  // never below the old bottom margin: a frame without mullion axis dims keeps
+  // exactly the sheet size (and scale) it had before the dimensions moved
+  const bottomAnn = Math.max(DM, (nAxis ? axisY(nAxis - 1) : chainY) - (oy + fh) + 40 * ts);
+  const totalH = M + fh + bottomAnn + TITLE_AREA;
   const annFs = tfs(SIZES.code, totalW);
 
   const landRect = {
@@ -127,7 +141,7 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
     ? `C-AH ${fmt(arch.headLength)} · C-CILL ${fmt(geom.cill.length)}${geom.cill.wider ? ' (wider)' : ''}${geom.cill.extension > 0 ? ` · proj ${geom.cill.extension}mm` : ''} · C-J ×2 ${fmt(arch.jambLength)}`
     : `C-H ${fmt(fw)} · C-CILL ${fmt(geom.cill.length)}${geom.cill.wider ? ' (wider)' : ''}${geom.cill.extension > 0 ? ` · proj ${geom.cill.extension}mm` : ''} · C-J ×2 ${fmt(fh)}`;
   const archLine = arch ? `${arch.AG.label} · start ${fmt(arch.start)} · rise ${fmt(arch.rise)} · ${radiiText(arch.outer)}${arch.headNotes ? ` · ${arch.headNotes}` : ''}` : '';
-  const titleY = oy + fh + DM + TITLE_AREA * 0.5;
+  const titleY = oy + fh + bottomAnn + TITLE_AREA * 0.5;
 
   return (
     <div className="w-full">
@@ -219,9 +233,9 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
             <line x1={X(0) - sw(12)} y1={AP.springY} x2={X(fw) + sw(12)} y2={AP.springY}
               stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS}
               strokeDasharray={`${sw(8)},${sw(3)},${sw(2)},${sw(3)}`} />
-            <DimV x={ox - DM * 0.45} y1={AP.springY} y2={Y(fh)} extFrom={X(0)}
+            <DimV x={ox + fw + DM * 0.45} y1={AP.springY} y2={Y(fh)} extFrom={X(fw)}
               label={`start ${fmt(arch.start)}`} small vbw={totalW} />
-            <DimV x={ox - DM * 0.45} y1={Y(0)} y2={AP.springY} extFrom={X(0)}
+            <DimV x={ox + fw + DM * 0.45} y1={Y(0)} y2={AP.springY} extFrom={X(fw)}
               label={`rise ${fmt(arch.rise)}`} small vbw={totalW} />
             {AP.radii.map((rl, k) => (
               <text key={`r-${k}`} x={rl.at[0]} y={rl.at[1]} fill={COLORS.dim} fontSize={annFs}
@@ -232,28 +246,31 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
 
         {/* ── AXIS DIMS ── */}
         {geom.transoms.map((tr, i) => (
-          <DimV key={`ta-${i}`} x={ox - DM * (0.45 + i * 0.35)}
-            y1={Y(0)} y2={Y(tr.axisT)} extFrom={X(0)}
+          <DimV key={`ta-${i}`} x={ox + fw + DM * (0.45 + i * 0.35)}
+            y1={Y(0)} y2={Y(tr.axisT)} extFrom={X(fw)}
             label={`T ${fmt(tr.axisT)}`} small vbw={totalW} />
         ))}
         {geom.mullions.filter((mu) => mu.full).map((mu, i) => (
-          <DimH key={`ma-${i}`} y={oy + fh + DM * (0.35 + i * 0.3)}
+          <DimH key={`ma-${i}`} y={axisY(i)}
             x1={X(0)} x2={X(mu.axisX)} extFrom={Y(fh)}
             label={`axis ${fmt(mu.axisX)}`} small vbw={totalW} />
         ))}
 
-        {/* ── MEMBER CHAINS (arched: no top chain — the head is curved) ── */}
+        {/* ── MEMBER CHAINS (arched: no bottom chain for the head — it is curved) ──
+             Piotr 06.09: member spacings along the BOTTOM, the vertical chain on
+             the LEFT, exactly as the glass sheet places them */}
         {!AP && (
-        <DimChainH y={oy - 24 * ts} cuts={hCuts.map(X)} extFrom={oy - 4 * ts}
+        <DimChainH y={chainY} cuts={hCuts.map(X)} extFrom={oy + fh + 4 * ts}
           vbw={totalW} fmt={(n) => fmt(n)} />
         )}
-        <DimChainV x={ox + fw + 26 * ts} cuts={vCuts.map(Y)} extFrom={ox + fw + 4 * ts}
+        <DimChainV x={ox - 26 * ts} cuts={vCuts.map(Y)} extFrom={ox - 4 * ts}
           vbw={totalW} fmt={(n) => fmt(n)} />
 
-        {/* ── OVERALL ── */}
-        <DimH y={oy + fh + DM * 0.85} x1={X(0)} x2={X(fw)} extFrom={Y(fh)}
+        {/* ── OVERALL ── width at the TOP, height on the RIGHT outside the axis
+             dims that now sit there (Piotr 06.09) ── */}
+        <DimH y={oy - 30 * ts} x1={X(0)} x2={X(fw)} extFrom={Y(0)}
           label={fmt(fw)} vbw={totalW} />
-        <DimV x={ox + fw + DM * 1.15} y1={Y(0)} y2={Y(fh)} extFrom={X(fw)}
+        <DimV x={ox + fw + overallVOff} y1={Y(0)} y2={Y(fh)} extFrom={X(fw)}
           label={fmt(fh)} vbw={totalW} />
 
         {/* Selection overlays — invisible click zones + highlight (sash pattern) */}

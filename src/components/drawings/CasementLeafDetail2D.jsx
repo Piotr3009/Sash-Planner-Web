@@ -136,6 +136,9 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
 
   const ox = MGN_LEFT_DIM, oy = MGN_TOP_DIM;
   const totalW = ox + geom.leafW + MGN_RIGHT_DIM;
+  // The chain now sits under the leaf and the overall width at the top; both fit
+  // the existing margins (bottom: 28·ts vs the 60·ts the overall width needed,
+  // top: 56·ts vs MGN_TOP_DIM), so the sheet size — and its scale — is unchanged
   const totalH = oy + geom.leafH + MGN_BOT_DIM + MGN_TITLE;
   const ts = totalW / VIEWBOX_REF;
   const X = (x) => ox + x;
@@ -188,8 +191,11 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
   vBarsDim.forEach((vb) => { topCuts.push(vb.left); topCuts.push(vb.right); });
   topCuts.push(geom.leafW - geom.stile);
   topCuts.push(geom.leafW);
-  const topDimY = oy - 24 * ts;
-  const topExtLineEnd = oy - 4 * ts;
+  // Piotr 06.09 (night 7 stage 2): the bar / stile chain runs along the BOTTOM
+  // edge, the overall width sits at the TOP — the rule the glass sheet already
+  // follows (CasementGlassDrawing2D)
+  const topDimY = oy + geom.leafH + 24 * ts;
+  const topExtLineEnd = oy + geom.leafH + 4 * ts;
 
   // Left dim chain
   const leftCuts = [0, geom.stile];
@@ -423,11 +429,11 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
           <DimChainV x={leftDimX} cuts={leftCuts.map(Y)} extFrom={leftExtLineEnd}
             vbw={totalW} labels={leftLabels} fmt={(n) => fmt(n)} />
 
-          {/* ── OVERALL ── */}
+          {/* ── OVERALL ── height on the RIGHT, width at the TOP (Piotr 06.09) ── */}
           <DimV x={ox + geom.leafW + (AP ? 80 : 40) * ts} y1={Y(0)} y2={Y(geom.leafH)}
             extFrom={X(geom.leafW)} label={fmt(geom.leafH)} vbw={totalW} />
-          <DimH y={oy + geom.leafH + 34 * ts} x1={X(0)} x2={X(geom.leafW)}
-            extFrom={Y(geom.leafH)} label={fmt(geom.leafW)} vbw={totalW} />
+          <DimH y={oy - 30 * ts} x1={X(0)} x2={X(geom.leafW)}
+            extFrom={Y(0)} label={fmt(geom.leafW)} vbw={totalW} />
 
           {/* ── TITLE ── */}
           <TitleBlock x={totalW / 2} y={titleY}

@@ -1,5 +1,6 @@
 /**
- * glassDxfExport.js — glazier DXF for SHAPED glass units (arched-casement-v2 C).
+ * glassDxfExport.js — glazier DXF for EVERY glass unit of a window (night 7 stage 1;
+ * shaped units since arched-casement-v2 C).
  *
  * One entity set per shaped unit, in the unit's own frame (origin = the
  * unit's bottom-left corner, y up, mm — exactly what the glazier cuts to):
@@ -16,8 +17,17 @@
  *                  bar-end dimensioning rows (v3 0.3: s from apex · L · angle)
  * Units are stacked top-down, MERGE_GAP (300 mm) apart, like the jamb and
  * arch CNC files. Serialised by dxfWriter.js (R12, POLYLINE + bulge).
- * Rectangular units are NOT exported here (the glass PDF covers them); a
- * window without a shaped unit is skipped with the reason, never guessed.
+ *
+ * RECTANGULAR units use the same layers (Piotr 06.09: the glazier gets ONE file
+ * with all the glass, not a DXF for the arches and a PDF for the rest):
+ * contour = 4 lines, edge cover line inset by profile glass.edgeCover all round,
+ * bars = bands profile glass.barWidth wide with the axis on GLASS_BAR_AXES, and
+ * the text block carries the bar positions measured from the bottom corners.
+ * Bar placement has the two sources the glass PDF already uses, so both
+ * documents print the same numbers: casement / triple rows carry engine counts
+ * (barsV / barsH) and split the glass equally; double-hung rows keep the
+ * sash-frame placement (grid pattern + computeGlassBarPositions).
+ * Only a window with NO glass at all is skipped, with the reason, never guessed.
  * File names: {name}_glass.dxf, merged {label}_glass.dxf.
  */
 import { writeDxf } from '../engine/cnc/dxfWriter.js';
@@ -26,6 +36,7 @@ import { buildGlassListForWindow } from '../engine/lists.js';
 import { getCasementProfile } from '../engine/profile.js';
 import { readGlassProfile, barBandCurves, glassEdgePoly, barEndRows, useBarTable } from '../engine/glassBars.js';
 import { downloadDxf, safeName } from './cncExport.js';
+import { computeGlassBarPositions } from '../components/drawings/drawingUtils.jsx';
 
 // v3 Block 0.2: bars are BANDS (two offset curves ±barWidth/2, bulge on arcs)
 // on GLASS_BARS, the axes move to GLASS_BAR_AXES, the edge cover line
@@ -124,6 +135,79 @@ export function shapedGlassUnits(windowSpec, derived) {
   return out;
 }
 
+/**
+ * Double-hung grid modes → bar counts. The SAME table GlassDrawing2D, SashDetail2D
+ * and the glass PDF use; a mode this table does not know means no bars.
+ */
+export const SASH_GRID_BARS = Object.freeze({
+  'none': { h: 0, v: 0 }, '2x2': { h: 0, v: 1 }, '3x3': { h: 0, v: 2 },
+  '4x4': { h: 1, v: 1 }, '6x6': { h: 1, v: 2 }, '9x9': { h: 2, v: 2 },
+});
+
+/**
+ * Bars of ONE rectangular unit, in the unit frame (origin = bottom-left, y up).
+ * Two sources, exactly the ones the glass PDF draws from, so the DXF and the PDF
+ * can never print different positions for the same unit:
+ *   · casement / triple rows carry the engine counts (barsV / barsH) → the glass
+ *     is split into equal lights, axis k at W·k/(n+1);
+ *   · double-hung rows keep the sash-frame placement — the wood bar centres of
+ *     the grid pattern, converted to glass coordinates by computeGlassBarPositions
+ *     (its cy runs from the glass TOP, so it is mirrored here to y-up).
+ * Verticals are numbered left → right, horizontals bottom → top.
+ * Returns [{ id, role, kind: 'straight', from, to, length }].
+ */
+export function rectBarsForRow(row, windowSpec, derived) {
+  const W = Number(row?.width) || 0;
+  const H = Number(row?.height) || 0;
+  if (!(W > 0) || !(H > 0)) return [];
+  let xs = [];
+  let ys = [];
+  const cV = Math.max(0, Math.round(Number(row?.barsV) || 0));
+  const cH = Math.max(0, Math.round(Number(row?.barsH) || 0));
+  if (cV > 0 || cH > 0) {
+    xs = Array.from({ length: cV }, (_, i) => (W * (i + 1)) / (cV + 1));
+    ys = Array.from({ length: cH }, (_, i) => (H * (i + 1)) / (cH + 1));
+  } else if (row?.sash === 'upper' || row?.sash === 'lower') {
+    const pat = SASH_GRID_BARS[row?.bars] || SASH_GRID_BARS['none'];
+    const isUpper = row.sash === 'upper';
+    const sashW = Number(derived?.sashWidth) || 0;
+    const sashH = Number(isUpper ? derived?.topSashHeight : derived?.bottomSashHeight) || 0;
+    if ((pat.v > 0 || pat.h > 0) && sashW > 0 && sashH > 0) {
+      const b = computeGlassBarPositions({ sashW, sashH, isUpper, vCount: pat.v, hCount: pat.h, faces: derived?.sashDims });
+      xs = (b.vBars || []).map((v) => v.cx);
+      // cy is measured DOWN from the glass top edge; the DXF frame is y-up
+      ys = (b.hBars || []).map((h) => H - h.cy).sort((a, c) => a - c);
+    }
+  }
+  const bars = [];
+  xs.forEach((x, i) => bars.push({ id: `V${i + 1}`, role: 'v', kind: 'straight', from: [x, 0], to: [x, H], length: H }));
+  ys.forEach((y, i) => bars.push({ id: `H${i + 1}`, role: 'h', kind: 'straight', from: [0, y], to: [W, y], length: W }));
+  return bars;
+}
+
+/**
+ * EVERY ordered glass unit of one window — the same rows the Glass tab and the
+ * glass PDF show (lists.buildGlassListForWindow), one entry per ordered unit
+ * (qty > 1 → repeated), shaped and rectangular alike, in row order.
+ * Returns [{ id, row, shape | null, rect: { width, height, bars } | null }].
+ */
+export function glassUnitsForWindow(windowSpec, derived) {
+  if (!windowSpec || !derived) return [];
+  const rows = buildGlassListForWindow(derived, windowSpec) || [];
+  const out = [];
+  for (const r of rows) {
+    const shaped = (r?.shape?.kind === 'arched' || r?.shape?.kind === 'circle') && Array.isArray(r.shape.poly);
+    const W = Number(r?.width) || 0;
+    const H = Number(r?.height) || 0;
+    // a unit with no size is not glass the glazier can cut — never guessed
+    if (!shaped && (!(W > 0) || !(H > 0))) continue;
+    const qty = Math.max(1, Math.round(Number(r.quantity ?? r.qty ?? 1)));
+    const rect = shaped ? null : { width: W, height: H, bars: rectBarsForRow(r, windowSpec, derived) };
+    for (let n = 0; n < qty; n++) out.push({ id: `G${out.length + 1}`, row: r, shape: shaped ? r.shape : null, rect });
+  }
+  return out;
+}
+
 /** One text line per bar — positions in mm in the unit frame. */
 export function barTextLine(b) {
   const L = fmt1(b.length);
@@ -148,9 +232,44 @@ export function barEndTextLines(shape) {
   return [head, ...rows.map((r) => `${r.id}  ${ascii(r.cells.s)}  L=${r.cells.L}  ${ascii(r.cells.angle)}`)];
 }
 
+/**
+ * Bar positions of a rectangular unit measured FROM THE BOTTOM CORNERS
+ * (Piotr 06.09) — the glazier sets a duplex bar out from the corner it can
+ * reach, so every bar gets both distances of its axis.
+ */
+export function rectBarPositionLines(rect) {
+  const bars = rect?.bars || [];
+  if (!bars.length) return [];
+  const W = rect.width, H = rect.height;
+  const rows = bars.map((b) => (b.role === 'v'
+    ? `${b.id}  FROM LEFT ${fmt1(b.from[0])}  FROM RIGHT ${fmt1(W - b.from[0])}`
+    : `${b.id}  FROM BOTTOM ${fmt1(b.from[1])}  FROM TOP ${fmt1(H - b.from[1])}`));
+  return ['BAR AXES FROM THE BOTTOM CORNERS:', ...rows];
+}
+
+/** Text lines of one RECTANGULAR unit. */
+export function rectUnitTextLines(unit, winName) {
+  const { row, rect } = unit;
+  const name = winName ? `${winName} - ` : '';
+  const lines = [
+    `${name}${unit.id} GLASS RECTANGULAR`,
+    `W${fmt1(rect.width)} x H${fmt1(rect.height)}${row.location || row.label ? ' ' + String(row.location || row.label).toUpperCase() : ''}`,
+    [row.type, row.makeup, row.spec, row.coating === 'soft_coat' ? 'SOFT COAT' : null, row.gas, row.finish, row.spacer ? `SPACER ${row.spacer}` : null]
+      .filter(Boolean).map((s) => String(s).toUpperCase()).join(' '),
+  ];
+  const bars = rect.bars || [];
+  const nV = bars.filter((b) => b.role === 'v').length;
+  const nH = bars.filter((b) => b.role === 'h').length;
+  lines.push(bars.length ? `BARS ${bars.length} (${nH}H x ${nV}V) TOTAL L=${fmt1(bars.reduce((s, b) => s + b.length, 0))}` : 'NO BARS');
+  for (const b of bars) lines.push(barTextLine(b));
+  lines.push(...rectBarPositionLines(rect));
+  return lines;
+}
+
 /** Text lines of one unit (also reused by the harness). */
 export function unitTextLines(unit, winName) {
   const { row, shape } = unit;
+  if (!shape) return rectUnitTextLines(unit, winName);
   const name = winName ? `${winName} - ` : '';
   const lines = [
     `${name}${unit.id} GLASS ${String(shape.archShape || 'arched').toUpperCase()}`,
@@ -184,11 +303,46 @@ function curvePoly(layer, c, ox, oy) {
 }
 
 /**
- * Entity list of ONE shaped unit placed with its bottom-left corner at (ox, oy).
+ * Entity list of ONE RECTANGULAR unit placed with its bottom-left corner at
+ * (ox, oy): contour (4 lines), edge cover line, bar bands + axes, text block.
+ * Bands and axes run the full unit — unclipped at the crossings, exactly like
+ * the shaped bands (barBandCurves), so the glazier reads one continuous bar.
+ */
+export function buildRectUnitEntities(unit, winName = '', ox = 0, oy = 0) {
+  const { rect } = unit;
+  const G = unitGlassProfile(unit);
+  const W = rect.width, H = rect.height;
+  const E = [];
+  E.push(polyE('GLASS_CONTOUR', [[ox, oy, 0], [ox + W, oy, 0], [ox + W, oy + H, 0], [ox, oy + H, 0]], true));
+  // edge cover line: the contour offset inward all round; a unit too small to
+  // carry it on both sides keeps the contour alone rather than a crossed line
+  const c = G.edgeCover;
+  if (2 * c < W && 2 * c < H) {
+    E.push(polyE('GLASS_EDGE', [[ox + c, oy + c, 0], [ox + W - c, oy + c, 0], [ox + W - c, oy + H - c, 0], [ox + c, oy + H - c, 0]], true));
+  }
+  const hw = G.barWidth / 2;
+  for (const b of rect.bars || []) {
+    E.push(polyE('GLASS_BAR_AXES', [[b.from[0] + ox, b.from[1] + oy, 0], [b.to[0] + ox, b.to[1] + oy, 0]], false));
+    for (const band of barBandCurves(b, hw)) {
+      E.push(polyE('GLASS_BARS', [[band.from[0] + ox, band.from[1] + oy, 0], [band.to[0] + ox, band.to[1] + oy, 0]], false));
+    }
+  }
+  const C = GLASS_DXF;
+  const lines = unitTextLines(unit, winName);
+  const tx = ox + W + C.textGap;
+  const top = oy + Math.max(H, lines.length * C.lineH);
+  lines.forEach((str, i) => E.push(noteE('GLASS_TEXT', tx, top - (i + 1) * C.lineH + (C.lineH - C.textH) / 2, C.textH, str)));
+  return { entities: E, width: W + C.textGap + C.textBlockW, height: Math.max(H, lines.length * C.lineH) };
+}
+
+/**
+ * Entity list of ONE unit placed with its bottom-left corner at (ox, oy) —
+ * shaped units keep the arched path, rectangular units the 4-line path.
  * Returns { entities, width, height } (text block included in the width).
  */
 export function buildGlassUnitEntities(unit, winName = '', ox = 0, oy = 0) {
   const { shape } = unit;
+  if (!shape) return buildRectUnitEntities(unit, winName, ox, oy);
   const G = unitGlassProfile(unit);
   const E = [];
   E.push(polyE('GLASS_CONTOUR', shift(shape.poly, ox, oy), true));
@@ -210,7 +364,7 @@ export function buildGlassUnitEntities(unit, winName = '', ox = 0, oy = 0) {
   };
 }
 
-/** All shaped units of one window, stacked top-down from (ox, oy = top). */
+/** All units of one window (shaped and rectangular), stacked top-down from (ox, oy = top). */
 export function buildGlassWindowEntities(units, winName = '', ox = 0, oy = 0) {
   const E = [];
   let y = oy;
@@ -258,9 +412,10 @@ export function glassDxfParamsForWindow(windowSpec, derived, name) {
   const category = windowSpec.category || 'sash';
   if (category !== 'casement' && category !== 'sash') return { skip: 'not a casement or sash window' };
   if (!derived) return { skip: 'window could not be calculated' };
-  if (!windowSpec.arch?.shape) return { skip: `not an arched ${category} — rectangular units go on the glass PDF` };
-  const units = shapedGlassUnits(windowSpec, derived);
-  if (!units.length) return { skip: 'no shaped glass unit' };
+  // night 7 stage 1: EVERY glass unit goes in the file, shaped or not — only a
+  // window that carries no glass at all is skipped
+  const units = glassUnitsForWindow(windowSpec, derived);
+  if (!units.length) return { skip: 'no glass unit' };
   return { params: { units, winNum: String(name || windowSpec.name || '') } };
 }
 
@@ -292,7 +447,7 @@ export function exportGlassDxfMerged(windows, fileLabel) {
     if (r.skip) skipped.push({ name: w.name || '?', reason: r.skip });
     else { items.push({ units: r.params.units, winNum: r.params.winNum }); units += r.params.units.length; }
   }
-  if (!items.length) return { error: 'No shaped glass units in this pack', skipped };
+  if (!items.length) return { error: 'No glass units in this pack', skipped };
   const ents = buildMergedGlassEntities(items);
   downloadDxf(`${safeName(fileLabel || 'pack')}_glass.dxf`, writeDxf(ents, GLASS_LAYERS));
   return { ok: true, exported: items.length, units, skipped };

@@ -154,64 +154,41 @@ karmi cut listę, PDF-y, rysunki, PP. Nigdy nie licz wymiarów okna w innym miej
 
 ---
 
-## STAN — noce 1–6 na `main` (łuki casement/sash/stałe, archiwum, planer v2, PDF szklarza, rama 68)
-Plus paczki z czatu 06.09: `arch-pieces-v1` (trapezy, Pre-Cut per kawałek, wręb 18, wymiary) i
-`gothic-full-v1` (traceria zawsze cała, łuki maswerku do krawędzi deski, napisy pod kawałkami).
-Harnessy t16–t27 ALL PASS. Spec historyczne w `docs/handover/`.
+## STAN — noce 1–7 na `main` / na branchu nocy 7 (łuki casement/sash/stałe, archiwum, planer v2, PDF szklarza, rama 68, gothic-full, glass DXF wszystkich szyb, wymiary, drzwi opcja B)
+Noce 1–6 + `arch-pieces-v1` + `gothic-full-v1` (e037020) są na `main`. Noc 7 siedzi na branchu
+`claude/zadanie-nocne-7-glass-dxf-wb0eay` (5 commitów, do zmergowania rano).
+Harnessy t16–t29 ALL PASS (1822 checks). Spec historyczne w `docs/handover/`.
 
-## ZADANIE NOCNE 7 — poprawki po przeglądzie Piotra (06.09), cztery bramkowane etapy
+## WYNIK NOCY 7 (06.09) — cztery etapy zamknięte + jeden punkt z BLOCKERS
 
-Sprawdź na starcie, że `gothic-full-v1` jest na `main`: `grep -c "mode = 'full'" src/engine/cnc/traceryExport.js` > 0
-i `grep -c "labels BESIDE the piece" src/engine/cnc/archDxf.js` > 0. Jeśli nie — STOP, wpis w BLOCKERS.
+1. **Glass DXF: wszystkie szyby** — `glassUnitsForWindow()`, kontur 4 linie, oblamówka z profilu (11),
+   pasy 18 z osiami, teksty z pozycjami prętów od dolnych narożników; reguła prętów ta sama co w glass PDF.
+   Bramka **t28** (50). Kształtowe bajt w bajt; łukowy sash urósł o dolną szybę (zamierzone).
+2. **Wymiary spójnie** — chain na dole, wymiar całkowity na górze, wysokości po prawej w Leaf / Frame /
+   FrontElevation / SashDetail / GlassDrawing; Box już spełniał regułę, Elements dziedziczy z komponentów.
+   Nowa bramka `verify/arch/lib/dimRule.mjs` w t19 / t22 / t27. Każdy viewBox bez zmian → skala bez zmian.
+3. **Drzwi opcja B** — land 43, leafAtJamb 47, leafFullHeight 94, leafNoThreshold 53; skrzydło 1000 → 906,
+   french 1200 → 2 × 556. Bramka **t27** (87), tabela stare/nowe liczona przez harness z drzewa d733414.
+4. **Kontrola 3D** — **t29** (34): łuki to prawdziwe łuki z `arch.js`, pierścienie od 68/47, `Kind: Fixed`
+   zostaje łukowy, drzwi 68/43 i słupek 136. **Nie zmieniono żadnego pliku 3D.**
+5. **BLOCKERS §19.6 zamknięty** — C.5b (tabela dla ramy 68) w specyfikacji, bramkowana t25 §2c.
 
-**Etapy — następny startuje TYLKO po ALL PASS poprzedniego i zielonym `npm run build`:**
+**Otwarte po nocy 7 (BLOCKERS §24) — wymagają decyzji Piotra, NIE kodować bez niej:**
+- **§24.1** koło w 3D idzie do `fix-only` bez `frameDims`; `FixFrameWindow` ma własne `FRAME_FACE 64`.
+  Pytanie: rama koła to 68 (casement) czy 64 (fix-frame)?
+- **§24.2** skrzydło w 3D jest 4 mm niższe (1398 vs 1402): 3D trzyma skrzydło 51 nad dołem ramy
+  (cokół liczony jak ościeżnica), profil mówi 47 (gapCill 6 + cillVisible 41). Błąd sprzed ramy 68.
+  Pytanie: który model cokołu jest prawdziwy?
+- **§24.3** screen „3D kwadratowe" nie dotarł — nic nie było oglądane w przeglądarce.
 
-1. **Glass DXF: wszystkie szyby, także prostokątne** (`src/utils/glassDxfExport.js`, `WindowDetailPage`,
-   `ProductionPackPage`). Dziś eksport pomija jednostki bez łuku („rectangular units go on the glass PDF")
-   — Piotr: szklarz dostaje JEDEN plik ze wszystkimi szybami. Prostokąt = kontur 4 linie, oblamówka 11
-   (`profile.glass.edgeCover`), pręty jako pasy 18 z osiami na `GLASS_BAR_AXES`, tekst z nazwą okna,
-   numerem jednostki, W × H, pozycjami prętów (od dolnych narożników). Per okno i zbiorczo (batch / pack)
-   ten sam układ warstw co dla kształtowych; jednostki ułożone w rzędach jak dziś. Pomijane jest tylko
-   okno bez szkła. Przycisk aktywny dla każdego okna casement/sash z co najmniej jedną szybą.
-   Bramka: t28 — okno prostokątne 040L 1000 × 1500 → 1 jednostka, kontur 789 × 1293 (wg profilu 68),
-   pasy 2 × 18 przy 1H/1V, oblamówka; okno 133 → 3 jednostki; pack z 1 prostym + 1 łukowym → obie;
-   kształtowe bajt w bajt jak przed etapem (snapshot z `sample_glass_*`).
-
-2. **Wymiary spójnie na wszystkich arkuszach** (Piotr: „na szkle pięknie, na Leaf / Elements nie").
-   Reguła z arch-pieces-v1: odległości między prętami / osie **na dole**, wymiar całkowity **na górze**,
-   wysokości po prawej. Zastosować w `CasementLeafDetail2D`, `CasementFrameDetail2D`, arkuszu Elements
-   (grid), oraz w sash: `FrontElevation2D`, `SashDetail2D`, `BoxDetail2D`, `GlassDrawing2D`. Nie zmieniać
-   niczego poza pozycją wymiarów; tytuły i skala bez zmian. Bramka: t19/t22 snapshoty prostokątne
-   przebazowane z wpisem w BUILD-LOG (co się przesunęło), arkusze łukowe renderują bez NaN, żaden tekst
-   poza viewBox (istniejący guard).
-
-3. **Drzwi — opcja B jak w casement** (`DEFAULT_DOOR_PROFILE`): face 68 już jest; wręb drzwi zostaje
-   **25** (casement 21 + 4), więc land = 68 − 25 = **43**, `leafAtJamb` = 43 + 4 = **47**
-   (dziś 36 / 40 = opcja A, zostawiona przez noc 6 bo spec mówił „face + post only" — BLOCKERS §19).
-   Skrzydło 1000 → 906 (było 920). Panele boczne, french overlap, słupek 136 — przelicz z profilu.
-   Bramka: harness drzwi (t14 / t27) z wektorami przeliczonymi Z WZORÓW z profilu, nie z kodu; wpis
-   w BUILD-LOG ze starymi i nowymi liczbami dla drzwi 1000 × 2100 i french 1200 × 2100.
-
-4. **3D po zmianie ramy 68 — kontrola** (Piotr: „3D view jakieś kwadratowe zamiast pokazywać, co
-   naprawdę się dzieje"; screen jeszcze nie dotarł). Sprawdź `windowSpecToConfig` + `update3D` →
-   `App.jsx` → `CasementFrame` / `ArchedCasementWindow` / `archedCasementGeometry.js` / `DoorFrame`:
-   czy `frameDims` (face 68, land 47, leafAtJamb 51, post 136) docierają do KAŻDEGO komponentu, czy
-   łukowy casement dalej używa `arch.js` (nie fallbacku prostokątnego), czy przy `Kind: Fixed` i przy
-   kole nie wraca prostokąt. Napisz t29: geometria helperów 3D dla 040L 1000 × 1500 (leaf 898 × 1402),
-   łuk semi 1000 (pierścienie od 68), koło 800, drzwi z panelami (post 136) — wymiary siatek = liczby
-   z profilu ±0,5. Każdą rozbieżność napraw; jeśli helper daje prostokąt dla łuku — to jest ten błąd.
-
-Bez LISP-a, bez listew, `casementLayouts.js` nietknięty, `calculations.js` tylko drzwi (etap 3).
-Sesja w chmurze, własny branch, commit + push po każdym zamkniętym punkcie; przy ostrzeżeniu o limicie
-dokończ punkt, harness, commit, push, werdykt, koniec. Każde DEFAULT (open) = wpis w BLOCKERS.
-Na koniec checklista i szczery werdykt z listą tego, czego nie zweryfikowałeś (przeglądarka, VCarve, PDF).
 
 ## NIE RÓB DZIŚ (zaplanowane, osobne pakiety)
 
 - Drzwi: ramiaki skrzydła 92 mm zamiast 94 (materiał 014); próg 4 zawiasów > 2100 mm.
-- Drzwi: land 47 / `leafAtJamb` 51 na ramie 68 (opcja B także dla drzwi) — decyzja Piotra, BLOCKERS 19.1.
-- Snapshot profilu per projekt (BLOCKERS 19.3) — dziś każde okno liczy się na żywo z aktywnego profilu.
-- Reguła ekonomiczna C.4 „AND niższy odpad" (BLOCKERS 19.5); spec C.5 do ponownego wydania dla ramy 68 (19.6).
+- Snapshot profilu per projekt (BLOCKERS 19.3) — dziś każde okno liczy się na żywo z aktywnego profilu
+  (po nocy 7 dotyczy też drzwi: skrzydło 920 → 906).
+- Reguła ekonomiczna C.4 „AND niższy odpad" (BLOCKERS 19.5). [C.5 dla ramy 68 = zrobione w nocy 7, C.5b.]
+- 3D: rama koła i model cokołu (BLOCKERS §24.1 / §24.2) — obie zmiany ruszają plik dzielony z PSW, czekają na decyzję.
 - PSW: port ramy 68 (`PSW-FRAME-68-PORT.md`) — repo tylko do odczytu z PC, Piotr robi sam.
 - Nadświetla łukowe drzwi; drzwi / sliding / bifold / front door poza zakresem (Piotr 07.09).
 - Listwy przyszybowe: moduł beading SASH zamrożony (także łukowe — 12.5, 13.5); casement nie ma listew
@@ -234,7 +211,7 @@ Na koniec checklista i szczery werdykt z listą tego, czego nie zweryfikowałeś
 ## Checklist na koniec sesji
 
 - [ ] branch sesji wypchnięty, `main` nietknięty
-- [ ] `node verify/arch/t16.mjs` … `t27.mjs` (t16, t17_edges, t18, t19, t20, t20_bars, t21, t22, t23, t24_stage4, t25, t26, t27) → ALL PASS (t16 / t18 / t19 / t20 / t22 / t23 / t25 wymagają `pip install ezdxf --break-system-packages`; fixtures prostokątne przebazowuje się TYLKO przy zamierzonej zmianie liczb: `node verify/arch/rect_casement_baseline.mjs` + `node verify/arch/t19_baseline.mjs live`, z wpisem starych i nowych liczb w BUILD-LOG)
+- [ ] `node verify/arch/t16.mjs` … `t29.mjs` (t16, t17_edges, t18, t19, t20, t20_bars, t21, t22, t23, t24_stage4, t25, t26, t27, t28, t29) → ALL PASS (t16 / t18 / t19 / t20 / t22 / t23 / t25 wymagają `pip install ezdxf --break-system-packages`; fixtures prostokątne przebazowuje się TYLKO przy zamierzonej zmianie liczb: `node verify/arch/rect_casement_baseline.mjs` + `node verify/arch/t19_baseline.mjs live`, z wpisem starych i nowych liczb w BUILD-LOG)
 - [ ] `npm run build` przechodzi
 - [ ] esbuild OK na każdym dotkniętym pliku, zero polskiego w źródłach
 - [ ] `git diff main --stat` obejmuje TYLKO pliki ze spec §11 (+ verify, docs, BUILD-LOG, BLOCKERS, CLAUDE.md)

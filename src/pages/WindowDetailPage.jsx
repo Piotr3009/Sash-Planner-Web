@@ -328,10 +328,11 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
         <div className="flex items-center justify-between mb-4">
           <div className="text-sm font-semibold text-ink-50">Glass Schedule</div>
           <div className="flex items-center gap-2">
-            {/* Glazier DXF for shaped (arched) units — arched-casement-v2 C. Same
-                row and style as the PDF export; disabled with the reason on
-                windows without a shaped unit. */}
-            {((windowSpec?.category || 'sash') === 'casement' || !!windowSpec?.arch?.shape) && (() => {
+            {/* Glazier DXF — every glass unit of the window, shaped and rectangular
+                (night 7 stage 1: the glazier gets ONE file with all the glass).
+                Same row and style as the PDF export; disabled with the reason on
+                a window that carries no glass. */}
+            {['casement', 'sash'].includes(windowSpec?.category || 'sash') && (() => {
               const r = glassDxfParamsForWindow(windowSpec, derived, item?.name);
               return (
                 <button
@@ -340,7 +341,7 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
                     if (res.error) alert(`Glass DXF unavailable: ${res.error}`);
                   }}
                   disabled={!!r.skip}
-                  title={r.skip ? `Glass DXF unavailable: ${r.skip}` : 'Glazier DXF: exact contour + bar axes of every shaped unit'}
+                  title={r.skip ? `Glass DXF unavailable: ${r.skip}` : `Glazier DXF: exact contour, edge cover and bar axes of every glass unit (${r.params.units.length})`}
                   className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   📐 Glass DXF

@@ -81,6 +81,19 @@ Every plan above: all pieces ≥ 450 overall and ≥ 400 on the shorter edge; wi
 same four arches have NO valid plan (5 / 10 / 6 / 6 pieces, shorter edges 268 / 93 / 309 / 350).
 ```
 
+### C.5b Reference results re-issued for the 68 frame (night 7 stage 5; BLOCKERS §19.6 closed)
+The C.5 table above is the **57-frame** table, by its own premises. Block F widened the frame to 68, which
+grows the head ring, so the required board width moved. Same independent projection, same allowance 10 and
+finger 15, land 47 / leafAtJamb 51. **Piece counts and boards are UNCHANGED — only W_req moved.**
+`t25` §2c asserts every line below against the live profile, so this table cannot drift from the engine.
+```
+HALF 1000 (semi-circle W1000):   3 pieces · board 150 (144.5 needed, was 134.7) · outer 551.0/592.1/551.0 · inner 464.4/418.8/464.4  (2 pieces need 211.6 → no)
+ROUND 1000 rise 250 (3-centre):  2 pieces · board 180 (165.5, was 158.3)        · outer 619.5/619.5       · inner 529.5/529.5
+GOTHIC 1000 (equilateral):       2 pieces per side · board 120 (119.4, was 112.6) · outer 532.1/573.9 · inner 500.0/421.7
+HALF 1500 (semi-circle W1500):   3 pieces · board 180 (178.0, was 168.1)        · outer 819.4/878.7/819.4 · inner 715.4/670.9/715.4  (2 pieces need 284.8 → no) · economy default 4 × 150
+tc240 1200 (3-centre rise 240):  2 pieces · board 180 (176.8, was 170.6)        · outer 697.9/697.9       · inner 625.9/625.9
+```
+
 ### C.6 CLAMPS layer (Piotr 06.09: the Rover A 1532 holds pieces in Uniclamps, not vacuum pods)
 Arch DXF gains layer **`CLAMPS`**: for each flat piece in the PIECES row, two suggested Uniclamp
 footprints (`cnc.clamp`: base **130 × 130**, jaws for a piece thickness 40–98 — the 93 depth fits;

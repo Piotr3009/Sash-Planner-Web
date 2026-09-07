@@ -1194,7 +1194,7 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight) {
     const rightW = (mode === 'right' || mode === 'both') ? (Number(sp.rightWidth) || 0) : 0;
     const totalWidth = frameWidth + leftW + rightW;
     const doorX = leftW;
-    const edge = ded.leafAtJamb;                       // 40 = land 36 + gap 4
+    const edge = ded.leafAtJamb;                       // 47 = land 43 + gap 4
 
     const frames = [
         leftW ? { x: 0, w: leftW, kind: 'panel', side: 'left' } : null,
