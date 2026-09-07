@@ -1144,7 +1144,22 @@ const BAR_ID_PREFIX = Object.freeze({ v: 'V', h: 'H', springing: 'S', ring: 'R',
 function readPatternSettings(opts) {
   const ratios = Array.isArray(opts?.hubRingRatios) ? opts.hubRingRatios.map(Number) : [];
   if (ratios.length < 3 || !ratios.every((k) => k > 0 && k < 1)) throw new ArchError('Casement profile arch.patterns.hubRingRatios is missing (three fractions of the clear half width)');
-  return { ratios };
+  const I = opts?.intersecting || {};
+  const pitch = Number(I.pitch), minM = Number(I.minMullions), maxM = Number(I.maxMullions);
+  if (!(pitch > 0 && minM >= 1 && maxM >= minM)) throw new ArchError('Casement profile arch.patterns.intersecting is missing (pitch / minMullions / maxMullions)');
+  return { ratios, pitch, minM, maxM };
+}
+
+/**
+ * Mullion count of an intersecting unit: the user's vertical-bar chips when set, otherwise one
+ * mullion per `pitch` of clear width, clamped (Piotr 07.09 — before night 6 this came from the
+ * pitch and a 1500 window got six; night 6 took it from the chips and got two, leaving the
+ * straight part of a tall window as a single pane).
+ */
+export function intersectingMullionCount(clearWidth, vBars, patternOpts) {
+  const S = readPatternSettings(patternOpts);
+  if (vBars > 0) return vBars;
+  return Math.max(S.minM, Math.min(S.maxM, Math.round(Number(clearWidth) / S.pitch)));
 }
 
 /** Intersection points of two circles (none, one or two). */
@@ -1292,11 +1307,16 @@ export function buildArchBars({ outline, shape, pattern = 'none', h = 0, v = 0, 
   }
 
   if (intersecting) {
-    // v4 Block E: columns = the user's vertical bars (equal divisions of the clear width, to the springing);
-    // none → the two PSW default columns at ±¼ of the clear width. The arch's own radius = the outline arc
-    // radius (every outline arc of a semi-circle / gothic shares it).
-    const columns = nV > 0 ? Array.from({ length: nV }, (_, i) => Wg * (i + 1) / (nV + 1)) : [xg - Wg / 4, xg + Wg / 4];
+    // Arcs: the PSW arched-sash rule (v4 Block E) — two per mullion top, both with the outline's own
+    // radius. Count: from the clear width by pitch unless the user set the chips (Piotr 07.09).
+    const nCols = intersectingMullionCount(Wg, nV, patternOpts);
+    const columns = Array.from({ length: nCols }, (_, i) => Wg * (i + 1) / (nCols + 1));
     const R = arcs[0].r;
+    // The straight part below the springing is divided by the mullions themselves, so it needs a
+    // bar on the springing line to close those panes — without it the whole straight part stays one
+    // pane on the tracery board (Piotr 07.09: a 1500 × 3000 gothic had 1700 mm undivided). The hub
+    // patterns have this bar as their `springing` role; intersecting lost it in v4 Block E.
+    if (ys > 0 && nCols > 0) straight('springing', 0, ys, Wg, ys);
     for (const x of columns) {
       straight('v', x, 0, x, ys);                                    // column up to the springing — the arcs take over
       for (const dir of [1, -1]) {

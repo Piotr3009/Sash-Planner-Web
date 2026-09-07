@@ -202,16 +202,46 @@ section('2 — bars on the glass outline (spec §2.3 / §3 vectors), glass frame
   const trac = gi.bars.filter((b) => b.role === 'tracery');
   const mull = gi.bars.filter((b) => b.role === 'v');
   const Wg = 1000 - 2 * glassOff, Rg = 1000 - glassOff;   // gothic equilateral W1000 on the glass: clear width 789, outline radius = frame R (W) − glassOff = 894.5 (were 811 / 905.5)
-  check(`intersecting gothic W1000, 0 V: two default columns at ±¼ of the clear width (${Wg / 4} / ${3 * Wg / 4}), from the bottom to the springing only`, mull.length === 2 && near(mull[0].from[0], Wg / 4, 1e-6) && near(mull[1].from[0], 3 * Wg / 4, 1e-6) && mull.every((b) => near(b.to[1], gi.glassOutline.springing, 1e-9)));
-  check(`intersecting gothic: 4 tracery arcs with the outline's own radius ${Rg.toFixed(1)} (concentric glass radius; the spec's "R 1000" is the frame radius — errata E4), centres on the springing line at column ∓ R`,
-    trac.length === 4 && trac.every((b) => near(b.arc.r, Rg, 1e-6) && near(b.arc.cy, gi.glassOutline.springing, 1e-9) && mull.some((m) => near(Math.abs(b.arc.cx - m.from[0]), Rg, 1e-6))), trac.map((b) => `${b.arc.cx.toFixed(1)}/${b.arc.r.toFixed(1)}`).join(' '));
+  // 07.09 (Piotr): the pre-night-6 rule is back — mullions from the CLEAR WIDTH by pitch (not the bar
+  // chips), and every arc springs from a mullion top to the OPPOSITE frame corner, so each arc has its
+  // own radius |x - (xg ± halfWidth)|. Independent expectation, computed here from the profile:
   const onOutline = (pt, o2) => near(pt[1], arch.chainYAtX(o2.arcs, pt[0]), 1e-6);
-  check('intersecting gothic: every tracery arc starts on a column top (springing) and ends ON the glass outline (circle–circle intersection), a quarter turn at most', trac.every((b) => {
-    const start = b.arc.cx < b.from[0] + 1e-9 && near(b.arc.a0, 0, 1e-9) ? b.from : b.to, end = start === b.from ? b.to : b.from;
-    return near(start[1], gi.glassOutline.springing, 1e-6) && mull.some((m) => near(m.from[0], start[0], 1e-6)) && onOutline(end, gi.glassOutline) && b.arc.a1 - b.arc.a0 <= Math.PI / 2 + 1e-9;
-  }));
+  const IS = P.arch.patterns.intersecting;
+  const nExp = Math.max(IS.minMullions, Math.min(IS.maxMullions, Math.round(Wg / IS.pitch)));
+  const xsExp = Array.from({ length: nExp }, (_, i) => Wg * (i + 1) / (nExp + 1));
+  check(`intersecting gothic W1000, 0 V: ${nExp} mullions from the pitch rule (Wg ${Wg.toFixed(1)} / ${IS.pitch}), bottom to the springing`,
+    mull.length === nExp && mull.every((m, i) => near(m.from[0], xsExp[i], 1e-6) && near(m.from[1], 0, 1e-9) && near(m.to[1], gi.glassOutline.springing, 1e-9)),
+    mull.map((m) => m.from[0].toFixed(1)).join(' '));
+  {
+    // The ARCS keep the PSW arched-sash rule: two per mullion, both with the outline's own radius
+    // (PC and PSW identical). Only the mullion COUNT went back to the pitch rule on 07.09.
+    const rGot = trac.map((b) => b.arc.r);
+    check(`intersecting gothic: ${2 * nExp} tracery arcs, all with the outline radius ${Rg.toFixed(1)}, centres on the springing line`,
+      trac.length === 2 * nExp && rGot.every((r) => near(r, Rg, 1e-6)) && trac.every((b) => near(b.arc.cy, gi.glassOutline.springing, 1e-9)),
+      `${trac.length} arcs`);
+    check('intersecting gothic: one springing bar closes the straight panes (restored 07.09 — hub patterns always had it)',
+      gi.bars.filter((b) => b.role === 'springing').length === 1);
+  }
+  check('intersecting gothic: every arc starts on a mullion top at the springing and ends on the outline, span <= 90 deg',
+    trac.every((b) => {
+      const start = [b.arc.cx + b.arc.r * Math.cos(b.arc.a0), b.arc.cy + b.arc.r * Math.sin(b.arc.a0)];
+      const end = [b.arc.cx + b.arc.r * Math.cos(b.arc.a1), b.arc.cy + b.arc.r * Math.sin(b.arc.a1)];
+      const onMull = (p) => near(p[1], gi.glassOutline.springing, 1e-6) && mull.some((m) => near(m.from[0], p[0], 1e-6));
+      return (onMull(start) || onMull(end)) && (onOutline(start, gi.glassOutline) || onOutline(end, gi.glassOutline)) && b.arc.a1 - b.arc.a0 <= Math.PI / 2 + 1e-9;
+    }));
   const si = derive(pcItem('B7', 1000, 1500, { archShape: 'three-centre', archStart: 1000, archBarPattern: 'intersecting' })).arch;
-  check(`intersecting on a semi-circle, 0 V: 2 default columns + 4 tracery arcs R ${xgS} (the clear half width), ends on the outline`, si.bars.filter((b) => b.role === 'v').length === 2 && si.bars.filter((b) => b.role === 'tracery').length === 4 && si.bars.filter((b) => b.role === 'tracery').every((b) => near(b.arc.r, xgS, 1e-6) && (onOutline(b.from, si.glassOutline) || onOutline(b.to, si.glassOutline))));
+  {
+    // semi-circle, same restored rule (07.09): pitch mullions, each arc to the opposite frame corner
+    const WgS = 1000 - 2 * glassOff;
+    const nS = Math.max(IS.minMullions, Math.min(IS.maxMullions, Math.round(WgS / IS.pitch)));
+    const vS = si.bars.filter((b) => b.role === 'v'), tS = si.bars.filter((b) => b.role === 'tracery');
+    const xsS = Array.from({ length: nS }, (_, i) => WgS * (i + 1) / (nS + 1));
+    check(`intersecting on a semi-circle, 0 V: ${nS} pitch mullions + ${2 * nS} tracery arcs with the outline radius ${xgS}, ends on the outline`,
+      vS.length === nS && tS.length === 2 * nS
+      && tS.every((b) => near(b.arc.r, xgS, 1e-6))
+      && tS.every((b) => onOutline(b.from, si.glassOutline) || onOutline(b.to, si.glassOutline)),
+      `${vS.length} v, ${tS.length} arcs`);
+  }
   expectThrows('hub-spoke on a three-centre → readable (PATTERNS_FOR_SHAPE: three-centre takes none)', () => derive(pcItem('B8', 1000, 1500, { archShape: 'three-centre', archStart: 1300, archBarPattern: 'hub-spoke' })), /Bar pattern "hub-spoke" is not available on a Three-centre arch \(allowed: none\)/);
   expectThrows('intersecting on a three-centre → readable', () => derive(pcItem('B9', 1000, 1500, { archShape: 'three-centre', archStart: 1300, archBarPattern: 'intersecting' })), /not available on a Three-centre arch/);
   check('PSW_PATTERNS_FOR_SHAPE = PSW price-calculator.js 990–995 (semi-circle six, gothic none | intersecting, three-centre none); PC adds quad-hub-spoke + custom on the semi-circle only (v3 0.4)',
@@ -447,7 +477,7 @@ section('6 — glass PDF (jsPDF in node): Shape column, mm + % line, shaped draw
 
 // ═══════════════════════════════════════════════════════════════════════════
 section('7 — profile v3 block and vocabulary');
-check('profile.arch v4: minHaunchRadius 150, hubRingRatios [0.3, 0.6, 0.8], no intersecting settings (v4 Block E: the arcs take the outline radius)', P.arch.version === 4 && P.arch.minHaunchRadius === 150 && JSON.stringify(P.arch.patterns.hubRingRatios) === '[0.3,0.6,0.8]' && !('intersecting' in P.arch.patterns));
+check('profile.arch v4: minHaunchRadius 150, hubRingRatios [0.3, 0.6, 0.8], intersecting 220 / 2 / 9 (mullion pitch restored 07.09; arcs keep the PSW shared radius)', P.arch.version === 4 && P.arch.minHaunchRadius === 150 && JSON.stringify(P.arch.patterns.hubRingRatios) === '[0.3,0.6,0.8]' && P.arch.patterns.intersecting.pitch === 220 && P.arch.patterns.intersecting.maxMullions === 9);
 check('ARCH_BAR_PATTERNS vocabulary (PSW six + v3 quad-hub-spoke + custom + Block 3 sunburst) and labels', JSON.stringify(arch.ARCH_BAR_PATTERNS) === '["none","half-hub","hub-spoke","double-hub-spoke","triple-hub-spoke","quad-hub-spoke","custom","intersecting","sunburst"]' && arch.ARCH_BAR_PATTERNS.every((p) => typeof arch.ARCH_BAR_PATTERN_LABELS[p] === 'string'));
 expectThrows('unknown pattern in an item throws at normalisation', () => pcItem('X', 1000, 1500, { archShape: 'three-centre', archStart: 1000, archBarPattern: 'star' }), /Unknown arch bar pattern "star"/);
 check('CUT_LIST_ORDER: C-AH directly after C-FH, C-ATR directly after C-TR', (() => { const s = lists.CUT_LIST_ORDER.map((x) => x.symbol); return s[s.indexOf('C-FH') + 1] === 'C-AH' && s[s.indexOf('C-TR') + 1] === 'C-ATR'; })());

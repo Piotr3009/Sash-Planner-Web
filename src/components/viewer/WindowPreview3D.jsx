@@ -3,6 +3,8 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, ContactShadows, Environment } from '@react-three/drei';
 import ParametricSashWindow from '../../3d/components/ParametricSashWindow.jsx';
 import CasementWindow from '../../3d/components/casement/CasementWindow.jsx';
+import ArchedCasementWindow from '../../3d/components/casement/ArchedCasementWindow.jsx';
+import FixFrameWindow from '../../3d/components/fix-frame/FixFrameWindow.jsx';
 import DoorWindow from '../../3d/components/door/DoorWindow.jsx';
 import { windowSpecToConfig, windowSpecToCasementProps } from '../../utils/windowSpecToConfig.js';
 
@@ -21,7 +23,56 @@ function Scene({ config, side }) {
       <directionalLight position={[-2, 3, -3]} intensity={0.4} />
 
       <group rotation={groupRotation}>
-        {config.windowCategory === 'casement' ? (
+        {config.windowCategory === 'fix-only' ? (
+          // circle fixed window (v3 Block 3) — the preview had no branch for it either
+          <FixFrameWindow
+            width={config.extWidth || config.width}
+            height={config.extHeight || config.height}
+            woodColor={config.woodColor}
+            woodColorExt={config.woodColorExt}
+            woodColorInt={config.woodColorInt}
+            sameColor={config.sameColor}
+            spacerColor={config.spacerColor}
+            glassFinish={config.glassFinish || 'clear'}
+            hBars={config.casementHBars || 0}
+            vBars={config.casementVBars || 0}
+            fixShape={config.fixShape || 'rectangle'}
+            fixType={config.fixType || 'standard'}
+            fixCircleBarPattern={config.fixCircleBarPattern || 'none'}
+            fixCircleBarOffset={config.fixCircleBarOffset || 200}
+          />
+        ) : config.windowCategory === 'casement' && config.casementType === 'arched' ? (
+          // Piotr 07.09: the preview drew EVERY casement as a rectangle — it never had the arched
+          // branch the configurator has (src/3d/App.jsx), so arched windows came out square here
+          // and in the pack's 3D Views. Same component, same props as the configurator.
+          <ArchedCasementWindow
+            width={config.extWidth || config.width}
+            height={config.extHeight || config.height}
+            archShape={config.casArchShape || 'semi-circle'}
+            archRise={config.archRise || null}
+            archProfile={config.archProfile || null}
+            barPattern={config.barPattern || null}
+            archMinHaunchRadius={config.archMinHaunchRadius || 0}
+            archPatterns={config.archPatterns || null}
+            frameDims={config.frameDims || null}
+            archSpokes={config.archSpokes || null}
+            archRings={config.archRings || null}
+            hingeDirection={config.casArchHinge || 'left'}
+            opening={0}
+            fixedLeaf={!!config.fixedLeaf}
+            hBars={config.casementHBars || 0}
+            vBars={config.casementVBars || 0}
+            woodColor={config.woodColor}
+            woodColorExt={config.woodColorExt}
+            woodColorInt={config.woodColorInt}
+            sameColor={config.sameColor}
+            spacerColor={config.spacerColor}
+            glassFinish={config.glassFinish || 'clear'}
+            sealColour={config.sealColour || 'black'}
+            sillExtension={config.sillExtension || 0}
+            sillWider={config.sillWider || false}
+          />
+        ) : config.windowCategory === 'casement' ? (
           <CasementWindow {...config.casementProps} />
         ) : config.windowCategory === 'door' ? (
           // Layout code mirrors the 3D App: french = 040F, otherwise hinge side.

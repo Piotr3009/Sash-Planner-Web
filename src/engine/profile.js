@@ -188,11 +188,14 @@ export const DEFAULT_CASEMENT_PROFILE = {
     // Glazing bar patterns in the arch (v2 P5), geometry ported from PSW
     // 3d-src FixFrameWindow.jsx (semiBarPattern) on the glass outline: hub
     // ring radii as fractions of the clear half width (ring 1 / 2 / 3). The
-    // intersecting pattern has no numbers here since v4 Block E — its arcs
-    // spring from the user's vertical bars with the outline's own radius
-    // (the v3 pitch / mullion-count / minimum-radius keys are gone).
     patterns: {
       hubRingRatios: [0.3, 0.6, 0.8],
+      // Intersecting tracery. The ARCS follow the PSW arched-sash rule (v4 Block E): two arcs from
+      // every mullion top, both with the outline's own radius — PC and PSW stay identical there.
+      // The MULLION COUNT comes from the clear width by pitch, as it did before night 6: taking it
+      // from the bar chips gave a 1500 gothic two mullions and left the straight part as one pane
+      // (Piotr 07.09). Chips still win when set. `pitch` = target clear spacing between mullions.
+      intersecting: { pitch: 220, minMullions: 2, maxMullions: 9 },
       // v3 Block 3: sunburst in a CIRCLE fixed window (PSW 3d-src FixFrameWindow
       // CircleFrame): one ring `offset` mm inside the clear circle, `spokes`
       // spokes from the ring to the glass edge. PSW's per-window offset

@@ -107,19 +107,23 @@ for (const S of SHAPES) {
       if (!hub) {
         const user = vBars.filter((b) => !(pattern === 'intersecting'));
         if (pattern === 'intersecting') {
-          // v4 Block E (PSW sash rule): the user's v bars ARE the tracery columns — equal divisions of the clear
-          // width up to the springing (0 → two default columns at ±¼); two arcs per column, nothing else vertical
-          const nExp = v > 0 ? v : 2;
-          const xsExp = v > 0 ? [...Array(v)].map((_, i) => O.width * (i + 1) / (v + 1)) : [O.width / 4, 3 * O.width / 4];
-          if (vBars.length !== nExp) issues.push(`intersecting columns ${vBars.length} ≠ ${nExp}`);
+          // Restored 07.09 (pre-night-6 rule): mullions come from the CLEAR WIDTH by pitch, the user's
+          // v chips only override the count; each arc springs from a mullion top to the OPPOSITE frame
+          // corner, so radii differ per arc. (v4 Block E used the chips + one shared radius.)
+          const IS = P.arch.patterns.intersecting;
+          const nExp = v > 0 ? v : Math.max(IS.minMullions, Math.min(IS.maxMullions, Math.round(O.width / IS.pitch)));
+          const xsExp = [...Array(nExp)].map((_, i) => O.width * (i + 1) / (nExp + 1));
+          if (vBars.length !== nExp) issues.push(`intersecting mullions ${vBars.length} != ${nExp}`);
           vBars.forEach((b, i) => {
-            if (!near(b.from[0], xsExp[i], 1e-6)) issues.push(`${b.id} at x ${b.from[0].toFixed(1)} ≠ ${xsExp[i].toFixed(1)}`);
-            if (!(near(Math.max(b.from[1], b.to[1]), O.springing, 1e-6) && near(Math.min(b.from[1], b.to[1]), 0, 1e-6))) issues.push(`${b.id} does not run glass bottom → springing`);
+            if (xsExp[i] == null || !near(b.from[0], xsExp[i], 1e-6)) issues.push(`${b.id} at x ${b.from[0].toFixed(1)}`);
+            if (!(near(Math.max(b.from[1], b.to[1]), O.springing, 1e-6) && near(Math.min(b.from[1], b.to[1]), 0, 1e-6))) issues.push(`${b.id} does not run glass bottom to springing`);
           });
           const trac = bars.filter((b) => b.role === 'tracery');
-          if (trac.length !== 2 * nExp) issues.push(`tracery arcs ${trac.length} ≠ ${2 * nExp}`);
-          if (!trac.every((b) => near(b.arc.r, O.arcs[0].r, 1e-6))) issues.push('tracery radius ≠ outline radius');
-          if (bars.some((b) => b.role === 'springing')) issues.push('springing bar on an intersecting unit');
+          if (trac.length !== 2 * nExp) issues.push(`tracery arcs ${trac.length} != ${2 * nExp}`);
+          if (!trac.every((b) => near(b.arc.r, O.arcs[0].r, 1e-6))) issues.push('tracery radius != outline radius');
+          // 07.09: intersecting gets the springing bar back (hub patterns always had it) — without it
+          // the straight part below the springing stays ONE pane on the tracery board
+          if (bars.filter((b) => b.role === 'springing').length !== 1) issues.push('missing springing bar on an intersecting unit');
         } else {
           if (user.length !== v) issues.push(`v count ${user.length} ≠ ${v}`);
           for (const b of user) {
@@ -251,7 +255,10 @@ section('3 — intersecting = the PSW SASH rule (ArchedSashWindow.jsx 915–940)
   const CASES = [
     ['G3 (spec: gothic 1000 × 1900, 3 V → 6 arcs)', 1000, 1900, { archShape: 'gothic-equilateral', casementVBars: 3 }, { arcs: 6 }],
     [`S2 (spec: semi-circle 1000, 2 V → 4 arcs R ${xgS} = (1000 − 2·${glassOff})/2; 405.5 at the 57 face)`, 1000, 1500, { archShape: 'three-centre', archStart: 1000, casementVBars: 2 }, { arcs: 4, R: xgS }],
-    [`S0 (spec: 0 V → columns at ±${xgS / 2} = ±Wg/4; ±202.75 at the 57 face)`, 1000, 1500, { archShape: 'three-centre', archStart: 1000 }, { arcs: 4, R: xgS, columns: [-xgS / 2, xgS / 2] }],
+    // 07.09: with no chips the mullion count follows the pitch rule (clear width / pitch), so a
+    // W1000 semi-circle takes 4 mullions, not the two PSW defaults — the arcs are unchanged (R = xgS)
+    [`S0 (0 V → pitch mullions, ${2 * Math.max(P.arch.patterns.intersecting.minMullions, Math.min(P.arch.patterns.intersecting.maxMullions, Math.round((1000 - 2 * glassOff) / P.arch.patterns.intersecting.pitch)))} arcs R ${xgS})`, 1000, 1500, { archShape: 'three-centre', archStart: 1000 },
+      { arcs: 2 * Math.max(P.arch.patterns.intersecting.minMullions, Math.min(P.arch.patterns.intersecting.maxMullions, Math.round((1000 - 2 * glassOff) / P.arch.patterns.intersecting.pitch))), R: xgS }],
     ['G2 1400 × 2400', 1400, 2400, { archShape: 'gothic-equilateral', casementVBars: 2 }, { arcs: 4 }],
     ['GD 1000 × 1700 drop', 1000, 1700, { archShape: 'gothic-drop', archProfile: 'drop', casementVBars: 1 }, { arcs: 2 }],
   ];
@@ -287,8 +294,17 @@ section('3 — intersecting = the PSW SASH rule (ArchedSashWindow.jsx 915–940)
     }
     check(`${name}: PSW sash rule (R ${psw.R.toFixed(1)}) → ${psw.arcs.length} arcs, all present in PC; ${verts} PSW sample vertices on the PC arcs within 0.2 mm / one step`, matched === psw.arcs.length && matched === tracery.length && verts > 0 && off === 0, `matched ${matched}/${psw.arcs.length}, off ${off}`);
   }
-  check('intersecting keeps no springing bar (PSW 23.08: the columns flow into the arcs) and the h bars stay below the springing', (() => { const d = derive(pcItem('GH', 1000, 2000, { archShape: 'gothic-equilateral', archBarPattern: 'intersecting', casementHBars: 2 })); return !d.arch.bars.some((b) => b.role === 'springing') && d.arch.bars.filter((b) => b.role === 'h').every((b) => b.from[1] < d.arch.glassOutline.springing); })());
-  check('no intersecting settings left in the profile / 3D fallback (pitch, mullion clamp, minRadius gone)', !('intersecting' in P.arch.patterns) && !readFileSync(resolve(ROOT, 'src', '3d', 'components', 'casement', 'archedCasementGeometry.js'), 'utf8').includes('minMullions'));
+  // 07.09 (Piotr): intersecting DOES take a springing bar — the hub patterns always had one and the
+  // straight part of a tall gothic stayed a single pane on the tracery board without it.
+  check('intersecting has one springing bar and the h bars stay below the springing', (() => { const d = derive(pcItem('GH', 1000, 2000, { archShape: 'gothic-equilateral', archBarPattern: 'intersecting', casementHBars: 2 })); return d.arch.bars.filter((b) => b.role === 'springing').length === 1 && d.arch.bars.filter((b) => b.role === 'h').every((b) => b.from[1] < d.arch.glassOutline.springing); })());
+  // 07.09: the profile and the 3D fallback both carry the mullion pitch, and they must agree —
+  // the arcs keep the PSW shared radius, only the count is settings-driven
+  check('intersecting settings match in the profile and the 3D fallback (pitch 220, 2..9 mullions; no minRadius)', (() => {
+    const I = P.arch.patterns.intersecting;
+    const src = readFileSync(resolve(ROOT, 'src', '3d', 'components', 'casement', 'archedCasementGeometry.js'), 'utf8');
+    const m = src.match(/intersecting:\s*\{\s*pitch:\s*(\d+),\s*minMullions:\s*(\d+),\s*maxMullions:\s*(\d+)\s*\}/);
+    return !!I && !!m && I.pitch === +m[1] && I.minMullions === +m[2] && I.maxMullions === +m[3] && !('minRadius' in I);
+  })());
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
