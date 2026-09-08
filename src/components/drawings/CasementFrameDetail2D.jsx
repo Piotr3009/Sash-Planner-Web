@@ -28,9 +28,13 @@ function fmt(n) {
   return Number.isInteger(r) ? r.toString() : r.toFixed(1);
 }
 
-export default function CasementFrameDetail2D({ windowSpec, derived, projectNumber, selectedElement, onElementClick }) {
+export default function CasementFrameDetail2D({ windowSpec, derived, projectNumber, selectedElement, onElementClick, onExpand }) {
   const clickable = typeof onElementClick === 'function';
   const hl = (key) => clickable && selectedElement === key;
+  // Piotr 07.09: the frame card was noticeably shorter than the leaf card next to it — the leaf had
+  // an Expand affordance and the frame had none. Both sheets now use the same wrapper, and neither
+  // caps its height any more (the drawing renders at its natural size, no inner scrollbar).
+  const handleExpand = (e) => { e.stopPropagation(); if (onExpand) onExpand(); };
   const geom = useMemo(() => {
     const cas = derived?.casement;
     if (!windowSpec || !cas) return null;
@@ -144,7 +148,12 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
   const titleY = oy + fh + bottomAnn + TITLE_AREA * 0.5;
 
   return (
-    <div className="w-full">
+    <div className="w-full relative">
+      {onExpand && (
+        <div className="absolute top-2 right-2 z-10 text-[10px] text-ink-400 bg-surface-700/80 px-2 py-1 rounded cursor-pointer hover:text-accent-400"
+          onClick={handleExpand}>⊕ Expand</div>
+      )}
+      <div onClick={onExpand ? handleExpand : undefined} className={onExpand ? 'cursor-pointer' : undefined}>
       <svg viewBox={`0 0 ${totalW} ${totalH}`} xmlns="http://www.w3.org/2000/svg"
         className="w-full h-auto" style={{ background: COLORS.bg }}
         data-arch-origin={AP ? `${ox},${oy}` : undefined}>
@@ -318,6 +327,7 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
             fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>{archLine}</text>
         )}
       </svg>
+      </div>
     </div>
   );
 }

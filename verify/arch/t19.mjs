@@ -147,8 +147,14 @@ section('1 — rectangular casements: every sheet byte-identical to the pre-nigh
     const { spec, derived } = deriveItem(M, { id: 'fx_' + name, width: c.input.width, height: c.input.height, name }, { windowCategory: 'casement', ...c.input.fc });
     const now = renderSheets(M, spec, derived);
     const base = BASE.sheets[name];
-    const same = { elevation: now.elevation === base.elevation, frame: now.frame === base.frame,
-      leaf: JSON.stringify(now.leaf) === JSON.stringify(base.leaf), glass: JSON.stringify(now.glass) === JSON.stringify(base.glass) };
+    // Compare the DRAWING, not the container chrome: the snapshot guards the geometry and the
+    // annotations, while the wrapper around the <svg> (expand button, click handler, height rules)
+    // is layout that changes on purpose — Piotr 07.09 asked for the two Elements cards to match.
+    const svgOnly = (str) => { const i = str.indexOf('<svg'); const j = str.lastIndexOf('</svg>'); return i < 0 || j < 0 ? str : str.slice(i, j + 6); };
+    const sameSheet = (a, b) => svgOnly(a) === svgOnly(b);
+    const sameList = (a, b) => a.length === b.length && a.every((g, i) => sameSheet(g.svg, b[i].svg) && g.label === b[i].label);
+    const same = { elevation: sameSheet(now.elevation, base.elevation), frame: sameSheet(now.frame, base.frame),
+      leaf: sameList(now.leaf, base.leaf), glass: sameList(now.glass, base.glass) };
     sheets += 2 + now.leaf.length + now.glass.length;
     check(`${name} (${c.input.fc.casementLayout}): elevation / frame / ${now.leaf.length} leaf / ${now.glass.length} glass sheets identical, no arch attributes`,
       Object.values(same).every(Boolean) && !/data-arch-origin| A /.test(now.elevation + now.frame), JSON.stringify(same));

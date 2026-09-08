@@ -42,6 +42,18 @@ for (const prop of ['archShape', 'archRise', 'archProfile', 'barPattern', 'frame
 check('arched preview sizes from extWidth / extHeight (ArchedCasementWindow ignores casementProps)', /extWidth \|\| config\.width/.test(prev) && /extHeight \|\| config\.height/.test(prev));
 check('preview never opens the leaf (a thumbnail is always closed)', /opening=\{0\}/.test(prev));
 
+console.log('== 4 — the user\'s bar counts reach the 3D (they used to stop at casementProps) ==');
+const w2c = read('src', 'utils', 'windowSpecToConfig.js');
+check('windowSpecToConfig puts casementHBars / casementVBars in the ARCH config (arch.bars, not casementProps)',
+  /casementHBars: Number\(arch\.bars\?\.h\)/.test(w2c) && /casementVBars: Number\(arch\.bars\?\.v\)/.test(w2c));
+
+console.log('== 5 — the two Elements cards use the same container (Piotr 07.09) ==');
+const frameSheet = read('src', 'components', 'drawings', 'CasementFrameDetail2D.jsx');
+const leafSheet = read('src', 'components', 'drawings', 'CasementLeafDetail2D.jsx');
+check('neither sheet caps its height (no maxHeight / inner scrollbar)', !/maxHeight/.test(frameSheet) && !/maxHeight/.test(leafSheet));
+check('both sheets offer the same Expand affordance', /Expand/.test(frameSheet) && /Expand/.test(leafSheet));
+check('both sheets scale the same way (w-full h-auto on the svg)', (frameSheet.match(/className="w-full h-auto"/g) || []).length === 1 && (leafSheet.match(/className="w-full h-auto"/g) || []).length === 1);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (!fail) console.log('ALL PASS');
 process.exit(fail ? 1 : 0);

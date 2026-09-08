@@ -221,8 +221,8 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
         {isExternalExpand ? '⊕ Expand' : (expanded ? '⊖ Collapse' : '⊕ Expand')}
       </div>
 
-      <div onClick={isExternalExpand ? handleExpand : () => setExpanded(!expanded)} className="cursor-pointer"
-        style={{ maxHeight: (expanded && !isExternalExpand) ? 'none' : '65vh', overflow: 'auto' }}>
+      {/* Piotr 07.09: no height cap — the sheet renders at its natural size, like the frame card */}
+      <div onClick={isExternalExpand ? handleExpand : () => setExpanded(!expanded)} className="cursor-pointer">
         <svg viewBox={`0 0 ${totalW} ${totalH}`} xmlns="http://www.w3.org/2000/svg"
           className="w-full h-auto" style={{ background: COLORS.bg }}
           data-arch-origin={AP ? `${ox},${oy}` : undefined}>

@@ -113,6 +113,11 @@ export function windowSpecToConfig(windowSpec) {
       archPatterns: archProfileSettings?.patterns || null,
       archSpokes: Number(arch.bars?.spokes) || null,
       archRings: Array.isArray(arch.bars?.rings) && arch.bars.rings.length ? [...arch.bars.rings] : null,
+      // Piotr 07.09: the user's bar counts never reached the 3D — casementHBars / casementVBars sat
+      // in casementProps, which the arched component does not read, so it fell back to the automatic
+      // mullion count (a 3-bar gothic was drawn with 6). The engine takes them from arch.bars; so does 3D now.
+      casementHBars: Number(arch.bars?.h) || 0,
+      casementVBars: Number(arch.bars?.v) || 0,
     } : { casementType: 'standard' };
     return {
       windowCategory: 'casement',
