@@ -4,6 +4,65 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-09-08 — NIGHT 8 (turn 65), branch `claude/magical-edison-j5q0a9`
+
+### Verdict ⛔ NOT RUN — the brief in `CLAUDE.md` is another repository's. Zero feature code written.
+
+`CLAUDE.md` at HEAD is `TURN 65 · PBI: THE EMPTY ROOM, THE BAYS, AND WHAT THE CARCASS WEARS` — a retail wardrobe
+designer. F1–F10 name 15 files and symbols; **14 return zero files** in `src/` and `verify/`, and none has ever
+existed on any branch. The three "licensed engine files" are `endPanelAuto.js` (absent), `cabinet.js` (absent)
+and `profile.js` (present, but it is the sash-window profile). There is no `reference/lisp/`, no `src/retail/`,
+no six goldens, no `verify/t65/`. Full evidence table in `BLOCKERS.md` §25.
+
+Not built here, deliberately: this repo's own CLAUDE.md says *"Trzy osobne produkty, nie duplikować logiki
+między nimi"* and *"poza zakres nie wychodź"*, and the brief's first law is *"1:1 = COPY … never re-invent"* —
+with no PRO wardrobe app present, every F would have been invention. `Piotr3009/Cabinet-core` is the likely
+home; attaching it was denied by the sandbox, so that stays an inference. See BLOCKERS §25.3–25.4.
+
+### What was done instead: a truthful baseline of this repo. Nothing changed, tree clean.
+
+**Suite ALL PASS — 16 harnesses, 1852 checks, 0 failures. `npm run build` OK (15.2 s).**
+
+| harness | checks | | harness | checks |
+|---|---|---|---|---|
+| t16 | 368 | | t23 | 81 |
+| t17_edges | 70 | | t24_stage4 | 26 |
+| t18 | 179 | | t25 | 225 |
+| t19 | 280 | | t26 | 36 |
+| t20 | 117 | | t27 | 87 |
+| t20_bars | 31 | | t28 | 50 |
+| t21 | 120 | | t29 | 34 |
+| t22 | 118 | | t30_preview | 30 |
+
+**t16–t29 = 1822 — byte-for-byte the figure night 7 stage 5 recorded.** Nothing has drifted since the last
+verdict; t30_preview's 30 is the only addition, giving 1852.
+
+### Two live footguns found while running it — worth knowing before the next night
+
+**1. `verify/arch/*_baseline.mjs` are fixture GENERATORS, not tests.** `rect_casement_baseline.mjs`,
+`t19_baseline.mjs` and `t22_baseline.mjs` print no verdict and exit 0 — and rewrite fixtures. Running the
+directory as a set (`for f in verify/arch/*.mjs`) silently re-blessed
+`verify/arch/fixtures/rect-casement-sheets.json`, flipping its provenance from `ref:"live" commit:0d211fd` to
+`ref:"HEAD" commit:<current HEAD>`, which then fails t27 line 347 — a failure that looks like a code regression
+and is not one. Caught and reverted here; the tree is clean. **Run `verify/arch/t*.mjs` minus `*baseline*`.**
+
+**2. `t26` rewrites two sample PDFs on every run** (`docs/handover/samples/sample_glass_order_arched*.pdf`) —
+jsPDF stamps a new document id, so `git status` shows them modified after any green run. Benign; do not commit
+the churn.
+
+### Prerequisites for a cold container (18 of 20 harnesses fail without them, all `MODULE_NOT_FOUND`, no code fault)
+
+```
+npm install                 # 239 packages
+pip install ezdxf           # 1.4.4 — t16, t17_edges, t25 shell out to verify/arch/dxf_probe.py
+```
+
+`verify/parity/psw-casement-layouts.mjs` was **not** run: it needs a read-only PSW clone at `/home/user/psw`
+(`git -c http.proxyAuthMethod=basic clone --depth 1 https://github.com/Piotr3009/Prime-Sash-Windows.git psw`)
+and PSW is outside this session's GitHub scope. It exits rc=2 with that instruction — not a failure.
+
+---
+
 ## 2026-09-06 — NIGHT 7 (zadanie nocne 7), Stage 1 (branch `claude/zadanie-nocne-7-glass-dxf-wb0eay`)
 
 Entry gate re-run after Piotr put `gothic-full-v1` on `main` (e037020): `mode = 'full'` **1**, `labels BESIDE the
