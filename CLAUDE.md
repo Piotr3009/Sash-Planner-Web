@@ -1,219 +1,342 @@
-# CLAUDE.md — Production Core (Sash-Planner-Web)
+# CLAUDE.md — TURN 65 · PBI: THE EMPTY ROOM, THE BAYS, AND WHAT THE CARCASS WEARS
 
-## O projekcie
+Run autonomously. Zero questions, zero stops. Skip-and-note. PR before morning.
+Full suite, never `--silent`. Frames under `verify/t65/`.
 
-Production Core (PC) to webowy SaaS do planowania produkcji stolarki drewnianej: okna
-skrzynkowe (sash), casement, drzwi, fix frame. Repo: `Piotr3009/Sash-Planner-Web`.
-Aplikacja jest w aktywnym rozwoju przed startem. Silniki sash / casement / door działają;
-fix frame nie ma jeszcze silnika (`emptyDerived`).
+## THE LAW OF THE TURN
 
-**Właściciel:** Piotr — NIE jest programistą. Ty piszesz cały kod, Piotr testuje i ocenia rano.
+**1:1 = COPY.** Where PRO has it, copy PRO's file, repoint imports, change only
+the skin (T62/T63 method, proven). Never re-invent in "retail language".
 
-Trzy osobne produkty, nie duplikować logiki między nimi:
-- **PC** — to repo (planowanie produkcji)
-- **PSW** — `Prime-Sash-Windows`, konfigurator/wycena dla klienta (tylko do odczytu)
-- **JC** — `Joinery-Core-SaaS`, magazyn/dostawcy (osobna subskrypcja, nie ruszać)
+**The lazy client.** Every step has its answer already chosen. NEXT always
+works. "More options" for the picky.
 
----
+**The right panel is the selected element, nothing else.** The owner:
+*"w menu prawym powinny się pojawiać tylko menu funkcyjne danego elementu,
+dokładnie te które już są. Po naciśnięciu na inny element menu się zmienia,
+a jak naciśniesz w szafę lub poza menu — znika."*
 
-## TRYB PRACY: AUTONOMIA NOCNA
+## THE THREE DECISIONS MADE HERE
 
-Zadanie na sesję jest w sekcji **„ZADANIE NOCNE"** niżej, spec w `docs/handover/`. Piotr
-zatwierdza cały zakres z góry — **nie czekaj na potwierdzenia** w jego obrębie, poza zakres
-nie wychodź.
+The owner ordered the spec with three questions open. Decided, one line each,
+overturnable with one word:
 
-- Sesja w chmurze na własnym branchu (nazwę nadaje środowisko). **Nigdy nie pushuj na `main`**
-  — Piotr merguje rano.
-- Commit po każdym zamkniętym zadaniu, push brancha.
-- Problem blokujący albo niejasna logika biznesowa → wpis w `BLOCKERS.md`, jedź dalej z resztą.
-- Werdykty per zadanie → `BUILD-LOG.md` (nowa sekcja na górze, z datą).
-- Harness musi przejść **ALL PASS przed każdym commitem** zadania, którego dotyczy.
-
-Rzeczy z listy „NIE RÓB DZIŚ" (§ niżej) są celowo poza zakresem, nawet jeśli wyglądają na
-łatwe do „przy okazji".
-
----
-
-## REPOZYTORIA
-
-### Sash-Planner-Web — TU PRACUJEMY
-```
-git -c http.proxyAuthMethod=basic clone --depth 1 https://github.com/Piotr3009/Sash-Planner-Web.git pc
-```
-
-### Prime-Sash-Windows — TYLKO DO ODCZYTU, OPCJONALNE
-```
-git -c http.proxyAuthMethod=basic clone --depth 1 https://github.com/Piotr3009/Prime-Sash-Windows.git psw
-```
-**NIE edytuj, NIE twórz branchy, NIE pushuj.** Jeśli klon się nie uda (repo prywatne) —
-nie proś o token: wszystkie potrzebne liczby z PSW są zacytowane w specyfikacji z plikiem
-i linią. Geometrię łuków z PSW **nie portować** — patrz spec §3 (Bézier w 2D,
-niewspółśrodkowe łuki w 3D).
+1. **A gap of 100 mm or less to the ceiling is closed by the CORNICE growing**,
+   not by a top infill — the owner said the cornice reaches the ceiling.
+   Top infill stays a manual choice. *(Overturn: "top infill zamyka".)*
+2. **A large gap (over 100 mm) is left alone.** No proposal, no nagging. ADD
+   TOP BOX sits in EXTRAS if the client wants it. *(Overturn: "proponuj top box".)*
+3. **No wardrobe is placed by the app at all.** The owner: *"ściana 4000 mm,
+   ale bez szaf"*. WHERE gives a 4000 mm wall and an empty room; the client
+   adds the first wardrobe himself — from the plus on the empty floor, or from
+   ADD A WARDROBE in the step. Default width when he does: **1200**, or the
+   wall if it is narrower. *(Overturn: "stawiaj pierwszą szafę".)*
 
 ---
 
-## KRYTYCZNE ZASADY
+## WHAT IS FROZEN
 
-1. **Kod, komentarze i copy po angielsku.** Zero polskiego w plikach źródłowych. Commity po angielsku.
-2. **Nie zmieniaj istniejących funkcji poza zakresem zadania.** Nowa metoda poza spec = wpis w BLOCKERS, nie kod.
-3. **Nigdy nie usuwaj kodu bez uzasadnienia** w BUILD-LOG.
-4. **Nie kłam.** Czego nie zrobiłeś — napisz. Werdykt ✅ tylko po harnessie.
-5. **Beading (listwy przyszybowe) jest zamrożony** — nie dotykać, także łukowych.
-6. **`casementLayouts.js`:** kolejność paneli w definicjach jest 1:1 z PSW (`casementHinges` jest indeksowane po tej kolejności). Nie zmieniać. Nowe kody wymagają tej samej zmiany w PSW i bumpa `CASEMENT_LAYOUTS_VERSION`.
-7. **Zustand:** nigdy `get xyz()` w store'ach (psuje hydratację persist).
-8. **Rysunki 2D:** wszystkie stałe wizualne z `drawingTheme.js`; mnożnik `sc` tylko do pozycji, nigdy do `fontSize` / `strokeWidth` / `strokeDasharray`. (W tym pakiecie nie ma 2D — zasada na przyszłość.)
-9. **Batch:** pole `label` (nie `name`); typ drzwi to `'door'` w liczbie pojedynczej.
-10. **Supabase PC:** projekt `teqkuumenoerphfuqijb`, multi-tenant przez `tenant_id`; `user_profiles.id` = `auth.uid()`. SQL nigdy w kodzie aplikacji bez osobnego pliku migracji. **W tym pakiecie nie ma zmian w bazie.**
-11. **Numery warsztatowe siedzą w profilu** (`src/engine/profile.js`), nie w kodzie. Łuki czytają `frameHead.face`, `leafTop.face`, `leafAtJamb`, `glassInset` z profilu — nigdy nie wpisuj 68 / 67 / 51 na sztywno (rama 68 weszła 06.09 bez dotykania `arch.js`; bramka grep w `verify/arch/t27.mjs` §8). Rama casement i drzwi: face **68**, rebate 21, land 47, `leafAtJamb` 51 (casement), słupek drzwi 136; 3D dostaje `frameDims` z profilu (`windowSpecToConfig.js`), stałe 57 / 36 w `src/3d` to tylko domyślne PSW.
+1. **PRO — zero bytes**: `index.html`, `src/App.jsx`, `src/main.jsx`,
+   `src/components/**`, `src/pages/**`. Freeze test green, unedited.
+2. **`reference/lisp/**`** — parens 14/14 at 0/0. **LISP IS LAW**: any change
+   to cut geometry goes into `reference/lisp/` FIRST, then the engine. F5 and
+   F6 below touch cut geometry; both follow that order or they are skipped.
+3. **The six goldens stay byte-identical.** Every engine change tonight must
+   be reachable only through a parameter the golden fixtures do not set, or
+   through a new code path they never enter. A change that would move a golden
+   is not made: skip that ONE feature, name the fixture and the line, and go
+   straight on to the next feature. **The session never halts.** "Stop" in this
+   file always means "stop that feature", never "stop the night" — there is no
+   condition tonight under which the run ends early or waits for the owner.
+   Never re-bless a fixture.
+4. **The copies from T62/T63 stay copies**; their fidelity tests stay green.
+5. **The layout is not rebuilt.** Variant B stands. Column widths change (F3);
+   nothing else moves.
 
----
+## LICENSED ENGINE FILES
 
-## WERYFIKACJA — obowiązkowa
+Only these, only for the named purpose, each with `UNNAMED=0` and the goldens
+proving nothing else moved:
 
-Każdy dotknięty plik:
-```
-npx esbuild@0.25.0 <plik.js>  --loader:.js=js   --format=esm --outfile=/dev/null
-npx esbuild@0.25.0 <plik.jsx> --loader:.jsx=jsx --jsx=automatic --format=esm --outfile=/dev/null
-```
-esbuild i Vite **nie łapią niezdefiniowanych identyfikatorów** — po dodaniu importu/hooka
-sprawdź `grep` przed commitem. Po każdym zapisie pliku `grep -F` na świeżo wpisany string
-(sed/python potrafią zawieść po cichu, a build i tak przejdzie).
+- `src/engine/endPanelAuto.js` — F6, the wardrobe's own step rule.
+- `src/engine/cabinet.js` — F5 (the shelf that caps an overlay stack) and F7
+  (the partition standing on that shelf), both narrow.
+- `src/engine/profile.js` — F8's cornice defaults only, as new keys.
 
-Harness (node, katalog `verify/` w repo — commituj go):
-```
-node verify/arch/t16.mjs
-```
-Bundluj moduły do `.audit/` przez esbuild (`--bundle --format=esm --external:react`),
-asercje na realnych danych z `normaliseToWindowSpec` → `deriveWindowData`. Grep-audyt
-to nie dowód. Do DXF round-trip: `pip install ezdxf --break-system-packages`.
-
-Na koniec: `npm run build` przechodzi.
+Anything else: skip-and-note.
 
 ---
 
-## ENGINEERING DISCIPLINE
+## F1 · THE ROOM STARTS EMPTY
 
-Dla każdego kroku, po kolei:
-1. **Understanding** — przeformułuj krok własnymi słowami.
-2. **Context linking** — które moduły to dotyka (engine / cnc / utils / pages).
-3. **Acceptance** — co znaczy „gotowe" (wektory testowe ze spec §10).
-4. **Think before code** — dwa podejścia, jedno odrzucone z uzasadnieniem. Najprostsze rozwiązanie pierwsze.
-5. **Edge cases** — null, 0, W poniżej minimum, rise > W/2, brak deski dopasowanej.
-6. **Plan** — numerowana lista, ryzykowne kroki ⚠️.
-7. **Implement** — bez niezleconych feature'ów. Jawność > domysły.
-8. **Self-review** — jak surowy reviewer.
-9. **Multi-pass** — logika → integracja → edge cases.
-10. **Verdict** — ✅ / ⚠️ / ❌ z tym, co NIE zostało zweryfikowane. Do BUILD-LOG.
+Owner: *"usuń szafę default"*.
 
-**LOGIC THINKING** przed każdą decyzją: co to jest → do czego należy → co się dzieje
-po akcji / błędzie / w edge case → czy ma sens fizycznie dla stolarni → co zmienia gdzie
-indziej. Brak sensu = **LOGIC FAILURE** w BLOCKERS, nie koduj tej części.
-**Zakaz fałszywej akceptacji**: bez „looks good" przed sprawdzeniem.
+- `startDesign` no longer adds a WARDROBE. The room mounts empty.
+- **Nothing is placed automatically, ever.** WHERE ends with a 4000 mm wall
+  (the default wall width) and an EMPTY room. The client places the first
+  wardrobe: the plus on the empty floor, and an ADD A WARDROBE action in the
+  step itself, both calling one store path. Its width when added:
+  `min(wallLength, 1200)`.
+- The empty room is a first-class state, not an error: the stage shows the
+  room with its walls and ceiling, the hint says what to do, and the steps
+  after WHERE stay reachable but say plainly that they need a wardrobe.
+- `fitWardrobeToWall` — T64's "fills the wall" — is **deleted**. It is what
+  produced a 3920 mm carcass with two 1960 mm leaves. Licensed removal.
+- Default wardrobe width in the profile: **1200 max by default, no hard
+  block** (owner: *"nie dawaj blokady na szafy szersze ale default daj 1200
+  max"*). The client may type wider; the engine's existing clamps still refuse
+  what the room refuses.
+- Every screen that assumed a wardrobe exists must survive an empty room:
+  READ each caller of the adapter's wardrobe readers and give it an empty
+  state, never a crash. The estimate page with zero items already has one.
 
-**PRECISION DIAGNOSER** przy bugu: mapa flow → pass programisty → pass biznesowy →
-weryfikacja własnego wniosku → symulacja na realnych danych → najmniejsza bezpieczna zmiana.
-Priorytet: złe wyniki > złamana logika biznesowa > rendering > UX > runtime > edge > wydajność > styl.
+**Proof**: `verify/t65/f1-*.png` — the empty 4000 mm room at WHERE and still
+empty at NEXT; the client's first wardrobe at 1200; the same on a 900 wall
+(900, not 1200); INSIDE with no wardrobe, saying so.
+
+## F2 · THE WHOLE LIGHTING RIG, COPIED — NOT JUST THE SLIDER
+
+Owner: *"retail jest za jasna … zapomniałeś o natężeniu naświetlenia — kopia
+identycznie jak w PRO, włącznie z ustawieniem jasności etc."*
+
+This is wider than a control. `profile.appearance.studio` holds ELEVEN named
+numbers, and one of them is the owner's own decision of 25.08.2026 —
+`baseGain: 0.75`, quoted in the profile: *"teraz 100 to niech będzie jakby
+teraz było 75"*. If retail's scene is brighter than PRO's, retail is not
+reading the same rig.
+
+- **Find every lighting number retail resolves** — walk `src/3d/Scene.jsx` and
+  the retail mount, and list what each reads: `baseGain`, `ambient`, `key`,
+  `fill`, `rim`, `exposure`, `shadowPadding`, the showroom `band`, the spots,
+  the environment probe, the tone mapping. Print PRO's value and retail's value
+  for each, side by side, in the PR body.
+- **Every difference is closed in retail's favour of PRO's number**, except a
+  difference that is deliberate and named in the code with a reason. There
+  should be none; if there is, name it and keep it, saying why.
+- The environment probe stays OFF in both — the profile explains at length why
+  (a tinted probe shifts white fronts). Do not "improve" it.
+- **Copy PRO's BRIGHT slider** into the retail top bar (`TopBar.jsx`, T26):
+  same `uiStore.brightness`, same min/max/step/default from
+  `profile.appearance.studio.brightness`, PBI skin. It is a slider in PRO and
+  stays a slider here — the no-slider rule is about dimensions, not light.
+- A test that asserts, number by number, that the retail rig equals PRO's.
+  That test is the thing that stops this drifting again.
+
+**Proof**: `verify/t65/f2-*.png` — the slider in the bar; the SAME scene
+rendered in PRO and in retail at the same brightness, side by side, plus the
+number-by-number table in the PR body.
+
+## F3 · COLUMN 2, TEN PER CENT NARROWER
+
+Owner: *"może na początek 10 procent zrób"*.
+
+- Measure the OPTIONS column today, take 10% off, hand the space to the stage.
+- The scale law (one number from window width) still governs; this is a change
+  to the base width, not a new mechanism.
+- **Check before, not after**: at 1280 and 1440, no label in the copied
+  `MaterialChoicePanel` or `FrontStyleGallery` may clip or break word-by-word.
+  If one does, keep the 10% and fix the copy's own `pbi-re-*` widths — never
+  the copy's markup. If it cannot be fixed without touching markup, take 5%
+  and say so.
+
+**Proof**: `verify/t65/f3-*.png` — before/after at 1280 and at 1440.
+
+## F4 · THE VIEW: STRAIGHT ON AND CLOSER, AS IN PRO
+
+Owner: *"default ustawienie sceny pokoju prosto i bliżej — dokładnie jak w
+PRO"*.
+
+- Read PRO's default camera (`src/3d/cameraPresets.js` and whatever PRO's
+  first-mount uses) and make retail's first view and RESET VIEW identical to
+  it: same preset, same framing distance, same target.
+- This supersedes T64's "FRONT, framed to bounds" — PRO's number wins.
+
+**Proof**: `verify/t65/f4-*.png` — PRO and retail first views side by side.
+
+## F5 · THE SHELF THAT CAPS AN OVERLAY STACK — SETBACK 0
+
+Owner: *"półka nad overlay drawers nie powinna mieć setback, powinna być na
+0"*; only that shelf, not every shelf; and the reason, which is why this is
+not cosmetic: *"jak dodasz szuflady to jest dziura i to wygląda okropnie"*.
+A 20 mm slot above a drawer stack, seen from the front. It must go.
+
+- `profile.shelfDepthClearance` is 20 and EVERY shelf reads it. **Do not change
+  it.** Narrow the change: the shelf that caps an overlay-drawer stack gets
+  clearance 0, every other shelf keeps 20.
+- Find where that shelf is emitted (`cabinet.js`, the overlay path — read
+  `setbackOf(item?.front_mm, C.shelfDepthClearance)` at both sites and see
+  which one caps a stack). Add the exception at that site only, named, with
+  the owner's sentence in the comment.
+- **LISP FIRST.** This is cut geometry: the shelf's depth changes, so the
+  wardrobe kit in `reference/lisp/` states it before the engine does. Parens
+  re-verified.
+- The goldens must not move: check whether any of the six carries an overlay
+  stack. If one does, the change WILL move it — stop, skip-and-note, and say
+  which fixture and why.
+
+**Proof**: a unit test asserting the capping shelf's depth equals D − boards·G
+(no clearance) while a plain shelf keeps the 20; the goldens unmoved.
+
+## F6 · END PANELS: NO CARCASS SIDE IS EVER LEFT SHOWING
+
+The owner, and this sentence is the whole law:
+
+> *"po prostu nie dopuszczamy do pozostawienia boku szafy / carcasa
+> widocznego."*
+
+Not "a step demands a panel" — **visibility demands a panel**. One rule, and
+it covers the kitchen and the wardrobe both; they only look different because
+what exposes a side differs:
+
+| Beside the side | Panel? | Why |
+|---|---|---|
+| nothing — a free end | **yes** | the whole side shows |
+| a wall | **no** | the wall covers it; the infill closes the gap |
+| a wardrobe, flush — same height, same depth, same offset | **no** | the neighbour covers it |
+| a wardrobe of different height, depth, or set back | **yes** | part of the side still shows |
+| the client added one by hand in EXTRAS | **yes, permanently** | his decision outranks the automat |
+
+- `endPanelAuto.js` already computes SITES first and filters after (T51, the
+  owner's *"dojeżdżam — panel się pojawia, nie dojeżdżam — panel znika"*).
+  Keep that architecture. Replace the question it asks with the one above:
+  **is any part of this side visible?** Read the neighbour's height, depth and
+  front offset; a side is covered only when the neighbour covers it fully.
+- One function answers it, for kitchens and wardrobes alike. If the kitchen's
+  present behaviour is a special case of the new question, it keeps working
+  unchanged and a test proves it. If it is NOT — if the visibility rule would
+  change a kitchen's panels — do not force it: keep the kitchen path as it is,
+  add the wardrobe path beside it in the same function, and say so in the PR
+  body with the case that differed.
+- **Retail adds them automatically, each removable.** PRO's law
+  (*"Plinth, top infill and end panels — added, never assumed"*) is
+  deliberately NOT changed for PRO. Panels appear as lines in the estimate so
+  the client sees what he pays for.
+- A panel added by hand in EXTRAS is permanent: the automat never removes it.
+  `declinedSides` holds the opposite already — add the matching "asked for"
+  set beside it, same shape, same file.
+
+**Proof**: `verify/t65/f6-*.png` — one wardrobe alone, panels both ends; a
+flush neighbour arrives and the shared panel goes; a taller neighbour arrives
+and it stays; a deeper neighbour, it stays; against a wall, no panel and an
+infill instead; a hand-added panel surviving a flush neighbour.
+
+## F7 · BAYS, IN THE CLIENT'S WORDS
+
+Owner: *"zamiast vertical partition dać BAYS i wpisz ilość, max 3"* · *"i
+wtedy dopiero informacja o tym że bays można zrobić niższe ale półka musi być
+fix"* · *"przegroda ma się zaczynać nad szufladami … na półce … pamiętaj starą
+zasadę: materiał nigdy nie wchodzi w materiał"*.
+
+- In INSIDE, the row named "Vertical partition (divider)" becomes **BAYS**,
+  with a typed count, default 1, **max 3**. Writing 3 puts two partitions in;
+  writing 1 takes them out. The partitions are the engine's own — this is a
+  name and a counter over the existing law, not a second law.
+- After a count above 1 is set, one line appears: bays may be different
+  heights, but the shelf between them is fixed. PRO's own wording if it has
+  one; otherwise that sentence.
+- **A partition inside a bay that holds an overlay drawer stack starts ON the
+  shelf that caps the stack** — whether the stack is 2 drawers or 5. It does
+  not pass through the stack, and it does not start at a fixed height. Material
+  never enters material.
+- Doors do NOT follow from bays (F9).
+
+**Proof**: `verify/t65/f7-*.png` — BAYS at 1, 2, 3; a partition standing on a
+5-drawer stack's shelf; the sentence.
+
+## F8 · CORNICE, TOP INFILL, END PANELS — THE MENU PRO HAS AND RETAIL NEVER GOT
+
+Owner: *"nie widzę przycisków: top infill, cornice, panels"*. They live in
+`src/components/ContextMenu.jsx` (334 lines) — the one surface the T63 ledger
+listed as OWED and the reason none of them are reachable.
+
+- **COPY** `ContextMenu.jsx` into `src/retail/design/detail/`, by the method:
+  verbatim, imports repointed, recursive component copies, skin only. It brings
+  cornice, top infill, end panels and the bottom mask with their refusals.
+- Entry: the wardrobe's own menu on the right, and the same actions offered in
+  EXTRAS on the left where they are choices rather than edits.
+- **Cornice is automatic at 40 mm** (new profile keys, defaults only).
+  When the gap to the ceiling is **100 mm or less, the cornice grows to close
+  it**, automatically, removable (decision 1). A visual choice of **40 / 70 /
+  100** sits beside it.
+- Gaps over 100 mm are left alone (decision 2).
+
+**Proof**: `verify/t65/f8-*.png` — the copied menu; a 40 mm cornice; a 80 mm
+gap closed by the cornice; the 40/70/100 chips; the estimate showing the
+panels and cornice as lines.
+
+## F9 · ADD DOORS, AND ADD TOP BOX MOVES LEFT
+
+Owner: *"drzwi to osobna decyzja, w extrasach lub w setup"* · *"ADD DOORS —
+i tu i tu chyba"* · *"add top box powinno być przeniesione do EXTRAS po lewej"*.
+
+- **Doors do not follow from bays.** ADD DOORS is its own action, offered in
+  **EXTRAS on the left** and on the **selected wardrobe on the right**. Both
+  call the same store path — one law, two doors to it.
+- **ADD TOP BOX moves out of the wardrobe's right-hand menu into EXTRAS on the
+  left.** Adding furniture is a step; editing an element is the right panel.
+
+**Proof**: `verify/t65/f9-*.png` — ADD DOORS in both places, one store call;
+ADD TOP BOX in EXTRAS and gone from the right.
+
+## F10 · THE RIGHT PANEL OBEYS ONE SENTENCE
+
+Owner: *"po naciśnięciu na inny element menu się zmienia, a jak naciśniesz w
+szafę lub poza menu — znika"*.
+
+- Click an element → its menu slides in. Click a different element → the menu
+  **swaps in place**, the panel does not close and reopen. Click the wardrobe
+  body or empty stage → it slides out.
+- The plus in the middle of a wardrobe **hides while the INSIDE menu is open**
+  (owner's point 5) — two doors to the same act confuse.
+- `TieRackMenu`, `TrouserMenu` and `KitMenu` are empty today: an element with
+  no controls is not clickable (the standing T60 law). Either give each the
+  controls PRO's editor has for it, or make it unclickable with the engine's
+  reason. Name which you did, per element.
+
+**Proof**: `verify/t65/f10-*.png` — element A open, element B swapping in,
+empty stage clicked and gone; the plus hidden with INSIDE open.
 
 ---
 
-## Stack
+## TESTS AND PROOF
 
-React 19 + Vite · Zustand · Tailwind · React Three Fiber / Three.js (`src/3d`, dzielone
-z PSW) · Supabase · jsPDF + jspdf-autotable · SheetJS (xlsx) · własny DXF R12 writer
-(`src/engine/cnc/dxfWriter.js`, POLYLINE z bulge, sprawdzony na VCarve). esbuild 0.25.0 do
-sprawdzeń. Bez TypeScript.
+1. Full suite green, never `--silent`. PRO freeze test green, unedited.
+2. **Goldens ×6 byte-identical** — the hard gate this turn, because engine
+   files are licensed. `verify/t65/t65-classify.mjs` names every engine delta
+   and proves none reaches the cut path of a fixture.
+3. `computeCabinet()` vs LISP exact; `UNNAMED=0`; parens 14/14 at 0/0, with
+   the wardrobe kit re-verified after F5.
+4. Boundary and copy-fidelity tests green; the new `ContextMenu` copy added to
+   the fidelity list with every label PRO's file carries.
+5. New tests: an empty room mounts and every screen survives it; the first
+   wardrobe is `min(wall,1200)`; the capping shelf has zero clearance and a
+   plain shelf 20; a flush neighbour removes a panel and a deeper one does not;
+   a hand-added panel survives; BAYS 1/2/3 and the partition standing on the
+   stack's shelf; the cornice closing a ≤100 mm gap; ADD DOORS from both places
+   calling one store path; the right panel swapping without closing.
+6. Playwright walk: every F's frames, plus a lazy-client run from the empty
+   room to ADD TO MY ESTIMATE, `verify/t65/lazy-01.png …`.
 
-Skrypty: `npm run dev` · `npm run build` · `npm run preview`.
+## LICENSED REMOVALS
 
-## Struktura (stan faktyczny)
+- `fitWardrobeToWall` and its callers (F1).
+- The default WARDROBE in `startDesign` (F1).
+- ADD TOP BOX from the wardrobe's right-hand menu (moves, F9).
+- Nothing else. Tombstones two lines maximum.
 
-```
-src/
-├── engine/
-│   ├── calculations.js      # deriveWindowData → deriveSashWindow / deriveCasementWindow / deriveDoorWindow
-│   ├── specification.js     # normaliseToWindowSpec (PSW fullConfig → windowSpec)
-│   ├── profile.js           # DEFAULT_*_PROFILE — wszystkie numery warsztatowe
-│   ├── casementLayouts.js   # kody layoutów 1:1 z PSW (nie ruszać kolejności paneli)
-│   ├── casementHardware.js  # dobór okuć (limity per skrzydło)
-│   ├── lists.js             # cut list: CUT_LIST_ORDER, MIRROR_PAIRS, grupowanie
-│   ├── bom.js · pricing.js · partRegistry.js · partSymbols.js · optimizer.js
-│   └── cnc/
-│       ├── dxfWriter.js     # R12 serialiser: {poly|circle|text}, bulge
-│       └── jambDxf.js       # port 1:1 KIT_SASH_JAMB.lsp — WZORZEC dla archDxf.js
-├── components/drawings/     # arkusze 2D (SVG), drawingTheme.js, drawingUtils.jsx
-├── pages/                   # ConfiguratorPage, WindowDetailPage, ProductionPackPage, ...
-├── stores/                  # Zustand (projectStore, estimateStore, ...)
-├── utils/                   # eksporty: cncExport.js, *PdfExport.js, excelExport.js
-└── 3d/                      # R3F (identyczne z PSW/3d-src)
-docs/handover/               # specyfikacje pakietów
-verify/                      # harnessy node (commitowane)
-```
+## BALANCE
 
-Zasada architektury: **`deriveWindowData()` jest jedynym źródłem prawdy per okno** —
-karmi cut listę, PDF-y, rysunki, PP. Nigdy nie licz wymiarów okna w innym miejscu.
+Per F: files touched, lines added/removed, and the PRO file each copy came
+from. Then one line each:
+- How many functions decide where an end panel goes? (One.)
+- How many store paths add a door? (One.)
+- Which engine lines changed, and why each cannot reach a golden.
+- Which of the three decisions above did the night rely on, and where.
 
----
+## SKIP-AND-NOTE ORDER
 
-## STAN — noce 1–7 na `main` / na branchu nocy 7 (łuki casement/sash/stałe, archiwum, planer v2, PDF szklarza, rama 68, gothic-full, glass DXF wszystkich szyb, wymiary, drzwi opcja B)
-Noce 1–6 + `arch-pieces-v1` + `gothic-full-v1` (e037020) są na `main`. Noc 7 siedzi na branchu
-`claude/zadanie-nocne-7-glass-dxf-wb0eay` (5 commitów, do zmergowania rano).
-Harnessy t16–t29 ALL PASS (1822 checks). Spec historyczne w `docs/handover/`.
-
-## WYNIK NOCY 7 (06.09) — cztery etapy zamknięte + jeden punkt z BLOCKERS
-
-1. **Glass DXF: wszystkie szyby** — `glassUnitsForWindow()`, kontur 4 linie, oblamówka z profilu (11),
-   pasy 18 z osiami, teksty z pozycjami prętów od dolnych narożników; reguła prętów ta sama co w glass PDF.
-   Bramka **t28** (50). Kształtowe bajt w bajt; łukowy sash urósł o dolną szybę (zamierzone).
-2. **Wymiary spójnie** — chain na dole, wymiar całkowity na górze, wysokości po prawej w Leaf / Frame /
-   FrontElevation / SashDetail / GlassDrawing; Box już spełniał regułę, Elements dziedziczy z komponentów.
-   Nowa bramka `verify/arch/lib/dimRule.mjs` w t19 / t22 / t27. Każdy viewBox bez zmian → skala bez zmian.
-3. **Drzwi opcja B** — land 43, leafAtJamb 47, leafFullHeight 94, leafNoThreshold 53; skrzydło 1000 → 906,
-   french 1200 → 2 × 556. Bramka **t27** (87), tabela stare/nowe liczona przez harness z drzewa d733414.
-4. **Kontrola 3D** — **t29** (34): łuki to prawdziwe łuki z `arch.js`, pierścienie od 68/47, `Kind: Fixed`
-   zostaje łukowy, drzwi 68/43 i słupek 136. **Nie zmieniono żadnego pliku 3D.**
-5. **BLOCKERS §19.6 zamknięty** — C.5b (tabela dla ramy 68) w specyfikacji, bramkowana t25 §2c.
-
-**Otwarte po nocy 7 (BLOCKERS §24) — wymagają decyzji Piotra, NIE kodować bez niej:**
-- **§24.1** koło w 3D idzie do `fix-only` bez `frameDims`; `FixFrameWindow` ma własne `FRAME_FACE 64`.
-  Pytanie: rama koła to 68 (casement) czy 64 (fix-frame)?
-- **§24.2** skrzydło w 3D jest 4 mm niższe (1398 vs 1402): 3D trzyma skrzydło 51 nad dołem ramy
-  (cokół liczony jak ościeżnica), profil mówi 47 (gapCill 6 + cillVisible 41). Błąd sprzed ramy 68.
-  Pytanie: który model cokołu jest prawdziwy?
-- **§24.3** screen „3D kwadratowe" nie dotarł — nic nie było oglądane w przeglądarce.
-
-
-## NIE RÓB DZIŚ (zaplanowane, osobne pakiety)
-
-- Drzwi: ramiaki skrzydła 92 mm zamiast 94 (materiał 014); próg 4 zawiasów > 2100 mm.
-- Snapshot profilu per projekt (BLOCKERS 19.3) — dziś każde okno liczy się na żywo z aktywnego profilu
-  (po nocy 7 dotyczy też drzwi: skrzydło 920 → 906).
-- Reguła ekonomiczna C.4 „AND niższy odpad" (BLOCKERS 19.5). [C.5 dla ramy 68 = zrobione w nocy 7, C.5b.]
-- 3D: rama koła i model cokołu (BLOCKERS §24.1 / §24.2) — obie zmiany ruszają plik dzielony z PSW, czekają na decyzję.
-- PSW: port ramy 68 (`PSW-FRAME-68-PORT.md`) — repo tylko do odczytu z PC, Piotr robi sam.
-- Nadświetla łukowe drzwi; drzwi / sliding / bifold / front door poza zakresem (Piotr 07.09).
-- Listwy przyszybowe: moduł beading SASH zamrożony (także łukowe — 12.5, 13.5); casement nie ma listew
-  w silniku W OGÓLE — osobny pakiet z przekrojem z profilu.
-- `EstimateConfiguratorPage.jsx` limit 3000 mm (nierozstrzygnięte).
-- Mullions/ślemienia casement nie trafiają do cut listy (`components.box`) — znana luka silnika.
-- Łuki: zmiana nazw kształtów na `'gothic'` + `profile` (spec §3.4), typy linii (DASHED) w `dxfWriter.js`,
-  złącze głowica/ościeżnica i skrzydło/słupek na linii startu łuku (haunch), pełna listwa na linii startu
-  w hub-spoke (9.7), pionowe pręty użytkownika przy hubach (9.6), paginacja tabeli w glass PDF.
-- Okno stałe `directGlazed` (14.1), FD30 / FD60 (14.9), offset sunburst per okno w konfiguratorze (14.5).
-- Sash glazing arch (`headType 'arch'`) — poza silnikiem do decyzji Piotra (15.1).
-
-## Pliki do utrzymywania
-
-- `CLAUDE.md` — ten plik; aktualizuj sekcję „ZADANIE NOCNE" i „NIE RÓB DZIŚ" po każdym pakiecie
-- `docs/handover/*.md` — specyfikacje pakietów (nie kasować po wdrożeniu — to historia decyzji)
-- `BUILD-LOG.md` — werdykty per krok, najnowsze na górze
-- `BLOCKERS.md` — pytania do Piotra, LOGIC FAILURE, CRITICAL AMBIGUITY
-
-## Checklist na koniec sesji
-
-- [ ] branch sesji wypchnięty, `main` nietknięty
-- [ ] `node verify/arch/t16.mjs` … `t29.mjs` (t16, t17_edges, t18, t19, t20, t20_bars, t21, t22, t23, t24_stage4, t25, t26, t27, t28, t29) → ALL PASS (t16 / t18 / t19 / t20 / t22 / t23 / t25 wymagają `pip install ezdxf --break-system-packages`; fixtures prostokątne przebazowuje się TYLKO przy zamierzonej zmianie liczb: `node verify/arch/rect_casement_baseline.mjs` + `node verify/arch/t19_baseline.mjs live`, z wpisem starych i nowych liczb w BUILD-LOG)
-- [ ] `npm run build` przechodzi
-- [ ] esbuild OK na każdym dotkniętym pliku, zero polskiego w źródłach
-- [ ] `git diff main --stat` obejmuje TYLKO pliki ze spec §11 (+ verify, docs, BUILD-LOG, BLOCKERS, CLAUDE.md)
-- [ ] `docs/handover/samples/`: `sample_arch_1200_*.dxf` (pięć), `sample_arch_c5_*.dxf` (pięć — od ramy 68 także `1000_gothic-equilateral`, bo skrzydło gotyku 1000 się planuje), `sample_glass_*.dxf`, `sample_tracery_*.dxf` (+ stare `.lsp` z nocy 5), `sample_sash_arch_1200_*.dxf` (trzy), `sample_circle_1000_sunburst.dxf` (CNC; 800 tylko glass / tracery — pierścień skrzydła 800 blokuje limit 400), `sample_glass_order_arched.pdf` + `_a3.pdf` (układ v4) w repo — wszystkie z profilu 68
-- [ ] BUILD-LOG.md z werdyktami, BLOCKERS.md z D5 / d50 / P9 / F2 otwartymi (D13 zamknięty przez v4 C.3/C.4) + §11–§15 (noc 5) + §16–§19 (noc 6) + wszystkim, co wyszło w nocy
+F5 → F6 → F8 → F7 → F9 → F10 → F4 → F3 → F2 → F1.
+F1 and F10 are the owner's plainest orders and are not skipped. F5 and F6
+touch cut geometry and the engine: if either cannot be done without moving a
+golden, it is skipped with the fixture named — that is the correct outcome,
+not a failure.
