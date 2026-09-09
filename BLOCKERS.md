@@ -4,6 +4,88 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-09-08 — NIGHT 8 (turn 65): STOPPED AT THE GATE — `CLAUDE.md` at HEAD is another project's brief
+
+### 25. The night could not run: HEAD's CLAUDE.md describes a wardrobe app, not Production Core
+
+The brief was "execute CLAUDE.md in full, autonomously, F1–F10, PR before morning". It was **not** executed and
+**no feature code was written**, because the CLAUDE.md at HEAD belongs to a different repository. Everything
+below is evidence, so the night can be re-run in one minute against the right repo.
+
+**What HEAD's CLAUDE.md asks for** — `# CLAUDE.md — TURN 65 · PBI: THE EMPTY ROOM, THE BAYS, AND WHAT THE
+CARCASS WEARS`: a retail wardrobe designer with a PRO/retail split — wardrobes, carcass end panels, cornice,
+plinth, top infill, BAYS, overlay drawer stacks, a `reference/lisp/` cut-geometry kit and six golden fixtures.
+
+**What is in this repo** — Production Core: sash / casement / door / fix-frame windows.
+
+#### 25.1 Every file and symbol the brief names, checked against `src/` and `verify/`
+
+| CLAUDE.md names it for | Symbol / path | Found here |
+|---|---|---|
+| licensed engine file (F6) | `src/engine/endPanelAuto.js` | **absent** |
+| licensed engine file (F5, F7) | `src/engine/cabinet.js` | **absent** |
+| licensed engine file (F8 cornice keys) | `src/engine/profile.js` | present, but it is the **window** profile (`DEFAULT_SASH_PROFILE`, box depths, sash faces) — no cornice, no shelf, no carcass |
+| "LISP IS LAW", parens 14/14 | `reference/lisp/**` | **absent** (no such directory, ever) |
+| F8 copy source (334 lines) | `src/components/ContextMenu.jsx` | **absent** |
+| F2 copy source | `src/3d/Scene.jsx` | **absent** |
+| F4 copy source | `src/3d/cameraPresets.js` | **absent** |
+| F2 target (T26) | retail `TopBar.jsx` | **absent** |
+| F8 copy target | `src/retail/design/detail/` | **absent** (no `src/retail/` at all) |
+| F1 | `startDesign`, `fitWardrobeToWall` | **absent** |
+| F2 | `uiStore.brightness`, `profile.appearance.studio` | **absent** |
+| F5 | `shelfDepthClearance` | **absent** |
+| F6 | `declinedSides` | **absent** |
+| F7 / F10 | `TieRackMenu`, `TrouserMenu`, `KitMenu` | **absent** |
+| F3 | `MaterialChoicePanel`, `FrontStyleGallery` | **absent** |
+| the hard gate | `computeCabinet()`, six goldens, `verify/t65/t65-classify.mjs` | **absent** |
+
+15 symbols searched across `src/` and `verify/`. **14 return zero files.** The one hit, `brightness`, is the
+*window* viewer's own slider (`src/3d/App.jsx:1185` and the casement/door components) — unrelated to F2's
+`uiStore.brightness` retail rig.
+
+`git log --all --diff-filter=A` over the whole history returns **nothing** for `cabinet`, `endPanel`, `retail`,
+`lisp`, `ContextMenu` or `cameraPresets`: these files have never existed on any branch of this repo.
+
+#### 25.2 How it got here
+
+| | |
+|---|---|
+| commit | `234a147` "Update CLAUDE.md", Piotr3009, Tue 8 Sep 2026 22:03:39 +0100 |
+| diff | `CLAUDE.md \| 527 ++++----`, 325 insertions, 202 deletions — **that one file only** |
+| it replaced | `9a6fcc0`'s `# CLAUDE.md — Production Core (Sash-Planner-Web)` — this repo's real brief |
+
+So the turn-65 wardrobe brief was pasted over Production Core's CLAUDE.md. No code moved with it.
+
+#### 25.3 Where the night probably belongs — `Piotr3009/Cabinet-core`
+
+`Cabinet-core` (public, last push 2026-09-03) is the only repo on the account whose subject is cabinets, and the
+brief's own licensed file is literally `src/engine/cabinet.js`. It could **not** be confirmed from this session:
+attaching it was denied by the sandbox (both `read` and `push`), and this session's GitHub scope is
+`Piotr3009/Sash-Planner-Web` only. Treat "Cabinet-core" as a strong inference, not a verified fact.
+
+Building the wardrobe app *here* was rejected deliberately, on three of your own standing rules: this repo's
+CLAUDE.md says **"Trzy osobne produkty, nie duplikować logiki między nimi"** and **"poza zakres nie wychodź"**;
+and the brief's own first law is **"1:1 = COPY … never re-invent"** — with no PRO wardrobe app in this repo
+there is nothing to copy from, so every one of F1–F10 would have been invention.
+
+#### 25.4 What to do in the morning — pick one
+
+1. **Re-run turn 65 against `Cabinet-core`** (expected: that is where the brief belongs), and restore this
+   repo's own brief here: `git checkout 9a6fcc0 -- CLAUDE.md`. *Not done tonight — it undoes your own commit
+   `234a147`, and that is your call, not mine.*
+2. If the wardrobe app is genuinely meant to become a fourth product **inside** Production Core, say so
+   explicitly: it is a new build from zero, not a turn-65 copy job, and the brief's hard gates (six goldens,
+   LISP parens, PRO freeze) have no subject here.
+
+#### 25.5 Verified state of this repo tonight (the one thing the night could establish)
+
+Nothing here was changed. The suite was run to give you a truthful baseline: **16 harnesses, 1852 checks,
+0 failures**, `npm run build` OK. Details and two live footguns in `BUILD-LOG.md` under the same date —
+including `verify/arch/*_baseline.mjs`, which are **fixture generators, not tests**, and silently re-bless
+`rect-casement-sheets.json` if you run `verify/arch/*.mjs` as a set.
+
+---
+
 ## 2026-09-06 — NIGHT 7 (zadanie nocne 7), stages on the rebased branch `claude/zadanie-nocne-7-glass-dxf-wb0eay`
 
 Entry gate re-run after `gothic-full-v1` landed on `main` (e037020): both markers 1 — §20 above is CLOSED, the
