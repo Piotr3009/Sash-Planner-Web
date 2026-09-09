@@ -12,7 +12,7 @@ const Viewer3D = lazy(() => import('../3d/App.jsx'));
 
 const BAR_OPTIONS = [
   { value: 'none', label: 'None' }, { value: '2x2', label: '2×2' }, { value: '3x3', label: '3×3' },
-  { value: '4x4', label: '4×4' }, { value: '6x6', label: '6×6' }, { value: '9x9', label: '9×9' },
+  { value: '4x4', label: '4×4' }, { value: '6x6', label: '6×6' }, { value: '8x8', label: '8×8' }, { value: '9x9', label: '9×9' },
   { value: 'custom', label: 'Custom' },
 ];
 const SASH_TYPES = [{ value: 'double', label: 'Double Hung' }, { value: 'triple', label: 'Triple Sash' }];

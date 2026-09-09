@@ -34,7 +34,7 @@ export const DEFAULT_PRICING = Object.freeze({
   // Georgian bars
   pricePerBar: 15,
   barsPerPattern: {
-    none: 0, '2x2': 2, '3x3': 4, '4x4': 4, '6x6': 5, '9x9': 8,
+    none: 0, '2x2': 2, '3x3': 4, '4x4': 4, '6x6': 5, '8x8': 6, '9x9': 8,
     '2-vertical': 2, '1-vertical': 1, custom: null,
   },
 

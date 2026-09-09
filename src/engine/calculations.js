@@ -156,6 +156,15 @@ export const CONFIGURATIONS = Object.freeze({
         horizontalBars: 1,
         description: '6 over 6'
     },
+    '8x8': {
+        key: '8x8',
+        rows: 2,
+        cols: 4,
+        totalPanes: 8,
+        verticalBars: 3,
+        horizontalBars: 1,
+        description: '8 over 8'        // Piotr 07.09: 4 across x 2 rows
+    },
     '9x9': {
         key: '9x9',
         rows: 3,
@@ -509,7 +518,7 @@ function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, to
 
 const BEADING_BAR_PATTERNS = {
     'none': { v: 0, h: 0 }, '2x2': { v: 1, h: 0 }, '3x3': { v: 2, h: 0 },
-    '4x4': { v: 1, h: 1 }, '6x6': { v: 2, h: 1 }, '9x9': { v: 2, h: 2 },
+    '4x4': { v: 1, h: 1 }, '6x6': { v: 2, h: 1 }, '8x8': { v: 3, h: 1 }, '9x9': { v: 2, h: 2 },
 };
 
 function calculateBeadingComponents(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight) {

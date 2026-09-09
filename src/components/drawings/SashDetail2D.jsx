@@ -12,7 +12,7 @@ const NS = { vectorEffect: 'non-scaling-stroke' };
 
 const BAR_PATTERNS = {
   'none': { h: 0, v: 0 }, '2x2': { h: 0, v: 1 }, '3x3': { h: 0, v: 2 },
-  '4x4': { h: 1, v: 1 }, '6x6': { h: 1, v: 2 }, '9x9': { h: 2, v: 2 },
+  '4x4': { h: 1, v: 1 }, '6x6': { h: 1, v: 2 }, '8x8': { h: 1, v: 3 }, '9x9': { h: 2, v: 2 },
 };
 const BAR_WIDTH = 22;
 
