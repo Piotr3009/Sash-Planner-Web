@@ -269,6 +269,11 @@ export const DEFAULT_CASEMENT_PROFILE = {
     seatSplitStart: 0.5,       // share of (board length − visible run) at the START end — the mullion seats into head and cill (machine test)
     sideValue: { left: 0, right: 1 },   // LH_RH_CNTRL for a joint on the left / right of the member (machine test)
     macroVarsInList: true,     // write OPn_HX / LH_RH_CNTRL / SCRW_ON_OFF as document variables
+    // Table placement per panel as the Biesse sample writes it (ExOrigin 9, corner 1, offsets).
+    // The values are machine-specific — take them from a list bSolid itself saved for one of
+    // Matt's programs. Off = UsingDefaultOrigins only (first thing to try on the machine).
+    writeExecutionParameters: false,
+    executionParameters: { origin: 9, refCorner: 1, rotX: 0, rotY: 0, rotZ: 0, offsetX: 66.8, offsetY: -139.45, offsetZ: 0 },
   },
   // ── Glazier numbers (ARCHED-WINDOWS-v3 Block 0.2) — the sealed unit's
   // spacer bar width laid out in the pattern, and the edge cover: the
@@ -351,6 +356,7 @@ export function migrateCasementProfile(profile) {
       ...D.bsuite, ...(profile.bsuite || {}),
       programs: Object.fromEntries(Object.keys(D.bsuite.programs).map((k) => [k, { ...D.bsuite.programs[k], ...(profile.bsuite?.programs?.[k] || {}) }])),
       sideValue: { ...D.bsuite.sideValue, ...(profile.bsuite?.sideValue || {}) },
+      executionParameters: { ...D.bsuite.executionParameters, ...(profile.bsuite?.executionParameters || {}) },
     },
     arch: profile.arch?.version === D.arch.version
       ? {

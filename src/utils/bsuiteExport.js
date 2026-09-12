@@ -30,10 +30,13 @@
  *    does not grow; readers (bSolid uses .NET ZipArchive) accept stored entries.
  */
 import { getCasementProfile } from '../engine/profile.js';
+import { zipSync, strToU8 } from 'fflate';
 
 const CRLF = '\r\n';
 const r1 = (v) => Math.round(Number(v) * 10) / 10;
 const fmt = (v) => String(r1(v)).replace(/\.0$/, '');
+// placement offsets keep their 0.01 (the sample has −139.45): no rounding to 0.1 there
+const fmtRaw = (v) => String(Math.round(Number(v) * 1000) / 1000);
 
 /* ─────────────────────────────── rows ─────────────────────────────── */
 
@@ -206,6 +209,19 @@ export function writeWorklistXml(rows, opts = {}) {
       L.push(`              <ParametricVariable TypeCode="Double" VariableName="${k}" Expression="${fmt(r.vars[k])}" ExpressionValue="${fmt(r.vars[k])}" MeasureUnit="mm" />`);
     }
     L.push('            </Variables>');
+    if (opts.executionParameters) {
+      // the sample writes the table placement per panel; values are machine-specific (profile.bsuite.executionParameters)
+      const X = opts.executionParameters;
+      const ex = (k, v, unit) => `                <ParametricVariable TypeCode="Object" VariableName="${k}" Expression="${v}" ExpressionValue="${typeof v === 'boolean' ? (v ? 'True' : 'False') : v}" MeasureUnit="${unit}" />`;
+      L.push('            <ExecutionParameters>');
+      L.push('              <ExecutionParameter Name="#EXPAR#0">');
+      L.push(ex('ExOrigin', X.origin, '')); L.push(ex('ExRefCorner', X.refCorner, ''));
+      L.push(ex('ExRotX', X.rotX, '')); L.push(ex('ExRotY', X.rotY, '')); L.push(ex('ExRotZ', X.rotZ, ''));
+      L.push(ex('ExOffsetX', fmtRaw(X.offsetX), 'mm')); L.push(ex('ExOffsetY', fmtRaw(X.offsetY), 'mm')); L.push(ex('ExOffsetZ', fmtRaw(X.offsetZ), 'mm'));
+      L.push(ex('ExMirrorX', false, '')); L.push(ex('ExMirrorY', false, ''));
+      L.push('              </ExecutionParameter>');
+      L.push('            </ExecutionParameters>');
+    }
     L.push('            <Children />');
     L.push('          </ProgramPanelNode>');
     L.push('        </Children>');
@@ -218,7 +234,7 @@ export function writeWorklistXml(rows, opts = {}) {
   return L.join(CRLF);
 }
 
-/* ─────────────────────────────── ZIP (stored) ─────────────────────────────── */
+/* ─────────────────────────────── ZIP (deflate, like the sample) ─────────────────────────────── */
 
 const CRC_TABLE = (() => {
   const t = new Uint32Array(256);
@@ -230,47 +246,21 @@ export function crc32(bytes) {
   for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
   return (c ^ 0xFFFFFFFF) >>> 0;
 }
-const u16 = (n) => [n & 0xFF, (n >>> 8) & 0xFF];
-const u32 = (n) => [n & 0xFF, (n >>> 8) & 0xFF, (n >>> 16) & 0xFF, (n >>> 24) & 0xFF];
-function dosTime(d) { return ((d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1)) & 0xFFFF; }
-function dosDate(d) { return (((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate()) & 0xFFFF; }
 
 /**
- * Minimal ZIP writer: entries [{ name, data: Uint8Array|string }] (a name ending in '/' is a
- * folder), STORED, one local header + central directory. Deterministic for a fixed `now`.
+ * ZIP writer via fflate — DEFLATE entries (method 8) exactly like the Biesse sample; the first
+ * cut wrote STORED entries, which bSolid refused to open (12.09). A name ending in '/' is a
+ * folder (stored, empty, external attributes 0 as in the sample). `now` fixes the DOS
+ * timestamps so the harness can compare bytes.
  */
 export function writeZip(entries, now = new Date()) {
-  const enc = new TextEncoder();
-  const locals = [];
-  const centrals = [];
-  let offset = 0;
-  const T = dosTime(now), D = dosDate(now);
+  const files = {};
   for (const e of entries) {
-    const nameB = enc.encode(e.name);
-    const data = typeof e.data === 'string' ? enc.encode(e.data) : (e.data || new Uint8Array(0));
-    const crc = data.length ? crc32(data) : 0;
-    const local = new Uint8Array([
-      ...u32(0x04034B50), ...u16(20), ...u16(0), ...u16(0), ...u16(T), ...u16(D),
-      ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nameB.length), ...u16(0),
-      ...nameB, ...data,
-    ]);
-    const central = new Uint8Array([
-      ...u32(0x02014B50), ...u16(20), ...u16(20), ...u16(0), ...u16(0), ...u16(T), ...u16(D),
-      ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nameB.length), ...u16(0), ...u16(0),
-      ...u16(0), ...u16(0), ...u32(e.name.endsWith('/') ? 0x10 : 0), ...u32(offset), ...nameB,
-    ]);
-    locals.push(local); centrals.push(central); offset += local.length;
+    const data = typeof e.data === 'string' ? strToU8(e.data) : (e.data || new Uint8Array(0));
+    const folder = e.name.endsWith('/');
+    files[e.name] = [data, { level: folder ? 0 : 6, mtime: now, attrs: 0 }];
   }
-  const cdSize = centrals.reduce((s, c) => s + c.length, 0);
-  const end = new Uint8Array([
-    ...u32(0x06054B50), ...u16(0), ...u16(0), ...u16(entries.length), ...u16(entries.length),
-    ...u32(cdSize), ...u32(offset), ...u16(0),
-  ]);
-  const total = offset + cdSize + end.length;
-  const out = new Uint8Array(total);
-  let p = 0;
-  for (const b of [...locals, ...centrals, end]) { out.set(b, p); p += b.length; }
-  return out;
+  return zipSync(files, { mtime: now });
 }
 
 /** The three entries of an .ewlist, in the sample's order. */
@@ -310,6 +300,6 @@ export function exportBsuiteFramesMerged(windows, fileLabel, profile = getCaseme
   if (!all.length) return { error: 'no frame members to export (casement windows only)', skipped };
   const rows = groupBsuiteRows(all);
   const filename = `${safeName(fileLabel)}_frames.ewlist`;
-  downloadBytes(filename, buildEwlist(rows, { programsFolder: profile.bsuite.programsFolder }));
+  downloadBytes(filename, buildEwlist(rows, { programsFolder: profile.bsuite.programsFolder, executionParameters: profile.bsuite.writeExecutionParameters ? profile.bsuite.executionParameters : null }));
   return { ok: true, rows: rows.length, pieces: rows.reduce((s, r) => s + r.quantity, 0), skipped, filename };
 }

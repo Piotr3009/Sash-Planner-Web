@@ -144,7 +144,7 @@ const shape = (xml) => {
   const ids = rows.map((_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`);
   const xml = X.writeWorklistXml(rows, { programsFolder: 'C:/BIESSE/PROGRAMS/SKYLON', now: new Date(2026, 8, 12, 12, 0, 0), ids });
   const mine = shape(xml), ref = shape(refXml);
-  const allowedMissing = new Set(['ExecutionParameters', 'ExecutionParameter', 'StopWorklistItem']);
+  const allowedMissing = new Set(['ExecutionParameters', 'ExecutionParameter', 'StopWorklistItem']);   // off by default (profile.bsuite.writeExecutionParameters)
   const missing = Object.keys(ref).filter((t) => !(t in mine) && !allowedMissing.has(t));
   const extra = Object.keys(mine).filter((t) => !(t in ref));
   const attrDiff = Object.keys(mine).filter((t) => t in ref && ![...mine[t]].every((a) => ref[t].has(a)));
@@ -168,6 +168,22 @@ console.log('== 5 — ZIP round-trip ==');
   const z = unzip(Buffer.from(bytes));
   check('three entries in the sample\'s order: worklist.wld, Programs/, version', Object.keys(z).join(',') === 'worklist.wld,Programs/,version' && Object.keys(refEntries).join(',') === Object.keys(z).join(','));
   check('version = "5"', z['version'].data.toString() === '5');
+  // 12.09 (bSolid refused the first, STORED build): entries are DEFLATE like the sample, folder stored, attrs 0
+  const refM = Object.fromEntries(Object.entries(refEntries).map(([k, v]) => [k, v.method]));
+  const mineM = Object.fromEntries(Object.entries(z).map(([k, v]) => [k, v.method]));
+  check('compression methods match the Biesse sample entry by entry (worklist 8, Programs/ 0, version 8)', JSON.stringify(mineM) === JSON.stringify(refM) && mineM['worklist.wld'] === 8, JSON.stringify(mineM));
+  {
+    const b = Buffer.from(bytes); const eocd = b.readUInt32LE(b.length - 22) === 0x06054B50 ? b.length - 22 : -1;
+    const cdOff = b.readUInt32LE(eocd + 16); let q = cdOff; const attrs = [];
+    while (q < eocd && b.readUInt32LE(q) === 0x02014B50) { const nl = b.readUInt16LE(q + 28), xl = b.readUInt16LE(q + 30), cl = b.readUInt16LE(q + 32); attrs.push(b.readUInt32LE(q + 38)); q += 46 + nl + xl + cl; }
+    check('central directory: external attributes 0 on every entry (sample), general flags 0', attrs.length === 3 && attrs.every((a) => a === 0));
+  }
+  {
+    const withEx = X.buildEwlist(rows, { programsFolder: 'C:/BIESSE/PROGRAMS/SKYLON', now, ids: rows.map((_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`), executionParameters: B.executionParameters });
+    const xml2 = unzip(Buffer.from(withEx))['worklist.wld'].data.toString('utf8');
+    check('optional ExecutionParameters block per panel with the sample\'s ten variables (ExOrigin … ExMirrorY)', (xml2.match(/<ExecutionParameters>/g) || []).length === rows.length && /VariableName="ExOrigin" Expression="9"/.test(xml2) && /VariableName="ExOffsetY" Expression="-139.45"/.test(xml2) && /VariableName="ExMirrorY" Expression="false" ExpressionValue="False"/.test(xml2));
+    check('without the option no ExecutionParameters is written (UsingDefaultOrigins only)', !z['worklist.wld'].data.toString('utf8').includes('ExecutionParameters'));
+  }
   check('worklist.wld CRC32 matches its content', z['worklist.wld'].crc === X.crc32(z['worklist.wld'].data));
   check('the extracted XML equals writeWorklistXml for the same rows', z['worklist.wld'].data.toString('utf8') === X.writeWorklistXml(rows, { programsFolder: 'C:/BIESSE/PROGRAMS/SKYLON', now, ids: rows.map((_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`) }));
   check('central directory present (EOCD signature at the end)', Buffer.from(bytes).readUInt32LE(bytes.length - 22) === 0x06054B50);
@@ -176,7 +192,7 @@ console.log('== 5 — ZIP round-trip ==');
 
 console.log('== 6 — profile ==');
 check('profile.bsuite: six programs, 68 × 93 comes from the profile not the export', Object.keys(B.programs).sort().join(',') === 'cill,head,jambL,jambR,mullion,transom' && B.programs.mullion.macro === true && B.programs.transom.macro === true);
-check('profile.bsuite defaults: screws 1, opOriginEnd start, seatSplitStart 0.5, macroVarsInList true, sideValue left 0 / right 1', B.screws === 1 && B.opOriginEnd === 'start' && B.seatSplitStart === 0.5 && B.macroVarsInList === true && B.sideValue.left === 0 && B.sideValue.right === 1);
+check('profile.bsuite defaults: screws 1, opOriginEnd start, seatSplitStart 0.5, macroVarsInList true, sideValue left 0 / right 1, placement off', B.screws === 1 && B.opOriginEnd === 'start' && B.seatSplitStart === 0.5 && B.macroVarsInList === true && B.sideValue.left === 0 && B.sideValue.right === 1 && B.writeExecutionParameters === false && B.executionParameters.origin === 9);
 {
   const m = P.migrateCasementProfile({ ...prof, bsuite: { programsFolder: 'D:/X', programs: { head: { file: 'H68.bSolid' } } } });
   check('migration keeps a stored folder / file and fills the rest from the defaults', m.bsuite.programsFolder === 'D:/X' && m.bsuite.programs.head.file === 'H68.bSolid' && m.bsuite.programs.head.panelId === 1001 && m.bsuite.programs.cill.file === B.programs.cill.file && m.bsuite.screws === 1);

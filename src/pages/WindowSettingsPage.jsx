@@ -1100,6 +1100,15 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
                     </div>
                   </div>
                   <div>
+                    <div className="text-ink-400 mb-1">Table placement (ExecutionParameters)</div>
+                    <div className="flex gap-1.5">
+                      {[[false, 'Default origins'], [true, 'Write placement']].map(([v, l]) => (
+                        <button key={String(v)} onClick={() => setPath(['bsuite', 'writeExecutionParameters'], v)}
+                          className={`px-2.5 py-1 text-[11px] rounded-lg border transition-all ${p.bsuite.writeExecutionParameters === v ? 'border-accent-500 bg-accent-500/15 text-accent-400 font-medium' : 'border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500'}`}>{l}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
                     <div className="text-ink-400 mb-1">Macro variables in the list</div>
                     <div className="flex gap-1.5">
                       {[[true, 'Write OPn_HX / LH_RH'], [false, 'Program defaults']].map(([v, l]) => (
