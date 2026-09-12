@@ -26,6 +26,7 @@ import { exportGlassPDF } from '../utils/glassPdfExport.js';
 import { exportGlassDxfForWindow, glassDxfParamsForWindow } from '../utils/glassDxfExport.js';
 import { exportBomPDF } from '../utils/bomPdfExport.js';
 import { exportCncJambsForWindow, canExportCncJambs, exportArchDxfForWindow, archParamsForWindow, traceryParamsForWindow, exportTraceryDxfForWindow } from '../utils/cncExport.js';
+import { exportBsuiteFramesMerged } from '../utils/bsuiteExport.js';
 
 
 const TABS = [
@@ -159,6 +160,22 @@ export default function WindowDetailPage() {
                 className={cls}>🪟 Tracery DXF</button>
             </>);
           })()}
+          {(windowSpec?.category || 'sash') === 'casement' && (
+            // 12.09: bSuite worklist for ONE window (Piotr: single window first, the pack is built from them)
+            <button
+              onClick={() => {
+                const r = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement,
+                  () => exportBsuiteFramesMerged([{ windowSpec, derived, name: item?.name }], item?.name || 'window'));
+                if (r.error) { alert(`bSuite frames unavailable: ${r.error}`); return; }
+                const sk = r.skipped?.length ? `\nSkipped: ${r.skipped.map((x) => `${x.element} (${x.reason})`).join(', ')}` : '';
+                alert(`${r.filename}: ${r.rows} rows, ${r.pieces} pieces.${sk}`);
+              }}
+              title="bSolid worklist (.ewlist) for this window's frame: head, cill, jambs, mullions, transoms — Matt's FC_* programs with LPX = finished length"
+              className="btn text-sm bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50"
+            >
+              🏭 bSuite frames
+            </button>
+          )}
           <Link to={editUrl} className="btn btn-primary text-sm">✏️ Edit Configuration</Link>
         </div>
       </div>

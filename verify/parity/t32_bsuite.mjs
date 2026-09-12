@@ -182,6 +182,14 @@ check('profile.bsuite defaults: screws 1, opOriginEnd start, seatSplitStart 0.5,
   check('migration keeps a stored folder / file and fills the rest from the defaults', m.bsuite.programsFolder === 'D:/X' && m.bsuite.programs.head.file === 'H68.bSolid' && m.bsuite.programs.head.panelId === 1001 && m.bsuite.programs.cill.file === B.programs.cill.file && m.bsuite.screws === 1);
 }
 
+console.log('== 7 — buttons: single window first, then the pack (Piotr) ==');
+{
+  const wdp = readFileSync(resolve(ROOT, 'src', 'pages', 'WindowDetailPage.jsx'), 'utf8');
+  const ppp = readFileSync(resolve(ROOT, 'src', 'pages', 'ProductionPackPage.jsx'), 'utf8');
+  check('WindowDetailPage: bSuite frames button for a casement window, via exportBsuiteFramesMerged([one window])', /bSuite frames/.test(wdp) && /exportBsuiteFramesMerged\(\[\{ windowSpec, derived/.test(wdp));
+  check('ProductionPackPage: bSuite frames button for a casement pack, all windows of the pack', /bSuite frames/.test(ppp) && /exportBsuiteFramesMerged\(/.test(ppp));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (!fail) console.log('ALL PASS');
 process.exit(fail ? 1 : 0);
