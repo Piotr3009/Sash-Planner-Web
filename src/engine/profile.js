@@ -255,7 +255,7 @@ export const DEFAULT_CASEMENT_PROFILE = {
   // name; until then bSolid keeps the program's own values). Test on the
   // machine decides opOriginEnd and the LH/RH meaning.
   bsuite: {
-    programsFolder: 'C:/BIESSE/PROGRAMS/SKYLON',   // ProgramUri base — where the .bSolid files live on the machine PC
+    programsFolder: 'C:/bSolid',   // ProgramUri base — Piotr's programs folder (12.09); bSolid needs an absolute path
     programs: {
       head:    { file: 'FC_HEAD_SKYLON.bSolid',    panelId: 1001, panelName: 'P1001' },
       cill:    { file: 'FC_CILL_SKYLON.bSolid',    panelId: 1001, panelName: 'P1001' },

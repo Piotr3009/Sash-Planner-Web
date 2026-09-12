@@ -191,7 +191,7 @@ console.log('== 5 — ZIP round-trip ==');
 }
 
 console.log('== 6 — profile ==');
-check('profile.bsuite: six programs, 68 × 93 comes from the profile not the export', Object.keys(B.programs).sort().join(',') === 'cill,head,jambL,jambR,mullion,transom' && B.programs.mullion.macro === true && B.programs.transom.macro === true);
+check('profile.bsuite: six programs, folder C:/bSolid, 68 × 93 comes from the profile not the export', Object.keys(B.programs).sort().join(',') === 'cill,head,jambL,jambR,mullion,transom' && B.programsFolder === 'C:/bSolid' && B.programs.mullion.macro === true && B.programs.transom.macro === true);
 check('profile.bsuite defaults: screws 1, opOriginEnd start, seatSplitStart 0.5, macroVarsInList true, sideValue left 0 / right 1, placement off', B.screws === 1 && B.opOriginEnd === 'start' && B.seatSplitStart === 0.5 && B.macroVarsInList === true && B.sideValue.left === 0 && B.sideValue.right === 1 && B.writeExecutionParameters === false && B.executionParameters.origin === 9);
 {
   const m = P.migrateCasementProfile({ ...prof, bsuite: { programsFolder: 'D:/X', programs: { head: { file: 'H68.bSolid' } } } });
