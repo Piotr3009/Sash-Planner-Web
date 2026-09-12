@@ -245,6 +245,31 @@ export const DEFAULT_CASEMENT_PROFILE = {
     clamp: { base: 130, minThickness: 40, maxThickness: 98, minPiece: 140 },
     clampClearance: 20,
   },
+  // ── bSuite worklist export (.ewlist) for the Rover A 1532 — frames only
+  // (12.09.2026). Matt's programs (FC_HEAD/CILL/LH_JAMB/RH_JAMB_SKYLON,
+  // MULLION_1, TRANSOM_1) are built on a 68 × 93 board and take the FINISHED
+  // length as LPX; the row carries program + quantity + LPX/LPY/LPZ. The
+  // mullion / transom macros expose OP1..3_HX (joint positions), LH_RH_CNTRL
+  // and SCRW_ON_OFF — written as document variables when macroVarsInList is
+  // on (Matt must link the macro properties to document variables of the same
+  // name; until then bSolid keeps the program's own values). Test on the
+  // machine decides opOriginEnd and the LH/RH meaning.
+  bsuite: {
+    programsFolder: 'C:/BIESSE/PROGRAMS/SKYLON',   // ProgramUri base — where the .bSolid files live on the machine PC
+    programs: {
+      head:    { file: 'FC_HEAD_SKYLON.bSolid',    panelId: 1001, panelName: 'P1001' },
+      cill:    { file: 'FC_CILL_SKYLON.bSolid',    panelId: 1001, panelName: 'P1001' },
+      jambL:   { file: 'FC_LH_JAMB_SKYLON.bSolid', panelId: 1001, panelName: 'P1001' },
+      jambR:   { file: 'FC_RH_JAMB_SKYLON.bSolid', panelId: 1001, panelName: 'P1001' },
+      mullion: { file: 'MULLION_1.bSolid',          panelId: 1001, panelName: 'P1001', macro: true },
+      transom: { file: 'TRANSOM_1.bSolid',          panelId: 1001, panelName: 'P1001', macro: true },
+    },
+    screws: 1,                 // SCRW_ON_OFF for the mullion / transom macro (1 = screws, 0 = dowels only)
+    opOriginEnd: 'start',      // 'start' | 'end' — the end of the member OPn_HX is measured from (machine test)
+    seatSplitStart: 0.5,       // share of (board length − visible run) at the START end — the mullion seats into head and cill (machine test)
+    sideValue: { left: 0, right: 1 },   // LH_RH_CNTRL for a joint on the left / right of the member (machine test)
+    macroVarsInList: true,     // write OPn_HX / LH_RH_CNTRL / SCRW_ON_OFF as document variables
+  },
   // ── Glazier numbers (ARCHED-WINDOWS-v3 Block 0.2) — the sealed unit's
   // spacer bar width laid out in the pattern, and the edge cover: the
   // perimeter spacer / seal band inside the unit contour. DEFAULT (open,
@@ -321,6 +346,12 @@ export function migrateCasementProfile(profile) {
     fix: { ...D.fix, ...(profile.fix || {}) },
     // v4 (ARCHED-WINDOWS-v4 Block C): CNC block (clamp limits), filled from the default
     cnc: { ...D.cnc, ...(profile.cnc || {}), clamp: { ...D.cnc.clamp, ...(profile.cnc?.clamp || {}) } },
+    // bSuite export block (12.09): merged key by key; program entries merged per element
+    bsuite: {
+      ...D.bsuite, ...(profile.bsuite || {}),
+      programs: Object.fromEntries(Object.keys(D.bsuite.programs).map((k) => [k, { ...D.bsuite.programs[k], ...(profile.bsuite?.programs?.[k] || {}) }])),
+      sideValue: { ...D.bsuite.sideValue, ...(profile.bsuite?.sideValue || {}) },
+    },
     arch: profile.arch?.version === D.arch.version
       ? {
           ...D.arch, ...profile.arch,

@@ -56,6 +56,7 @@ import WindowPreview3D from '../components/viewer/WindowPreview3D.jsx';
 import Window3DCaptureRig from '../components/viewer/Window3DCaptureRig.jsx';
 import ImageLightbox from '../components/ImageLightbox.jsx';
 import { exportCncJambsMerged, exportArchDxfMerged, exportTraceryMerged } from '../utils/cncExport.js';
+import { exportBsuiteFramesMerged } from '../utils/bsuiteExport.js';
 import { exportGlassDxfMerged } from '../utils/glassDxfExport.js';
 
 // ─── Tab config ───
@@ -547,6 +548,25 @@ export default function ProductionPackPage() {
                 🪟 Tracery {kind.toUpperCase()} (all)
               </button>
             ))}
+            {(pp?.type || batch?.type) === 'casement' && (
+              <button
+                onClick={() => {
+                  // 12.09: bSuite worklist for the Rover — frame members only (Matt's programs),
+                  // leaves come as a second file once their programs exist
+                  const r = exportBsuiteFramesMerged(
+                    (windowsData || []).map((wd) => ({ windowSpec: wd.windowSpec, derived: wd.derived, name: wd.win?.name })),
+                    pp?.name || batch?.label || 'pack',
+                  );
+                  if (r.error) { alert(`bSuite frames: ${r.error}`); return; }
+                  const sk = r.skipped?.length ? `\nSkipped ${r.skipped.length}: ${r.skipped.map((x) => `${x.element} (${x.reason})`).join(', ')}` : '';
+                  alert(`bSuite worklist ${r.filename}: ${r.rows} rows, ${r.pieces} pieces.${sk}`);
+                }}
+                title="One .ewlist for bSolid: head, cill, jambs, mullions and transoms of every casement in the pack (Matt's FC_* programs, LPX = finished length)"
+                className="btn btn-secondary text-xs px-4"
+              >
+                🏭 bSuite frames (.ewlist)
+              </button>
+            )}
           </div>
         </div>
       </header>

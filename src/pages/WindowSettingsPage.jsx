@@ -1066,6 +1066,66 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
               </fieldset>
             </div>
           )}
+
+          {/* ══ 12.09 — bSuite worklist export (.ewlist): where Matt's programs live and how the macros are driven ══ */}
+          {p.bsuite && (
+            <div className="card p-4 mt-4">
+              <div className="text-xs font-semibold text-ink-200 mb-2">bSuite export
+                <span className="text-ink-500 font-normal"> · Rover worklist (.ewlist) for frame members — programs by Matt (Biesse UK)</span>
+              </div>
+              <div className="text-xs">
+                <div className="mb-3">
+                  <div className="text-ink-400 mb-1">Programs folder on the machine PC (ProgramUri base)</div>
+                  <input type="text" defaultValue={p.bsuite.programsFolder} key={p.bsuite.programsFolder}
+                    onBlur={(e) => setPath(['bsuite', 'programsFolder'], e.target.value.trim() || p.bsuite.programsFolder)}
+                    className="w-full max-w-lg px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+                </div>
+                <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                  <div>
+                    <div className="text-ink-400 mb-1">Screws in mullion / transom macro</div>
+                    <div className="flex gap-1.5">
+                      {[[1, 'Screws'], [0, 'Dowels only']].map(([v, l]) => (
+                        <button key={v} onClick={() => setPath(['bsuite', 'screws'], v)}
+                          className={`px-2.5 py-1 text-[11px] rounded-lg border transition-all ${p.bsuite.screws === v ? 'border-accent-500 bg-accent-500/15 text-accent-400 font-medium' : 'border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500'}`}>{l}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-ink-400 mb-1">Joint position OPn_HX measured from</div>
+                    <div className="flex gap-1.5">
+                      {[['start', 'Start of member'], ['end', 'End of member']].map(([v, l]) => (
+                        <button key={v} onClick={() => setPath(['bsuite', 'opOriginEnd'], v)}
+                          className={`px-2.5 py-1 text-[11px] rounded-lg border transition-all ${p.bsuite.opOriginEnd === v ? 'border-accent-500 bg-accent-500/15 text-accent-400 font-medium' : 'border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500'}`}>{l}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-ink-400 mb-1">Macro variables in the list</div>
+                    <div className="flex gap-1.5">
+                      {[[true, 'Write OPn_HX / LH_RH'], [false, 'Program defaults']].map(([v, l]) => (
+                        <button key={String(v)} onClick={() => setPath(['bsuite', 'macroVarsInList'], v)}
+                          className={`px-2.5 py-1 text-[11px] rounded-lg border transition-all ${p.bsuite.macroVarsInList === v ? 'border-accent-500 bg-accent-500/15 text-accent-400 font-medium' : 'border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500'}`}>{l}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Program files (name on the machine PC)</div>
+                <div className="grid grid-cols-2 gap-x-5 gap-y-2 max-w-2xl">
+                  {Object.entries(p.bsuite.programs).map(([k, prog]) => (
+                    <div key={k} className="flex items-center gap-2">
+                      <span className="text-ink-400 w-16 shrink-0">{k}</span>
+                      <input type="text" defaultValue={prog.file} key={`${k}-${prog.file}`}
+                        onBlur={(e) => setPath(['bsuite', 'programs', k, 'file'], e.target.value.trim() || prog.file)}
+                        className="flex-1 px-2 py-1 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-xs" />
+                    </div>
+                  ))}
+                </div>
+                <div className="text-[11px] text-ink-500 mt-3">
+                  The list carries the finished length (LPX) and the 68 × 93 board; the machining lives in the programs. The macro variables reach bSolid only once the macro properties are linked to document variables of the same name — until then the programs' own values apply. Arched heads are skipped (Arch DXF).
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ══ RIGHT 1/3 — live drawings ══ */}

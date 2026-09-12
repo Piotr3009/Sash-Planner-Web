@@ -149,10 +149,13 @@ export const useWindowProfileStore = create(
       // Roots are whitelisted so a typo can never grow the profile; the value
       // must parse as a finite number (an empty field commits nothing).
       setCasementPath: (path, value) => {
-        const roots = ['arch', 'cnc', 'tracery', 'geometry'];
+        const roots = ['arch', 'cnc', 'tracery', 'geometry', 'bsuite'];
         if (!Array.isArray(path) || path.length < 2 || !roots.includes(path[0])) return;
-        const v = Number(value);
-        if (!Number.isFinite(v)) return;
+        // 12.09: the bsuite block holds strings (folder, file names, 'start' | 'end') and booleans,
+        // the other roots are numeric only — keep the numeric guard for them
+        const isBsuite = path[0] === 'bsuite';
+        const v = isBsuite ? (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'string' ? value : null) : Number(value);
+        if (v === null || (!isBsuite && !Number.isFinite(v))) return;
         set((s) => {
           const casement = clone(s.casement);
           let node = casement;

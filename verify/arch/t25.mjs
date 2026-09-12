@@ -422,7 +422,7 @@ section('6 — downstream: cut list / pre-cut follow the plan, export skip reaso
   const store = src('stores/windowProfileStore.js');
   check('WindowSettingsPage: "CNC & arches" card with finger / allowance / stock widths / minClampLength / minPieceLength / wasteThreshold / glazingRebate / clamp / tracery fields and an ArchError validation line',
     page.includes('CNC &amp; arches') && ['minClampLength', 'minPieceLength', 'wasteThreshold', 'glazingRebate', 'clampClearance', 'paneOffset', 'profileWidth', 'ridgeLand', 'edgeLand', 'mitreLeg', 'stockWidths'].every((k) => page.includes(k)) && page.includes('setCasementPath') && page.includes('archValidation'));
-  check('windowProfileStore: setCasementPath (arch / cnc / tracery / geometry whitelist) + setCasementStockWidths (comma list → sorted positive numbers)', store.includes('setCasementPath') && store.includes('setCasementStockWidths') && store.includes("['arch', 'cnc', 'tracery', 'geometry']"));
+  check('windowProfileStore: setCasementPath (arch / cnc / tracery / geometry / bsuite whitelist) + setCasementStockWidths (comma list → sorted positive numbers)', store.includes('setCasementPath') && store.includes('setCasementStockWidths') && store.includes("['arch', 'cnc', 'tracery', 'geometry', 'bsuite']"));   // 12.09: + bsuite (strings / booleans allowed there)
   check('no LISP output anywhere (rule): no LSP writer / button, tracery export is DXF only', !/buildTraceryLsp|writeLsp|_tracery\.lsp/.test(src('utils/cncExport.js')) && !/Tracery LSP/.test(src('pages/WindowDetailPage.jsx')) && !/Tracery LSP/.test(src('pages/ProductionPackPage.jsx')) && src('utils/cncExport.js').includes("if (kind !== 'dxf') return { error: 'Tracery export is DXF only', skipped };"));
 }
 
