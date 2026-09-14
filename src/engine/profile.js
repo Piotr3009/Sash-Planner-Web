@@ -277,11 +277,12 @@ export const DEFAULT_CASEMENT_PROFILE = {
           mullion: { path: 'C:/Users/Xp600/Desktop/TEMPLATES_02.09.26/UPDATED_09.09.26/MULLION_MASTER_V2.bSolid', panelId: 1001, panelName: 'P1001', mode: 'master' },
           transom: { path: 'C:/Users/Xp600/Desktop/TEMPLATES_02.09.26/UPDATED_09.09.26/TRANSOM_MASTER_V2.bSolid', panelId: 1001, panelName: 'P1001', mode: 'master' },
         },
-        // REQUIRED by bSolid (12.09: a list without this block is silently ignored).
-        // Matt's programs carry ExOrigin 0 / corner 0 / offsets 0; the Biesse sample
-        // list saved on this very machine (user Xp600) has 9 / 1 / 66.8 / −139.45 —
-        // the machine test decides which the table wants.
-        writeExecutionParameters: true,
+        // bSolid writes an EMPTY <ExecutionParameters /> per panel (Worklist_5.ewlist, 14.09) —
+        // that is the default. 'Write placement' fills it with the values below (the Biesse
+        // sample list saved on this machine, user Xp600, had 9 / 1 / 66.8 / −139.45).
+        // Each program entry also carries `stored` once its .bSolid file is uploaded in
+        // Window Settings — the export embeds those files (bSolid reads programs from the list).
+        writeExecutionParameters: false,
         executionParameters: { origin: 0, refCorner: 0, rotX: 0, rotY: 0, rotZ: 0, offsetX: 0, offsetY: 0, offsetZ: 0 },
       },
     ],

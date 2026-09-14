@@ -117,6 +117,7 @@ console.log('== 3 — grouping ==');
 
 console.log('== 4 — XML shape vs the Biesse sample ==');
 const refZip = readFileSync(resolve(ROOT, 'docs', 'handover', 'workshop', 'JOINERY_NETWORK_EVENT.ewlist'));
+const piotrZip = readFileSync(resolve(ROOT, 'docs', 'handover', 'workshop', 'Worklist_5_bSolid_export.ewlist'));   // saved by Piotr's bSolid 14.09 — ground truth
 function unzip(buf) {
   // minimal reader: walk local headers (both stored and deflated), return { name: Buffer }
   const out = {}; let p = 0;
@@ -162,6 +163,18 @@ const shape = (xml) => {
   writeFileSync(resolve(ROOT, 'docs', 'handover', 'samples', 'sample_frames_052L_040L.ewlist'), X.buildEwlist(rows, { now: new Date(2026, 8, 12, 12, 0, 0), ids }));
 }
 
+console.log('== 4b — line by line against the list bSolid itself saved (Worklist_5, 14.09) ==');
+{
+  const pz = unzip(piotrZip);
+  const pxml = pz['worklist.wld'].data.toString('utf8');
+  check('bSolid\'s own list embeds the program as Programs\\NAME.bSolid and writes an empty <ExecutionParameters />', Object.keys(pz).some((n) => /^Programs\\.+\.bSolid$/.test(n)) && pxml.includes('<ExecutionParameters />'));
+  // build the same row (CILL_MASTER_V2, LPX 520, HORN 0) and compare the item text modulo Id / LastAccess / Quantity / Label
+  const norm = (t) => t.replace(/Id="[0-9a-f-]{36}"/g, 'Id="#"').replace(/LastAccess="[^"]+"/g, 'LastAccess="#"').replace(/Quantity="\d+"/g, 'Quantity="#"').replace(/Label="[^"]*"/g, 'Label="#"');
+  const pItem = norm(pxml.match(/    <CadProgramWorklistItem [\s\S]*?    <\/CadProgramWorklistItem>/)[0]);
+  const mine = norm(X.writeWorklistXml([{ program: 'CILL_MASTER_V2.bSolid', path: 'C:/bSolid/CILL_MASTER_V2.bSolid', panelId: 1001, panelName: 'P1001', quantity: 5, label: '', vars: { LPX: 520, LPY: 68, LPZ: 93 }, docVars: { HORN: 0 } }], { ids: ['00000000-0000-4000-8000-000000000000'] }).match(/    <CadProgramWorklistItem [\s\S]*?    <\/CadProgramWorklistItem>/)[0]);
+  check('a frame row written by PC is IDENTICAL to the row bSolid wrote (modulo Id / time / quantity / label)', mine === pItem, mine === pItem ? '' : `first diff at ${[...mine].findIndex((c, i) => c !== pItem[i])}`);
+}
+
 console.log('== 5 — ZIP round-trip ==');
 {
   const w = mk('W', '133');
@@ -169,7 +182,19 @@ console.log('== 5 — ZIP round-trip ==');
   const now = new Date(2026, 8, 12, 12, 0, 0);
   const bytes = X.buildEwlist(rows, { now, ids: rows.map((_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`) });
   const z = unzip(Buffer.from(bytes));
-  check('three entries in the sample\'s order: worklist.wld, Programs/, version', Object.keys(z).join(',') === 'worklist.wld,Programs/,version' && Object.keys(refEntries).join(',') === Object.keys(z).join(','));
+  check('three entries in the sample\'s order when no program bytes are given: worklist.wld, Programs/, version', Object.keys(z).join(',') === 'worklist.wld,Programs/,version' && Object.keys(refEntries).join(',') === Object.keys(z).join(','));
+  {
+    // 14.09: the ground truth is Piotr's own bSolid export — the program sits INSIDE the list as
+    // Programs\NAME.bSolid (backslash), deflate; a list without it shows every row red
+    const fake = { [rows[0].program]: new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3, 4, 5, 6, 7, 8]) };
+    const withProg = X.buildEwlist(rows, { now, ids: rows.map((_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`), programs: fake });
+    const zp = unzip(Buffer.from(withProg));
+    const names = Object.keys(zp);
+    check('program bytes are embedded as Programs\\NAME.bSolid (backslash, like bSolid), between Programs/ and version', names.join(',') === `worklist.wld,Programs/,Programs\\${rows[0].program},version`, names.join(','));
+    check('the embedded bytes round-trip unchanged (deflate)', Buffer.compare(zp[`Programs\\${rows[0].program}`].data, Buffer.from(fake[rows[0].program])) === 0 && zp[`Programs\\${rows[0].program}`].method === 8);
+    check('one embedded copy per distinct program even when several rows use it', (() => { const two = X.buildEwlist([rows[0], { ...rows[0], label: 'x' }], { now, ids: ['a', 'b'], programs: fake }); return Object.keys(unzip(Buffer.from(two))).filter((n) => n.startsWith('Programs\\')).length === 1; })());
+  }
+  check('every panel node carries an EMPTY <ExecutionParameters /> by default (as bSolid writes it)', (z['worklist.wld'].data.toString('utf8').match(/<ExecutionParameters \/>/g) || []).length === rows.filter((r) => !r.noPanel).length);
   check('version = "5"', z['version'].data.toString() === '5');
   // 12.09 (bSolid refused the first, STORED build): entries are DEFLATE like the sample, folder stored, attrs 0
   const refM = Object.fromEntries(Object.entries(refEntries).map(([k, v]) => [k, v.method]));
@@ -185,7 +210,7 @@ console.log('== 5 — ZIP round-trip ==');
     const withEx = X.buildEwlist(rows, { now, ids: rows.map((_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`), executionParameters: TGT.executionParameters });
     const xml2 = unzip(Buffer.from(withEx))['worklist.wld'].data.toString('utf8');
     check('ExecutionParameters block per panel with the ten variables (ExOrigin … ExMirrorY), values from the target', (xml2.match(/<ExecutionParameters>/g) || []).length === rows.filter((r) => !r.noPanel).length && /VariableName="ExOrigin" Expression="0"/.test(xml2) && /VariableName="ExOffsetY" Expression="0"/.test(xml2) && /VariableName="ExMirrorY" Expression="false" ExpressionValue="False"/.test(xml2));
-    check('without the option no ExecutionParameters is written (UsingDefaultOrigins only)', !z['worklist.wld'].data.toString('utf8').includes('ExecutionParameters'));
+    check('without the option only the empty element is written (no ExOrigin values)', !z['worklist.wld'].data.toString('utf8').includes('ExOrigin'));
   }
   check('worklist.wld CRC32 matches its content', z['worklist.wld'].crc === X.crc32(z['worklist.wld'].data));
   check('the extracted XML equals writeWorklistXml for the same rows', z['worklist.wld'].data.toString('utf8') === X.writeWorklistXml(rows, { now, ids: rows.map((_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`) }));
@@ -196,7 +221,7 @@ console.log('== 5 — ZIP round-trip ==');
 console.log('== 6 — profile ==');
 check('profile.bsuite: active target machine with six V2 program paths, 68 × 93 comes from the profile not the export', Object.keys(TGT.programs).sort().join(',') === 'cill,head,jambL,jambR,mullion,transom' && TGT.id === 'machine' && TGT.programs.head.path.endsWith('/UPDATED_09.09.26/HEAD_MASTER_V2.bSolid') && TGT.programs.mullion.mode === 'master' && TGT.programs.transom.mode === 'master');
 check('profile.bsuite.master defaults: opn1From bottom, hand codes left 1 / right 4 / top 2, headWidth 80, trickle on', B.master.opn1From === 'bottom' && B.master.handCodes.left === 1 && B.master.handCodes.right === 4 && B.master.handCodes.top === 2 && B.master.headWidth === 80 && B.master.writeTrickleVent === true);
-check('profile.bsuite defaults: screws 1, opOriginEnd start, seatSplitStart 0.5, macroVarsInList true, sideValue left 0 / right 1, target placement ON with Matt\'s zeros', B.screws === 1 && B.opOriginEnd === 'start' && B.seatSplitStart === 0.5 && B.macroVarsInList === true && B.sideValue.left === 0 && B.sideValue.right === 1 && TGT.writeExecutionParameters === true && TGT.executionParameters.origin === 0 && TGT.executionParameters.offsetY === 0);   // 14.09: placement per target, Matt's zeros
+check('profile.bsuite defaults: screws 1, opOriginEnd start, seatSplitStart 0.5, macroVarsInList true, sideValue left 0 / right 1, target placement OFF (empty element) with Matt\'s zeros ready', B.screws === 1 && B.opOriginEnd === 'start' && B.seatSplitStart === 0.5 && B.macroVarsInList === true && B.sideValue.left === 0 && B.sideValue.right === 1 && TGT.writeExecutionParameters === false && TGT.executionParameters.origin === 0 && TGT.executionParameters.offsetY === 0);   // 14.09: placement per target, Matt's zeros
 {
   const m = P.migrateCasementProfile({ ...prof, bsuite: { programsFolder: 'D:/X', programs: { head: { file: 'H68.bSolid' } }, writeExecutionParameters: false } });
   check('migration: a 12.09 copy (folder + file names) becomes ONE target with full paths, the rest filled from the defaults', m.bsuite.targets.length === 1 && m.bsuite.targets[0].programs.head.path === 'D:/X/H68.bSolid' && m.bsuite.targets[0].programs.head.panelId === 1001 && m.bsuite.targets[0].programs.cill.path.endsWith('CILL_MASTER_V2.bSolid') && m.bsuite.targets[0].writeExecutionParameters === false && m.bsuite.activeTarget === m.bsuite.targets[0].id && m.bsuite.screws === 1 && !('programsFolder' in m.bsuite));

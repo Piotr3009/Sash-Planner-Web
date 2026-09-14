@@ -27,6 +27,7 @@ import { exportGlassDxfForWindow, glassDxfParamsForWindow } from '../utils/glass
 import { exportBomPDF } from '../utils/bomPdfExport.js';
 import { exportCncJambsForWindow, canExportCncJambs, exportArchDxfForWindow, archParamsForWindow, traceryParamsForWindow, exportTraceryDxfForWindow } from '../utils/cncExport.js';
 import { exportBsuiteFramesMerged } from '../utils/bsuiteExport.js';
+import { downloadBsuiteProgram } from '../services/bsuitePrograms.js';
 
 
 const TABS = [
@@ -163,12 +164,12 @@ export default function WindowDetailPage() {
           {(windowSpec?.category || 'sash') === 'casement' && (
             // 12.09: bSuite worklist for ONE window (Piotr: single window first, the pack is built from them)
             <button
-              onClick={() => {
-                const r = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement,
-                  () => exportBsuiteFramesMerged([{ windowSpec, derived, name: item?.name }], item?.name || 'window'));
+              onClick={async () => {
+                const r = await withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement,
+                  () => exportBsuiteFramesMerged([{ windowSpec, derived, name: item?.name }], item?.name || 'window', undefined, null, downloadBsuiteProgram));
                 if (r.error) { alert(`bSuite frames unavailable: ${r.error}`); return; }
                 const sk = r.skipped?.length ? `\nSkipped: ${r.skipped.map((x) => `${x.element} (${x.reason})`).join(', ')}` : '';
-                alert(`${r.filename} for ${r.target}: ${r.rows} rows, ${r.pieces} pieces.${sk}`);
+                alert(`${r.filename} for ${r.target}: ${r.rows} rows, ${r.pieces} pieces, ${r.embedded} programs embedded.${sk}`);
               }}
               title="bSolid worklist (.ewlist) for this window's frame: head, cill, jambs, mullions, transoms — Matt's FC_* programs with LPX = finished length"
               className="btn text-sm bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50"

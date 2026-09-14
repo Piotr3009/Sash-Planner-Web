@@ -57,6 +57,7 @@ import Window3DCaptureRig from '../components/viewer/Window3DCaptureRig.jsx';
 import ImageLightbox from '../components/ImageLightbox.jsx';
 import { exportCncJambsMerged, exportArchDxfMerged, exportTraceryMerged } from '../utils/cncExport.js';
 import { exportBsuiteFramesMerged } from '../utils/bsuiteExport.js';
+import { downloadBsuiteProgram } from '../services/bsuitePrograms.js';
 import { exportGlassDxfMerged } from '../utils/glassDxfExport.js';
 
 // ─── Tab config ───
@@ -550,16 +551,17 @@ export default function ProductionPackPage() {
             ))}
             {(pp?.type || batch?.type) === 'casement' && (
               <button
-                onClick={() => {
+                onClick={async () => {
                   // 12.09: bSuite worklist for the Rover — frame members only (Matt's programs),
-                  // leaves come as a second file once their programs exist
-                  const r = exportBsuiteFramesMerged(
+                  // leaves come as a second file once their programs exist; 14.09: the programs
+                  // are embedded (downloaded from the target's uploaded files)
+                  const r = await exportBsuiteFramesMerged(
                     (windowsData || []).map((wd) => ({ windowSpec: wd.windowSpec, derived: wd.derived, name: wd.win?.name })),
-                    pp?.name || batch?.label || 'pack',
+                    pp?.name || batch?.label || 'pack', undefined, null, downloadBsuiteProgram,
                   );
                   if (r.error) { alert(`bSuite frames: ${r.error}`); return; }
                   const sk = r.skipped?.length ? `\nSkipped ${r.skipped.length}: ${r.skipped.map((x) => `${x.element} (${x.reason})`).join(', ')}` : '';
-                  alert(`bSuite worklist ${r.filename} for ${r.target}: ${r.rows} rows, ${r.pieces} pieces.${sk}`);
+                  alert(`bSuite worklist ${r.filename} for ${r.target}: ${r.rows} rows, ${r.pieces} pieces, ${r.embedded} programs embedded.${sk}`);
                 }}
                 title="One .ewlist for bSolid: head, cill, jambs, mullions and transoms of every casement in the pack (Matt's FC_* programs, LPX = finished length)"
                 className="btn btn-secondary text-xs px-4"

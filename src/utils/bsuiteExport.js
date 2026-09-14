@@ -7,19 +7,25 @@
  * the macro variables (OPn_HX joint positions, LH_RH_CNTRL, SCRW_ON_OFF) as document
  * variables. bSolid does the machining — this file never describes a toolpath.
  *
- * Format (docs: Petros warsztat/biesse → "PATENT: format LISTY ZADAŃ bSolid", from the Biesse UK
- * sample JOINERY_NETWORK_EVENT.ewlist):
- *   NAME.ewlist = ZIP with  worklist.wld  (XML, UTF-8, CRLF, no <?xml?> header)
- *                           Programs/     (empty folder)
- *                           version       ("5")
+ * Format (Biesse UK sample JOINERY_NETWORK_EVENT.ewlist + a list saved by Piotr's own bSolid,
+ * Worklist_5.ewlist, 14.09.2026 — the second one is the ground truth):
+ *   NAME.ewlist = ZIP (deflate) with
+ *       worklist.wld                 XML, UTF-8, CRLF, no <?xml?> header
+ *       Programs/                    folder entry
+ *       Programs\NAME.bSolid         THE PROGRAM ITSELF — bSolid reads programs from inside the
+ *                                    list, not from the disk (backslash in the entry name, as
+ *                                    bSolid writes it); a list without them shows every row red
+ *                                    "The program does not exist / Program read error"
+ *       version                      "5"
+ *   Every ProgramPanelNode carries an EMPTY <ExecutionParameters /> (bSolid writes it so; a list
+ *   with no element at all is silently ignored). ProgramUri is informational (where the program
+ *   came from).
  *   <Worklist Description="" Version="4"><Items>
  *     <CadProgramWorklistItem Id=GUID Name="PROG.bSolid" Quantity=N Label=… ProgramUri="file:///…">
  *       <ExecutionTimeData …/><Origins/>
  *       <ProgramDocumentNode Id="document" Name="document">
  *         <Variables> document variables (String) </Variables>
  *         <Children><ProgramPanelNode Id="1001" Name="P1001"><Variables> LPX/LPY/LPZ (Double) …
- *   ExecutionParameters (machine origin / offsets) are NOT written: UsingDefaultOrigins="true".
- *   Whether bSolid accepts that is the first machine test (BLOCKERS).
  *
  * Rules:
  *  - numbers come from `derived` (cut list lengths, mullionRuns / transomRuns), never recomputed;
@@ -272,8 +278,10 @@ export function writeWorklistXml(rows, opts = {}) {
       L.push(`              <ParametricVariable TypeCode="Double" VariableName="${k}" Expression="${fmt(r.vars[k])}" ExpressionValue="${fmt(r.vars[k])}" MeasureUnit="mm" />`);
     }
     L.push('            </Variables>');
-    if (opts.executionParameters) {
-      // the sample writes the table placement per panel; values are machine-specific (profile.bsuite.executionParameters)
+    if (!opts.executionParameters) {
+      L.push('            <ExecutionParameters />');   // as bSolid writes it (Worklist_5.ewlist)
+    } else {
+      // optional table placement per panel (Biesse sample); values are machine-specific (target.executionParameters)
       const X = opts.executionParameters;
       const ex = (k, v, unit) => `                <ParametricVariable TypeCode="Object" VariableName="${k}" Expression="${v}" ExpressionValue="${typeof v === 'boolean' ? (v ? 'True' : 'False') : v}" MeasureUnit="${unit}" />`;
       L.push('            <ExecutionParameters>');
@@ -326,15 +334,29 @@ export function writeZip(entries, now = new Date()) {
   return zipSync(files, { mtime: now });
 }
 
-/** The three entries of an .ewlist, in the sample's order. */
+/**
+ * The .ewlist: worklist.wld, the Programs/ folder, one embedded program per distinct program
+ * name (`Programs\NAME.bSolid`, backslash as bSolid writes it), version.
+ * opts.programs: { [fileName]: Uint8Array } — the program bytes to embed (from the target's
+ * uploaded files). A row whose program is missing from `opts.programs` is still written (bSolid
+ * will show it red) — the caller reports those in `skipped`.
+ */
 export function buildEwlist(rows, opts = {}) {
   const xml = writeWorklistXml(rows, opts);
   const now = opts.now || new Date();
-  return writeZip([
+  const entries = [
     { name: 'worklist.wld', data: xml },
     { name: 'Programs/', data: new Uint8Array(0) },
-    { name: 'version', data: '5' },
-  ], now);
+  ];
+  const seen = new Set();
+  for (const r of rows) {
+    const bytes = opts.programs?.[r.program];
+    if (!bytes || seen.has(r.program)) continue;
+    seen.add(r.program);
+    entries.push({ name: `Programs\\${r.program}`, data: bytes });
+  }
+  entries.push({ name: 'version', data: '5' });
+  return writeZip(entries, now);
 }
 
 /* ─────────────────────────────── export (browser) ─────────────────────────────── */
@@ -353,7 +375,9 @@ const safeName = (s) => String(s || 'pack').replace(/[^A-Za-z0-9_-]+/g, '_').rep
  * Many windows (a pack or a batch) → one {label}_frames.ewlist.
  * windows: [{ windowSpec, derived, name }]. Returns { ok, rows, skipped, filename } or { error }.
  */
-export function exportBsuiteFramesMerged(windows, fileLabel, profile = getCasementProfile(), targetId = null) {
+// loadProgram(storagePath) → Uint8Array is injected by the page (services/bsuitePrograms.js) so this
+// module stays free of the Supabase client and stays testable in node
+export async function exportBsuiteFramesMerged(windows, fileLabel, profile = getCasementProfile(), targetId = null, loadProgram = null) {
   const target = (targetId && profile.bsuite.targets.find((t) => t.id === targetId)) || bsuiteActiveTarget(profile.bsuite);
   const all = [];
   const skipped = [];
@@ -363,7 +387,23 @@ export function exportBsuiteFramesMerged(windows, fileLabel, profile = getCaseme
   }
   if (!all.length) return { error: 'no frame members to export (casement windows only)', skipped };
   const rows = groupBsuiteRows(all);
+  // the programs to embed: every distinct program of the rows, from the target's uploaded files
+  const programs = {};
+  const missing = [];
+  for (const r of rows) {
+    if (programs[r.program]) continue;
+    const key = Object.keys(target.programs).find((k) => fileNameOf(target.programs[k].path) === r.program);
+    const stored = key ? target.programs[key].stored : null;
+    if (!stored?.storagePath) { missing.push(r.program); continue; }
+    if (typeof loadProgram !== 'function') { missing.push(`${r.program} (no program loader)`); continue; }
+    try { programs[r.program] = await loadProgram(stored.storagePath); }
+    catch (e) { missing.push(`${r.program} (${e?.message || 'download failed'})`); }
+  }
+  if (missing.length && missing.length === Object.keys(programs).length + missing.length) {
+    return { error: `no program files for ${target.name} — upload the .bSolid files in Window Settings → bSuite export (${[...new Set(missing)].join(', ')})`, skipped };
+  }
+  for (const m of new Set(missing)) skipped.push({ element: m, reason: 'program file not uploaded for this target — its rows will show red in bSolid' });
   const filename = `${safeName(fileLabel)}_frames_${safeName(target.name).toLowerCase()}.ewlist`;
-  downloadBytes(filename, buildEwlist(rows, { executionParameters: target.writeExecutionParameters ? target.executionParameters : null }));
-  return { ok: true, rows: rows.length, pieces: rows.reduce((s, r) => s + r.quantity, 0), skipped, filename, target: target.name };
+  downloadBytes(filename, buildEwlist(rows, { executionParameters: target.writeExecutionParameters ? target.executionParameters : null, programs }));
+  return { ok: true, rows: rows.length, pieces: rows.reduce((s, r) => s + r.quantity, 0), skipped, filename, target: target.name, embedded: Object.keys(programs).length };
 }

@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
+import { uploadBsuiteProgram, removeBsuiteProgram } from '../services/bsuitePrograms.js';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
 import { kgPerM, VARIANT_ORDER } from '../engine/profile.js';
 import NumInput from '../components/NumInput.jsx';
@@ -1120,17 +1121,41 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
                       <button onClick={removeTarget} className="px-2.5 py-1.5 text-[11px] rounded-lg border border-surface-500 text-ink-300 hover:text-red-400 hover:border-red-500/60">remove target</button>
                     )}
                   </div>
-                  <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Program paths on this computer (full path, .bSolid)</div>
-                  <div className="space-y-1.5 max-w-3xl">
-                    {Object.keys(LABEL).map((k) => (
-                      <div key={k} className="flex items-center gap-2">
-                        <span className="text-ink-400 w-16 shrink-0">{LABEL[k]}</span>
-                        <input type="text" defaultValue={active.programs[k].path} key={`${active.id}-${k}-${active.programs[k].path}`}
-                          onBlur={(e) => { const v = cleanPath(e.target.value); if (v && v !== active.programs[k].path) patchProgram(k, { path: v }); }}
-                          className="flex-1 px-2 py-1 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-xs font-mono" />
-                      </div>
-                    ))}
+                  <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Programs — path on this computer (goes into the list as ProgramUri) and the .bSolid FILE (embedded in the list — bSolid reads programs from inside the .ewlist)</div>
+                  <div className="space-y-1.5 max-w-4xl">
+                    {Object.keys(LABEL).map((k) => {
+                      const st = active.programs[k].stored;
+                      const fileName = String(active.programs[k].path).split(/[\\/]/).pop();
+                      const mismatch = st && st.fileName !== fileName;
+                      return (
+                        <div key={k} className="flex items-center gap-2">
+                          <span className="text-ink-400 w-16 shrink-0">{LABEL[k]}</span>
+                          <input type="text" defaultValue={active.programs[k].path} key={`${active.id}-${k}-${active.programs[k].path}`}
+                            onBlur={(e) => { const v = cleanPath(e.target.value); if (v && v !== active.programs[k].path) patchProgram(k, { path: v }); }}
+                            className="flex-1 px-2 py-1 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-xs font-mono" />
+                          <label className={`shrink-0 px-2.5 py-1 text-[11px] rounded-lg border cursor-pointer ${st ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/5' : 'border-amber-500/50 text-amber-400 bg-amber-500/5'}`}
+                            title={st ? `${st.fileName} · ${(st.bytes / 1048576).toFixed(1)} MB · ${new Date(st.uploadedAt).toLocaleString('en-GB')}` : 'No file uploaded — the list would show this row red'}>
+                            {st ? `✓ ${(st.bytes / 1048576).toFixed(1)} MB` : '↑ Upload .bSolid'}
+                            <input type="file" accept=".bSolid,.bsolid" className="hidden"
+                              onChange={async (e) => {
+                                const f = e.target.files?.[0]; e.target.value = '';
+                                if (!f) return;
+                                try {
+                                  const stored = await uploadBsuiteProgram(active.id, k, f);
+                                  patchProgram(k, { stored, path: active.programs[k].path.replace(/[^\\/]+$/, f.name) });
+                                } catch (err) { alert(`Upload failed: ${err?.message || err}`); }
+                              }} />
+                          </label>
+                          {st && (
+                            <button onClick={async () => { if (!window.confirm(`Remove the uploaded ${st.fileName}?`)) return; try { await removeBsuiteProgram(st.storagePath); } catch { /* keep going */ } patchProgram(k, { stored: null }); }}
+                              className="shrink-0 text-[11px] text-ink-500 hover:text-red-400" title="Remove the uploaded file">✕</button>
+                          )}
+                          {mismatch && <span className="text-[10px] text-amber-400" title="The uploaded file's name differs from the path's file name — the list uses the path's name">name ≠</span>}
+                        </div>
+                      );
+                    })}
                   </div>
+                  <div className="text-[11px] text-ink-500 mt-1">Green = file uploaded and embedded on export. Amber = missing — that row would be red in bSolid. Upload the same six files Matt sent; when he sends a new version, upload it here.</div>
                   <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mt-4 mb-3">
                     <div>
                       <div className="text-ink-400 mb-1">Table placement (ExecutionParameters) — bSolid needs the block</div>
