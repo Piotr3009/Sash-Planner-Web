@@ -36,6 +36,8 @@ const X = await import(bundle('src/utils/bsuiteExport.js', 't32_bs.mjs'));
 
 const prof = P.getCasementProfile();
 const B = prof.bsuite;
+const TGT = P.bsuiteActiveTarget(B);
+const FN = (k) => TGT.programs[k].path.split('/').pop();
 const mk = (name, code, w = 1800, h = 1500, extra = {}) => {
   const it = { name, width: w, height: h, windowCategory: 'casement', casementLayout: code, glassType: 'double', frameType: 'standard', ...extra };
   const windowSpec = S.normaliseToWindowSpec({ ...it, fullConfig: it });
@@ -48,7 +50,7 @@ console.log('== 1 — rows per layout ==');
   const w = mk('W', '040L');
   const { rows, skipped } = X.buildBsuiteFrameRows(w.windowSpec, w.derived, 'W', prof);
   const box = Object.fromEntries(w.derived.components.box.map((p) => [p.elementName, p.length]));
-  check('040L: 4 rows — head, cill, jamb L, jamb R — in that order', rows.map(progOf).join(',') === [B.programs.head.file, B.programs.cill.file, B.programs.jambL.file, B.programs.jambR.file].join(','), rows.map(progOf).join(','));
+  check('040L: 4 rows — head, cill, jamb L, jamb R — in that order', rows.map(progOf).join(',') === [FN('head'), FN('cill'), FN('jambL'), FN('jambR')].join(','), rows.map(progOf).join(','));
   check('040L: LPX = the cut-list lengths (head 1800, jambs 1500)', near(rows[0].vars.LPX, box['C-FRAME HEAD']) && near(rows[2].vars.LPX, box['C-FRAME JAMB (L)']) && rows[0].vars.LPX === 1800 && rows[2].vars.LPX === 1500);
   check('040L: every row is a 68 × 93 board (profile face × depth)', rows.every((r) => r.vars.LPY === prof.elements.frameHead.face && r.vars.LPZ === prof.frameDepth && r.vars.LPY === 68 && r.vars.LPZ === 93));
   check('040L: panel node 1001 / P1001, no macro variables, nothing skipped', rows.every((r) => r.panelId === 1001 && r.panelName === 'P1001' && Object.keys(r.docVars).length === 0) && skipped.length === 0);
@@ -57,13 +59,13 @@ console.log('== 1 — rows per layout ==');
   const w = mk('W', '120');
   const { rows } = X.buildBsuiteFrameRows(w.windowSpec, w.derived, 'W', prof);
   const m = w.derived.casement.mullionRuns[0];
-  check('120: 5 rows, the mullion row LPX = mullionRuns[0].length (1423), no transom → no OPn_HX', rows.length === 5 && rows[4].program === B.programs.mullion.file && near(rows[4].vars.LPX, Math.round(m.length * 10) / 10) && !('OP1_HX' in rows[4].docVars));
+  check('120: 5 rows, the mullion row LPX = mullionRuns[0].length (1423), no transom → no OPn_HX', rows.length === 5 && rows[4].program === FN('mullion') && near(rows[4].vars.LPX, Math.round(m.length * 10) / 10) && !('OP1_HX' in rows[4].docVars));
 }
 {
   const w = mk('W', '052L');
   const { rows } = X.buildBsuiteFrameRows(w.windowSpec, w.derived, 'W', prof);
   const m = w.derived.casement.mullionRuns[0], t = w.derived.casement.transomRuns[0];
-  const mull = rows.find((r) => r.program === B.programs.mullion.file), tr = rows.find((r) => r.program === B.programs.transom.file);
+  const mull = rows.find((r) => r.program === FN('mullion')), tr = rows.find((r) => r.program === FN('transom'));
   // independent: the transom axis measured along the BOARD from the mullion's start (top) or end
   // (bottom); the board is (length − visible run) longer, split by seatSplitStart at the start
   const extra = m.length - (m.yBottom - m.yTop), startOff = extra * B.seatSplitStart;
@@ -75,7 +77,7 @@ console.log('== 1 — rows per layout ==');
 {
   const w = mk('W', '142');
   const { rows } = X.buildBsuiteFrameRows(w.windowSpec, w.derived, 'W', prof);
-  const mulls = rows.filter((r) => r.program === B.programs.mullion.file), trs = rows.filter((r) => r.program === B.programs.transom.file);
+  const mulls = rows.filter((r) => r.program === FN('mullion')), trs = rows.filter((r) => r.program === FN('transom'));
   check('142: 3 mullions + 2 transom runs = 9 rows', rows.length === 9 && mulls.length === 3 && trs.length === 2);
   check('142: every mullion carries exactly one joint (the fanlight transom height), every transom none', mulls.every((r) => 'OP1_HX' in r.docVars && !('OP2_HX' in r.docVars)) && trs.every((r) => !('OP1_HX' in r.docVars)));
 }
@@ -83,12 +85,12 @@ console.log('== 1 — rows per layout ==');
   // opOriginEnd flips the joint position to the other end — same window, other profile
   const w = mk('W', '052L');
   const alt = { ...prof, bsuite: { ...B, opOriginEnd: B.opOriginEnd === 'end' ? 'start' : 'end' } };
-  const a = X.buildBsuiteFrameRows(w.windowSpec, w.derived, 'W', prof).rows.find((r) => r.program === B.programs.mullion.file);
-  const b = X.buildBsuiteFrameRows(w.windowSpec, w.derived, 'W', alt).rows.find((r) => r.program === B.programs.mullion.file);
+  const a = X.buildBsuiteFrameRows(w.windowSpec, w.derived, 'W', prof).rows.find((r) => r.program === FN('mullion'));
+  const b = X.buildBsuiteFrameRows(w.windowSpec, w.derived, 'W', alt).rows.find((r) => r.program === FN('mullion'));
   const m = w.derived.casement.mullionRuns[0];
   check('opOriginEnd: start + end positions add up to the BOARD length (1423, not the 1412 visible run)', near(a.docVars.OP1_HX + b.docVars.OP1_HX, Math.round(m.length * 10) / 10, 0.15) && m.length === 1423, `${a.docVars.OP1_HX} + ${b.docVars.OP1_HX} vs ${m.length}`);
   const noMacro = { ...prof, bsuite: { ...B, macroVarsInList: false } };
-  const c = X.buildBsuiteFrameRows(w.windowSpec, w.derived, 'W', noMacro).rows.find((r) => r.program === B.programs.mullion.file);
+  const c = X.buildBsuiteFrameRows(w.windowSpec, w.derived, 'W', noMacro).rows.find((r) => r.program === FN('mullion'));
   check('macroVarsInList = false: the mullion row carries LPX only', Object.keys(c.docVars).length === 0 && c.vars.LPX === a.vars.LPX);
 }
 
@@ -96,7 +98,7 @@ console.log('== 2 — arched head skipped, sash refused ==');
 {
   const g = mk('G', '040L', 1000, 1900, { casementType: 'arched', archShape: 'gothic-equilateral', archHinge: 'left' });
   const { rows, skipped } = X.buildBsuiteFrameRows(g.windowSpec, g.derived, 'G', prof);
-  check('gothic: head skipped with a reason, cill + jambs still exported (3 rows)', rows.length === 3 && !rows.some((r) => r.program === B.programs.head.file) && skipped.length === 1 && /arched head/.test(skipped[0].reason));
+  check('gothic: head skipped with a reason, cill + jambs still exported (3 rows)', rows.length === 3 && !rows.some((r) => r.program === FN('head')) && skipped.length === 1 && /arched head/.test(skipped[0].reason));
   check('gothic: jambs are the straight part only (start line, not the full height)', rows.filter((r) => /JAMB/.test(r.program)).every((r) => r.vars.LPX < 1900));
   const it = { name: 'S', width: 1000, height: 1800, windowCategory: 'sash', sashType: 'double', glassType: 'double', frameType: 'standard', hornType: 'A' };
   const ss = S.normaliseToWindowSpec({ ...it, fullConfig: it });
@@ -109,9 +111,9 @@ console.log('== 3 — grouping ==');
   const a = mk('A', '040L'), b = mk('B', '040L'), c = mk('C', '040L', 1200, 1500);
   const all = [...X.buildBsuiteFrameRows(a.windowSpec, a.derived, 'A', prof).rows, ...X.buildBsuiteFrameRows(b.windowSpec, b.derived, 'B', prof).rows, ...X.buildBsuiteFrameRows(c.windowSpec, c.derived, 'C', prof).rows];
   const g = X.groupBsuiteRows(all);
-  check('two identical 1800 windows + one 1200: heads 1800 collapse to Quantity 2, the 1200 head stays its own row', g.filter((r) => r.program === B.programs.head.file).map((r) => `${r.vars.LPX}x${r.quantity}`).sort().join(',') === '1200x1,1800x2');
-  check('grouped rows carry the joined labels', g.find((r) => r.program === B.programs.head.file && r.quantity === 2).label === 'A - HEAD +1');
-  check('jambs 1500 of all three collapse to Quantity 3', g.find((r) => r.program === B.programs.jambL.file).quantity === 3);
+  check('two identical 1800 windows + one 1200: heads 1800 collapse to Quantity 2, the 1200 head stays its own row', g.filter((r) => r.program === FN('head')).map((r) => `${r.vars.LPX}x${r.quantity}`).sort().join(',') === '1200x1,1800x2');
+  check('grouped rows carry the joined labels', g.find((r) => r.program === FN('head') && r.quantity === 2).label === 'A - HEAD +1');
+  check('jambs 1500 of all three collapse to Quantity 3', g.find((r) => r.program === FN('jambL')).quantity === 3);
 }
 
 console.log('== 4 — XML shape vs the Biesse sample ==');
@@ -142,7 +144,7 @@ const shape = (xml) => {
   const w1 = mk('W1', '052L'), w2 = mk('W2', '040L');
   const rows = X.groupBsuiteRows([...X.buildBsuiteFrameRows(w1.windowSpec, w1.derived, 'W1', prof).rows, ...X.buildBsuiteFrameRows(w2.windowSpec, w2.derived, 'W2', prof).rows]);
   const ids = rows.map((_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`);
-  const xml = X.writeWorklistXml(rows, { programsFolder: 'C:/BIESSE/PROGRAMS/SKYLON', now: new Date(2026, 8, 12, 12, 0, 0), ids });
+  const xml = X.writeWorklistXml(rows, { now: new Date(2026, 8, 12, 12, 0, 0), ids });
   const mine = shape(xml), ref = shape(refXml);
   const allowedMissing = new Set(['ExecutionParameters', 'ExecutionParameter', 'StopWorklistItem']);   // off by default (profile.bsuite.writeExecutionParameters)
   const missing = Object.keys(ref).filter((t) => !(t in mine) && !allowedMissing.has(t));
@@ -151,12 +153,12 @@ const shape = (xml) => {
   check('every element we write exists in the sample with the same attribute set (ExecutionParameters / Stop omitted on purpose)', missing.length === 0 && extra.length === 0 && attrDiff.length === 0, `missing ${missing} extra ${extra} attrs ${attrDiff}`);
   check('root <Worklist Description="" Version="4"> and trailing <Variables />, no <?xml?> header, CRLF', xml.startsWith('<Worklist Description="" Version="4">\r\n') && xml.endsWith('  <Variables />\r\n</Worklist>') && !xml.includes('<?xml'));
   check('one CadProgramWorklistItem per row with Quantity, UsingDefaultOrigins="true" and a GUID Id', (xml.match(/<CadProgramWorklistItem /g) || []).length === rows.length && rows.every((r, i) => xml.includes(`Id="${ids[i]}" Name="${r.program}" Counter="0" Label="${r.label}" Quantity="${r.quantity}"`)) && xml.includes('UsingDefaultOrigins="true"'));
-  check('ProgramUri absolute file:///C:/… with forward slashes', /ProgramUri="file:\/\/\/C:\/BIESSE\/PROGRAMS\/SKYLON\/FC_HEAD_SKYLON\.bSolid"/.test(xml));
+  check('ProgramUri = the target\'s full path as file:///C:/… with forward slashes', xml.includes(`ProgramUri="file:///${TGT.programs.head.path}"`) && /file:\/\/\/C:\/Users\/Xp600\/Desktop\/TEMPLATES_02\.09\.26\/UPDATED_09\.09\.26\/HEAD_MASTER_V2\.bSolid/.test(xml));
   check('panel node <ProgramPanelNode Id="1001" Name="P1001"> with LPX/LPY/LPZ as Double, mm', /<ProgramPanelNode Id="1001" Name="P1001">\r\n            <Variables>\r\n              <ParametricVariable TypeCode="Double" VariableName="LPX" Expression="1800" ExpressionValue="1800" MeasureUnit="mm" \/>/.test(xml));
   check('macro variables as document variables (String) on the mullion row only', /VariableName="OP1_HX" Expression="469\.7"/.test(xml) && (xml.match(/VariableName="OP1_HX"/g) || []).length === 1 && /VariableName="LH_RH_CNTRL"/.test(xml) && /VariableName="SCRW_ON_OFF" Expression="1"/.test(xml));
   check('LastAccess in the sample\'s MM/DD/YYYY HH:MM:SS form', xml.includes('LastAccess="09/12/2026 12:00:00"'));
-  check("a folder with '&' is escaped as &amp; (the sample has P&R)", X.writeWorklistXml(rows.slice(0, 1), { programsFolder: 'C:/MASTER/P&R', ids: [ids[0]] }).includes('ProgramUri="file:///C:/MASTER/P&amp;R/FC_HEAD_SKYLON.bSolid"'));
-  writeFileSync(resolve(ROOT, 'docs', 'handover', 'samples', 'sample_frames_052L_040L.ewlist'), X.buildEwlist(rows, { programsFolder: 'C:/BIESSE/PROGRAMS/SKYLON', now: new Date(2026, 8, 12, 12, 0, 0), ids }));
+  check("a path with '&' is escaped as &amp; (the sample has P&R)", X.writeWorklistXml([{ ...rows[0], path: 'C:/MASTER/P&R/X.bSolid', program: 'X.bSolid' }], { ids: [ids[0]] }).includes('ProgramUri="file:///C:/MASTER/P&amp;R/X.bSolid"'));
+  writeFileSync(resolve(ROOT, 'docs', 'handover', 'samples', 'sample_frames_052L_040L.ewlist'), X.buildEwlist(rows, { now: new Date(2026, 8, 12, 12, 0, 0), ids }));
 }
 
 console.log('== 5 — ZIP round-trip ==');
@@ -164,7 +166,7 @@ console.log('== 5 — ZIP round-trip ==');
   const w = mk('W', '133');
   const rows = X.groupBsuiteRows(X.buildBsuiteFrameRows(w.windowSpec, w.derived, 'W', prof).rows);
   const now = new Date(2026, 8, 12, 12, 0, 0);
-  const bytes = X.buildEwlist(rows, { programsFolder: 'C:/BIESSE/PROGRAMS/SKYLON', now, ids: rows.map((_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`) });
+  const bytes = X.buildEwlist(rows, { now, ids: rows.map((_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`) });
   const z = unzip(Buffer.from(bytes));
   check('three entries in the sample\'s order: worklist.wld, Programs/, version', Object.keys(z).join(',') === 'worklist.wld,Programs/,version' && Object.keys(refEntries).join(',') === Object.keys(z).join(','));
   check('version = "5"', z['version'].data.toString() === '5');
@@ -179,23 +181,28 @@ console.log('== 5 — ZIP round-trip ==');
     check('central directory: external attributes 0 on every entry (sample), general flags 0', attrs.length === 3 && attrs.every((a) => a === 0));
   }
   {
-    const withEx = X.buildEwlist(rows, { programsFolder: 'C:/BIESSE/PROGRAMS/SKYLON', now, ids: rows.map((_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`), executionParameters: B.executionParameters });
+    const withEx = X.buildEwlist(rows, { now, ids: rows.map((_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`), executionParameters: TGT.executionParameters });
     const xml2 = unzip(Buffer.from(withEx))['worklist.wld'].data.toString('utf8');
-    check('optional ExecutionParameters block per panel with the sample\'s ten variables (ExOrigin … ExMirrorY)', (xml2.match(/<ExecutionParameters>/g) || []).length === rows.length && /VariableName="ExOrigin" Expression="9"/.test(xml2) && /VariableName="ExOffsetY" Expression="-139.45"/.test(xml2) && /VariableName="ExMirrorY" Expression="false" ExpressionValue="False"/.test(xml2));
+    check('ExecutionParameters block per panel with the ten variables (ExOrigin … ExMirrorY), values from the target', (xml2.match(/<ExecutionParameters>/g) || []).length === rows.length && /VariableName="ExOrigin" Expression="0"/.test(xml2) && /VariableName="ExOffsetY" Expression="0"/.test(xml2) && /VariableName="ExMirrorY" Expression="false" ExpressionValue="False"/.test(xml2));
     check('without the option no ExecutionParameters is written (UsingDefaultOrigins only)', !z['worklist.wld'].data.toString('utf8').includes('ExecutionParameters'));
   }
   check('worklist.wld CRC32 matches its content', z['worklist.wld'].crc === X.crc32(z['worklist.wld'].data));
-  check('the extracted XML equals writeWorklistXml for the same rows', z['worklist.wld'].data.toString('utf8') === X.writeWorklistXml(rows, { programsFolder: 'C:/BIESSE/PROGRAMS/SKYLON', now, ids: rows.map((_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`) }));
+  check('the extracted XML equals writeWorklistXml for the same rows', z['worklist.wld'].data.toString('utf8') === X.writeWorklistXml(rows, { now, ids: rows.map((_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`) }));
   check('central directory present (EOCD signature at the end)', Buffer.from(bytes).readUInt32LE(bytes.length - 22) === 0x06054B50);
-  check('deterministic: same rows + same clock → identical bytes', Buffer.compare(Buffer.from(bytes), Buffer.from(X.buildEwlist(rows, { programsFolder: 'C:/BIESSE/PROGRAMS/SKYLON', now, ids: rows.map((_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`) }))) === 0);
+  check('deterministic: same rows + same clock → identical bytes', Buffer.compare(Buffer.from(bytes), Buffer.from(X.buildEwlist(rows, { now, ids: rows.map((_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`) }))) === 0);
 }
 
 console.log('== 6 — profile ==');
-check('profile.bsuite: six programs, folder C:/bSolid, 68 × 93 comes from the profile not the export', Object.keys(B.programs).sort().join(',') === 'cill,head,jambL,jambR,mullion,transom' && B.programsFolder === 'C:/bSolid' && B.programs.mullion.macro === true && B.programs.transom.macro === true);
-check('profile.bsuite defaults: screws 1, opOriginEnd start, seatSplitStart 0.5, macroVarsInList true, sideValue left 0 / right 1, placement off', B.screws === 1 && B.opOriginEnd === 'start' && B.seatSplitStart === 0.5 && B.macroVarsInList === true && B.sideValue.left === 0 && B.sideValue.right === 1 && B.writeExecutionParameters === false && B.executionParameters.origin === 9);
+check('profile.bsuite: active target machine with six V2 program paths, 68 × 93 comes from the profile not the export', Object.keys(TGT.programs).sort().join(',') === 'cill,head,jambL,jambR,mullion,transom' && TGT.id === 'machine' && TGT.programs.head.path.endsWith('/UPDATED_09.09.26/HEAD_MASTER_V2.bSolid') && TGT.programs.mullion.macro === true && TGT.programs.transom.macro === true);
+check('profile.bsuite defaults: screws 1, opOriginEnd start, seatSplitStart 0.5, macroVarsInList true, sideValue left 0 / right 1, target placement ON with Matt\'s zeros', B.screws === 1 && B.opOriginEnd === 'start' && B.seatSplitStart === 0.5 && B.macroVarsInList === true && B.sideValue.left === 0 && B.sideValue.right === 1 && TGT.writeExecutionParameters === true && TGT.executionParameters.origin === 0 && TGT.executionParameters.offsetY === 0);   // 14.09: placement per target, Matt's zeros
 {
-  const m = P.migrateCasementProfile({ ...prof, bsuite: { programsFolder: 'D:/X', programs: { head: { file: 'H68.bSolid' } } } });
-  check('migration keeps a stored folder / file and fills the rest from the defaults', m.bsuite.programsFolder === 'D:/X' && m.bsuite.programs.head.file === 'H68.bSolid' && m.bsuite.programs.head.panelId === 1001 && m.bsuite.programs.cill.file === B.programs.cill.file && m.bsuite.screws === 1);
+  const m = P.migrateCasementProfile({ ...prof, bsuite: { programsFolder: 'D:/X', programs: { head: { file: 'H68.bSolid' } }, writeExecutionParameters: false } });
+  check('migration: a 12.09 copy (folder + file names) becomes ONE target with full paths, the rest filled from the defaults', m.bsuite.targets.length === 1 && m.bsuite.targets[0].programs.head.path === 'D:/X/H68.bSolid' && m.bsuite.targets[0].programs.head.panelId === 1001 && m.bsuite.targets[0].programs.cill.path.endsWith('CILL_MASTER_V2.bSolid') && m.bsuite.targets[0].writeExecutionParameters === false && m.bsuite.activeTarget === m.bsuite.targets[0].id && m.bsuite.screws === 1 && !('programsFolder' in m.bsuite));
+  const m2 = P.migrateCasementProfile({ ...prof, bsuite: { ...B, targets: [...B.targets, { id: 'office', name: 'Office', programs: { head: { path: 'C:/bSolid/HEAD.bSolid' } } }], activeTarget: 'office' } });
+  check('migration: stored targets kept, a partial target filled per element, activeTarget honoured', m2.bsuite.targets.length === 2 && m2.bsuite.activeTarget === 'office' && m2.bsuite.targets[1].programs.head.path === 'C:/bSolid/HEAD.bSolid' && m2.bsuite.targets[1].programs.transom.macro === true && m2.bsuite.targets[1].executionParameters.origin === 0);
+  const wO = mk('W', '040L');
+  const rowsO = X.buildBsuiteFrameRows(wO.windowSpec, wO.derived, 'W', m2, m2.bsuite.targets[1]).rows;
+  check('rows built for a chosen target use ITS paths (Name = file name, ProgramUri = its path)', rowsO[0].program === 'HEAD.bSolid' && rowsO[0].path === 'C:/bSolid/HEAD.bSolid' && rowsO[1].path.endsWith('CILL_MASTER_V2.bSolid'));
 }
 
 console.log('== 7 — buttons: single window first, then the pack (Piotr) ==');

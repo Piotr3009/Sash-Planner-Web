@@ -246,34 +246,45 @@ export const DEFAULT_CASEMENT_PROFILE = {
     clampClearance: 20,
   },
   // ── bSuite worklist export (.ewlist) for the Rover A 1532 — frames only
-  // (12.09.2026). Matt's programs (FC_HEAD/CILL/LH_JAMB/RH_JAMB_SKYLON,
-  // MULLION_1, TRANSOM_1) are built on a 68 × 93 board and take the FINISHED
-  // length as LPX; the row carries program + quantity + LPX/LPY/LPZ. The
-  // mullion / transom macros expose OP1..3_HX (joint positions), LH_RH_CNTRL
-  // and SCRW_ON_OFF — written as document variables when macroVarsInList is
-  // on (Matt must link the macro properties to document variables of the same
-  // name; until then bSolid keeps the program's own values). Test on the
-  // machine decides opOriginEnd and the LH/RH meaning.
+  // (12–14.09.2026). Matt's programs are built on a 68 × 93 board and take the
+  // FINISHED length as LPX; a row carries program + quantity + LPX/LPY/LPZ. The
+  // mullion / transom macros expose OP1..3_HX (joint positions), LH_RH_CNTRL and
+  // SCRW_ON_OFF — written as document variables when macroVarsInList is on (Matt
+  // must link the macro properties to document variables of the same name).
+  //
+  // TARGETS (Piotr 14.09): a list is made FOR A COMPUTER — the machine PC, the
+  // office PC, Jack's PC — and each one keeps the programs under its own paths.
+  // So the paths live per target, every element with its own full path, and the
+  // table placement too (ExOrigin / offsets belong to the table, not the program).
+  // Programs on the machine (photos 14.09): C:\Users\Xp600\Desktop\TEMPLATES_02.09.26
+  // \UPDATED_09.09.26\*_MASTER_V2.bSolid — Matt's 09.09 update of the 01.09 FC_* set.
   bsuite: {
-    programsFolder: 'C:/bSolid',   // ProgramUri base — Piotr's programs folder (12.09); bSolid needs an absolute path
-    programs: {
-      head:    { file: 'FC_HEAD_SKYLON.bSolid',    panelId: 1001, panelName: 'P1001' },
-      cill:    { file: 'FC_CILL_SKYLON.bSolid',    panelId: 1001, panelName: 'P1001' },
-      jambL:   { file: 'FC_LH_JAMB_SKYLON.bSolid', panelId: 1001, panelName: 'P1001' },
-      jambR:   { file: 'FC_RH_JAMB_SKYLON.bSolid', panelId: 1001, panelName: 'P1001' },
-      mullion: { file: 'MULLION_1.bSolid',          panelId: 1001, panelName: 'P1001', macro: true },
-      transom: { file: 'TRANSOM_1.bSolid',          panelId: 1001, panelName: 'P1001', macro: true },
-    },
+    activeTarget: 'machine',
+    targets: [
+      {
+        id: 'machine',
+        name: 'Machine (Rover)',
+        programs: {
+          head:    { path: 'C:/Users/Xp600/Desktop/TEMPLATES_02.09.26/UPDATED_09.09.26/HEAD_MASTER_V2.bSolid',    panelId: 1001, panelName: 'P1001' },
+          cill:    { path: 'C:/Users/Xp600/Desktop/TEMPLATES_02.09.26/UPDATED_09.09.26/CILL_MASTER_V2.bSolid',    panelId: 1001, panelName: 'P1001' },
+          jambL:   { path: 'C:/Users/Xp600/Desktop/TEMPLATES_02.09.26/UPDATED_09.09.26/LH_JAMB_MASTER_V2.bSolid', panelId: 1001, panelName: 'P1001' },
+          jambR:   { path: 'C:/Users/Xp600/Desktop/TEMPLATES_02.09.26/UPDATED_09.09.26/RH_JAMB_MASTER_V2.bSolid', panelId: 1001, panelName: 'P1001' },
+          mullion: { path: 'C:/Users/Xp600/Desktop/TEMPLATES_02.09.26/UPDATED_09.09.26/MULLION_MASTER_V2.bSolid', panelId: 1001, panelName: 'P1001', macro: true },
+          transom: { path: 'C:/Users/Xp600/Desktop/TEMPLATES_02.09.26/UPDATED_09.09.26/TRANSOM_MASTER_V2.bSolid', panelId: 1001, panelName: 'P1001', macro: true },
+        },
+        // REQUIRED by bSolid (12.09: a list without this block is silently ignored).
+        // Matt's programs carry ExOrigin 0 / corner 0 / offsets 0; the Biesse sample
+        // list saved on this very machine (user Xp600) has 9 / 1 / 66.8 / −139.45 —
+        // the machine test decides which the table wants.
+        writeExecutionParameters: true,
+        executionParameters: { origin: 0, refCorner: 0, rotX: 0, rotY: 0, rotZ: 0, offsetX: 0, offsetY: 0, offsetZ: 0 },
+      },
+    ],
     screws: 1,                 // SCRW_ON_OFF for the mullion / transom macro (1 = screws, 0 = dowels only)
     opOriginEnd: 'start',      // 'start' | 'end' — the end of the member OPn_HX is measured from (machine test)
     seatSplitStart: 0.5,       // share of (board length − visible run) at the START end — the mullion seats into head and cill (machine test)
     sideValue: { left: 0, right: 1 },   // LH_RH_CNTRL for a joint on the left / right of the member (machine test)
     macroVarsInList: true,     // write OPn_HX / LH_RH_CNTRL / SCRW_ON_OFF as document variables
-    // Table placement per panel as the Biesse sample writes it (ExOrigin 9, corner 1, offsets).
-    // The values are machine-specific — take them from a list bSolid itself saved for one of
-    // Matt's programs. Off = UsingDefaultOrigins only (first thing to try on the machine).
-    writeExecutionParameters: false,
-    executionParameters: { origin: 9, refCorner: 1, rotX: 0, rotY: 0, rotZ: 0, offsetX: 66.8, offsetY: -139.45, offsetZ: 0 },
   },
   // ── Glazier numbers (ARCHED-WINDOWS-v3 Block 0.2) — the sealed unit's
   // spacer bar width laid out in the pattern, and the edge cover: the
@@ -322,6 +333,48 @@ let activeCasementProfile = null;
  * Without this, deriveCasementWindow crashes on `geometry.land` of undefined
  * and every consumer sees derived = null (blank tabs).
  */
+const BSUITE_KEYS = ['head', 'cill', 'jambL', 'jambR', 'mullion', 'transom'];
+
+/** One target's programs merged over the defaults' shape (panel ids, macro flags). */
+function mergeTargetPrograms(stored, def) {
+  return Object.fromEntries(BSUITE_KEYS.map((k) => [k, { ...def[k], ...(stored?.[k] || {}) }]));
+}
+
+export function migrateBsuite(stored, D) {
+  const defTarget = D.targets[0];
+  let targets;
+  if (Array.isArray(stored?.targets) && stored.targets.length) {
+    targets = stored.targets.map((t, i) => ({
+      ...defTarget, ...t,
+      id: t.id || `target-${i + 1}`,
+      programs: mergeTargetPrograms(t.programs, defTarget.programs),
+      executionParameters: { ...defTarget.executionParameters, ...(t.executionParameters || {}) },
+    }));
+  } else if (stored?.programsFolder || stored?.programs) {
+    // 12.09 shape → one target
+    const folder = String(stored.programsFolder || 'C:/bSolid').replace(/\\/g, '/').replace(/\/+$/, '');
+    targets = [{
+      ...defTarget,
+      id: 'target-1', name: `Programs in ${folder}`,
+      programs: Object.fromEntries(BSUITE_KEYS.map((k) => {
+        const p = stored.programs?.[k] || {};
+        return [k, { ...defTarget.programs[k], ...p, path: p.file ? `${folder}/${p.file}` : defTarget.programs[k].path }];
+      })),
+      writeExecutionParameters: stored.writeExecutionParameters ?? defTarget.writeExecutionParameters,
+      executionParameters: { ...defTarget.executionParameters, ...(stored.executionParameters || {}) },
+    }];
+  } else targets = D.targets.map((t) => ({ ...t, programs: mergeTargetPrograms(null, t.programs), executionParameters: { ...t.executionParameters } }));
+  const activeTarget = targets.some((t) => t.id === stored?.activeTarget) ? stored.activeTarget : targets[0].id;
+  const { programsFolder, programs, writeExecutionParameters, executionParameters, ...rest } = stored || {};
+  void programsFolder; void programs; void writeExecutionParameters; void executionParameters;
+  return { ...D, ...rest, targets, activeTarget, sideValue: { ...D.sideValue, ...(stored?.sideValue || {}) } };
+}
+
+/** The target a list is built for (profile.bsuite.activeTarget, else the first). */
+export function bsuiteActiveTarget(bsuite) {
+  return bsuite.targets.find((t) => t.id === bsuite.activeTarget) || bsuite.targets[0];
+}
+
 export function migrateCasementProfile(profile) {
   if (!profile) return null;
   const D = DEFAULT_CASEMENT_PROFILE;
@@ -351,13 +404,10 @@ export function migrateCasementProfile(profile) {
     fix: { ...D.fix, ...(profile.fix || {}) },
     // v4 (ARCHED-WINDOWS-v4 Block C): CNC block (clamp limits), filled from the default
     cnc: { ...D.cnc, ...(profile.cnc || {}), clamp: { ...D.cnc.clamp, ...(profile.cnc?.clamp || {}) } },
-    // bSuite export block (12.09): merged key by key; program entries merged per element
-    bsuite: {
-      ...D.bsuite, ...(profile.bsuite || {}),
-      programs: Object.fromEntries(Object.keys(D.bsuite.programs).map((k) => [k, { ...D.bsuite.programs[k], ...(profile.bsuite?.programs?.[k] || {}) }])),
-      sideValue: { ...D.bsuite.sideValue, ...(profile.bsuite?.sideValue || {}) },
-      executionParameters: { ...D.bsuite.executionParameters, ...(profile.bsuite?.executionParameters || {}) },
-    },
+    // bSuite export block: merged key by key. Targets (14.09) are kept as stored; a
+    // 12.09 copy with programsFolder + programs (one folder, file names) becomes one
+    // target named after the folder so nothing the user typed is lost.
+    bsuite: migrateBsuite(profile.bsuite, D.bsuite),
     arch: profile.arch?.version === D.arch.version
       ? {
           ...D.arch, ...profile.arch,

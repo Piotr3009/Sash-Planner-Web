@@ -8,7 +8,7 @@ import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignm
 import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
-import { withProfiles } from '../engine/profile.js';
+import { withProfiles, getCasementProfile, bsuiteActiveTarget } from '../engine/profile.js';
 import { buildGlassListForWindow, buildVentGrilles } from '../engine/lists.js';
 import { effectiveAssignment, buildWindowPartQtys, buildWindowHardware, resolvePartTotal, formatQty, mergeWindowMaterials } from '../engine/bom.js';
 import { liveSectionsFor } from '../engine/partRegistry.js';
@@ -168,12 +168,12 @@ export default function WindowDetailPage() {
                   () => exportBsuiteFramesMerged([{ windowSpec, derived, name: item?.name }], item?.name || 'window'));
                 if (r.error) { alert(`bSuite frames unavailable: ${r.error}`); return; }
                 const sk = r.skipped?.length ? `\nSkipped: ${r.skipped.map((x) => `${x.element} (${x.reason})`).join(', ')}` : '';
-                alert(`${r.filename}: ${r.rows} rows, ${r.pieces} pieces.${sk}`);
+                alert(`${r.filename} for ${r.target}: ${r.rows} rows, ${r.pieces} pieces.${sk}`);
               }}
               title="bSolid worklist (.ewlist) for this window's frame: head, cill, jambs, mullions, transoms — Matt's FC_* programs with LPX = finished length"
               className="btn text-sm bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50"
             >
-              🏭 bSuite frames
+              🏭 bSuite frames → {bsuiteActiveTarget(getCasementProfile().bsuite).name}
             </button>
           )}
           <Link to={editUrl} className="btn btn-primary text-sm">✏️ Edit Configuration</Link>

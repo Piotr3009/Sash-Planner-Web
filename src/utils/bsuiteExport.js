@@ -29,7 +29,7 @@
  *  - the ZIP writer below is dependency-free (STORED entries + CRC32) so the browser bundle
  *    does not grow; readers (bSolid uses .NET ZipArchive) accept stored entries.
  */
-import { getCasementProfile } from '../engine/profile.js';
+import { getCasementProfile, bsuiteActiveTarget } from '../engine/profile.js';
 import { zipSync, strToU8 } from 'fflate';
 
 const CRLF = '\r\n';
@@ -66,9 +66,9 @@ function opPositions(B, memberStart, memberEnd, boardLength, jointAxes) {
  * Build the frame rows of one casement window.
  * Returns { rows, skipped: [{ element, reason }] }.
  */
-export function buildBsuiteFrameRows(windowSpec, derived, name, profile = getCasementProfile()) {
+export function buildBsuiteFrameRows(windowSpec, derived, name, profile = getCasementProfile(), target = bsuiteActiveTarget(profile.bsuite)) {
   const B = profile.bsuite;
-  const P = B.programs;
+  const P = target.programs;
   const face = profile.elements.frameHead.face;
   const depth = profile.frameDepth;
   const rows = [];
@@ -85,7 +85,7 @@ export function buildBsuiteFrameRows(windowSpec, derived, name, profile = getCas
     if (!part) { skipped.push({ element: label, reason: 'not in the cut list' }); return; }
     const prog = P[key];
     rows.push({
-      program: prog.file, panelId: prog.panelId, panelName: prog.panelName,
+      program: fileNameOf(prog.path), path: prog.path, panelId: prog.panelId, panelName: prog.panelName,
       quantity: part.quantity || 1,
       label: `${winName} - ${label}`,
       vars: { LPX: r1(part.length), LPY: face, LPZ: depth },
@@ -120,7 +120,7 @@ export function buildBsuiteFrameRows(windowSpec, derived, name, profile = getCas
     const positions = opPositions(B, m.yTop, m.yBottom, m.length, axes);
     if (axes.length > 3) skipped.push({ element: `${winName} - MULLION ${i + 1}`, reason: `${axes.length} joints — the macro takes 3 (OP1..3_HX); extra joints dropped` });
     rows.push({
-      program: P.mullion.file, panelId: P.mullion.panelId, panelName: P.mullion.panelName,
+      program: fileNameOf(P.mullion.path), path: P.mullion.path, panelId: P.mullion.panelId, panelName: P.mullion.panelName,
       quantity: 1, label: `${winName} - MULLION ${mullions.length > 1 ? i + 1 : ''}`.trim(),
       vars: { LPX: r1(m.length), LPY: face, LPZ: depth },
       docVars: macroVars(positions, side),
@@ -133,7 +133,7 @@ export function buildBsuiteFrameRows(windowSpec, derived, name, profile = getCas
     const inside = mullions.filter((m) => m.axisX > t.x1 + 0.6 && m.axisX < t.x2 - 0.6).map((m) => r1(m.axisX));
     const positions = opPositions(B, t.x1, t.x2, t.length, inside);
     rows.push({
-      program: P.transom.file, panelId: P.transom.panelId, panelName: P.transom.panelName,
+      program: fileNameOf(P.transom.path), path: P.transom.path, panelId: P.transom.panelId, panelName: P.transom.panelName,
       quantity: 1, label: `${winName} - TRANSOM ${transoms.length > 1 ? i + 1 : ''}`.trim(),
       vars: { LPX: r1(t.length), LPY: face, LPZ: depth },
       docVars: macroVars(positions, 'right'),
@@ -146,7 +146,7 @@ export function buildBsuiteFrameRows(windowSpec, derived, name, profile = getCas
 
 /** Identical rows (program + every variable) collapse into one row; labels are joined. */
 export function groupBsuiteRows(rows) {
-  const key = (r) => JSON.stringify([r.program, r.vars, r.docVars]);
+  const key = (r) => JSON.stringify([r.path || r.program, r.vars, r.docVars]);
   const out = new Map();
   for (const r of rows) {
     const k = key(r);
@@ -172,26 +172,31 @@ function stamp(d = new Date()) {
   return `${p(d.getMonth() + 1)}/${p(d.getDate())}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
-/** file:///C:/folder/PROG.bSolid — forward slashes, & escaped by the XML writer. */
-export function programUri(folder, file) {
-  const f = String(folder || '').replace(/\\/g, '/').replace(/\/+$/, '');
+/** The file name of a full path (either slash). */
+export const fileNameOf = (p) => String(p || '').split(/[\\/]/).pop();
+
+/**
+ * file:///C:/folder/PROG.bSolid — from a FULL path (target program), forward slashes, & escaped
+ * by the XML writer. A bare file name is put under C:/ so the URI is still absolute.
+ */
+export function programUri(fullPath) {
+  const f = String(fullPath || '').replace(/\\/g, '/');
   const abs = /^[A-Za-z]:\//.test(f) ? f : `C:/${f.replace(/^\/+/, '')}`;
-  return `file:///${abs}/${file}`;
+  return `file:///${abs}`;
 }
 
 /**
  * The worklist XML — same element / attribute layout as the Biesse sample, line by line.
- * opts: { programsFolder, now?: Date, ids?: string[] (deterministic GUIDs for the harness) }
+ * opts: { executionParameters?, now?: Date, ids?: string[] (deterministic GUIDs for the harness) }
  */
 export function writeWorklistXml(rows, opts = {}) {
-  const folder = opts.programsFolder;
   const now = stamp(opts.now || new Date());
   const L = [];
   L.push('<Worklist Description="" Version="4">');
   L.push('  <Items>');
   rows.forEach((r, i) => {
     const id = opts.ids?.[i] || guid();
-    L.push(`    <CadProgramWorklistItem Id="${id}" Name="${esc(r.program)}" Counter="0" Label="${esc(r.label || '')}" Quantity="${r.quantity}" Description="${esc(r.note || '')}" UsingDefaultOrigins="true" LastAccess="${now}" ProgramUri="${esc(programUri(folder, r.program))}">`);
+    L.push(`    <CadProgramWorklistItem Id="${id}" Name="${esc(r.program)}" Counter="0" Label="${esc(r.label || '')}" Quantity="${r.quantity}" Description="${esc(r.note || '')}" UsingDefaultOrigins="true" LastAccess="${now}" ProgramUri="${esc(programUri(r.path || r.program))}">`);
     L.push('      <ExecutionTimeData ExecutionTime="00:00:00" DateTime="01/01/0001 00:00:00" Quantity="0" />');
     L.push('      <Origins />');
     L.push('      <ProgramDocumentNode Id="document" Name="document">');
@@ -290,16 +295,17 @@ const safeName = (s) => String(s || 'pack').replace(/[^A-Za-z0-9_-]+/g, '_').rep
  * Many windows (a pack or a batch) → one {label}_frames.ewlist.
  * windows: [{ windowSpec, derived, name }]. Returns { ok, rows, skipped, filename } or { error }.
  */
-export function exportBsuiteFramesMerged(windows, fileLabel, profile = getCasementProfile()) {
+export function exportBsuiteFramesMerged(windows, fileLabel, profile = getCasementProfile(), targetId = null) {
+  const target = (targetId && profile.bsuite.targets.find((t) => t.id === targetId)) || bsuiteActiveTarget(profile.bsuite);
   const all = [];
   const skipped = [];
   for (const w of windows) {
-    const { rows, skipped: sk } = buildBsuiteFrameRows(w.windowSpec, w.derived, w.name, profile);
+    const { rows, skipped: sk } = buildBsuiteFrameRows(w.windowSpec, w.derived, w.name, profile, target);
     all.push(...rows); skipped.push(...sk);
   }
   if (!all.length) return { error: 'no frame members to export (casement windows only)', skipped };
   const rows = groupBsuiteRows(all);
-  const filename = `${safeName(fileLabel)}_frames.ewlist`;
-  downloadBytes(filename, buildEwlist(rows, { programsFolder: profile.bsuite.programsFolder, executionParameters: profile.bsuite.writeExecutionParameters ? profile.bsuite.executionParameters : null }));
-  return { ok: true, rows: rows.length, pieces: rows.reduce((s, r) => s + r.quantity, 0), skipped, filename };
+  const filename = `${safeName(fileLabel)}_frames_${safeName(target.name).toLowerCase()}.ewlist`;
+  downloadBytes(filename, buildEwlist(rows, { executionParameters: target.writeExecutionParameters ? target.executionParameters : null }));
+  return { ok: true, rows: rows.length, pieces: rows.reduce((s, r) => s + r.quantity, 0), skipped, filename, target: target.name };
 }

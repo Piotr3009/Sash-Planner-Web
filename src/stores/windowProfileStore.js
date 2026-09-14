@@ -170,6 +170,24 @@ export const useWindowProfileStore = create(
         get()._sync();
       },
 
+      // 14.09: bSuite targets (computers with their own program paths) — replaced whole,
+      // validated: ids unique and non-empty, names non-empty, six program paths per target
+      setCasementBsuiteTargets: (targets, activeTarget) => {
+        if (!Array.isArray(targets) || !targets.length) return;
+        const ids = new Set();
+        for (const t of targets) {
+          if (!t || typeof t.id !== 'string' || !t.id || ids.has(t.id) || typeof t.name !== 'string' || !t.name.trim()) return;
+          if (!t.programs || !['head', 'cill', 'jambL', 'jambR', 'mullion', 'transom'].every((k) => typeof t.programs[k]?.path === 'string')) return;
+          ids.add(t.id);
+        }
+        set((s) => {
+          const casement = clone(s.casement);
+          casement.bsuite = { ...casement.bsuite, targets: clone(targets), activeTarget: ids.has(activeTarget) ? activeTarget : targets[0].id };
+          return { casement };
+        });
+        get()._sync();
+      },
+
       // Stock widths as a comma list ("63, 75, 95") → sorted positive numbers;
       // an empty or all-junk list is refused (the planner needs a board).
       setCasementStockWidths: (text) => {

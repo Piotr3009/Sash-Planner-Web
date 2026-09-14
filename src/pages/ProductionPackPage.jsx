@@ -18,7 +18,7 @@ import { mergeWindowMaterials, formatQty, makeRawResolver } from '../engine/bom.
 import { summarizeWindows } from '../utils/batchSummary.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
-import { withProfiles } from '../engine/profile.js';
+import { withProfiles, getCasementProfile, bsuiteActiveTarget } from '../engine/profile.js';
 import {
   buildCutListForWindow,
   buildGroupedCutList,
@@ -559,12 +559,12 @@ export default function ProductionPackPage() {
                   );
                   if (r.error) { alert(`bSuite frames: ${r.error}`); return; }
                   const sk = r.skipped?.length ? `\nSkipped ${r.skipped.length}: ${r.skipped.map((x) => `${x.element} (${x.reason})`).join(', ')}` : '';
-                  alert(`bSuite worklist ${r.filename}: ${r.rows} rows, ${r.pieces} pieces.${sk}`);
+                  alert(`bSuite worklist ${r.filename} for ${r.target}: ${r.rows} rows, ${r.pieces} pieces.${sk}`);
                 }}
                 title="One .ewlist for bSolid: head, cill, jambs, mullions and transoms of every casement in the pack (Matt's FC_* programs, LPX = finished length)"
                 className="btn btn-secondary text-xs px-4"
               >
-                🏭 bSuite frames (.ewlist)
+                🏭 bSuite frames → {bsuiteActiveTarget(getCasementProfile().bsuite).name}
               </button>
             )}
           </div>
