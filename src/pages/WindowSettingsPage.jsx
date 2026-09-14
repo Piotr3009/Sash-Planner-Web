@@ -1082,8 +1082,10 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
               save([...T, { ...active, id, name: `Computer ${n}`, programs: Object.fromEntries(Object.entries(active.programs).map(([k, v]) => [k, { ...v }])), executionParameters: { ...active.executionParameters } }], id);
             };
             const removeTarget = () => { if (T.length > 1 && window.confirm(`Remove target "${active.name}"?`)) save(T.filter((t) => t.id !== active.id), T.find((t) => t.id !== active.id).id); };
+            // Explorer's "Copy as path" wraps the path in quotes — strip them, and any whitespace
+            const cleanPath = (v) => String(v || '').trim().replace(/^["']+|["']+$/g, '').trim().replace(/\\/g, '/');
             const fillFromFolder = (folder) => {
-              const f = String(folder || '').trim().replace(/\\/g, '/').replace(/\/+$/, '');
+              const f = cleanPath(folder).replace(/\/+$/, '');
               if (!f) return;
               patchActive({ programs: Object.fromEntries(Object.entries(active.programs).map(([k, v]) => [k, { ...v, path: `${f}/${String(v.path).split(/[\\/]/).pop()}` }])) });
             };
@@ -1124,7 +1126,7 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
                       <div key={k} className="flex items-center gap-2">
                         <span className="text-ink-400 w-16 shrink-0">{LABEL[k]}</span>
                         <input type="text" defaultValue={active.programs[k].path} key={`${active.id}-${k}-${active.programs[k].path}`}
-                          onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== active.programs[k].path) patchProgram(k, { path: v.replace(/\\/g, '/') }); }}
+                          onBlur={(e) => { const v = cleanPath(e.target.value); if (v && v !== active.programs[k].path) patchProgram(k, { path: v }); }}
                           className="flex-1 px-2 py-1 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-xs font-mono" />
                       </div>
                     ))}

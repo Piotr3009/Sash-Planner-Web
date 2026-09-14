@@ -173,14 +173,15 @@ function stamp(d = new Date()) {
 }
 
 /** The file name of a full path (either slash). */
-export const fileNameOf = (p) => String(p || '').split(/[\\/]/).pop();
+export const fileNameOf = (p) => String(p || '').trim().replace(/^["']+|["']+$/g, '').split(/[\\/]/).pop();
 
 /**
  * file:///C:/folder/PROG.bSolid — from a FULL path (target program), forward slashes, & escaped
  * by the XML writer. A bare file name is put under C:/ so the URI is still absolute.
  */
 export function programUri(fullPath) {
-  const f = String(fullPath || '').replace(/\\/g, '/');
+  // defensive: quotes from Explorer's "Copy as path", stray whitespace, backslashes
+  const f = String(fullPath || '').trim().replace(/^["']+|["']+$/g, '').trim().replace(/\\/g, '/');
   const abs = /^[A-Za-z]:\//.test(f) ? f : `C:/${f.replace(/^\/+/, '')}`;
   return `file:///${abs}`;
 }

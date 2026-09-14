@@ -157,6 +157,7 @@ const shape = (xml) => {
   check('panel node <ProgramPanelNode Id="1001" Name="P1001"> with LPX/LPY/LPZ as Double, mm', /<ProgramPanelNode Id="1001" Name="P1001">\r\n            <Variables>\r\n              <ParametricVariable TypeCode="Double" VariableName="LPX" Expression="1800" ExpressionValue="1800" MeasureUnit="mm" \/>/.test(xml));
   check('macro variables as document variables (String) on the mullion row only', /VariableName="OP1_HX" Expression="469\.7"/.test(xml) && (xml.match(/VariableName="OP1_HX"/g) || []).length === 1 && /VariableName="LH_RH_CNTRL"/.test(xml) && /VariableName="SCRW_ON_OFF" Expression="1"/.test(xml));
   check('LastAccess in the sample\'s MM/DD/YYYY HH:MM:SS form', xml.includes('LastAccess="09/12/2026 12:00:00"'));
+  check('a quoted Windows path (Explorer "Copy as path") is cleaned: quotes off, backslashes → /, spaces kept', X.programUri('"C:\\Users\\Konrad Puc\\OneDrive\\Desktop\\Biesse Master Stick\\FC_68mm\\HEAD_MASTER_V2.bSolid"') === 'file:///C:/Users/Konrad Puc/OneDrive/Desktop/Biesse Master Stick/FC_68mm/HEAD_MASTER_V2.bSolid' && X.fileNameOf('"C:\\x\\HEAD_MASTER_V2.bSolid"') === 'HEAD_MASTER_V2.bSolid');
   check("a path with '&' is escaped as &amp; (the sample has P&R)", X.writeWorklistXml([{ ...rows[0], path: 'C:/MASTER/P&R/X.bSolid', program: 'X.bSolid' }], { ids: [ids[0]] }).includes('ProgramUri="file:///C:/MASTER/P&amp;R/X.bSolid"'));
   writeFileSync(resolve(ROOT, 'docs', 'handover', 'samples', 'sample_frames_052L_040L.ewlist'), X.buildEwlist(rows, { now: new Date(2026, 8, 12, 12, 0, 0), ids }));
 }
