@@ -30,6 +30,7 @@
  *    does not grow; readers (bSolid uses .NET ZipArchive) accept stored entries.
  */
 import { getCasementProfile, bsuiteActiveTarget } from '../engine/profile.js';
+import { buildVentGrilles } from '../engine/lists.js';
 import { zipSync, strToU8 } from 'fflate';
 
 const CRLF = '\r\n';
@@ -89,7 +90,7 @@ export function buildBsuiteFrameRows(windowSpec, derived, name, profile = getCas
       quantity: part.quantity || 1,
       label: `${winName} - ${label}`,
       vars: { LPX: r1(part.length), LPY: face, LPZ: depth },
-      docVars: {},
+      docVars: { HORN: 0 },          // V2 head / cill: LPX − HORN; casement frames have no horns
       element: label, window: winName,
     });
   };
@@ -105,42 +106,91 @@ export function buildBsuiteFrameRows(windowSpec, derived, name, profile = getCas
   // Mullions (full height in the PC construction) and transoms (segmented between mullions)
   const mullions = derived?.casement?.mullionRuns || [];
   const transoms = derived?.casement?.transomRuns || [];
-  const macroVars = (positions, side) => {
-    if (!B.macroVarsInList) return {};
-    const dv = {};
-    positions.slice(0, 3).forEach((pos, i) => { dv[`OP${i + 1}_HX`] = pos; });
-    if (positions.length) { dv.LH_RH_CNTRL = sideVal(B, side); dv.SCRW_ON_OFF = B.screws; }
-    return dv;
-  };
-  mullions.forEach((m, i) => {
-    // transoms meeting this mullion: their axis heights are the joints along the mullion
-    const joints = transoms.filter((t) => Math.abs(t.x2 - m.x1) < 0.6 || Math.abs(t.x1 - m.x2) < 0.6);
-    const axes = [...new Set(joints.map((t) => r1(t.axisT)))];
-    const side = joints.some((t) => Math.abs(t.x2 - m.x1) < 0.6) ? 'left' : 'right';   // a transom ending at x1 sits on the mullion's left
-    const positions = opPositions(B, m.yTop, m.yBottom, m.length, axes);
-    if (axes.length > 3) skipped.push({ element: `${winName} - MULLION ${i + 1}`, reason: `${axes.length} joints — the macro takes 3 (OP1..3_HX); extra joints dropped` });
-    rows.push({
-      program: fileNameOf(P.mullion.path), path: P.mullion.path, panelId: P.mullion.panelId, panelName: P.mullion.panelName,
-      quantity: 1, label: `${winName} - MULLION ${mullions.length > 1 ? i + 1 : ''}`.trim(),
-      vars: { LPX: r1(m.length), LPY: face, LPZ: depth },
-      docVars: macroVars(positions, side),
-      element: `MULLION ${i + 1}`, window: winName,
-      note: positions.length ? `joints at ${positions.join(' / ')} from the ${B.opOriginEnd}` : 'no transom joint — macro defaults apply',
+  const frameW = Number(windowSpec?.frame?.width) || 0;
+  const frameH = Number(windowSpec?.frame?.height) || 0;
+
+  if (P.mullion.mode === 'master' || P.transom.mode === 'master') {
+    // ── V2 masters: the program takes the WINDOW and computes its own board (no panel node)
+    const M = B.master;
+    const lights = (derived?.casement?.layoutDef?.panels || []).map((q) => ({
+      // layoutDef panels are centred on the frame; runs are frame-absolute (0 = outer bottom-left)
+      x1: frameW / 2 + q.x - q.w / 2, x2: frameW / 2 + q.x + q.w / 2,
+      y1: frameH / 2 + q.y - q.h / 2, y2: frameH / 2 + q.y + q.h / 2,
+      hinge: q.hinge, role: q._role,
+    }));
+    const code = (light) => (light ? (M.handCodes[light.hinge] ?? M.handCodes.fixed) : M.handCodes.fixed);
+    // TRKL_VNT: the same Approved Document F rule the BOM uses (grille count from the room type)
+    const trickle = M.writeTrickleVent ? (buildVentGrilles(windowSpec) > 0 ? 1 : 0) : undefined;
+    const common = () => {
+      const dv = { WINDOW_WIDTH: r1(frameW), WINDOW_HEIGHT: r1(frameH), HORN: 0, FRM_SZE: face, HEAD_WDTH: M.headWidth };
+      if (trickle !== undefined) dv.TRKL_VNT = trickle;
+      return dv;
+    };
+    const opn1 = (axisT) => (axisT == null ? M.noJointValue : r1(M.opn1From === 'top' ? frameH - axisT : axisT));
+    mullions.forEach((m, i) => {
+      const joints = transoms.filter((t) => Math.abs(t.x2 - m.x1) < 0.6 || Math.abs(t.x1 - m.x2) < 0.6);
+      const axes = [...new Set(joints.map((t) => r1(t.axisT)))].sort((a, b) => a - b);
+      const leftLight = lights.filter((l) => l.x2 <= m.axisX + 0.6 && l.role === 'main').sort((a, b) => b.x2 - a.x2)[0];
+      const rightLight = lights.filter((l) => l.x1 >= m.axisX - 0.6 && l.role === 'main').sort((a, b) => a.x1 - b.x1)[0];
+      if (axes.length > 1) skipped.push({ element: `${winName} - MULLION ${i + 1}`, reason: `${axes.length} transom joints — the V2 master takes one (OPN_1_H); the lowest was written` });
+      rows.push({
+        program: fileNameOf(P.mullion.path), path: P.mullion.path, panelId: P.mullion.panelId, panelName: P.mullion.panelName, noPanel: true,
+        quantity: 1, label: `${winName} - MULLION ${mullions.length > 1 ? i + 1 : ''}`.trim(),
+        vars: { LPX: r1(m.length), LPY: face, LPZ: depth },
+        docVars: { ...common(), OPN_1_H: opn1(axes[0]), OPN_1_HAND: code(leftLight), OPN_2_HAND: code(rightLight) },
+        element: `MULLION ${i + 1}`, window: winName,
+        note: axes.length ? `V2 master: window ${r1(frameW)} × ${r1(frameH)}, joint at ${opn1(axes[0])} from the ${M.opn1From}` : `V2 master: window ${r1(frameW)} × ${r1(frameH)}, no transom (OPN_1_H = ${M.noJointValue})`,
+      });
     });
-  });
-  transoms.forEach((t, i) => {
-    // mullions crossing INSIDE this transom run (none in the segmented construction — noted, not invented)
-    const inside = mullions.filter((m) => m.axisX > t.x1 + 0.6 && m.axisX < t.x2 - 0.6).map((m) => r1(m.axisX));
-    const positions = opPositions(B, t.x1, t.x2, t.length, inside);
-    rows.push({
-      program: fileNameOf(P.transom.path), path: P.transom.path, panelId: P.transom.panelId, panelName: P.transom.panelName,
-      quantity: 1, label: `${winName} - TRANSOM ${transoms.length > 1 ? i + 1 : ''}`.trim(),
-      vars: { LPX: r1(t.length), LPY: face, LPZ: depth },
-      docVars: macroVars(positions, 'right'),
-      element: `TRANSOM ${i + 1}`, window: winName,
-      note: positions.length ? `joints at ${positions.join(' / ')}` : 'ends on the mullions — no interior joint, macro defaults apply',
+    transoms.forEach((t, i) => {
+      const below = lights.filter((l) => l.y2 <= t.axisT + 0.6 && l.x1 < t.x2 - 0.6 && l.x2 > t.x1 + 0.6).sort((a, b) => b.y2 - a.y2)[0];
+      const above = lights.filter((l) => l.y1 >= t.axisT - 0.6 && l.x1 < t.x2 - 0.6 && l.x2 > t.x1 + 0.6).sort((a, b) => a.y1 - b.y1)[0];
+      rows.push({
+        program: fileNameOf(P.transom.path), path: P.transom.path, panelId: P.transom.panelId, panelName: P.transom.panelName, noPanel: true,
+        quantity: 1, label: `${winName} - TRANSOM ${transoms.length > 1 ? i + 1 : ''}`.trim(),
+        vars: { LPX: r1(t.length), LPY: face, LPZ: depth },
+        docVars: { ...common(), OPN_1_H: opn1(t.axisT), OPN_1_HAND: code(below), OPN_2_HAND: code(above) },
+        element: `TRANSOM ${i + 1}`, window: winName,
+        note: `V2 master: window ${r1(frameW)} × ${r1(frameH)}, transom at ${opn1(t.axisT)} from the ${M.opn1From}, run ${r1(t.length)}`,
+      });
     });
-  });
+  } else {
+    // ── V1 macros (01.09 MULLION_1 / TRANSOM_1): LPX + OPn_HX joint positions on the board
+    const macroVars = (positions, side) => {
+      if (!B.macroVarsInList) return {};
+      const dv = {};
+      positions.slice(0, 3).forEach((pos, i) => { dv[`OP${i + 1}_HX`] = pos; });
+      if (positions.length) { dv.LH_RH_CNTRL = sideVal(B, side); dv.SCRW_ON_OFF = B.screws; }
+      return dv;
+    };
+    mullions.forEach((m, i) => {
+      const joints = transoms.filter((t) => Math.abs(t.x2 - m.x1) < 0.6 || Math.abs(t.x1 - m.x2) < 0.6);
+      const axes = [...new Set(joints.map((t) => r1(t.axisT)))];
+      const side = joints.some((t) => Math.abs(t.x2 - m.x1) < 0.6) ? 'left' : 'right';
+      const positions = opPositions(B, m.yTop, m.yBottom, m.length, axes);
+      if (axes.length > 3) skipped.push({ element: `${winName} - MULLION ${i + 1}`, reason: `${axes.length} joints — the macro takes 3 (OP1..3_HX); extra joints dropped` });
+      rows.push({
+        program: fileNameOf(P.mullion.path), path: P.mullion.path, panelId: P.mullion.panelId, panelName: P.mullion.panelName,
+        quantity: 1, label: `${winName} - MULLION ${mullions.length > 1 ? i + 1 : ''}`.trim(),
+        vars: { LPX: r1(m.length), LPY: face, LPZ: depth },
+        docVars: macroVars(positions, side),
+        element: `MULLION ${i + 1}`, window: winName,
+        note: positions.length ? `joints at ${positions.join(' / ')} from the ${B.opOriginEnd}` : 'no transom joint — macro defaults apply',
+      });
+    });
+    transoms.forEach((t, i) => {
+      const inside = mullions.filter((m) => m.axisX > t.x1 + 0.6 && m.axisX < t.x2 - 0.6).map((m) => r1(m.axisX));
+      const positions = opPositions(B, t.x1, t.x2, t.length, inside);
+      rows.push({
+        program: fileNameOf(P.transom.path), path: P.transom.path, panelId: P.transom.panelId, panelName: P.transom.panelName,
+        quantity: 1, label: `${winName} - TRANSOM ${transoms.length > 1 ? i + 1 : ''}`.trim(),
+        vars: { LPX: r1(t.length), LPY: face, LPZ: depth },
+        docVars: macroVars(positions, 'right'),
+        element: `TRANSOM ${i + 1}`, window: winName,
+        note: positions.length ? `joints at ${positions.join(' / ')}` : 'ends on the mullions — no interior joint, macro defaults apply',
+      });
+    });
+  }
   return { rows, skipped };
 }
 
@@ -173,7 +223,7 @@ function stamp(d = new Date()) {
 }
 
 /** The file name of a full path (either slash). */
-export const fileNameOf = (p) => String(p || '').trim().replace(/^["']+|["']+$/g, '').split(/[\\/]/).pop();
+export const fileNameOf = (p) => String(p || '').replace(/"/g, '').trim().split(/[\\/]/).pop();
 
 /**
  * file:///C:/folder/PROG.bSolid — from a FULL path (target program), forward slashes, & escaped
@@ -181,7 +231,7 @@ export const fileNameOf = (p) => String(p || '').trim().replace(/^["']+|["']+$/g
  */
 export function programUri(fullPath) {
   // defensive: quotes from Explorer's "Copy as path", stray whitespace, backslashes
-  const f = String(fullPath || '').trim().replace(/^["']+|["']+$/g, '').trim().replace(/\\/g, '/');
+  const f = String(fullPath || '').replace(/"/g, '').trim().replace(/^'+|'+$/g, '').trim().replace(/\\/g, '/');
   const abs = /^[A-Za-z]:\//.test(f) ? f : `C:/${f.replace(/^\/+/, '')}`;
   return `file:///${abs}`;
 }
@@ -207,6 +257,13 @@ export function writeWorklistXml(rows, opts = {}) {
       for (const [k, v] of dv) L.push(`          <ParametricVariable TypeCode="String" VariableName="${k}" Expression="${fmt(v)}" ExpressionValue="${fmt(v)}" MeasureUnit="mm" />`);
       L.push('        </Variables>');
     } else L.push('        <Variables />');
+    if (r.noPanel) {
+      // V2 master: the program computes its own board from the document variables
+      L.push('        <Children />');
+      L.push('      </ProgramDocumentNode>');
+      L.push('    </CadProgramWorklistItem>');
+      return;
+    }
     L.push('        <Children>');
     L.push(`          <ProgramPanelNode Id="${r.panelId}" Name="${esc(r.panelName)}">`);
     L.push('            <Variables>');

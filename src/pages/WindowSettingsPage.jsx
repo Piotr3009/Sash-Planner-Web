@@ -1083,7 +1083,7 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
             };
             const removeTarget = () => { if (T.length > 1 && window.confirm(`Remove target "${active.name}"?`)) save(T.filter((t) => t.id !== active.id), T.find((t) => t.id !== active.id).id); };
             // Explorer's "Copy as path" wraps the path in quotes — strip them, and any whitespace
-            const cleanPath = (v) => String(v || '').trim().replace(/^["']+|["']+$/g, '').trim().replace(/\\/g, '/');
+            const cleanPath = (v) => String(v || '').replace(/"/g, '').trim().replace(/^'+|'+$/g, '').trim().replace(/\\/g, '/');
             const fillFromFolder = (folder) => {
               const f = cleanPath(folder).replace(/\/+$/, '');
               if (!f) return;
@@ -1153,9 +1153,48 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
                       </div>
                     )}
                   </div>
+                  {(active.programs.mullion.mode === 'master' || active.programs.transom.mode === 'master') && (
+                    <div className="mb-3">
+                      <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">V2 master programs (mullion / transom) — document variables</div>
+                      <div className="flex flex-wrap gap-x-5 gap-y-3 items-end">
+                        <div>
+                          <div className="text-ink-400 mb-1">OPN_1_H (joint height) measured from</div>
+                          <div className="flex gap-1.5">
+                            {[['bottom', 'Frame bottom'], ['top', 'Frame top']].map(([v, l]) => (
+                              <button key={v} onClick={() => setPath(['bsuite', 'master', 'opn1From'], v)} className={chip(p.bsuite.master?.opn1From === v)}>{l}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-2 items-end">
+                          {[['left', 'Left-hung'], ['right', 'Right-hung'], ['top', 'Top-hung'], ['fixed', 'Fixed']].map(([k, l]) => (
+                            <div key={k}>
+                              <div className="text-ink-400 mb-1 text-[10px]">OPN hand · {l}</div>
+                              <input type="text" inputMode="numeric" defaultValue={p.bsuite.master?.handCodes?.[k]} key={`hc-${k}-${p.bsuite.master?.handCodes?.[k]}`}
+                                onBlur={(e) => { const v = Number(e.target.value); if (Number.isFinite(v)) setPath(['bsuite', 'master', 'handCodes', k], v); }}
+                                className="w-14 px-2 py-1 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-xs text-right" />
+                            </div>
+                          ))}
+                          <div>
+                            <div className="text-ink-400 mb-1 text-[10px]">HEAD_WDTH</div>
+                            <input type="text" inputMode="numeric" defaultValue={p.bsuite.master?.headWidth} key={`hw-${p.bsuite.master?.headWidth}`}
+                              onBlur={(e) => { const v = Number(e.target.value); if (Number.isFinite(v) && v > 0) setPath(['bsuite', 'master', 'headWidth'], v); }}
+                              className="w-16 px-2 py-1 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-xs text-right" />
+                          </div>
+                          <div>
+                            <div className="text-ink-400 mb-1 text-[10px]">TRKL_VNT</div>
+                            <div className="flex gap-1.5">
+                              {[[true, 'From room type'], [false, 'Leave program']].map(([v, l]) => (
+                                <button key={String(v)} onClick={() => setPath(['bsuite', 'master', 'writeTrickleVent'], v)} className={chip(p.bsuite.master?.writeTrickleVent === v)}>{l}</button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
                     <div>
-                      <div className="text-ink-400 mb-1">Screws in mullion / transom macro</div>
+                      <div className="text-ink-400 mb-1">Screws in mullion / transom macro <span className="text-ink-500">(V1 macro programs only)</span></div>
                       <div className="flex gap-1.5">
                         {[[1, 'Screws'], [0, 'Dowels only']].map(([v, l]) => (
                           <button key={v} onClick={() => setPath(['bsuite', 'screws'], v)} className={chip(p.bsuite.screws === v)}>{l}</button>
@@ -1180,7 +1219,7 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
                     </div>
                   </div>
                   <div className="text-[11px] text-ink-500">
-                    The list carries the finished length (LPX) and the 68 × 93 board; the machining lives in the programs. bSolid resolves every program by the exact path in the list, so each computer that opens lists needs its own target. Macro variables reach bSolid only once the macro properties are linked to document variables of the same name. Arched heads are skipped (Arch DXF).
+                    Frame rows carry the finished length (LPX) and the 68 × 93 board; V2 mullion / transom masters take the window (WINDOW_WIDTH / HEIGHT), the joint height OPN_1_H, the hands and the trickle-vent flag and compute their own board. bSolid resolves every program by the exact path in the list, so each computer that opens lists needs its own target — and a worklist only RUNS on the machine PC (the office bSolid shows it red). Arched heads are skipped (Arch DXF).
                   </div>
                 </div>
               </div>

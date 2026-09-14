@@ -269,8 +269,13 @@ export const DEFAULT_CASEMENT_PROFILE = {
           cill:    { path: 'C:/Users/Xp600/Desktop/TEMPLATES_02.09.26/UPDATED_09.09.26/CILL_MASTER_V2.bSolid',    panelId: 1001, panelName: 'P1001' },
           jambL:   { path: 'C:/Users/Xp600/Desktop/TEMPLATES_02.09.26/UPDATED_09.09.26/LH_JAMB_MASTER_V2.bSolid', panelId: 1001, panelName: 'P1001' },
           jambR:   { path: 'C:/Users/Xp600/Desktop/TEMPLATES_02.09.26/UPDATED_09.09.26/RH_JAMB_MASTER_V2.bSolid', panelId: 1001, panelName: 'P1001' },
-          mullion: { path: 'C:/Users/Xp600/Desktop/TEMPLATES_02.09.26/UPDATED_09.09.26/MULLION_MASTER_V2.bSolid', panelId: 1001, panelName: 'P1001', macro: true },
-          transom: { path: 'C:/Users/Xp600/Desktop/TEMPLATES_02.09.26/UPDATED_09.09.26/TRANSOM_MASTER_V2.bSolid', panelId: 1001, panelName: 'P1001', macro: true },
+          // 14.09: Matt's V2 mullion / transom are PARAMETRIC MASTERS (like the Biesse sample's
+          // OUTER_FRAME): no OP1_HX macro any more — the program takes the WINDOW (WINDOW_WIDTH /
+          // WINDOW_HEIGHT), the joint height OPN_1_H, the hands and the trickle-vent flag as
+          // document variables and computes its own board. mode 'master' → the row carries those
+          // variables and NO panel node. (mode 'macro' = the 01.09 V1 programs with OP1_HX.)
+          mullion: { path: 'C:/Users/Xp600/Desktop/TEMPLATES_02.09.26/UPDATED_09.09.26/MULLION_MASTER_V2.bSolid', panelId: 1001, panelName: 'P1001', mode: 'master' },
+          transom: { path: 'C:/Users/Xp600/Desktop/TEMPLATES_02.09.26/UPDATED_09.09.26/TRANSOM_MASTER_V2.bSolid', panelId: 1001, panelName: 'P1001', mode: 'master' },
         },
         // REQUIRED by bSolid (12.09: a list without this block is silently ignored).
         // Matt's programs carry ExOrigin 0 / corner 0 / offsets 0; the Biesse sample
@@ -280,6 +285,18 @@ export const DEFAULT_CASEMENT_PROFILE = {
         executionParameters: { origin: 0, refCorner: 0, rotX: 0, rotY: 0, rotZ: 0, offsetX: 0, offsetY: 0, offsetZ: 0 },
       },
     ],
+    // ── V2 master programs (mode 'master'): document variables read out of MULLION_1 /
+    // TRANSOM_1_MASTER_V2 on 14.09 — WINDOW_WIDTH, WINDOW_HEIGHT, HORN, OPN_1_H, OPN_1_HAND,
+    // OPN_2_HAND, FRM_SZE, HEAD_WDTH, TRKL_VNT (TOOL_1..3 / PASS_NUM / STACKED_1 stay the
+    // program's). The meanings below are DEFAULT (open) until Matt confirms them.
+    master: {
+      opn1From: 'bottom',        // OPN_1_H = joint height measured from the frame BOTTOM ('top' = from the head)
+      handCodes: { left: 1, right: 4, top: 2, bottom: 3, fixed: 0 },   // OPN_n_HAND codes (Matt's defaults 1 / 4 on a left + right pair)
+      noJointValue: 0,           // OPN_1_H written for a member with no joint (ask Matt whether 0 disables the joint)
+      headWidth: 80,             // HEAD_WDTH (Matt's default; the head program's 80 constant)
+      writeTrickleVent: true,    // TRKL_VNT from the window's ventilation (1 when a trickle vent is fitted)
+    },
+    // ── V1 macro programs (mode 'macro', 01.09 FC_* set) — kept for a target that still uses them
     screws: 1,                 // SCRW_ON_OFF for the mullion / transom macro (1 = screws, 0 = dowels only)
     opOriginEnd: 'start',      // 'start' | 'end' — the end of the member OPn_HX is measured from (machine test)
     seatSplitStart: 0.5,       // share of (board length − visible run) at the START end — the mullion seats into head and cill (machine test)
@@ -367,7 +384,8 @@ export function migrateBsuite(stored, D) {
   const activeTarget = targets.some((t) => t.id === stored?.activeTarget) ? stored.activeTarget : targets[0].id;
   const { programsFolder, programs, writeExecutionParameters, executionParameters, ...rest } = stored || {};
   void programsFolder; void programs; void writeExecutionParameters; void executionParameters;
-  return { ...D, ...rest, targets, activeTarget, sideValue: { ...D.sideValue, ...(stored?.sideValue || {}) } };
+  return { ...D, ...rest, targets, activeTarget, sideValue: { ...D.sideValue, ...(stored?.sideValue || {}) },
+    master: { ...D.master, ...(stored?.master || {}), handCodes: { ...D.master.handCodes, ...(stored?.master?.handCodes || {}) } } };
 }
 
 /** The target a list is built for (profile.bsuite.activeTarget, else the first). */
