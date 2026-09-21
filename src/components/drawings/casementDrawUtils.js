@@ -2,6 +2,11 @@
  * casementDrawUtils.js — shared helpers for the casement 2D drawings
  * (same drawing system as sash: drawingTheme + drawingUtils).
  */
+import { casementBarCounts } from '../../engine/casementBarGrid.js';
+
+// Bar counts per pane role live in the engine (casementBarGrid.js) since the
+// one-grid rule of 21.09.2026; re-exported so the drawings keep one import.
+export { casementBarCounts };
 
 export function casementRoleName(leaf, bounds) {
   if (leaf === 'fan') return 'Fan';
@@ -30,14 +35,6 @@ export function groupCasementLeaves(derived) {
     g.panes.push({ index: i, hinge: pn.hinge });
   });
   return groups;
-}
-
-/** Bar counts for a pane role from windowSpec.casement.bars. */
-export function casementBarCounts(bars, role) {
-  const b = bars || {};
-  if (role === 'fan') return { v: b.fanV || 0, h: b.fanH || 0 };
-  if (role === 'fan2') return { v: b.fan2V || 0, h: b.fan2H || 0 };
-  return { v: b.v || 0, h: b.h || 0 };
 }
 
 /**

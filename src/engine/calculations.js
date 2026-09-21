@@ -3,6 +3,7 @@ import { selectCasementHinges, summariseHinges, selectCasementLocks, summariseLo
 import { getWindowProfile, getCasementProfile, getDoorProfile, DEFAULT_DOOR_PROFILE, profileSashDepth, profileBoardWidth, boardWidthForDepth, profileBoxDepth, kgPerM } from './profile.js';
 import { buildArchGeometry, buildSashArchGeometry, planArchSegments, buildGlassOutline, buildArchBars, glassOutlinePoly, chainAreaAboveLine, ArchError, isCircleShape, buildCircleGeometry, buildCircleGlassOutline, buildCircleBars } from './arch.js';
 import { buildTraceryForDerived } from './cnc/traceryExport.js';
+import { casementLeafBars, leafBarsToUnit } from './casementBarGrid.js';
 
 /**
  * calculations.js - ETAP 3
@@ -789,6 +790,17 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
         return { x: R(x), y: R(y), w: leafSizes[i].leafW, h: leafSizes[i].leafH };
     });
 
+    // ── Glazing bars, ONE grid for the window (Piotr 21.09.2026, casementBarGrid.js):
+    //    the lines of the tallest light run through every main light; a light
+    //    under a fan carries the lines that cross its glass. Computed ONCE here;
+    //    the sheets, the glass rows, the glass PDF / DXF and the astragal run
+    //    read these numbers. Arched / circle leaves keep their arch bar list.
+    const leafBars = (archSpec || isCircle) ? null : casementLeafBars({
+        leafRects, panels: layoutDef.panels, bars: casBars, stile: els.leafStile.face,
+    });
+    if (leafBars) leafBars.forEach((b, i) => { leafSizes[i].bars = b; });
+    const unitInset = glassInset == null ? (els.leafStile.face - ded.glass / 2) : glassInset;
+
     // ── Drawing-ready member runs (mm, exterior view) ──
     const landX = (b, side) => side === 'L'
         ? (b.leftIsJamb ? geo.land : b.leftAxis + geo.mullionLand / 2)
@@ -963,6 +975,8 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
             location: `${layout} P${i + 1} ${pn.hinge === 'fixed' ? 'fixed' : pn.hinge}`,
             role: pn._role || 'main',
             qty: 1,
+            // the bars this unit REALLY carries: counts + axes from the unit's top-left corner
+            bars: { ...leafBars[i].counts, ...leafBarsToUnit(leafBars[i], els.leafStile.face, unitInset) },
         }));
     const glassSqm = archSpec ? archOutline.area / 1e6 : paneGlass.reduce((a, g) => a + (g.width * g.height) / 1e6, 0);
     const openers = layoutDef.panels.filter((pn) => pn.hinge !== 'fixed').length;
@@ -1008,11 +1022,6 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     // Glazing bead: pane perimeters +15%. Astragal bars: same run glued on
     // BOTH glass faces — Triangle (Ext) outside, Georgian Middle inside.
     // Between-glass (internal georgian) bars live inside the IGU: no material.
-    const barCountsFor = (role) => (role === 'fan'
-        ? { h: casBars.fanH, v: casBars.fanV }
-        : role === 'fan2'
-            ? { h: casBars.fan2H, v: casBars.fan2V }
-            : { h: casBars.h, v: casBars.v });
     const BEAD_WASTE = 1.15;
     const recBead = (name, mm, notes) =>
         createComponentRecord(windowSpec, 'beading', name, 'profile', mm, 1, notes);
@@ -1021,10 +1030,7 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     const casBarType = cas.barType || windowSpec.casementBarType || 'astragal';
     const barMm = casBarType !== 'astragal' ? 0
         : archSpec ? archBars.totalLength
-        : paneGlass.reduce((a, g) => {
-            const c = barCountsFor(g.role);
-            return a + c.h * (g.width || 0) + c.v * (g.height || 0);
-        }, 0);
+        : paneGlass.reduce((a, g) => a + g.bars.h * (g.width || 0) + g.bars.v * (g.height || 0), 0);
     const beading = [recBead('C-GLAZING BEADING', Math.round(perimMm * BEAD_WASTE), 'Pane perimeters + 15%')];
     if (barMm > 0) {
         beading.push(recBead('C-TRIANGLE BEADING (EXT)', Math.round(barMm * BEAD_WASTE), 'Astragal bars ext + 15%'));

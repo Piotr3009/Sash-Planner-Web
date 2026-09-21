@@ -24,11 +24,9 @@ import { getCasementProfile } from '../../engine/profile.js';
 import { readGlassProfile, glassEdgeArcs, barEndRows, useBarTable } from '../../engine/glassBars.js';
 import { DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
-import { casementBarCounts } from './casementDrawUtils.js';
 import { glassToSheet, archedOutlineD, barBandD, arcLabelPoint, barArcLabelPoint, isHaunchArc, radiiText, onCurve, closedChainD } from './archDrawUtils.js';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
-const WOOD_BAR = 22;
 const SPACER = 18;
 const EDGE_SEAL = 11;
 
@@ -59,37 +57,13 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
     if (!cas?.leaves) return null;
     const mm = cas.leaves[idx];
     if (!mm) return null;
-    const stile = p.elements.leafStile.face;
-    const REBATE = stile - (p.deductions.glass / 2 - stile) - stile + 12.5; // = 12.5, kept explicit
     const glassW = mm.leafW - p.deductions.glass;
     const glassH = mm.leafH - p.deductions.glass;
-    // Unit origin in leaf coords
-    const originX = stile - 12.5;
-    const originY = stile - 12.5;
-    // Wood bars on the daylight → spacer bars on the same centre lines
-    const pn = cas.layoutDef.panels[idx];
-    const counts = casementBarCounts(windowSpec.casement?.bars, pn._role || 'main');
-    const daylightW = mm.leafW - 2 * stile;
-    const daylightH = mm.leafH - 2 * stile;
-    const vBars = [];
-    if (counts.v > 0) {
-      const paneW = (daylightW - counts.v * WOOD_BAR) / (counts.v + 1);
-      for (let i = 0; i < counts.v; i++) {
-        const woodCenter = stile + (i + 1) * paneW + i * WOOD_BAR + WOOD_BAR / 2;
-        const cx = woodCenter - originX;
-        vBars.push({ cx, left: cx - SPACER / 2, right: cx + SPACER / 2 });
-      }
-    }
-    const hBars = [];
-    if (counts.h > 0) {
-      const paneH = (daylightH - counts.h * WOOD_BAR) / (counts.h + 1);
-      for (let j = 0; j < counts.h; j++) {
-        const woodCenter = stile + (j + 1) * paneH + j * WOOD_BAR + WOOD_BAR / 2;
-        const cy = woodCenter - originY;
-        hBars.push({ cy, top: cy - SPACER / 2, bot: cy + SPACER / 2 });
-      }
-    }
-    void REBATE;
+    // Spacer bars on the wood bar centre lines — the engine unit carries them
+    // (casementBarGrid.js: one grid for the window, unit coordinates)
+    const unitBars = derived.customGlassUnits?.[idx]?.bars || { x: [], y: [] };
+    const vBars = unitBars.x.map((cx) => ({ cx, left: cx - SPACER / 2, right: cx + SPACER / 2 }));
+    const hBars = unitBars.y.map((cy) => ({ cy, top: cy - SPACER / 2, bot: cy + SPACER / 2 }));
     // ── Arched unit: outline, seal, bars from derived.arch (glass frame, y up) ──
     const A = derived.arch;
     if (A?.geometry && A.glassOutline && idx === 0) {

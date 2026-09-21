@@ -426,10 +426,18 @@ section('6 — cut list / BOM / paint: C-TRACERY, elevation keeps 22, glass keep
   check('paint area grows by the tracery face (board − panes) / 1e6', near(d.paint.areaSqm, noPat.paint.areaSqm + Math.round(d.arch.tracery.areas.timber / 1e6 * 100) / 100, 0.011), `${d.paint.areaSqm} vs ${noPat.paint.areaSqm} + ${d.arch.tracery.areas.timber / 1e6}`);
   // rectangular casements: byte-identical to the origin/main fixture (t18 §3 does the same; repeated here because the sash record loop changed)
   const FX = JSON.parse(readFileSync(resolve(ROOT, 'verify', 'arch', 'fixtures', 'rect-casement-base.json'), 'utf8'));
-  check(`rectangular casements (${Object.keys(FX).length}) derived / cut / glass byte-identical to the fixture`, Object.entries(FX).every(([name, c]) => {
+  // 21.09 (one bar grid): the engine's added bar keys are stripped, the fixture stays pre-21.09 (see t18 §3, t33)
+  const stripBarGrid = (d) => {
+    const o = JSON.parse(JSON.stringify(d));
+    (o?.casement?.leaves || []).forEach((l) => { delete l.bars; });
+    (o?.customGlassUnits || []).forEach((u) => { delete u.bars; });
+    return o;
+  };
+  const stripRows = (rows) => rows.map((r) => { const o = { ...r }; delete o.barAxes; return o; });
+  check(`rectangular casements (${Object.keys(FX).length}) derived / cut / glass byte-identical to the fixture (bar-grid keys aside)`, Object.entries(FX).every(([name, c]) => {
     const rs = specification.normaliseToWindowSpec({ id: 'fx_' + name, width: c.input.width, height: c.input.height, name }, { fullConfig: { windowCategory: 'casement', ...c.input.fc } });
     const rd = derive(rs);
-    return JSON.stringify(rd) === JSON.stringify(c.derived) && JSON.stringify(lists.buildCutListForWindow(rd, rs)) === JSON.stringify(c.cut) && JSON.stringify(lists.buildGlassListForWindow(rd, rs)) === JSON.stringify(c.glass);
+    return JSON.stringify(stripBarGrid(rd)) === JSON.stringify(c.derived) && JSON.stringify(lists.buildCutListForWindow(rd, rs)) === JSON.stringify(c.cut) && JSON.stringify(stripRows(lists.buildGlassListForWindow(rd, rs))) === JSON.stringify(c.glass);
   }));
 }
 

@@ -11,8 +11,8 @@ import { CASEMENT_HINGE_SLOTS, CASEMENT_LOCK_SLOTS } from './casementHardware.js
 import { GLASS_MAKEUP, glassGas } from './specification.js';
 import { profileRawForSection, getWindowProfile, getCasementProfile } from './profile.js';
 // Pure helper (no React) — shared with the 2D drawings so panel, PDF and
-// sketch all count bars the same way.
-import { casementBarCounts, casementPaneFinish } from '../components/drawings/casementDrawUtils.js';
+// sketch all read the frosted scope the same way.
+import { casementPaneFinish } from '../components/drawings/casementDrawUtils.js';
 
 const DEFAULT_SETTINGS = {
   kerf: 3,
@@ -328,12 +328,15 @@ export function buildGlassListForWindow(derived, windowSpec) {
       // Bars belong on the ROW (Piotr 02.08, PDF audit item 5): the screen used
       // to recompute them locally while the PDF printed nothing — one engine
       // field now feeds the panel text, the PDF column AND the PDF sketch.
-      if (derived.category === 'casement') {
-        const { v, h } = casementBarCounts(windowSpec?.casement?.bars, u.role || 'main');
+      if (derived.category === 'casement' && u.bars) {
+        // the unit's OWN bars from the engine grid (casementBarGrid.js): a
+        // light under a fan carries only the window lines that cross it
+        const { v, h } = u.bars;
         if (v > 0 || h > 0) {
           row.barsV = v;
           row.barsH = h;
           row.bars = `${h}H × ${v}V ${barType}`;
+          row.barAxes = { x: u.bars.x, y: u.bars.y };   // mm from the unit's left / top edge
         }
       }
       // Shaped unit (arched casement, arched-casement-v2): the row keeps the

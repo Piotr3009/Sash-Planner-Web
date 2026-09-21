@@ -42,6 +42,7 @@ function bundle(srcRoot, tag) {
     `export * as calculations from '${relPath('engine/calculations.js')}';`,
     `export * as glassBars from '${relPath('engine/glassBars.js')}';`,
     `export * as glassPdf from '${relPath('utils/glassPdfExport.js')}';`,
+    `export * as lists from '${relPath('engine/lists.js')}';`,
   ].join('\n'));
   const out = resolve(AUDIT, `${tag}-bundle.mjs`);
   execFileSync('npx', ['-y', 'esbuild@0.25.0', entry, '--bundle', '--format=esm', '--platform=node',
@@ -219,12 +220,27 @@ section('2 — pagination: blocks stack and never break inside a table; a page h
 // ═══════════════════════════════════════════════════════════════════════════
 section('3 — rectangular-only exports byte-identical to the previous commit; mixed exports keep the schedule');
 {
-  const rects = wd([cas('R1', 900, 1200), cas('R2', 1200, 1200, { casementLayout: '120', casementHBars: 1, casementVBars: 2 }),
+  // 21.09 (one bar grid, t33): the casement sketch draws the ENGINE bar axes (row.barAxes — the factory
+  // drawing's and the glazier DXF's numbers) instead of equal splits of the unit; on a unit with one bar
+  // per direction the two coincide, so the byte-identity guard against 402c58a runs on 1H × 1V and a
+  // separate check pins the 1H × 2V sketch to the engine axes.
+  const rects = wd([cas('R1', 900, 1200), cas('R2', 1200, 1200, { casementLayout: '120', casementHBars: 1, casementVBars: 1 }),
     specification.normaliseToWindowSpec({ id: 'S1', name: 'S1', width: 1000, height: 1500 }, { fullConfig: { windowCategory: 'sash' } })]);
   // jsPDF's trailer /ID is a hash of the creation timestamp — masked with the date; everything else must match
   const mask = (b) => Buffer.from(b).toString('latin1').replace(/\/CreationDate \([^)]*\)/g, '/CreationDate (X)').replace(/\/ID \[ <[0-9A-F]+> <[0-9A-F]+> \]/g, '/ID [X]');
   const a = render(M, rects), b = render(OLD, rects);
   check(`rectangular-only (2 casements + 1 sash → ${pageCount(a.bytes)} pages): NEW output byte-identical to ${PREV} (CreationDate + its /ID hash masked)`, mask(a.bytes) === mask(b.bytes) && pageCount(a.bytes) === pageCount(b.bytes), `${a.bytes.length} vs ${b.bytes.length} bytes`);
+  {
+    const two = wd([cas('R2', 1200, 1200, { casementLayout: '120', casementHBars: 1, casementVBars: 2 })]);
+    const rows = M.lists.buildGlassListForWindow(two[0].derived, two[0].windowSpec);
+    const ax = rows[0].barAxes.x, U = rows[0].width, BW = 18, ES = 11;
+    // the chain under the unit: edge seal → bar 1 → bar 2 → edge seal, in the sketch's half-mm labels
+    const f = (v) => { const r = Math.round(v * 2) / 2; return Number.isInteger(r) ? String(r) : r.toFixed(1); };
+    const expect = [f(ax[0] - BW / 2 - ES), f(ax[1] - ax[0] - BW), f(U - ES - (ax[1] + BW / 2))];
+    const r2 = render(M, two);
+    const texts = r2.texts.map((t) => t.text);
+    check(`1H × 2V unit: the sketch chain prints the engine axes (${expect.join(' / ')}), not equal splits of the unit`, expect.every((s) => texts.includes(s)), JSON.stringify(texts.filter((t) => /^\d+(\.5)?$/.test(t))));
+  }
   const mixed = render(M, [...rects, ...W3]);
   check('mixed export: schedule page + drawing pages + bars page; rectangular cells keep their header bar (title at the cell top)', pageCount(mixed.bytes) === 1 + Math.ceil(6 / 4) + 1 && mixed.texts.some((t) => t.page === 2 && /^1 · R1 — .* GLASS$/.test(t.text) && t.y < 40));
 }

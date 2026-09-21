@@ -4,6 +4,86 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-09-21 — BAR GRID: one grid of glazing-bar lines for the casement window (chat session, ZIP delivery)
+
+### Verdict ✅ — the rule is in the engine, every consumer reads it, 22 rectangular sheets still byte-identical
+
+Piotr, from a 3-light casement with a fanlight over the middle light (the 3D preview): *"mamy 8 ale pod fanem też
+mamy 8 a powinno być 6 i totalnie wyrównane z prawym i lewym skrzydłem"*. Cause, found in the code: every light
+spread the spec count of horizontal bars over its OWN glass height (3D `CasementGlazing`, the three 2D sheets, the
+glass PDF and DXF, the glass rows), so the light under the fan got the same 3 bars squeezed into a shorter glass and
+none of them met the side lights' lines. The same law sits in PSW (its 2D `casBars` and its 3D).
+
+**The rule (approved by Piotr 21.09.2026, mockup first):** the horizontal bars are ONE grid for the whole window —
+set out on the tallest main light (equal panes, as today); every main light shows the lines that cross its own
+glass; a line whose sliver against the light's edge would be lower than **1/3 of a normal pane** is dropped
+(*"niż 1/3 będzie ok"*); fanlights keep their own counts; the fan height stays whatever the client set (no snapping —
+the fan decides how many lines fall under it: 2100 × 1400 131 with 3 H, fan 30 % → 2 bars, 50 % → 1 bar).
+
+**Where it lives:** `src/engine/casementBarGrid.js` — `alignMainBarLines()` (the rule), `casementLeafBars()` (the
+engine entry, bars of every leaf in frame AND leaf coordinates), `leafBarsToUnit()` (glass-unit coordinates), and
+the two helpers that moved here from the drawings: `casementBarCounts` (from `casementDrawUtils.js`, re-exported
+there) and `computeBarPositions` (from `drawingUtils.jsx`, re-exported there — the sash / door sheets keep their
+import). `deriveCasementWindow` computes the bars ONCE per window: `derived.casement.leaves[i].bars` (`counts`,
+`aligned`, `dropped`, `frame`, `local`) and `derived.customGlassUnits[i].bars` (`h`, `v`, `x`, `y`).
+
+**How many paths compute a casement bar position now — the honest count.** Before: **eight** (3D
+`CasementGlazing`, `CasementElevation2D`, `CasementLeafDetail2D`, `CasementGlassDrawing2D`, the glass PDF sketch,
+`glassDxfExport.rectBarsForRow`, the glass rows in `lists.js`, the astragal run in `calculations.js`), in three
+different placement laws (2D: equal panes between 22 mm wood bars on the daylight; 3D: equal split of the 64-rail
+glass; PDF / DXF: equal split of the unit from counts). After: **two.** (1) The engine — the three sheets, the rows,
+the PDF, the DXF and the astragal run read its numbers, no recomputation (t33 §6 greps for it). (2) The 3D
+`CasementWindow.jsx`, a PSW parity file: it applies the SAME `alignMainBarLines` to its own glass rects and keeps
+its own equal-split placement for the reference light (changing that would move every casement preview against
+PSW). Consequence, named: the 3D preview's bars sit within ~1.5 mm of the sheets' (64 vs 67 rail); the SET of
+lines a light shows can differ between the preview and the sheets only when a sliver lies within 3 mm of the 1/3
+threshold. The sheets are the production truth.
+
+**What changed in the output, beyond the fan case.** The glass PDF sketch and the glazier DXF used to split the
+unit equally from counts while the factory drawing placed the wood bars on the daylight and converted — the two
+differed by up to 0.75 mm on a unit with 2 or 3 bars (the PDF comment claimed they matched; they did not). Both now
+print the engine axes, so drawing = PDF = DXF by construction (t26 §3 pins the 1H × 2V chain 121.5 / 122 / 121.5).
+On a unit with one bar per direction nothing moves (the axis is the centre in every law).
+
+**Fixtures — none re-blessed.** t19: all 22 rectangular sheets (R1 – R4) byte-identical to the pre-night-4
+fixture — the engine computes the sheets' numbers with the sheets' own expression order, so the SVG text is the
+same string. t18 §3 / t20: the derived JSON gained the bar keys; the harness strips exactly those keys
+(`leaves[].bars`, `customGlassUnits[].bars`, glass row `barAxes`) before comparing with the UNCHANGED fixture, so
+everything else is still guarded byte for byte, and the new keys are checked by t33. t26 §3: the byte-identity
+against 402c58a runs on 1H × 1V (where the old and new sketch coincide) plus the new axes check.
+
+**Suite ALL PASS — 19 harnesses, 1928 checks, 0 failures. `npm run build` OK (14.1 s).**
+
+| harness | checks | | harness | checks | | harness | checks |
+|---|---|---|---|---|---|---|---|
+| t16 | 368 | | t22 | 118 | | t28 | 50 |
+| t17_edges | 70 | | t23 | 81 | | t29 | 34 |
+| t18 | 179 | | t24_stage4 | 26 | | t30_preview | 30 |
+| t19 | 280 | | t25 | 225 | | **t33_bar_grid (new)** | **43** |
+| t20 | 117 | | t26 | 37 (was 36) | | parity t31_bars_8x8 | 18 |
+| t20_bars | 31 | | t27 | 87 | | parity t32_bsuite | 54 |
+| t21 | 120 | | | | | | |
+
+t33 (`node verify/arch/t33_bar_grid.mjs`) on the real data path: 131 3H × 1V → 8 / 6 / 8, the middle light's
+frame lines EXACTLY the sides' 2nd and 3rd (frame y 702 / 999.5), an independent formula agrees; fan 15 % → 2
+(line 1 lands in the transom band: 18 mm sliver), 50 % → 1; the 1/3 boundary ± 1 mm on a 1-bar window (with 3 bars
+the boundary lies below the 15 % fan clamp, so a 3-bar light under a fan can never show all three — FYI); rows,
+astragal run (8730 not 9485), elevation SVG y attributes shared between lights, leaf and glass sheets on the engine
+lines, DXF axes mirrored to y-up, the 3D plan on the 3D rects; 040L / 120 / 133 / 013 untouched; 142 and 052L.
+Visual proof: `CasementElevation2D` of the 131 rendered from HEAD and from this tree, side by side (sent to Piotr).
+
+**The 3D was seen** (Piotr 07.09: test the component that renders the screen, not the geometry under it): the real
+`CasementWindow` mounted in a throw-away vite page under headless Chromium (SwiftShader), 131 3H × 1V at fan 30 %
+→ 8 / 6 / 8 with the middle bars on the sides' lines, at fan 50 % → 8 / 4 / 8; both screenshots sent to Piotr. The
+wiring (`hBarPositions` from `CasementWindow` through `CasementPanel` / `SashFrame` into `CasementGlazing`) is also
+asserted by t33 §6.
+
+**Balance (src):** 95 added / 115 removed in 12 existing files, plus the new engine module (143 lines) — the
+removed lines are the seven recomputations. Harnesses: +42 / −6 in t18 / t20 / t26, t33 new (244 lines).
+Docs: `docs/handover/PSW-BAR-GRID-PORT.md` — the PSW port, line by line on PSW `b699610` (19.09.2026).
+
+---
+
 ## 2026-09-08 — NIGHT 8 (turn 65), branch `claude/magical-edison-j5q0a9`
 
 ### Verdict ⛔ NOT RUN — the brief in `CLAUDE.md` is another repository's. Zero feature code written.

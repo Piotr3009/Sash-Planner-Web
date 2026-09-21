@@ -18,9 +18,8 @@
 import { useMemo } from 'react';
 import { getCasementProfile } from '../../engine/profile.js';
 import { offsetArcs } from '../../engine/arch.js';
-import { computeBarPositions, DimH, DimV, TitleBlock, Label, tfs } from './drawingUtils.jsx';
+import { DimH, DimV, TitleBlock, Label, tfs } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, DIMS, VIEWBOX_REF } from './drawingTheme.js';
-import { casementBarCounts } from './casementDrawUtils.js';
 import { archToSheet, glassToSheet, archedOutlineD, barBandD, arcLabelPoint, radiiText } from './archDrawUtils.js';
 import CircleFixedDrawing2D from './CircleFixedDrawing2D.jsx';
 
@@ -42,17 +41,14 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
     const p = getCasementProfile();
     const g = p.geometry;
     const stile = p.elements.leafStile.face;
-    const bars = windowSpec.casement?.bars || {};
 
     const leaves = cas.leafRects.map((r, i) => {
       const pn = cas.layoutDef.panels[i];
       const glassX = r.x + stile, glassY = r.y + stile;
       const glassW = r.w - 2 * stile, glassH = r.h - 2 * stile;
-      const counts = casementBarCounts(bars, pn._role || 'main');
-      const barPos = computeBarPositions({
-        glassX, glassY, glassW, glassH,
-        vCount: counts.v, hCount: counts.h, barW: BAR_WIDTH,
-      });
+      // bars from the engine grid (casementBarGrid.js) in frame coordinates —
+      // one set of lines for the window, a light under a fan shows its share
+      const barPos = cas.leaves[i]?.bars?.frame || { vBars: [], hBars: [] };
       return { r, hinge: pn.hinge, glassX, glassY, glassW, glassH, barPos, i, topY: r.y };
     });
 

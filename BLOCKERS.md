@@ -4,6 +4,19 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-09-21 — BAR GRID (one grid of glazing-bar lines): what is left for Piotr
+
+| # | Item | State | Ask |
+|---|------|-------|-----|
+| 26.1 | **PSW not ported** — PSW's 2D estimate drawing (`js/estimate-renderer.js` `casBars`) and its 3D still squeeze the spec count into the light under a fan | `docs/handover/PSW-BAR-GRID-PORT.md`: the helper (verbatim), 3 lines in `estimate-renderer.js` + one block, `CasementWindow.jsx` / `CasementPanel.jsx` / `CasementGlazing.jsx` line by line on PSW `b699610` | Port in the PSW repo; until then a PSW estimate with a fan over SOME lights (131, 142, 052L/R) draws bars PC will not make |
+| 26.2 | **PSW bar price** stays by the spec count (`hBars + vBars`, `price-calculator.js` 353), not by the bars a light really carries; PC prices no casement bars at all | untouched, on purpose | Say if the price should follow the real count — separate change |
+| 26.3 | **3D preview vs sheets** — the preview keeps its own equal-split placement on the 64-rail glass (PSW parity file); bars sit within ~1.5 mm of the sheets, the SET of lines can differ only when a sliver is within 3 mm of the 1/3 threshold | named in BUILD-LOG | Accept (preview), or order the 3D onto the engine's daylight placement — that moves every casement preview against PSW |
+| 26.4 | **3 H bars under a fan can never show all three**: with the 15 % minimum fan the first grid line always lands in the transom band (a 2100 × 1400 131 gives an 18 mm sliver at 15 %); the light shows 2 or fewer | by the rule as approved | FYI — if a client wants three under the fan, that is a smaller fan than the clamp allows |
+| 26.5 | Leaf and glass drawings group by size + role; two main lights of the same size in DIFFERENT tiers would share one drawing though their bars differ | no layout has that today | FYI |
+| 26.6 | `CLAUDE.md` at HEAD is still the Cabinet Core T65 brief (night 8, §25) — this session did not touch it | as before | `git checkout 9a6fcc0 -- CLAUDE.md` when you want the PC brief back |
+
+---
+
 ## 2026-09-08 — NIGHT 8 (turn 65): STOPPED AT THE GATE — `CLAUDE.md` at HEAD is another project's brief
 
 ### 25. The night could not run: HEAD's CLAUDE.md describes a wardrobe app, not Production Core

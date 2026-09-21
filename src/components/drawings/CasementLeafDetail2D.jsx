@@ -19,9 +19,9 @@
  */
 import { useMemo, useState } from 'react';
 import { getCasementProfile } from '../../engine/profile.js';
-import { computeBarPositions, DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs } from './drawingUtils.jsx';
+import { DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
-import { casementBarCounts, casementRoleName, paneTitle } from './casementDrawUtils.js';
+import { casementRoleName, paneTitle } from './casementDrawUtils.js';
 import { archToSheet, glassToSheet, archedOutlineD, ringBandD, barBandD, arcLabelPoint, isHaunchArc, radiiText } from './archDrawUtils.js';
 import CircleFixedDrawing2D from './CircleFixedDrawing2D.jsx';
 
@@ -79,11 +79,9 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
     const unitW = leafW - 2 * (stile + glassIn);
     const unitH = leafH - 2 * (stile + glassIn);
     const role = pn._role || 'main';
-    const counts = casementBarCounts(windowSpec.casement?.bars, role);
-    let { vBars, hBars } = computeBarPositions({
-      glassX, glassY, glassW, glassH,
-      vCount: counts.v, hCount: counts.h, barW: BAR_WIDTH,
-    });
+    // bars from the engine grid (casementBarGrid.js) in leaf coordinates —
+    // a light under a fan carries the window lines that cross it, not its own count
+    let { vBars, hBars } = mm.bars?.local || { vBars: [], hBars: [] };
     // ── Arched leaf: rings + glass outline + bars from derived.arch ──
     let arch = null;
     const A = derived.arch;

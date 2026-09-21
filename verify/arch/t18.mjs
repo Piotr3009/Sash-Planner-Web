@@ -319,13 +319,25 @@ section('3 — cut list, glass unit, paint / seals / weights; rectangular caseme
   // BOM metres = Σ over the plan's pieces of their own rough length (outer stock edge + fingers)
   const blankMm = (plan) => plan.pieces.reduce((s2, pc) => s2 + Math.round(pc.roughLength), 0);
   check('BOM: C-ARCH HEAD → c_frame_head (mm = Σ blank pieces × rough length), C-ARCH TOP RAIL → c_sash_top_rail (same rule)', qtys.c_frame_head?.mm === blankMm(d.arch.plans.frameHead) && qtys.c_sash_top_rail?.mm === blankMm(d.arch.plans.leafTop) && qtys.c_frame_head.mm > ahLen + 20, JSON.stringify([qtys.c_frame_head, qtys.c_sash_top_rail]));
-  // rectangular casements: byte-identical to the origin/main fixture
+  // rectangular casements: byte-identical to the origin/main fixture.
+  // 21.09 (one bar grid, casementBarGrid.js): the engine now carries the bars of
+  // every leaf / glass unit (leaves[i].bars, customGlassUnits[i].bars, glass row
+  // barAxes). Those ADDED keys are stripped before the comparison — the fixture
+  // stays the pre-21.09 file, so everything else is still guarded byte for byte;
+  // the added keys themselves are checked by verify/arch/t33_bar_grid.mjs.
   const FX = JSON.parse(readFileSync(resolve(ROOT, 'verify', 'arch', 'fixtures', 'rect-casement-base.json'), 'utf8'));
+  const stripBarGrid = (d) => {
+    const o = JSON.parse(JSON.stringify(d));
+    (o?.casement?.leaves || []).forEach((l) => { delete l.bars; });
+    (o?.customGlassUnits || []).forEach((u) => { delete u.bars; });
+    return o;
+  };
+  const stripRows = (rows) => rows.map((r) => { const o = { ...r }; delete o.barAxes; return o; });
   for (const [name, c] of Object.entries(FX)) {
     const rs = specification.normaliseToWindowSpec({ id: 'fx_' + name, width: c.input.width, height: c.input.height, name }, { fullConfig: { windowCategory: 'casement', ...c.input.fc } });
     const rd = derive(rs);
-    check(`rectangular ${name} (${c.input.fc.casementLayout}): derived / cut list / glass rows JSON-identical to origin/main, no arch key`,
-      JSON.stringify(rd) === JSON.stringify(c.derived) && JSON.stringify(lists.buildCutListForWindow(rd, rs)) === JSON.stringify(c.cut) && JSON.stringify(lists.buildGlassListForWindow(rd, rs)) === JSON.stringify(c.glass) && !('arch' in rd));
+    check(`rectangular ${name} (${c.input.fc.casementLayout}): derived / cut list / glass rows JSON-identical to origin/main (bar-grid keys aside), no arch key`,
+      JSON.stringify(stripBarGrid(rd)) === JSON.stringify(c.derived) && JSON.stringify(lists.buildCutListForWindow(rd, rs)) === JSON.stringify(c.cut) && JSON.stringify(stripRows(lists.buildGlassListForWindow(rd, rs))) === JSON.stringify(c.glass) && !('arch' in rd));
   }
 }
 

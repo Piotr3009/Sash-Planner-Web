@@ -34,6 +34,7 @@ import {
   casementLayoutDef,
   resolveCasementLayout,
 } from '../../../engine/casementLayouts';
+import { alignMainBarLines } from '../../../engine/casementBarGrid.js';
 import { casementPaneFinish } from '../../../components/drawings/casementDrawUtils.js';
 
 // Layout geometry lives in src/engine/casementLayouts.js — the single
@@ -107,6 +108,29 @@ export default function CasementWindow({
     [layout, innerW, innerH, height, fanlightRatio, fan2Ratio, casementHinges, middleSection, FRAME_FACE]
   );
 
+  // Leaf sits in rebate: extends 21mm into frame rebate on each side, minus 4mm gap
+  const leafGap = 4;
+
+  // ─── Horizontal glazing bars: ONE grid for the window (Piotr 21.09.2026) ───
+  // Every main light's bars sit on the lines of the tallest main light; a light
+  // under a fan shows the lines that cross its glass (a sliver lower than 1/3
+  // of a pane drops the bar). Fans keep their own count. Same rule as the
+  // engine sheets (casementBarGrid.js); here on the 3D glass rects, y up.
+  const hBarPlan = useMemo(() => {
+    const lights = (layoutDef.panels || []).map((p) => {
+      const glassH = (p.h + REBATE_STEP * 2 - leafGap * 2) - SASH_RAIL * 2;
+      const lo = p.y - glassH / 2, hi = p.y + glassH / 2;
+      const n = p._role === 'fan' ? fanHBars : p._role === 'fan2' ? fan2HBars : hBars;
+      const lines = [];
+      for (let i = 1; i <= (n || 0); i++) lines.push(lo + (glassH / (n + 1)) * i);
+      return { role: p._role, lo, hi, lines };
+    });
+    return alignMainBarLines(lights, { barW: 22 }).map((a, i) => {
+      const c = (lights[i].lo + lights[i].hi) / 2;
+      return a.lines.map((y) => y - c);   // mm from the glass centre, y up
+    });
+  }, [layoutDef, hBars, fanHBars, fan2HBars]);
+
   const W = mm(width);
   const H = mm(height);
   const halfD = mm(FRAME_DEPTH) / 2;
@@ -128,8 +152,6 @@ export default function CasementWindow({
 
       {/* ─── Panels (leaves) ─── */}
       {layoutDef.panels && layoutDef.panels.map((p, i) => {
-        // Leaf sits in rebate: extends 21mm into frame rebate on each side, minus 4mm gap
-        const leafGap = 4;
         const leafW = p.w + REBATE_STEP * 2 - leafGap * 2;
         const leafH = p.h + REBATE_STEP * 2 - leafGap * 2;
         // Leaf Z: sits ON gasket, flush with exterior
@@ -150,6 +172,7 @@ export default function CasementWindow({
             spacerColor={spacerColor}
             glassFinish={casementPaneFinish(p._role, { finish: glassFinish, frostedLocation })}
             hBars={p._role === 'fan' ? fanHBars : p._role === 'fan2' ? fan2HBars : hBars}
+            hBarPositions={hBarPlan[i]}
             vBars={p._role === 'fan' ? fanVBars : p._role === 'fan2' ? fan2VBars : vBars}
             ironmongery={ironmongery}
             position={[mm(p.x), mm(p.y) + openingCenterY, leafZ]}

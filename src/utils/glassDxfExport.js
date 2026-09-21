@@ -24,9 +24,9 @@
  * bars = bands profile glass.barWidth wide with the axis on GLASS_BAR_AXES, and
  * the text block carries the bar positions measured from the bottom corners.
  * Bar placement has the two sources the glass PDF already uses, so both
- * documents print the same numbers: casement / triple rows carry engine counts
- * (barsV / barsH) and split the glass equally; double-hung rows keep the
- * sash-frame placement (grid pattern + computeGlassBarPositions).
+ * documents print the same numbers: casement rows carry the engine bar axes
+ * (row.barAxes — casementBarGrid.js, one grid for the whole window); double-hung
+ * rows keep the sash-frame placement (grid pattern + computeGlassBarPositions).
  * Only a window with NO glass at all is skipped, with the reason, never guessed.
  * File names: {name}_glass.dxf, merged {label}_glass.dxf.
  */
@@ -148,8 +148,9 @@ export const SASH_GRID_BARS = Object.freeze({
  * Bars of ONE rectangular unit, in the unit frame (origin = bottom-left, y up).
  * Two sources, exactly the ones the glass PDF draws from, so the DXF and the PDF
  * can never print different positions for the same unit:
- *   · casement / triple rows carry the engine counts (barsV / barsH) → the glass
- *     is split into equal lights, axis k at W·k/(n+1);
+ *   · casement rows carry the engine bar axes (row.barAxes — casementBarGrid.js,
+ *     one grid for the window; x from the unit's left edge, y from its TOP edge,
+ *     mirrored here to y-up);
  *   · double-hung rows keep the sash-frame placement — the wood bar centres of
  *     the grid pattern, converted to glass coordinates by computeGlassBarPositions
  *     (its cy runs from the glass TOP, so it is mirrored here to y-up).
@@ -162,11 +163,9 @@ export function rectBarsForRow(row, windowSpec, derived) {
   if (!(W > 0) || !(H > 0)) return [];
   let xs = [];
   let ys = [];
-  const cV = Math.max(0, Math.round(Number(row?.barsV) || 0));
-  const cH = Math.max(0, Math.round(Number(row?.barsH) || 0));
-  if (cV > 0 || cH > 0) {
-    xs = Array.from({ length: cV }, (_, i) => (W * (i + 1)) / (cV + 1));
-    ys = Array.from({ length: cH }, (_, i) => (H * (i + 1)) / (cH + 1));
+  if (row?.barAxes) {
+    xs = (row.barAxes.x || []).slice().sort((a, c) => a - c);
+    ys = (row.barAxes.y || []).map((y) => H - y).sort((a, c) => a - c);
   } else if (row?.sash === 'upper' || row?.sash === 'lower') {
     const pat = SASH_GRID_BARS[row?.bars] || SASH_GRID_BARS['none'];
     const isUpper = row.sash === 'upper';

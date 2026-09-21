@@ -12,6 +12,11 @@
  *  - Drawing files just pass vbw={totalW}. No sc anywhere.
  */
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, DIMS, VIEWBOX_REF } from './drawingTheme.js';
+import { computeBarPositions } from '../../engine/casementBarGrid.js';
+
+// The equal-pane bar placement moved to the engine (casementBarGrid.js) with
+// the one-grid rule of 21.09.2026; re-exported for the sash and door sheets.
+export { computeBarPositions };
 
 // ─── Legacy color aliases (used by FrontElevation, Glass, Sections) ───
 export const STROKE = {
@@ -265,23 +270,6 @@ export function Label({ x, y, text, anchor = 'middle', opacity = 0.8, vbw }) {
       {text}
     </text>
   );
-}
-
-// ─── Bar positioning helper (for SASH — wood bars, equal spacing within opening) ───
-export function computeBarPositions({ glassX, glassY, glassW, glassH, vCount, hCount, barW }) {
-  const paneW = vCount > 0 ? Math.max((glassW - vCount * barW) / (vCount + 1), 0) : glassW;
-  const paneH = hCount > 0 ? Math.max((glassH - hCount * barW) / (hCount + 1), 0) : glassH;
-  const vBars = [];
-  for (let i = 0; i < vCount; i++) {
-    const left = glassX + (i + 1) * paneW + i * barW;
-    vBars.push({ cx: left + barW / 2, left, right: left + barW });
-  }
-  const hBars = [];
-  for (let j = 0; j < hCount; j++) {
-    const top = glassY + (j + 1) * paneH + j * barW;
-    hBars.push({ cy: top + barW / 2, top, bot: top + barW });
-  }
-  return { vBars, hBars, paneW, paneH };
 }
 
 // ─── Glass spacer bar positions (derived from WOOD bar centers) ───
