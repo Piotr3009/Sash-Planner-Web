@@ -2067,13 +2067,16 @@ function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat,
 // TAB: BOM
 // ═══════════════════════════════════════════════════════════════
 // ─── TAB: Spraying ───
-// Structure 2: Part A = elements (box + sashes) by colour (single grouped, dual separate);
+// Structure 2: Part A = elements (box + sashes; casement: frame + leaves + fans) by colour (single grouped, dual separate);
 // Part B = beadings (staff/parting/glazing/georgian) by INTERIOR colour, as lm + pcs.
 const SPRAY_BEADINGS = {
   'STAFF BEADING': 'Staff',
   'PARTING BEADING': 'Parting',
   'GLAZING BEADING': 'Glazing',
   'GEORGIAN MIDDLE BEADING': 'Georgian',
+  // casement (C- records from deriveCasementWindow); the triangle (ext) stays on the leaf, like the sash one
+  'C-GLAZING BEADING': 'Glazing',
+  'C-GEORGIAN MIDDLE BEADING': 'Georgian',
 };
 const SPRAY_BAR_LEN_M = 3;            // beading supplied in 3 m bars
 const ceilHalf = (x) => Math.ceil(x * 2) / 2;   // round up to nearest 0.5
@@ -2110,8 +2113,6 @@ function SprayMeta({ label, value }) {
   );
 }
 
-const SPRAY_ELEM_ORDER = { 'Box': 0, 'Upper Sash': 1, 'Lower Sash': 2 };
-
 function SprayingTab({ windowsData, batch, pp, registerExport }) {
   const data = useMemo(() => {
     const wins = (windowsData || []).filter((wd) => wd.derived);
@@ -2136,16 +2137,26 @@ function SprayingTab({ windowsData, batch, pp, registerExport }) {
       const sW = Math.round(derived.sashWidth || 0);
       const tH = Math.round(derived.topSashHeight || 0);
       const bH = Math.round(derived.bottomSashHeight || 0);
-      const elements = [
-        { element: 'Box', size: `${fw} × ${fh}` },
-        { element: 'Upper Sash', size: `${sW} × ${tH}` },
-        { element: 'Lower Sash', size: `${sW} × ${bH}` },
-      ];
+      // Casement (Piotr 21.09.2026): frame, then every leaf, then the fans — one row per pane, leaf size
+      const elements = derived.category === 'casement'
+        ? [
+            { element: 'Frame', size: `${fw} × ${fh}`, sort: 0 },
+            ...(derived.casement?.leaves || []).map((lf, i) => {
+              const role = derived.casement.layoutDef?.panels?.[i]?._role || 'main';
+              const kind = role === 'fan' ? 'Fan' : role === 'fan2' ? 'Fan 2' : 'Leaf';
+              return { element: `${kind} P${i + 1}`, size: `${Math.round(lf.leafW)} × ${Math.round(lf.leafH)}`, sort: role === 'main' ? 1 : 2 };
+            }),
+          ]
+        : [
+            { element: 'Box', size: `${fw} × ${fh}`, sort: 0 },
+            { element: 'Upper Sash', size: `${sW} × ${tH}`, sort: 1 },
+            { element: 'Lower Sash', size: `${sW} × ${bH}`, sort: 2 },
+          ];
 
       // PART A — each element row goes into its colour section.
       // Dual: row appears in BOTH the outside and inside colour sections (face labelled).
       elements.forEach((el) => {
-        const base = { projectNum, window: win.name, element: el.element, size: el.size, sort: SPRAY_ELEM_ORDER[el.element] ?? 9 };
+        const base = { projectNum, window: win.name, element: el.element, size: el.size, sort: el.sort };
         if (isDual) {
           addRow(outside, { ...base, colour: `${getColorName(outside)} (out)`, noteKey: `${win.id}_${el.element}_out` });
           addRow(inside,  { ...base, colour: `${getColorName(inside)} (in)`,  noteKey: `${win.id}_${el.element}_in` });
@@ -2158,13 +2169,13 @@ function SprayingTab({ windowsData, batch, pp, registerExport }) {
       if (!beadByColor[inside]) beadByColor[inside] = { hex: inside, name: getColorName(inside), beads: {} };
       (derived.components?.beading || []).forEach((b) => {
         const label = SPRAY_BEADINGS[b.elementName];
-        if (!label) return; // exclude triangle + meeting (attached to sash)
+        if (!label) return; // exclude triangle + meeting (attached to the sash / leaf)
         const mm = (b.length || 0) * (b.quantity || 1);
         beadByColor[inside].beads[label] = (beadByColor[inside].beads[label] || 0) + mm;
       });
     });
 
-    // Sort each section's rows: by element (Box → Upper → Lower), then window
+    // Sort each section's rows: by element (Box / Frame → sashes / leaves → fans), then window
     const sections = Object.values(colorSections).map((s) => ({
       hex: s.hex, name: s.name,
       rows: s.rows.slice().sort((a, b) => a.sort - b.sort || String(a.window).localeCompare(String(b.window))),
