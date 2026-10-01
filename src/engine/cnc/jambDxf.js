@@ -37,9 +37,9 @@ export const JAMB_CNC = Object.freeze({
   headW: 102,
   headInset: 102,
   cutoutW: 60,
-  pulleyW: 27,
+  pulleyW: 26,             // Piotr 01.10.2026: new pulley 26 × 118 (was 27 × 93)
   pulleyInner: 4,
-  pulleyInnerW: 19,
+  pulleyInnerW: 18,        // 26 − 2 × 4 side walls
   minWidthFor2Vents: 990,  // lisp: (if (>= fw 990) ...) — below it, always max 1
                            // (was 1050 in the older lisp revision; workshop
                            // lowered it — ~15mm clearance to the mortises at 990)
@@ -239,12 +239,13 @@ export function buildJambEntities(p, ox = 0, oy = 0) {
     E.push(rect('SJ-FRAME', o, oy, o + jW, oy + rjLen));
     E.push(rect('SJ-STILE', o + stX, oy - C.stileExt, o + stX + C.stileW, oy + rjLen + C.stileExt));
     for (const pl of [pl1, pl2]) {
-      E.push(slot('SJ-PULLEY-FRAME', o + pl, oy + rjLen - 166.5, o + pl + C.pulleyW, oy + rjLen - 73.5));
-      E.push(rect('SJ-POCKET', o + pl + C.pulleyInner, oy + rjLen - 163.5,
+      // Pulley recess 118 long: top stays 73.5 below the jamb top, the extra length goes down
+      E.push(slot('SJ-PULLEY-FRAME', o + pl, oy + rjLen - 191.5, o + pl + C.pulleyW, oy + rjLen - 73.5));
+      E.push(rect('SJ-POCKET', o + pl + C.pulleyInner, oy + rjLen - 188.5,                 // 112 long (3mm end walls)
         o + pl + C.pulleyInner + C.pulleyInnerW, oy + rjLen - 76.5));
       const cx = o + pl + C.pulleyW / 2;
       E.push(circle('SJ-PULLEY-DRILL', cx, oy + rjLen - 70, 1.5));
-      E.push(circle('SJ-PULLEY-DRILL', cx, oy + rjLen - 170, 1.5));
+      E.push(circle('SJ-PULLEY-DRILL', cx, oy + rjLen - 195, 1.5));                           // 3.5 past the new end
     }
     if (winNum) E.push(text('SJ-TEXT', o + jW / 2, oy + rjLen / 4, C.headTextH, `${winNum} - ${label}`, 90, 1));
   };
