@@ -163,6 +163,7 @@ export const GLASS_TYPES = [
 export const GLASS_SPECS = [
   { value: 'toughened', label: 'Toughened' },
   { value: 'laminated', label: 'Laminated' },
+  { value: 'acoustic', label: 'Laminate / Acoustic' },   // 01.10.2026: 4x14x6.8 = 24.8mm unit, 24.8mm clips
 ];
 
 export const GLASS_FINISHES = [

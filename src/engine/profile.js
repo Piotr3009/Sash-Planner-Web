@@ -47,7 +47,7 @@ export const DEFAULT_SASH_PROFILE = {
   // geometrically coupled values; changing them reshapes the whole window.
   // Glass makeup labels printed on glass orders (free text; no effect on sizes).
   // Keyed by glass type; the frame variant chooses the type per window.
-  glassMakeup: { double: '4x16x4', double_slim: '4x8x4', triple: '4x8x4x8x4', single: '', passive: '' },
+  glassMakeup: { double: '4x16x4', double_slim: '4x8x4', triple: '4x8x4x8x4', single: '', passive: '', acoustic: '4x14x6.8' },   // acoustic = SPEC makeup (01.10.2026)
   hornExtension: 70,  // sash horn height; per-window spec override wins, this is the workshop default
   dedSchema: 2,       // v2: sashHeight is the PURE opening deduction (MR excluded)
   deductions: {
@@ -575,6 +575,7 @@ export function normalizeSashProfile(p) {
   if (!p.glassMakeup) {
     p.glassMakeup = { ...DEFAULT_SASH_PROFILE.glassMakeup };
   }
+  if (p.glassMakeup.acoustic == null) p.glassMakeup.acoustic = DEFAULT_SASH_PROFILE.glassMakeup.acoustic;   // 01.10: stored profiles predate the spec
   // v3: arched-sash block for stored profiles (no UI edits it yet)
   if (!p.sashArch) {
     p.sashArch = { ...DEFAULT_SASH_PROFILE.sashArch, limits: { ...DEFAULT_SASH_PROFILE.sashArch.limits } };

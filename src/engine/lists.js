@@ -8,7 +8,7 @@
 
 import { CONSTANTS, deriveWindowData } from './calculations.js';
 import { CASEMENT_HINGE_SLOTS, CASEMENT_LOCK_SLOTS } from './casementHardware.js';
-import { GLASS_MAKEUP, glassGas } from './specification.js';
+import { GLASS_MAKEUP, glassGas, glassMakeupFor } from './specification.js';
 import { profileRawForSection, getWindowProfile, getCasementProfile } from './profile.js';
 // Pure helper (no React) — shared with the 2D drawings so panel, PDF and
 // sketch all read the frosted scope the same way.
@@ -294,7 +294,7 @@ function buildGlassRow(windowSpec, width, height, location, qty, finishOverride,
   const glassSpec = windowSpec?.glazing?.spec || 'toughened';
   const spacer = windowSpec?.glazing?.spacerColour || 'silver';
   const spacerType = windowSpec?.glazing?.spacerType || 'warm';
-  const makeup = windowSpec?.glazing?.makeup ?? getWindowProfile()?.glassMakeup?.[glassType] ?? (GLASS_MAKEUP[glassType] ?? GLASS_MAKEUP.double);
+  const makeup = glassMakeupFor(windowSpec?.glazing, getWindowProfile());   // acoustic spec → 4x14x6.8
   const coating = windowSpec?.glazing?.coating || 'standard';
   const gas = windowSpec?.glazing?.gas ?? glassGas(glassType);
   const finish = finishOverride || windowSpec?.glazing?.finish || windowSpec?.glazing?.lowerGlass || 'clear';
@@ -397,7 +397,7 @@ export function buildGlassListForWindow(derived, windowSpec) {
   const glassSpec = windowSpec?.glazing?.spec || 'toughened';
   const spacer = windowSpec?.glazing?.spacerColour || 'silver';
   const spacerType = windowSpec?.glazing?.spacerType || 'warm';
-  const makeup = windowSpec?.glazing?.makeup ?? getWindowProfile()?.glassMakeup?.[glassType] ?? (GLASS_MAKEUP[glassType] ?? GLASS_MAKEUP.double);
+  const makeup = glassMakeupFor(windowSpec?.glazing, getWindowProfile());   // acoustic spec → 4x14x6.8
   const coating = windowSpec?.glazing?.coating || 'standard';
   const gas = windowSpec?.glazing?.gas ?? glassGas(glassType);
   const isFrosted = windowSpec?.glazing?.finish === 'frosted';

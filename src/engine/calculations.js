@@ -473,11 +473,13 @@ function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, to
     const cordM = round((3 * frameHeight) / 1000);
 
     // Glazing clips — 20 per window, size depends on glass type + frame type
-    // double/single/passive → 24mm, triple → 28mm, slim frame → 16mm
+    // double/single/passive → 24mm, triple → 28mm, slim frame → 16mm,
+    // Laminate / Acoustic spec (24.8mm unit) → 24.8mm (Piotr 01.10.2026)
     const frameT = windowSpec.frame?.type;
     const isSlim = frameT === 'slim';
+    const isAcoustic = windowSpec.glazing?.spec === 'acoustic';
     const clipSize = frameT === 'heritage' ? 'heritage'
-      : isSlim ? '16mm' : (glassType === 'triple' ? '28mm' : '24mm');
+      : isSlim ? '16mm' : isAcoustic ? '24.8mm' : (glassType === 'triple' ? '28mm' : '24mm');
     const clipQty = 20;
 
     // Spacer 1mm — 20 per window

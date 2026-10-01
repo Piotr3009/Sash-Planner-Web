@@ -415,6 +415,21 @@ export default function WindowSettingsPage() {
                   onChange={(e) => setGlassMakeup(gType, e.target.value)}
                   className="px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm font-mono w-[200px]" />
                 <div className="text-[11px] text-ink-300 mt-2">{GLASS_TYPE_LABEL[gType]}{sum ? <span className="text-blue-300"> · {sum} mm</span> : null}</div>
+                {(() => {
+                  // Laminate / Acoustic SPEC makeup — same for every frame variant (01.10.2026)
+                  const av = (profile.glassMakeup || {}).acoustic ?? '';
+                  const an = String(av).split(/[^0-9.]+/).map(Number).filter((n) => n > 0);
+                  const asum = an.length >= 2 ? Math.round(an.reduce((a, b) => a + b, 0) * 10) / 10 : null;
+                  return (
+                    <div className="mt-3">
+                      <div className="text-[11px] text-ink-400 mb-1">Laminate / Acoustic spec — makeup (mm)</div>
+                      <input type="text" value={av}
+                        onChange={(e) => setGlassMakeup('acoustic', e.target.value)}
+                        className="px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm font-mono w-[200px]" />
+                      <div className="text-[11px] text-ink-300 mt-2">any glass type with this spec{asum ? <span className="text-blue-300"> · {asum} mm · clips {asum} mm</span> : null}</div>
+                    </div>
+                  );
+                })()}
               </fieldset>
             </div>
           );

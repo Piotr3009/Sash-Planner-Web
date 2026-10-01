@@ -32,6 +32,17 @@ function detectGridMode(spec, item) {
 // Passive (vacuum) and single have no unit makeup; gas fill only applies to sealed units.
 export const GLASS_MAKEUP = { double: '4x16x4', double_slim: '4x8x4', triple: '4x8x4x8x4', passive: '', single: '' };
 export const GLASS_THICKNESS = { double: 24, double_slim: 16, triple: 28 };
+// Laminate / Acoustic SPEC (Piotr 01.10.2026): the unit is 4 × 14 × 6.8 = 24.8mm whatever the
+// glass TYPE chip says (windows only — doors keep their own makeup), and it takes 24.8mm clips.
+export const ACOUSTIC_MAKEUP = '4x14x6.8';
+export const ACOUSTIC_THICKNESS = 24.8;
+/** The makeup printed on glass orders: explicit override → acoustic spec → profile per type → default. */
+export function glassMakeupFor(glazing, profile) {
+  if (glazing?.makeup != null) return glazing.makeup;
+  const type = glazing?.type || 'double';
+  if (glazing?.spec === 'acoustic') return profile?.glassMakeup?.acoustic ?? ACOUSTIC_MAKEUP;
+  return profile?.glassMakeup?.[type] ?? (GLASS_MAKEUP[type] ?? GLASS_MAKEUP.double);
+}
 
 // Doors take THICKER panes than windows (Piotr 04.08): minimum 6mm glass, and
 // double/triple deliberately land on the SAME 28mm unit, so one rebate depth
@@ -463,7 +474,7 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       frostedLocation,
       coating: item?.glassCoating || fc.glassCoating || 'standard',
       gas: item?.glassGas ?? fc.glassGas ?? glassGas(glassType),
-      thickness: isDoorCategory ? DOOR_GLASS_THICKNESS : (GLASS_THICKNESS[glassType] ?? 24),
+      thickness: isDoorCategory ? DOOR_GLASS_THICKNESS : (glassSpec === 'acoustic' ? ACOUSTIC_THICKNESS : (GLASS_THICKNESS[glassType] ?? 24)),
       // Explicit per-window override only; otherwise undefined so consumers
       // fall back to the workshop profile's glassMakeup (live, snapshot-aware).
       makeup: item?.makeup ?? item?.glazing?.makeup
