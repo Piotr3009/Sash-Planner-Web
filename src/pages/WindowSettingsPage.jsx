@@ -619,9 +619,9 @@ export default function WindowSettingsPage() {
         const gU = d.topSashHeight - f.top - f.meet;
         const gL = d.bottomSashHeight - f.meet - f.bottom;
         const gw = d.sashWidth - 2 * f.stile;
-        // sealed unit = clear light + 2×rebate(12.5) per axis — same numbers as Glass Schedule
-        const uW = gw + 25;
-        const uH = gU + 25;
+        // sealed unit = clear light + 2×rebate (CONSTANTS.GLASS_REBATE, 11.5) per axis — same numbers as Glass Schedule
+        const uW = gw + 2 * CONSTANTS.GLASS_REBATE;
+        const uH = gU + 2 * CONSTANTS.GLASS_REBATE;
         return (
           <div className="text-[11px] text-amber-400 mt-1">
             TEMP · clear light: US {gw} × {gU} · LS {gw} × {gL} {gU === gL ? '(equal ✓)' : '(NOT EQUAL ✗)'} · sealed unit: {uW} × {uH}

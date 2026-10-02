@@ -81,7 +81,13 @@ const BAR_PATTERNS = {
   '4x4': { h: 1, v: 1 }, '6x6': { h: 1, v: 2 }, '8x8': { h: 1, v: 3 }, '9x9': { h: 2, v: 2 },
 };
 const SPACER_BAR = 18;
-const EDGE_SEAL = 11;
+// Edge seal (perimeter spacer line) per glass type — the casement profile's glazier
+// block, the SAME number the 2D sheets and the glazier DXF draw (10mm since 02.10.2026).
+const edgeSealFor = (glassType) => readGlassProfile(getCasementProfile(), typeKey(glassType)).edgeCover;
+const typeKey = (t) => {
+  const k = String(t || 'double').toLowerCase().replace(/\s+/g, '_');
+  return ['double', 'double_slim', 'triple', 'single', 'passive'].includes(k) ? k : 'double';
+};
 
 function fmt(n) {
   const r = Math.round(n * 10) / 10;
@@ -522,6 +528,7 @@ function drawGlass(doc, cx, cy, cw, ch, g) {
   doc.rect(gx, gy, gw, gh, 'FD');
 
   // Edge seal
+  const EDGE_SEAL = edgeSealFor(g.type);
   const es = EDGE_SEAL * sc;
   doc.setLineWidth(LW.seal);
   doc.rect(gx + es, gy + es, gw - 2 * es, gh - 2 * es);

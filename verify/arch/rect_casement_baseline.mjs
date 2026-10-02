@@ -9,6 +9,13 @@
  * profile formula (leafW = W − 2·leafAtJamb, leafH = H − leafFullHeight) so
  * BUILD-LOG can quote them.
  *
+ * 02.10.2026 (glass 1mm smaller all round, glassInset 12.5 → 11.5): re-run for
+ * the glass numbers. The bar-grid keys added on 21.09 (leaves[i].bars,
+ * customGlassUnits[i].bars, glass row barAxes) are stripped before writing,
+ * exactly as t18 §3 / t20 strip them from the live derived — the fixture keeps
+ * its pre-21.09 shape and those keys stay guarded by t33_bar_grid.mjs. The old
+ * and new glass unit sizes are printed per fixture.
+ *
  * Run: node verify/arch/rect_casement_baseline.mjs
  */
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -31,7 +38,14 @@ for (const [name, c] of Object.entries(FX)) {
   const W = c.input.width, H = c.input.height;
   const fW = W - 2 * P.deductions.leafAtJamb, fH = H - P.deductions.leafFullHeight;
   console.log(`${name} ${c.input.fc.casementLayout} ${W} × ${H}: leaf old ${JSON.stringify(oldLeaf)} → new ${JSON.stringify(newLeaf)}; single-leaf formula ${W} − 2·${P.deductions.leafAtJamb} = ${fW}, ${H} − ${P.deductions.leafFullHeight} = ${fH}`);
-  FX[name] = { input: c.input, derived, cut, glass };
+  const oldUnits = (c.derived.customGlassUnits || []).map((u) => `${u.width}×${u.height}`).join(', ');
+  const newUnits = (derived.customGlassUnits || []).map((u) => `${u.width}×${u.height}`).join(', ');
+  console.log(`   glass units old ${oldUnits} → new ${newUnits} (glassInset ${P.geometry.glassInset})`);
+  const stripped = JSON.parse(JSON.stringify(derived));
+  (stripped.casement?.leaves || []).forEach((l) => { delete l.bars; });
+  (stripped.customGlassUnits || []).forEach((u) => { delete u.bars; });
+  const glassRows = glass.map((r) => { const o = { ...r }; delete o.barAxes; return o; });
+  FX[name] = { input: c.input, derived: stripped, cut, glass: glassRows };
 }
 writeFileSync(file, JSON.stringify(FX));
 console.log(`wrote ${file} from the live tree at ${commit.slice(0, 7)}`);

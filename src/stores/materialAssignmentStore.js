@@ -56,6 +56,7 @@ export const SASH_WINDOW_PARTS = {
   consumables: [
     { id: 'cord',               name: 'Cord / Rope',              section: '—',  pcs: 1, materialType: 'consumable', unit: 'm' },
     { id: 'glazing_clips_24mm', name: 'Glazing Clips — standard frame', section: '—', pcs: 20, materialType: 'consumable', unit: 'pcs', note: 'size = assigned material' },
+    { id: 'glazing_clips_24_8mm', name: 'Glazing Clips — laminated / acoustic (24.8mm)', section: '—', pcs: 20, materialType: 'consumable', unit: 'pcs', note: '4-14-6.8 unit · Laminated or Laminate / Acoustic spec' },
     { id: 'glazing_clips_28mm', name: 'Glazing Clips — triple frame',   section: '—', pcs: 20, materialType: 'consumable', unit: 'pcs', note: 'size = assigned material' },
     { id: 'glazing_clips_14mm', name: 'Glazing Clips — slim frame',     section: '—', pcs: 20, materialType: 'consumable', unit: 'pcs', note: 'size = assigned material' },
     { id: 'glazing_clips_heritage', name: 'Glazing Clips — heritage frame', section: '—', pcs: 20, materialType: 'consumable', unit: 'pcs', note: 'size = assigned material' },
@@ -154,6 +155,7 @@ export const CASEMENT_PARTS = {
   glazing: [
     { id: 'c_glass_clips_double', name: 'Glass Clips — Double', sub: 'double glazed units', section: '—', pcs: 1, materialType: 'consumable', unit: 'pcs' },
     { id: 'c_glass_clips_triple', name: 'Glass Clips — Triple', sub: 'triple glazed units', section: '—', pcs: 1, materialType: 'consumable', unit: 'pcs' },
+    { id: 'c_glass_clips_laminated', name: 'Glass Clips — Laminated / Acoustic (24.8mm)', sub: 'laminated or Laminate / Acoustic spec, 4-14-6.8 unit', section: '—', pcs: 1, materialType: 'consumable', unit: 'pcs' },
     { id: 'c_glazing_packer', name: 'Glazing Packers', sub: '8 pcs × pane — engine counts panes', section: '—', pcs: 8, materialType: 'consumable', unit: 'pcs' },
   ],
 };

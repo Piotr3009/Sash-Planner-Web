@@ -19,7 +19,10 @@ export const CONSTANTS = Object.freeze({
     // Total sash height deduction from frame: top_sash + bot_sash = frame_height - 92
     // Bottom sash is 33mm taller than top sash
     SASH_HEIGHT_DEDUCTION: 92,
-    GLASS_REBATE: 12.5,           // glass sits this deep into each rail/stile rebate
+    // Glass sits this deep into each rail/stile rebate (the rebate itself is 18).
+    // Piotr 02.10.2026: 11.5 (was 12.5) — every sealed unit 1mm smaller all round;
+    // the perimeter spacer stays where it was (casement profile glass.edgeCover 11 → 10).
+    GLASS_REBATE: 11.5,
     SASH_HEIGHT_DIFFERENCE: 33,   // legacy fallback — live value = bottomRail.face − topRail.face (sashFaces().diff)
 
     // Frame component deductions (verified against Excel)
@@ -63,12 +66,12 @@ export const CONSTANTS = Object.freeze({
     HORN_ALLOWANCE_VERTICAL: 70,
     HORN_ALLOWANCE_HORIZONTAL: 30,
 
-    // Glass deduction from sash width (verified against Excel: glass_w = sash_w - 89)
-    // = 2×stile(57) - 2×rebate(12.5) = 114 - 25 = 89
-    GLASS_WIDTH_DEDUCTION: 89,
-    // Glass deduction from sash height (verified against Excel: glass_h = top_sash_h - 75)
-    // = topRail(57) + meetRail(43) - 2×rebate(12.5) = 100 - 25 = 75
-    GLASS_HEIGHT_DEDUCTION: 75,
+    // Glass deduction from sash width (Excel had 89 with the 12.5 rebate; 02.10.2026: 91)
+    // = 2×stile(57) - 2×rebate(11.5) = 114 - 23 = 91
+    GLASS_WIDTH_DEDUCTION: 91,
+    // Glass deduction from sash height (Excel had 75 with the 12.5 rebate; 02.10.2026: 77)
+    // = topRail(57) + meetRail(43) - 2×rebate(11.5) = 100 - 23 = 77
+    GLASS_HEIGHT_DEDUCTION: 77,
 
     // Tolerances
     GLASS_TOLERANCE: 3,
@@ -466,20 +469,28 @@ function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, to
     const barPerSash = (pattern.v * glassH) + (pattern.h * glassW);
     const perimPerSash = 2 * (glassW + glassH);
 
-    // Glass area (m²)
-    const glassSqm = round((glassW * glassH) / 1_000_000 * 2);
+    // Glass area (m²) — the SEALED UNIT size (clear light + the rebate each side),
+    // the same numbers as the glass schedule / order, as casement and doors
+    // already do (Piotr 02.10.2026; before: the clear light, under-counted).
+    const unitW = glassW + 2 * CONSTANTS.GLASS_REBATE;
+    const unitH = glassH + 2 * CONSTANTS.GLASS_REBATE;
+    const glassSqm = round((unitW * unitH) / 1_000_000 * 2);
 
     // Cord — 3× frame height in meters
     const cordM = round((3 * frameHeight) / 1000);
 
     // Glazing clips — 20 per window, size depends on glass type + frame type
     // double/single/passive → 24mm, triple → 28mm, slim frame → 16mm,
-    // Laminate / Acoustic spec (24.8mm unit) → 24.8mm (Piotr 01.10.2026)
+    // Laminate / Acoustic spec (24.8mm unit) → 24.8mm (Piotr 01.10.2026);
+    // Laminated spec on a double / passive unit → 24.8mm too (Piotr 02.10.2026 —
+    // single laminated stays 24mm, a laminated triple stays 28mm)
     const frameT = windowSpec.frame?.type;
     const isSlim = frameT === 'slim';
-    const isAcoustic = windowSpec.glazing?.spec === 'acoustic';
+    const glassSpec = windowSpec.glazing?.spec;
+    const is248 = glassSpec === 'acoustic'
+      || (glassSpec === 'laminated' && (glassType === 'double' || glassType === 'passive'));
     const clipSize = frameT === 'heritage' ? 'heritage'
-      : isSlim ? '16mm' : isAcoustic ? '24.8mm' : (glassType === 'triple' ? '28mm' : '24mm');
+      : isSlim ? '16mm' : is248 ? '24.8mm' : (glassType === 'triple' ? '28mm' : '24mm');
     const clipQty = 20;
 
     // Spacer 1mm — 20 per window

@@ -52,8 +52,9 @@ section('1 — profile = spec F (the one literal check) and the option-B identit
 check('casement: frameHead 68 / frameJamb 68 / land 47 / rebate 21 / gap 4 / leafAtJamb 51 / leafFullHeight 98 / fanFromAxis 65 / frameSchema 2',
   E.frameHead.face === 68 && E.frameJamb.face === 68 && G.land === 47 && G.rebate === 21 && G.gap === 4 && D.leafAtJamb === 51 && D.leafFullHeight === 98 && D.fanFromAxis === 65 && P.frameSchema === 2,
   JSON.stringify([E.frameHead.face, E.frameJamb.face, G.land, G.rebate, G.gap, D.leafAtJamb, D.leafFullHeight, D.fanFromAxis, P.frameSchema]));
-check('casement UNCHANGED by Block F: cill 68 / mullion 68 / transom 68 / leaf members 67 / glassInset 12.5 / gapCill 6 / cillVisible 41 / lowerFromAxis 64',
-  E.frameCill.face === 68 && E.mullion.face === 68 && E.transom.face === 68 && E.leafStile.face === 67 && E.leafTop.face === 67 && E.leafBottom.face === 67 && G.glassInset === 12.5 && G.gapCill === 6 && G.cillVisible === 41 && D.lowerFromAxis === 64);
+// glassInset 11.5 since 02.10.2026 (glass schema 2: 1mm smaller all round) — it was 12.5 through Block F and is not a Block F number
+check('casement UNCHANGED by Block F: cill 68 / mullion 68 / transom 68 / leaf members 67 / glassInset 11.5 (glass schema 2, 02.10.2026) / gapCill 6 / cillVisible 41 / lowerFromAxis 64',
+  E.frameCill.face === 68 && E.mullion.face === 68 && E.transom.face === 68 && E.leafStile.face === 67 && E.leafTop.face === 67 && E.leafBottom.face === 67 && G.glassInset === 11.5 && P.glassSchema === 2 && G.gapCill === 6 && G.cillVisible === 41 && D.lowerFromAxis === 64);
 check('identity: land + rebate = frame face (option B — the rebate stays, the land grows)', G.land + G.rebate === E.frameHead.face && E.frameJamb.face === E.frameHead.face);
 check('identity: leafAtJamb = land + gap', D.leafAtJamb === G.land + G.gap);
 check('identity: leafFullHeight = leafAtJamb + gapCill + cillVisible (top layer + cill layer)', D.leafFullHeight === D.leafAtJamb + G.gapCill + G.cillVisible);
@@ -347,14 +348,16 @@ section('9 — materials labels, fixtures re-baselined from the live tree');
   check(`fixture rect-casement-sheets.json provenance: ref "live" from ${sheets.commit?.slice(0, 7)}, 4 windows`, sheets.ref === 'live' && typeof sheets.commit === 'string' && sheets.commit.length === 40 && Object.keys(sheets.sheets || {}).length === 4);
   const elev = sheets.sheets?.R1?.elevation || '';
   check(`R1 elevation sheet carries the 898 leaf (text "${leafW}") and not 920`, elev.includes(String(leafW)) && !/\b920\b/.test(elev));
-  // The sash ENGINE fixture must stay untouched — no night since Block F has changed a
-  // sash number. The sash SHEETS fixture was deliberately re-baselined in night 7 stage 2
-  // (the dimensions moved: chains to the bottom, overall width to the top), so it is no
-  // longer part of this guard; t22 §1 is its byte-identity proof and §1b the rule proof.
+  // The sash SHEETS fixture was deliberately re-baselined in night 7 stage 2 (the dimensions
+  // moved: chains to the bottom, overall width to the top) and again on 02.10.2026 (glass −1 mm
+  // per side, seal 10), so it is not part of this guard; t22 §1 is its byte-identity proof and
+  // §1b the rule proof. The sash ENGINE fixture (rect-sash-base.json) was re-baselined on
+  // 02.10.2026 too (verify/arch/rect_sash_baseline.mjs prints every changed value) — the Block F
+  // guard on it is now the sash PROFILE: stiles / top rail face 57, sash is not in Block F.
   const sash = JSON.parse(readFileSync(resolve(ROOT, 'verify', 'arch', 'fixtures', 'rect-sash-sheets.json'), 'utf8'));
-  const sashWt = execFileSync('git', ['status', '--porcelain', '--', 'verify/arch/fixtures/rect-sash-base.json'], { cwd: ROOT, encoding: 'utf8' }).trim();
+  const sashBase = JSON.parse(readFileSync(resolve(ROOT, 'verify', 'arch', 'fixtures', 'rect-sash-base.json'), 'utf8'));
   const SP = M.profile.DEFAULT_SASH_PROFILE;
-  check('sash ENGINE fixture untouched (rect-sash-base.json clean), 6 sash windows in the sheets fixture; sash profile stiles / top rail face 57 unchanged (sash is not in Block F)', sashWt === '' && Object.keys(sash).length === 6 && SP.elements.stiles.face === 57 && SP.elements.topRail.face === 57, `${sashWt} / ${Object.keys(sash).length} / ${SP.elements.stiles.face}`);
+  check('sash ENGINE fixture: std_2x2 units 731 × 610.5 (glass rebate 11.5 since 02.10.2026), 6 sash windows in the sheets fixture; sash profile stiles / top rail face 57 unchanged (sash is not in Block F)', near(sashBase.std_2x2?.glass?.[0]?.width, 731) && near(sashBase.std_2x2?.glass?.[0]?.height, 610.5) && Object.keys(sash).length === 6 && SP.elements.stiles.face === 57 && SP.elements.topRail.face === 57, `${JSON.stringify(sashBase.std_2x2?.glass?.[0])} / ${Object.keys(sash).length} / ${SP.elements.stiles.face}`);
   // and the re-baselined sash sheets really carry the new placement
   check('rect-sash-sheets.json re-baselined with the night-7 rule (upper sash: no chain label above the overall width)', checkDimRule(sash.std_2x2.upper).ok, checkDimRule(sash.std_2x2.upper).why);
   const port = readFileSync(resolve(ROOT, 'docs', 'handover', 'PSW-FRAME-68-PORT.md'), 'utf8');

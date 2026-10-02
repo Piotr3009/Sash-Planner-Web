@@ -36,11 +36,13 @@ const { specification, calculations, arch, profile, archDxf, dxfWriter, cncExpor
 const CP = profile.DEFAULT_CASEMENT_PROFILE;
 // v4 Block F (frame 68): every frame-driven expectation is computed from the profile with the spec formulas, never read off the engine
 const tF = CP.elements.frameHead.face, oL = CP.deductions.leafAtJamb, tL = CP.elements.leafTop.face, gI = CP.geometry.glassInset, land = CP.geometry.land;
-const glassOff = oL + tL - gI;                                                    // 51 + 67 − 12.5 = 105.5 (was 94.5)
+const glassOff = oL + tL - gI;                                                    // 51 + 67 − 11.5 = 106.5 (02.10.2026; 105.5 with 12.5)
+const COVER = CP.glass.edgeCover.default;                                         // edge cover 10 (02.10.2026; was 11)
+const OUTSET = CP.geometry.glazingRebate - gI;                                    // tracery board beyond the unit 6.5 (was 5.5)
 // the 800 circle: frame ring R / R − face, rebate wall R − land, leaf ring (R − leafAtJamb) / (R − leafAtJamb − leafTop.face), glass R − glassOff
-const R8 = 800 / 2, rFi = R8 - tF, rWall = R8 - land, rLo = R8 - oL, rLi = rLo - tL, rG = R8 - glassOff;   // 400 / 332 / 353 / 349 / 282 / 294.5 (was 343 / 364 / 360 / 293 / 305.5)
-const D8 = 2 * rG;                                                                // clear glass diameter 589 (was 611)
-const rSun = rG - CP.arch.patterns.sunburst.offset;                               // sunburst ring 294.5 − 200 = 94.5 (was 105.5)
+const R8 = 800 / 2, rFi = R8 - tF, rWall = R8 - land, rLo = R8 - oL, rLi = rLo - tL, rG = R8 - glassOff;   // 400 / 332 / 353 / 349 / 282 / 293.5 (294.5 before 02.10.2026)
+const D8 = 2 * rG;                                                                // clear glass diameter 587 (589 before 02.10.2026)
+const rSun = rG - CP.arch.patterns.sunburst.offset;                               // sunburst ring 293.5 − 200 = 93.5 (94.5 before 02.10.2026)
 const frameCentre = (R8 + rFi) / 2, leafCentre = (rLo + rLi) / 2;                 // ring centre-line radii 366 / 315.5 (was 371.5 / 326.5)
 const f1 = (v) => { const r = Math.round(v * 10) / 10; return Number.isInteger(r) ? String(r) : r.toFixed(1); };   // one-decimal print of the rows / DXF text
 // independent planner (verify/arch/lib/indPlanner.mjs) on rings built from the formula radii — a closed ring = two half circles (§1 checks the engine's layout)
@@ -300,13 +302,13 @@ section('7 — glazier DXF + tracery DXF / LSP for the circle (samples)');
   const p = probe(path);
   const contour = p.polys.find((x) => x.layer === 'GLASS_CONTOUR');
   const edge = p.polys.find((x) => x.layer === 'GLASS_EDGE');
-  check(`GLASS_CONTOUR: closed, 2 vertices, both arcs R ${rG}; GLASS_EDGE arcs R ${rG - 11} (cover 11)`, !!contour && contour.closed && contour.n === 2 && polyArcs(contour.pts.map((pt, i) => [pt[0], pt[1], contour.bulges[i]]), true).every((a) => near(a.r, rG, 0.01)) && polyArcs(edge.pts.map((pt, i) => [pt[0], pt[1], edge.bulges[i]]), true).every((a) => near(a.r, rG - 11, 0.01)));
+  check(`GLASS_CONTOUR: closed, 2 vertices, both arcs R ${rG}; GLASS_EDGE arcs R ${rG - COVER} (cover ${COVER})`, COVER === 10 && !!contour && contour.closed && contour.n === 2 && polyArcs(contour.pts.map((pt, i) => [pt[0], pt[1], contour.bulges[i]]), true).every((a) => near(a.r, rG, 0.01)) && polyArcs(edge.pts.map((pt, i) => [pt[0], pt[1], edge.bulges[i]]), true).every((a) => near(a.r, rG - COVER, 0.01)));
   const texts = p.texts.map((t) => t.text);
   check(`texts: GLASS CIRCLE, DIAMETER ${f1(D8)} R ${f1(rG)}, BARS 8 PATTERN SUNBURST, spoke ends from apex`, texts.some((t) => /GLASS CIRCLE$/.test(t)) && texts.some((t) => t.startsWith(`DIAMETER ${f1(D8)} R ${f1(rG)}`)) && texts.some((t) => /BARS 8 PATTERN SUNBURST/.test(t)) && texts.some((t) => /FROM APEX/.test(t)));
   check(`GLASS_BARS bands: 2 per straight bar + 2 per arc (ring R ${rSun} ± 9)`, (p.counts.GLASS_BARS?.POLYLINE || 0) === 16 && p.polys.filter((x) => x.layer === 'GLASS_BARS' && x.arcs > 0).length === 4);
   const tr = cncExport.traceryParamsForWindow(CIRCLE, DC, 'CIR');
-  // Piotr 06.09: board = the unit circle + 5.5 all round (rebate 18 − glass 12.5): bbox −5.5 … 616.5
-  check(`traceryParamsForWindow: circle → full mode, 7 panes, board = the unit circle + 5.5 (bbox −5.5 … ${D8 + 5.5})`, !tr.skip && tr.params.build.geom.mode === 'full' && tr.params.build.geom.panes.length === 7 && near(tr.params.build.geom.bbox.minX, -5.5, 1e-6) && near(tr.params.build.geom.bbox.maxX, D8 + 5.5, 1e-6), tr.skip);
+  // Piotr 06.09: board = the unit circle + (rebate 18 − glass inset) all round: 6.5 since 02.10.2026 (was 5.5)
+  check(`traceryParamsForWindow: circle → full mode, 7 panes, board = the unit circle + ${OUTSET} (bbox −${OUTSET} … ${D8 + OUTSET})`, OUTSET === 6.5 && !tr.skip && tr.params.build.geom.mode === 'full' && tr.params.build.geom.panes.length === 7 && near(tr.params.build.geom.bbox.minX, -OUTSET, 1e-6) && near(tr.params.build.geom.bbox.maxX, D8 + OUTSET, 1e-6), tr.skip);
   const hubPane = tr.params.build.geom.panes.find((pn) => pn.daylight.edges.length === 2);
   check(`the hub pane is a full circle: rail at R ${rSun} − 11 + 2, limit at R ${rSun} − 11 + 10 (bar half 11)`, !!hubPane && near(hubPane.rail.edges[0].arc.r, rSun - 11 + 2, 1e-6) && near(hubPane.limit.edges[0].arc.r, rSun - 11 + 10, 1e-6));
   const rt = cncExport.exportTraceryDxfForWindow(CIRCLE, DC, 'CIR');
@@ -337,8 +339,8 @@ section('8 — sheets: circle sheets concentric on the engine radii; fixed recta
   const gsvg = S.glass[0].svg;
   const go = dataAttr(gsvg, 'data-arch-origin');
   const garcs = svgArcs(gsvg);
-  const gR = [rG, rG - 11, rSun - 9, rSun + 9];   // unit, edge cover 11, sunburst ring band ± 9
-  check(`glass sheet: circle unit, arcs concentric on (ox + ${rG}, oy + ${rG}), radii ${rG} / ${rG - 11} / ring band ${rSun - 9} – ${rSun + 9}, no springing dims`,
+  const gR = [rG, rG - COVER, rSun - 9, rSun + 9];   // unit, edge cover 10, sunburst ring band ± 9
+  check(`glass sheet: circle unit, arcs concentric on (ox + ${rG}, oy + ${rG}), radii ${rG} / ${rG - COVER} / ring band ${rSun - 9} – ${rSun + 9}, no springing dims`,
     new RegExp(`Circle · Ø ${D8}`).test(gsvg) && garcs.length >= 6 && garcs.every((a) => near(a.cx, go[0] + rG, 0.01) && near(a.cy, go[1] + rG, 0.01) && gR.some((r) => near(a.r, r, 0.01))) && !/springing/.test(gsvg), garcs.map((a) => a.r.toFixed(1)).join(' '));
   const open = deriveItem(M, { id: 'f', name: 'RF', width: 600, height: 1200 }, { windowCategory: 'casement', casementLayout: '040L' });
   const fixed = deriveItem(M, { id: 'f', name: 'RF', width: 600, height: 1200 }, { windowCategory: 'casement', casementLayout: '040L', casementKind: 'fixed' });

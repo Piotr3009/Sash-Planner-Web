@@ -60,6 +60,7 @@ export const ELEMENT_TO_PART_ID = {
 // Glazing clip size → assignment part id (size depends on glass/frame type)
 export const CLIP_SIZE_TO_PART_ID = {
   '24mm': 'glazing_clips_24mm',
+  '24.8mm': 'glazing_clips_24_8mm', // laminated / acoustic unit (4-14-6.8 = 24.8), 02.10.2026
   '28mm': 'glazing_clips_28mm',
   '16mm': 'glazing_clips_14mm', // part id kept for existing assignments; label is 16mm
   '14mm': 'glazing_clips_14mm', // legacy derived snapshots
@@ -270,8 +271,13 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
         const isFan = String(g.role || '').startsWith('fan');
         return a + (isFan ? 6 : ((g.height || 0) > 500 ? 8 : 6));
       }, 0);
-      const clipsPid = (windowSpec.glazing?.type === 'triple')
-        ? 'c_glass_clips_triple' : 'c_glass_clips_double';
+      // Laminate / Acoustic spec, or Laminated on a double / passive unit → the
+      // 24.8mm clip (Piotr 02.10.2026); a laminated triple keeps the triple clip.
+      const gType = windowSpec.glazing?.type || 'double';
+      const gSpec = windowSpec.glazing?.spec;
+      const is248 = gSpec === 'acoustic' || (gSpec === 'laminated' && (gType === 'double' || gType === 'passive'));
+      const clipsPid = is248 ? 'c_glass_clips_laminated'
+        : (gType === 'triple') ? 'c_glass_clips_triple' : 'c_glass_clips_double';
       setQty(clipsPid, clipsQty, 'pcs');
     }
     // ── Consumables: silicone, astragal tape (1mm/2mm one side each), seals ──

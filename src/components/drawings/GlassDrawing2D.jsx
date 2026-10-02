@@ -2,20 +2,24 @@
  * GlassDrawing2D.jsx
  *
  * Production drawing of sealed glass unit for glass factory.
- * One per sash (upper/lower). Shows glass outline, 11mm edge seal,
- * spacer bars (18mm), chain dimensions, overall dimensions.
+ * One per sash (upper/lower). Shows glass outline, the edge seal (casement
+ * profile glass.edgeCover — 10mm since 02.10.2026, the SAME number the glass
+ * PDF and the glazier DXF draw), spacer bars (18mm), chain dimensions,
+ * overall dimensions. The unit size comes from the Glass Schedule rows
+ * (CONSTANTS.GLASS_REBATE each side of the clear light).
  */
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
 import { buildGlassListForWindow } from '../../engine/lists.js';
+import { getCasementProfile } from '../../engine/profile.js';
+import { readGlassProfile } from '../../engine/glassBars.js';
 import { STROKE, COLORS, FONT, SIZES, WEIGHTS, STROKES, VIEWBOX_REF,
   DimH, DimV, DimChainH, DimChainV, tfs, computeGlassBarPositions } from './drawingUtils.jsx';
 import CasementGlassDrawing2D from './CasementGlassDrawing2D.jsx';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
 const SPACER_BAR = 18;
-const REBATE = 12.5;
-const EDGE_SEAL = 11;
+const REBATE = CONSTANTS.GLASS_REBATE;   // glass into the sash rebate per side (11.5)
 
 function fmt(n) {
   const r = Math.round(n * 10) / 10;
@@ -55,6 +59,8 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
     const gRow = gRows[isUpper ? 0 : 1];
     const glassW = gRow ? gRow.width : sashW - 114 + 2 * REBATE;
     const glassH = gRow ? gRow.height : (isUpper ? topH - 100 : botH - 133) + 2 * REBATE;
+    // Edge seal (perimeter spacer line) per glass type from the casement profile glazier block
+    const EDGE_SEAL = readGlassProfile(getCasementProfile(), windowSpec?.glazing?.type || 'double').edgeCover;
 
     const gridMode = windowSpec.sash?.grid?.mode || 'none';
     const BAR_PATTERNS = {
@@ -70,7 +76,7 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
       sashW, sashH, isUpper, vCount, hCount, faces: derived?.sashDims,
     });
 
-    // Chain cuts — 11 | seg | 18 | seg | 18 | seg | 11
+    // Chain cuts — seal | seg | 18 | seg | 18 | seg | seal
     const hCuts = [0, EDGE_SEAL];
     bars.vBars.forEach(b => { hCuts.push(b.left); hCuts.push(b.right); });
     hCuts.push(glassW - EDGE_SEAL, glassW);
@@ -130,7 +136,7 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
     const isFrosted = glassFinish === 'frosted' && (!isUpper || frostedLocation === 'both');
 
     return { glassW, glassH, vBars: bars.vBars, hBars: bars.hBars,
-      vCount, hCount, hCuts, vCuts, checkOk, errs,
+      vCount, hCount, hCuts, vCuts, checkOk, errs, edgeSeal: EDGE_SEAL,
       glassType, glassFinish, spacerColour, spacerType, isFrosted, isUpper };
   }, [windowSpec, derived, type]);
 
@@ -169,15 +175,15 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
           fill={COLORS.glass} fillOpacity={0.08}
           stroke={COLORS.glass} strokeWidth={STROKES.outer} {...NS} />
 
-        {/* Edge seal 11mm */}
-        <rect x={ox + EDGE_SEAL} y={oy + EDGE_SEAL}
-          width={d.glassW - 2 * EDGE_SEAL} height={d.glassH - 2 * EDGE_SEAL}
+        {/* Edge seal (profile glass.edgeCover, 10mm) */}
+        <rect x={ox + d.edgeSeal} y={oy + d.edgeSeal}
+          width={d.glassW - 2 * d.edgeSeal} height={d.glassH - 2 * d.edgeSeal}
           fill="none" stroke={COLORS.glass} strokeWidth={0.5} {...NS} strokeOpacity={0.6} />
 
         {/* Frosted hatch overlay — inside edge seal, drawn under bars */}
         {d.isFrosted && (
-          <rect x={ox + EDGE_SEAL} y={oy + EDGE_SEAL}
-            width={d.glassW - 2 * EDGE_SEAL} height={d.glassH - 2 * EDGE_SEAL}
+          <rect x={ox + d.edgeSeal} y={oy + d.edgeSeal}
+            width={d.glassW - 2 * d.edgeSeal} height={d.glassH - 2 * d.edgeSeal}
             fill={`url(#frost-${d.isUpper ? 'u' : 'l'})`} stroke="none" />
         )}
 
@@ -231,13 +237,13 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
 
         {/* ── DIMENSIONS ── */}
 
-        {/* Bottom chain: 11 | seg | 18 | seg | 11 — bar spacings run along the
+        {/* Bottom chain: seal | seg | 18 | seg | seal — bar spacings run along the
             BOTTOM edge (Piotr 06.09, as on the casement glass sheet) */}
         <DimChainH y={oy + d.glassH + 24 * ts} extFrom={oy + d.glassH + 4 * ts}
           cuts={d.hCuts.map(cx => ox + cx)}
           vbw={totalW} minSegment={SPACER_BAR * 1.5} fmt={fmt} />
 
-        {/* Left chain: 11 | seg | 18 | seg | 11 */}
+        {/* Left chain: seal | seg | 18 | seg | seal */}
         <DimChainV x={ox - 24 * ts} extFrom={ox - 4 * ts}
           cuts={d.vCuts.map(cy => oy + cy)}
           vbw={totalW} minSegment={SPACER_BAR * 1.5} fmt={fmt} />

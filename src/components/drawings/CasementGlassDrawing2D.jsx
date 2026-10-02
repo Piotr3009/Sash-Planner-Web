@@ -2,11 +2,12 @@
  * CasementGlassDrawing2D.jsx
  *
  * Production drawing of a casement sealed glass unit — same drawing system
- * and factory content as the sash GlassDrawing2D: glass outline, 11mm edge
- * seal, 18mm spacer bars on the wood-bar centre lines, chain + overall
- * dimensions. One drawing per UNIQUE glass size; the pane list (P1, P2…)
- * goes in the title. Unit = leaf − 109 (glass enters 12.5 into the rebate),
- * so the unit origin sits at stile − 12.5 in leaf coordinates.
+ * and factory content as the sash GlassDrawing2D: glass outline, the edge
+ * seal (profile glass.edgeCover — 10mm since 02.10.2026), 18mm spacer bars on
+ * the wood-bar centre lines, chain + overall dimensions. One drawing per
+ * UNIQUE glass size; the pane list (P1, P2…) goes in the title. Unit = leaf −
+ * deductions.glass (111: glass enters 11.5 into the rebate), so the unit
+ * origin sits at stile − 11.5 in leaf coordinates.
  *
  * Arched casement (arched-casement-v2 night 4, spec §4 D + E; v3 Block 0.2 /
  * 0.3): the unit IS derived.arch.glassOutline — the SAME ArcChain the glazier
@@ -28,7 +29,6 @@ import { glassToSheet, archedOutlineD, barBandD, arcLabelPoint, barArcLabelPoint
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
 const SPACER = 18;
-const EDGE_SEAL = 11;
 
 function fmt(n) {
   const r = Math.round(n * 10) / 10;
@@ -57,8 +57,14 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
     if (!cas?.leaves) return null;
     const mm = cas.leaves[idx];
     if (!mm) return null;
-    const glassW = mm.leafW - p.deductions.glass;
-    const glassH = mm.leafH - p.deductions.glass;
+    // Unit = leaf − 2 × (leaf face − glassInset): the engine's own rule (calculations.js glassDed),
+    // so the sheet follows a profile edit of glassInset; deductions.glass only for a profile without it.
+    const inset = p.geometry?.glassInset;
+    const glassDed = (inset == null) ? p.deductions.glass : Math.round(2 * (p.elements.leafStile.face - inset) * 10) / 10;
+    const glassW = mm.leafW - glassDed;
+    const glassH = mm.leafH - glassDed;
+    // Edge seal (perimeter spacer line) per glass type — the number the glass PDF and the glazier DXF draw
+    const edgeSeal = readGlassProfile(p, windowSpec.glazing?.type || 'double').edgeCover;
     // Spacer bars on the wood bar centre lines — the engine unit carries them
     // (casementBarGrid.js: one grid for the window, unit coordinates)
     const unitBars = derived.customGlassUnits?.[idx]?.bars || { x: [], y: [] };
@@ -83,7 +89,7 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
       const endRows = barEndRows(bars, O);
       return { glassW: O.width, glassH: O.height, vBars: [], hBars: [], arch: { outline: O, seal, bars, vList, hList, label: A.geometry.label, spacer: G.barWidth, edgeCover: G.edgeCover, endRows, table: useBarTable(bars) } };
     }
-    return { glassW, glassH, vBars, hBars };
+    return { glassW, glassH, vBars, hBars, edgeSeal };
   }, [windowSpec, derived, group]);
 
   if (!geom) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
@@ -220,16 +226,16 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
           fill={COLORS.glass} fillOpacity={COLORS.glassOpacity}
           stroke={COLORS.glass} strokeWidth={STROKES.glass} {...NS} />
 
-        {/* 11mm edge seal */}
-        <rect x={X(EDGE_SEAL)} y={Y(EDGE_SEAL)}
-          width={glassW - 2 * EDGE_SEAL} height={glassH - 2 * EDGE_SEAL}
+        {/* Edge seal (profile glass.edgeCover, 10mm) */}
+        <rect x={X(geom.edgeSeal)} y={Y(geom.edgeSeal)}
+          width={glassW - 2 * geom.edgeSeal} height={glassH - 2 * geom.edgeSeal}
           fill="none" stroke={COLORS.glass} strokeWidth={STROKES.glassLight} {...NS}
           strokeOpacity={0.6} strokeDasharray={`${sw(5)},${sw(4)}`} />
 
         {/* Frosted hatch overlay — inside edge seal, drawn under bars */}
         {isFrosted && (
-          <rect x={X(EDGE_SEAL)} y={Y(EDGE_SEAL)}
-            width={glassW - 2 * EDGE_SEAL} height={glassH - 2 * EDGE_SEAL}
+          <rect x={X(geom.edgeSeal)} y={Y(geom.edgeSeal)}
+            width={glassW - 2 * geom.edgeSeal} height={glassH - 2 * geom.edgeSeal}
             fill={`url(#${patternId})`} stroke="none" />
         )}
           </>

@@ -12,8 +12,14 @@
  *     overall width at the TOP, no text bbox overlapping the outline bbox;
  *   - bars pages at the end: every bar id and every row of every unit, one
  *     thumbnail per block, blocks never broken across pages;
- *   - rectangular-only exports byte-identical to the previous commit
- *     (git archive of 402c58a bundled the same way, CreationDate masked);
+ *   - rectangular-only exports byte-identical to the stored fixture
+ *     verify/arch/fixtures/t26-rect-glass-pdf.json (CreationDate masked).
+ *     Until 02.10.2026 this was a byte-identity against the 402c58a tree; the
+ *     glass −1 mm change (unit sizes, edge seal 11 → 10) altered every
+ *     rectangular cell by design, and the old tree carries its seal as a
+ *     module constant that cannot be injected, so the reference moved to a
+ *     fixture rendered from the live tree. Re-bless with
+ *     `node verify/arch/t26.mjs --rebless` after a DELIBERATE change only;
  *   - A3 / A4 by the `format` option (MediaBox), the pack passes its setting.
  * Writes docs/handover/samples/sample_glass_order_arched.pdf (+ _a3).
  * Run: node verify/arch/t26.mjs
@@ -218,22 +224,35 @@ section('2 — pagination: blocks stack and never break inside a table; a page h
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-section('3 — rectangular-only exports byte-identical to the previous commit; mixed exports keep the schedule');
+section('3 — rectangular-only exports byte-identical to the stored fixture; mixed exports keep the schedule');
 {
   // 21.09 (one bar grid, t33): the casement sketch draws the ENGINE bar axes (row.barAxes — the factory
   // drawing's and the glazier DXF's numbers) instead of equal splits of the unit; on a unit with one bar
   // per direction the two coincide, so the byte-identity guard against 402c58a runs on 1H × 1V and a
   // separate check pins the 1H × 2V sketch to the engine axes.
+  // 02.10.2026: the reference is the fixture (see the header) — the 402c58a tree can no longer match.
   const rects = wd([cas('R1', 900, 1200), cas('R2', 1200, 1200, { casementLayout: '120', casementHBars: 1, casementVBars: 1 }),
     specification.normaliseToWindowSpec({ id: 'S1', name: 'S1', width: 1000, height: 1500 }, { fullConfig: { windowCategory: 'sash' } })]);
   // jsPDF's trailer /ID is a hash of the creation timestamp — masked with the date; everything else must match
   const mask = (b) => Buffer.from(b).toString('latin1').replace(/\/CreationDate \([^)]*\)/g, '/CreationDate (X)').replace(/\/ID \[ <[0-9A-F]+> <[0-9A-F]+> \]/g, '/ID [X]');
-  const a = render(M, rects), b = render(OLD, rects);
-  check(`rectangular-only (2 casements + 1 sash → ${pageCount(a.bytes)} pages): NEW output byte-identical to ${PREV} (CreationDate + its /ID hash masked)`, mask(a.bytes) === mask(b.bytes) && pageCount(a.bytes) === pageCount(b.bytes), `${a.bytes.length} vs ${b.bytes.length} bytes`);
+  const a = render(M, rects);
+  const fxPath = resolve(ROOT, 'verify', 'arch', 'fixtures', 't26-rect-glass-pdf.json');
+  const masked = mask(a.bytes);
+  if (process.argv.includes('--rebless')) {
+    const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim();
+    writeFileSync(fxPath, JSON.stringify({ commit, generated: new Date().toISOString().slice(0, 10), pages: pageCount(a.bytes), masked: Buffer.from(masked, 'latin1').toString('base64') }));
+    console.log(`  re-blessed ${fxPath} from the live tree (${commit.slice(0, 7)}), ${masked.length} masked bytes`);
+  }
+  const FXP = JSON.parse(readFileSync(fxPath, 'utf8'));
+  const fxMasked = Buffer.from(FXP.masked, 'base64').toString('latin1');
+  check(`rectangular-only (2 casements + 1 sash → ${pageCount(a.bytes)} pages): NEW output byte-identical to the fixture (${FXP.commit.slice(0, 7)}, ${FXP.generated}; CreationDate + its /ID hash masked)`, masked === fxMasked && pageCount(a.bytes) === FXP.pages, `${masked.length} vs ${fxMasked.length} bytes`);
+  // the previous tree still renders the same windows (it must not throw) — layout parity with it is no longer byte-exact
+  const b = render(OLD, rects);
+  check(`previous tree ${PREV} renders the same rectangular set to the same page count (${pageCount(b.bytes)})`, pageCount(a.bytes) === pageCount(b.bytes));
   {
     const two = wd([cas('R2', 1200, 1200, { casementLayout: '120', casementHBars: 1, casementVBars: 2 })]);
     const rows = M.lists.buildGlassListForWindow(two[0].derived, two[0].windowSpec);
-    const ax = rows[0].barAxes.x, U = rows[0].width, BW = 18, ES = 11;
+    const ax = rows[0].barAxes.x, U = rows[0].width, BW = 18, ES = M.profile.getCasementProfile().glass.edgeCover.default;   // edge seal 10 since 02.10.2026
     // the chain under the unit: edge seal → bar 1 → bar 2 → edge seal, in the sketch's half-mm labels
     const f = (v) => { const r = Math.round(v * 2) / 2; return Number.isInteger(r) ? String(r) : r.toFixed(1); };
     const expect = [f(ax[0] - BW / 2 - ES), f(ax[1] - ax[0] - BW), f(U - ES - (ax[1] + BW / 2))];

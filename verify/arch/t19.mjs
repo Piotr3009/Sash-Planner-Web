@@ -343,8 +343,10 @@ for (const key of Object.keys(RENDERED)) {
   const gsRel = svgArcs(gsvg).map((a) => ({ cx: a.cx - o[0], cy: -(a.cy - (o[1] + A.glassOutline.height)), r: a.r }));   // unit bottom-left
   check(`${key}: glass sheet — ${gRel.length} GLASS_CONTOUR arcs each have an SVG arc with the same centre and radius (unit frame)`,
     gRel.length === A.glassOutline.arcs.length && gRel.every((d) => hasCircle(gsRel, d, tolerance)), gRel.map((d) => `${d.cx.toFixed(2)},${d.cy.toFixed(2)} r${d.r.toFixed(2)}`).join(' | '));
-  check(`${key}: glass sheet — the seal arcs are the contour arcs − 11 on the same centres`,
-    gRel.every((d) => hasCircle(gsRel, { ...d, r: d.r - 11 }, tolerance)));
+  // edge cover 10 since 02.10.2026 (was 11): the unit is 1mm smaller all round, the spacer line stays put
+  const cover = M.profile.getCasementProfile().glass.edgeCover.default;
+  check(`${key}: glass sheet — the seal arcs are the contour arcs − ${cover} (profile edge cover) on the same centres`,
+    cover === 10 && gRel.every((d) => hasCircle(gsRel, { ...d, r: d.r - cover }, tolerance)));
   const gBars = gents.filter((e) => e.type === 'poly' && e.layer === 'GLASS_BAR_AXES' && e.pts.some((p) => p[2])).flatMap((p) => polyArcs(p.pts, false));
   if (gBars.length) {
     check(`${key}: glass sheet — ${gBars.length} GLASS_BARS arcs drawn as 18 mm spacer bands (r ± 9) on the same centres`,

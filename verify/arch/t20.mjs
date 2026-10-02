@@ -166,10 +166,10 @@ section(`1 — FIT view (0.1): W 1200 semi-circle → frame ${rF} / ${rFi}, reba
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-section('2 — glazier DXF (0.2): layers, bands ±9, edge −11 (per glass type), axes; SVG ↔ DXF ±0.01');
+section('2 — glazier DXF (0.2): layers, bands ±9, edge −10 (per glass type; 02.10.2026, was 11), axes; SVG ↔ DXF ±0.01');
 {
   const G = glassBars.readGlassProfile(P, 'double');
-  check('profile glass block: barWidth 18, edgeCover double 11 / triple 11 / default 11 (DEFAULT open)', G.barWidth === 18 && G.edgeCover === 11 && P.glass.edgeCover.triple === 11 && P.glass.edgeCover.default === 11);
+  check('profile glass block: barWidth 18, edgeCover double 10 / triple 10 / default 10 (02.10.2026: glass 1mm smaller all round, spacer unmoved; was 11)', G.barWidth === 18 && G.edgeCover === 10 && P.glass.edgeCover.triple === 10 && P.glass.edgeCover.default === 10);
   check('migrateCasementProfile fills glass + tracery blocks for a stored copy without them', (() => { const m = profile.migrateCasementProfile({ ...P, glass: undefined, tracery: undefined }); return m.glass.barWidth === 18 && m.tracery.paneOffset === 2; })());
   const cases = [
     ['SC', pcItem('SC', 1000, 1500, { archShape: 'three-centre', archStart: 1000, archBarPattern: 'hub-spoke' })],
@@ -202,11 +202,11 @@ section('2 — glazier DXF (0.2): layers, bands ±9, edge −11 (per glass type)
       });
       check(`${name}: ${straightAxes.length} straight axes have parallel band edges at ±9`, ok);
     }
-    // edge line: contour arcs − 11, same centres; straight sides at 11 / Wg − 11 / bottom 11
+    // edge line: contour arcs − 10, same centres; straight sides at 10 / Wg − 10 / bottom 10 (edge cover 10 since 02.10.2026)
     const contour = p.polys.find((x) => x.layer === 'GLASS_CONTOUR'), edge = p.polys.find((x) => x.layer === 'GLASS_EDGE');
     const cArcs = polyArcs(contour.pts.map((pt, i) => [pt[0], pt[1], contour.bulges[i]]), true), eArcs = polyArcs(edge.pts.map((pt, i) => [pt[0], pt[1], edge.bulges[i]]), true);
-    check(`${name}: GLASS_EDGE arcs = contour arcs − 11 on the same centres (${cArcs.length} arcs)`, cArcs.length === eArcs.length && cArcs.every((a) => has(eArcs, a, -11)));
-    check(`${name}: GLASS_EDGE box = contour box inset 11 (bottom / sides), closed`, edge.closed && near(edge.bbox[0], contour.bbox[0] + 11, 1e-6) && near(edge.bbox[1], contour.bbox[1] + 11, 1e-6) && near(edge.bbox[2], contour.bbox[2] - 11, 1e-6));
+    check(`${name}: GLASS_EDGE arcs = contour arcs − 10 on the same centres (${cArcs.length} arcs)`, cArcs.length === eArcs.length && cArcs.every((a) => has(eArcs, a, -10)));
+    check(`${name}: GLASS_EDGE box = contour box inset 10 (bottom / sides), closed`, edge.closed && near(edge.bbox[0], contour.bbox[0] + 10, 1e-6) && near(edge.bbox[1], contour.bbox[1] + 10, 1e-6) && near(edge.bbox[2], contour.bbox[2] - 10, 1e-6));
     // SVG ↔ DXF: the glass sheet draws the same band / edge arcs (centre + radius ±0.01, unit frame)
     const groups = M.cdu.groupCasementGlass(d, spec);
     const svg = renderToStaticMarkup(React.createElement(M.GlassDrawing, { windowSpec: spec, derived: d, group: groups[0] }));

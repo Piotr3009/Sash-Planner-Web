@@ -512,7 +512,7 @@ export function cornerGuides(contour, leg) {
  * Board loop of an arched glass unit in the glass frame: the unit outline offset
  * by `inset` (positive = inwards, negative = outwards). The tracery board sits
  * the full glazing rebate in, so the engine path passes glassInset − glazingRebate
- * (= −5.5 with 12.5 / 18): the board is 5.5 larger than the sealed unit all round.
+ * (= −6.5 with 11.5 / 18 since 02.10.2026; −5.5 before): the board is larger than the sealed unit all round.
  */
 export function boardFromOutline(outline, glassInset) {
   const Wg = outline.width, ys = outline.springing;
@@ -801,12 +801,12 @@ export function buildTraceryForDerived(derived, profile, winNum = '', opts = {})
   const glassInset = Number(opts.glassInset ?? profile?.geometry?.glassInset);
   if (!(glassInset >= 0)) throw new ArchError('Casement profile geometry.glassInset is missing');
   // The board reaches the timber at the bottom of the glazing rebate (Piotr 06.09): the glass
-  // unit sits glassInset (12.5) into an 18 mm rebate, the board the full rebate — so the board
-  // outline is the unit outline moved OUT by (glazingRebate − glassInset) = 5.5, all round.
+  // unit sits glassInset (11.5 since 02.10.2026, was 12.5) into an 18 mm rebate, the board the full
+  // rebate — so the board outline is the unit outline moved OUT by (glazingRebate − glassInset) = 6.5, all round.
   const glazingRebate = Number(opts.glazingRebate ?? profile?.geometry?.glazingRebate);
   if (!(glazingRebate >= glassInset)) throw new ArchError('Casement profile geometry.glazingRebate is missing or below glassInset');
   const T = readTraceryProfile(profile);
-  const outset = glazingRebate - glassInset;                              // 5.5: board beyond the unit
+  const outset = glazingRebate - glassInset;                              // 6.5: board beyond the unit
   const board = boardFromOutline(A.glassOutline, -outset);
   // a circle board is always cut whole (no springing line to mirror about)
   const geom = buildTraceryGeometry(board, barCurves(A.bars, outset + 1), T, board.circle ? { ...opts, mode: 'full' } : opts);

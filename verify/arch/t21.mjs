@@ -4,7 +4,7 @@
  * Real data path: PSW `arched-group` item / PC `frameShape 'arched'` item →
  * normaliseToWindowSpec → deriveWindowData → lists. Reference numbers: closed
  * forms on the profile (head 80, sashWidth 178 → inset 89, topRail 57, rebate
- * 12.5, meeting rail 43) and PSW price-calculator.js (RISE_RATIO, MIN_STRAIGHT
+ * 11.5 since 02.10.2026 (was 12.5), meeting rail 43) and PSW price-calculator.js (RISE_RATIO, MIN_STRAIGHT
  * 900, MIN_UPPER_STILE 100, minHeightFor).
  *
  * Sections: 1 geometry vectors W 1000 / 1200 / 1500 × (semi-circle, three-centre
@@ -55,8 +55,8 @@ const derive = (spec) => calculations.deriveWindowData(spec, {});
 
 // profile numbers behind the vectors
 const HEAD = SP.sashArch.headFace, INSET = SP.deductions.sashWidth / 2, TOP = SP.elements.topRail.face, MEET = SP.elements.meetingRail.face, REB = calculations.CONSTANTS.GLASS_REBATE;
-check('profile: sashArch head 80, limits 400 / 1500 / 900 / 100, minHaunchRadius 150; inset 89 = sashWidth 178 / 2; topRail 57; meeting rail 43; rebate 12.5',
-  HEAD === 80 && SP.sashArch.limits.minWidth === 400 && SP.sashArch.limits.maxWidth === 1500 && SP.sashArch.limits.minStraightBelowRise === 900 && SP.sashArch.limits.minUpperStile === 100 && SP.sashArch.minHaunchRadius === 150 && INSET === 89 && TOP === 57 && MEET === 43 && REB === 12.5);
+check('profile: sashArch head 80, limits 400 / 1500 / 900 / 100, minHaunchRadius 150; inset 89 = sashWidth 178 / 2; topRail 57; meeting rail 43; rebate 11.5 (02.10.2026, was 12.5)',
+  HEAD === 80 && SP.sashArch.limits.minWidth === 400 && SP.sashArch.limits.maxWidth === 1500 && SP.sashArch.limits.minStraightBelowRise === 900 && SP.sashArch.limits.minUpperStile === 100 && SP.sashArch.minHaunchRadius === 150 && INSET === 89 && TOP === 57 && MEET === 43 && REB === 11.5);
 check('normalizeSashProfile fills sashArch for a stored profile without it', profile.normalizeSashProfile({ deductions: { sashHeight: 135 }, dedSchema: 2, elements: {} }).sashArch.headFace === 80);
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -78,16 +78,16 @@ for (const v of V) {
   if (!d) continue;
   const G = d.arch.geometry;
   check(`${tag}: shape, rise ${v.rise.toFixed(1)}, start ${(v.H - v.rise).toFixed(1)}`, G.shape === v.shape && near(G.rise, v.rise, 0.01) && near(G.start, v.H - v.rise, 0.01), `${G.shape} ${G.rise} ${G.start}`);
-  check(`${tag}: rings — head 0 → 80, top rail 89 → 146, glass 133.5 (concentric, from the profile)`, G.offsets.headInner === HEAD && G.offsets.sashOuter === INSET && G.offsets.sashInner === INSET + TOP && near(G.offsets.glass, INSET + TOP - REB, 1e-9)
+  check(`${tag}: rings — head 0 → 80, top rail 89 → 146, glass 134.5 (concentric, from the profile; 133.5 before 02.10.2026)`, G.offsets.headInner === HEAD && G.offsets.sashOuter === INSET && G.offsets.sashInner === INSET + TOP && near(G.offsets.glass, INSET + TOP - REB, 1e-9)
     && G.head.outer.every((a, i) => near(a.r - G.head.inner[i].r, HEAD, 1e-9)) && G.topRail.outer.every((a, i) => near(G.arcs[i].r - a.r, INSET, 1e-9)) && G.glass.arcs.every((a, i) => near(G.arcs[i].r - a.r, INSET + TOP - REB, 1e-9)));
   check(`${tag}: rule C — every chain starts vertical at the stile line (x = ±(W/2 − offset), y = 0)`, [G.head.inner, G.topRail.outer, G.topRail.inner, G.glass.arcs].every((chain) => { const s = arch.arcPoint(chain[0], chain[0].a0), e = arch.arcPoint(chain[chain.length - 1], chain[chain.length - 1].a1); return near(s[1], 0, 1e-9) && near(e[1], 0, 1e-9) && near(s[0], -e[0], 1e-9); }));
   if (v.shape === 'semi-circle') {
     const R = v.W / 2;
-    check(`${tag}: closed forms — S-AH centre π·(R − 40) = ${(Math.PI * (R - 40)).toFixed(1)}, S-ATR centre π·(R − 89 − 28.5) = ${(Math.PI * (R - INSET - TOP / 2)).toFixed(1)}, glass R ${R - 133.5}`, near(G.head.lengths.centre, Math.PI * (R - HEAD / 2), 0.01) && near(G.topRail.lengths.centre, Math.PI * (R - INSET - TOP / 2), 0.01) && near(G.glass.arcs[0].r, R - (INSET + TOP - REB), 1e-9));
+    check(`${tag}: closed forms — S-AH centre π·(R − 40) = ${(Math.PI * (R - 40)).toFixed(1)}, S-ATR centre π·(R − 89 − 28.5) = ${(Math.PI * (R - INSET - TOP / 2)).toFixed(1)}, glass R ${R - (INSET + TOP - REB)}`, near(G.head.lengths.centre, Math.PI * (R - HEAD / 2), 0.01) && near(G.topRail.lengths.centre, Math.PI * (R - INSET - TOP / 2), 0.01) && near(G.glass.arcs[0].r, R - (INSET + TOP - REB), 1e-9));
   }
   check(`${tag}: upper stile — clear H/2 − rise = ${(v.H / 2 - v.rise).toFixed(1)} ≥ 100, piece + MR/2 = ${(v.H / 2 - v.rise + MEET / 2).toFixed(1)}`, near(G.upperStileClear, v.H / 2 - v.rise, 0.01) && G.upperStileClear >= 100 && near(G.upperStraightStile, v.H / 2 - v.rise + MEET / 2, 0.01));
   const O = d.arch.glassOutline;
-  check(`${tag}: upper glass unit: width W − 267 = ${v.W - 267}, springing = stile clear − 21.5 + 12.5, apex = springing + glass rise`, near(O.width, v.W - 2 * (INSET + TOP - REB), 1e-9) && near(O.springing, G.upperStileClear - MEET / 2 + REB, 1e-9) && near(O.apex, O.springing + G.glass.apex, 1e-9));
+  check(`${tag}: upper glass unit: width W − 269 = ${v.W - 269} (W − 267 before 02.10.2026), springing = stile clear − 21.5 + 11.5, apex = springing + glass rise`, near(O.width, v.W - 2 * (INSET + TOP - REB), 1e-9) && near(O.springing, G.upperStileClear - MEET / 2 + REB, 1e-9) && near(O.apex, O.springing + G.glass.apex, 1e-9));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -167,7 +167,7 @@ section('4 — cut list / BOM: S-AH, S-ATR, stiles + jambs to the springing, hea
   check('horns: STILES TOP = straight stile + hornExtension 70', near(h.components.sash.find((c) => c.elementName === 'STILES TOP (L)').length, h.arch.geometry.upperStraightStile + 70, 0.05));
   // glass rows: upper arched + lower rectangular
   const rows = lists.buildGlassListForWindow(d, spec);
-  check('glass rows: upper (shape arched, W − 267 wide) + lower (rect: sash − 89 × lower − 108)', rows.length === 2 && rows[0].location === 'upper' && rows[0].shape?.kind === 'arched' && near(rows[0].width, 1000 - 267, 0.05) && rows[1].location === 'lower' && !rows[1].shape && near(rows[1].width, d.sashWidth - 89, 0.05) && near(rows[1].height, d.bottomSashHeight - 108, 0.05), JSON.stringify(rows.map((r) => [r.location, r.width, r.height])));
+  check('glass rows: upper (shape arched, W − 269 wide) + lower (rect: sash − 91 × lower − 110) — 02.10.2026, rebate 11.5 (was 267 / 89 / 108)', rows.length === 2 && rows[0].location === 'upper' && rows[0].shape?.kind === 'arched' && near(rows[0].width, 1000 - 269, 0.05) && rows[1].location === 'lower' && !rows[1].shape && near(rows[1].width, d.sashWidth - 91, 0.05) && near(rows[1].height, d.bottomSashHeight - 110, 0.05), JSON.stringify(rows.map((r) => [r.location, r.width, r.height])));
   // bars: upper straight + pattern on the upper outline, lower h only
   const b = derive(psw('B1', 1000, 2200, { archShape: 'semi-circle', archBarPattern: 'hub-spoke', archHBars: 1, lowerHBars: 2 }));
   check('bars: hub-spoke on the upper unit (7) + 1 h below the springing; lower 2 h positions = thirds of the lower daylight', b.arch.bars.length === 8 && b.arch.bars.filter((x) => x.role === 'h').length === 1 && b.arch.lowerBars.h === 2 && b.arch.lowerBars.positions.length === 2 && near(b.arch.lowerBars.positions[0] * 3, b.arch.lowerBars.glassH, 0.2));

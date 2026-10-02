@@ -13,6 +13,7 @@
  */
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, DIMS, VIEWBOX_REF } from './drawingTheme.js';
 import { computeBarPositions } from '../../engine/casementBarGrid.js';
+import { CONSTANTS } from '../../engine/calculations.js';
 
 // The equal-pane bar placement moved to the engine (casementBarGrid.js) with
 // the one-grid rule of 21.09.2026; re-exported for the sash and door sheets.
@@ -278,7 +279,8 @@ export function Label({ x, y, text, anchor = 'middle', opacity = 0.8, vbw }) {
 // faces: live rail/stile faces (derived.sashDims) — literals stay as fallback
 export function computeGlassBarPositions({ sashW, sashH, isUpper, vCount, hCount, faces }) {
   const STILE = Number(faces?.stile) || 57, TOP_RAIL = Number(faces?.topRail) || 57, MEET_RAIL = Number(faces?.meetingRail) || 43, BOT_RAIL = Number(faces?.bottomRail) || 90;
-  const REBATE = 12.5, WOOD_BAR = 22, SPACER = 18;
+  // glass into the sash rebate per side — ONE number with the engine (CONSTANTS.GLASS_REBATE, 11.5 since 02.10.2026)
+  const REBATE = CONSTANTS.GLASS_REBATE, WOOD_BAR = 22, SPACER = 18;
 
   const topEdge = isUpper ? TOP_RAIL : MEET_RAIL;
   const botEdge = isUpper ? MEET_RAIL : BOT_RAIL;

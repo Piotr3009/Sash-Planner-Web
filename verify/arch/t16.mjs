@@ -83,12 +83,12 @@ const W = 1200;
 const tF = P.elements.frameHead.face;        // 68 (v4 Block F, was 57)
 const oL = P.deductions.leafAtJamb;          // 51 (v4 Block F, was 40)
 const tL = P.elements.leafTop.face;          // 67
-const gI = P.geometry.glassInset;            // 12.5
+const gI = P.geometry.glassInset;            // 11.5 (02.10.2026: glass 1mm smaller all round; was 12.5)
 const LIM = P.arch.limits;
 // v4 Block F (option B): the spec numbers for the frame — the ONE check that may carry literals;
 // every inner vector below is written as a formula of tF / oL / tL / gI.
-check('profile = spec F: frameHead 68 / frameJamb 68 / land 47 / rebate 21 / leafAtJamb 51 / leafFullHeight 98 / fanFromAxis 65 / leafTop 67 / glassInset 12.5',
-  tF === 68 && P.elements.frameJamb.face === 68 && P.geometry.land === 47 && P.geometry.rebate === 21 && oL === 51 && P.deductions.leafFullHeight === 98 && P.deductions.fanFromAxis === 65 && tL === 67 && gI === 12.5,
+check('profile = spec F: frameHead 68 / frameJamb 68 / land 47 / rebate 21 / leafAtJamb 51 / leafFullHeight 98 / fanFromAxis 65 / leafTop 67 / glassInset 11.5',
+  tF === 68 && P.elements.frameJamb.face === 68 && P.geometry.land === 47 && P.geometry.rebate === 21 && oL === 51 && P.deductions.leafFullHeight === 98 && P.deductions.fanFromAxis === 65 && tL === 67 && gI === 11.5,
   `${tF}/${P.elements.frameJamb.face}/${P.geometry.land}/${P.geometry.rebate}/${oL}/${P.deductions.leafFullHeight}/${P.deductions.fanFromAxis}/${tL}/${gI}`);
 check('profile: land + rebate = frame face (option B — the rebate stays 21, the land grows)', P.geometry.land + P.geometry.rebate === tF && oL === P.geometry.land + P.geometry.gap);
 

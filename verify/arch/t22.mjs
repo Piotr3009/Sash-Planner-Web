@@ -210,10 +210,11 @@ section('3 — glazier DXF + tracery for the arched upper unit');
   writeFileSync(path, text);
   const p = probe(path);
   const contour = p.polys.find((x) => x.layer === 'GLASS_CONTOUR');
-  check('glazier DXF: contour = the upper unit (W − 267 wide, arcs R 366.5), layers incl. GLASS_EDGE / GLASS_BAR_AXES', !!contour && near(contour.bbox[2] - contour.bbox[0], 1000 - 267, 1e-6) && polyArcs(contour.pts.map((pt, i) => [pt[0], pt[1], contour.bulges[i]]), true).every((a) => near(a.r, 500 - 133.5, 0.01)) && ['GLASS_EDGE', 'GLASS_BAR_AXES'].every((l) => p.layers.includes(l)));
+  // 02.10.2026: glass 11.5 into the rebate (was 12.5) → unit W − 269 (was 267), arcs R 365.5 (was 366.5)
+  check('glazier DXF: contour = the upper unit (W − 269 wide, arcs R 365.5), layers incl. GLASS_EDGE / GLASS_BAR_AXES', !!contour && near(contour.bbox[2] - contour.bbox[0], 1000 - 269, 1e-6) && polyArcs(contour.pts.map((pt, i) => [pt[0], pt[1], contour.bulges[i]]), true).every((a) => near(a.r, 500 - 134.5, 0.01)) && ['GLASS_EDGE', 'GLASS_BAR_AXES'].every((l) => p.layers.includes(l)));
   const tr = cncExport.traceryParamsForWindow(spec, d, 'SS');
-  // Piotr 06.09: the board reaches the rebate bottom (18) — 5.5 OUTSIDE the unit (unit sits 12.5 in)
-  check('traceryParamsForWindow accepts the sash (hub-spoke): full mode, panes > 0, board = the unit −5.5 (rebate 18, glass 12.5)', !tr.skip && tr.params.build.geom.panes.length > 0 && near(tr.params.build.geom.bbox.minX, -5.5, 1e-6), tr.skip);
+  // Piotr 06.09: the board reaches the rebate bottom (18) — OUTSIDE the unit: 6.5 since 02.10.2026 (unit sits 11.5 in; was 5.5 / 12.5)
+  check('traceryParamsForWindow accepts the sash (hub-spoke): full mode, panes > 0, board = the unit −6.5 (rebate 18, glass 11.5)', !tr.skip && tr.params.build.geom.panes.length > 0 && near(tr.params.build.geom.bbox.minX, -6.5, 1e-6), tr.skip);
   const rt = cncExport.exportTraceryDxfForWindow(spec, d, 'SS');
   writeFileSync(resolve(SAMPLES, 'sample_tracery_sash_hub.dxf'), await lastBlob.text());
   check('exportTraceryDxfForWindow → SS_tracery.dxf', rt.ok && lastName === 'SS_tracery.dxf');

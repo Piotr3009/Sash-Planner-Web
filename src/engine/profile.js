@@ -96,6 +96,12 @@ export const DEFAULT_CASEMENT_PROFILE = {
   // 40) are migrated key by key in migrateCasementProfile — only values that
   // still equal the OLD default move, a workshop edit is kept.
   frameSchema: 2,
+  // Glass schema (Piotr 02.10.2026): 2 = every sealed unit 1mm smaller all round
+  // (glassInset 11.5, deductions.glass 111) with the perimeter spacer left where
+  // it was (glass.edgeCover 10). Stored copies with schema 1 are migrated key
+  // by key in migrateCasementProfile — only values that still equal the OLD
+  // default (12.5 / 109 / 11) move, a workshop edit is kept.
+  glassSchema: 2,
   frameDepth: 93,   // finished depth of frame / mullion / transom members
   leafDepth: 57,
   leafDepthTriple: 61,  // 28mm triple unit needs a deeper rebate    // finished depth of all leaf members
@@ -121,10 +127,10 @@ export const DEFAULT_CASEMENT_PROFILE = {
     gapBelowTransom: 4,   // gap between transom land and lower top rail
     gapCill: 6,           // gap between bottom rail and cill
     cillVisible: 41,      // cill front height seen from outside
-    glassInset: 12.5,     // glass enters the leaf rebate this deep, per side
+    glassInset: 11.5,     // glass enters the leaf rebate this deep, per side (glass schema 2: 12.5 → 11.5)
     // The leaf's glazing rebate is 18 deep everywhere — casement, sash, fixed
-    // (Piotr 06.09): 12.5 of it is glass, the remaining 5.5 takes the clips.
-    // A tracery board reaches the timber: it sits the full 18 in, not 12.5.
+    // (Piotr 06.09): 11.5 of it is glass, the remaining 6.5 takes the clips.
+    // A tracery board reaches the timber: it sits the full 18 in, not 11.5.
     glazingRebate: 18,
     // Layer closure: 47+4 + leafH + 6+41 = extH  (full = extH − 98)
     //                top 47+4 + fan + 6+8 = T    (fan  = T − 65)
@@ -144,8 +150,8 @@ export const DEFAULT_CASEMENT_PROFILE = {
     // Glass: DERIVED from the leaf member face — glass = leaf − 2×(face −
     // glassInset). Kept here as the resolved value for display/back-compat;
     // the engine computes it so changing the leaf face resizes the glass
-    // (Piotr 04.08). 109 = 2×(67 − 12.5).
-    glass: 109,
+    // (Piotr 04.08). 111 = 2×(67 − 11.5) (glass schema 2; was 109 with 12.5).
+    glass: 111,
   },
   lengths: {
     mullion: 77,       // C-M = extH − 77 (full height, runs through)
@@ -306,11 +312,12 @@ export const DEFAULT_CASEMENT_PROFILE = {
   },
   // ── Glazier numbers (ARCHED-WINDOWS-v3 Block 0.2) — the sealed unit's
   // spacer bar width laid out in the pattern, and the edge cover: the
-  // perimeter spacer / seal band inside the unit contour. DEFAULT (open,
-  // BLOCKERS): 11 for every glass type until Piotr gives the triple value.
+  // perimeter spacer / seal band inside the unit contour. Piotr 02.10.2026
+  // (glass schema 2): 10 for every glass type (was 11) — the unit is 1mm
+  // smaller all round and the spacer line stays where it was.
   glass: {
     barWidth: 18,
-    edgeCover: { default: 11, double: 11, double_slim: 11, triple: 11, single: 11, passive: 11 },
+    edgeCover: { default: 10, double: 10, double_slim: 10, triple: 10, single: 10, passive: 10 },
   },
   // ── Timber tracery over the arched unit (v3 Block 0.4, numbers from
   // docs/handover/workshop/arka_CNC-piotr.dxf): bead profile R8 along every
@@ -403,12 +410,17 @@ export function migrateCasementProfile(profile) {
   // frame. Each frame-driven value that equals its OLD default moves to the
   // new default; anything the workshop edited by hand is left alone.
   const fs = migrateFrameSchema(profile, D);
+  // Glass schema 2 (02.10.2026): a schema-1 copy still carries the 12.5 glass
+  // inset / 109 deduction / 11 edge cover — each moves to the new default only
+  // while it equals the old one.
+  const gs = migrateGlassSchema(profile, D);
   return {
     ...D, ...profile,
     frameSchema: D.frameSchema,
+    glassSchema: D.glassSchema,
     elements: { ...D.elements, ...profile.elements, ...fs.elements },
-    geometry: { ...D.geometry, ...profile.geometry, ...fs.geometry },
-    deductions: { ...D.deductions, ...profile.deductions, ...fs.deductions },
+    geometry: { ...D.geometry, ...profile.geometry, ...fs.geometry, ...gs.geometry },
+    deductions: { ...D.deductions, ...profile.deductions, ...fs.deductions, ...gs.deductions },
     lengths: { ...D.lengths, ...profile.lengths },
     // v1.2: arched-head section (finger joint, board stock) — filled from the
     // default for profiles stored before arched-casement-v1. v1.3: the block
@@ -418,7 +430,7 @@ export function migrateCasementProfile(profile) {
     // a stored v2 block is replaced whole (no UI edits this block yet).
     // v3 (arched-windows-v3): glazier block + tracery block, filled from the
     // default for older stored copies (no UI edits them yet).
-    glass: { ...D.glass, ...(profile.glass || {}), edgeCover: { ...D.glass.edgeCover, ...(profile.glass?.edgeCover || {}) } },
+    glass: { ...D.glass, ...(profile.glass || {}), edgeCover: { ...D.glass.edgeCover, ...(profile.glass?.edgeCover || {}), ...gs.edgeCover } },
     tracery: { ...D.tracery, ...(profile.tracery || {}) },
     fix: { ...D.fix, ...(profile.fix || {}) },
     // v4 (ARCHED-WINDOWS-v4 Block C): CNC block (clamp limits), filled from the default
@@ -448,6 +460,22 @@ const FRAME_SCHEMA_1 = {
   geometry: { land: 36 },
   deductions: { leafAtJamb: 40, leafFullHeight: 87, fanFromAxis: 54 },
 };
+// Old defaults of glass schema 1 (glass 12.5 into the rebate, 2×(67 − 12.5) =
+// 109, edge cover 11) and the schema-2 keys they map to. Returns only the keys
+// that must move (Piotr 02.10.2026: 1mm smaller all round, spacer unmoved).
+const GLASS_SCHEMA_1 = { geometry: { glassInset: 12.5 }, deductions: { glass: 109 }, edgeCover: 11 };
+function migrateGlassSchema(profile, D) {
+  const out = { geometry: {}, deductions: {}, edgeCover: {} };
+  if ((Number(profile.glassSchema) || 1) >= D.glassSchema) return out;
+  if (profile.geometry?.glassInset === GLASS_SCHEMA_1.geometry.glassInset) out.geometry.glassInset = D.geometry.glassInset;
+  if (profile.deductions?.glass === GLASS_SCHEMA_1.deductions.glass) out.deductions.glass = D.deductions.glass;
+  const covers = profile.glass?.edgeCover || {};
+  for (const k of Object.keys(covers)) {
+    if (covers[k] === GLASS_SCHEMA_1.edgeCover) out.edgeCover[k] = D.glass.edgeCover[k] ?? D.glass.edgeCover.default;
+  }
+  return out;
+}
+
 function migrateFrameSchema(profile, D) {
   const out = { elements: {}, geometry: {}, deductions: {} };
   if ((Number(profile.frameSchema) || 1) >= D.frameSchema) return out;
@@ -528,7 +556,7 @@ export const DEFAULT_DOOR_PROFILE = Object.freeze({
     mullionLand: 26,
     gapCill: 6,
     cillVisible: 41,
-    glassInset: 12.5,
+    glassInset: 11.5,     // glass enters the leaf rebate this deep, per side (02.10.2026: 12.5 → 11.5, as windows)
   },
   deductions: {
     leafAtJamb: 47,          // land 43 + gap 4 (was 40)
