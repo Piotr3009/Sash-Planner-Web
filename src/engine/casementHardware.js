@@ -105,30 +105,63 @@ const TOP_LADDER = ['c_hinge_top_8', 'c_hinge_top_12', 'c_hinge_top_16', 'c_hing
 
 // ── Espag lock kits (Kenrick Excalibur PAS 24, Suits Lignum — BJ Waller) ──
 // One kit per opener: claw lock + steel shootbolts in a single kit, 22mm
-// backset, night-vent keeps, SBD. Sizing per the BJ Waller card:
-// "To Suit Sash Rebate Size — HEIGHT for side hung / WIDTH for top hung".
-// Side-hung kits are handed; the card states LH/RH viewed from the INSIDE,
-// which maps onto the same letters as the hinge rule (hinged-left outside →
-// RH) — verify on the first order. Top hung kits are unhanded.
+// backset, night-vent keeps, SBD.
+//
+// SIZE BANDS = the BJ Waller card, "To Suit Sash Rebate Size — HEIGHT for side
+// hung / WIDTH for top hung", read on the card 04.10.2026: the PAS 24 kits,
+// side and top hung, carry exactly these six bands (the Standard kits too, bar
+// one variant listed as 480–750), and the Joinery Core materials are entered
+// with the same sizes. They replace the 312–448 … 1218–1482 ladder of
+// 02.08.2026, which does not match the card.
+//
+// Three purchasable codes per band — LH and RH (side hung, handed) and TOP
+// (top hung, unhanded) — so every band expands into three assignment rows
+// (CASEMENT_LOCK_PARTS below), the way the side hung hinges split into LH / RH.
+//
+// Below 350mm no kit is made (the shortest shootbolt extension, 135mm, suits
+// 350–490): those openers go to `c_lock_sub350` — ONE row for every hand, the
+// workshop assigns what it fits there. Above 1520mm the largest kit is
+// reported and flagged — out-of-range picks are never hidden.
+//
+// Handing, from the card: "LH — Anti-clockwise Opening (Viewed From the Inside
+// / Outward Opening)", "RH — Clockwise Opening (…)". Seen from above, a sash
+// hinged on its LEFT (inside view) swings anti-clockwise as it opens outward,
+// so LH = hinged left from INSIDE = hinged RIGHT from OUTSIDE — the same
+// letters as the hinge rule (hinged-left outside → RH). Confirm on the first
+// order.
+//
+// The engine compares the overall LEAF height / width with the band, as it
+// did before. The card says "sash rebate size": whether that equals the leaf
+// size on this profile is the workshop's call (open point, 04.10.2026).
+const LOCK_SUB_ID = 'c_lock_sub350';
+const LOCK_KIT_BANDS = [[350, 490], [420, 550], [540, 750], [740, 1000], [1000, 1260], [1260, 1520]];
+
 export const CASEMENT_LOCK_SLOTS = [
-  { id: 'c_lock_312', lo: 312, hi: 448 },
-  { id: 'c_lock_372', lo: 372, hi: 508 },
-  { id: 'c_lock_502', lo: 502, hi: 702 },
-  { id: 'c_lock_702', lo: 702, hi: 962 },
-  { id: 'c_lock_958', lo: 958, hi: 1218 },
-  { id: 'c_lock_1218', lo: 1218, hi: 1482 },
-].map((r) => ({
-  ...r,
-  name: `Espag Lock Kit \u2014 sash ${r.lo}\u2013${r.hi}mm`,
-  sub: 'PAS24 claw + shootbolt kit \u00b7 side: sash height / top: sash width',
-  hint: `Recommended: Kenrick Excalibur PAS 24 Kit (Suits Lignum), BJ Waller \u2014 rebate size ${r.lo}\u2013${r.hi}mm. Pick LH/RH (side hung) and packer colour when ordering; SKU shows after size selection on the BJ Waller card.`,
-}));
+  {
+    id: LOCK_SUB_ID, lo: 0, hi: LOCK_KIT_BANDS[0][0], kit: false,   // hi is exclusive: 350 itself takes the first kit
+    name: 'Lock — sash <350mm',
+    sub: 'no espag kit this short · gearbox only or casement fastener',
+    hint: 'No Excalibur kit is made this short: the smallest BJ Waller kit suits a 350mm sash rebate (shortest shootbolt extension 135mm). Assign what the workshop fits instead — the Excalibur gearbox with claws on its own (BJ Waller KEX20022XL, 22mm backset, no shootbolts) or a casement fastener. Outside the PAS 24 tested kit sizes. One row for LH, RH and top hung alike; side hung counts by sash height, top hung by sash width.',
+  },
+  ...LOCK_KIT_BANDS.map(([lo, hi], i) => ({
+    id: `c_lock_${lo}`, lo, hi, kit: true,
+    name: `Espag Lock Kit — sash ${lo}–${hi}mm`,
+    sub: 'PAS24 claw + shootbolt kit · side: sash height / top: sash width',
+    hint: `Kenrick Excalibur PAS 24 Kit (Suits Lignum), BJ Waller — to suit sash rebate size ${lo}–${hi}mm, 22mm backset. Pick the packer colour when ordering.${
+      i === LOCK_KIT_BANDS.length - 1
+        ? ` Above ${hi}mm the engine still reports this kit, flagged "! verify size" — BJ Waller lists a 300mm extension piece (KEX90300) as "additional required for 1470mm +"; confirm with the supplier.`
+        : ''}`,
+  })),
+];
+
+const LOCK_KIT_SLOTS = CASEMENT_LOCK_SLOTS.filter((s) => s.kit);
 
 /**
- * Pick a lock kit per opener. Side hung sizes by sash HEIGHT, top hung by
- * sash WIDTH (per the Excalibur card). Overlapping bands resolve to the
- * smallest kit that covers the dimension. Out-of-range picks are flagged,
- * never hidden.
+ * Pick a lock per opener. Side hung sizes by sash HEIGHT, top hung by sash
+ * WIDTH (per the Excalibur card). Below the smallest kit → the <350 slot.
+ * Overlapping bands resolve to the smallest kit that covers the dimension.
+ * Above the largest kit, or with no size at all, the pick is flagged
+ * (`overLimit`), never hidden.
  */
 export function selectCasementLocks(panels, leafSizes) {
   return panels.map((pn, i) => {
@@ -137,14 +170,13 @@ export function selectCasementLocks(panels, leafSizes) {
     const top = pn.hinge === 'top';
     const dim = top ? (sz.leafW || 0) : (sz.leafH || 0);
     const handing = top ? null : (pn.hinge === 'left' ? 'RH' : 'LH');
-    const slot = CASEMENT_LOCK_SLOTS.find((r) => dim >= r.lo && dim <= r.hi);
-    if (slot) {
-      return { panel: i + 1, hung: top ? 'top' : 'side', handing, slotId: slot.id, dim };
-    }
-    const fallback = dim < CASEMENT_LOCK_SLOTS[0].lo
-      ? CASEMENT_LOCK_SLOTS[0]
-      : CASEMENT_LOCK_SLOTS[CASEMENT_LOCK_SLOTS.length - 1];
-    return { panel: i + 1, hung: top ? 'top' : 'side', handing, slotId: fallback.id, dim, overLimit: true };
+    const base = { panel: i + 1, hung: top ? 'top' : 'side', handing };
+    // A missing size is a data problem, not a small sash.
+    if (!(dim > 0)) return { ...base, slotId: LOCK_SUB_ID, dim, overLimit: true };
+    if (dim < LOCK_KIT_SLOTS[0].lo) return { ...base, slotId: LOCK_SUB_ID, dim };
+    const slot = LOCK_KIT_SLOTS.find((r) => dim >= r.lo && dim <= r.hi);
+    if (slot) return { ...base, slotId: slot.id, dim };
+    return { ...base, slotId: LOCK_KIT_SLOTS[LOCK_KIT_SLOTS.length - 1].id, dim, overLimit: true };
   });
 }
 
@@ -272,4 +304,38 @@ export const CASEMENT_HINGE_PARTS = CASEMENT_HINGE_SLOTS.flatMap((s) => (
       hand,
       slotId: s.id,
     }))
+));
+
+// ── Lock assignment rows ── one row per PURCHASABLE code, as for the hinges:
+// each kit band splits into LH / RH (side hung) and TOP (top hung, unhanded) —
+// three separate products with their own stock; the <350 slot stays ONE row.
+// Viewpoints as in HAND_NOTE: our drawings are the exterior view, the BJ
+// Waller card is the interior view.
+const LOCK_HAND_NOTE = {
+  LH: 'LH kit — sash hinged RIGHT viewed from OUTSIDE (BJ Waller card: "LH — anti-clockwise opening, viewed from the inside"). Sized by sash HEIGHT. ',
+  RH: 'RH kit — sash hinged LEFT viewed from OUTSIDE (BJ Waller card: "RH — clockwise opening, viewed from the inside"). Sized by sash HEIGHT. ',
+  TOP: 'Top hung kit — unhanded. Sized by sash WIDTH. ',
+};
+
+/**
+ * Assignment part id for a lock slot + hand: 'LH' | 'RH' (side hung), or null
+ * / 'TOP' for top hung — null is how the picks carry a top hung opener. The
+ * <350 slot is a single row whatever the hand.
+ */
+export function lockPartId(slotId, handing) {
+  if (!slotId) return null;
+  if (slotId === LOCK_SUB_ID) return slotId;
+  return `${slotId}_${handing ? String(handing).toLowerCase() : 'top'}`;
+}
+
+export const CASEMENT_LOCK_PARTS = CASEMENT_LOCK_SLOTS.flatMap((s) => (
+  s.kit
+    ? ['LH', 'RH', 'TOP'].map((hand) => ({
+      id: lockPartId(s.id, hand),
+      name: `${s.name} · ${hand}`,
+      hint: `${LOCK_HAND_NOTE[hand]}${s.hint}`,
+      hand,
+      slotId: s.id,
+    }))
+    : [{ id: s.id, name: s.name, hint: s.hint, hand: null, slotId: s.id }]
 ));

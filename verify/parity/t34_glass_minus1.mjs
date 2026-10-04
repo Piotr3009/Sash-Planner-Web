@@ -1,7 +1,8 @@
 /**
  * t34 — glass −1 mm per side (Piotr 02.10.2026) + 24.8 mm clips.
  *
- * Bundles the LIVE src and a reference tree (default origin/main) and derives
+ * Bundles the LIVE src and a reference tree (default 12670b6, the last commit
+ * before the change — needs the full git history) and derives
  * the same windows from both: a sash (standard, 2x2 bars), a casement (040L,
  * 2v/1h), a fixed window and a door. Prints the sealed-unit sizes, the glass
  * m², the clips and the edge cover side by side and asserts the live tree:
@@ -16,14 +17,17 @@
  *   migration: a stored schema-1 casement profile (12.5 / 109 / 11) comes out
  *          11.5 / 111 / 10; a hand-edited 12 stays 12; schema 2 is left alone
  *
- * Run: node verify/parity/t34_glass_minus1.mjs [git-ref]   (default origin/main)
+ * Run: node verify/parity/t34_glass_minus1.mjs [git-ref]   (default 12670b6)
  */
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { ROOT, AUDIT, bundleTree, deriveItem } from '../arch/lib/sheets.mjs';
 
-const ref = process.argv[2] || 'origin/main';
+// The reference is the last commit BEFORE the change (12670b6 "Laminet"), pinned. It was 'origin/main' when this
+// harness was written on 02.10.2026 — true only until the change itself was pushed there (8b0b96f), after which
+// live and reference were the same tree and every "live = ref − 2" check failed (found 04.10.2026).
+const ref = process.argv[2] || '12670b6';
 const tag = `t34-ref-${ref.replace(/[^\w.-]+/g, '_')}`;
 const tree = resolve(AUDIT, `${tag}-tree`);
 rmSync(tree, { recursive: true, force: true });

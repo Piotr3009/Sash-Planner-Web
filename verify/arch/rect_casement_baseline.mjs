@@ -16,6 +16,12 @@
  * its pre-21.09 shape and those keys stay guarded by t33_bar_grid.mjs. The old
  * and new glass unit sizes are printed per fixture.
  *
+ * 04.10.2026 (espag lock ladder = the BJ Waller card: 350–490 … 1260–1520,
+ * ids c_lock_350 … c_lock_1260): re-run for the lock slot ids in
+ * derived.casement.hardware. The old and new lock picks are printed per
+ * fixture; nothing else may move (verify/parity/t35_locks.mjs asserts the
+ * picks themselves).
+ *
  * Run: node verify/arch/rect_casement_baseline.mjs
  */
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -41,6 +47,8 @@ for (const [name, c] of Object.entries(FX)) {
   const oldUnits = (c.derived.customGlassUnits || []).map((u) => `${u.width}×${u.height}`).join(', ');
   const newUnits = (derived.customGlassUnits || []).map((u) => `${u.width}×${u.height}`).join(', ');
   console.log(`   glass units old ${oldUnits} → new ${newUnits} (glassInset ${P.geometry.glassInset})`);
+  const locks = (d) => (d.casement?.hardware?.lockPicks || []).map((k) => (k ? `${k.slotId}${k.handing ? ' ' + k.handing : ' top'} @${k.dim}${k.overLimit ? ' !' : ''}` : 'fixed')).join(', ');
+  console.log(`   locks old ${locks(c.derived)} → new ${locks(derived)}`);
   const stripped = JSON.parse(JSON.stringify(derived));
   (stripped.casement?.leaves || []).forEach((l) => { delete l.bars; });
   (stripped.customGlassUnits || []).forEach((u) => { delete u.bars; });

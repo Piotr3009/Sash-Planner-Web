@@ -16,7 +16,7 @@
 
 import { buildPrecutForWindow, buildHardwareList } from './lists.js';
 import { assignmentFor, legacyToCanonical } from './partRegistry.js';
-import { hingePartId } from './casementHardware.js';
+import { hingePartId, lockPartId } from './casementHardware.js';
 
 /** Normalise a material catalog size ('150 x 38mm') to a raw-section key ('150x38'). */
 export function materialSizeToRaw(size) {
@@ -256,9 +256,13 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
     }
     if (sidePairs > 0) setQty('c_wedge_packer', sidePairs, 'pcs');
     // Espag lock kits: one kit per opener from the engine lock ladder
-    // (the Excalibur kit already includes the shootbolts).
+    // (the Excalibur kit already includes the shootbolts). LH, RH and TOP are
+    // three separate SKUs → three assignment rows per size band (04.10.2026);
+    // the <350 slot is one row, so its three counts add up there.
     Object.entries(cw.hardware.lockSummary || {}).forEach(([slotId, e]) => {
-      setQty(slotId, e.count, 'pcs');
+      setQty(lockPartId(slotId, 'LH'), e.LH, 'pcs');
+      setQty(lockPartId(slotId, 'RH'), e.RH, 'pcs');
+      setQty(lockPartId(slotId, 'TOP'), e.unhanded, 'pcs');
     });
     const panes = Array.isArray(derived.customGlassUnits) ? derived.customGlassUnits : [];
     if (panes.length > 0) {

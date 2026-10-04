@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import * as cloud from '../services/cloudSync.js';
 import { normalizeAssignments, expandAssignments, legacyToCanonical } from '../engine/partRegistry.js';
-import { CASEMENT_HINGE_PARTS, CASEMENT_LOCK_SLOTS } from '../engine/casementHardware.js';
+import { CASEMENT_HINGE_PARTS, CASEMENT_LOCK_PARTS } from '../engine/casementHardware.js';
 
 // ─── Sash Window Parts (hardcoded — structural, used by calculations engine) ───
 // section = pre-cut (raw) section that needs to be matched to a stock material
@@ -109,7 +109,10 @@ export const CASEMENT_PARTS = {
     id: s.id, name: s.name, hint: s.hint,
     section: '\u2014', pcs: 2, materialType: 'ironmongery', unit: 'pcs',
   })),
-  ironmongeryLocks: CASEMENT_LOCK_SLOTS.map((l) => ({
+  // Lock rows: one per PURCHASABLE code from the engine catalogue — six BJ
+  // Waller size bands × LH / RH / TOP, plus one row for sashes under 350mm
+  // (04.10.2026; the hinge rows split LH / RH the same way).
+  ironmongeryLocks: CASEMENT_LOCK_PARTS.map((l) => ({
     id: l.id, name: l.name, hint: l.hint,
     section: '\u2014', pcs: 1, materialType: 'ironmongery', unit: 'pcs',
   })),

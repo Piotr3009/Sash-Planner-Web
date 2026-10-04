@@ -13,7 +13,9 @@
  *   - bars pages at the end: every bar id and every row of every unit, one
  *     thumbnail per block, blocks never broken across pages;
  *   - rectangular-only exports byte-identical to the stored fixture
- *     verify/arch/fixtures/t26-rect-glass-pdf.json (CreationDate masked).
+ *     verify/arch/fixtures/t26-rect-glass-pdf.json (CreationDate and the date
+ *     printed in the title block masked — 04.10.2026: without the second mask
+ *     the check passed only on the day the fixture was blessed).
  *     Until 02.10.2026 this was a byte-identity against the 402c58a tree; the
  *     glass −1 mm change (unit sizes, edge seal 11 → 10) altered every
  *     rectangular cell by design, and the old tree carries its seal as a
@@ -234,7 +236,11 @@ section('3 — rectangular-only exports byte-identical to the stored fixture; mi
   const rects = wd([cas('R1', 900, 1200), cas('R2', 1200, 1200, { casementLayout: '120', casementHBars: 1, casementVBars: 1 }),
     specification.normaliseToWindowSpec({ id: 'S1', name: 'S1', width: 1000, height: 1500 }, { fullConfig: { windowCategory: 'sash' } })]);
   // jsPDF's trailer /ID is a hash of the creation timestamp — masked with the date; everything else must match
-  const mask = (b) => Buffer.from(b).toString('latin1').replace(/\/CreationDate \([^)]*\)/g, '/CreationDate (X)').replace(/\/ID \[ <[0-9A-F]+> <[0-9A-F]+> \]/g, '/ID [X]');
+  // 04.10.2026: the title block also PRINTS today's date on every page ("(02/10/2026)" in the content stream), so the
+  // fixture of 02.10 matched only on the day it was blessed. The printed date is masked too — on the live bytes and on
+  // the stored fixture alike, so the fixture file itself stays as it is.
+  const maskText = (str) => str.replace(/\/CreationDate \([^)]*\)/g, '/CreationDate (X)').replace(/\/ID \[ <[0-9A-F]+> <[0-9A-F]+> \]/g, '/ID [X]').replace(/\(\d{2}\/\d{2}\/\d{4}\)/g, '(DD/MM/YYYY)');
+  const mask = (b) => maskText(Buffer.from(b).toString('latin1'));
   const a = render(M, rects);
   const fxPath = resolve(ROOT, 'verify', 'arch', 'fixtures', 't26-rect-glass-pdf.json');
   const masked = mask(a.bytes);
@@ -244,8 +250,8 @@ section('3 — rectangular-only exports byte-identical to the stored fixture; mi
     console.log(`  re-blessed ${fxPath} from the live tree (${commit.slice(0, 7)}), ${masked.length} masked bytes`);
   }
   const FXP = JSON.parse(readFileSync(fxPath, 'utf8'));
-  const fxMasked = Buffer.from(FXP.masked, 'base64').toString('latin1');
-  check(`rectangular-only (2 casements + 1 sash → ${pageCount(a.bytes)} pages): NEW output byte-identical to the fixture (${FXP.commit.slice(0, 7)}, ${FXP.generated}; CreationDate + its /ID hash masked)`, masked === fxMasked && pageCount(a.bytes) === FXP.pages, `${masked.length} vs ${fxMasked.length} bytes`);
+  const fxMasked = maskText(Buffer.from(FXP.masked, 'base64').toString('latin1'));
+  check(`rectangular-only (2 casements + 1 sash → ${pageCount(a.bytes)} pages): NEW output byte-identical to the fixture (${FXP.commit.slice(0, 7)}, ${FXP.generated}; CreationDate, its /ID hash and the printed date masked)`, masked === fxMasked && pageCount(a.bytes) === FXP.pages, `${masked.length} vs ${fxMasked.length} bytes`);
   // the previous tree still renders the same windows (it must not throw) — layout parity with it is no longer byte-exact
   const b = render(OLD, rects);
   check(`previous tree ${PREV} renders the same rectangular set to the same page count (${pageCount(b.bytes)})`, pageCount(a.bytes) === pageCount(b.bytes));
