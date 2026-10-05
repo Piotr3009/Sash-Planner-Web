@@ -102,16 +102,18 @@ export const CASEMENT_PARTS = {
       hint: 'Arched casement with a bar pattern: one board (profile tracery.boardThickness) cut on the CNC to the pane pattern, applied on one side of the glass. Engine-fed: blank W x H from the tracery export.' },
   ],
   // Hinge slots: rows come from the engine catalogue (single source of truth
-  // for labels + width/weight limits). The engine picks the slot per opener;
-  // the user assigns ANY material to any slot — `hint` is only the "?" tooltip
-  // recommendation (Piotr 02.08.2026).
+  // for labels + size/weight limits). The engine picks the slot per opener;
+  // the user assigns ANY material to any slot — `hint` is the "?" tooltip with
+  // the limits of the row. One row per slot, no LH / RH: the material is a
+  // PAIR, so PCS is 1 (Piotr 04.10.2026 — Yield 2 on the row for a product
+  // sold per piece).
   ironmongeryHinges: CASEMENT_HINGE_PARTS.map((s) => ({
     id: s.id, name: s.name, hint: s.hint,
-    section: '\u2014', pcs: 2, materialType: 'ironmongery', unit: 'pcs',
+    section: '\u2014', pcs: 1, materialType: 'ironmongery', unit: 'pcs',
   })),
   // Lock rows: one per PURCHASABLE code from the engine catalogue — six BJ
   // Waller size bands × LH / RH / TOP, plus one row for sashes under 350mm
-  // (04.10.2026; the hinge rows split LH / RH the same way).
+  // (04.10.2026).
   ironmongeryLocks: CASEMENT_LOCK_PARTS.map((l) => ({
     id: l.id, name: l.name, hint: l.hint,
     section: '\u2014', pcs: 1, materialType: 'ironmongery', unit: 'pcs',

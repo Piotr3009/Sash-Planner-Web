@@ -16,7 +16,7 @@
 
 import { buildPrecutForWindow, buildHardwareList } from './lists.js';
 import { assignmentFor, legacyToCanonical } from './partRegistry.js';
-import { hingePartId, lockPartId } from './casementHardware.js';
+import { lockPartId } from './casementHardware.js';
 
 /** Normalise a material catalog size ('150 x 38mm') to a raw-section key ('150x38'). */
 export function materialSizeToRaw(size) {
@@ -230,29 +230,25 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
   }
 
   // ── Casement ironmongery + glazing (engine hinge picks → slot quantities) ──
-  // Hinges are ordered in handed PAIRS; LH/RH split lives in
-  // derived.casement.hardware for the production pass.
+  // Hinges: ONE row per slot, counted in pairs — one per opener. The stays
+  // are bought per pair with no LH / RH code, so side hung slots are no longer
+  // split into LH / RH rows (04.10.2026); a product sold per piece takes
+  // Yield 2 on its row.
   const cw = derived.casement;
   if (derived.category === 'casement' && cw?.hardware) {
-    const { hingeSummary, sideOpeners } = cw.hardware;
+    const { hingeSummary } = cw.hardware;
     let sidePairs = 0;
-    let unrestrictedPairs = 0;
     Object.entries(hingeSummary).forEach(([slotId, e]) => {
-      const top = slotId.startsWith('c_hinge_top');
-      if (top) {
-        setQty(slotId, e.pairs, 'pairs');
-      } else {
-        // Side hung: LH and RH are separate SKUs → separate assignment rows.
-        setQty(hingePartId(slotId, 'LH'), e.LH, 'pairs');
-        setQty(hingePartId(slotId, 'RH'), e.RH, 'pairs');
-        sidePairs += e.pairs;
-      }
-      if (slotId === 'c_hinge_xl' || slotId === 'c_hinge_small') unrestrictedPairs += e.pairs;
+      setQty(slotId, e.pairs, 'pairs');
+      if (!slotId.startsWith('c_hinge_top')) sidePairs += e.pairs;
     });
-    // Separate restrictor only when the window requests child restriction
-    // (configurator checkbox; undefined = legacy windows = ON).
-    if (unrestrictedPairs > 0 && windowSpec.childRestrictor !== false) {
-      setQty('c_child_restrictor', unrestrictedPairs, 'pcs');
+    // No side hung slot carries a restricted hinge any more, so the separate
+    // restrictor goes on EVERY side hung opener (04.10.2026; before, only the
+    // two unrestricted slots asked for it) — and only when the window requests
+    // child restriction (configurator checkbox; undefined = legacy windows =
+    // ON). Top hung openers never get one.
+    if (sidePairs > 0 && windowSpec.childRestrictor !== false) {
+      setQty('c_child_restrictor', sidePairs, 'pcs');
     }
     if (sidePairs > 0) setQty('c_wedge_packer', sidePairs, 'pcs');
     // Espag lock kits: one kit per opener from the engine lock ladder

@@ -208,16 +208,8 @@ export function expandAssignments(data) {
       if (legacyId && !flat[legacyId]) flat[legacyId] = { ...val };
     }
   }
-  // Side hung hinge slots split into handed rows (c_hinge_600 → _lh / _rh).
-  // Until a hand-specific SKU is assigned, both rows inherit the old unhanded
-  // assignment, so nothing is lost by the split; assigning either hand wins.
-  for (const key of Object.keys(flat)) {
-    if (!key.startsWith('c_hinge_') || key.startsWith('c_hinge_top')) continue;
-    if (key.endsWith('_lh') || key.endsWith('_rh')) continue;
-    for (const hand of ['_lh', '_rh']) {
-      if (!flat[key + hand]) flat[key + hand] = { ...flat[key] };
-    }
-  }
+  // (The LH / RH inheritance for side hung hinge rows went with the handed
+  // rows on 04.10.2026: a hinge slot is one row again.)
   return flat;
 }
 export function assignmentFor(data, partKey, variantKey = 'standard') {

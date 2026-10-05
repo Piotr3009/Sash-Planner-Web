@@ -22,6 +22,13 @@
  * fixture; nothing else may move (verify/parity/t35_locks.mjs asserts the
  * picks themselves).
  *
+ * 04.10.2026 (hinge set = ten rows by range, ids c_hinge_side_360 …
+ * c_hinge_top_xl, no LH / RH): re-run for derived.casement.hardware.hingePicks
+ * and hingeSummary — new slot ids, picks carry leafW + leafH and no handing,
+ * the summary counts pairs only. The old and new hinge picks are printed per
+ * fixture; nothing else may move (verify/parity/t36_hinges.mjs asserts the
+ * picks themselves).
+ *
  * Run: node verify/arch/rect_casement_baseline.mjs
  */
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -49,6 +56,8 @@ for (const [name, c] of Object.entries(FX)) {
   console.log(`   glass units old ${oldUnits} → new ${newUnits} (glassInset ${P.geometry.glassInset})`);
   const locks = (d) => (d.casement?.hardware?.lockPicks || []).map((k) => (k ? `${k.slotId}${k.handing ? ' ' + k.handing : ' top'} @${k.dim}${k.overLimit ? ' !' : ''}` : 'fixed')).join(', ');
   console.log(`   locks old ${locks(c.derived)} → new ${locks(derived)}`);
+  const hinges = (d) => (d.casement?.hardware?.hingePicks || []).map((k) => (k ? `${k.slotId}${k.handing ? ' ' + k.handing : ''} @${k.leafW ?? '?'}×${k.leafH ?? '?'} ${k.weightKg}kg${k.overLimit ? ' !' : ''}` : 'fixed')).join(', ');
+  console.log(`   hinges old ${hinges(c.derived)} → new ${hinges(derived)}`);
   const stripped = JSON.parse(JSON.stringify(derived));
   (stripped.casement?.leaves || []).forEach((l) => { delete l.bars; });
   (stripped.customGlassUnits || []).forEach((u) => { delete u.bars; });

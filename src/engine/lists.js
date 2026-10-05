@@ -482,20 +482,19 @@ export function buildHardwareList(windowSpec, derived = null) {
     if (!hw) return [];
     const list = [];
     const slotName = (id) => CASEMENT_HINGE_SLOTS.find((s) => s.id === id)?.name || id;
+    // One line per hinge slot, in pairs — the stays have no LH / RH code, so no
+    // hand split (04.10.2026). The flag shows for side AND top hung.
     Object.entries(hw.hingeSummary).forEach(([slotId, e]) => {
-      const handed = slotId.startsWith('c_hinge_top')
-        ? 'pairs'
-        : `${e.LH} LH / ${e.RH} RH${e.overLimit ? ' · ! verify limits' : ''}`;
-      list.push({ item: slotName(slotId), detail: handed, quantity: e.pairs });
+      list.push({ item: slotName(slotId), detail: `pairs${e.overLimit ? ' · ! verify limits' : ''}`, quantity: e.pairs });
     });
-    const unrestricted = (hw.hingeSummary.c_hinge_xl?.pairs || 0)
-      + (hw.hingeSummary.c_hinge_small?.pairs || 0);
-    if (unrestricted > 0 && windowSpec.childRestrictor !== false) {
-      list.push({ item: 'Child restrictor', detail: 'releasable · for unrestricted hinges', quantity: unrestricted });
-    }
     const sidePairs = Object.entries(hw.hingeSummary)
       .filter(([id]) => !id.startsWith('c_hinge_top'))
       .reduce((a, [, e]) => a + e.pairs, 0);
+    // No side hung slot carries a restricted hinge: one restrictor per side
+    // hung opener when the window asks for child restriction.
+    if (sidePairs > 0 && windowSpec.childRestrictor !== false) {
+      list.push({ item: 'Child restrictor', detail: 'releasable · for unrestricted hinges', quantity: sidePairs });
+    }
     if (sidePairs > 0) {
       list.push({ item: 'Wedge packers', detail: '1 set per hinge pair (verify)', quantity: sidePairs });
     }

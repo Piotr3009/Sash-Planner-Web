@@ -1228,7 +1228,7 @@ export default function ConfiguratorPage() {
                 <input type="checkbox" checked={childRestrictor} onChange={e => setChildRestrictor(e.target.checked)} className="accent-accent-500" />
                 Child restrictor
                 <span
-                  title="Building Regs AD K: an openable window below 800mm floor level with an external drop of 600mm or more must restrict initial opening to 100mm. On escape (egress) windows the restrictor must be releasable without tools (AD B). Hinge slots 350\u2013700mm have the restriction built in; XL / small sashes get a separate releasable restrictor added automatically (Nico Safety Catch, BJ Waller RST42012A)."
+                  title="Building Regs AD K: an openable window below 800mm floor level with an external drop of 600mm or more must restrict initial opening to 100mm. On escape (egress) windows the restrictor must be releasable without tools (AD B). None of the friction hinge rows has a restriction built in: with this box ticked the engine adds one separate releasable restrictor per side hung opener (the Child Restrictor row in Assign Materials); top hung openers get none."
                   onClick={(e) => e.preventDefault()}
                   className="w-4 h-4 flex items-center justify-center rounded-full bg-surface-600 text-accent-400 text-[9px] font-bold cursor-help shrink-0"
                 >?</span>
