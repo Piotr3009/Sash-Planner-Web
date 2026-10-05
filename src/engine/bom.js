@@ -203,7 +203,9 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
     const beadTapeM = c.beadTape?.meters || 0;
     setQty('bead_tape', beadTapeM / 2, 'm');       // 1mm (one side)
     setQty('bead_tape_2mm', beadTapeM / 2, 'm');   // 2mm (other side)
-    setQty('silicone', c.silicone?.tubes, 'tubes');
+    // Casement has its own silicone row (c_silicone, below): feeding the sash
+    // row too counted every casement tube twice (05.10.2026).
+    if (derived.category !== 'casement') setQty('silicone', c.silicone?.tubes, 'tubes');
     setQty('seal_sliding_6070', c.seal6070?.meters, 'm');
     setQty('seal_bottom_6009', c.seal6009?.meters, 'm');
   }
@@ -432,6 +434,10 @@ export function mergeWindowMaterials(windows, { assignments, assignmentsData, ma
 
     // ── ironmongeryStore products (via batch slots) ──
     buildWindowHardware(windowSpec, batch, ironmongeryItems, derived).forEach(({ line, product }) => {
+      // Engine-picked casement hardware is already in the list above as an
+      // Assign Materials row — listing the hardware line too doubled it as an
+      // "unassigned" row (05.10.2026).
+      if (line.enginePart) return;
       const qty = Number(line.quantity) || 0;
       if (!qty) return;
       if (product) {

@@ -482,10 +482,15 @@ export function buildHardwareList(windowSpec, derived = null) {
     if (!hw) return [];
     const list = [];
     const slotName = (id) => CASEMENT_HINGE_SLOTS.find((s) => s.id === id)?.name || id;
+    // `enginePart: true` marks a line whose quantity the BOM ALREADY carries as
+    // an Assign Materials row (hinge / lock slot, Child Restrictor, Wedge
+    // Packers). The detail (hand, size, flag) is for the window's hardware
+    // card; mergeWindowMaterials skips these lines so nothing is listed twice
+    // (Piotr 05.10.2026 — every one of them showed again as "unassigned").
     // One line per hinge slot, in pairs — the stays have no LH / RH code, so no
     // hand split (04.10.2026). The flag shows for side AND top hung.
     Object.entries(hw.hingeSummary).forEach(([slotId, e]) => {
-      list.push({ item: slotName(slotId), detail: `pairs${e.overLimit ? ' · ! verify limits' : ''}`, quantity: e.pairs });
+      list.push({ item: slotName(slotId), detail: `pairs${e.overLimit ? ' · ! verify limits' : ''}`, quantity: e.pairs, enginePart: true });
     });
     const sidePairs = Object.entries(hw.hingeSummary)
       .filter(([id]) => !id.startsWith('c_hinge_top'))
@@ -493,13 +498,13 @@ export function buildHardwareList(windowSpec, derived = null) {
     // No side hung slot carries a restricted hinge: one restrictor per side
     // hung opener when the window asks for child restriction.
     if (sidePairs > 0 && windowSpec.childRestrictor !== false) {
-      list.push({ item: 'Child restrictor', detail: 'releasable · for unrestricted hinges', quantity: sidePairs });
+      list.push({ item: 'Child restrictor', detail: 'releasable · for unrestricted hinges', quantity: sidePairs, enginePart: true });
     }
     if (sidePairs > 0) {
       // One wedge per side hung opener, under the bottom hinge only, as long
       // as the hinge (05.10.2026). Quantity = wedges; the metres are the BOM's.
       const wedgeMm = Object.entries(hw.hingeSummary).reduce((a, [id, e]) => a + e.pairs * hingeWedgeMm(id), 0);
-      list.push({ item: 'Wedge packers', detail: `under the bottom hinge · ${(wedgeMm / 1000).toFixed(2)} m in total`, quantity: sidePairs });
+      list.push({ item: 'Wedge packers', detail: `under the bottom hinge · ${(wedgeMm / 1000).toFixed(2)} m in total`, quantity: sidePairs, enginePart: true });
     }
     Object.entries(hw.lockSummary || {}).forEach(([slotId, e]) => {
       const nm = CASEMENT_LOCK_SLOTS.find((r) => r.id === slotId)?.name || slotId;
@@ -508,7 +513,7 @@ export function buildHardwareList(windowSpec, derived = null) {
       if (e.RH) parts.push(`${e.RH} RH`);
       if (e.unhanded) parts.push(`${e.unhanded} top (unhanded)`);
       if (e.overLimit) parts.push('! verify size');
-      list.push({ item: nm, detail: parts.join(' / '), quantity: e.count });
+      list.push({ item: nm, detail: parts.join(' / '), quantity: e.count, enginePart: true });
     });
     // Client-facing items — resolved to products via per-window ironmongery
     // slots (casementHandles / trickleVents). No stay line: friction stays
