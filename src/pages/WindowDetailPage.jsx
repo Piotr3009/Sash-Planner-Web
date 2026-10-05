@@ -494,7 +494,7 @@ function BOMPanel({ item, windowSpec, settings, derived, batch, projectLabel }) 
 
       if (assignment?.material_id) {
         const matId = assignment.material_id;
-        const mat = materials.find((m) => m.id === matId);
+        const mat = materials.find((m) => m.id === matId) || ironmongeryItems.find((m) => m.id === matId);
         if (mat) {
           if (!matMap[matId]) matMap[matId] = { material: mat, parts: [], total: 0, unit };
           matMap[matId].parts.push(partData);
@@ -511,7 +511,7 @@ function BOMPanel({ item, windowSpec, settings, derived, batch, projectLabel }) 
     const groups = Object.values(matMap);
     if (unassigned.parts.length > 0) groups.push(unassigned);
     return groups;
-  }, [partQtys, assignments, assignmentsData, materials, windowSpec, batch]);
+  }, [partQtys, assignments, assignmentsData, materials, ironmongeryItems, windowSpec, batch]);
 
   // Ironmongery (hardware) as card-A groups — shared single source (bom.js)
   const hardwareGroups = useMemo(

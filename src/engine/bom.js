@@ -390,7 +390,10 @@ export function mergeWindowMaterials(windows, { assignments, assignmentsData, ma
       if (!total) return;
 
       if (assignment?.material_id) {
-        const mat = materials.find((m) => m.id === assignment.material_id);
+        // Hinge / lock / restrictor rows are assigned from the Ironmongery
+        // catalogue (IRN-xxx) since 05.10.2026 — look the id up there too.
+        const mat = materials.find((m) => m.id === assignment.material_id)
+          || (ironmongeryItems || []).find((m) => m.id === assignment.material_id);
         if (mat) {
           bump(`mat:${mat.id}`, {
             name: mat.name,

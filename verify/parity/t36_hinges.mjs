@@ -387,6 +387,13 @@ section('5 — merged purchase list with materials assigned');
     'assignments left on the old ids (c_hinge_600, c_hinge_600_lh, c_hinge_hd_rh, c_hinge_xl, c_hinge_top_12) are ignored — nothing of the old set reaches the list');
   const cost = rows.filter((r) => /^mat:m-(413|260|each)$/.test(r.key)).reduce((a, r) => a + r.qty * r.costPerUnit, 0);
   ok(Math.abs(cost - (3 * 9.68 + 4.45 + 2 * 7.03)) < 1e-9, `assigned hinge cost = 3 × 9.68 + 4.45 + 2 × 7.03 = ${(3 * 9.68 + 4.45 + 2 * 7.03).toFixed(2)}`, String(cost));
+  // Hinge / lock / restrictor rows are assigned from the IRONMONGERY catalogue (05.10.2026): an id from there resolves too
+  const irn = [{ id: 'irn-7', item_number: 'IRN-007', name: 'Friction hinge 311mm easy clean', category: 'casementHinges', size: '311mm', finish: 'silver', unit: 'pcs', cost_per_unit: 8.12, jc_uuid: 'jc-311' }];
+  const dataIrn = { schema: 2, overrides: {}, base: { c_hinge_side_xl: { material_id: 'irn-7', yield: 1 } } };
+  const rowsIrn = bom.mergeWindowMaterials([{ windowSpec: WIN.single.spec, derived: WIN.single.d, batch: null }], { assignments: partRegistry.expandAssignments(dataIrn), assignmentsData: dataIrn, materials, ALL_PARTS: store.ALL_PARTS, ironmongeryItems: irn, settings: {} });
+  const ri = rowsIrn.find((r) => r.key === 'mat:irn-7');
+  ok(ri?.qty === 1 && ri.name === 'Friction hinge 311mm easy clean' && ri.costPerUnit === 8.12 && ri._assigned === true && ri.material?.item_number === 'IRN-007' && ri.material?.jc_uuid === 'jc-311' && !rowsIrn.some((r) => r.key === 'part:c_hinge_side_xl'),
+    'an assignment pointing at an Ironmongery catalogue item (IRN) resolves in the merged list: name, cost, item number, jc_uuid, no unassigned row', JSON.stringify(ri));
   const none = bom.mergeWindowMaterials([{ windowSpec: WIN.single.spec, derived: WIN.single.d, batch: null }], { assignments: {}, assignmentsData: { schema: 2, base: {}, overrides: {} }, materials, ALL_PARTS: store.ALL_PARTS, ironmongeryItems: [], settings: {} });
   const un = none.find((r) => r.key === 'part:c_hinge_side_xl');
   ok(un?.qty === 1 && un._assigned === false && un.name === 'Side Hinges XL — oversize up to 1200 × 1800mm', 'a row nobody assigned shows as an unassigned part under its range name — visible, not dropped', JSON.stringify(un));

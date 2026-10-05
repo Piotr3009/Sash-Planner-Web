@@ -3,6 +3,7 @@ import NumInput from '../components/NumInput.jsx';
 import MaterialPicker from '../components/MaterialPicker.jsx';
 import { useParams } from 'react-router-dom';
 import { useMaterialStore } from '../stores/materialStore.js';
+import { useIronmongeryStore, IRONMONGERY_CATEGORIES } from '../stores/ironmongeryStore.js';
 import { useMaterialAssignmentStore, SASH_WINDOW_PARTS, ALL_PARTS, CASEMENT_PARTS, CASEMENT_ALL_PARTS } from '../stores/materialAssignmentStore.js';
 import { liveSectionsFor, PART_REGISTRY, REGISTRY_VARIANTS } from '../engine/partRegistry.js';
 import { deriveWindowData } from '../engine/calculations.js';
@@ -46,10 +47,13 @@ function partForDrawingKey(dk, ctx) {
   return hit ? hit[0] : null;
 }
 
-function PartRow({ part, assignment, materials, categories, subcategoriesByCategory, onAssign, onFilter, onYieldChange, onRemove, disabled, selected, onSelect }) {
+function PartRow({ part, assignment, materials, categories, subcategoriesByCategory, categoryLabels, defaultCategory, onAssign, onFilter, onYieldChange, onRemove, disabled, selected, onSelect }) {
   const [open, setOpen] = useState(false);
-  const selCat = assignment?.category || '';
+  // Ironmongery rows open on their own catalogue tab (hinges → Casement Hinges)
+  // until the user picks a filter; '' saved by the user means "All" and stays.
+  const selCat = assignment?.category ?? defaultCategory ?? '';
   const selSub = assignment?.subcategory || '';
+  const catLabel = (c) => categoryLabels?.[c] || c;
 
   // Filter materials by selected category + subcategory
   const filteredMaterials = useMemo(() => {
@@ -171,7 +175,7 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
         >
           <option value="">All</option>
           {categories.map((c) => (
-            <option key={c} value={c}>{c}</option>
+            <option key={c} value={c}>{catLabel(c)}</option>
           ))}
         </select>
       </td>
@@ -208,7 +212,7 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
         />
         {assignedMat && (
           <div className="text-[10px] text-ink-400 mt-0.5 flex items-center gap-2">
-            <span>{assignedMat.size || '—'}</span>
+            <span>{[assignedMat.size, assignedMat.finish].filter(Boolean).join(' · ') || '—'}</span>
             {assignedMat.jc_uuid && (
               <span className="text-[8px] px-1 py-0.5 rounded bg-amber-600/15 text-amber-500 border border-amber-500/25">JC</span>
             )}
@@ -326,7 +330,7 @@ function VariantRow({ part, vk, materials, categories, subcategoriesByCategory, 
 }
 
 // ─── Part Group Section ───
-function PartGroupSection({ title, subtitle, parts, assignments, materials, categories, subcategoriesByCategory, onAssign, onFilter, onYieldChange, onRemove, disabled, selectedPart, onSelect, defaultOpen = false }) {
+function PartGroupSection({ title, subtitle, parts, assignments, materials, categories, subcategoriesByCategory, categoryLabels, defaultCategory, onAssign, onFilter, onYieldChange, onRemove, disabled, selectedPart, onSelect, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
   const assigned = parts.filter((p) => assignments?.[p.id]).length;
   return (
@@ -366,6 +370,8 @@ function PartGroupSection({ title, subtitle, parts, assignments, materials, cate
                   materials={materials}
                   categories={categories}
                   subcategoriesByCategory={subcategoriesByCategory}
+                  categoryLabels={categoryLabels}
+                  defaultCategory={defaultCategory}
                   onAssign={onAssign}
                   onFilter={onFilter}
                   onYieldChange={onYieldChange}
@@ -390,6 +396,25 @@ export default function MaterialAssignmentsPage() {
   const isSash = typeId === 'sash';
 
   const materials = useMaterialStore((s) => s.materials);
+  // Hinge, lock and restrictor rows assign from the IRONMONGERY catalogue
+  // (Materials → Ironmongery, IRN-xxx), not from the main materials list
+  // (Piotr 05.10.2026): its Casement Hinges / Casement Locks tabs are where
+  // those products are entered. Filters use its own categories.
+  const ironItems = useIronmongeryStore((s) => s.items);
+  const ironCategories = useMemo(() => {
+    const present = new Set(ironItems.map((m) => m.category).filter(Boolean));
+    const known = IRONMONGERY_CATEGORIES.map((c) => c.key).filter((k) => present.has(k));
+    const extra = [...present].filter((k) => !known.includes(k)).sort();
+    return [...known, ...extra];
+  }, [ironItems]);
+  const ironCategoryLabels = useMemo(() => Object.fromEntries(IRONMONGERY_CATEGORIES.map((c) => [c.key, c.label])), []);
+  const ironSubcategoriesByCategory = useMemo(() => {
+    const map = {};
+    ironItems.forEach((m) => {
+      if (m.category && m.subcategory) (map[m.category] ||= new Set()).add(m.subcategory);
+    });
+    return Object.fromEntries(Object.entries(map).map(([cat, subs]) => [cat, [...subs].sort()]));
+  }, [ironItems]);
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const setAssignment = useMaterialAssignmentStore((s) => s.setAssignment);
   const setFilter = useMaterialAssignmentStore((s) => s.setFilter);
@@ -642,12 +667,14 @@ export default function MaterialAssignmentsPage() {
             />
             <PartGroupSection
               title="🔩 Ironmongery — Hinges"
-              subtitle={`${CASEMENT_PARTS.ironmongeryHinges.length} slots · engine picks the slot per opener from leaf size + weight`}
+              subtitle={`${CASEMENT_PARTS.ironmongeryHinges.length} slots · engine picks the slot per opener from leaf size + weight · products from the Ironmongery catalogue`}
               parts={CASEMENT_PARTS.ironmongeryHinges}
               assignments={assignments}
-              materials={materials}
-              categories={categories}
-              subcategoriesByCategory={subcategoriesByCategory}
+              materials={ironItems}
+              categories={ironCategories}
+              subcategoriesByCategory={ironSubcategoriesByCategory}
+              categoryLabels={ironCategoryLabels}
+              defaultCategory="casementHinges"
               onAssign={setAssignment}
               onFilter={setFilter}
               onYieldChange={setYield}
@@ -658,12 +685,14 @@ export default function MaterialAssignmentsPage() {
             />
             <PartGroupSection
               title="🔩 Ironmongery — Locks"
-              subtitle={`${CASEMENT_PARTS.ironmongeryLocks.length} kits · sized by sash height (side) / width (top)`}
+              subtitle={`${CASEMENT_PARTS.ironmongeryLocks.length} kits · sized by sash height (side) / width (top) · products from the Ironmongery catalogue`}
               parts={CASEMENT_PARTS.ironmongeryLocks}
               assignments={assignments}
-              materials={materials}
-              categories={categories}
-              subcategoriesByCategory={subcategoriesByCategory}
+              materials={ironItems}
+              categories={ironCategories}
+              subcategoriesByCategory={ironSubcategoriesByCategory}
+              categoryLabels={ironCategoryLabels}
+              defaultCategory="casementLocks"
               onAssign={setAssignment}
               onFilter={setFilter}
               onYieldChange={setYield}
@@ -674,12 +703,13 @@ export default function MaterialAssignmentsPage() {
             />
             <PartGroupSection
               title="🔩 Ironmongery — Others"
-              subtitle={`${CASEMENT_PARTS.ironmongeryOthers.length} parts · restrictor, packers`}
+              subtitle={`${CASEMENT_PARTS.ironmongeryOthers.length} parts · restrictor, packers · products from the Ironmongery catalogue`}
               parts={CASEMENT_PARTS.ironmongeryOthers}
               assignments={assignments}
-              materials={materials}
-              categories={categories}
-              subcategoriesByCategory={subcategoriesByCategory}
+              materials={ironItems}
+              categories={ironCategories}
+              subcategoriesByCategory={ironSubcategoriesByCategory}
+              categoryLabels={ironCategoryLabels}
               onAssign={setAssignment}
               onFilter={setFilter}
               onYieldChange={setYield}
