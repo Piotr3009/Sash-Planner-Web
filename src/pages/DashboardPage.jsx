@@ -82,15 +82,20 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 1.5;
 const ZOOM_STEP = 0.1;
-const ZOOM_KEY = 'pc-dashboard-zoom';
+// 05.10 (Piotr): the board opens at 80%, at 100% everything was too close.
+const ZOOM_DEFAULT = 0.8;
+// The user's own choice is kept under this key. "-v2" because the default
+// changed from 100% to 80%: a zoom remembered before that is dropped once, so
+// the new default shows up everywhere.
+const ZOOM_KEY = 'pc-dashboard-zoom-v2';
 const clampZoom = (z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 10) / 10));
 
 function readStoredZoom() {
   try {
     const z = parseFloat(window.localStorage.getItem(ZOOM_KEY));
-    return Number.isFinite(z) ? clampZoom(z) : 1;
+    return Number.isFinite(z) ? clampZoom(z) : ZOOM_DEFAULT;
   } catch {
-    return 1;
+    return ZOOM_DEFAULT;
   }
 }
 
@@ -755,9 +760,9 @@ export default function DashboardPage() {
               </button>
               <button
                 type="button"
-                onClick={() => changeZoom(1)}
+                onClick={() => changeZoom(ZOOM_DEFAULT)}
                 className={`min-w-[52px] px-2 border-x border-surface-500 text-[12px] font-medium tabular-nums ${zoomButtonClass}`}
-                title="Reset zoom to 100%"
+                title={`Reset zoom to ${Math.round(ZOOM_DEFAULT * 100)}%`}
               >
                 {Math.round(zoom * 100)}%
               </button>
