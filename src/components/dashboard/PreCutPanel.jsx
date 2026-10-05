@@ -5,7 +5,7 @@
  */
 import { useState, useMemo } from 'react';
 import { buildPrecutForWindow } from '../../engine/lists.js';
-import { effectiveAssignment, materialSizeToRaw, ELEMENT_TO_PART_ID } from '../../engine/bom.js';
+import { effectiveAssignment, materialSizeToRaw, ELEMENT_TO_PART_ID, assignedMaterialForItems } from '../../engine/bom.js';
 import { optimisePrecut } from '../../engine/optimizer.js';
 import { getPartSymbol } from '../../engine/partSymbols.js';
 import { useMaterialAssignmentStore } from '../../stores/materialAssignmentStore.js';
@@ -144,19 +144,9 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
   // Variant-aware (schema 2): slim/triple overrides of THIS window's frame
   // resolve correctly; flat map stays as fallback. Mixed materials in one
   // group return { mixed: n } instead of a false single identity.
-  const getMaterialForGroup = (items) => {
-    const frameType = windowSpec?.frame?.type || 'standard';
-    const ids = new Set();
-    (items || []).forEach((it) => {
-      const base = String(it.elementName || '').replace(/ \((FIX L|FIX R|C)\)$/, '');
-      const pid = ELEMENT_TO_PART_ID[base] || ELEMENT_TO_PART_ID[it.elementName];
-      const a = pid ? effectiveAssignment(pid, frameType, assignmentsData, assignments) : null;
-      if (a?.material_id) ids.add(a.material_id);
-    });
-    if (ids.size === 1) return materials.find((m) => m.id === [...ids][0]) || null;
-    if (ids.size > 1) return { mixed: ids.size };
-    return null;
-  };
+  const getMaterialForGroup = (items) => assignedMaterialForItems(items, {
+    assignments, assignmentsData, materials, frameType: windowSpec?.frame?.type || 'standard',
+  });
 
   // Same content choice as the Production Pack export (Piotr 02.08 — the
   // single-window button used to fire blind with 'both').

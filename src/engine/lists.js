@@ -7,7 +7,7 @@
  */
 
 import { CONSTANTS, deriveWindowData } from './calculations.js';
-import { CASEMENT_HINGE_SLOTS, CASEMENT_LOCK_SLOTS, hingeWedgeMm } from './casementHardware.js';
+import { CASEMENT_HINGE_SLOTS, CASEMENT_LOCK_SLOTS, hingeWedgeMm, childRestrictorCounts } from './casementHardware.js';
 import { GLASS_MAKEUP, glassGas, glassMakeupFor } from './specification.js';
 import { profileRawForSection, getWindowProfile, getCasementProfile } from './profile.js';
 // Pure helper (no React) — shared with the 2D drawings so panel, PDF and
@@ -496,9 +496,12 @@ export function buildHardwareList(windowSpec, derived = null) {
       .filter(([id]) => !id.startsWith('c_hinge_top'))
       .reduce((a, [, e]) => a + e.pairs, 0);
     // No side hung slot carries a restricted hinge: one restrictor per side
-    // hung opener when the window asks for child restriction.
-    if (sidePairs > 0 && windowSpec.childRestrictor !== false) {
-      list.push({ item: 'Child restrictor', detail: 'releasable · for unrestricted hinges', quantity: sidePairs, enginePart: true });
+    // hung opener, handed like its lock, with one stud each, only when the
+    // window has the Child restrictor box ticked (05.10.2026).
+    const cr = childRestrictorCounts(hw.lockPicks, windowSpec.childRestrictor);
+    if (cr.studs > 0) {
+      const hands = [cr.LH && `${cr.LH} LH`, cr.RH && `${cr.RH} RH`].filter(Boolean).join(' / ');
+      list.push({ item: 'Child restrictor', detail: `${hands} · ${cr.studs} stud${cr.studs === 1 ? '' : 's'}`, quantity: cr.studs, enginePart: true });
     }
     if (sidePairs > 0) {
       // One wedge per side hung opener, under the bottom hinge only, as long

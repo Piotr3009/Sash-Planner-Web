@@ -476,6 +476,9 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       roomType: ventRoomType,   // 'habitable' | 'kitchen' | 'bathroom' | 'other'
       soleWindow: ventSoleWindow
     },
+    // Configurator checkbox. Only a window saved with the box ticked asks for
+    // child restrictors (Piotr 05.10.2026); not set = not asked.
+    childRestrictor: (item?.childRestrictor ?? fc.childRestrictor) === true,
     cill: {
       extension: Number(item?.sillExtension ?? spec.sillExtension ?? item?.sill_extension) || 0,
       wider: !!(item?.sillWider ?? spec.sillWider),

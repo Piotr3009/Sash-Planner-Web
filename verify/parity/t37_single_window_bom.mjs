@@ -69,7 +69,8 @@ const mk = (id, w, h, fc, batch = null) => {
   return { id, windowSpec, derived: calculations.deriveWindowData(windowSpec, {}), batch };
 };
 const sash = (id, w, h, fc = {}, batch) => mk(id, w, h, { windowCategory: 'sash', frameType: 'standard', ...fc }, batch);
-const cas = (id, w, h, fc = {}, batch) => mk(id, w, h, { windowCategory: 'casement', ...fc }, batch);
+// Child restrictor box ticked on every casement here, so the restrictor rows are exercised (05.10.2026: counted only when ticked).
+const cas = (id, w, h, fc = {}, batch) => mk(id, w, h, { windowCategory: 'casement', childRestrictor: true, ...fc }, batch);
 const WINS = [
   sash('S-std', 1000, 1600, {}, BATCH),
   sash('S-bars', 1300, 1800, { upperBars: '2x2', lowerBars: '2x2' }),
@@ -312,7 +313,8 @@ section('4 — hardware: no card for an engine-picked line');
       if (part[slotId]?.qty !== e.pairs || part[slotId]?.unit !== 'pairs') bad.push(`${w.id}: ${slotId}`);
       if (!slotId.startsWith('c_hinge_top')) { side += e.pairs; wedgeMm += e.pairs * H.hingeWedgeMm(slotId); }
     }
-    if ((part.c_child_restrictor?.qty || 0) !== side) bad.push(`${w.id}: restrictors ${part.c_child_restrictor?.qty} vs ${side}`);
+    const restrictors = (part.c_child_restrictor_lh?.qty || 0) + (part.c_child_restrictor_rh?.qty || 0);
+    if (restrictors !== side || (part.c_child_restrictor_stud?.qty || 0) !== side) bad.push(`${w.id}: restrictors ${restrictors}, studs ${part.c_child_restrictor_stud?.qty} vs ${side} side hung`);
     if (!near(part.c_wedge_packer?.qty || 0, wedgeMm / 1000)) bad.push(`${w.id}: wedge ${part.c_wedge_packer?.qty} vs ${wedgeMm / 1000}`);
     const locks = Object.values(part).filter((l) => l.part.id.startsWith('c_lock')).reduce((a, l) => a + l.qty, 0);
     const picked = Object.values(hw.lockSummary || {}).reduce((a, e) => a + e.count, 0);

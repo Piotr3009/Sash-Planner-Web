@@ -585,6 +585,9 @@ export const useProjectStore = create((set, get) => ({
       spacerColor: windowConfig.spacerColor || defaults.spacerColor || 'silver',
       spacerType: windowConfig.spacerType || defaults.spacerType || 'warm',
       pas24: windowConfig.pas24 !== undefined ? windowConfig.pas24 : (defaults.pas24 || false),
+      // Child restrictor checkbox: was never copied, so the box reset after
+      // every save and the BOM could not see it (fixed 05.10.2026).
+      childRestrictor: !!windowConfig.childRestrictor,
       // Fields the configurator sends but the whitelist silently dropped —
       // the exact trio the user watched reset after every save (F5 bug).
       glassCoating: windowConfig.glassCoating || defaults.glassCoating || 'standard',
@@ -753,6 +756,9 @@ export const useProjectStore = create((set, get) => ({
       spacerColor: windowConfig.spacerColor || defaults.spacerColor || 'silver',
       spacerType: windowConfig.spacerType || defaults.spacerType || 'warm',
       pas24: windowConfig.pas24 !== undefined ? windowConfig.pas24 : (defaults.pas24 || false),
+      // Child restrictor checkbox: was never copied, so the box reset after
+      // every save and the BOM could not see it (fixed 05.10.2026).
+      childRestrictor: !!windowConfig.childRestrictor,
       // Fields the configurator sends but the whitelist silently dropped —
       // the exact trio the user watched reset after every save (F5 bug).
       glassCoating: windowConfig.glassCoating || defaults.glassCoating || 'standard',

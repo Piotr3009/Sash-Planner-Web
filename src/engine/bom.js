@@ -22,7 +22,7 @@
 
 import { buildPrecutForWindow, buildHardwareList } from './lists.js';
 import { assignmentFor, legacyToCanonical } from './partRegistry.js';
-import { lockPartId, hingeWedgeMm } from './casementHardware.js';
+import { lockPartId, hingeWedgeMm, childRestrictorCounts, CHILD_RESTRICTOR_PART } from './casementHardware.js';
 import { isAcousticUnit } from './specification.js';
 
 /** Normalise a material catalog size ('150 x 38mm') to a raw-section key ('150x38'). */
@@ -79,8 +79,8 @@ export const CLIP_SIZE_TO_PART_ID = {
 // says — sash and casement (Piotr 05.10.2026; until then its m² landed on the
 // Double row). Doors keep their own makeup, so they stay on the type row.
 export const GLASS_ACOUSTIC_PART_ID = 'glass_acoustic';
-// Preserver: 25% of the PRIMER litres, every window type (Piotr 05.10.2026).
-export const PRESERVER_OF_PRIMER = 0.25;
+// Preserver: 10% of the PRIMER litres, every window type (Piotr 05.10.2026).
+export const PRESERVER_OF_PRIMER = 0.10;
 
 export const GLASS_TYPE_TO_PART_ID = {
   double: 'glass_double',
@@ -132,6 +132,25 @@ export function makeRawResolver({ assignments, assignmentsData, materials, frame
     const mat = a?.material_id ? (materials || []).find((m) => m.id === a.material_id) : null;
     return mat ? materialSizeToRaw(mat.size) : null;
   };
+}
+
+/**
+ * The material assigned to a group of pre-cut items (group header on the
+ * Pre-Cut tab, single window and pack alike). One material: that material;
+ * several: { mixed: n }; none: null. An item of a pack carries its window's
+ * frame variant as `_frameType`; a single window passes `frameType`.
+ */
+export function assignedMaterialForItems(items, { assignments, assignmentsData, materials, frameType = 'standard' }) {
+  const ids = new Set();
+  (items || []).forEach((it) => {
+    const base = String(it.elementName || '').replace(/ \((FIX L|FIX R|C)\)$/, '');
+    const pid = ELEMENT_TO_PART_ID[base] || ELEMENT_TO_PART_ID[it.elementName];
+    const a = pid ? effectiveAssignment(pid, it._frameType || frameType, assignmentsData, assignments) : null;
+    if (a?.material_id) ids.add(a.material_id);
+  });
+  if (ids.size === 1) return (materials || []).find((m) => m.id === [...ids][0]) || null;
+  if (ids.size > 1) return { mixed: ids.size };
+  return null;
 }
 
 export const FRAME_BOX_PART_SUFFIX = { slim: '_slim', heritage: '_heritage', triple: '_triple' };
@@ -255,21 +274,18 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
   const cw = derived.casement;
   if (derived.category === 'casement' && cw?.hardware) {
     const { hingeSummary } = cw.hardware;
-    let sidePairs = 0;
     let wedgeMm = 0;
     Object.entries(hingeSummary).forEach(([slotId, e]) => {
       setQty(slotId, e.pairs, 'pairs');
-      if (!slotId.startsWith('c_hinge_top')) sidePairs += e.pairs;
       wedgeMm += e.pairs * hingeWedgeMm(slotId);
     });
-    // No side hung slot carries a restricted hinge any more, so the separate
-    // restrictor goes on EVERY side hung opener (04.10.2026; before, only the
-    // two unrestricted slots asked for it) — and only when the window requests
-    // child restriction (configurator checkbox; undefined = legacy windows =
-    // ON). Top hung openers never get one.
-    if (sidePairs > 0 && windowSpec.childRestrictor !== false) {
-      setQty('c_child_restrictor', sidePairs, 'pcs');
-    }
+    // Child restrictors: one per side hung opener, split by hand, plus one
+    // stud each, only when the window has the box ticked (05.10.2026). Top
+    // hung openers never get one.
+    const cr = childRestrictorCounts(cw.hardware.lockPicks, windowSpec.childRestrictor);
+    setQty(CHILD_RESTRICTOR_PART.LH, cr.LH, 'pcs');
+    setQty(CHILD_RESTRICTOR_PART.RH, cr.RH, 'pcs');
+    setQty(CHILD_RESTRICTOR_PART.STUD, cr.studs, 'pcs');
     // Wedge packers in METRES (05.10.2026; was 1 pcs per hinge pair): one
     // wedge per side hung opener, under the bottom hinge, as long as the hinge.
     addMm('c_wedge_packer', wedgeMm);

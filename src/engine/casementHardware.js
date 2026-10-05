@@ -44,9 +44,11 @@
 //               nothing between them), and a sash under 660mm high that is
 //               too heavy for its row.
 //
-// Child restriction: none of these stays is restricted, so the BOM adds the
-// separate Child Restrictor for EVERY side hung opener when the window asks
-// for it (bom.js). No child restriction on top hung (Piotr 02.08.2026).
+// Child restriction: none of these stays is restricted, so the BOM adds a
+// separate Child Restrictor to every SIDE hung opener, but only when the window
+// has the Child restrictor box ticked (Piotr 05.10.2026). The restrictor is
+// handed (LH / RH, same hand as the lock) and takes one stud each. No child
+// restriction on top hung (Piotr 02.08.2026).
 //
 // This module imports nothing — keep it cycle-free (stores import from here).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -218,6 +220,28 @@ export function summariseLocks(picks) {
     else e.unhanded += 1;
     if (p.overLimit) e.overLimit = true;
   });
+  return out;
+}
+
+// Child restrictor rows (Assign Materials): the catch is handed, the stud is
+// a separate part, one per restrictor (BJ Waller: "1x restrictor requires 1x
+// stud"; hinged on the left viewed from outside = RH, the lock's hand).
+export const CHILD_RESTRICTOR_PART = { LH: 'c_child_restrictor_lh', RH: 'c_child_restrictor_rh', STUD: 'c_child_restrictor_stud' };
+
+/**
+ * Child restrictors of a window: { LH, RH, studs }, one per SIDE hung opener,
+ * by the hand its lock pick carries; nothing unless the window asks for child
+ * restriction (windowSpec.childRestrictor === true).
+ */
+export function childRestrictorCounts(lockPicks, wanted) {
+  const out = { LH: 0, RH: 0, studs: 0 };
+  if (wanted !== true) return out;
+  (lockPicks || []).forEach((p) => {
+    if (!p || p.hung !== 'side') return;
+    if (p.handing === 'LH') out.LH += 1;
+    else if (p.handing === 'RH') out.RH += 1;
+  });
+  out.studs = out.LH + out.RH;
   return out;
 }
 

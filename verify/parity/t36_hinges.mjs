@@ -16,9 +16,10 @@
  *      with its top hung fan, the 120 pair, 180L with a fixed light, narrow
  *      tall leaves, an oversize leaf, a top hung leaf in the 451–560 gap, a
  *      triple glazed pair, a fixed window
- *   4  BOM (buildWindowPartQtys): one row per slot in pairs, no _lh / _rh row,
- *      a Child Restrictor for EVERY side hung opener (none for top hung, none
- *      when the window says no), wedge packers per side hung opener
+ *   4  BOM (buildWindowPartQtys): one row per slot in pairs, no _lh / _rh hinge
+ *      row; Child Restrictor LH / RH / Stud only on a window with the box
+ *      ticked, one per side hung opener by hand (none for top hung), wedge
+ *      packers per side hung opener
  *   5  merged purchase list with materials assigned, Yield 2 for a product
  *      sold per piece; assignments left on the old ids are ignored
  *   6  hardware list labels and the "! verify limits" flag for side and top;
@@ -318,22 +319,22 @@ const WIN = {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-section('4 — BOM: one row per slot, restrictor on every side hung opener');
+section('4: BOM, one row per slot; restrictors LH / RH / Stud only when the window asks');
 const hingeBom = (w, spec = w.spec) => Object.fromEntries(Object.entries(bom.buildWindowPartQtys(w.d, spec, {}, () => null))
-  .filter(([k]) => /^c_hinge|^c_child_restrictor$|^c_wedge_packer$/.test(k)).map(([k, v]) => [k, v.mm != null ? `${v.mm} mm` : `${v.qty} ${v.unit}`]));
+  .filter(([k]) => /^c_hinge|^c_child_restrictor|^c_wedge_packer$/.test(k)).map(([k, v]) => [k, v.mm != null ? `${v.mm} mm` : `${v.qty} ${v.unit}`]));
 {
   const allIds = new Set(store.ALL_PARTS.map((p) => p.id));
   const EXPECT = {
-    single: { c_hinge_side_xl: '1 pairs', c_child_restrictor: '1 pcs', c_wedge_packer: '500 mm' },
-    fan: { c_hinge_top_450: '1 pairs', c_hinge_side_600: '1 pairs', c_hinge_side_800: '1 pairs', c_child_restrictor: '2 pcs', c_wedge_packer: '819 mm' },
-    pair: { c_hinge_side_600: '2 pairs', c_child_restrictor: '2 pcs', c_wedge_packer: '826 mm' },
-    pairTriple: { c_hinge_side_800: '2 pairs', c_child_restrictor: '2 pcs', c_wedge_packer: '812 mm' },
-    fixedLight: { c_hinge_side_600: '1 pairs', c_child_restrictor: '1 pcs', c_wedge_packer: '413 mm' },
-    small: { c_hinge_side_600: '1 pairs', c_child_restrictor: '1 pcs', c_wedge_packer: '413 mm' },
-    narrowTall: { c_hinge_side_360: '1 pairs', c_child_restrictor: '1 pcs', c_wedge_packer: '210 mm' },
-    narrowFan: { c_hinge_top_450: '1 pairs', c_hinge_side_360: '2 pairs', c_child_restrictor: '2 pcs', c_wedge_packer: '420 mm' },
-    tallHd: { c_hinge_side_800: '1 pairs', c_child_restrictor: '1 pcs', c_wedge_packer: '406 mm' },
-    oversize: { c_hinge_side_xl: '1 pairs', c_child_restrictor: '1 pcs', c_wedge_packer: '500 mm' },
+    single: { c_hinge_side_xl: '1 pairs', c_wedge_packer: '500 mm' },
+    fan: { c_hinge_top_450: '1 pairs', c_hinge_side_600: '1 pairs', c_hinge_side_800: '1 pairs', c_wedge_packer: '819 mm' },
+    pair: { c_hinge_side_600: '2 pairs', c_wedge_packer: '826 mm' },
+    pairTriple: { c_hinge_side_800: '2 pairs', c_wedge_packer: '812 mm' },
+    fixedLight: { c_hinge_side_600: '1 pairs', c_wedge_packer: '413 mm' },
+    small: { c_hinge_side_600: '1 pairs', c_wedge_packer: '413 mm' },
+    narrowTall: { c_hinge_side_360: '1 pairs', c_wedge_packer: '210 mm' },
+    narrowFan: { c_hinge_top_450: '1 pairs', c_hinge_side_360: '2 pairs', c_wedge_packer: '420 mm' },
+    tallHd: { c_hinge_side_800: '1 pairs', c_wedge_packer: '406 mm' },
+    oversize: { c_hinge_side_xl: '1 pairs', c_wedge_packer: '500 mm' },
     topGap: { c_hinge_top_450: '1 pairs' },
     fixedWindow: {},
   };
@@ -342,13 +343,31 @@ const hingeBom = (w, spec = w.spec) => Object.fromEntries(Object.entries(bom.bui
     const same = JSON.stringify(Object.entries(q).sort()) === JSON.stringify(Object.entries(EXPECT[name]).sort());
     const picks = w.d.casement.hardware.hingePicks.filter(Boolean);
     const pairs = Object.entries(q).filter(([k]) => k.startsWith('c_hinge')).reduce((a, [, v]) => a + parseFloat(v), 0);
-    ok(same && pairs === picks.length && Object.keys(q).every((k) => allIds.has(k)) && !Object.keys(q).some((k) => /_(lh|rh)$/.test(k)),
+    ok(same && pairs === picks.length && Object.keys(q).every((k) => allIds.has(k)) && !Object.keys(q).some((k) => /^c_hinge.*_(lh|rh)$/.test(k)),
       `${name}: ${JSON.stringify(q)} — ${pairs} pair(s) for ${picks.length} opener(s), every id an Assign Materials row`, JSON.stringify(q));
   }
-  // The restrictor follows the SIDE hung openers, whatever row they sit on (before: only the XL / small rows asked for one)
-  ok(hingeBom(WIN.fan).c_child_restrictor === '2 pcs' && hingeBom(WIN.pair).c_child_restrictor === '2 pcs',
-    'Child Restrictor: one per side hung opener on EVERY side row (052L: 2, 120: 2) — the top hung fan gets none');
-  ok(hingeBom(WIN.topGap).c_child_restrictor === undefined && hingeBom(WIN.topGap).c_wedge_packer === undefined, 'a top hung window: no Child Restrictor, no wedge packers');
+  // Child restrictors (Piotr 05.10.2026): LH / RH / Stud rows, one restrictor per SIDE hung opener by hand, one stud
+  // each, and only on a window with the box ticked. The hand is typed again here: hinged left (outside view) = RH.
+  const asked = (w) => ({ ...w.spec, childRestrictor: true });
+  const hands = (w) => {
+    const side = w.d.casement.layoutDef.panels.filter((pn) => pn.hinge === 'left' || pn.hinge === 'right');
+    return { LH: side.filter((pn) => pn.hinge === 'right').length, RH: side.filter((pn) => pn.hinge === 'left').length };
+  };
+  const restr = (q) => ({ LH: parseFloat(q.c_child_restrictor_lh) || 0, RH: parseFloat(q.c_child_restrictor_rh) || 0, studs: parseFloat(q.c_child_restrictor_stud) || 0 });
+  for (const [name, w] of Object.entries(WIN)) {
+    const r = restr(hingeBom(w, asked(w)));
+    const h = hands(w);
+    ok(r.LH === h.LH && r.RH === h.RH && r.studs === h.LH + h.RH && Object.keys(hingeBom(w, asked(w))).every((k) => allIds.has(k)),
+      `${name}, box ticked: ${r.LH} LH + ${r.RH} RH restrictor(s), ${r.studs} stud(s), one per side hung opener by hand`, JSON.stringify(r));
+  }
+  ok(JSON.stringify(restr(hingeBom(WIN.pair, asked(WIN.pair)))) === JSON.stringify({ LH: 1, RH: 1, studs: 2 }), 'the 120 pair with the box ticked: 1 LH + 1 RH + 2 studs');
+  const singleHinge = WIN.single.d.casement.layoutDef.panels.find((pn) => pn.hinge !== 'fixed').hinge;
+  ok(JSON.stringify(restr(hingeBom(WIN.single, asked(WIN.single)))) === JSON.stringify(singleHinge === 'left' ? { LH: 0, RH: 1, studs: 1 } : { LH: 1, RH: 0, studs: 1 }),
+    `040L with the box ticked: its opener is hinged on the ${singleHinge} (outside view) → 1 ${singleHinge === 'left' ? 'RH' : 'LH'} + 1 stud, none of the other hand`);
+  ok(restr(hingeBom(WIN.fan, asked(WIN.fan))).studs === 2, '052L with the box ticked: 2 restrictors for the 2 side hung openers, the top hung fan gets none');
+  ok(restr(hingeBom(WIN.topGap, asked(WIN.topGap))).studs === 0 && hingeBom(WIN.topGap).c_wedge_packer === undefined, 'a top hung window: no Child Restrictor even with the box ticked, no wedge packers');
+  ok(!store.ALL_PARTS.some((part) => part.id === 'c_child_restrictor') && ['c_child_restrictor_lh', 'c_child_restrictor_rh', 'c_child_restrictor_stud'].every((id) => allIds.has(id)),
+    'Assign Materials: the single Child Restrictor row is gone, LH / RH / Stud rows are there');
   // Wedge packers (Piotr 05.10.2026): ONE wedge per side hung opener, under the bottom hinge only, as long as the hinge
   // of the picked row — 210 / 311 / 413 / 406 mm, 500 mm agreed for XL; metres in the BOM, nothing for top hung.
   const W = { c_hinge_side_360: 210, c_hinge_side_460: 311, c_hinge_side_600: 413, c_hinge_side_800: 406, c_hinge_side_xl: 500 };
@@ -364,13 +383,16 @@ const hingeBom = (w, spec = w.spec) => Object.fromEntries(Object.entries(bom.bui
   ok(wRow?.unit === 'm' && /BOTTOM hinge only/.test(wRow.hint) && /Yield 0\.5/.test(wRow.hint), 'Assign Materials: the Wedge Packers row is in metres and says so');
   const wm = bom.mergeWindowMaterials([{ windowSpec: WIN.pair.spec, derived: WIN.pair.d, batch: null }], { assignments: { c_wedge_packer: { material_id: 'w1', yield: 0.5 } }, assignmentsData: { schema: 2, base: { c_wedge_packer: { material_id: 'w1', yield: 0.5 } }, overrides: {} }, materials: [{ id: 'w1', name: '7 Degree Wedge Packer 2000mm', cost_per_unit: 1.89 }], ALL_PARTS: store.ALL_PARTS, ironmongeryItems: [], settings: {} }).find((r) => r.key === 'mat:w1');
   ok(Math.abs(wm?.qty - 0.413) < 1e-9, 'merged list: two openers on 460–600 → 0.826 m; with Yield 0.5 → 0.413 of a 2 m length', String(wm?.qty));
+  const noRestrictor = (q) => !Object.keys(q).some((k) => k.startsWith('c_child_restrictor'));
   const off = hingeBom(WIN.fan, { ...WIN.fan.spec, childRestrictor: false });
-  ok(off.c_child_restrictor === undefined && off.c_wedge_packer === '819 mm' && off.c_hinge_side_600 === '1 pairs',
+  ok(noRestrictor(off) && off.c_wedge_packer === '819 mm' && off.c_hinge_side_600 === '1 pairs',
     'windowSpec.childRestrictor === false → no Child Restrictor; hinges and wedge packers unchanged', JSON.stringify(off));
-  ok(hingeBom(WIN.fan, { ...WIN.fan.spec, childRestrictor: true }).c_child_restrictor === '2 pcs', 'windowSpec.childRestrictor === true → the same as not set (legacy windows = on)');
-  // Not asserted, reported: whether the configurator's flag reaches the spec at all.
-  const carried = specification.normaliseToWindowSpec({ id: 'x', name: 'x', width: 1000, height: 1500 }, { fullConfig: { windowCategory: 'casement', casementLayout: '040L', childRestrictor: false } }).childRestrictor;
-  console.log(`NOTE  normaliseToWindowSpec gives windowSpec.childRestrictor = ${carried} for a window saved with the box unticked${carried === false ? '' : ' — the configurator flag does not reach the BOM (older than this change, reported 05.10.2026, not asserted here)'}`);
+  ok(noRestrictor(hingeBom(WIN.fan, { ...WIN.fan.spec, childRestrictor: undefined })) && noRestrictor(hingeBom(WIN.fan)),
+    'box never saved (not set) → no Child Restrictor: only a ticked box asks for one');
+  // The configurator's box reaches the spec (it did not before 05.10.2026).
+  const carried = (v) => specification.normaliseToWindowSpec({ id: 'x', name: 'x', width: 1000, height: 1500, ...(v === undefined ? {} : { childRestrictor: v }) }, { fullConfig: { windowCategory: 'casement', casementLayout: '040L' } }).childRestrictor;
+  ok(carried(true) === true && carried(false) === false && carried(undefined) === false,
+    'normaliseToWindowSpec carries the Child restrictor box: ticked → true, unticked or never saved → false');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -424,8 +446,10 @@ section('5 — merged purchase list with materials assigned');
 section('6 — hardware list labels; the old set is gone from src');
 {
   const hl = (w, spec = w.spec) => lists.buildHardwareList(spec, w.d).filter((r) => /Hinges|restrictor|Wedge|handle/i.test(r.item)).map((r) => `${r.item} | ${r.detail} | ${r.quantity}`);
-  ok(hl(WIN.fan).join(' ; ') === 'Top Hung Hinges — sash 300–450mm · ≤16kg | pairs | 1 ; Side Hinges — sash 460–600mm · ≤21kg | pairs | 1 ; Side Hinges HD — sash 460–800mm · ≤35kg | pairs | 1 ; Child restrictor | releasable · for unrestricted hinges | 2 ; Wedge packers | under the bottom hinge · 0.82 m in total | 2 ; Casement handle | per opener | 3',
-    'hardware list 052L: one line per row in pairs (no LH / RH), 2 restrictors + 2 wedge packer sets for the 2 side hung openers, 3 handles', hl(WIN.fan).join(' ; '));
+  ok(hl(WIN.fan).join(' ; ') === 'Top Hung Hinges — sash 300–450mm · ≤16kg | pairs | 1 ; Side Hinges — sash 460–600mm · ≤21kg | pairs | 1 ; Side Hinges HD — sash 460–800mm · ≤35kg | pairs | 1 ; Wedge packers | under the bottom hinge · 0.82 m in total | 2 ; Casement handle | per opener | 3',
+    'hardware list 052L, box not ticked: one line per row in pairs (no LH / RH), no restrictor line, 2 wedge packer sets for the 2 side hung openers, 3 handles', hl(WIN.fan).join(' ; '));
+  ok(hl(WIN.pair, { ...WIN.pair.spec, childRestrictor: true }).includes('Child restrictor | 1 LH / 1 RH · 2 studs | 2'),
+    'hardware list 120, box ticked: "Child restrictor | 1 LH / 1 RH · 2 studs | 2"', hl(WIN.pair, { ...WIN.pair.spec, childRestrictor: true }).join(' ; '));
   ok(hl(WIN.pair)[0] === 'Side Hinges — sash 460–600mm · ≤21kg | pairs | 2', 'hardware list 120: one line, 2 pairs — the two hands together', hl(WIN.pair)[0]);
   ok(hl(WIN.narrowTall)[0] === 'Side Hinges — sash up to 360mm · ≤18kg | pairs · ! verify limits | 1', 'hardware list, flagged side hung opener: "pairs · ! verify limits"', hl(WIN.narrowTall)[0]);
   ok(hl(WIN.topGap).join(' ; ') === 'Top Hung Hinges — sash 300–450mm · ≤16kg | pairs · ! verify limits | 1 ; Casement handle | per opener | 1',

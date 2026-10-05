@@ -53,7 +53,7 @@ export const SASH_WINDOW_PARTS = {
   paint: [
     { id: 'paint_primer',     name: 'Primer',               section: '—',  pcs: 1, materialType: 'paint', unit: 'L' },
     { id: 'paint_preserver',  name: 'Preserver',            section: '—',  pcs: 1, materialType: 'paint', unit: 'L',
-      hint: 'Timber preserver: 25% of the primer litres (sash and doors).' },
+      hint: 'Timber preserver: 10% of the primer litres (sash and doors).' },
     { id: 'paint_white_9016', name: 'White Standard 9016',  section: '—',  pcs: 1, materialType: 'paint', unit: 'L' },
     { id: 'paint_bespoke',    name: 'Bespoke Colour',       section: '—',  pcs: 1, materialType: 'paint', unit: 'L', optional: true },
   ],
@@ -123,8 +123,14 @@ export const CASEMENT_PARTS = {
     section: '\u2014', pcs: 1, materialType: 'ironmongery', unit: 'pcs',
   })),
   ironmongeryOthers: [
-    { id: 'c_child_restrictor', name: 'Child Restrictor (releasable)', section: '\u2014', pcs: 1, materialType: 'ironmongery', unit: 'pcs',
-      hint: 'Recommended: Nico Window Restrictor Safety Catch, stainless steel \u2014 BJ Waller SKU RST42012A. Concealed in the window cavity, releasable to 100mm, auto-reset on closing. LH/RH + 13mm stud ordered as separate parts (1 stud per restrictor); hinged-left sash = RH restrictor.' },
+    // Child restrictor: handed catch + separate stud (05.10.2026). Counted per
+    // side hung opener, only on windows with the Child restrictor box ticked.
+    { id: 'c_child_restrictor_lh', name: 'Child Restrictor LH', section: '\u2014', pcs: 1, materialType: 'ironmongery', unit: 'pcs',
+      hint: 'Left hand restrictor: side hung sash hinged on the RIGHT, viewed from outside. One per such opener, only when the window has Child restrictor ticked. Top hung openers get none.' },
+    { id: 'c_child_restrictor_rh', name: 'Child Restrictor RH', section: '\u2014', pcs: 1, materialType: 'ironmongery', unit: 'pcs',
+      hint: 'Right hand restrictor: side hung sash hinged on the LEFT, viewed from outside. One per such opener, only when the window has Child restrictor ticked. Top hung openers get none.' },
+    { id: 'c_child_restrictor_stud', name: 'Child Restrictor Stud', section: '\u2014', pcs: 1, materialType: 'ironmongery', unit: 'pcs',
+      hint: 'One stud per restrictor (LH + RH together). Sold separately from the restrictor.' },
     { id: 'c_wedge_packer', name: 'Wedge Packers', section: '\u2014', pcs: 1, materialType: 'consumable', unit: 'm',
       hint: 'Metres. One wedge per side hung opener, under the BOTTOM hinge only (on the cill, or on the transom when the leaf sits above one) \u2014 its length is the hinge length of the row the engine picked: 210 / 311 / 413 / 406mm, 500mm on the XL row. Top hung openers get none. For a packer sold in 2m lengths set Yield 0.5 to read the result in lengths.' },
   ],
@@ -157,7 +163,7 @@ export const CASEMENT_PARTS = {
     { id: 'c_paint_primer', name: 'Primer', section: '—', pcs: 1, materialType: 'paint', unit: 'L',
       hint: 'Casement primer — litres from the engine paint model.' },
     { id: 'c_paint_preserver', name: 'Preserver', section: '—', pcs: 1, materialType: 'paint', unit: 'L',
-      hint: 'Timber preserver: 25% of the primer litres.' },
+      hint: 'Timber preserver: 10% of the primer litres.' },
     { id: 'c_paint_white_9016', name: 'White Standard 9016', section: '—', pcs: 1, materialType: 'paint', unit: 'L',
       hint: 'Topcoat when the window colour is RAL 9016 / default white.' },
     { id: 'c_paint_bespoke', name: 'Bespoke Colour', section: '—', pcs: 1, materialType: 'paint', unit: 'L',

@@ -14,7 +14,7 @@ import { useProjectStore, BATCH_STATUSES } from '../stores/projectStore.js';
 import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignmentStore.js';
 import { useMaterialStore } from '../stores/materialStore.js';
 import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
-import { mergeWindowMaterials, formatQty, makeRawResolver } from '../engine/bom.js';
+import { mergeWindowMaterials, formatQty, makeRawResolver, assignedMaterialForItems } from '../engine/bom.js';
 import { summarizeWindows } from '../utils/batchSummary.js';
 import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
@@ -28,7 +28,7 @@ import {
   buildVentGrilles, buildCurvedMembersForWindow } from '../engine/lists.js';
 import { optimisePrecut } from '../engine/optimizer.js';
 import { exportGlassPDF, prepGlassRefImages } from '../utils/glassPdfExport.js';
-import { uploadGlassRef } from '../services/glassRefs.js';
+import { uploadGlassRef, deleteGlassRef } from '../services/glassRefs.js';
 import { exportPreCutPDF } from '../utils/precutPdfExport.js';
 import { exportSprayingPDF } from '../utils/sprayingPdfExport.js';
 import { exportCutListPDF } from '../utils/cutListPdfExport.js';
@@ -263,14 +263,15 @@ export default function ProductionPackPage() {
         frameType: windowSpec?.frame?.type || 'standard',
       });
       const pre = buildPrecutForWindow(derived, windowSpec, settings, resolveRaw);
+      const frameVariant = windowSpec?.frame?.type || 'standard';
       pre.sashEngineering.forEach((g) => {
-        g.items.forEach((it) => { it.windowName = win.name; it._projectNumber = win._projectNumber; });
+        g.items.forEach((it) => { it.windowName = win.name; it._projectNumber = win._projectNumber; it._frameType = frameVariant; });
         const found = allPrecut.sashEngineering.find((x) => x.section === g.section);
         if (found) found.items.push(...g.items);
         else allPrecut.sashEngineering.push({ section: g.section, items: [...g.items] });
       });
       pre.boxSapele.forEach((g) => {
-        g.items.forEach((it) => { it.windowName = win.name; it._projectNumber = win._projectNumber; });
+        g.items.forEach((it) => { it.windowName = win.name; it._projectNumber = win._projectNumber; it._frameType = frameVariant; });
         const found = allPrecut.boxSapele.find((x) => x.preCutWidth === g.preCutWidth);
         if (found) found.items.push(...g.items);
         else allPrecut.boxSapele.push({ preCutWidth: g.preCutWidth, items: [...g.items] });
@@ -1227,8 +1228,9 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport, ex
   const selection = (pp?.glassRefSelection || []).filter((p) => glassRefs.some((r) => r.path === p));
 
   // Upload straight from the pack into the shared tenant library (Piotr 04.08:
-  // the "+" belongs HERE). Deletion stays in Settings only — removing an image
-  // from one pack's view would silently strip it from every other pack's PDF.
+  // the "+" belongs HERE). The minus on a thumbnail deletes the image from that
+  // shared library, exactly like Settings does (Piotr 05.10.2026), so every
+  // pack loses it.
   const handleAddRefs = async (e) => {
     const files = Array.from(e.target.files || []);
     e.target.value = '';
@@ -1244,6 +1246,16 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport, ex
     if (files.length > room) setSelHint(`Only ${room} slot(s) left — extra files were skipped.`);
     if (added.length) updateSettings({ glassReferences: [...glassRefs, ...added] });
     setRefBusy(false);
+  };
+
+  const handleDeleteRef = async (ref) => {
+    if (refBusy) return;
+    setSelHint('');
+    try { await deleteGlassRef(ref.path); } catch { /* keep list consistent anyway */ }
+    updateSettings({ glassReferences: glassRefs.filter((r) => r.path !== ref.path) });
+    if (isPPMode && pp && selection.includes(ref.path)) {
+      updateProductionPack(pp.id, { glassRefSelection: selection.filter((p) => p !== ref.path) });
+    }
   };
 
   const toggleRef = (path) => {
@@ -1297,23 +1309,30 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport, ex
             <div className="text-xs font-semibold text-ink-200">
               PDF references <span className="text-ink-500 font-normal">tick up to 3 for this pack's Glass PDF</span>
             </div>
-            <div className="text-[10px] text-ink-500">shared library · delete in Settings</div>
+            <div className="text-[10px] text-ink-500">shared library · the minus deletes an image for every pack</div>
           </div>
           {selHint && <div className="text-[11px] text-amber-400 mb-2">{selHint}</div>}
           <div className="flex flex-wrap gap-3">
             {glassRefs.map((r) => {
               const on = selection.includes(r.path);
               return (
-                <button key={r.path} type="button" onClick={() => toggleRef(r.path)}
-                  className={`w-[96px] text-left group relative rounded-lg border transition-colors ${
-                    on ? 'border-accent-500' : 'border-surface-500 hover:border-surface-400'}`}>
-                  <div className="h-[64px] rounded-t-lg overflow-hidden bg-surface-700">
-                    <img src={r.url} alt={r.name} className="w-full h-full object-cover" loading="lazy" />
-                  </div>
-                  <div className={`absolute top-1 left-1 w-4 h-4 rounded border flex items-center justify-center text-[10px] ${
-                    on ? 'bg-accent-500 border-accent-500 text-white' : 'bg-surface-800/80 border-surface-400 text-transparent'}`}>✓</div>
-                  <div className="px-1 py-0.5 text-[10px] text-ink-400 truncate">{r.name}</div>
-                </button>
+                <div key={r.path} className="w-[96px] relative">
+                  <button type="button" onClick={() => toggleRef(r.path)}
+                    className={`w-full text-left group relative rounded-lg border transition-colors ${
+                      on ? 'border-accent-500' : 'border-surface-500 hover:border-surface-400'}`}>
+                    <div className="h-[64px] rounded-t-lg overflow-hidden bg-surface-700">
+                      <img src={r.url} alt={r.name} className="w-full h-full object-cover" loading="lazy" />
+                    </div>
+                    <div className={`absolute top-1 left-1 w-4 h-4 rounded border flex items-center justify-center text-[10px] ${
+                      on ? 'bg-accent-500 border-accent-500 text-white' : 'bg-surface-800/80 border-surface-400 text-transparent'}`}>✓</div>
+                    <div className="px-1 py-0.5 text-[10px] text-ink-400 truncate">{r.name}</div>
+                  </button>
+                  <button type="button" onClick={() => handleDeleteRef(r)} disabled={refBusy}
+                    title="Delete image" aria-label={`Delete ${r.name}`}
+                    className="absolute top-1 right-1 w-4 h-4 rounded bg-surface-800/90 border border-surface-400 text-ink-200 hover:text-red-400 hover:border-red-400 flex items-center justify-center text-[12px] leading-none disabled:opacity-50">
+                    −
+                  </button>
+                </div>
               );
             })}
             {Array.from({ length: Math.max(0, LIBRARY_MAX - glassRefs.length) }).map((_, i) => (
@@ -1426,22 +1445,12 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
   // Material assignment lookup
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const assignmentsData = useMaterialAssignmentStore((s) => s.data);
-  const getMaterialById = useMaterialStore((s) => s.getMaterialById);
+  const materials = useMaterialStore((s) => s.materials);
 
-  // Resolve full material info for a group by checking assignments of its items
-  const getMaterialForGroup = (items) => {
-    for (const item of items) {
-      const sym = getPartSymbol(item.elementName);
-      if (sym?.partId) {
-        const assignment = assignments[sym.partId];
-        if (assignment?.material_id) {
-          const mat = getMaterialById(assignment.material_id);
-          if (mat) return mat;
-        }
-      }
-    }
-    return null;
-  };
+  // The material assigned to a group: the same lookup as the single window's
+  // Pre-Cut tab (sash, casement and frame variants alike). Several materials
+  // in one group come back as { mixed: n }.
+  const getMaterialForGroup = (items) => assignedMaterialForItems(items, { assignments, assignmentsData, materials });
 
   // Editable stock lengths and offcuts per group — persisted to the active
   // container (production pack or batch) so they survive tab switches & reloads.
@@ -1565,7 +1574,7 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
     const exportGroups = allGroups.map((g) => ({
       ...g,
       stockLength: stockLengths[g.key] || g.defaultStock,
-      materialInfo: getMaterialForGroup(g.items),
+      materialInfo: ((m) => (m?.mixed ? null : m))(getMaterialForGroup(g.items)),
     }));
     const projList = isPPMode
       ? [...new Set((pp?.assignments || []).map((a) => {
@@ -1618,6 +1627,7 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
               <div className="text-sm font-semibold text-ink-50">{group.label}</div>
               {(() => {
                 const mat = getMaterialForGroup(group.items);
+                if (mat?.mixed) return <span className="text-[10px] text-amber-400">{mat.mixed} materials</span>;
                 return mat ? (
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-[10px] text-accent-400 bg-accent-500/10 px-2 py-0.5 rounded font-mono">{mat.item_number}</span>
