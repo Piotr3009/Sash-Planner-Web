@@ -75,6 +75,8 @@ export const useIronmongeryStore = create((set, get) => ({
       loaded: false,
 
       setItems: (items) => set({ items, loaded: true }),
+      // The number the next hand-added item will get (shown in the Add form).
+      peekNextItemNumber: () => nextItemNumber(get().items),
 
       // ─── CRUD ───
       addItem: (data) => {
@@ -161,11 +163,15 @@ export const useIronmongeryStore = create((set, get) => ({
 
         csvData.forEach((row) => {
           if (row.jc_uuid && existing.some((m) => m.jc_uuid === row.jc_uuid)) {
+            // Re-import of a known JC item: refresh it, and take the JC item
+            // number too (05.10.2026 — rows saved before the column existed
+            // have none; a re-import of the same export restores it).
+            const next = (m) => ({ ...m, ...normalize(row), ...(row.item_number ? { item_number: row.item_number } : {}) });
             set((s) => ({
-              items: s.items.map((m) =>
-                m.jc_uuid === row.jc_uuid ? { ...m, ...normalize(row) } : m
-              ),
+              items: s.items.map((m) => (m.jc_uuid === row.jc_uuid ? next(m) : m)),
             }));
+            const saved = get().items.find((m) => m.jc_uuid === row.jc_uuid);
+            if (saved) cloud.saveIron(saved);
             updated++;
           } else {
             imported.push({
@@ -190,7 +196,17 @@ export const useIronmongeryStore = create((set, get) => ({
           // Retired categories (casementVents / casementStays) fold into their
           // new tabs so existing items keep showing up.
           const items = data.map((m) => ({ ...m, category: migrateIronCategory(m.category) }));
+          // Items added by hand before item_number was stored (05.10.2026) have
+          // no number: give them the next IRN-xxx now and save it. JC items
+          // keep waiting for their own number from a re-import — never invent one.
+          const renumbered = [];
+          items.forEach((m) => {
+            if (m.item_number || m.jc_uuid) return;
+            m.item_number = nextItemNumber([...items, ...renumbered]);
+            renumbered.push(m);
+          });
           set({ items, loaded: true });
+          renumbered.forEach((m) => cloud.saveIron(m));
         }
         else set({ loaded: true });
       },

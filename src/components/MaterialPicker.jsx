@@ -64,12 +64,16 @@ export default function MaterialPicker({ materials = [], value, onSelect, disabl
 
   const needle = q.trim().toLowerCase();
   const list = needle
-    ? materials.filter((m) => `${m.item_number || m.id} ${m.name || ''} ${m.size || ''}`.toLowerCase().includes(needle))
+    ? materials.filter((m) => `${m.item_number || ''} ${m.name || ''} ${m.size || ''} ${m.finish || ''}`.toLowerCase().includes(needle))
     : materials;
 
   const selected = value ? materials.find((m) => m.id === value) : null;
+  // Ironmongery items synced from Joinery Core carry no item number (the
+  // ironmongery table has no such column) — show the name alone then, never
+  // the raw uuid (05.10.2026).
+  const title = (m) => `${m.item_number ? `${m.item_number} — ` : ''}${m.name}`;
   const label = selected
-    ? `${selected.item_number || selected.id} — ${selected.name}${selected.size ? ` (${selected.size})` : ''}`
+    ? `${title(selected)}${selected.size ? ` (${selected.size})` : ''}`
     : placeholder;
 
   const panel = open ? createPortal(
@@ -117,10 +121,11 @@ export default function MaterialPicker({ materials = [], value, onSelect, disabl
             )}
             <div className="min-w-0 flex-1">
               <div className="text-[13px] text-ink-100 truncate">
-                {m.item_number || m.id} — {m.name}
+                {title(m)}
               </div>
               <div className="text-[10px] text-ink-400 flex items-center gap-2">
                 {m.size && <span className="font-mono">{m.size}</span>}
+                {m.finish && <span>{m.finish}</span>}
                 {m.cost_per_unit > 0 && <span>£{Number(m.cost_per_unit).toFixed(2)}{m.unit ? `/${m.unit}` : ''}</span>}
                 {m.jc_uuid && <span className="text-[8px] px-1 py-0.5 rounded bg-amber-600/15 text-amber-500 border border-amber-500/25">JC</span>}
               </div>

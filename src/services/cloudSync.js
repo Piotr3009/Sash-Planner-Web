@@ -444,11 +444,14 @@ export async function deleteMaterialCloud(id) {
 // ─────────────────────────────────────────────────────────────
 // IRONMONGERY — maps to ironmongery table.
 // ─────────────────────────────────────────────────────────────
+// `item_number` (05.10.2026): the JC number (MAT-xxx) or the app's IRN-xxx —
+// column added by docs/handover/sql/2026-10-05_ironmongery_item_number.sql.
 function memIronToDb(it, tenantId) {
-  const { id, name, category, finish, size, is_pas24, auto_quantity, cost, cost_per_unit,
+  const { id, item_number, name, category, finish, size, is_pas24, auto_quantity, cost, cost_per_unit,
     image_url, jc_uuid, notes, ...rest } = it;
   return {
     id, tenant_id: tenantId, category: category || 'other', name,
+    item_number: item_number || null,
     finish: finish || rest.color || null, size: size || null,
     is_pas24: !!is_pas24, auto_quantity: auto_quantity ?? null,
     cost: cost ?? cost_per_unit ?? null,
@@ -457,7 +460,7 @@ function memIronToDb(it, tenantId) {
 }
 function dbIronToMem(r) {
   return {
-    id: r.id, category: r.category, name: r.name, finish: r.finish || '',
+    id: r.id, item_number: r.item_number || '', category: r.category, name: r.name, finish: r.finish || '',
     size: r.size || '', is_pas24: !!r.is_pas24, auto_quantity: r.auto_quantity ?? null,
     cost_per_unit: r.cost || 0, image_url: r.photo_url || '',
     jc_uuid: r.jc_uuid || '', notes: r.notes || '', created_at: r.created_at,

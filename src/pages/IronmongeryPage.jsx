@@ -34,8 +34,13 @@ function ImageLightbox({ src, onClose }) {
 }
 
 // ─── Add / Edit Modal (no category field — auto-assigned) ───
-function ItemFormModal({ material, activeCategory, onSave, onCancel }) {
+function ItemFormModal({ material, activeCategory, onSave, onCancel, nextNumber }) {
   const isEdit = !!material;
+  // ITEM # is never typed: JC items carry their JC number, hand-added items get
+  // the next IRN-xxx on save (05.10.2026).
+  const itemNumber = isEdit
+    ? (material.item_number || (material.jc_uuid ? '— re-import from Joinery Core to restore' : '—'))
+    : `${nextNumber} (assigned on save)`;
   const catLabel = IRONMONGERY_CATEGORIES.find(c => c.key === activeCategory)?.label || activeCategory;
   const [form, setForm] = useState({
     name: material?.name || '',
@@ -69,6 +74,11 @@ function ItemFormModal({ material, activeCategory, onSave, onCancel }) {
         <div className="text-[10px] text-accent-400 mb-4">Category: {catLabel}</div>
 
         <div className="space-y-3">
+          <div>
+            <label className="text-[10px] text-ink-400 uppercase tracking-wider block mb-1">Item #</label>
+            <input className="input text-xs w-full font-mono text-ink-400" value={itemNumber} readOnly />
+          </div>
+
           <div>
             <label className="text-[10px] text-ink-400 uppercase tracking-wider block mb-1">Name *</label>
             <input className="input text-xs w-full" value={form.name} onChange={(e) => update('name', e.target.value)} placeholder="e.g. Sash Lock PAS24" autoFocus />
@@ -437,6 +447,7 @@ export default function IronmongeryPage() {
         <ItemFormModal
           material={showForm !== 'add' ? showForm : null}
           activeCategory={activeTab}
+          nextNumber={useIronmongeryStore.getState().peekNextItemNumber()}
           onSave={handleSave}
           onCancel={() => setShowForm(false)}
         />
