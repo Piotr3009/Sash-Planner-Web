@@ -257,8 +257,12 @@ function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf, colourBy
 
       // Label — BLACK text (was white)
       // Full description when it fits the piece, otherwise the dimension
-      // alone. Same font size either way.
-      const fullLabel = `${projNum ? projNum + '-' : ''}${winName ? winName + '-' : ''}${sym?.symbol || ''} ${cutLen}`.trim();
+      // alone. Same font size either way. A piece coloured by part carries no
+      // part symbol: the colour already says what it is, so the label is
+      // project number, window and dimension only.
+      const plainLabel = `${projNum ? projNum + '-' : ''}${winName ? winName + '-' : ''}${sym?.symbol || ''} ${cutLen}`.trim();
+      const colouredLabel = `${[projNum, winName].filter(Boolean).join('-')} ${cutLen}`.trim();
+      const fullLabel = partColour ? colouredLabel : plainLabel;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.5);
       tc(doc, C.black);

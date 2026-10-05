@@ -1741,11 +1741,16 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
                                     cursor += cutLen + (settings?.kerf || 3);
                                     // Colour by part, and the label rule: the full description when
                                     // it fits the piece, otherwise the dimension alone (same font).
+                                    // A coloured piece carries no part symbol, the colour says what
+                                    // it is: project number, window and dimension only.
                                     const partColour = colourByPart ? partColourForElement(elName) : null;
                                     const barPx = Math.max(0, tabWidth - 208) * (barWidthPct / 100);
                                     const piecePx = barPx * (cutLen / barStock);
+                                    const fullText = partColour
+                                      ? `${[projNum, winName].filter(Boolean).join('-')} ${cutLen}`.trim()
+                                      : `${label} ${cutLen}`.trim();
                                     const shown = tabWidth
-                                      ? barLabelThatFits(`${label} ${cutLen}`.trim(), String(cutLen), piecePx - 4, (t) => t.length * 4.6)
+                                      ? barLabelThatFits(fullText, String(cutLen), piecePx - 4, (t) => t.length * 4.6)
                                       : String(cutLen);
                                     return (
                                       <div key={idx}
