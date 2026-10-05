@@ -7,7 +7,7 @@
  */
 
 import { CONSTANTS, deriveWindowData } from './calculations.js';
-import { CASEMENT_HINGE_SLOTS, CASEMENT_LOCK_SLOTS } from './casementHardware.js';
+import { CASEMENT_HINGE_SLOTS, CASEMENT_LOCK_SLOTS, hingeWedgeMm } from './casementHardware.js';
 import { GLASS_MAKEUP, glassGas, glassMakeupFor } from './specification.js';
 import { profileRawForSection, getWindowProfile, getCasementProfile } from './profile.js';
 // Pure helper (no React) — shared with the 2D drawings so panel, PDF and
@@ -496,7 +496,10 @@ export function buildHardwareList(windowSpec, derived = null) {
       list.push({ item: 'Child restrictor', detail: 'releasable · for unrestricted hinges', quantity: sidePairs });
     }
     if (sidePairs > 0) {
-      list.push({ item: 'Wedge packers', detail: '1 set per hinge pair (verify)', quantity: sidePairs });
+      // One wedge per side hung opener, under the bottom hinge only, as long
+      // as the hinge (05.10.2026). Quantity = wedges; the metres are the BOM's.
+      const wedgeMm = Object.entries(hw.hingeSummary).reduce((a, [id, e]) => a + e.pairs * hingeWedgeMm(id), 0);
+      list.push({ item: 'Wedge packers', detail: `under the bottom hinge · ${(wedgeMm / 1000).toFixed(2)} m in total`, quantity: sidePairs });
     }
     Object.entries(hw.lockSummary || {}).forEach(([slotId, e]) => {
       const nm = CASEMENT_LOCK_SLOTS.find((r) => r.id === slotId)?.name || slotId;

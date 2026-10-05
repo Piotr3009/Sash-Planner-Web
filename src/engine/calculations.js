@@ -1056,18 +1056,28 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     // the glass drawings show). BOM assigns this length to the 2mm (outside)
     // and 1mm (inside) slots equally. Silicone stays 0.1 tube/m of
     // perimeter + single bar run (sash rule — bedding, not both faces);
-    // weather seals per Piotr 02.08.2026: frame seal 2H+2W, head&jambs seal
-    // 2H+1W, both +10%, colour pair picked by sealColour in the BOM.
+    // weather seals: two lines round EVERY LEAF, fixed or opening (Piotr
+    // 05.10.2026 — until then one run round the outer frame, so mullions and
+    // transoms added nothing): frame seal 2×leafH + 2×leafW, head&jambs seal
+    // 2×leafH + 1×leafW, summed over the leaves, both +10%, colour pair picked
+    // by sealColour in the BOM.
     const casSiliconeTubes = Math.round(0.1 * ((perimMm + barMm) / 1000) * 10) / 10;
     const casBeadTapeSideM = Math.round(((perimMm + 2 * barMm) / 1000) * 100) / 100;
     const SEAL_F = 1.10;
-    // Arched: the seal follows the true frame outline — two jambs to the
-    // springing + the head arc (outer edge), plus the cill for the frame seal.
-    // circle: the seal is the ring's outer circumference — no jambs, no cill run
-    const jambRun = isCircle ? 0 : archSpec ? 2 * AG.start : 2 * frameHeight;
-    const headRun = archSpec ? AG.frameHead.lengths.outer : frameWidth;
-    const casSealFrameM = Math.round(((jambRun + headRun + (isCircle ? 0 : frameWidth)) * SEAL_F / 1000) * 100) / 100;
-    const casSealHjM = Math.round(((jambRun + headRun) * SEAL_F / 1000) * 100) / 100;
+    // Per leaf: sides (the two stiles), head (top edge), bottom (bottom edge).
+    // Arched: the leaf's true outline — two straight stiles + the top rail arc
+    // (outer edge) + the bottom rail. Circle: the ring's outer circumference
+    // only — no stiles, no bottom run.
+    const leafSealRuns = archSpec
+        ? [{
+            sides: isCircle ? 0 : 2 * AG.leafStraightStile,
+            head: AG.leafTop.lengths.outer,
+            bottom: isCircle ? 0 : leafSizes[0].leafW,
+        }]
+        : leafSizes.map((s) => ({ sides: 2 * s.leafH, head: s.leafW, bottom: s.leafW }));
+    const sealMm = (pick) => leafSealRuns.reduce((a, r) => a + pick(r), 0);
+    const casSealFrameM = Math.round((sealMm((r) => r.sides + r.head + r.bottom) * SEAL_F / 1000) * 100) / 100;
+    const casSealHjM = Math.round((sealMm((r) => r.sides + r.head) * SEAL_F / 1000) * 100) / 100;
     const casSealColour = (cas.sealColour || windowSpec.sealColour || 'black').toLowerCase();
 
     void r1;

@@ -306,8 +306,9 @@ section('3 — cut list, glass unit, paint / seals / weights; rectangular caseme
   // true-outline consumables
   const outerArea = 1000 * 1300 + arch.chainAreaAboveLine(g.arcs);
   expectNear('paint area = W × start + area under the outer chain (m², 2 dp)', d.paint.areaSqm, Math.round(outerArea / 1e6 * 100) / 100, 1e-9);
-  expectNear('seal frame = (2 × start + head outer arc + W) × 1.10', d.consumables.sealFrame.meters, Math.round((2 * 1300 + g.frameHead.lengths.outer + 1000) * 1.1 / 1000 * 100) / 100, 1e-9);
-  expectNear('seal head & jambs = (2 × start + head outer arc) × 1.10', d.consumables.sealHeadJambs.meters, Math.round((2 * 1300 + g.frameHead.lengths.outer) * 1.1 / 1000 * 100) / 100, 1e-9);
+  // 05.10.2026: seals run round the LEAF (two straight stiles + the top rail outer arc, + the bottom rail for the frame line), not the frame
+  expectNear('seal frame = (2 × leaf straight stile + leaf top outer arc + leafW) × 1.10', d.consumables.sealFrame.meters, Math.round((2 * g.leafStraightStile + g.leafTop.lengths.outer + d.casement.leaves[0].leafW) * 1.1 / 1000 * 100) / 100, 1e-9);
+  expectNear('seal head & jambs = (2 × leaf straight stile + leaf top outer arc) × 1.10', d.consumables.sealHeadJambs.meters, Math.round((2 * g.leafStraightStile + g.leafTop.lengths.outer) * 1.1 / 1000 * 100) / 100, 1e-9);
   expectNear('glass m² = true outline area', d.consumables.glass.sqm, Math.round(d.arch.glassOutline.area / 1e6 * 100) / 100, 1e-9);
   const timber = [...d.components.box, ...d.components.sash].reduce((a, c) => a + (c.section.split('x').map(Number).reduce((x, y) => x * y) * 610 / 1e6) * (c.length / 1000) * c.quantity, 0);
   expectNear('timber weight = Σ section × density × length over the cut list (curved members at their arc length)', d.weights.timber, Math.round(timber * 10) / 10, 0.11);

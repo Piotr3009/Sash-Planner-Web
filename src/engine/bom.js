@@ -16,7 +16,7 @@
 
 import { buildPrecutForWindow, buildHardwareList } from './lists.js';
 import { assignmentFor, legacyToCanonical } from './partRegistry.js';
-import { lockPartId } from './casementHardware.js';
+import { lockPartId, hingeWedgeMm } from './casementHardware.js';
 
 /** Normalise a material catalog size ('150 x 38mm') to a raw-section key ('150x38'). */
 export function materialSizeToRaw(size) {
@@ -238,9 +238,11 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
   if (derived.category === 'casement' && cw?.hardware) {
     const { hingeSummary } = cw.hardware;
     let sidePairs = 0;
+    let wedgeMm = 0;
     Object.entries(hingeSummary).forEach(([slotId, e]) => {
       setQty(slotId, e.pairs, 'pairs');
       if (!slotId.startsWith('c_hinge_top')) sidePairs += e.pairs;
+      wedgeMm += e.pairs * hingeWedgeMm(slotId);
     });
     // No side hung slot carries a restricted hinge any more, so the separate
     // restrictor goes on EVERY side hung opener (04.10.2026; before, only the
@@ -250,7 +252,9 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
     if (sidePairs > 0 && windowSpec.childRestrictor !== false) {
       setQty('c_child_restrictor', sidePairs, 'pcs');
     }
-    if (sidePairs > 0) setQty('c_wedge_packer', sidePairs, 'pcs');
+    // Wedge packers in METRES (05.10.2026; was 1 pcs per hinge pair): one
+    // wedge per side hung opener, under the bottom hinge, as long as the hinge.
+    addMm('c_wedge_packer', wedgeMm);
     // Espag lock kits: one kit per opener from the engine lock ladder
     // (the Excalibur kit already includes the shootbolts). LH, RH and TOP are
     // three separate SKUs → three assignment rows per size band (04.10.2026);

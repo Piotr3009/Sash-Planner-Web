@@ -53,6 +53,25 @@
 
 // Ladder order = selection order: the first row whose limits all hold wins.
 //   side: { minW, maxW, maxH, maxKg }   top: { minH, maxH, maxW, maxKg }
+//
+// WEDGE PACKER (Piotr 05.10.2026): one wedge per SIDE hung opener, under the
+// BOTTOM hinge only — on the cill, or on the transom when the leaf sits above
+// one — as long as the hinge itself. HINGE_WEDGE_MM holds that length per side
+// hung row: the stay the row is sized for (210 / 311 / 413 / 406), and an
+// agreed 500mm on the XL row, whose product is the workshop's choice. Top hung
+// rows have none (the stays sit on the sides of the sash).
+const HINGE_WEDGE_MM = {
+  c_hinge_side_360: 210,
+  c_hinge_side_460: 311,
+  c_hinge_side_600: 413,
+  c_hinge_side_800: 406,
+  c_hinge_side_xl: 500,
+};
+
+/** Wedge packer length (mm) for ONE opener on this hinge slot; 0 for top hung. */
+export function hingeWedgeMm(slotId) {
+  return HINGE_WEDGE_MM[slotId] || 0;
+}
 const HINGE_ROWS = [
   // ── Side hung — by sash WIDTH ──
   ['c_hinge_side_360', 'Side Hinges — sash up to 360mm · ≤18kg', 'side', { minW: 260, maxW: 360, maxH: 1200, maxKg: 18 }],

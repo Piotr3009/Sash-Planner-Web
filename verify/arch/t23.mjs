@@ -202,8 +202,9 @@ const DC = derive(CIRCLE);
     DC.customGlassUnits.length === 1 && g.width === D8 && g.shape.kind === 'circle' && near(g.shape.area, Math.PI * rG ** 2, 1e-3) && g.shape.poly.length === 2 && g.shape.bars.length === 8 && g.shape.pattern === 'sunburst');
   check(`derived.arch: shape circle, frame ring plan ${indFrame8.def?.n} pieces (leaf ring blocked by the ${CP.arch.minPieceLength} limit — noted, see t25), tracery full mode 7 panes (hub + 6), glassOutline origin (${glassOff}, ${glassOff}) + centreFrame (${R8}, ${R8})`,
     DC.arch.shape === 'circle' && DC.arch.plans.frameHead.totalPieces === indFrame8.def?.n && DC.arch.plans.leafTop.noStock && DC.arch.tracery?.mode === 'full' && DC.arch.tracery.panes === 7 && near(DC.arch.glassOutline.origin.x, glassOff, 1e-6) && DC.arch.glassOutline.centreFrame.x === R8);
-  check(`seals: frame seal = 2π·400 × 1.1 (no jambs, no cill run); paint from π·R² + tracery timber; glass sqm = true area π·(${rG} mm)²`,
-    near(DC.consumables.sealFrame.meters, 2 * Math.PI * 0.4 * 1.1, 0.01) && DC.paint.areaSqm >= 0.5 && near(DC.consumables.glass.sqm, Math.PI * (rG / 1000) ** 2, 0.01));
+  // 05.10.2026: the seal runs round the LEAF ring (R − leafAtJamb), not the frame ring
+  check(`seals: frame seal = head & jambs = 2π·(400 − ${oL}) × 1.1 — the leaf ring, no stiles, no bottom run; paint from π·R² + tracery timber; glass sqm = true area π·(${rG} mm)²`,
+    near(DC.consumables.sealFrame.meters, 2 * Math.PI * (0.4 - oL / 1000) * 1.1, 0.01) && DC.consumables.sealHeadJambs.meters === DC.consumables.sealFrame.meters && DC.paint.areaSqm >= 0.5 && near(DC.consumables.glass.sqm, Math.PI * (rG / 1000) ** 2, 0.01));
   check(`beading: glazing bead = 2π·${rG} × 1.15, astragal = bar run × 1.15 (both faces)`,
     near(DC.components.beading[0].length, Math.round(2 * Math.PI * rG * 1.15), 1) && DC.components.beading.length === 3);
   const noPat = derive(cas('CN', 800, 800, { casementKind: 'fixed', archShape: 'circle' }));

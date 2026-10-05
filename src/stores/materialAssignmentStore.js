@@ -121,8 +121,8 @@ export const CASEMENT_PARTS = {
   ironmongeryOthers: [
     { id: 'c_child_restrictor', name: 'Child Restrictor (releasable)', section: '\u2014', pcs: 1, materialType: 'ironmongery', unit: 'pcs',
       hint: 'Recommended: Nico Window Restrictor Safety Catch, stainless steel \u2014 BJ Waller SKU RST42012A. Concealed in the window cavity, releasable to 100mm, auto-reset on closing. LH/RH + 13mm stud ordered as separate parts (1 stud per restrictor); hinged-left sash = RH restrictor.' },
-    { id: 'c_wedge_packer', name: 'Wedge Packers', section: '\u2014', pcs: 1, materialType: 'consumable', unit: 'pcs',
-      hint: '1 set per hinge pair \u2014 verify the set contents with the workshop.' },
+    { id: 'c_wedge_packer', name: 'Wedge Packers', section: '\u2014', pcs: 1, materialType: 'consumable', unit: 'm',
+      hint: 'Metres. One wedge per side hung opener, under the BOTTOM hinge only (on the cill, or on the transom when the leaf sits above one) \u2014 its length is the hinge length of the row the engine picked: 210 / 311 / 413 / 406mm, 500mm on the XL row. Top hung openers get none. For a packer sold in 2m lengths set Yield 0.5 to read the result in lengths.' },
   ],
 
   beading: [
@@ -141,11 +141,11 @@ export const CASEMENT_PARTS = {
     { id: 'c_bead_tape_2mm', name: 'Bead Tape 2mm', section: '—', pcs: 1, materialType: 'consumable', unit: 'm',
       hint: 'Astragal fixing tape, the other glass face (sash convention: 2mm inside).' },
     { id: 'c_seal_frame_black', name: 'Frame Seal — Black', section: '—', pcs: 1, materialType: 'consumable', unit: 'm',
-      hint: 'Perimeter frame seal: 2×H + 2×W + 10%. The BOM picks Black or White from the window Seal colour.' },
+      hint: 'Seal round every leaf, fixed or opening: (2 × leaf height + 2 × leaf width) per leaf, summed, + 10%. The BOM picks Black or White from the window Seal colour.' },
     { id: 'c_seal_frame_white', name: 'Frame Seal — White', section: '—', pcs: 1, materialType: 'consumable', unit: 'm',
-      hint: 'Perimeter frame seal, white — same length rule as the black one.' },
+      hint: 'Seal round every leaf, white — same length rule as the black one.' },
     { id: 'c_seal_hj_black', name: 'Head & Jambs Seal — Black', section: '—', pcs: 1, materialType: 'consumable', unit: 'm',
-      hint: 'Second seal line: 2×H + 1×W + 10%. Colour follows the window Seal colour.' },
+      hint: 'Second seal line, head and jambs of every leaf, fixed or opening: (2 × leaf height + 1 × leaf width) per leaf, summed, + 10%. Colour follows the window Seal colour.' },
     { id: 'c_seal_hj_white', name: 'Head & Jambs Seal — White', section: '—', pcs: 1, materialType: 'consumable', unit: 'm',
       hint: 'Second seal line, white — same length rule as the black one.' },
   ],
