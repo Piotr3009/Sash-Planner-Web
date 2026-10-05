@@ -225,7 +225,7 @@ export function assignmentFor(data, partKey, variantKey = 'standard') {
 // that prints on glass orders); falls back to the static list label.
 const GLASS_PART_TO_TYPE = {
   glass_double: 'double', glass_double_slim: 'double_slim', glass_triple: 'triple',
-  glass_single: 'single', glass_passive: 'passive',
+  glass_single: 'single', glass_passive: 'passive', glass_acoustic: 'acoustic',
 };
 
 export function liveSectionsFor(partId, profile, variantKey = 'standard') {

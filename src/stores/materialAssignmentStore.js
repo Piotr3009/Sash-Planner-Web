@@ -47,9 +47,13 @@ export const SASH_WINDOW_PARTS = {
     { id: 'glass_triple',     name: 'Triple Glazing',       section: '4-8-4-8-4', pcs: 2, materialType: 'glass', unit: 'm²' },
     { id: 'glass_single',     name: 'Single Heritage',      section: '6.8mm lam',      pcs: 2, materialType: 'glass', unit: 'm²' },
     { id: 'glass_passive',    name: 'Passive (Vacuum)',     section: 'vacuum',   pcs: 2, materialType: 'glass', unit: 'm²' },
+    { id: 'glass_acoustic',   name: 'Laminate / Acoustic',  section: '4-14-6.8', pcs: 2, materialType: 'glass', unit: 'm²', optional: true,
+      hint: 'The 24.8mm Laminate / Acoustic unit: every sash or casement window with the Laminate / Acoustic spec, or the Laminated spec on a double / passive unit — the same glass. Its m² no longer land on the Double row. Doors stay on their glass type row.' },
   ],
   paint: [
     { id: 'paint_primer',     name: 'Primer',               section: '—',  pcs: 1, materialType: 'paint', unit: 'L' },
+    { id: 'paint_preserver',  name: 'Preserver',            section: '—',  pcs: 1, materialType: 'paint', unit: 'L',
+      hint: 'Timber preserver: 25% of the primer litres (sash and doors).' },
     { id: 'paint_white_9016', name: 'White Standard 9016',  section: '—',  pcs: 1, materialType: 'paint', unit: 'L' },
     { id: 'paint_bespoke',    name: 'Bespoke Colour',       section: '—',  pcs: 1, materialType: 'paint', unit: 'L', optional: true },
   ],
@@ -152,6 +156,8 @@ export const CASEMENT_PARTS = {
   paint: [
     { id: 'c_paint_primer', name: 'Primer', section: '—', pcs: 1, materialType: 'paint', unit: 'L',
       hint: 'Casement primer — litres from the engine paint model.' },
+    { id: 'c_paint_preserver', name: 'Preserver', section: '—', pcs: 1, materialType: 'paint', unit: 'L',
+      hint: 'Timber preserver: 25% of the primer litres.' },
     { id: 'c_paint_white_9016', name: 'White Standard 9016', section: '—', pcs: 1, materialType: 'paint', unit: 'L',
       hint: 'Topcoat when the window colour is RAL 9016 / default white.' },
     { id: 'c_paint_bespoke', name: 'Bespoke Colour', section: '—', pcs: 1, materialType: 'paint', unit: 'L',

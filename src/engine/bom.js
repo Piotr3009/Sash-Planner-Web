@@ -17,6 +17,7 @@
 import { buildPrecutForWindow, buildHardwareList } from './lists.js';
 import { assignmentFor, legacyToCanonical } from './partRegistry.js';
 import { lockPartId, hingeWedgeMm } from './casementHardware.js';
+import { isAcousticUnit } from './specification.js';
 
 /** Normalise a material catalog size ('150 x 38mm') to a raw-section key ('150x38'). */
 export function materialSizeToRaw(size) {
@@ -68,6 +69,13 @@ export const CLIP_SIZE_TO_PART_ID = {
 };
 
 // Glass type → assignment part id
+// Laminate / Acoustic unit (4-14-6.8): its own row whatever the glass TYPE chip
+// says — sash and casement (Piotr 05.10.2026; until then its m² landed on the
+// Double row). Doors keep their own makeup, so they stay on the type row.
+export const GLASS_ACOUSTIC_PART_ID = 'glass_acoustic';
+// Preserver: 25% of the PRIMER litres, every window type (Piotr 05.10.2026).
+export const PRESERVER_OF_PRIMER = 0.25;
+
 export const GLASS_TYPE_TO_PART_ID = {
   double: 'glass_double',
   double_slim: 'glass_double_slim',
@@ -203,7 +211,8 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
   // ── Glass (sqm to purchase) ──
   const g = derived.consumables?.glass;
   if (g?.sqm) {
-    setQty(GLASS_TYPE_TO_PART_ID[g.type] || 'glass_double', g.sqm, 'm²');
+    const acoustic = windowSpec.category !== 'door' && isAcousticUnit(windowSpec.glazing);
+    setQty(acoustic ? GLASS_ACOUSTIC_PART_ID : (GLASS_TYPE_TO_PART_ID[g.type] || 'glass_double'), g.sqm, 'm²');
   }
 
   // ── Weights (total window mass +5% = counterbalance to buy) ──
@@ -221,6 +230,7 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
   if (p) {
     const isCas = derived.category === 'casement';
     setQty(isCas ? 'c_paint_primer' : 'paint_primer', p.primer, 'L');
+    setQty(isCas ? 'c_paint_preserver' : 'paint_preserver', Math.round((Number(p.primer) || 0) * PRESERVER_OF_PRIMER * 100) / 100, 'L');
     const hex = (windowSpec.color?.single || '').toUpperCase();
     const ral = String(windowSpec.color?.ral || '').replace(/[^0-9]/g, '');
     const isWhite9016 = ral === '9016' || hex === '#F6F6F6' || (!hex && !ral);
@@ -278,8 +288,7 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
       // Laminate / Acoustic spec, or Laminated on a double / passive unit → the
       // 24.8mm clip (Piotr 02.10.2026); a laminated triple keeps the triple clip.
       const gType = windowSpec.glazing?.type || 'double';
-      const gSpec = windowSpec.glazing?.spec;
-      const is248 = gSpec === 'acoustic' || (gSpec === 'laminated' && (gType === 'double' || gType === 'passive'));
+      const is248 = isAcousticUnit(windowSpec.glazing);
       const clipsPid = is248 ? 'c_glass_clips_laminated'
         : (gType === 'triple') ? 'c_glass_clips_triple' : 'c_glass_clips_double';
       setQty(clipsPid, clipsQty, 'pcs');

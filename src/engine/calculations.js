@@ -4,6 +4,7 @@ import { getWindowProfile, getCasementProfile, getDoorProfile, DEFAULT_DOOR_PROF
 import { buildArchGeometry, buildSashArchGeometry, planArchSegments, buildGlassOutline, buildArchBars, glassOutlinePoly, chainAreaAboveLine, ArchError, isCircleShape, buildCircleGeometry, buildCircleGlassOutline, buildCircleBars } from './arch.js';
 import { buildTraceryForDerived } from './cnc/traceryExport.js';
 import { casementLeafBars, leafBarsToUnit } from './casementBarGrid.js';
+import { isAcousticUnit } from './specification.js';
 
 /**
  * calculations.js - ETAP 3
@@ -486,9 +487,7 @@ function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, to
     // single laminated stays 24mm, a laminated triple stays 28mm)
     const frameT = windowSpec.frame?.type;
     const isSlim = frameT === 'slim';
-    const glassSpec = windowSpec.glazing?.spec;
-    const is248 = glassSpec === 'acoustic'
-      || (glassSpec === 'laminated' && (glassType === 'double' || glassType === 'passive'));
+    const is248 = isAcousticUnit({ spec: windowSpec.glazing?.spec, type: glassType });
     const clipSize = frameT === 'heritage' ? 'heritage'
       : isSlim ? '16mm' : is248 ? '24.8mm' : (glassType === 'triple' ? '28mm' : '24mm');
     const clipQty = 20;

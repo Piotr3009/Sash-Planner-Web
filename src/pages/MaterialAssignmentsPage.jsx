@@ -720,9 +720,9 @@ export default function MaterialAssignmentsPage() {
             />
             <PartGroupSection
               title="🧊 Casement Glazing"
-              subtitle={`${CASEMENT_PARTS.glazing.length + 2} parts · glass rows are shared with sash (assign once); silicone/tapes/paint shared too`}
+              subtitle={`${CASEMENT_PARTS.glazing.length + 3} parts · glass rows are shared with sash (assign once); silicone/tapes/paint shared too`}
               parts={[
-                ...SASH_WINDOW_PARTS.glass.filter((g) => g.id === 'glass_double' || g.id === 'glass_triple'),
+                ...SASH_WINDOW_PARTS.glass.filter((g) => g.id === 'glass_double' || g.id === 'glass_triple' || g.id === 'glass_acoustic'),
                 ...CASEMENT_PARTS.glazing,
               ]}
               assignments={assignments}
@@ -867,7 +867,7 @@ export default function MaterialAssignmentsPage() {
         {/* Glass */}
         <PartGroupSection
           title="🪟 Glass"
-          subtitle={`${SASH_WINDOW_PARTS.glass.length} types · double, slim, triple, single, passive`}
+          subtitle={`${SASH_WINDOW_PARTS.glass.length} types · double, slim, triple, single, passive, laminate / acoustic`}
           parts={SASH_WINDOW_PARTS.glass}
           assignments={assignments}
           materials={materials}
@@ -885,7 +885,7 @@ export default function MaterialAssignmentsPage() {
         {/* Paint */}
         <PartGroupSection
           title="🎨 Paint"
-          subtitle={`${SASH_WINDOW_PARTS.paint.length} types · primer, white 9016, bespoke`}
+          subtitle={`${SASH_WINDOW_PARTS.paint.length} types · primer, preserver, white 9016, bespoke`}
           parts={SASH_WINDOW_PARTS.paint}
           assignments={assignments}
           materials={materials}
