@@ -21,17 +21,18 @@ const STATUS_CONFIG = {
 };
 
 // ─── Board geometry ───
-// Width split of the four card columns, gaps excluded. The starting point was
-// 16 / 26 / 34 / 24; two points moved from Project complete to the project
-// and its batches, so their texts fit on one line on a 1440 px screen.
+// Width split of the four card columns, gaps excluded.
+// 05.10 (Piotr): the production packs must dominate the board, not the
+// batches. Batches are a quarter narrower than in the first version of this
+// layout (27 → 20.25) and the packs take that width (34 → 40.75).
 const SHARE_PROJECT = 17;
-const SHARE_BATCHES = 27;
-const SHARE_PACKS = 34;
+const SHARE_BATCHES = 20.25;
+const SHARE_PACKS = 40.75;
 const SHARE_COMPLETE = 22;
 const LANE_W = 72;               // free lane between the blocks: connection lines only
 const BAND_PAD = 12;             // band padding around its cards
 const BAND_GAP = 24;             // room between a project card and its batches
-const BATCH_H = 40;
+const BATCH_H = 36;              // 05.10 (Piotr): a tenth lower than the first version (40)
 const BATCH_GAP = 8;
 const PROJECT_CARD_MIN_H = 84;
 const SUMMARY_CARD_MIN_H = 76;
@@ -65,6 +66,12 @@ const HEADING_CLASS = 'text-[13px] uppercase tracking-wide text-ink-50 font-semi
 // every link stays readable on the banded background.
 const LINE_WIDTH = 2;
 const LINE_OPACITY = { projectToBatch: 0.5, batchToPack: 0.8, packToComplete: 0.8 };
+// Pointing at a project or a pack strengthens its own links. The other links
+// stay on the board, only calmer.
+const LINE_WIDTH_HOT = 3;
+const LINE_CALM = 0.5;           // share of its normal opacity an unrelated link keeps
+// A batch outside the category picked in the legend stays in place, faded.
+const DIMMED_OPACITY = 0.35;
 
 const statusOptionLabel = (s) =>
   STATUS_CONFIG[s]?.label === 'Prep' ? 'Preparation' : STATUS_CONFIG[s]?.label === 'Prod' ? 'In production' : STATUS_CONFIG[s]?.label || s;
@@ -250,7 +257,7 @@ function BatchAssignDropdown({ batchId, projectId, productionPacks, currentPPId,
 }
 
 // ─── SVG connection lines (Project→Batch, Batch→PP, PP→Delivery) ───
-function ConnectionLines({ containerRef, projects, productionPacks }) {
+function ConnectionLines({ containerRef, projects, productionPacks, onlyType, hot }) {
   const [lines, setLines] = useState([]);
   const signature = useRef('');
 
@@ -269,13 +276,21 @@ function ConnectionLines({ containerRef, projects, productionPacks }) {
     const completeEls = elementsBy(board, 'data-delivery-id');
     const half = (v) => Math.round(v * 2) / 2;
 
+    // Every link remembers its project and its pack, so it can be lit from either end.
+    const packOfBatch = new Map();
+    productionPacks.forEach((pp) => (pp.assignments || []).forEach(({ batchId }) => packOfBatch.set(batchId, pp.id)));
+    // With a category picked in the legend only that category keeps its links.
+    const inCategory = (type) => !onlyType || type === onlyType;
+
     const next = [];
-    const link = (key, from, to, type, opacity) => next.push({
+    const link = (key, from, to, type, opacity, projectId, ppId) => next.push({
       key,
       x1: half(from.right), y1: half(from.midY),
       x2: half(to.left), y2: half(to.midY),
       color: typeColor(type).line,
       opacity,
+      projectId,
+      ppId,
     });
 
     // ── Project → Batch lines ──
@@ -285,8 +300,9 @@ function ConnectionLines({ containerRef, projects, productionPacks }) {
       const projBox = box(projEl);
       (project.batches || []).forEach((batch) => {
         const batchEl = batchEls.get(batch.id);
-        if (!batchEl) return;
-        link(`p-${project.id}-${batch.id}`, projBox, box(batchEl), batch.type || 'sash', LINE_OPACITY.projectToBatch);
+        const type = batch.type || 'sash';
+        if (!batchEl || !inCategory(type)) return;
+        link(`p-${project.id}-${batch.id}`, projBox, box(batchEl), type, LINE_OPACITY.projectToBatch, project.id, packOfBatch.get(batch.id) || null);
       });
     });
 
@@ -304,7 +320,8 @@ function ConnectionLines({ containerRef, projects, productionPacks }) {
           .find((p) => p.id === projectId)
           ?.batches?.find((b) => b.id === batchId);
         const type = batch?.type || 'sash';
-        link(`b-${batchId}-${pp.id}`, box(batchEl), ppBox, type, LINE_OPACITY.batchToPack);
+        if (!inCategory(type)) return;
+        link(`b-${batchId}-${pp.id}`, box(batchEl), ppBox, type, LINE_OPACITY.batchToPack, projectId, pp.id);
         if (!typesByProject.has(projectId)) typesByProject.set(projectId, new Set());
         typesByProject.get(projectId).add(type);
       });
@@ -315,7 +332,7 @@ function ConnectionLines({ containerRef, projects, productionPacks }) {
         const completeEl = completeEls.get(projectId);
         if (!completeEl) return;
         const type = types.size === 1 ? [...types][0] : (pp.type || 'sash');
-        link(`d-${pp.id}-${projectId}`, ppBox, box(completeEl), type, LINE_OPACITY.packToComplete);
+        link(`d-${pp.id}-${projectId}`, ppBox, box(completeEl), type, LINE_OPACITY.packToComplete, projectId, pp.id);
       });
     });
 
@@ -329,19 +346,26 @@ function ConnectionLines({ containerRef, projects, productionPacks }) {
   if (lines.length === 0) return null;
   const maxY = Math.max(...lines.map((l) => Math.max(l.y1, l.y2)), 0) + 40;
 
+  // Links of the project or pack under the pointer. Nothing changes when the
+  // pointed card has no link at all.
+  const isHot = (l) => !!hot && (hot.kind === 'project' ? l.projectId === hot.id : l.ppId === hot.id);
+  const lit = lines.some(isHot);
+  const drawn = lit ? [...lines].sort((a, b) => Number(isHot(a)) - Number(isHot(b))) : lines;   // lit links on top
+
   return (
     <svg aria-hidden="true" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: maxY, pointerEvents: 'none', overflow: 'visible' }}>
-      {lines.map((l) => {
+      {drawn.map((l) => {
         const dx = (l.x2 - l.x1) * 0.4;
+        const strong = lit && isHot(l);
         return (
           <path
             key={l.key}
             d={`M${l.x1} ${l.y1} C${l.x1 + dx} ${l.y1}, ${l.x2 - dx} ${l.y2}, ${l.x2} ${l.y2}`}
             fill="none"
             stroke={l.color}
-            strokeWidth={LINE_WIDTH}
+            strokeWidth={strong ? LINE_WIDTH_HOT : LINE_WIDTH}
             strokeLinecap="round"
-            opacity={l.opacity}
+            opacity={!lit ? l.opacity : strong ? 1 : l.opacity * LINE_CALM}
           />
         );
       })}
@@ -459,6 +483,20 @@ export default function DashboardPage() {
     try { window.localStorage.setItem(ZOOM_KEY, String(next)); } catch { /* no storage: the zoom still works for this visit */ }
   };
 
+  // ─── Category picked in the legend ───
+  // One category at a time, a second click clears it. Only the packs of that
+  // category stay; batches of the other categories stay in place, faded, and
+  // lose their links. Projects and their completion are not touched. Not kept
+  // between visits: the board always opens complete.
+  const [onlyType, setOnlyType] = useState(null);
+
+  // ─── Project or pack under the pointer (its links are drawn stronger) ───
+  const [hot, setHot] = useState(null);
+  const pointAt = (kind, id) => ({
+    onMouseEnter: () => setHot({ kind, id }),
+    onMouseLeave: () => setHot(null),
+  });
+
   const deliveryData = useMemo(() => {
     return visibleProjects.map((project) => {
       const batches = project.batches || [];
@@ -534,7 +572,10 @@ export default function DashboardPage() {
     const packEls = elementsBy(column, 'data-pp-id');
 
     let previousTarget = 0;
-    const wanted = productionPacks.map((pp, index) => {
+    const wanted = [];
+    productionPacks.forEach((pp, index) => {
+      const packEl = packEls.get(pp.id);
+      if (!packEl) return;   // not on the board (another category is picked in the legend)
       const mids = (pp.assignments || [])
         .map(({ batchId }) => batchEls.get(batchId))
         .filter(Boolean)
@@ -542,7 +583,7 @@ export default function DashboardPage() {
       // a pack with no batch on the board stays right under the pack listed before it
       const target = mids.length ? mids.reduce((sum, y) => sum + y, 0) / mids.length : previousTarget;
       previousTarget = target;
-      return { id: pp.id, index, target, height: packEls.get(pp.id)?.offsetHeight || 0 };
+      wanted.push({ id: pp.id, index, target, height: packEl.offsetHeight });
     });
     const heightStep = (pack) => Math.round(pack.target / (BATCH_H + BATCH_GAP));
     wanted.sort((a, b) => heightStep(a) - heightStep(b) || a.index - b.index);
@@ -584,13 +625,18 @@ export default function DashboardPage() {
     return () => { alive = false; cancelAnimationFrame(frame); observer.disconnect(); };
   }, []);
 
+  const shownPackCards = useMemo(
+    () => (onlyType ? packCards.filter((card) => card.categories.includes(onlyType)) : packCards),
+    [packCards, onlyType],
+  );
+
   const orderedPackCards = useMemo(() => {
     const position = new Map(packPlan.order.map((id, i) => [id, i]));
-    return packCards
+    return shownPackCards
       .map((card, i) => ({ card, rank: position.has(card.pp.id) ? position.get(card.pp.id) : packPlan.order.length + i }))
       .sort((a, b) => a.rank - b.rank)
       .map((entry) => entry.card);
-  }, [packCards, packPlan]);
+  }, [shownPackCards, packPlan]);
 
   const handleAssign = (batchId, projectId, ppId) => {
     const currentPP = getPackForBatch(projectId, batchId);
@@ -674,14 +720,26 @@ export default function DashboardPage() {
             <p className="text-[12px] text-ink-400 mt-0.5">Assign batches to production packs · track project completion</p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 ml-auto">
-            {/* Category key */}
-            <div className="flex items-center gap-3 text-[12px] text-ink-200">
-              {Object.keys(TYPE_COLORS).map((type) => (
-                <span key={type} className="flex items-center gap-1.5 whitespace-nowrap">
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: typeColor(type).dot }} />
-                  {typeLabel(type)}
-                </span>
-              ))}
+            {/* Category key: click a category to see only its production packs */}
+            <div className="flex items-center gap-1 text-[12px]" role="group" aria-label="Show one category">
+              {Object.keys(TYPE_COLORS).map((type) => {
+                const tc = typeColor(type);
+                const active = onlyType === type;
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setOnlyType(active ? null : type)}
+                    aria-pressed={active}
+                    title={active ? 'Show all production packs' : `Show only ${typeLabel(type)} production packs`}
+                    className={`flex items-center gap-1.5 h-7 px-2 rounded-md border whitespace-nowrap transition-colors ${active ? '' : 'border-transparent text-ink-200 hover:text-ink-50 hover:bg-surface-600'} ${onlyType && !active ? 'opacity-50' : ''}`}
+                    style={active ? { background: tc.bg, borderColor: tc.border, color: tc.text } : undefined}
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: tc.dot }} />
+                    {typeLabel(type)}
+                  </button>
+                );
+              })}
             </div>
             {/* Zoom */}
             <div className="flex items-center rounded-lg border border-surface-500 overflow-hidden" role="group" aria-label="Board zoom">
@@ -721,7 +779,7 @@ export default function DashboardPage() {
               className="input text-[13px] w-[220px]"
             />
             <div className="text-[12px] text-ink-400 whitespace-nowrap">
-              {visibleProjects.length}/{projects.length} projects · {productionPacks.length} packs
+              {visibleProjects.length}/{projects.length} projects · {onlyType ? `${shownPackCards.length}/` : ''}{productionPacks.length} packs
             </div>
           </div>
         </div>
@@ -739,7 +797,13 @@ export default function DashboardPage() {
               transformOrigin: '0 0',
             }}
           >
-            <ConnectionLines containerRef={containerRef} projects={projects} productionPacks={productionPacks} />
+            <ConnectionLines
+              containerRef={containerRef}
+              projects={projects}
+              productionPacks={productionPacks}
+              onlyType={onlyType}
+              hot={hot}
+            />
 
             {/* Column headers: these name the four stages of the board, so they
                 must read as headings, not as hint text under the page subtitle. */}
@@ -780,6 +844,7 @@ export default function DashboardPage() {
                     <div
                       className={`flex items-center min-w-0 ${band}`}
                       style={{ gridColumn: COL.band, gridRow: row, gap: BAND_GAP, padding: BAND_PAD }}
+                      {...pointAt('project', project.id)}
                     >
                       <div
                         data-project-id={project.id}
@@ -848,21 +913,23 @@ export default function DashboardPage() {
                           const assignedPP = getPackForBatch(project.id, batch.id);
                           const winCount = batch.windows?.length || 0;
                           const batchLabel = `${typeLabel(batch.type)} ×${winCount}`;
+                          const dimmed = !!onlyType && (batch.type || 'sash') !== onlyType;
 
                           return (
                             <div
                               key={batch.id}
                               data-batch-id={batch.id}
-                              className="flex items-center gap-2 rounded-lg pl-3 pr-2"
-                              style={{ height: BATCH_H, background: tc.bg, border: `1px solid ${tc.border}` }}
+                              className="flex items-center gap-2 rounded-lg pl-3 pr-2 transition-opacity"
+                              style={{ height: BATCH_H, background: tc.bg, border: `1px solid ${tc.border}`, opacity: dimmed ? DIMMED_OPACITY : 1 }}
                             >
                               <span className="w-2 h-2 rounded-full shrink-0" style={{ background: tc.dot }} />
                               <span className="text-[14px] font-semibold truncate min-w-0" style={{ color: tc.text }} title={batchLabel}>
                                 {batchLabel}
                               </span>
                               {/* The assign control takes the room the label leaves and shortens
-                                  its own text first; the label gives way only below a clickable minimum. */}
-                              <span className="flex justify-end" style={{ flex: '1 1 0%', minWidth: 60 }}>
+                                  its own text first (the full pack name stays in its tooltip and on
+                                  the pack card); the label gives way only below a clickable minimum. */}
+                              <span className="flex justify-end" style={{ flex: '1 1 0%', minWidth: 40 }}>
                                 <BatchAssignDropdown
                                   batchId={batch.id}
                                   projectId={project.id}
@@ -884,6 +951,7 @@ export default function DashboardPage() {
                     <div
                       className={`flex items-center min-w-0 ${band}`}
                       style={{ gridColumn: COL.complete, gridRow: row, padding: BAND_PAD }}
+                      {...pointAt('project', project.id)}
                     >
                       <div
                         data-delivery-id={d.projectId}
@@ -933,6 +1001,7 @@ export default function DashboardPage() {
                       key={pp.id}
                       className="relative group"
                       style={{ marginTop: packPlan.gaps[pp.id] ?? (i === 0 ? 0 : PACK_GAP) }}
+                      {...pointAt('pack', pp.id)}
                     >
                       <div
                         data-pp-id={pp.id}

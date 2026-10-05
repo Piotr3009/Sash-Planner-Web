@@ -65,7 +65,9 @@ function drawHeader(doc, PG, info, pageNum, totalPages) {
   doc.setLineWidth(LW.sep);
   doc.line(x, y + HEADER_H, x + w, y + HEADER_H);
 
-  const col1 = 80, col2 = w - 70, col3 = w - 35;
+  // The date cell (col2 → col3) is 43 mm wide: a 12 pt date is about 21 mm and
+  // has to end well before the Rev cell.
+  const col1 = 80, col2 = w - 78, col3 = w - 35;
   doc.setLineWidth(LW.borderIn);
   doc.line(x + col1, y, x + col1, y + HEADER_H);
   doc.line(x + col2, y, x + col2, y + HEADER_H);
@@ -109,7 +111,7 @@ function drawHeader(doc, PG, info, pageNum, totalPages) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   tc(doc, C.black);
-  doc.text(info.date, x + col2 + 20, y + 14);
+  doc.text(info.date, x + col2 + 15, y + 14);
   doc.text(String(info.totalSections), x + col2 + 28, y + HEADER_H / 2 + 14);
 
   // Rev / Page
