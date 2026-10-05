@@ -40,6 +40,7 @@ import { buildProductionBook } from '../utils/productionBookExport.js';
 import { svgNodeToPng, loadImageSize } from '../utils/svgRaster.js';
 import { getColorName } from '../config.js';
 import { getPartSymbol } from '../engine/partSymbols.js';
+import { partColourForElement, partColourForCutSymbol, barLabelThatFits } from '../engine/partColours.js';
 
 import FrontElevation2D from '../components/drawings/FrontElevation2D.jsx';
 import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
@@ -1458,6 +1459,18 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
   const [stockLengths, setStockLengths] = useState(savedPrecut?.stockLengths || {});
   const [offcutsMap, setOffcutsMap] = useState(savedPrecut?.offcuts || {}); // key → [length, ...]
   const [offcutInput, setOffcutInput] = useState({}); // key → current input string (not persisted)
+  // Colour by part (05.10.2026): on unless switched off for this pack; drives
+  // the bars here, the Pre-Cut PDF and the colour chips of the Cut List.
+  const [colourByPart, setColourByPart] = useState(savedPrecut?.colourByPart !== false);
+  // Width of the tab, to tell whether a piece label fits its piece on screen.
+  const tabEl = useRef(null);
+  const [tabWidth, setTabWidth] = useState(0);
+  const attachTab = useCallback((el) => { tabEl.current = el; if (el) setTabWidth(el.clientWidth || 0); }, []);
+  useEffect(() => {
+    const onResize = () => { if (tabEl.current) setTabWidth(tabEl.current.clientWidth || 0); };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   const [expandedGroups, setExpandedGroups] = useState({});
   const [expandedTables, setExpandedTables] = useState({}); // inner element-table toggle (collapsed by default)
 
@@ -1469,8 +1482,8 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
     if (!didMountPrecut.current) { didMountPrecut.current = true; return; }
     const targetId = isPPMode ? pp?.id : batch?.id;
     if (!targetId) return;
-    persistPrecut(targetId, isPPMode, { stockLengths, offcuts: offcutsMap });
-  }, [stockLengths, offcutsMap]);
+    persistPrecut(targetId, isPPMode, { stockLengths, offcuts: offcutsMap, colourByPart });
+  }, [stockLengths, offcutsMap, colourByPart]);
 
   if (!merged?.precut) {
     return <div className="card p-8 text-center text-ink-400">No pre-cut data available.</div>;
@@ -1593,12 +1606,22 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
       isPPMode,
       format: exportFormat,
       content,
+      colourByPart,
     });
   };
   registerExport('precut', handleExportPDF);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" ref={attachTab}>
+      <div className="flex items-center justify-end gap-3">
+        <span className="text-xs text-ink-300">Colour by part</span>
+        <button type="button" role="switch" aria-checked={colourByPart} aria-label="Colour by part"
+          onClick={() => setColourByPart((v) => !v)}
+          title="Colour the pieces by part (casement): screen, Pre-Cut PDF and Cut List"
+          className={`w-14 h-7 rounded-full text-[11px] font-bold transition-colors ${colourByPart ? 'bg-accent-500 text-white' : 'bg-surface-500 text-ink-200'}`}>
+          {colourByPart ? 'ON' : 'OFF'}
+        </button>
+      </div>
       {allGroups.map((group) => {
         const optGroup = getOptGroup(group);
         const isExpanded = expandedGroups[group.key] !== false; // default expanded
@@ -1716,18 +1739,26 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
                                     const left = (cursor / barStock) * 100;
                                     const width = (cutLen / barStock) * 100;
                                     cursor += cutLen + (settings?.kerf || 3);
+                                    // Colour by part, and the label rule: the full description when
+                                    // it fits the piece, otherwise the dimension alone (same font).
+                                    const partColour = colourByPart ? partColourForElement(elName) : null;
+                                    const barPx = Math.max(0, tabWidth - 208) * (barWidthPct / 100);
+                                    const piecePx = barPx * (cutLen / barStock);
+                                    const shown = tabWidth
+                                      ? barLabelThatFits(`${label} ${cutLen}`.trim(), String(cutLen), piecePx - 4, (t) => t.length * 4.6)
+                                      : String(cutLen);
                                     return (
                                       <div key={idx}
                                         className="absolute inset-y-0 border-r border-surface-800 text-[8px] text-white flex items-center justify-center overflow-hidden px-0.5"
                                         style={{
                                           left: `${left}%`,
                                           width: `${width}%`,
-                                          background: bar.isOffcut ? 'rgba(217,161,53,0.6)' : 'rgba(0,180,160,0.6)',
+                                          background: partColour ? partColour.hex : (bar.isOffcut ? 'rgba(217,161,53,0.6)' : 'rgba(0,180,160,0.6)'),
+                                          color: partColour ? '#111111' : undefined,
+                                          fontWeight: partColour ? 700 : undefined,
                                         }}
-                                        title={`${label} ${cutLen} mm${elName ? ' — ' + elName : ''}`}>
-                                        <span className="truncate">
-                                          {cutLen > barStock * 0.08 ? `${label} ${cutLen}` : (label || '')}
-                                        </span>
+                                        title={`${label} ${cutLen} mm${elName ? ' — ' + elName : ''}${partColour ? ' · ' + partColour.name : ''}`}>
+                                        <span className="truncate">{shown}</span>
                                       </div>
                                     );
                                   })}
@@ -1937,12 +1968,18 @@ function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat,
 
   const totalPieces = merged.cutList.reduce((s, c) => s + (c.quantity || 1), 0);
 
+  // Colour by part: the switch lives on the Pre-Cut tab and is saved with the
+  // pack; a group shows the colour of the compartment its pieces were put in.
+  const colourByPart = (isPPMode ? pp?.precutSettings : batch?.defaults?.precutSettings)?.colourByPart !== false;
+  const groupColour = (symbol) => (colourByPart ? partColourForCutSymbol(symbol) : null);
+
   const handleExport = () => {
     const company = useProjectStore.getState().settings.company || {};
     const projects = [...new Set(merged.cutList.map((c) => c._projectNumber).filter(Boolean))];
     const groups = byElement.map((g) => {
       const m = getMaterialForElement(g.element);
       return {
+        colour: groupColour(g.symbolInfo?.symbol)?.hex || null,
         symbol: g.symbolInfo?.symbol || '',
         element: g.element,
         mirror: g.symbolInfo?.mirror,
@@ -2000,6 +2037,10 @@ function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat,
               ))}
               <div className="flex-1">
                 <div className="flex items-center gap-2">
+                  {groupColour(sym.symbol) && (
+                    <span className="w-5 h-5 rounded-sm border border-surface-300 shrink-0"
+                      style={{ background: groupColour(sym.symbol).hex }} title={groupColour(sym.symbol).name} />
+                  )}
                   <span className="text-xs font-mono font-bold text-accent-400 bg-accent-500/10 px-1.5 py-0.5 rounded">{sym.symbol}</span>
                   <span className="text-sm font-semibold text-ink-50">{group.element}</span>
                   {sym.mirror && (

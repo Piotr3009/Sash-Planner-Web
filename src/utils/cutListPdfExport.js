@@ -8,6 +8,7 @@
  * by factor S = A3/A4 long edge = 420/297 ≈ 1.414.
  */
 import { jsPDF } from 'jspdf';
+import { hexToRgb } from '../engine/partColours.js';
 
 // ─── Colours (shared palette with glass renderer) ───
 const C = {
@@ -191,7 +192,13 @@ export function exportCutListPDF(info) {
     const pillPad = 2.4 * S;
     const pillW = pillTextW + pillPad * 2;
     const pillH = 8 * S;
-    const pillX = x + 3 * S;
+    // Colour by part: the compartment colour of this group, before the symbol.
+    const chipW = g.colour ? 8 * S : 0;
+    if (g.colour) {
+      fc(doc, hexToRgb(g.colour)); dc(doc, C.black); doc.setLineWidth(0.2);
+      doc.rect(x + 3 * S, cardTop + (headBandH - pillH) / 2, chipW, pillH, 'FD');
+    }
+    const pillX = x + 3 * S + (g.colour ? chipW + 2 * S : 0);
     const pillY = cardTop + (headBandH - pillH) / 2;
     const pillFill = g.mirror ? C.pillBlue : C.pillGray;
     const pillText = g.mirror ? C.pillBlueT : C.pillGrayT;

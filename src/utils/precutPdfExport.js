@@ -7,6 +7,7 @@
  */
 import { jsPDF } from 'jspdf';
 import { getPartSymbol } from '../engine/partSymbols.js';
+import { PART_COLOUR_GROUPS, partColourForElement, hexToRgb, barLabelThatFits } from '../engine/partColours.js';
 
 // ─── COLORS ───
 const C = {
@@ -207,7 +208,7 @@ function drawSummaryTable(doc, PG, groups, startY, beginPage) {
 }
 
 // ─── BLO VISUALIZATION (per section page) ───
-function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf) {
+function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf, colourByPart = false) {
   const x = PG.bx + 4;
   const areaW = PG.w - 2 * PG.bx - 8;
   let y = startY;
@@ -245,18 +246,24 @@ function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf) {
       const cutX = x + (cursor / barStock) * barW;
       const cutW = (cutLen / barStock) * barW;
 
-      const color = bar.isOffcut ? C.amber : C.teal;
+      // Colour by part: the piece takes its compartment colour (offcut bars
+      // too, they keep their "(offcut N)" note); otherwise one colour as before.
+      const partColour = colourByPart ? partColourForElement(elName) : null;
+      const color = partColour ? hexToRgb(partColour.hex) : (bar.isOffcut ? C.amber : C.teal);
       fc(doc, color);
       dc(doc, [30, 30, 35]);
       doc.setLineWidth(LW.barCut);
       doc.rect(cutX, y, cutW, barH, 'FD');
 
       // Label — BLACK text (was white)
-      const label = `${projNum ? projNum + '-' : ''}${winName ? winName + '-' : ''}${sym?.symbol || ''} ${cutLen}`;
+      // Full description when it fits the piece, otherwise the dimension
+      // alone. Same font size either way.
+      const fullLabel = `${projNum ? projNum + '-' : ''}${winName ? winName + '-' : ''}${sym?.symbol || ''} ${cutLen}`.trim();
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.5);
       tc(doc, C.black);
-      if (cutW > 20) {
+      const label = barLabelThatFits(fullLabel, String(cutLen), cutW - 1.5, (t) => doc.getTextWidth(t));
+      if (label) {
         doc.text(label, cutX + cutW / 2, y + barH / 2 + 1.5, { align: 'center' });
       }
 
@@ -414,6 +421,97 @@ function drawElementTable(doc, PG, items, startY, isPPMode, sg, beginPage) {
   return y;
 }
 
+// ─── COLOUR BY PART: legend line of a section ───
+function colourGroupsIn(items) {
+  const ids = new Set((items || []).map((it) => partColourForElement(it.elementName)?.id).filter(Boolean));
+  return PART_COLOUR_GROUPS.filter((g) => ids.has(g.id));
+}
+
+function drawColourLegend(doc, x, y, groups) {
+  let cx = x;
+  groups.forEach((g) => {
+    fc(doc, hexToRgb(g.hex));
+    dc(doc, C.black);
+    doc.setLineWidth(LW.barOutline);
+    doc.rect(cx, y - 3.6, 9, 4.6, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    tc(doc, C.black);
+    doc.text(g.name, cx + 11, y);
+    cx += 11 + doc.getTextWidth(g.name) + 8;
+  });
+}
+
+// ─── COLOUR BY PART: the key sheet (frame and leaf drawn apart) ───
+// Rectangles are [x, y, w, h, colour group id] on a 340 x 400 (frame) and a
+// 200 x 400 (leaf) grid; `u` turns a grid unit into mm for the page format.
+const KEY_FRAME = [
+  [38, 126, 119, 24, 'transom'], [183, 126, 119, 24, 'transom'],
+  [157, 32, 26, 322, 'mullion'],
+  [12, 32, 26, 322, 'frame_jambs'], [302, 32, 26, 322, 'frame_jambs'],
+  [12, 6, 316, 26, 'frame_head'],
+  [2, 354, 336, 32, 'frame_cill'],
+];
+const KEY_LEAF = [
+  [40, 36, 120, 320, null],
+  [10, 6, 30, 380, 'leaf_stiles'], [160, 6, 30, 380, 'leaf_stiles'],
+  [40, 6, 120, 30, 'leaf_top_rail'],
+  [40, 356, 120, 30, 'leaf_bottom_rail'],
+];
+
+function drawColourKeyPage(doc, PG, topY) {
+  const k = PG.w / 297;      // A4 landscape = 1
+  const u = 0.2646 * k;      // one grid unit in mm
+  const byId = Object.fromEntries(PART_COLOUR_GROUPS.map((g) => [g.id, g]));
+  const x0 = PG.bx + 8 * k;
+  let y = topY + 4;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18 * k);
+  tc(doc, C.black);
+  doc.text('COLOUR KEY · CASEMENT', x0, y);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10 * k);
+  tc(doc, C.dark);
+  doc.text('One colour = one compartment', PG.w - PG.bx - 6, y, { align: 'right' });
+  y += 10 * k;
+
+  const drawPart = (title, rects, family, ox) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13 * k);
+    tc(doc, C.black);
+    doc.text(title, ox, y);
+    const top = y + 4;
+    dc(doc, C.black);
+    doc.setLineWidth(0.3);
+    let maxX = 0;
+    rects.forEach(([rx, ry, rw, rh, id]) => {
+      fc(doc, id ? hexToRgb(byId[id].hex) : [232, 241, 246]);
+      doc.rect(ox + rx * u, top + ry * u, rw * u, rh * u, 'FD');
+      maxX = Math.max(maxX, rx + rw);
+    });
+    // Legend of this drawing, to its right.
+    const lx = ox + (maxX + 22) * u;
+    let ly = top + 14 * u;
+    PART_COLOUR_GROUPS.filter((g) => g.family === family).forEach((g) => {
+      fc(doc, hexToRgb(g.hex));
+      doc.rect(lx, ly - 5 * u, 44 * u, 24 * u, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12 * k);
+      tc(doc, C.black);
+      doc.text(g.name, lx + 52 * u, ly + 9 * u);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5 * k);
+      tc(doc, C.dark);
+      doc.text(g.note, lx + 52 * u, ly + 24 * u);
+      ly += 46 * u;
+    });
+  };
+
+  drawPart('FRAME', KEY_FRAME, 'frame', x0);
+  drawPart('LEAF', KEY_LEAF, 'leaf', x0 + 610 * u);
+}
+
 // ─── MAIN EXPORT ───
 export function exportPreCutPDF({
   groups,           // [{ key, label, type, items, stockLength, materialInfo }]
@@ -427,6 +525,7 @@ export function exportPreCutPDF({
   content = 'both', // 'both' | 'graphics' | 'list'
   companySettings = {},
   returnDoc = false,
+  colourByPart = false, // colour the pieces by part + legend + key sheet
 }) {
   const PG = getPageDims(format);
   const endTrim = settings?.endTrim || 10;
@@ -514,6 +613,13 @@ export function exportPreCutPDF({
 
     y += sg.materialInfo ? 18 : 12;
 
+    // Colour by part: which colour is which part in this section.
+    const legendGroups = colourByPart && content !== 'list' ? colourGroupsIn(sg.items) : [];
+    if (legendGroups.length) {
+      drawColourLegend(doc, PG.bx + 4, y - 3, legendGroups);
+      y += 6;
+    }
+
     // BLO (skipped when exporting the list only) — first page of the material only
     if (content !== 'list') {
       doc.setFont('helvetica', 'bold');
@@ -522,7 +628,7 @@ export function exportPreCutPDF({
       doc.text('BAR LAYOUT OPTIMIZER', PG.bx + 4, y);
       y += 8;
 
-      y = drawBLO(doc, PG, sg.optGroup, sg.stockLength, y, endTrim, kerf);
+      y = drawBLO(doc, PG, sg.optGroup, sg.stockLength, y, endTrim, kerf, colourByPart);
       y += 4;
     }
 
@@ -531,6 +637,11 @@ export function exportPreCutPDF({
       y = drawElementTable(doc, PG, sg.items, y, isPPMode, sg, beginPage);
     }
   });
+
+  // Colour by part: one key sheet at the end, to hang by the saw.
+  if (colourByPart && content !== 'list' && summaryGroups.some((sg) => colourGroupsIn(sg.items).length)) {
+    drawColourKeyPage(doc, PG, beginPage());
+  }
 
   // Resolve the {tot} placeholder to the real page count on every page.
   doc.putTotalPages(NB);
