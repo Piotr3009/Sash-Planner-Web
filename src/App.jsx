@@ -22,7 +22,7 @@ const ConfiguratorPage = lazy(() => import('./pages/ConfiguratorPage.jsx'));
 const EstimateConfiguratorPage = lazy(() => import('./pages/EstimateConfiguratorPage.jsx'));
 const WindowDetailPage = lazy(() => import('./pages/WindowDetailPage.jsx'));
 const ProductionPackPage = lazy(() => import('./pages/ProductionPackPage.jsx'));
-// Post-login splash (pulls in 3D deps, so lazy-load it like the other 3D pages).
+// Lightweight post-login welcome page, loaded only when entering the app.
 const LandingPage = lazy(() => import('./pages/LandingPage.jsx'));
 
 const PageLoading = () => (
@@ -70,11 +70,13 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
 
-      {/* All protected routes share the unified sidebar via MainLayout */}
-      <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-        <Route index element={
+      {/* The welcome page has its own full-width shell; workspace routes keep the sidebar. */}
+      <Route path="/" element={
+        <ProtectedRoute>
           <Suspense fallback={<PageLoading />}><LandingPage /></Suspense>
-        } />
+        </ProtectedRoute>
+      } />
+      <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="estimates" element={<EstimatesPage />} />
         <Route path="estimates/:estimateId/configure" element={
