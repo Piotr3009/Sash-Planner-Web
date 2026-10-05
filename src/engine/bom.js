@@ -11,7 +11,13 @@
  *   buildWindowHardware(windowSpec, batch, ironmongeryItems)
  *     → [{ line, product }]                 (ironmongeryStore products via batch slots)
  *
- * mergeWindowMaterials(...) sums many windows into a flat purchase list.
+ * One list on top of them:
+ *   buildWindowMaterialLines(win, ctx)  → the material lines of ONE window
+ *   windowBomCards(lines)               → that window's BOM tab (cards)
+ *   mergeWindowMaterials(windows, ctx)  → the sum of every window's lines =
+ *                                         the purchase list of a project / pack
+ * Nothing else may count a window's materials: a second loop on a page is how
+ * the single window and its purchase list drifted apart (05.10.2026).
  */
 
 import { buildPrecutForWindow, buildHardwareList } from './lists.js';
@@ -351,115 +357,153 @@ export function buildWindowHardware(windowSpec, batch, ironmongeryItems = [], de
 }
 
 /**
- * Merge many windows into ONE flat purchase list (Project Materials).
- * Simple addition: same material → quantities sum. Mixed window types OK.
+ * Material lines of ONE window — the single source of every material list.
  *
- * windows: [{ derived, windowSpec, batch }]
- * Returns: [{ key, name, qty, unit, costPerUnit, source, material|product|null }]
+ * "Single window first; a project or a pack is the sum of single windows"
+ * (Piotr 07.09.2026). The window's BOM tab draws its cards from these lines
+ * (windowBomCards) and the purchase list of a project / pack is nothing but
+ * their sum (mergeWindowMaterials), so a window cannot show anything its
+ * purchase list does not. Until 05.10.2026 the tab built its cards with a
+ * second loop of its own: it listed the engine-picked casement hardware twice
+ * (a ghost "unassigned" card per hinge / lock line) and never showed the
+ * custom consumables.
+ *
+ * win: { derived, windowSpec, batch }
+ * Returns one line per counted item, in list order — custom consumables, the
+ * Assign Materials rows, the client-chosen hardware:
+ *   { key, name, unit, qty, costPerUnit, source, material | product, _assigned,
+ *     part?       the Assign Materials row or custom consumable behind the line
+ *     yieldCoeff? the row multiplier already applied to qty
+ *     custom?     true for a custom consumable
+ *     line?       the hardware line behind an ironmongery line }
+ * The first eight fields are the purchase-list row; the rest is detail for the
+ * single window.
+ */
+export function buildWindowMaterialLines(win, { assignments, assignmentsData, materials, ALL_PARTS, ironmongeryItems, settings }) {
+  const { derived, windowSpec, batch } = win || {};
+  if (!derived || !windowSpec) return [];
+  const lines = [];
+
+  // ── materialAssignmentStore parts (timber/beading/glass/consumables/paint) ──
+  const frameType = windowSpec?.frame?.type || 'standard';
+  const resolveRaw = makeRawResolver({ assignments, assignmentsData, materials, frameType });
+  const partQtys = buildWindowPartQtys(derived, windowSpec, settings, resolveRaw);
+
+  // ── User-defined consumables: fixed quantity per window ──
+  (assignmentsData?.customParts || []).forEach((cp) => {
+    const assignment = effectiveAssignment(cp.id, frameType, assignmentsData, assignments);
+    const yieldCoeff = assignment?.yield || 1.0;
+    const total = (Number(cp.qtyPerWindow) || 0) * yieldCoeff;
+    if (!total) return;
+    const mat = assignment?.material_id ? materials.find((m) => m.id === assignment.material_id) : null;
+    if (mat) {
+      lines.push({
+        key: `mat:${mat.id}`, name: mat.name, unit: cp.unit || 'pcs',
+        costPerUnit: Number(mat.cost_per_unit) || 0,
+        source: 'material', material: mat, _assigned: true,
+        qty: total, part: cp, yieldCoeff, custom: true,
+      });
+    } else {
+      lines.push({
+        key: `part:${cp.id}`, name: cp.name, unit: cp.unit || 'pcs',
+        costPerUnit: 0, source: 'part', material: null, _assigned: false,
+        qty: total, part: cp, yieldCoeff, custom: true,
+      });
+    }
+  });
+
+  ALL_PARTS.forEach((part) => {
+    const entry = partQtys[part.id];
+    if (!entry) return;
+    const assignment = effectiveAssignment(part.id, frameType, assignmentsData, assignments);
+    const yieldCoeff = assignment?.yield || 1.0;
+    const { total, unit } = resolvePartTotal(entry, yieldCoeff);
+    if (!total) return;
+
+    if (assignment?.material_id) {
+      // Hinge / lock / restrictor rows are assigned from the Ironmongery
+      // catalogue (IRN-xxx) since 05.10.2026 — look the id up there too.
+      const mat = materials.find((m) => m.id === assignment.material_id)
+        || (ironmongeryItems || []).find((m) => m.id === assignment.material_id);
+      if (mat) {
+        lines.push({
+          key: `mat:${mat.id}`,
+          name: mat.name,
+          unit,
+          costPerUnit: Number(mat.cost_per_unit) || 0,
+          source: 'material',
+          material: mat,
+          _assigned: true,
+          qty: total, part, yieldCoeff,
+        });
+        return;
+      }
+    }
+    // Unassigned — one line per part so the user sees what needs assigning
+    lines.push({
+      key: `part:${part.id}`,
+      name: part.name,
+      unit,
+      costPerUnit: 0,
+      source: 'material',
+      material: null,
+      _assigned: false,
+      qty: total, part, yieldCoeff,
+    });
+  });
+
+  // ── ironmongeryStore products (via batch slots) ──
+  buildWindowHardware(windowSpec, batch, ironmongeryItems, derived).forEach(({ line, product }) => {
+    // Engine-picked casement hardware is already above as an Assign Materials
+    // row — a hardware line of its own doubled it as an "unassigned" item
+    // (05.10.2026).
+    if (line.enginePart) return;
+    const qty = Number(line.quantity) || 0;
+    if (!qty) return;
+    if (product) {
+      lines.push({
+        key: `irn:${product.id}`,
+        name: product.name,
+        unit: product.unit || 'pcs',
+        costPerUnit: Number(product.cost_per_unit) || 0,
+        source: 'ironmongery',
+        product,
+        _assigned: true,
+        qty, line,
+      });
+    } else {
+      lines.push({
+        key: `hw:${line.item}`,
+        name: line.item,
+        unit: 'pcs',
+        costPerUnit: 0,
+        source: 'ironmongery',
+        product: null,
+        _assigned: false,
+        qty, line,
+      });
+    }
+  });
+
+  return lines;
+}
+
+/**
+ * Sum material lines into purchase-list rows: same key → quantities add up.
+ * Returns: [{ key, qty, name, unit, costPerUnit, source, material|product, _assigned }]
  *   sorted with assigned materials first, then unassigned.
  */
-export function mergeWindowMaterials(windows, { assignments, assignmentsData, materials, ALL_PARTS, ironmongeryItems, settings }) {
-  // key → { name, qty, unit, costPerUnit, source, material/product, _assigned }
+export function mergeMaterialLines(lines) {
+  // key → { qty, name, unit, costPerUnit, source, material/product, _assigned }
   const acc = {};
-
-  const bump = (key, fields, addQty) => {
-    if (!acc[key]) acc[key] = { qty: 0, ...fields };
-    acc[key].qty += addQty;
-  };
-
-  windows.forEach(({ derived, windowSpec, batch }) => {
-    if (!derived || !windowSpec) return;
-
-    // ── materialAssignmentStore parts (timber/beading/glass/consumables/paint) ──
-    const frameType = windowSpec?.frame?.type || 'standard';
-    const resolveRaw = makeRawResolver({ assignments, assignmentsData, materials, frameType });
-    const partQtys = buildWindowPartQtys(derived, windowSpec, settings, resolveRaw);
-
-    // ── User-defined consumables: fixed quantity per window ──
-    (assignmentsData?.customParts || []).forEach((cp) => {
-      const assignment = effectiveAssignment(cp.id, frameType, assignmentsData, assignments);
-      const yieldCoeff = assignment?.yield || 1.0;
-      const total = (Number(cp.qtyPerWindow) || 0) * yieldCoeff;
-      if (!total) return;
-      const mat = assignment?.material_id ? materials.find((m) => m.id === assignment.material_id) : null;
-      if (mat) {
-        bump(`mat:${mat.id}`, {
-          name: mat.name, unit: cp.unit || 'pcs',
-          costPerUnit: Number(mat.cost_per_unit) || 0,
-          source: 'material', material: mat, _assigned: true,
-        }, total);
-      } else {
-        bump(`part:${cp.id}`, {
-          name: cp.name, unit: cp.unit || 'pcs',
-          costPerUnit: 0, source: 'part', material: null, _assigned: false,
-        }, total);
-      }
-    });
-
-    ALL_PARTS.forEach((part) => {
-      const entry = partQtys[part.id];
-      if (!entry) return;
-      const assignment = effectiveAssignment(part.id, frameType, assignmentsData, assignments);
-      const yieldCoeff = assignment?.yield || 1.0;
-      const { total, unit } = resolvePartTotal(entry, yieldCoeff);
-      if (!total) return;
-
-      if (assignment?.material_id) {
-        // Hinge / lock / restrictor rows are assigned from the Ironmongery
-        // catalogue (IRN-xxx) since 05.10.2026 — look the id up there too.
-        const mat = materials.find((m) => m.id === assignment.material_id)
-          || (ironmongeryItems || []).find((m) => m.id === assignment.material_id);
-        if (mat) {
-          bump(`mat:${mat.id}`, {
-            name: mat.name,
-            unit,
-            costPerUnit: Number(mat.cost_per_unit) || 0,
-            source: 'material',
-            material: mat,
-            _assigned: true,
-          }, total);
-          return;
-        }
-      }
-      // Unassigned — group by part so the user sees what needs assigning
-      bump(`part:${part.id}`, {
-        name: part.name,
-        unit,
-        costPerUnit: 0,
-        source: 'material',
-        material: null,
-        _assigned: false,
-      }, total);
-    });
-
-    // ── ironmongeryStore products (via batch slots) ──
-    buildWindowHardware(windowSpec, batch, ironmongeryItems, derived).forEach(({ line, product }) => {
-      // Engine-picked casement hardware is already in the list above as an
-      // Assign Materials row — listing the hardware line too doubled it as an
-      // "unassigned" row (05.10.2026).
-      if (line.enginePart) return;
-      const qty = Number(line.quantity) || 0;
-      if (!qty) return;
-      if (product) {
-        bump(`irn:${product.id}`, {
-          name: product.name,
-          unit: product.unit || 'pcs',
-          costPerUnit: Number(product.cost_per_unit) || 0,
-          source: 'ironmongery',
-          product,
-          _assigned: true,
-        }, qty);
-      } else {
-        bump(`hw:${line.item}`, {
-          name: line.item,
-          unit: 'pcs',
-          costPerUnit: 0,
-          source: 'ironmongery',
-          product: null,
-          _assigned: false,
-        }, qty);
-      }
-    });
+  (lines || []).forEach((l) => {
+    if (!acc[l.key]) {
+      // The first line of a key names the row; the single-window detail
+      // (part / yieldCoeff / custom / line) stays behind.
+      const { key, qty, part, yieldCoeff, custom, line, ...fields } = l;
+      acc[l.key] = { qty: 0, ...fields };
+    }
+    acc[l.key].qty += l.qty;
   });
 
   const rows = Object.entries(acc).map(([key, v]) => ({ key, ...v }));
@@ -469,4 +513,76 @@ export function mergeWindowMaterials(windows, { assignments, assignmentsData, ma
     return a.name.localeCompare(b.name);
   });
   return rows;
+}
+
+/**
+ * Merge many windows into ONE flat purchase list (Project Materials, pack BOM).
+ * Simple addition of every window's lines: same material → quantities sum.
+ * Mixed window types OK.
+ *
+ * windows: [{ derived, windowSpec, batch }]
+ * Returns: [{ key, name, qty, unit, costPerUnit, source, material|product|null }]
+ *   sorted with assigned materials first, then unassigned.
+ */
+export function mergeWindowMaterials(windows, ctx) {
+  const lines = [];
+  (windows || []).forEach((w) => { lines.push(...buildWindowMaterialLines(w, ctx)); });
+  return mergeMaterialLines(lines);
+}
+
+/**
+ * The single window's BOM cards, from its material lines:
+ *   rows       the window's purchase-list rows (mergeMaterialLines) — cost, PDF
+ *   materials  one card per assigned material: { key, material, parts, total, unit }
+ *   unassigned { parts } — rows still to assign in Assign Materials, or null.
+ *              No total: its rows are metres, litres, pieces… (the card used to
+ *              add them all up into one number).
+ *   hardware   client-chosen products (handles, vents, sash furniture):
+ *              [{ key, line, product }] — never an engine-picked line.
+ * Every card total and unit IS the purchase-list row with the same key, and
+ * every part row carries its own { total, unit, yieldCoeff }.
+ * Cards keep the Assign Materials order; custom consumables come after it.
+ */
+export function windowBomCards(lines) {
+  const all = lines || [];
+  const rows = mergeMaterialLines(all);
+  const rowByKey = Object.fromEntries(rows.map((r) => [r.key, r]));
+  const partLines = all.filter((l) => l.part);
+  const ordered = [...partLines.filter((l) => !l.custom), ...partLines.filter((l) => l.custom)];
+
+  const cards = {};
+  const unassignedParts = [];
+  ordered.forEach((l) => {
+    const partRow = { ...l.part, total: l.qty, unit: l.unit, yieldCoeff: l.yieldCoeff, custom: !!l.custom };
+    if (!l._assigned) { unassignedParts.push(partRow); return; }
+    if (!cards[l.key]) {
+      const row = rowByKey[l.key];
+      cards[l.key] = { key: l.key, material: l.material, parts: [], total: row.qty, unit: row.unit };
+    }
+    cards[l.key].parts.push(partRow);
+  });
+
+  return {
+    rows,
+    materials: Object.values(cards),
+    unassigned: unassignedParts.length ? { parts: unassignedParts } : null,
+    hardware: all.filter((l) => l.line).map((l) => ({ key: l.key, line: l.line, product: l.product || null })),
+  };
+}
+
+/**
+ * Rows of the window BOM PDF's "HARDWARE — ENGINE SELECTION" table: every
+ * hardware line with its detail (hand split, size, "! verify" flags).
+ * `assigned` is stated for a client-chosen product only. An engine-picked line
+ * is an Assign Materials row: whether THAT row has a material is said once, in
+ * the materials table above — the table used to print "— unassigned" after
+ * every hinge and lock line whatever was assigned (05.10.2026).
+ */
+export function windowHardwareDetailRows(windowSpec, batch, ironmongeryItems = [], derived = null) {
+  return buildWindowHardware(windowSpec, batch, ironmongeryItems, derived).map(({ line, product }) => ({
+    item: product?.name || line.item,
+    detail: line.detail || '',
+    qty: line.quantity,
+    ...(line.enginePart ? {} : { assigned: !!product }),
+  }));
 }

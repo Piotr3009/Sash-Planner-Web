@@ -10,7 +10,7 @@ import { parseSpecification, normaliseToWindowSpec } from '../engine/specificati
 import { deriveWindowData } from '../engine/calculations.js';
 import { withProfiles, getCasementProfile, bsuiteActiveTarget } from '../engine/profile.js';
 import { buildGlassListForWindow, buildVentGrilles } from '../engine/lists.js';
-import { effectiveAssignment, buildWindowPartQtys, buildWindowHardware, resolvePartTotal, formatQty, mergeWindowMaterials } from '../engine/bom.js';
+import { formatQty, buildWindowMaterialLines, windowBomCards, windowHardwareDetailRows } from '../engine/bom.js';
 import { liveSectionsFor } from '../engine/partRegistry.js';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
 import ImageLightbox from '../components/ImageLightbox.jsx';
@@ -466,68 +466,46 @@ function BOMPanel({ item, windowSpec, settings, derived, batch, projectLabel }) 
   const ironmongeryItems = useIronmongeryStore((s) => s.items);
   const [zoomSrc, setZoomSrc] = useState(null);
 
-  // Build qty map per part — shared single source (bom.js)
-  const partQtys = useMemo(
-    () => buildWindowPartQtys(derived, windowSpec, settings),
-    [derived, windowSpec, settings]
-  );
+  // ONE source for this tab — the window's material lines (bom.js). The cards,
+  // the cost and the PDF below all come from them, and the purchase list of
+  // the project / pack is the sum of the very same lines, so this window can
+  // never show anything its purchase list does not (Piotr: single window
+  // first, the list is the sum of single windows). No quantity is counted here.
+  const bom = useMemo(() => {
+    if (!derived || !windowSpec) return { rows: [], materials: [], unassigned: null, hardware: [] };
+    return windowBomCards(buildWindowMaterialLines(
+      { derived, windowSpec, batch },
+      { assignments, assignmentsData, materials, ALL_PARTS, ironmongeryItems, settings },
+    ));
+  }, [derived, windowSpec, batch, assignments, assignmentsData, materials, ironmongeryItems, settings]);
 
-  // Group by material (same structure as Project Materials)
+  // Material cards (same structure as Project Materials) + one card of the
+  // rows still to assign. Section: LIVE finished dims from the profile (per
+  // this window's frame variant) — static list labels never show invented
+  // material sizes. A custom consumable has no section and no pcs.
   const bomGroups = useMemo(() => {
-    const matMap = {};
-    const unassigned = { material: null, parts: [], total: 0, unit: 'm' };
-
     const frameType = windowSpec?.frame?.type || 'standard';
     const sashProfile = batch?.defaults?.sashProfile || useWindowProfileStore.getState().sash;
-    ALL_PARTS.forEach((part) => {
-      const entry = partQtys[part.id];
-      if (!entry) return;
-
-      const assignment = effectiveAssignment(part.id, frameType, assignmentsData, assignments);
-      const yieldCoeff = assignment?.yield || 1.0;
-      const { total, unit } = resolvePartTotal(entry, yieldCoeff);
-      const pcsTotal = part.pcs;
-      // Section: LIVE finished dims from the profile (per this window's frame
-      // variant) — static list labels never show invented material sizes.
-      const live = liveSectionsFor(part.id, sashProfile, frameType);
-      const partData = { ...part, section: live?.section || part.section || '—', pcsTotal, total, unit, yield: yieldCoeff };
-
-      if (assignment?.material_id) {
-        const matId = assignment.material_id;
-        const mat = materials.find((m) => m.id === matId) || ironmongeryItems.find((m) => m.id === matId);
-        if (mat) {
-          if (!matMap[matId]) matMap[matId] = { material: mat, parts: [], total: 0, unit };
-          matMap[matId].parts.push(partData);
-          matMap[matId].total += total;
-          matMap[matId].unit = unit;
-          return;
-        }
-      }
-      unassigned.parts.push(partData);
-      unassigned.total += total;
-      unassigned.unit = unit;
+    const partData = (part) => ({
+      ...part,
+      section: part.custom ? '—' : (liveSectionsFor(part.id, sashProfile, frameType)?.section || part.section || '—'),
+      pcsTotal: part.custom ? '—' : part.pcs,
+      yield: part.yieldCoeff,
     });
-
-    const groups = Object.values(matMap);
-    if (unassigned.parts.length > 0) groups.push(unassigned);
+    const groups = bom.materials.map((g) => ({ material: g.material, parts: g.parts.map(partData), total: g.total, unit: g.unit }));
+    // No total on the unassigned card: its rows are metres, litres, pieces…
+    if (bom.unassigned) groups.push({ material: null, parts: bom.unassigned.parts.map(partData) });
     return groups;
-  }, [partQtys, assignments, assignmentsData, materials, ironmongeryItems, windowSpec, batch]);
+  }, [bom, windowSpec, batch]);
 
-  // Ironmongery (hardware) as card-A groups — shared single source (bom.js)
-  const hardwareGroups = useMemo(
-    () => buildWindowHardware(windowSpec, batch, ironmongeryItems, derived),
-    [windowSpec, batch, ironmongeryItems, derived]
-  );
+  // Ironmongery cards: the client-chosen products only (handles, vents, sash
+  // furniture). Engine-picked casement hardware — hinges, locks, restrictors,
+  // wedge packers — is an Assign Materials row and sits in the cards above.
+  const hardwareGroups = bom.hardware;
 
-  // Total material + ironmongery for this one window — same source as Project
-  // Materials / BOM export (mergeWindowMaterials), so figures match everywhere.
-  const bomRows = useMemo(() => {
-    if (!derived || !windowSpec) return [];
-    return mergeWindowMaterials(
-      [{ derived, windowSpec, batch }],
-      { assignments, assignmentsData, materials, ALL_PARTS, ironmongeryItems, settings }
-    );
-  }, [derived, windowSpec, batch, assignments, assignmentsData, materials, ironmongeryItems, settings]);
+  // Total material + ironmongery for this one window — the same rows as
+  // Project Materials / BOM export, so figures match everywhere.
+  const bomRows = bom.rows;
 
   const windowCost = useMemo(
     () => bomRows.reduce((s, r) => s + (r.costPerUnit > 0 ? r.qty * r.costPerUnit : 0), 0),
@@ -558,12 +536,7 @@ function BOMPanel({ item, windowSpec, settings, derived, batch, projectLabel }) 
       total: `£${windowCost.toFixed(2)}`,
       // Engine hardware picks with hands/sizes/kit detail — the merged rows
       // above only carry summed quantities (PDF audit item 1).
-      hardware: hardwareGroups.map(({ line, product }) => ({
-        item: product?.name || line.item,
-        detail: line.detail || '',
-        qty: line.quantity,
-        assigned: !!product,
-      })),
+      hardware: windowHardwareDetailRows(windowSpec, batch, ironmongeryItems, derived),
     });
   };
 
@@ -614,8 +587,10 @@ function BOMPanel({ item, windowSpec, settings, derived, batch, projectLabel }) 
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-sm font-semibold text-ink-100">{formatQty(group.total, group.unit)}</div>
-                <div className="text-[10px] text-ink-400">total</div>
+                <div className="text-sm font-semibold text-ink-100">
+                  {group.material ? formatQty(group.total, group.unit) : `${group.parts.length} ${group.parts.length === 1 ? 'part' : 'parts'}`}
+                </div>
+                <div className="text-[10px] text-ink-400">{group.material ? 'total' : 'to assign'}</div>
               </div>
             </div>
 
