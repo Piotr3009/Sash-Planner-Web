@@ -4,6 +4,139 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-10-06 · TURA PC: CASEMENT LEAF 64 AND TRANSOM SEAT 8.5 (branch `claude/casement-leaf-64`)
+
+Owner decisions (Piotr, 06.10.2026): **A.** the four casement leaf members are 64 wide everywhere (were 67);
+**B.** the transom seat is 8.5 (was 8; the joint needs 8.6, 8.5 is enough).
+
+### Stage 0: baseline and impact analysis (no code changes)
+
+Starting commit **5459f5b** (`main`, 06.10.2026). `git diff f6a86db 5459f5b -- src` is empty: the facts the brief
+verified on f6a86db hold unchanged, and every number of its section 2 was reproduced below (040L 1000 x 1200:
+leaf 898 x 1102, glass 787 x 991, beading 4089, leaf 27 kg, weights 26.3 / 16.4 / 44.8; transoms 906 / 1706 / 840).
+
+**Suite on the starting commit: 23 harnesses, 2218 checks, 0 failures. `npm run build` OK (16.9 s).**
+
+| harness | checks | | harness | checks | | harness | checks |
+|---|---|---|---|---|---|---|---|
+| t16 | 368 | | t23 | 81 | | t33_bar_grid | 43 |
+| t17_edges | 70 | | t24_stage4 | 26 | | parity t31_bars_8x8 | 18 |
+| t18 | 179 | | t25 | 225 | | parity t32_bsuite | 54 |
+| t19 | 280 | | t26 | 38 | | parity t34_glass_minus1 | 41 |
+| t20 | 117 | | t27 | 87 | | parity t35_locks | 51 |
+| t20_bars | 31 | | t28 | 50 | | parity t36_hinges | 110 |
+| t21 | 120 | | t29 | 34 | | parity t37_single_window_bom | 47 |
+| t22 | 118 | | t30_preview | 30 | | | |
+
+Run as night 8 recorded: `verify/arch/t*.mjs` minus the `*baseline*` generators, plus `verify/parity/*.mjs`, each
+with `node <file>`, after `npm ci` and `pip install ezdxf`. `verify/parity/psw-casement-layouts.mjs` exits rc 2 (no
+PSW clone at `../psw`, PSW is outside this session): not a failure, not counted. The suite rewrites 30 files in
+`docs/handover/samples/` (t16, t18, t20, t22, t23, t25, t26, t28, t32); those are history (brief 3.4.3) and were
+restored with `git checkout` after every run. They were already out of date before this tura (the committed
+`sample_glass_rect_1000x1500_040L.dxf` still has the pre-02.10 unit 789, the engine gives 787).
+
+**The sweep.** Eight read-only agents, one area each (leaf face readers, glass deduction, transom seat consumers,
+literals 67 / 111 / 67x57, profile migration and write-back, raw stock, beading / hinges / weights, harnesses and
+fixtures). Every hit, classified:
+
+| where | what it does with the leaf face / glass / seat | class |
+|---|---|---|
+| `engine/profile.js:114-116` | `leafStile` / `leafTop` / `leafBottom` `face: 67` | literal (the source) |
+| `engine/profile.js:154` | `deductions.glass: 111`, the stored "resolved value" of 2 x (67 - 11.5) | literal |
+| `engine/profile.js:158` | `lengths.transomSeat: 8` | literal (the source) |
+| `engine/profile.js:100, 153, 191` | comments quoting 111, 2 x (67 - 11.5), 150 - 51 - 67 = 32 | comment |
+| `engine/profile.js:463-466` | glass schema 1 history (2 x (67 - 12.5) = 109) | comment, history, stays |
+| `engine/profile.js:421-424` | migration merge: a stored face / glass / seat overrides the default, no leaf or length step exists | derives (gap) |
+| `engine/profile.js:471` | glass schema 1 migration writes `D.deductions.glass` whatever the copy's face is | derives (hazard: 105 next to a stored 67) |
+| `engine/profile.js:686-689` | `profileRawForSection` compares the SECOND token (the leaf depth 57 / 61), never the face | derives, face-blind |
+| `engine/calculations.js:655` | leaf section string `${leafStile.face}x${ld}` (all leaf records, timber kg) | derives |
+| `engine/calculations.js:660-662` | `glassDed = R(2 x (leafStile.face - glassInset))`, `ded.glass` only without `glassInset` | derives (copy 1 of 3) |
+| `engine/calculations.js:698` | arched glass bottom edge `cillSide + (leafBottom.face - glassInset)` | derives |
+| `engine/calculations.js:811, 814, 991` | bar grid daylight, unit inset (`ded.glass / 2` fallback), unit bar axes | derives |
+| `engine/calculations.js:880, 900` | `C-TRANSOM` record and `transomRuns[].length` = field leaf W + `transomSeat`, both through R() | derives (the only two readers of the seat) |
+| `engine/calculations.js:843` | partial mullion = tier leaf H + `partialMullionSeat` | derives, out of scope (stays 8) |
+| `engine/calculations.js:919, 938, 1019-1020` | curved leaf members = ring centre line, leaf timber run and kg/m from the face | derives |
+| `engine/arch.js:468-472, 1391-1396` | arch / circle leaf ring `leafAtJamb` .. `+ leafTop.face`, glass offset `- glassInset` | derives |
+| `engine/arch.js:1361` | example "(800 circle: 400 / 343, 360 / 293, glass 305.5)" from the 57 / 40 / 67 / 12.5 era | comment (stale) |
+| `engine/casementBarGrid.js:110, 138` | daylight `leaf - 2 x stile`, unit origin `stile - glassInset` | derives (parameter) |
+| `engine/cnc/archDxf.js:155, 218` | CNC DXF prints the ring FACE and radii | derives |
+| `utils/glassPdfExport.js:117` | example "R 55.5/1305.5/55.5" = V1 glass radii with 40 + 67 - 12.5 | comment (stale) |
+| `components/drawings/CasementLeafDetail2D.jsx:73, 118-119` | `glassIn = deductions.glass / 2 - stile`, subtitle glass = `leaf - deductions.glass` | **stale reader** |
+| `components/drawings/CasementLeafDetail2D.jsx:8, 10, 73, 78, 169` | comments: section (67), glass 12.5 into the rebate, -12.5, 54.5 inset, "top-rail 67 chain dim" | comment |
+| `components/drawings/CasementDrawing2D.jsx:366` | glass callout `leaf - deductions.glass` (component imported nowhere in src) | **stale reader** |
+| `components/drawings/CasementGlassDrawing2D.jsx:63` | `2 x (face - inset)`, `deductions.glass` fallback | derives (copy 2 of 3) |
+| `components/drawings/CasementGlassDrawing2D.jsx:9` | comment "deductions.glass (111: ...)" | comment |
+| `components/drawings/CasementElevation2D.jsx:43-48` | daylight rect `leaf - 2 x stile` (prints no glass size, no stile) | derives |
+| `components/drawings/CasementFrameDetail2D.jsx:218` | prints `C-T <length>` on a 0.5 grid | derives |
+| `components/drawings/CircleFixedDrawing2D.jsx:92` | prints `C-LEAF RING <leafTop.face> face` | derives |
+| `pages/WindowSettingsPage.jsx:836, 941` | glass figure `R(2 x (face - glassInset))` | derives (copy 3 of 3, no fallback) |
+| `pages/WindowSettingsPage.jsx:689, 875` | Transom card, `NumInput` (type number, no step) -> `setCasementLength` (`Number(v)`) | derives |
+| `stores/windowProfileStore.js:134-144` | `setCasementLeafFace` writes the three faces, never `deductions.glass` | setter (gap) |
+| `stores/windowProfileStore.js:113-121, 151-171` | `setCasementGeometry` / `setCasementPath` can write `glassInset`, never `deductions.glass` | setter (gap) |
+| `stores/materialAssignmentStore.js:101-103` | slot labels `section: '67×57'` (display only: no code matches on it) | label |
+| `stores/projectStore.js:378` | batch `_profileSnapshot` = copy of the live profile (setter has zero callers) | derives |
+| `src/3d/**` (`CasementPanel.jsx:20` `SASH_RAIL = 64`) | already 64 from constants | out of scope |
+| door profile and door engine (94 / 94 / 180, own glass formulas) | share nothing with the casement glass | out of scope |
+| every other `67` / `111` / `64` / `105` hit (RAL hex, heritage board 111, coupling 43 + 68 = 111, `lowerFromAxis` 64, sash cill nose 64x128, stock width 105, 3D coordinates) | different meaning | unrelated |
+
+What the sweep found beyond the brief, kept for the stages and for BLOCKERS:
+
+1. **The migrated profile is not written back to the cloud on load.** `onRehydrateStorage` and `loadFromCloud`
+   (`windowProfileStore.js:239-252, 218-235`) migrate in memory and write localStorage only; the cloud copy is
+   written by `_sync` (any setter or Reset). The glass schema went the same way (commit 8b0b96f did not touch the
+   store). Described in Stage 1.
+2. **Triple glazing, no material assigned:** the Pre-Cut raw section of a leaf member is the finished section
+   itself (`profileRawForSection` finds nothing for depth 61), so it moves from `67x61` to `64x61`. Double glazing
+   stays `63x63` (a coincidence: depth 57 = sash stile face 57).
+3. **The cut list and the Pre-Cut "finished" column round every length to whole mm** (`lists.js:95, 236`): the
+   906.5 transom prints 907 there, 906.5 on the frame sheet and in bSuite. Same rule as every leaf today (446.2 ->
+   446). Not changed (sash fixtures must stay byte-identical); reported.
+4. **Arched leaf top rail plans:** the narrower ring lets the 1000 x rise 200 three-centre leaf top go from one
+   180 board to the economy plan 2 x 150 (t16:435, t25:279 pin the old plan).
+5. **Beading NaN:** `parseSection('profile')` gives `[NaN]`; no reachable reader uses `finishedWidth` /
+   `thickness` of a beading record (BLOCKERS).
+
+**The reference set, before (5459f5b, default profile).** Same windows as the new harness t38.
+
+| window | leaf W×H | leaf section | glass units | transom cut / run / Pre-Cut | beading glazing / ext / int | kg timber / glass / total | leaf kg | hinge picks | glass m² | bead tape m |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 040L 1000x1200 | 898×1102 | 67x57 | 787×991 | - | 4089 | 26.3 / 16.4 / 44.8 | 27 | side_xl | 0.78 | 3.56 |
+| 040L 1000x1200 bars 2V/1H | 898×1102 | 67x57 | 787×991 | - | 4089 / 3184 / 3184 | 26.3 / 16.4 / 44.8 | 27 | side_xl | 0.78 | 9.09 |
+| 021 1000x1200 | 898×356.2, 898×714.8 | 67x57 | 787×245.2, 787×603.8 | 906 / 906 / 926 | 5573 | 33.8 / 14 / 50.3 | 10.4, fix | top_450, - | 0.67 | 4.85 |
+| 120 1800x1500 | 832×1402 | 67x57 | 721×1291 | - | 9255 | 51.8 / 39.1 / 95.4 | 31.5, 31.5 | side_xl, side_xl | 1.86 | 8.05 |
+| 052L 1800x1500 | 832×446.2, 832×924.8, 832×1402 | 67x57 | 721×335.2, 721×813.8, 721×1291 | 840 / 840 / 860 | 10587 | 58.7 / 36.9 / 100.5 | 11.6, 21.5, 31.5 | top_450, side_xl, side_xl | 1.76 | 9.21 |
+| 021 1800x1500 | 1698×446.2, 1698×924.8 | 67x57 | 1587×335.2, 1587×813.8 | 1706 / 1706 / 1726 | 9943 | 54.3 / 38.3 / 97.2 | 22.2, fix | top_450, - | 1.82 | 8.65 |
+| 023 1800x1500 | 832×446.2, 832×443.6, 832×447.2 | 67x57 | 721×335.2, 721×332.6, 721×336.2 | 840 / 840 / 860 | 14568 | 79.6 / 30.4 / 115.5 | 11.6, 11.6, 11.5, 11.5, fix, fix | top_450, top_450, side_xl, side_xl, -, - | 1.45 | 12.67 |
+| 142 1800x1500 | 399×1402, 399×446.2, 399×924.8 | 67x57 | 288×1291, 288×335.2, 288×813.8 | 407 / 407 / 427 | 15198 | 82.1 / 29.5 / 117.2 | 17, 6.3, fix, 6.3, fix, 17 | side_460, top_450, -, top_450, -, side_460 | 1.41 | 13.22 |
+| 031 1800x1500 (partial mullion) | 832×446.2, 1698×924.8 | 67x57 | 721×335.2, 1587×813.8 | 1706 / 1706 / 1726 | 10380 | 57.9 / 37.3 / 100 | 11.6, 11.6, fix | top_450, top_450, - | 1.77 | 9.03 |
+| arched V1 three-centre 1000x1500 start 1300 | 898×1402 | 67x57 | 787×1291 | - | 4632 | 28.1 / 21 / 51.5 | 32.6 | side_xl | 1 | 4.03 |
+| circle 800 sunburst (fixed) | 698×698 | 67x57 | 587×587 | - | 2121 / 2055 / 2055 | 17.7 / 5.7 / 24.6 | fix | - | 0.27 | 5.42 |
+| CONTROL sash standard 2x2 | - | 57x57/57x90 | 731×610.5 | - | 5959.3 / 4600 / 5750 / 945.3 / 945.3 | 12.24 / 17.47 / 31.2 | - | - | 0.89 | - |
+| CONTROL door single-external | - | 94x61/180x61 | 741×1755 | - | - | 0 | - | - | 1.3 | - |
+
+| window | leaf member lengths | frame H / CILL / J / J | mullions | Pre-Cut leaf raw | BOM mm stile / top / bottom | BOM mm transom / mullion | BOM glass m² |
+|---|---|---|---|---|---|---|---|
+| 040L 1000x1200 | 1102 898 | 1000 / 1000 / 1200 / 1200 | - | 63x63 | 2244 / 918 / 918 | - / - | 0.78 |
+| 040L 1000x1200 bars 2V/1H | 1102 898 | 1000 / 1000 / 1200 / 1200 | - | 63x63 | 2244 / 918 / 918 | - / - | 0.78 |
+| 021 1000x1200 | 356.2 898 714.8 | 1000 / 1000 / 1200 / 1200 | - | 63x63 | 2222 / 1836 / 1836 | 926 / - | 0.67 |
+| 120 1800x1500 | 1402 832 | 1800 / 1800 / 1500 / 1500 | 1423 | 63x63 | 5688 / 1704 / 1704 | - / 1443 | 1.86 |
+| 052L 1800x1500 | 446.2 832 924.8 1402 | 1800 / 1800 / 1500 / 1500 | 1423 | 63x63 | 5666 / 2556 / 2556 | 860 / 1443 | 1.76 |
+| 021 1800x1500 | 446.2 1698 924.8 | 1800 / 1800 / 1500 / 1500 | - | 63x63 | 2822 / 3436 / 3436 | 1726 / - | 1.82 |
+| 023 1800x1500 | 446.2 832 443.6 447.2 | 1800 / 1800 / 1500 / 1500 | 1423 | 63x63 | 5588 / 5112 / 5112 | 3440 / 1443 | 1.45 |
+| 142 1800x1500 | 1402 399 446.2 924.8 | 1800 / 1800 / 1500 / 1500 | 1423 | 63x63 | 11332 / 2514 / 2514 | 854 / 4329 | 1.41 |
+| 031 1800x1500 (partial mullion) | 446.2 832 924.8 1698 | 1800 / 1800 / 1500 / 1500 | 454.2 | 63x63 | 3754 / 3422 / 3422 | 1726 / 474 | 1.77 |
+| arched V1 three-centre 1000x1500 start 1300 | 1253 915.3 898 | 1073.9 / 1000 / 1300 / 1300 | - | 63x63, 180x57 | 2546 / 918 / 918 | - / - | 1 |
+| circle 800 sunburst (fixed) | 1982.3 | 2299.6 | - | 200x93 | - / - / - | - / - | 0.27 |
+| CONTROL sash standard 2x2 | 822 687.5 720.5 | 1000 / 1000 / 1000 / 1392 / 1392 / 828 / 796 / 1500 / 1500 / 1500 / 1500 | - | 63x63, 63x95 | - / - / - | - / - | 0.89 |
+| CONTROL door single-external | 2006 906 | 1000 / 2100 / 2100 / 1000 | - | 94x61, 180x61 | - / - / - | - / - | 1.3 |
+
+| arched window | leaf top outer R | leaf top inner R | glass R | glass bbox | glass origin |
+|---|---|---|---|---|---|
+| arched V1 three-centre 1000x1500 start 1300 | 99/1349/99 | 32/1282/32 | 43.5/1293.5/43.5 | 787×1291 | 106.5, 102.5 |
+| circle 800 sunburst (fixed) | 349/349 | 282/282 | 293.5 | 587×587 | 106.5, 106.5 |
+
+---
+
 ## 2026-09-21 — BAR GRID: one grid of glazing-bar lines for the casement window (chat session, ZIP delivery)
 
 ### Verdict ✅ — the rule is in the engine, every consumer reads it, 22 rectangular sheets still byte-identical
