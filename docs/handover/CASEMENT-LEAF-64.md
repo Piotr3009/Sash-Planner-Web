@@ -39,7 +39,7 @@ Owner decisions (Piotr, 06.10.2026), branch `claude/casement-leaf-64`, from `mai
 
 ## Proof
 
-`node verify/parity/t38_leaf_64_seat_85.mjs` (304 checks against the start commit), plus the whole suite; see
+`node verify/parity/t38_leaf_64_seat_85.mjs` (311 checks against the start commit), plus the whole suite; see
 BUILD-LOG 06.10.2026.
 
 ## What PSW would have to check to match

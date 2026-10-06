@@ -433,7 +433,7 @@ for (const v of PLAN_VECTORS) {
   expectThrows('missing finger length throws (no defaults in the planner)', () => arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, finger: {} }, CNC_OPTS), /finger\.length is missing/);
   expectThrows('missing cnc block throws (v4: cnc.minClampLength)', () => arch.planArchSegments(g.frameHead, PLAN_OPTS, undefined), /cnc\.minClampLength is missing/);
   // Leaf 64 (06.10.2026): N still starts at 1 (the fewest plan is ONE 180 board, W_req 159, no joint), but the
-  // 64 ring is 3 narrower, so 2 pieces now need W_req 148.05 <= 150 (151.05 with the 67 face: no narrower board)
+  // 64 ring is 3 narrower, so 2 pieces now need W_req 148.05 <= 150 (150.90 with the 67 face: no narrower board)
   // and pass the limits, while the one-board waste is 0.532 > wasteThreshold 0.45: the C.4 rule takes 2 x 150.
   const shallowLeaf = arch.buildArchPlan({ shape: 'three-centre', width: 1000, height: 1500, rise: 200 }, P).plans.leafTop;
   const sa = shallowLeaf.arcs[0];
@@ -441,6 +441,11 @@ for (const v of PLAN_VECTORS) {
     sa.fewest?.n === 1 && sa.fewest.stock === 180 && near(sa.fewest.wReq, 159, 1e-9) && near(sa.fewest.waste, 0.532, 0.001) && P.arch.wasteThreshold === 0.45
     && sa.rule === 'economy' && sa.default?.n === 2 && sa.default.stock === 150 && near(sa.default.wReq, 148.05, 0.01) && shallowLeaf.pieces.length === 2,
     `${sa.rule}: fewest ${sa.fewest?.n} × ${sa.fewest?.stock} (W_req ${sa.fewest?.wReq}, waste ${sa.fewest?.waste}), default ${sa.default?.n} × ${sa.default?.stock} (W_req ${sa.default?.wReq})`);
+  // and a one-board DEFAULT is still made: the shallower 1000 × rise 180 leaf top rail (W_req 180 - 51 + 10 = 139)
+  const r180 = arch.buildArchPlan({ shape: 'three-centre', width: 1000, height: 1500, rise: 180 }, P).plans.leafTop;
+  check('v4: the 1000 × rise 180 leaf top rail is ONE 150 board by default (fewest rule, W_req 139 = 180 - 51 + 10), whole chain, no joint',
+    r180.arcs[0].rule === 'fewest' && r180.arcs[0].default?.n === 1 && r180.pieces.length === 1 && r180.pieces[0].stock === 150 && r180.pieces[0].jointedEnds === 0 && near(r180.pieces[0].wReq, 139, 1e-9),
+    `${r180.arcs[0].rule} ${r180.pieces.length} × ${r180.pieces[0]?.stock}, W_req ${r180.pieces[0]?.wReq}, joints ${r180.pieces[0]?.jointedEnds}`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

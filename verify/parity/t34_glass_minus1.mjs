@@ -101,9 +101,13 @@ for (const [name, W] of Object.entries(WINDOWS)) {
 // ── the default profile (leaf 64, 06.10.2026): casement and fixed units = ref - 2 + 6 = ref + 4 ──
 for (const name of LEAF67) {
   const W = WINDOWS[name];
-  const uL = units(LIVE, ...Object.values(deriveItem(LIVE, W.item, W.fc)));
-  const uR = units(REF, ...Object.values(deriveItem(REF, W.item, W.fc)));
+  const L = deriveItem(LIVE, W.item, W.fc), R = deriveItem(REF, W.item, W.fc);
+  const uL = units(LIVE, L.spec, L.derived);
+  const uR = units(REF, R.spec, R.derived);
   uL.forEach(([w, h], i) => ok(near(w, uR[i][0] + 4) && near(h, uR[i][1] + 4), `${name} on the default profile (leaf 64): unit ${i + 1} ${w}×${h} = ref ${uR[i][0]}×${uR[i][1]} - 2 + 6 each way`));
+  const sqL = L.derived.consumables?.glass?.sqm, sqR = R.derived.consumables?.glass?.sqm;
+  const areaL = uL.reduce((a, [w, h]) => a + w * h, 0) / 1e6, areaR = uR.reduce((a, [w, h]) => a + w * h, 0) / 1e6;
+  ok(near(sqL - sqR, areaL - areaR, 0.02), `${name} on the default profile: m² moved by the unit area (${sqR} → ${sqL})`);
 }
 
 // ── edge cover + tracery outset ──

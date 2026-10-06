@@ -276,7 +276,7 @@ section('3 — planner invariants on the engine output');
   const sp = shallow.plans.leafTop.pieces;
   // one whole chain on a horizontal chord: W_req = the leaf outer band's apex above the springing = rise − leafAtJamb + allowance (200 − 51 + 10 = 159; was 170)
   // Leaf 64 (06.10.2026): the one-board plan is still the FEWEST (N starts at 1), but the 64 ring makes the
-  // 2-piece plan fit a 150 board (W_req 148.05; 151.05 with the 67 face, so no narrower board then) within the
+  // 2-piece plan fit a 150 board (W_req 148.05; 150.90 with the 67 face, so no narrower board then) within the
   // limits, and the one-board waste is over wasteThreshold 0.45: the C.4 economy rule takes 2 x 150. The engine
   // pieces are checked against the independent planner's choice, as before.
   check(`one-board plan first: the 1000 × rise 200 leaf top rail's FEWEST plan is ONE ${ish.fewest?.stock} board (W_req ${f1(ish.fewest?.wReq)} = rise - leafAtJamb + allowance ${200 - oL + A}, L ${f1(ish.fewest?.pieces[0].overall)}, independent; 57 frame: 180 board, W_req 170, L 940), N starts at 1; with the 64 leaf the independent rule is ${ish.rule} ${ish.def?.n} × ${ish.def?.stock} and the engine cuts exactly that`,
@@ -284,6 +284,13 @@ section('3 — planner invariants on the engine output');
     && ish.rule === 'economy' && ish.def?.n === 2 && ish.def.stock === 150 && near(ish.def.wReq, 148.05, 0.05)
     && sp.length === 2 && sp.every((p, i) => p.stock === ish.def.stock && p.jointedEnds === 1 && near(p.wReq, ish.def.wReq, 0.5) && near(p.roughLength, ish.def.pieces[i].overall, 0.5)),
     `${sp.length} × ${sp[0]?.stock}, W_req ${f1(sp[0]?.wReq)}, L ${f1(sp[0]?.roughLength)}; independent ${ish.rule} ${ish.def?.n} × ${ish.def?.stock} W_req ${f1(ish.def?.wReq)}`);
+  // a one-board DEFAULT on the 64 leaf: the shallower 1000 × rise 180 (W_req = 180 − leafAtJamb + allowance = 139)
+  const sh180 = arch.buildArchPlan({ shape: 'three-centre', width: 1000, height: 1500, rise: 180 }, P);
+  const i180 = independentPlan(sh180.leafTop)[0];
+  const s180 = sh180.plans.leafTop.pieces;
+  check(`one-board plan: the 1000 × rise 180 leaf top rail fits ONE ${i180.def?.stock} board by default (W_req ${f1(i180.fewest?.wReq)} = rise - leafAtJamb + allowance ${180 - oL + A}, L ${f1(i180.fewest?.pieces[0].overall)}, independent rule ${i180.rule}), no joints, both ends square`,
+    i180.rule === 'fewest' && i180.def?.n === 1 && near(i180.fewest.wReq, 180 - oL + A, 0.5) && s180.length === 1 && s180[0].stock === i180.def.stock && s180[0].jointedEnds === 0 && near(s180[0].wReq, i180.fewest.wReq, 0.5) && near(s180[0].roughLength, i180.fewest.pieces[0].overall, 0.5),
+    `${s180.length} × ${s180[0]?.stock}, W_req ${f1(s180[0]?.wReq)}, L ${f1(s180[0]?.roughLength)}`);
   const gl = arch.buildArchPlan({ shape: 'gothic-equilateral', width: 1000, height: 2000 }, P);
   const igl = independentPlan(gl.leafTop);
   // verdict FLIPPED by the 68 frame (leafAtJamb 51): the leaf ring 949 / 882 (was 960 / 893) fits ONE 200 board per side (W_req 197.1 ≤ 200);

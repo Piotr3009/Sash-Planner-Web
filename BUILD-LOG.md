@@ -224,7 +224,7 @@ run under node (they trigger a browser download), their inputs are checked.
 
 ### Stage 5: tests
 
-**New harness `verify/parity/t38_leaf_64_seat_85.mjs`, 304 checks.** It bundles the live `src` and the start
+**New harness `verify/parity/t38_leaf_64_seat_85.mjs`, 311 checks.** It bundles the live `src` and the start
 commit 5459f5b (`git archive`, hash in its header) with the engine, the four casement sheets, the unused
 `CasementDrawing2D`, the Window Settings page and both stores. Sections 0 to 14:
 
@@ -236,11 +236,11 @@ commit 5459f5b (`git archive`, hash in its header) with the engine, the four cas
 | 3 | glass units and glass schedule rows = reference + 6 each way | 22 |
 | 4 | every transom = reference + 0.5, runs too; 906.5 / 1706.5 / 840.5 literal; Pre-Cut 927 | 21 |
 | 5 | frame members, mullions, mullion runs identical; 031 partial mullion 454.2 = 446.2 + 8 | 23 |
-| 6 | 040L and 120 by hand (arithmetic in the file) | 13 |
+| 6 | 040L and 120 by hand (arithmetic in the file; the daylight read off the rendered leaf sheet) | 13 |
 | 7 | arched V1 and circle: ring outer - inner = 64 on every arc, glass r = outer - 52.5, origin 51 + 52.5, V1 bottom 47 + 52.5 | 9 |
 | 8 | sash and door: derived, cut list, glass schedule deep-equal | 6 |
 | 9 | migrations (stored 67/111/8, face 70 -> glass 117, seat 9, current schemas left alone, per face, glass schema 1 copy, idempotent, frame schema 1 copy, a stored old profile derives the new numbers) | 10 |
-| 10 | 4 sheets + Window Settings vs the glass schedule, stile 64; again with face 70 typed in the store; sensitivity on the reference tree | 32 |
+| 10 | 4 sheets + Window Settings vs the glass schedule, stile 64; again with face 70 typed in the store; sensitivity on the reference tree; a non-whole unit (052L 727 x 341.2) on all three printing sheets | 39 |
 | 11 | raw stock: assigned 63x75 stays (flat and schema-2 assignments), unassigned fallback = reference; triple 67x61 -> 64x61; slot labels | 31 |
 | 12 | live code with the old numbers pinned = reference, derived and sheets byte for byte | 22 |
 | 13 | the helper; structure: the five readers call it, none reads `deductions.glass` | 9 |
@@ -252,7 +252,7 @@ daylight 704 x 1274, beading round(2 x 2 x (727 + 1297) x 1.15) = 9310, leaf 2.2
 
 **Existing harnesses: 31 failures after the change, every one a consequence of 67 -> 64 or 8 -> 8.5.**
 Expectation updated only after the arithmetic below; no assertion deleted or loosened (the check counts are the
-same or higher: t34 41 -> 44).
+same or higher: t16 368 -> 369, t25 225 -> 226, t34 41 -> 46).
 
 | harness : check | old | new | why |
 |---|---|---|---|
@@ -260,7 +260,7 @@ same or higher: t34 41 -> 44).
 | t17:127 deepest ring offset | 51 + 67 = 118, 32 below 150 | 51 + 64 = 115, 35 below | leafAtJamb + leafTop.face |
 | t18:85 derived constants | glass bottom 102.5, glass offset 106.5 | 99.5 = 47 + (64 - 11.5), 103.5 = 51 + 64 - 11.5 | the face moves the glass line 3 out |
 | t18:288 C-ARCH TOP RAIL section | 67x57 | 64x57 | `${face}x${depth}` |
-| t16:435 and t25:279, 1000 x rise 200 leaf top rail | ONE 180 board | fewest still ONE 180 (W_req 159 = 200 - 51 + 10, N starts at 1) but the default is the economy plan **2 x 150** | the 64 ring is 3 narrower: 2 pieces need W_req 148.05 <= 150 (151.05 with 67, so no narrower board existed) and pass the limits (shorter edge 458.9 >= 400); the one-board waste 0.532 > wasteThreshold 0.45, rule C.4. The engine plan equals the independent planner `lib/indPlanner.mjs` |
+| t16:435 and t25:279, 1000 x rise 200 leaf top rail | ONE 180 board | fewest still ONE 180 (W_req 159 = 200 - 51 + 10, N starts at 1) but the default is the economy plan **2 x 150** | the 64 ring is 3 narrower: 2 pieces need W_req 148.05 <= 150 (150.90 with 67, so no narrower board existed) and pass the limits (shorter edge 458.9 >= 400); the one-board waste 0.532 > wasteThreshold 0.45, rule C.4. The engine plan equals the independent planner `lib/indPlanner.mjs`. New check in both: the shallower 1000 x rise 180 is still ONE 150 board by default (W_req 139 = 180 - 51 + 10, no joint), so a one-board default stays covered |
 | t27:134 frame migration keeps other elements | `leafTop.face === 67` | `=== stored` and `=== 64` | the stored copy is the live default |
 | t28:105 / 133 / 135 / 138 / 158 glazier DXF | 787 x 1291, `W787 x H1291`, `TOTAL L=2078`, axes 393.5 / 645.5, 133 units 432.3 x 335.2 / 813.8 | 793 x 1297, `W793 x H1297`, `TOTAL L=2090` (793 + 1297), axes 396.5 / 648.5, 438.3 x 341.2 / 819.8 | glass + 6 each way (1000 - 102 - 105, 1500 - 98 - 105), axes at W/2 and H/2 |
 | t34:73 casement and fixed units "= ref - 2" | 793 x 1297 vs ref 789 x 1293 | live derived on a profile with the leaf PINNED at 67: 787 x 1291 = ref - 2 (what t34 proves), plus a new check on the default: ref - 2 + 2 x (67 - 64) = ref + 4 | the reference tree 12670b6 has the 67 leaf |
@@ -290,7 +290,7 @@ geometry counts for the sheets, every text operator of the PDF):
 
 Also: t32 (bSuite) passes unchanged (its transom check is relational); t24_stage4 passes untouched (the
 DashboardPage strings); t28's injection into its old tree now carries 64 / 105 (that builder reads neither,
-§5 byte identity proves it). Stale leaf numbers in harness comments refreshed in t17, t19, t24_stage4, t33;
+§5 byte identity proves it). Stale leaf numbers in harness comments refreshed in t17, t19, t33 (t24_stage4 is byte-identical to the start commit);
 the header arithmetic in t20, t20_bars, t23 and t26 still quotes older numbers (51 + 67 - 12.5): comments
 only, their checks compute from the profile.
 

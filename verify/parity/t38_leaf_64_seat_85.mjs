@@ -257,8 +257,14 @@ section('6 - literal numbers by hand');
   const d = L['040L-1000x1200'].derived, c = d.casement;
   ok(c.leaves[0].leafW === 898 && c.leaves[0].leafH === 1102, '040L: leaf 898 x 1102');
   ok(d.customGlassUnits[0].width === 793 && d.customGlassUnits[0].height === 997, `040L: glass unit 793 x 997`, JSON.stringify(d.customGlassUnits[0]));
-  const lb = c.leaves[0].bars;
-  ok(c.leaves[0].leafW - 2 * 64 === 770 && c.leaves[0].leafH - 2 * 64 === 974 && (!lb || true), '040L: daylight 770 x 974 (leaf - 2 x 64)');
+  // the daylight is printed by the leaf sheet (its dimension chain), so the check reads the rendered sheet
+  const leafSheetTexts = (id) => {
+    const { spec, derived } = L[id];
+    const svg = renderToStaticMarkup(React.createElement(LIVE.LeafDetail, { windowSpec: spec, derived, group: LIVE.cdu.groupCasementLeaves(derived)[0], projectNumber: 'P-1' }));
+    return [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]);
+  };
+  const t040 = leafSheetTexts('040L-1000x1200');
+  ok(t040.includes('770') && t040.includes('974') && !t040.includes('764') && !t040.includes('968'), '040L: daylight 770 x 974 printed on the leaf sheet (reference 764 x 968)', JSON.stringify(t040.slice(0, 8)));
   ok(d.components.beading.length === 1 && d.components.beading[0].length === 4117, `040L: glazing beading 4117`, JSON.stringify(d.components.beading));
   ok(c.leafWeights[0].weightKg === 26.8, `040L: leaf weight 26.8 kg (reference ${F['040L-1000x1200'].derived.casement.leafWeights[0].weightKg})`, JSON.stringify(c.leafWeights));
   ok(d.weights.timber === 25.9 && d.weights.glass === 16.6 && d.weights.total === 44.6, `040L: weights 25.9 / 16.6 / 44.6`, JSON.stringify(d.weights));
@@ -266,7 +272,8 @@ section('6 - literal numbers by hand');
   const e = L['120-1800x1500'].derived, ec = e.casement;
   ok(ec.leaves.every((l) => l.leafW === 832 && l.leafH === 1402), '120: leaves 832 x 1402');
   ok(e.customGlassUnits.every((u) => u.width === 727 && u.height === 1297), '120: glass units 727 x 1297', JSON.stringify(e.customGlassUnits.map((u) => [u.width, u.height])));
-  ok(ec.leaves.every((l) => l.leafW - 128 === 704 && l.leafH - 128 === 1274), '120: daylight 704 x 1274');
+  const t120 = leafSheetTexts('120-1800x1500');
+  ok(t120.includes('704') && t120.includes('1274') && !t120.includes('698') && !t120.includes('1268'), '120: daylight 704 x 1274 printed on the leaf sheet (reference 698 x 1268)', JSON.stringify(t120.slice(0, 8)));
   ok(e.components.beading[0].length === 9310, `120: glazing beading 9310`, JSON.stringify(e.components.beading));
   ok(ec.leafWeights.every((x) => x.weightKg === 31.2), `120: leaf weights 31.2 / 31.2 kg`, JSON.stringify(ec.leafWeights));
   ok(e.consumables.glass.sqm === 1.89, `120: glass 1.89 m2`, String(e.consumables.glass.sqm));
@@ -404,6 +411,25 @@ function checkSheets(M, label, w, face) {
   return { derived, rows };
 }
 for (const [id, label] of [['040L-1000x1200', '040L'], ['arched-V1', 'arched V1']]) checkSheets(LIVE, label, SET.find((w) => w.id === id), 64);
+{
+  // A unit that is NOT a whole number (052L 1800 x 1500: 727 x 341.2 fan, 727 x 819.8): the glass sheet and the
+  // production elevation print the schedule exactly; the leaf sheet prints every size on its 0.5 grid (as it
+  // prints the 446.2 leaf "446"), so its subtitle shows the schedule unit rounded to 0.5 (BLOCKERS 27.7 d).
+  const { spec, derived } = L['052L-1800x1500'];
+  const sch = LIVE.lists.buildGlassListForWindow(derived, spec).map((r) => `${r.width} x ${r.height}`);
+  const half = (v) => { const r = Math.round(v * 2) / 2; return Number.isInteger(r) ? String(r) : r.toFixed(1); };
+  LIVE.cdu.groupCasementLeaves(derived).forEach((group) => {
+    const u = derived.customGlassUnits[group.rep];
+    const m = texts(render(LIVE.LeafDetail, { windowSpec: spec, derived, group, projectNumber: 'P-1' })).join('\n').match(GLASS_RE);
+    ok(m && m[1] === half(u.width) && m[2] === half(u.height), `052L leaf sheet ${group.key}: glass ${m?.[1]} x ${m?.[2]} = the schedule unit ${u.width} x ${u.height} on the sheet's 0.5 grid`);
+  });
+  LIVE.cdu.groupCasementGlass(derived, spec).forEach((group) => {
+    const m = texts(render(LIVE.GlassDrawing, { windowSpec: spec, derived, group })).join('\n').match(/(\d+(?:\.\d)?) × (\d+(?:\.\d)?) mm/);
+    ok(m && sch.includes(`${m[1]} x ${m[2]}`), `052L glass sheet ${group.key}: prints ${m?.[1]} x ${m?.[2]} mm, exactly the schedule`);
+  });
+  const calls = texts(render(LIVE.CasDrawing, { windowSpec: spec, derived, batch: null })).map((x) => x.match(GLASS_RE)).filter(Boolean);
+  ok(calls.length === 3 && calls.every((m) => sch.includes(`${m[1]} x ${m[2]}`)), `052L CasementDrawing2D: glass callouts ${calls.map((m) => `${m[1]} x ${m[2]}`).join(', ')}, exactly the schedule`);
+}
 {
   const html = renderSettings(LIVE);
   const g = settingsGlass(html);
