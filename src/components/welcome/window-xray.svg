@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1672" height="941" viewBox="0 0 1672 941" role="img" aria-label="Registered structural X-ray view of a timber box sash window with twelve glass panes">
+<defs>
+  <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#66e9e0" stop-opacity=".09"/><stop offset="1" stop-color="#00b4a0" stop-opacity=".018"/></linearGradient>
+  <linearGradient id="timber" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#7ef0e5" stop-opacity=".095"/><stop offset="1" stop-color="#4ddcc6" stop-opacity=".025"/></linearGradient>
+</defs>
+<g id="box-faces" fill="url(#timber)" stroke="#90eee4" stroke-width="1.7" stroke-linejoin="round">
+<polygon points="899,82 934,77 934,789 899,785" />
+<polygon points="934,77 1323,27 1323,78 934,122" />
+<polygon points="1323,27 1365,22 1365,823 1324,820" />
+<polygon points="1365,22 1401,39 1403,813 1365,823" />
+<polygon points="874,788 899,781 1365,817 1403,812 1414,815 1371,834" />
+<polygon points="874,788 1371,834 1371,848 874,802" />
+<polygon points="1371,834 1414,815 1414,830 1371,848" />
+<polygon points="885,806 1370,851 1404,836 1404,844 1370,857 885,813" />
+</g>
+<g id="profile-details" fill="none" stroke="#53cbbb" stroke-opacity=".67" stroke-width="1.1" stroke-linejoin="round">
+<path d="M 939,124 L 939,776 L 1325,804" />
+<path d="M 947,490 L 947,774 L 1323,800" />
+<path d="M 953,489 L 953,771" />
+<path d="M 934,122 L 1323,78" />
+<path d="M 942,128 L 1319,87" />
+<path d="M 957,131 L 1320,93" />
+<path d="M 962,137 L 1315,101" />
+<path d="M 1321,94 L 1323,800" />
+<path d="M 1327,83 L 1328,818" />
+<path d="M 1365,22 L 1367,821" />
+<path d="M 899,785 L 1365,823" />
+</g>
+<g id="glass-panes" fill="url(#glass)" stroke="#65cfc4" stroke-opacity=".68" stroke-width="1.15" stroke-linejoin="round">
+<polygon points="976,144 1074,132 1074,279 975,285" />
+<polygon points="1084,131 1192,119 1193,272 1084,279" />
+<polygon points="1203,118 1307,106 1308,264 1203,271" />
+<polygon points="976,296 1075,289 1075,421 976,423" />
+<polygon points="1085,289 1194,282 1194,419 1085,421" />
+<polygon points="1204,282 1308,275 1309,415 1204,418" />
+<polygon points="980,450 1077,448 1078,584 980,584" />
+<polygon points="1089,447 1197,445 1198,589 1089,586" />
+<polygon points="1209,445 1319,443 1320,592 1209,589" />
+<polygon points="980,597 1078,600 1079,735 980,730" />
+<polygon points="1090,600 1198,602 1199,743 1090,736" />
+<polygon points="1210,604 1320,607 1321,752 1210,745" />
+</g>
+<g id="main-sash" fill="none" stroke="#9beddf" stroke-opacity=".94" stroke-width="1.65" stroke-linejoin="round" stroke-linecap="round">
+<path d="M 967,139 L 1309,102 L 1309,416 L 967,425 Z" />
+<path d="M 972,143 L 1307,106" />
+<path d="M 970,146 L 970,425" />
+<path d="M 1075,127 L 1083,126 L 1085,423 L 1077,423 Z" />
+<path d="M 1194,114 L 1202,113 L 1204,420 L 1196,420 Z" />
+<path d="M 968,286 L 1308,264 L 1309,273 L 969,295 Z" />
+<!-- Two compact meeting-rail faces, inset between the sash stiles. -->
+<path d="M 974,425 L 1309,416 L 1309,437 L 974,445 Z" />
+<path d="M 975,428 L 1308,419" stroke-width=".85" stroke-opacity=".64" />
+<path d="M 975,440 L 1309,433" stroke-width=".9" stroke-opacity=".68" />
+<path d="M 974,445 L 980,449 L 1309,442 L 1309,437" stroke-width="1.1" stroke-opacity=".67" />
+<path d="M 974,445 L 1321,439 L 1323,800 L 946,774" />
+<path d="M 971,449 L 972,731" />
+<path d="M 1078,445 L 1087,445 L 1090,741 L 1081,741 Z" />
+<path d="M 1198,442 L 1207,442 L 1210,748 L 1201,748 Z" />
+<path d="M 972,585 L 1321,594 L 1321,604 L 971,594 Z" />
+<path d="M 971,732 L 1322,754 L 1323,800 L 947,775 L 947,765" />
+<path d="M 978,738 L 1319,760" />
+<path d="M 953,770 L 1323,796" />
+</g>
+<g id="sash-stiles-and-horns" fill="url(#timber)" stroke="#acf4e7" stroke-width="1.65" stroke-linejoin="round" stroke-linecap="round">
+<!-- Each face is one closed contour from the head down into its horn.
+     The left horn follows the recessed upper sash plane, behind the box reveal.
+     No seam, cap or transverse edge crosses either stile at meeting-rail height. -->
+<path id="upper-left-continuous-stile" d="M 963,135 L 974,141 L 974,454 C 974,458 969,461 969,468 C 969,474 972,478 968,484 C 967,487 965,489 963,490 Z" />
+<path id="upper-right-continuous-stile" d="M 1309,102 L 1323,94 L 1323,481 C 1318,479 1315,473 1317,467 C 1319,461 1316,454 1312,451 C 1309,448 1309,444 1309,438 Z" />
+<!-- Quiet inner-edge bevels follow the grain direction into the horn curve. -->
+<path d="M 978,143 L 978,454 C 978,460 973,463 973,470 C 973,475 976,480 972,485 C 970,488 967,490 963,490" fill="none" stroke-width=".85" stroke-opacity=".42" />
+<path d="M 1320,99 L 1320,454 C 1323,462 1318,469 1320,475" fill="none" stroke-width=".85" stroke-opacity=".42" />
+</g>
+<g id="hidden-structure" fill="none" stroke="#42baa9" stroke-opacity=".32" stroke-width="1" stroke-dasharray="5 7" stroke-linejoin="round">
+<path d="M 935,98 L 1401,39" />
+<path d="M 935,98 L 935,768 L 1403,813" />
+<path d="M 899,82 L 935,98" />
+<path d="M 899,785 L 935,768" />
+<path d="M 965,142 L 983,148 L 1334,111 L 1315,101" />
+<path d="M 983,148 L 983,429 L 1336,421 L 1334,111" />
+<path d="M 974,445 L 980,449 L 1328,442 L 1309,437" />
+<path d="M 969,448 L 987,452 L 989,758 L 1341,780 L 1323,800" />
+<path d="M 1321,439 L 1339,443 L 1341,780" />
+<path d="M 971,732 L 989,721 L 1340,744 L 1322,754" />
+</g>
+<g id="hardware-outline" fill="none" stroke="#6fcfbd" stroke-opacity=".48" stroke-width="1.1" stroke-linejoin="round">
+<path d="M 1008,422 L 1009,418 L 1040,417 L 1042,421 M 1019,417 L 1019,414 L 1029,414 L 1029,417" />
+<path d="M 1232,417 L 1233,412 L 1264,411 L 1267,416 M 1242,411 L 1243,408 L 1253,408 L 1253,411" />
+<path d="M 1003,749 L 1033,751 L 1034,761 L 1003,759 Z M 1010,749 L 1010,744 L 1026,745 L 1028,751" />
+<path d="M 1243,766 L 1280,769 L 1280,779 L 1243,776 Z M 1250,765 L 1251,760 L 1269,761 L 1272,768" />
+</g></svg>

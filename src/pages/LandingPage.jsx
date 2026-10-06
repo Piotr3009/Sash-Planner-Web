@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore.js';
 import { getMyProfile } from '../services/cloudSync.js';
+import WindowBuildAnimation from '../components/welcome/WindowBuildAnimation.jsx';
 import './LandingPage.css';
 
 function firstName(...names) {
@@ -53,16 +54,7 @@ export default function LandingPage() {
       </header>
 
       <main className="pc-welcome__hero">
-        <div className="pc-welcome__art">
-          <img
-            src="/images/welcome/sash-window-studio.webp"
-            alt="White timber box sash window with Georgian glazing bars, curved sash horns and brass fittings"
-            width="1672"
-            height="941"
-            fetchPriority="high"
-            draggable="false"
-          />
-        </div>
+        <WindowBuildAnimation />
         <div className="pc-welcome__shade" aria-hidden="true" />
 
         <div className="pc-welcome__copy">
