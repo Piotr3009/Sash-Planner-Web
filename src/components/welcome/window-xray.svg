@@ -48,10 +48,10 @@
 <path d="M 1194,114 L 1202,113 L 1204,420 L 1196,420 Z" />
 <path d="M 968,286 L 1308,264 L 1309,273 L 969,295 Z" />
 <!-- Two compact meeting-rail faces, inset between the sash stiles. -->
-<path d="M 957,425 L 1309,416 L 1309,437 L 957,445 Z" />
-<path d="M 958,428 L 1308,419" stroke-width=".85" stroke-opacity=".64" />
-<path d="M 958,440 L 1309,433" stroke-width=".9" stroke-opacity=".68" />
-<path d="M 958,445 L 976,449 L 1309,442 L 1309,437" stroke-width="1.1" stroke-opacity=".67" />
+<path d="M 974,425 L 1309,416 L 1309,437 L 974,445 Z" />
+<path d="M 975,428 L 1308,419" stroke-width=".85" stroke-opacity=".64" />
+<path d="M 975,440 L 1309,433" stroke-width=".9" stroke-opacity=".68" />
+<path d="M 974,445 L 980,449 L 1309,442 L 1309,437" stroke-width="1.1" stroke-opacity=".67" />
 <path d="M 974,445 L 1321,439 L 1323,800 L 946,774" />
 <path d="M 971,449 L 972,731" />
 <path d="M 1078,445 L 1087,445 L 1090,741 L 1081,741 Z" />
@@ -63,11 +63,12 @@
 </g>
 <g id="sash-stiles-and-horns" fill="url(#timber)" stroke="#acf4e7" stroke-width="1.65" stroke-linejoin="round" stroke-linecap="round">
 <!-- Each face is one closed contour from the head down into its horn.
+     The left horn follows the recessed upper sash plane, behind the box reveal.
      No seam, cap or transverse edge crosses either stile at meeting-rail height. -->
-<path id="upper-left-continuous-stile" d="M 941,126 L 956,132 L 956,447 C 956,451 951,453 949,457 C 946,461 947,465 949,470 C 950,476 946,483 941,486 Z" />
+<path id="upper-left-continuous-stile" d="M 963,135 L 974,141 L 974,454 C 974,458 969,461 969,468 C 969,474 972,478 968,484 C 967,487 965,489 963,490 Z" />
 <path id="upper-right-continuous-stile" d="M 1309,102 L 1323,94 L 1323,481 C 1318,479 1315,473 1317,467 C 1319,461 1316,454 1312,451 C 1309,448 1309,444 1309,438 Z" />
 <!-- Quiet inner-edge bevels follow the grain direction into the horn curve. -->
-<path d="M 958,133 L 958,446 C 958,452 953,455 951,458 C 948,463 950,467 951,471 C 952,477 949,481 945,484" fill="none" stroke-width=".85" stroke-opacity=".42" />
+<path d="M 978,143 L 978,454 C 978,460 973,463 973,470 C 973,475 976,480 972,485 C 970,488 967,490 963,490" fill="none" stroke-width=".85" stroke-opacity=".42" />
 <path d="M 1320,99 L 1320,454 C 1323,462 1318,469 1320,475" fill="none" stroke-width=".85" stroke-opacity=".42" />
 </g>
 <g id="hidden-structure" fill="none" stroke="#42baa9" stroke-opacity=".32" stroke-width="1" stroke-dasharray="5 7" stroke-linejoin="round">
@@ -77,7 +78,7 @@
 <path d="M 899,785 L 935,768" />
 <path d="M 965,142 L 983,148 L 1334,111 L 1315,101" />
 <path d="M 983,148 L 983,429 L 1336,421 L 1334,111" />
-<path d="M 957,445 L 976,449 L 1328,442 L 1309,437" />
+<path d="M 974,445 L 980,449 L 1328,442 L 1309,437" />
 <path d="M 969,448 L 987,452 L 989,758 L 1341,780 L 1323,800" />
 <path d="M 1321,439 L 1339,443 L 1341,780" />
 <path d="M 971,732 L 989,721 L 1340,744 L 1322,754" />

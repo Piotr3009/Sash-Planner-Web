@@ -5,6 +5,8 @@ import xraySource from './window-xray.svg?raw';
 const DURATION = 12;
 const FINISHED_IMAGE = '/images/welcome/sash-window-finished.webp';
 const TIMBER_IMAGE = '/images/welcome/sash-window-timber.webp';
+const FINISHED_DETAIL = '/images/welcome/sash-horn-flush-finished.webp';
+const TIMBER_DETAIL = '/images/welcome/sash-horn-flush-timber.webp';
 const clamp = (value) => Math.max(0, Math.min(1, value));
 const ease = (value) => {
   const p = clamp(value);
@@ -176,6 +178,8 @@ export default function WindowBuildAnimation() {
     <div ref={rootRef} className="pc-welcome__art pc-welcome__animation">
       <link rel="preload" as="image" href={FINISHED_IMAGE} />
       <link rel="preload" as="image" href={TIMBER_IMAGE} />
+      <link rel="preload" as="image" href={FINISHED_DETAIL} />
+      <link rel="preload" as="image" href={TIMBER_DETAIL} />
       <svg
         className="pc-welcome__scene"
         viewBox="0 0 1672 941"
@@ -184,6 +188,17 @@ export default function WindowBuildAnimation() {
         aria-label="A sash window takes shape from technical drawing through X-ray and natural timber to its painted finish."
       >
         <defs>
+          {/* Registered close-up artwork keeps the horn flush with the sash face. */}
+          <linearGradient id={id('detail-fade')} gradientUnits="userSpaceOnUse" x1="0" x2="0" y1="370" y2="570">
+            <stop stopColor="white" stopOpacity="0" /><stop offset=".175" stopColor="white" />
+            <stop offset=".625" stopColor="white" /><stop offset="1" stopColor="white" stopOpacity="0" />
+          </linearGradient>
+          <filter id={id('detail-feather')} filterUnits="userSpaceOnUse" x="918" y="360" width="94" height="220">
+            <feGaussianBlur stdDeviation="2.5" />
+          </filter>
+          <mask id={id('detail-mask')} maskUnits="userSpaceOnUse" x="918" y="360" width="94" height="220" style={{ maskType: 'alpha' }}>
+            <rect x="928" y="370" width="74" height="200" fill={fill('detail-fade')} filter={fill('detail-feather')} />
+          </mask>
           <linearGradient id={id('material-gradient')} data-wood-gradient="" gradientUnits="userSpaceOnUse" x1="700" x2="820">
             <stop stopColor="white" /><stop offset=".5" stopColor="white" stopOpacity=".5" /><stop offset="1" stopColor="white" stopOpacity="0" />
           </linearGradient>
@@ -207,8 +222,14 @@ export default function WindowBuildAnimation() {
           </linearGradient>
         </defs>
         <rect width="1672" height="941" fill="#111419" />
-        <g data-wood="" mask={fill('material-mask')} opacity="0"><image href={TIMBER_IMAGE} width="1672" height="941" /></g>
-        <g data-paint="" mask={fill('paint-mask')} opacity="0"><image href={FINISHED_IMAGE} width="1672" height="941" /></g>
+        <g data-wood="" mask={fill('material-mask')} opacity="0">
+          <image href={TIMBER_IMAGE} width="1672" height="941" />
+          <image href={TIMBER_DETAIL} x="865" y="285" width="240" height="290" preserveAspectRatio="none" mask={fill('detail-mask')} />
+        </g>
+        <g data-paint="" mask={fill('paint-mask')} opacity="0">
+          <image href={FINISHED_IMAGE} width="1672" height="941" />
+          <image href={FINISHED_DETAIL} x="865" y="285" width="240" height="290" preserveAspectRatio="none" mask={fill('detail-mask')} />
+        </g>
         <g data-xray="" mask={fill('wire-mask')} opacity="0" dangerouslySetInnerHTML={artwork.xray} />
         <g data-drawing="">
           <svg x="858" y="-3" width="638" height="930" viewBox="160 20 1550 2080" overflow="visible" dangerouslySetInnerHTML={artwork.drawing} />
