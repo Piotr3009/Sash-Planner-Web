@@ -1,342 +1,228 @@
-# CLAUDE.md — TURN 65 · PBI: THE EMPTY ROOM, THE BAYS, AND WHAT THE CARCASS WEARS
+# CLAUDE.md: TURA PC · CASEMENT LEAF 64 AND TRANSOM SEAT 8.5
 
-Run autonomously. Zero questions, zero stops. Skip-and-note. PR before morning.
-Full suite, never `--silent`. Frames under `verify/t65/`.
+This file is the brief for ONE tura in this repo (`Piotr3009/Sash-Planner-Web`, Production Core, "PC"). If your session was started for a different task, ignore this file.
 
-## THE LAW OF THE TURN
+Owner decisions (Piotr, 06.10.2026):
 
-**1:1 = COPY.** Where PRO has it, copy PRO's file, repoint imports, change only
-the skin (T62/T63 method, proven). Never re-invent in "retail language".
+- **A.** All four casement LEAF members (both stiles, top rail, bottom rail) are 64 mm wide everywhere. Today they are 67.
+- **B.** The transom seat is 8.5 mm. Today it is 8. (The joint needs 8.6; 8.5 is enough.)
 
-**The lazy client.** Every step has its answer already chosen. NEXT always
-works. "More options" for the picky.
-
-**The right panel is the selected element, nothing else.** The owner:
-*"w menu prawym powinny się pojawiać tylko menu funkcyjne danego elementu,
-dokładnie te które już są. Po naciśnięciu na inny element menu się zmienia,
-a jak naciśniesz w szafę lub poza menu — znika."*
-
-## THE THREE DECISIONS MADE HERE
-
-The owner ordered the spec with three questions open. Decided, one line each,
-overturnable with one word:
-
-1. **A gap of 100 mm or less to the ceiling is closed by the CORNICE growing**,
-   not by a top infill — the owner said the cornice reaches the ceiling.
-   Top infill stays a manual choice. *(Overturn: "top infill zamyka".)*
-2. **A large gap (over 100 mm) is left alone.** No proposal, no nagging. ADD
-   TOP BOX sits in EXTRAS if the client wants it. *(Overturn: "proponuj top box".)*
-3. **No wardrobe is placed by the app at all.** The owner: *"ściana 4000 mm,
-   ale bez szaf"*. WHERE gives a 4000 mm wall and an empty room; the client
-   adds the first wardrobe himself — from the plus on the empty floor, or from
-   ADD A WARDROBE in the step. Default width when he does: **1200**, or the
-   wall if it is narrower. *(Overturn: "stawiaj pierwszą szafę".)*
+He asked for a thorough analysis, the change everywhere, and thorough tests.
 
 ---
 
-## WHAT IS FROZEN
+## 0. How to run this tura
 
-1. **PRO — zero bytes**: `index.html`, `src/App.jsx`, `src/main.jsx`,
-   `src/components/**`, `src/pages/**`. Freeze test green, unedited.
-2. **`reference/lisp/**`** — parens 14/14 at 0/0. **LISP IS LAW**: any change
-   to cut geometry goes into `reference/lisp/` FIRST, then the engine. F5 and
-   F6 below touch cut geometry; both follow that order or they are skipped.
-3. **The six goldens stay byte-identical.** Every engine change tonight must
-   be reachable only through a parameter the golden fixtures do not set, or
-   through a new code path they never enter. A change that would move a golden
-   is not made: skip that ONE feature, name the fixture and the line, and go
-   straight on to the next feature. **The session never halts.** "Stop" in this
-   file always means "stop that feature", never "stop the night" — there is no
-   condition tonight under which the run ends early or waits for the owner.
-   Never re-bless a fixture.
-4. **The copies from T62/T63 stay copies**; their fidelity tests stay green.
-5. **The layout is not rebuilt.** Variant B stands. Column widths change (F3);
-   nothing else moves.
-
-## LICENSED ENGINE FILES
-
-Only these, only for the named purpose, each with `UNNAMED=0` and the goldens
-proving nothing else moved:
-
-- `src/engine/endPanelAuto.js` — F6, the wardrobe's own step rule.
-- `src/engine/cabinet.js` — F5 (the shelf that caps an overlay stack) and F7
-  (the partition standing on that shelf), both narrow.
-- `src/engine/profile.js` — F8's cornice defaults only, as new keys.
-
-Anything else: skip-and-note.
+1. Run autonomously. No questions. If something is unclear or outside the scope below, skip it and write it in `BLOCKERS.md`.
+2. Start from the current `main`. Work on a branch named `claude/casement-leaf-64`. Commit there. Open a PR to `main`. Do not merge. Do not push to `main`. No force push.
+3. Code, comments and UI copy in English.
+4. Every NEW file starts with the Skylon Development Ltd header. Copy it from `src/engine/partColours.js`.
+5. In text you write (comments, logs, UI copy, PR text) do not use the em dash or en dash characters. Hyphens are fine.
+6. No new dependencies. No UI layout changes. Do not remove or rename functions. If you believe one of these is needed, do not do it: write it in `BLOCKERS.md`.
+7. `deriveWindowData()` is the single source of truth. Components never calculate per-window data on their own.
+8. Zustand stores: no ES6 getter properties.
+9. A grep is not proof. Prove every claim with the harness on derived data, and test the component (the drawing), not only the geometry under it.
+10. Do not edit this file.
 
 ---
 
-## F1 · THE ROOM STARTS EMPTY
+## 1. Scope
 
-Owner: *"usuń szafę default"*.
+**In scope**
 
-- `startDesign` no longer adds a WARDROBE. The room mounts empty.
-- **Nothing is placed automatically, ever.** WHERE ends with a 4000 mm wall
-  (the default wall width) and an EMPTY room. The client places the first
-  wardrobe: the plus on the empty floor, and an ADD A WARDROBE action in the
-  step itself, both calling one store path. Its width when added:
-  `min(wallLength, 1200)`.
-- The empty room is a first-class state, not an error: the stage shows the
-  room with its walls and ceiling, the hint says what to do, and the steps
-  after WHERE stay reachable but say plainly that they need a wardrobe.
-- `fitWardrobeToWall` — T64's "fills the wall" — is **deleted**. It is what
-  produced a 3920 mm carcass with two 1960 mm leaves. Licensed removal.
-- Default wardrobe width in the profile: **1200 max by default, no hard
-  block** (owner: *"nie dawaj blokady na szafy szersze ale default daj 1200
-  max"*). The client may type wider; the engine's existing clamps still refuse
-  what the room refuses.
-- Every screen that assumed a wardrobe exists must survive an empty room:
-  READ each caller of the adapter's wardrobe readers and give it an empty
-  state, never a crash. The estimate page with zero items already has one.
+- A. Casement leaf member face 67 to 64 in the engine default profile, and the glass deduction that follows it (111 to 105).
+- B. `lengths.transomSeat` 8 to 8.5 in the engine default profile.
+- Stored profiles: schema migrations for both, same pattern as the existing ones.
+- Material slot labels, 2D drawings, comments, tests, logs.
 
-**Proof**: `verify/t65/f1-*.png` — the empty 4000 mm room at WHERE and still
-empty at NEXT; the client's first wardrobe at 1200; the same on a 900 wall
-(900, not 1200); INSIDE with no wardrobe, saying so.
+**Out of scope, do not touch**
 
-## F2 · THE WHOLE LIGHTING RIG, COPIED — NOT JUST THE SLIDER
+- Frame, mullion, transom sections (68 x 93).
+- Leaf depth 57, leaf outer size, every `deductions.leaf*` value.
+- Every other `lengths.*` value, including `partialMullionSeat` (it stays 8, see section 5).
+- Sash windows. Doors.
+- The bSuite export (`src/utils/bsuiteExport.js`). It has known open items that are handled separately.
+- The batch profile freeze (`updateBatchStatus`, `_profileSnapshot`).
+- The 3D code. PSW. The Dashboard and the welcome page.
 
-Owner: *"retail jest za jasna … zapomniałeś o natężeniu naświetlenia — kopia
-identycznie jak w PRO, włącznie z ustawieniem jasności etc."*
+---
 
-This is wider than a control. `profile.appearance.studio` holds ELEVEN named
-numbers, and one of them is the owner's own decision of 25.08.2026 —
-`baseGain: 0.75`, quoted in the profile: *"teraz 100 to niech będzie jakby
-teraz było 75"*. If retail's scene is brighter than PRO's, retail is not
-reading the same rig.
+## 2. Facts established before this tura
 
-- **Find every lighting number retail resolves** — walk `src/3d/Scene.jsx` and
-  the retail mount, and list what each reads: `baseGain`, `ambient`, `key`,
-  `fill`, `rim`, `exposure`, `shadowPadding`, the showroom `band`, the spots,
-  the environment probe, the tone mapping. Print PRO's value and retail's value
-  for each, side by side, in the PR body.
-- **Every difference is closed in retail's favour of PRO's number**, except a
-  difference that is deliberate and named in the code with a reason. There
-  should be none; if there is, name it and keep it, saying why.
-- The environment probe stays OFF in both — the profile explains at length why
-  (a tinted probe shifts white fronts). Do not "improve" it.
-- **Copy PRO's BRIGHT slider** into the retail top bar (`TopBar.jsx`, T26):
-  same `uiStore.brightness`, same min/max/step/default from
-  `profile.appearance.studio.brightness`, PBI skin. It is a slider in PRO and
-  stays a slider here — the no-slider rule is about dimensions, not light.
-- A test that asserts, number by number, that the retail rig equals PRO's.
-  That test is the thing that stops this drifting again.
+Verified on `main` at `f6a86db`, 06.10.2026. Re-check them on your starting commit.
 
-**Proof**: `verify/t65/f2-*.png` — the slider in the bar; the SAME scene
-rendered in PRO and in retail at the same brightness, side by side, plus the
-number-by-number table in the PR body.
+### Profile
 
-## F3 · COLUMN 2, TEN PER CENT NARROWER
+- `src/engine/profile.js`, `DEFAULT_CASEMENT_PROFILE.elements`: `leafStile`, `leafTop`, `leafBottom` have `face: 67`.
+- `deductions.glass: 111` is the stored "resolved value" of `2 x (leafStile.face - geometry.glassInset)`, that is 2 x (67 - 11.5).
+- `lengths.transomSeat: 8`. `lengths.partialMullionSeat: 8` is a separate, provisional value.
+- Schema migrations already in place: `frameSchema` and `glassSchema`, with `migrateFrameSchema` and `migrateGlassSchema`. Rule: a value moves only while it still equals the OLD default. A value the workshop edited by hand is kept.
+- Piotr's stored workshop profile today: leaf 67 / 67 / 67, glass 111, glassInset 11.5, transomSeat 8, frameSchema 2, glassSchema 2.
 
-Owner: *"może na początek 10 procent zrób"*.
+### A. Leaf face in the engine
 
-- Measure the OPTIONS column today, take 10% off, hand the space to the stage.
-- The scale law (one number from window width) still governs; this is a change
-  to the base width, not a new mechanism.
-- **Check before, not after**: at 1280 and 1440, no label in the copied
-  `MaterialChoicePanel` or `FrontStyleGallery` may clip or break word-by-word.
-  If one does, keep the 10% and fix the copy's own `pbi-re-*` widths — never
-  the copy's markup. If it cannot be fixed without touching markup, take 5%
-  and say so.
+- `src/engine/calculations.js` already derives from the face: `secLeaf` comes from `els.leafStile.face`, and `glassDed = R(2 * (els.leafStile.face - glassInset))`. It falls back to `ded.glass` only when `glassInset` is missing (two places, around lines 661 and 814).
+- Measured with a profile whose three faces are 64, window 040L, 1000 x 1200. Exactly these values change against today:
 
-**Proof**: `verify/t65/f3-*.png` — before/after at 1280 and at 1440.
-
-## F4 · THE VIEW: STRAIGHT ON AND CLOSER, AS IN PRO
-
-Owner: *"default ustawienie sceny pokoju prosto i bliżej — dokładnie jak w
-PRO"*.
-
-- Read PRO's default camera (`src/3d/cameraPresets.js` and whatever PRO's
-  first-mount uses) and make retail's first view and RESET VIEW identical to
-  it: same preset, same framing distance, same target.
-- This supersedes T64's "FRONT, framed to bounds" — PRO's number wins.
-
-**Proof**: `verify/t65/f4-*.png` — PRO and retail first views side by side.
-
-## F5 · THE SHELF THAT CAPS AN OVERLAY STACK — SETBACK 0
-
-Owner: *"półka nad overlay drawers nie powinna mieć setback, powinna być na
-0"*; only that shelf, not every shelf; and the reason, which is why this is
-not cosmetic: *"jak dodasz szuflady to jest dziura i to wygląda okropnie"*.
-A 20 mm slot above a drawer stack, seen from the front. It must go.
-
-- `profile.shelfDepthClearance` is 20 and EVERY shelf reads it. **Do not change
-  it.** Narrow the change: the shelf that caps an overlay-drawer stack gets
-  clearance 0, every other shelf keeps 20.
-- Find where that shelf is emitted (`cabinet.js`, the overlay path — read
-  `setbackOf(item?.front_mm, C.shelfDepthClearance)` at both sites and see
-  which one caps a stack). Add the exception at that site only, named, with
-  the owner's sentence in the comment.
-- **LISP FIRST.** This is cut geometry: the shelf's depth changes, so the
-  wardrobe kit in `reference/lisp/` states it before the engine does. Parens
-  re-verified.
-- The goldens must not move: check whether any of the six carries an overlay
-  stack. If one does, the change WILL move it — stop, skip-and-note, and say
-  which fixture and why.
-
-**Proof**: a unit test asserting the capping shelf's depth equals D − boards·G
-(no clearance) while a plain shelf keeps the 20; the goldens unmoved.
-
-## F6 · END PANELS: NO CARCASS SIDE IS EVER LEFT SHOWING
-
-The owner, and this sentence is the whole law:
-
-> *"po prostu nie dopuszczamy do pozostawienia boku szafy / carcasa
-> widocznego."*
-
-Not "a step demands a panel" — **visibility demands a panel**. One rule, and
-it covers the kitchen and the wardrobe both; they only look different because
-what exposes a side differs:
-
-| Beside the side | Panel? | Why |
+| Value | 67 (today) | 64 |
 |---|---|---|
-| nothing — a free end | **yes** | the whole side shows |
-| a wall | **no** | the wall covers it; the infill closes the gap |
-| a wardrobe, flush — same height, same depth, same offset | **no** | the neighbour covers it |
-| a wardrobe of different height, depth, or set back | **yes** | part of the side still shows |
-| the client added one by hand in EXTRAS | **yes, permanently** | his decision outranks the automat |
+| Leaf member section, 4 members | 67x57 | 64x57 |
+| Glass unit | 787 x 991 | 793 x 997 |
+| Beading length | 4089 | 4117 |
+| Leaf weight (also in the hinge pick) | 27 kg | 26.8 kg |
+| Weights timber / glass / total | 26.3 / 16.4 / 44.8 | 25.9 / 16.6 / 44.6 |
+| Glass area | 0.78 m2 | 0.79 m2 |
+| Bead tape, one side | 3.56 m | 3.58 m |
 
-- `endPanelAuto.js` already computes SITES first and filters after (T51, the
-  owner's *"dojeżdżam — panel się pojawia, nie dojeżdżam — panel znika"*).
-  Keep that architecture. Replace the question it asks with the one above:
-  **is any part of this side visible?** Read the neighbour's height, depth and
-  front offset; a side is covered only when the neighbour covers it fully.
-- One function answers it, for kitchens and wardrobes alike. If the kitchen's
-  present behaviour is a special case of the new question, it keeps working
-  unchanged and a test proves it. If it is NOT — if the visibility rule would
-  change a kitchen's panels — do not force it: keep the kitchen path as it is,
-  add the wardrobe path beside it in the same function, and say so in the PR
-  body with the case that differed.
-- **Retail adds them automatically, each removable.** PRO's law
-  (*"Plinth, top infill and end panels — added, never assumed"*) is
-  deliberately NOT changed for PRO. Panels appear as lines in the estimate so
-  the client sees what he pays for.
-- A panel added by hand in EXTRAS is permanent: the automat never removes it.
-  `declinedSides` holds the opposite already — add the matching "asked for"
-  set beside it, same shape, same file.
+- Unchanged in that window: leaf outer size 898 x 1102, member lengths (stiles 1102, rails 898), the whole frame.
 
-**Proof**: `verify/t65/f6-*.png` — one wardrobe alone, panels both ends; a
-flush neighbour arrives and the shared panel goes; a taller neighbour arrives
-and it stays; a deeper neighbour, it stays; against a wall, no panel and an
-infill instead; a hand-added panel surviving a flush neighbour.
+### A. Stale readers of `deductions.glass`
 
-## F7 · BAYS, IN THE CLIENT'S WORDS
+- `src/components/drawings/CasementDrawing2D.jsx` (around line 366) and `src/components/drawings/CasementLeafDetail2D.jsx` (around lines 73, 118, 119) read `p.deductions.glass` directly.
+- `CasementGlassDrawing2D.jsx` and `src/pages/WindowSettingsPage.jsx` derive it from the face.
+- `setCasementLeafFace` in `src/stores/windowProfileStore.js` writes the three faces and does not touch `deductions.glass`.
+- Result today: a workshop that edits the leaf face gets drawings that disagree with the glass schedule. After this tura that must be impossible.
 
-Owner: *"zamiast vertical partition dać BAYS i wpisz ilość, max 3"* · *"i
-wtedy dopiero informacja o tym że bays można zrobić niższe ale półka musi być
-fix"* · *"przegroda ma się zaczynać nad szufladami … na półce … pamiętaj starą
-zasadę: materiał nigdy nie wchodzi w materiał"*.
+### A. Materials and raw stock
 
-- In INSIDE, the row named "Vertical partition (divider)" becomes **BAYS**,
-  with a typed count, default 1, **max 3**. Writing 3 puts two partitions in;
-  writing 1 takes them out. The partitions are the engine's own — this is a
-  name and a counter over the existing law, not a second law.
-- After a count above 1 is set, one line appears: bays may be different
-  heights, but the shelf between them is fixed. PRO's own wording if it has
-  one; otherwise that sentence.
-- **A partition inside a bay that holds an overlay drawer stack starts ON the
-  shelf that caps the stack** — whether the stack is 2 drawers or 5. It does
-  not pass through the stack, and it does not start at a fixed height. Material
-  never enters material.
-- Doors do NOT follow from bays (F9).
+- `src/stores/materialAssignmentStore.js`: slots `c_sash_stile`, `c_sash_top_rail`, `c_sash_bottom_rail` show `section: '67×57'`. Assignments are stored by slot id and material id.
+- In Piotr's workshop data all three leaf slots are assigned to one engineered timber, 63 x 75 mm. That assignment must survive untouched, and the raw stock of the leaf must stay 63 x 75.
+- Raw stock resolution for casement members: Part Registry assignment (`resolveRaw`), then `settings.sectionMap[section]`, then `profileRawForSection(section)`, then the finished section. The default `sectionMap` has only sash keys. Check that no path changes its result when the finished section string becomes `64x57`.
 
-**Proof**: `verify/t65/f7-*.png` — BAYS at 1, 2, 3; a partition standing on a
-5-drawer stack's shelf; the sentence.
+### A. 3D
 
-## F8 · CORNICE, TOP INFILL, END PANELS — THE MENU PRO HAS AND RETAIL NEVER GOT
+- The 3D already draws the casement leaf at 64 from constants (`src/3d/components/casement/CasementPanel.jsx`, `SASH_RAIL = 64`), independent of the profile. After this tura the engine and the 3D agree. Do not change the 3D.
 
-Owner: *"nie widzę przycisków: top infill, cornice, panels"*. They live in
-`src/components/ContextMenu.jsx` (334 lines) — the one surface the T63 ledger
-listed as OWED and the reason none of them are reachable.
+### B. Transom seat in the engine
 
-- **COPY** `ContextMenu.jsx` into `src/retail/design/detail/`, by the method:
-  verbatim, imports repointed, recursive component copies, skin only. It brings
-  cornice, top infill, end panels and the bottom mask with their refusals.
-- Entry: the wardrobe's own menu on the right, and the same actions offered in
-  EXTRAS on the left where they are choices rather than edits.
-- **Cornice is automatic at 40 mm** (new profile keys, defaults only).
-  When the gap to the ceiling is **100 mm or less, the cornice grows to close
-  it**, automatically, removable (decision 1). A visual choice of **40 / 70 /
-  100** sits beside it.
-- Gaps over 100 mm are left alone (decision 2).
+- Used in two places in `calculations.js` (around lines 880 and 900): the `C-TRANSOM` cut list record and `casement.transomRuns[].length`, both `field leaf width + lengths.transomSeat`.
+- `calculations.js` around line 843 uses `lengths.partialMullionSeat` for the partial mullion. Do not change it.
+- Measured with seat 8.5: only those two values change per transom, nothing else in the derived data.
 
-**Proof**: `verify/t65/f8-*.png` — the copied menu; a 40 mm cornice; a 80 mm
-gap closed by the cornice; the 40/70/100 chips; the estimate showing the
-panels and cornice as lines.
+| Window | Transom today | With 8.5 |
+|---|---|---|
+| 021, 1000 x 1200 (leaf 898) | 906 | 906.5 |
+| 021, 1800 x 1500 (leaf 1698) | 1706 | 1706.5 |
+| 052L, 1800 x 1500 (leaf 832) | 840 | 840.5 |
 
-## F9 · ADD DOORS, AND ADD TOP BOX MOVES LEFT
+- Pre-Cut rounds to whole millimetres after adding the machining allowance (`src/engine/lists.js`, `Math.round(length + MACHINING_ALLOWANCE)`): 906.5 + 20 gives 927, was 926.
 
-Owner: *"drzwi to osobna decyzja, w extrasach lub w setup"* · *"ADD DOORS —
-i tu i tu chyba"* · *"add top box powinno być przeniesione do EXTRAS po lewej"*.
+### Tests
 
-- **Doors do not follow from bays.** ADD DOORS is its own action, offered in
-  **EXTRAS on the left** and on the **selected wardrobe on the right**. Both
-  call the same store path — one law, two doors to it.
-- **ADD TOP BOX moves out of the wardrobe's right-hand menu into EXTRAS on the
-  left.** Adding furniture is a step; editing an element is the right panel.
+- Mention 67 or 111 today: `verify/parity/t34_glass_minus1.mjs`; in `verify/arch/`: `t16`, `t17_edges`, `t18`, `t19`, `t20`, `t20_bars`, `t23`, `t24_stage4`, `t25`, `t26`, `t27`, `t28`, `t33_bar_grid`; fixture `verify/arch/fixtures/rect-casement-base.json` and the sheet fixtures built from it.
+- No test names `transomSeat`; they pin transom lengths as numbers. Expect half-millimetre differences in every window with a transom.
+- There is no test runner script. Each harness is run with `node <file>`.
 
-**Proof**: `verify/t65/f9-*.png` — ADD DOORS in both places, one store call;
-ADD TOP BOX in EXTRAS and gone from the right.
+### Seen during preparation, not part of this task
 
-## F10 · THE RIGHT PANEL OBEYS ONE SENTENCE
-
-Owner: *"po naciśnięciu na inny element menu się zmienia, a jak naciśniesz w
-szafę lub poza menu — znika"*.
-
-- Click an element → its menu slides in. Click a different element → the menu
-  **swaps in place**, the panel does not close and reopen. Click the wardrobe
-  body or empty stage → it slides out.
-- The plus in the middle of a wardrobe **hides while the INSIDE menu is open**
-  (owner's point 5) — two doors to the same act confuse.
-- `TieRackMenu`, `TrouserMenu` and `KitMenu` are empty today: an element with
-  no controls is not clickable (the standing T60 law). Either give each the
-  controls PRO's editor has for it, or make it unclickable with the engine's
-  reason. Name which you did, per element.
-
-**Proof**: `verify/t65/f10-*.png` — element A open, element B swapping in,
-empty stage clicked and gone; the plus hidden with INSIDE open.
+- `components.beading[0].finishedWidth` and `.thickness` are `NaN` in the derived data of a casement window, before and after. Do not fix. Find what reads them and report it in `BLOCKERS.md`.
 
 ---
 
-## TESTS AND PROOF
+## 3. Work, in this order
 
-1. Full suite green, never `--silent`. PRO freeze test green, unedited.
-2. **Goldens ×6 byte-identical** — the hard gate this turn, because engine
-   files are licensed. `verify/t65/t65-classify.mjs` names every engine delta
-   and proves none reaches the cut path of a fixture.
-3. `computeCabinet()` vs LISP exact; `UNNAMED=0`; parens 14/14 at 0/0, with
-   the wardrobe kit re-verified after F5.
-4. Boundary and copy-fidelity tests green; the new `ContextMenu` copy added to
-   the fidelity list with every label PRO's file carries.
-5. New tests: an empty room mounts and every screen survives it; the first
-   wardrobe is `min(wall,1200)`; the capping shelf has zero clearance and a
-   plain shelf 20; a flush neighbour removes a panel and a deeper one does not;
-   a hand-added panel survives; BAYS 1/2/3 and the partition standing on the
-   stack's shelf; the cornice closing a ≤100 mm gap; ADD DOORS from both places
-   calling one store path; the right panel swapping without closing.
-6. Playwright walk: every F's frames, plus a lazy-client run from the empty
-   room to ADD TO MY ESTIMATE, `verify/t65/lazy-01.png …`.
+### Stage 0: baseline and impact analysis (no code changes)
 
-## LICENSED REMOVALS
+1. Run every harness in `verify/arch/t*.mjs` and `verify/parity/*.mjs` on the starting commit. Record the pass count per file. Run `npm run build`.
+2. Sweep `src` for every reader of the leaf face, the glass deduction and the transom seat: `leafStile`, `leafTop`, `leafBottom`, `deductions.glass`, `transomSeat`, `67`, `111`, `67x57`, `67×57`. For each hit write whether it derives the number or holds a literal.
+3. Derive this reference set with the default profile and keep the numbers as the "before" table:
+   - casement 040L 1000 x 1200
+   - casement 040L with bars 2 vertical / 1 horizontal
+   - casement 021 1000 x 1200
+   - casement 120, 052L, 021, 023, 142, each 1800 x 1500
+   - one arched casement and one circle fixed window, using the vectors the arch harness already uses
+   - controls that must not change at all: one sash window (standard, 2x2 bars) and one door
+4. For each window record: leaf sizes, leaf member sections and lengths, transom and mullion lengths, glass units, bars, beading, weights, hinge picks, the Pre-Cut lengths, and the BOM timber and glass rows (the way `verify/parity/t37_single_window_bom.mjs` builds them).
+5. Write the result as the first part of a new entry at the top of `BUILD-LOG.md`.
 
-- `fitWardrobeToWall` and its callers (F1).
-- The default WARDROBE in `startDesign` (F1).
-- ADD TOP BOX from the wardrobe's right-hand menu (moves, F9).
-- Nothing else. Tombstones two lines maximum.
+### Stage 1: default profile and migration
 
-## BALANCE
+1. `DEFAULT_CASEMENT_PROFILE.elements`: `leafStile`, `leafTop`, `leafBottom` face 64.
+2. `deductions.glass` 105, that is 2 x (64 - 11.5).
+3. `lengths.transomSeat` 8.5.
+4. Update the comments in `profile.js` that quote the old numbers (the elements block, the glass deduction note, the `transomSeat` line, and the `minHaunchRadius` note: 150 - 51 - 64 = 35).
+5. Add two schema counters next to `frameSchema` and `glassSchema`, each with its own migrate function in the same style:
+   - `leafSchema: 2`: for a stored copy below 2, each of the three faces that still equals 67 moves to 64. A hand-edited face stays.
+   - `lengthSchema: 2`: for a stored copy below 2, `lengths.transomSeat` moves to 8.5 only while it still equals 8. A hand-edited value stays.
+6. A very old stored copy (glass schema 1: inset 12.5, glass 109, edge cover 11, leaf 67) must come out as inset 11.5, leaf 64, glass 105, edge cover 10.
+7. Find where the migrated profile is written back (store hydrate, cloud sync) and confirm a stored workshop profile holding 67 / 111 / 8 reaches the cloud as 64 / 105 / 8.5 after the first load, the way the glass schema did. Describe the path in `BUILD-LOG.md`.
+8. `withProfiles` also runs `migrateCasementProfile` on a batch `_profileSnapshot`. Do not change that. Report what it means for a frozen batch (see section 5, item 2).
 
-Per F: files touched, lines added/removed, and the PRO file each copy came
-from. Then one line each:
-- How many functions decide where an end panel goes? (One.)
-- How many store paths add a door? (One.)
-- Which engine lines changed, and why each cannot reach a golden.
-- Which of the three decisions above did the night rely on, and where.
+### Stage 2: one source for the glass deduction
 
-## SKIP-AND-NOTE ORDER
+1. Invariant: wherever `geometry.glassInset` is a number, the glass deduction is `R(2 x (leafStile.face - glassInset))`. `deductions.glass` is never read as an independent value.
+2. Add one exported helper in `profile.js` that returns the derived deduction and falls back to `deductions.glass` only when `glassInset` is missing. Use it in `calculations.js` (both places), `CasementDrawing2D.jsx`, `CasementLeafDetail2D.jsx`, `CasementGlassDrawing2D.jsx` and `WindowSettingsPage.jsx`. Where a drawing already receives derived data, take the glass unit size from that data instead of a second formula.
+3. Keep the stored `deductions.glass` in step: `migrateCasementProfile` rewrites it to the derived value when `glassInset` is a number, and `setCasementLeafFace` does the same on write (and the setter of `glassInset`, if one exists).
+4. No behaviour change for the default profile other than 67 to 64.
 
-F5 → F6 → F8 → F7 → F9 → F10 → F4 → F3 → F2 → F1.
-F1 and F10 are the owner's plainest orders and are not skipped. F5 and F6
-touch cut geometry and the engine: if either cannot be done without moving a
-golden, it is skipped with the fixture named — that is the correct outcome,
-not a failure.
+### Stage 3: transom seat consumers
+
+1. Follow the half millimetre through every consumer of the transom length: cut list, Pre-Cut, bar optimiser, Excel and PDF exports, purchase list metres, 2D drawings that dimension the transom, the bSuite rows (read only: do not edit that file).
+2. Nothing may truncate, crash or show a long float. A finished length is shown with at most one decimal, the way leaf heights such as 446.2 already are.
+3. `WindowSettingsPage.jsx`: the Transom row (`lenKey: 'transomSeat'`) must show and accept 8.5.
+
+### Stage 4: labels and comments
+
+1. `materialAssignmentStore.js`: the three leaf slots show `64×57`. Keep the ids and everything else. Change the label only.
+2. `CasementLeafDetail2D.jsx`: update the two comments that mention 67.
+3. Files in `docs/handover/` are history. Do not rewrite them.
+
+### Stage 5: tests
+
+**New harness** `verify/parity/t38_leaf_64_seat_85.mjs`, in the style of `t34_glass_minus1.mjs`: it bundles the live `src` and a reference tree at the commit this branch starts from (record the hash in the header). It asserts, for the reference set of Stage 0:
+
+1. Leaf outer sizes equal the reference.
+2. Every leaf member section is `64x57` (reference `67x57`). Leaf member lengths equal the reference.
+3. Glass units of rectangular leaves = reference + 6 in width and in height.
+4. Every transom length = reference + 0.5, in the cut list record and in `transomRuns`. Literal numbers: 906.5, 1706.5, 840.5 for the three windows of section 2, and Pre-Cut 927 for the first.
+5. Frame head, cill, jambs and mullions identical to the reference. A partial mullion keeps its reference length.
+6. Literal expected numbers for 040L 1000 x 1200, with the arithmetic in a comment: leaf 898 x 1102, glass unit 793 x 997, daylight 770 x 974 (leaf minus 2 x 64), beading 4117, leaf weight 26.8 kg. Recompute a second window by hand the same way.
+7. Arched leaf: the top rail ring is 64 wide (outer radius minus inner radius), and the glass line sits 64 - 11.5 = 52.5 inside the leaf edge.
+8. Sash window and door: derived data deep-equal to the reference. Nothing moves.
+9. Migration: stored 67 / 67 / 67 with glass 111 and seat 8 comes out 64 / 64 / 64 with 105 and 8.5. A stored face of 70 stays 70 and its glass deduction is 117. A stored seat of 9 stays 9. A stored copy already on the current schemas is left alone. The glass schema 1 copy comes out as in Stage 1, item 6.
+10. Drawings: render `CasementDrawing2D`, `CasementLeafDetail2D`, `CasementGlassDrawing2D` and `CasementElevation2D` for 040L and for one arched window, the way `verify/arch/lib/sheets.mjs` does. The glass size printed on each equals the glass schedule, and the stile dimension printed is 64. Repeat with a hand-edited face of 70: every drawing, the glass schedule and the Window Settings figure show the same glass number.
+11. Raw stock: with a Part Registry assignment on the three leaf slots the Pre-Cut raw section is the assigned material, before and after. Without an assignment the fallback result is the same as on the reference tree.
+
+**Existing harnesses**
+
+1. Every failure after the change must be explained as a consequence of 67 to 64 or of 8 to 8.5, with the arithmetic, before its expectation is updated. Write old number, new number and the reason in `BUILD-LOG.md`.
+2. Never weaken or delete an assertion to get a pass.
+3. Regenerate fixtures (`rect_casement_baseline.mjs`, `t19_baseline.mjs`, `t22_baseline.mjs`) only after reading the diff. Allowed differences: leaf member width, glass, bars, beading, weights, transom length. Anything else is a bug to fix or to report.
+4. Sash fixtures (`rect-sash-*.json`) must stay byte-identical.
+5. `t34_glass_minus1.mjs` compares against an old tree. Keep what it proves (glass 1 mm smaller per side). Adjust it for the leaf change explicitly and say how in `BUILD-LOG.md`.
+6. `verify/parity/t32_bsuite.mjs` must pass without any change to `src/utils/bsuiteExport.js`. If it pins a transom number, update that expectation and explain it.
+7. `verify/arch/t24_stage4.mjs` checks literal strings in `src/pages/DashboardPage.jsx`. That file is out of scope, so those checks must pass untouched.
+
+**End of work**
+
+- Run the full suite twice on the final tree, then `npm run build`. Record the pass count per file.
+
+### Stage 6: logs and PR
+
+1. `BUILD-LOG.md`: complete the new entry at the top. Verdict, what changed, the before / after table of the reference set, suite counts.
+2. `BLOCKERS.md`: new entry at the top with the numbered items of section 5.
+3. `docs/handover/CASEMENT-LEAF-64.md`: a short as-built note for both changes. Include what PSW would have to check to match (its 3D already draws 64; its estimate renderer is not in this repo).
+4. PR description: summary, files changed, suite counts, the items for Piotr.
+
+---
+
+## 4. Done when
+
+1. No 67 is left for the casement leaf in `src`: code, labels, comments. Grep proof in `BUILD-LOG.md`.
+2. The default profile and a migrated stored profile both give leaf 64, glass 105, transom seat 8.5.
+3. Every reader takes the glass deduction from the one source.
+4. The reference set shows the specified numbers. The controls (sash, door, frame head, cill, jambs, mullions) are identical to the starting commit.
+5. Full suite green twice, build green, pass counts recorded.
+6. PR open and not merged. `BUILD-LOG.md`, `BLOCKERS.md` and the as-built note are written.
+
+---
+
+## 5. Items to report to Piotr in `BLOCKERS.md` (short, numbered)
+
+1. **What happens at merge.** After merge and deploy the stored workshop profile (leaf 67, glass 111, seat 8) is migrated to 64 / 105 / 8.5 on the first load. Every casement batch is then recalculated, including windows already in production packs, because no batch has a frozen profile. State per window type what changes (members 64, glass + 6 each way, beading, weights, transoms + 0.5). Piotr decides when to merge.
+2. **Frozen batches.** A frozen `_profileSnapshot` is also migrated by schema migrations, and the freeze is not wired in the UI. Describe the current behaviour and what would have to change. Do not implement it.
+3. **Partial mullion seat.** `lengths.partialMullionSeat` stays 8 and is marked provisional in the code. Ask whether it should follow the transom seat to 8.5.
+4. **Hinges.** Any window in the reference set whose hinge pick changes slot because of the weight change.
+5. **Raw stock.** Confirm the assigned leaf material stays as assigned. Nothing to do unless he wants another section.
+6. **Beading NaN.** What reads `finishedWidth` / `thickness` of the casement beading record, and whether anything depends on them.
+7. Anything else you skipped, with the reason.
