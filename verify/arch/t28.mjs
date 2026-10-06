@@ -66,7 +66,9 @@ const OLD = await bundle(resolve(prevTree, 'src'), 't28-prev');
   const G = OLD.profile.DEFAULT_CASEMENT_PROFILE;
   for (const k of Object.keys(G.glass.edgeCover)) G.glass.edgeCover[k] = 10;
   G.geometry.glassInset = 11.5;
-  G.deductions.glass = 111;
+  // 06.10.2026: today's leaf 64 and its deduction 105 (were 67 / 111); the old builder reads neither, §5 proves it
+  for (const k of ['leafStile', 'leafTop', 'leafBottom']) G.elements[k] = { ...G.elements[k], face: 64 };
+  G.deductions.glass = 105;
 }
 
 const { specification, calculations, glassDxf, dxfWriter, profile } = M;
@@ -98,45 +100,46 @@ const DR = derive(RECT);
 const rectUnits = glassDxf.glassUnitsForWindow(RECT, DR);
 check('glassUnitsForWindow: ONE unit (the 040L leaf), rectangular (no shape)', rectUnits.length === 1 && !rectUnits[0].shape && !!rectUnits[0].rect, String(rectUnits.length));
 const U = rectUnits[0];
-// the unit size comes from the engine (leaf 898 x 1402 inside the 68 frame, glass deduction 111 since 02.10.2026 — 109 before)
+// the unit size comes from the engine (leaf 898 x 1402 inside the 68 frame, glass deduction 105 = 2 x (64 - 11.5) since
+// 06.10.2026: leaf 64; it was 111 from 02.10.2026 and 109 before)
 const expW = 1000 - 2 * P.deductions.leafAtJamb - P.deductions.glass;
 const expH = 1500 - P.deductions.leafFullHeight - P.deductions.glass;
-check(`unit = 787 x 1291 from the profile (W − 2·leafAtJamb ${P.deductions.leafAtJamb} − glass ${P.deductions.glass}, H − leafFullHeight ${P.deductions.leafFullHeight} − glass; 789 x 1293 before 02.10.2026)`,
-  near(U.rect.width, 787) && near(U.rect.height, 1291) && near(U.rect.width, expW) && near(U.rect.height, expH), `${U.rect.width} x ${U.rect.height} vs ${expW} x ${expH}`);
+check(`unit = 793 x 1297 from the profile (W - 2·leafAtJamb ${P.deductions.leafAtJamb} - glass ${P.deductions.glass}, H - leafFullHeight ${P.deductions.leafFullHeight} - glass; 787 x 1291 with the 67 leaf, 789 x 1293 before 02.10.2026)`,
+  near(U.rect.width, 793) && near(U.rect.height, 1297) && near(U.rect.width, expW) && near(U.rect.height, expH), `${U.rect.width} x ${U.rect.height} vs ${expW} x ${expH}`);
 const EU = glassDxf.buildGlassUnitEntities(U, 'R040', 0, 0).entities;
 const contour = layerOf(EU, 'GLASS_CONTOUR');
-check('GLASS_CONTOUR: ONE closed 4-vertex polyline, no bulge, corners (0,0)-(787,1291)',
+check('GLASS_CONTOUR: ONE closed 4-vertex polyline, no bulge, corners (0,0)-(793,1297)',
   contour.length === 1 && contour[0].closed && contour[0].pts.length === 4 && contour[0].pts.every((p) => !p[2]) &&
   near(contour[0].pts[0][0], 0) && near(contour[0].pts[0][1], 0) && near(contour[0].pts[2][0], expW) && near(contour[0].pts[2][1], expH),
   JSON.stringify(contour[0]?.pts));
 const cover = P.glass.edgeCover.double;
 const edge = layerOf(EU, 'GLASS_EDGE');
-check(`GLASS_EDGE: ONE closed rectangle inset by glass.edgeCover ${cover} all round (10,10)-(777,1281)`,
+check(`GLASS_EDGE: ONE closed rectangle inset by glass.edgeCover ${cover} all round (10,10)-(783,1287)`,
   cover === 10 && edge.length === 1 && edge[0].closed && edge[0].pts.length === 4 &&
   near(edge[0].pts[0][0], cover) && near(edge[0].pts[0][1], cover) &&
   near(edge[0].pts[2][0], expW - cover) && near(edge[0].pts[2][1], expH - cover), JSON.stringify(edge[0]?.pts));
 const axes = layerOf(EU, 'GLASS_BAR_AXES');
 const bands = layerOf(EU, 'GLASS_BARS');
-check('GLASS_BAR_AXES: 2 axes — V1 at x = 393.5 (W/2), H1 at y = 645.5 (H/2), full length',
+check('GLASS_BAR_AXES: 2 axes: V1 at x = 396.5 (W/2), H1 at y = 648.5 (H/2), full length',
   axes.length === 2 && near(axes[0].pts[0][0], expW / 2) && near(axes[0].pts[0][1], 0) && near(axes[0].pts[1][1], expH) &&
   near(axes[1].pts[0][1], expH / 2) && near(axes[1].pts[0][0], 0) && near(axes[1].pts[1][0], expW),
   JSON.stringify(axes.map((a) => a.pts)));
 const bw = P.glass.barWidth;
 const vBand = bands.filter((b) => near(b.pts[0][0], b.pts[1][0])).map((b) => b.pts[0][0]).sort((a, b) => a - b);
 const hBand = bands.filter((b) => near(b.pts[0][1], b.pts[1][1])).map((b) => b.pts[0][1]).sort((a, b) => a - b);
-check(`GLASS_BARS: 4 band edges — 2 x glass.barWidth ${bw} (V at 384.5 / 402.5, H at 636.5 / 654.5)`,
+check(`GLASS_BARS: 4 band edges: 2 x glass.barWidth ${bw} (V at 387.5 / 405.5, H at 639.5 / 657.5)`,
   bands.length === 4 && vBand.length === 2 && hBand.length === 2 &&
   near(vBand[0], expW / 2 - bw / 2) && near(vBand[1], expW / 2 + bw / 2) &&
   near(hBand[0], expH / 2 - bw / 2) && near(hBand[1], expH / 2 + bw / 2), JSON.stringify([vBand, hBand]));
 const txt = layerOf(EU, 'GLASS_TEXT').map((t) => t.str);
 check('GLASS_TEXT: window name + unit id + RECTANGULAR on line 1', txt[0] === 'R040 - G1 GLASS RECTANGULAR', txt[0]);
-check('GLASS_TEXT: W x H line carries the engine numbers', txt[1].startsWith('W787 x H1291'), txt[1]);
+check('GLASS_TEXT: W x H line carries the engine numbers (W793 x H1297; W787 x H1291 with the 67 leaf)', txt[1].startsWith('W793 x H1297'), txt[1]);
 check('GLASS_TEXT: the glass spec line (type, makeup, spec, gas, finish)', /DOUBLE/.test(txt[2]) && /TOUGHENED/.test(txt[2]), txt[2]);
-check('GLASS_TEXT: bar count line 1H x 1V', txt.some((t) => t === 'BARS 2 (1H x 1V) TOTAL L=2078'), txt[3]);
+check('GLASS_TEXT: bar count line 1H x 1V, total = 793 + 1297 = 2090 (2078 = 787 + 1291 with the 67 leaf)', txt.some((t) => t === 'BARS 2 (1H x 1V) TOTAL L=2090'), txt[3]);
 check('GLASS_TEXT: bar axes measured FROM THE BOTTOM CORNERS (left / right, bottom / top)',
   txt.includes('BAR AXES FROM THE BOTTOM CORNERS:') &&
-  txt.includes('V1  FROM LEFT 393.5  FROM RIGHT 393.5') &&
-  txt.includes('H1  FROM BOTTOM 645.5  FROM TOP 645.5'), JSON.stringify(txt.slice(-3)));
+  txt.includes('V1  FROM LEFT 396.5  FROM RIGHT 396.5') &&
+  txt.includes('H1  FROM BOTTOM 648.5  FROM TOP 648.5'), JSON.stringify(txt.slice(-3)));
 check('the single-window export is ENABLED for a plain rectangular casement (was: skipped)', glassDxf.canExportGlassDxf(RECT, DR) === true);
 check('the OLD code skipped exactly this window (proof the stage changed behaviour)', !!OLD.glassDxf.glassDxfParamsForWindow(RECT, DR, 'R040').skip, String(OLD.glassDxf.glassDxfParamsForWindow(RECT, DR, 'R040').skip));
 
@@ -154,8 +157,8 @@ const U133 = glassDxf.glassUnitsForWindow(W133, D133);
 // The engine is right; the assertion follows the engine, not the brief.
 check('133 (3 lights + fanlights) → 6 units = 3 fanlights + 3 lights (brief said 3 — erratum)',
   U133.length === 6 && U133.filter((u) => /top/.test(u.row.location)).length === 3, String(U133.length));
-check('133: every unit carries its own size from the engine row (432.3 x 335.2 fanlight, 432.3 x 813.8 light; 434.3 / 337.2 / 815.8 before 02.10.2026)',
-  near(U133[0].rect.width, 432.3) && near(U133[0].rect.height, 335.2) && near(U133[3].rect.height, 813.8),
+check('133: every unit carries its own size from the engine row (438.3 x 341.2 fanlight, 438.3 x 819.8 light; 432.3 / 335.2 / 813.8 with the 67 leaf, 434.3 / 337.2 / 815.8 before 02.10.2026)',
+  near(U133[0].rect.width, 438.3) && near(U133[0].rect.height, 341.2) && near(U133[3].rect.height, 819.8),
   JSON.stringify(U133.map((u) => [u.rect.width, u.rect.height])));
 const E133 = glassDxf.buildGlassWindowEntities(U133, 'R133', 0, 0);
 check('133: the window entity list carries 6 contours and 6 edge lines, none overlapping in y',
@@ -275,10 +278,10 @@ for (const [tag, path, contours] of [['rectangular 040L', rectPath, 1], ['mixed 
 {
   const p = probe(rectPath);
   const c = p.polys.find((x) => x.layer === 'GLASS_CONTOUR');
-  check('rectangular 040L after the round-trip: contour bbox 787 x 1291', near(c.bbox[2] - c.bbox[0], expW) && near(c.bbox[3] - c.bbox[1], expH),
+  check('rectangular 040L after the round-trip: contour bbox 793 x 1297', near(c.bbox[2] - c.bbox[0], expW) && near(c.bbox[3] - c.bbox[1], expH),
     JSON.stringify(c.bbox));
   const e = p.polys.find((x) => x.layer === 'GLASS_EDGE');
-  check('rectangular 040L after the round-trip: edge line bbox 767 x 1271 (787 − 2·10)', near(e.bbox[2] - e.bbox[0], expW - 2 * cover) && near(e.bbox[3] - e.bbox[1], expH - 2 * cover),
+  check('rectangular 040L after the round-trip: edge line bbox 773 x 1277 (793 - 2·10)', near(e.bbox[2] - e.bbox[0], expW - 2 * cover) && near(e.bbox[3] - e.bbox[1], expH - 2 * cover),
     JSON.stringify(e.bbox));
   check('rectangular 040L after the round-trip: 2 axes + 4 band edges', p.polys.filter((x) => x.layer === 'GLASS_BAR_AXES').length === 2 && p.polys.filter((x) => x.layer === 'GLASS_BARS').length === 4);
 }

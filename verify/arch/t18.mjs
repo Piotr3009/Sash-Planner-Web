@@ -6,7 +6,7 @@
  * fullConfig) → deriveWindowData → lists → glazier DXF → ezdxf → glass PDF.
  * The EXPECTED numbers are the spec §3 vectors: the OUTER geometry (W, rise,
  * radii, arc lengths) is reproduced as literals; every profile-dependent number
- * (rings, clear width, springing, bar ends — v4 Block F: faces 68 / 67,
+ * (rings, clear width, springing, bar ends; v4 Block F: faces 68 / 64 (leaf 64 since 06.10.2026, was 67),
  * leafAtJamb 51, glassInset 11.5 (02.10.2026, was 12.5), minHaunchRadius 150) is computed here from
  * the profile object with its formula, never read from the code; closed forms
  * and numeric integrals cross-check what the spec does not list (areas, bar
@@ -76,13 +76,13 @@ function probe(path) {
 // profile numbers the vectors assume (v4 Block F, frame schema 2) — the ONE literal check below; everything downstream is a formula of these
 const tF = P.elements.frameHead.face, oL = P.deductions.leafAtJamb, tL = P.elements.leafTop.face, gI = P.geometry.glassInset;
 const cillSide = P.deductions.leafFullHeight - P.deductions.leafAtJamb;          // 98 − 51 = 47 (unchanged)
-const glassBottom = cillSide + (P.elements.leafBottom.face - gI);                // 47 + 67 − 11.5 = 102.5 (02.10.2026; was 101.5 with 12.5)
-const glassOff = oL + tL - gI;                                                   // 51 + 67 − 11.5 = 106.5 (was 105.5 with 12.5)
+const glassBottom = cillSide + (P.elements.leafBottom.face - gI);                // 47 + 64 - 11.5 = 99.5 (leaf 64, 06.10.2026; 102.5 with 67, 101.5 with 67 and 12.5)
+const glassOff = oL + tL - gI;                                                   // 51 + 64 - 11.5 = 103.5 (106.5 with 67, 105.5 with 67 and 12.5)
 const r05 = (v) => Math.round(v * 2) / 2;                                        // the engine's bar-length rounding (0.5 mm)
 const fmt1 = (v) => { const r = Math.round(v * 10) / 10; return Number.isInteger(r) ? String(r) : r.toFixed(1); };   // PDF / bar-row number format (1 dp, integers bare)
-check('profile numbers behind the §3 vectors (v4 Block F): faces 68 / 68 / 67, land 47, leafAtJamb 51, leafFullHeight 98, fanFromAxis 65, glassInset 11.5, minHaunchRadius 150, frameSchema 2, glassSchema 2',
-  tF === 68 && P.elements.frameJamb.face === 68 && tL === 67 && P.geometry.land === 47 && oL === 51 && P.deductions.leafFullHeight === 98 && P.deductions.fanFromAxis === 65 && gI === 11.5 && P.arch.minHaunchRadius === 150 && P.frameSchema === 2 && P.glassSchema === 2);
-check('derived constants: glass bottom edge 102.5 = (98 − 51) + (67 − 11.5) from the frame bottom (was 101.5), glass offset 106.5 = 51 + 67 − 11.5 from the frame outer (was 105.5)', glassBottom === 102.5 && glassOff === 106.5);
+check('profile numbers behind the §3 vectors (v4 Block F): faces 68 / 68 / 64 (leaf 64 since 06.10.2026, was 67), land 47, leafAtJamb 51, leafFullHeight 98, fanFromAxis 65, glassInset 11.5, minHaunchRadius 150, frameSchema 2, glassSchema 2',
+  tF === 68 && P.elements.frameJamb.face === 68 && tL === 64 && P.geometry.land === 47 && oL === 51 && P.deductions.leafFullHeight === 98 && P.deductions.fanFromAxis === 65 && gI === 11.5 && P.arch.minHaunchRadius === 150 && P.frameSchema === 2 && P.glassSchema === 2);
+check('derived constants: glass bottom edge 99.5 = (98 - 51) + (64 - 11.5) from the frame bottom (102.5 with the 67 leaf, 101.5 before 02.10), glass offset 103.5 = 51 + 64 - 11.5 from the frame outer (106.5 with 67, 105.5 before 02.10)', glassBottom === 99.5 && glassOff === 103.5);
 
 // PC item → windowSpec → derived, the way the app does it (window saved by the configurator)
 const pcItem = (id, width, height, fields) => specification.normaliseToWindowSpec(
@@ -285,7 +285,7 @@ section('3 — cut list, glass unit, paint / seals / weights; rectangular caseme
   check('jambs = start (1300) − jambDeduct, both sides', jamb.length === 1300 && byName(d.components.box, 'C-FRAME JAMB (R)').length === 1300);
   check('cill unchanged (1000)', byName(d.components.box, 'C-FRAME CILL').length === 1000);
   const atr = byName(d.components.sash, 'C-ARCH TOP RAIL');
-  check('C-ARCH TOP RAIL replaces C-TOP RAIL: code C-ATR-P1, section 67x57', !!atr && !byName(d.components.sash, 'C-TOP RAIL') && atr.code === 'C-ATR-P1' && atr.section === '67x57');
+  check('C-ARCH TOP RAIL replaces C-TOP RAIL: code C-ATR-P1, section 64x57 (leaf 64 since 06.10.2026, was 67x57)', !!atr && !byName(d.components.sash, 'C-TOP RAIL') && atr.code === 'C-ATR-P1' && atr.section === '64x57');
   expectNear(`C-ARCH TOP RAIL length = leaf ring centre line (${atrLen.toFixed(2)} = ${E1.total} − (${oL} + ${tL}/2)·π)`, atr.length, atrLen, 0.05);
   check(`stiles = leaf straight stile = start − cillSide ${cillSide} = ${1300 - cillSide}`, byName(d.components.sash, 'C-STILE (L)').length === 1300 - cillSide && byName(d.components.sash, 'C-STILE (R)').length === 1300 - cillSide);
   check(`bottom rail = leaf width ${1000 - 2 * oL} = 1000 − 2 × ${oL} (unchanged rule)`, byName(d.components.sash, 'C-BOTTOM RAIL').length === 1000 - 2 * oL);

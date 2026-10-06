@@ -82,13 +82,13 @@ const DEG = 180 / Math.PI;
 const W = 1200;
 const tF = P.elements.frameHead.face;        // 68 (v4 Block F, was 57)
 const oL = P.deductions.leafAtJamb;          // 51 (v4 Block F, was 40)
-const tL = P.elements.leafTop.face;          // 67
+const tL = P.elements.leafTop.face;          // 64 (leaf schema 2, 06.10.2026; was 67)
 const gI = P.geometry.glassInset;            // 11.5 (02.10.2026: glass 1mm smaller all round; was 12.5)
 const LIM = P.arch.limits;
 // v4 Block F (option B): the spec numbers for the frame — the ONE check that may carry literals;
 // every inner vector below is written as a formula of tF / oL / tL / gI.
-check('profile = spec F: frameHead 68 / frameJamb 68 / land 47 / rebate 21 / leafAtJamb 51 / leafFullHeight 98 / fanFromAxis 65 / leafTop 67 / glassInset 11.5',
-  tF === 68 && P.elements.frameJamb.face === 68 && P.geometry.land === 47 && P.geometry.rebate === 21 && oL === 51 && P.deductions.leafFullHeight === 98 && P.deductions.fanFromAxis === 65 && tL === 67 && gI === 11.5,
+check('profile = spec F: frameHead 68 / frameJamb 68 / land 47 / rebate 21 / leafAtJamb 51 / leafFullHeight 98 / fanFromAxis 65 / leafTop 64 (06.10.2026, was 67) / glassInset 11.5',
+  tF === 68 && P.elements.frameJamb.face === 68 && P.geometry.land === 47 && P.geometry.rebate === 21 && oL === 51 && P.deductions.leafFullHeight === 98 && P.deductions.fanFromAxis === 65 && tL === 64 && gI === 11.5,
   `${tF}/${P.elements.frameJamb.face}/${P.geometry.land}/${P.geometry.rebate}/${oL}/${P.deductions.leafFullHeight}/${P.deductions.fanFromAxis}/${tL}/${gI}`);
 check('profile: land + rebate = frame face (option B — the rebate stays 21, the land grows)', P.geometry.land + P.geometry.rebate === tF && oL === P.geometry.land + P.geometry.gap);
 
@@ -432,7 +432,15 @@ for (const v of PLAN_VECTORS) {
   expectThrows('missing contourAllowance throws (no defaults in the planner)', () => arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, contourAllowance: undefined }, CNC_OPTS), /contourAllowance is missing/);
   expectThrows('missing finger length throws (no defaults in the planner)', () => arch.planArchSegments(g.frameHead, { ...PLAN_OPTS, finger: {} }, CNC_OPTS), /finger\.length is missing/);
   expectThrows('missing cnc block throws (v4: cnc.minClampLength)', () => arch.planArchSegments(g.frameHead, PLAN_OPTS, undefined), /cnc\.minClampLength is missing/);
-  check('v4: N starts at 1 — the shallow 1000 × rise 200 leaf top rail is ONE 180 board, no joint', arch.buildArchPlan({ shape: 'three-centre', width: 1000, height: 1500, rise: 200 }, P).plans.leafTop.pieces.length === 1);
+  // Leaf 64 (06.10.2026): N still starts at 1 (the fewest plan is ONE 180 board, W_req 159, no joint), but the
+  // 64 ring is 3 narrower, so 2 pieces now need W_req 148.05 <= 150 (151.05 with the 67 face: no narrower board)
+  // and pass the limits, while the one-board waste is 0.532 > wasteThreshold 0.45: the C.4 rule takes 2 x 150.
+  const shallowLeaf = arch.buildArchPlan({ shape: 'three-centre', width: 1000, height: 1500, rise: 200 }, P).plans.leafTop;
+  const sa = shallowLeaf.arcs[0];
+  check('v4: N starts at 1: the shallow 1000 × rise 200 leaf top rail plans ONE 180 board first (fewest, W_req 159, no joint); the 64 leaf makes 2 × 150 fit (W_req 148.05) and the one-board waste 0.532 > 0.45, so the economy rule takes 2 × 150',
+    sa.fewest?.n === 1 && sa.fewest.stock === 180 && near(sa.fewest.wReq, 159, 1e-9) && near(sa.fewest.waste, 0.532, 0.001) && P.arch.wasteThreshold === 0.45
+    && sa.rule === 'economy' && sa.default?.n === 2 && sa.default.stock === 150 && near(sa.default.wReq, 148.05, 0.01) && shallowLeaf.pieces.length === 2,
+    `${sa.rule}: fewest ${sa.fewest?.n} × ${sa.fewest?.stock} (W_req ${sa.fewest?.wReq}, waste ${sa.fewest?.waste}), default ${sa.default?.n} × ${sa.default?.stock} (W_req ${sa.default?.wReq})`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

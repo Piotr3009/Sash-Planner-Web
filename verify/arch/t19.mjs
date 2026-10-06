@@ -402,7 +402,7 @@ section('4 — 3D: archedCasementGeometry (ArchedCasementWindow) on every shape 
     check(`${tag}: rule C — the outer contour is vertical at the springing (the two points around the chain start share x = W/2)`,
       (() => { const i = G.outer.findIndex((p) => near(p[1], G.springY, 1e-6) && near(p[0], s.width / 2, 1e-6)); return i > 0 && near(G.outer[i - 1][0], s.width / 2, 1e-6); })());
   }
-  // bars: engine roles reproduced on the 3D daylight outline (3D leaf face 64 vs profile 67 → same count / roles / pattern)
+  // bars: engine roles reproduced on the 3D daylight outline (3D leaf face 64 = profile 64 since 06.10.2026, was 67 → same count / roles / pattern)
   const hub = M.geo3d.archedCasementGeometry({ archShape: 'semi-circle', width: 1000, height: 1500, archRise: 500, barPattern: 'hub-spoke', hBars: 1, ...opts });
   const engine = RENDERED['semi-bars'].derived.arch;
   check('3D bars: semi-circle hub-spoke 1H → same bar count and roles as the engine list', hub.bars.length === engine.bars.length && hub.bars.every((b, i) => b.role === engine.bars[i].role && b.kind === engine.bars[i].kind), `${hub.bars.length} vs ${engine.bars.length}`);

@@ -53,8 +53,9 @@ check('casement: frameHead 68 / frameJamb 68 / land 47 / rebate 21 / gap 4 / lea
   E.frameHead.face === 68 && E.frameJamb.face === 68 && G.land === 47 && G.rebate === 21 && G.gap === 4 && D.leafAtJamb === 51 && D.leafFullHeight === 98 && D.fanFromAxis === 65 && P.frameSchema === 2,
   JSON.stringify([E.frameHead.face, E.frameJamb.face, G.land, G.rebate, G.gap, D.leafAtJamb, D.leafFullHeight, D.fanFromAxis, P.frameSchema]));
 // glassInset 11.5 since 02.10.2026 (glass schema 2: 1mm smaller all round) — it was 12.5 through Block F and is not a Block F number
-check('casement UNCHANGED by Block F: cill 68 / mullion 68 / transom 68 / leaf members 67 / glassInset 11.5 (glass schema 2, 02.10.2026) / gapCill 6 / cillVisible 41 / lowerFromAxis 64',
-  E.frameCill.face === 68 && E.mullion.face === 68 && E.transom.face === 68 && E.leafStile.face === 67 && E.leafTop.face === 67 && E.leafBottom.face === 67 && G.glassInset === 11.5 && P.glassSchema === 2 && G.gapCill === 6 && G.cillVisible === 41 && D.lowerFromAxis === 64);
+// leaf members 64 since 06.10.2026 (leaf schema 2, Piotr) - they were 67 through Block F and are not a Block F number either
+check('casement UNCHANGED by Block F: cill 68 / mullion 68 / transom 68 / leaf members 64 (leaf schema 2, 06.10.2026; 67 in Block F) / glassInset 11.5 (glass schema 2, 02.10.2026) / gapCill 6 / cillVisible 41 / lowerFromAxis 64',
+  E.frameCill.face === 68 && E.mullion.face === 68 && E.transom.face === 68 && E.leafStile.face === 64 && E.leafTop.face === 64 && E.leafBottom.face === 64 && P.leafSchema === 2 && G.glassInset === 11.5 && P.glassSchema === 2 && G.gapCill === 6 && G.cillVisible === 41 && D.lowerFromAxis === 64);
 check('identity: land + rebate = frame face (option B — the rebate stays, the land grows)', G.land + G.rebate === E.frameHead.face && E.frameJamb.face === E.frameHead.face);
 check('identity: leafAtJamb = land + gap', D.leafAtJamb === G.land + G.gap);
 check('identity: leafFullHeight = leafAtJamb + gapCill + cillVisible (top layer + cill layer)', D.leafFullHeight === D.leafAtJamb + G.gapCill + G.cillVisible);
@@ -131,7 +132,8 @@ section('3 — migrateCasementProfile: frameSchema 1 → 2 moves only the values
   const m1 = mig(stored);
   check('stored schema-1 copy with the old defaults → 68 / 68 / 47 / 51 / 98 / 65, frameSchema 2', m1.frameSchema === 2 && m1.elements.frameHead.face === 68 && m1.elements.frameJamb.face === 68 && m1.geometry.land === 47 && m1.deductions.leafAtJamb === 51 && m1.deductions.leafFullHeight === 98 && m1.deductions.fanFromAxis === 65,
     JSON.stringify([m1.frameSchema, m1.elements.frameHead.face, m1.geometry.land, m1.deductions.leafAtJamb, m1.deductions.leafFullHeight, m1.deductions.fanFromAxis]));
-  check('migration keeps everything else of the stored copy (arch / cnc / tracery / glass blocks, other elements)', JSON.stringify(m1.arch) === JSON.stringify(stored.arch) && JSON.stringify(m1.cnc) === JSON.stringify(stored.cnc) && m1.elements.leafTop.face === 67 && m1.elements.frameCill.face === 68);
+  // the stored copy is the live default, so its leaf is 64 on leaf schema 2 (06.10.2026; it was 67 before)
+  check('migration keeps everything else of the stored copy (arch / cnc / tracery / glass blocks, other elements)', JSON.stringify(m1.arch) === JSON.stringify(stored.arch) && JSON.stringify(m1.cnc) === JSON.stringify(stored.cnc) && m1.elements.leafTop.face === stored.elements.leafTop.face && m1.elements.leafTop.face === 64 && m1.elements.frameCill.face === 68);
   const edited = JSON.parse(JSON.stringify(stored));
   edited.elements.frameJamb.face = 60; edited.deductions.leafAtJamb = 45;   // a workshop edit in the 57 era
   const m2 = mig(edited);

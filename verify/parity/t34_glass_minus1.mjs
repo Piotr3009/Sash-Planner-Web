@@ -17,6 +17,12 @@
  *   migration: a stored schema-1 casement profile (12.5 / 109 / 11) comes out
  *          11.5 / 111 / 10; a hand-edited 12 stays 12; schema 2 is left alone
  *
+ * 06.10.2026 (leaf 64, deduction 105, BUILD-LOG): the reference tree has the 67 leaf, so the casement
+ * and fixed units are derived with the live code on a profile whose leaf is PINNED at 67 (leaf schema 2,
+ * so the migration keeps it): "live = ref - 2" still proves the glass -1 mm per side and nothing else.
+ * The default 64 profile is checked on its own: unit = ref - 2 + 2 x (67 - 64) = ref + 4. The migration
+ * expectations follow the leaf schema: the stored deduction is re-derived from the migrated face.
+ *
  * Run: node verify/parity/t34_glass_minus1.mjs [git-ref]   (default 12670b6)
  */
 import { execFileSync } from 'node:child_process';
@@ -40,6 +46,12 @@ const REF = await bundleTree(resolve(tree, 'src'), tag, EXTRA);
 
 let fails = 0;
 const ok = (cond, msg) => { console.log(`${cond ? 'PASS' : 'FAIL'}  ${msg}`); if (!cond) fails += 1; };
+// the live casement profile with the leaf pinned at 67 (the reference tree's leaf; see the header)
+const P67 = JSON.parse(JSON.stringify(LIVE.profile.DEFAULT_CASEMENT_PROFILE));
+for (const k of ['leafStile', 'leafTop', 'leafBottom']) P67.elements[k].face = 67;
+P67.deductions.glass = 111;
+const withLeaf67 = (fn) => { LIVE.profile.setActiveCasementProfile(P67); try { return fn(); } finally { LIVE.profile.setActiveCasementProfile(null); } };
+const LEAF67 = new Set(['casement', 'fixed']);
 const near = (a, b, tol = 0.051) => Math.abs(a - b) <= tol;
 
 const WINDOWS = {
@@ -59,7 +71,7 @@ function units(M, spec, derived) {
 }
 
 for (const [name, W] of Object.entries(WINDOWS)) {
-  const L = deriveItem(LIVE, W.item, W.fc);
+  const L = LEAF67.has(name) ? withLeaf67(() => deriveItem(LIVE, W.item, W.fc)) : deriveItem(LIVE, W.item, W.fc);
   const R = deriveItem(REF, W.item, W.fc);
   const uL = units(LIVE, L.spec, L.derived);
   const uR = units(REF, R.spec, R.derived);
@@ -86,13 +98,21 @@ for (const [name, W] of Object.entries(WINDOWS)) {
   }
 }
 
+// ── the default profile (leaf 64, 06.10.2026): casement and fixed units = ref - 2 + 6 = ref + 4 ──
+for (const name of LEAF67) {
+  const W = WINDOWS[name];
+  const uL = units(LIVE, ...Object.values(deriveItem(LIVE, W.item, W.fc)));
+  const uR = units(REF, ...Object.values(deriveItem(REF, W.item, W.fc)));
+  uL.forEach(([w, h], i) => ok(near(w, uR[i][0] + 4) && near(h, uR[i][1] + 4), `${name} on the default profile (leaf 64): unit ${i + 1} ${w}×${h} = ref ${uR[i][0]}×${uR[i][1]} - 2 + 6 each way`));
+}
+
 // ── edge cover + tracery outset ──
 const PL = LIVE.profile.getCasementProfile();
 const PR = REF.profile.getCasementProfile();
 for (const t of ['double', 'double_slim', 'triple', 'single', 'passive']) {
   ok(LIVE.glassBars.readGlassProfile(PL, t).edgeCover === 10 && REF.glassBars.readGlassProfile(PR, t).edgeCover === 11, `edge cover ${t}: live 10, ref 11`);
 }
-ok(PL.geometry.glassInset === 11.5 && PL.deductions.glass === 111 && PL.geometry.glazingRebate === 18, `casement profile: glassInset 11.5, deductions.glass 111, rebate 18`);
+ok(PL.geometry.glassInset === 11.5 && PL.deductions.glass === 105 && PL.elements.leafStile.face === 64 && PL.geometry.glazingRebate === 18, `casement profile: glassInset 11.5, deductions.glass 105 = 2 x (64 - 11.5) (111 with the 67 leaf), rebate 18`);
 ok(LIVE.profile.getDoorProfile().geometry.glassInset === 11.5, `door profile: glassInset 11.5`);
 ok(LIVE.calculations.CONSTANTS.GLASS_REBATE === 11.5, `sash CONSTANTS.GLASS_REBATE 11.5`);
 ok(PL.geometry.glazingRebate - PL.geometry.glassInset === 6.5, `tracery board outset 6.5 (18 − 11.5)`);
@@ -101,15 +121,20 @@ ok(PL.geometry.glazingRebate - PL.geometry.glassInset === 6.5, `tracery board ou
 const stored = JSON.parse(JSON.stringify(PR));           // ref default = exactly what a tenant saved before today
 delete stored.glassSchema;
 const m1 = LIVE.profile.migrateCasementProfile(stored);
-ok(m1.glassSchema === 2 && m1.geometry.glassInset === 11.5 && m1.deductions.glass === 111 && Object.values(m1.glass.edgeCover).every((v) => v === 10),
-  `migration: stored 12.5 / 109 / 11 → 11.5 / 111 / 10, glassSchema 2`);
+ok(m1.glassSchema === 2 && m1.geometry.glassInset === 11.5 && m1.deductions.glass === 105 && m1.elements.leafStile.face === 64 && Object.values(m1.glass.edgeCover).every((v) => v === 10),
+  `migration: stored 12.5 / 109 / 11 (leaf 67) → 11.5 / 105 / 10, leaf 64 (111 before the leaf schema), glassSchema 2`);
 const edited = JSON.parse(JSON.stringify(stored)); edited.geometry.glassInset = 12; edited.glass.edgeCover.triple = 9;
 const m2 = LIVE.profile.migrateCasementProfile(edited);
-ok(m2.geometry.glassInset === 12 && m2.glass.edgeCover.triple === 9 && m2.glass.edgeCover.double === 10 && m2.deductions.glass === 111,
-  `migration: hand-edited 12 / triple 9 kept, untouched keys move`);
-const v2 = JSON.parse(JSON.stringify(stored)); v2.glassSchema = 2;
+ok(m2.geometry.glassInset === 12 && m2.glass.edgeCover.triple === 9 && m2.glass.edgeCover.double === 10 && m2.deductions.glass === 104,
+  `migration: hand-edited 12 / triple 9 kept, untouched keys move; the deduction follows the inset and the 64 leaf: 2 x (64 - 12) = 104 (was the stored 111)`);
+// a copy on the CURRENT schemas (glass 2, and since 06.10.2026 leaf 2 / length 2) is left alone
+const v2 = JSON.parse(JSON.stringify(stored)); v2.glassSchema = 2; v2.leafSchema = 2; v2.lengthSchema = 2;
 const m3 = LIVE.profile.migrateCasementProfile(v2);
-ok(m3.geometry.glassInset === 12.5 && m3.deductions.glass === 109 && m3.glass.edgeCover.double === 11, `migration: a schema-2 copy is left alone (12.5 / 109 / 11 stay)`);
+ok(m3.geometry.glassInset === 12.5 && m3.deductions.glass === 109 && m3.glass.edgeCover.double === 11 && m3.elements.leafStile.face === 67, `migration: a copy on the current schemas is left alone (12.5 / 109 / 11 / leaf 67 stay; 109 = 2 x (67 - 12.5))`);
+// the same glass-schema-2 copy without the leaf schema: the glass keys stay, the leaf moves, the deduction follows
+const v2l = JSON.parse(JSON.stringify(stored)); v2l.glassSchema = 2;
+const m3l = LIVE.profile.migrateCasementProfile(v2l);
+ok(m3l.geometry.glassInset === 12.5 && m3l.glass.edgeCover.double === 11 && m3l.elements.leafStile.face === 64 && m3l.deductions.glass === 103, `migration: a glass-schema-2 copy without the leaf schema keeps 12.5 / 11, its leaf moves to 64, deduction 2 x (64 - 12.5) = 103`);
 
 // ── clips ──
 const clipsSash = (fc) => {

@@ -117,7 +117,7 @@ section('3 — Block 4: curved members → blank pieces in the pre-cut, BOM blan
   // v4 Block F (frame 68): the expected piece counts / boards come from the independent planner (verify/arch/lib/indPlanner.mjs) on rings built
   // from the profile formulas — frame ring R / R − face, leaf ring (R − leafAtJamb) / (R − leafAtJamb − leafTop.face); a closed ring = two half circles
   const CP = profile.DEFAULT_CASEMENT_PROFILE;
-  const R8 = 800 / 2, tF = CP.elements.frameHead.face, oL = CP.deductions.leafAtJamb, tL = CP.elements.leafTop.face;   // 400 / 68 / 51 / 67
+  const R8 = 800 / 2, tF = CP.elements.frameHead.face, oL = CP.deductions.leafAtJamb, tL = CP.elements.leafTop.face;   // 400 / 68 / 51 / 64 (leaf 64 since 06.10.2026)
   const halves = (r) => [{ cx: 0, cy: 0, r, a0: 0, a1: Math.PI, clip0: null, clip1: null }, { cx: 0, cy: 0, r, a0: Math.PI, a1: 2 * Math.PI, clip0: null, clip1: null }];
   const circleRing = (ro, ri) => ({ outer: halves(ro), inner: halves(ri) });
   const IND = { stock: CP.arch.stockWidths, allowance: CP.arch.contourAllowance, finger: CP.arch.finger.length, minClamp: CP.cnc.minClampLength, minPiece: CP.arch.minPieceLength, threshold: CP.arch.wasteThreshold };
