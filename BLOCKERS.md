@@ -4,6 +4,87 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-10-06 · TURA PC: CASEMENT LEAF 64 AND TRANSOM SEAT 8.5, items for Piotr (branch `claude/casement-leaf-64`)
+
+**27.1 What happens at merge.** After merge and deploy, the stored workshop profile (leaf 67, glass 111, seat 8,
+no `leafSchema` / `lengthSchema`) is migrated to 64 / 105 / 8.5 **on the first load, in memory and in
+localStorage, on every client**. No batch has a frozen profile (27.2), so **every casement batch is
+recalculated at once, including windows already in production packs.** Per window type:
+
+| window type | what changes | what does not |
+|---|---|---|
+| every casement (opening, fixed) | leaf members 64x57 (triple 64x61) in the cut list and Pre-Cut; glass units + 6 in width and height (040L 1000 x 1200: 787 x 991 -> 793 x 997); glass m² up (0.78 -> 0.79); glazing beading up about 28 mm per pane (4089 -> 4117), astragal beading and bead tape up; leaf weight down 0.1 to 0.3 kg (27 -> 26.8), window timber down 0.1 to 1.7 kg | leaf outer sizes, leaf member LENGTHS, frame head / cill / jambs, mullions (also partial), locks, hinge slots (none moved in the reference set or the fixtures), seals |
+| casements with a transom (021, 052L/R, 023, 142, 031, ...) | every transom + 0.5 (906 -> 906.5, 1706 -> 1706.5, 840 -> 840.5); Pre-Cut and BOM + 1 mm per transom where the field leaf width is whole (926 -> 927), the same as before where it already ended in .5 (round half up); the cut list prints 907 (27.7 b) | the transom axis and land band, the partial mullion (seat 8, 27.3) |
+| arched casements | as every casement, plus: the curved leaf top rail is longer by 1.5 mm x its sweep in radians (V1 1000 x 1500 start 1300: 915.3 -> 920.0); its blank plan can change: the 1000 x rise 200 arch goes from ONE 180 board to the economy plan 2 x 150 (27.7 c); the glass line moves 3 mm out all round (radii + 3) | the frame head and the leaf outer contour |
+| circle fixed windows | the leaf ring centre line 1982.3 -> 1991.8 (800 circle); glass diameter + 6 (587 -> 593) | the frame ring |
+| sash windows, doors | nothing (t38 §8 deep-equal, sash fixtures byte-identical) | |
+
+You decide when to merge. Production packs already printed with 67 / 8 numbers will not match a reprint.
+
+**27.2 Frozen batches.** `updateBatchStatus` (`projectStore.js:365`) is the only writer of `_profileSnapshot`
+and has **zero callers**, so no batch is frozen through the app (rows written by other means were not checked).
+If one were: the snapshot is a JSON copy of the live, already migrated profile, carrying only the schema
+counters that existed at freeze time; `withProfiles` runs `migrateCasementProfile` on it on EVERY read, so a
+snapshot taken before today has no `leafSchema` / `lengthSchema`, reads as schema 1, and its 67 / 8 become 64 /
+8.5 with the glass re-derived. **A freeze does not protect against a schema migration** (the frame and glass
+schemas behaved the same). Two more gaps: `updateBatchStatus` puts only `status` into `currentBatch` (not the new
+`defaults`), and `WindowDetailPage`'s derived memo does not depend on `currentBatch`. To make a freeze real: wire
+it in the UI, fix those two, and either stamp a snapshot as "frozen" so `withProfiles` fills only missing keys
+and never moves a value, or record the counters at freeze time and treat a missing counter as "do not move". Not
+implemented (the brief says describe only).
+
+**27.3 Partial mullion seat.** `lengths.partialMullionSeat` stays 8 (provisional, "UNCONFIRMED length rule" on
+the cut list). The 031 1800 x 1500 partial mullion stays 454.2 = 446.2 + 8. **Question: should it follow the
+transom seat to 8.5?** It would be a one-line default plus one more key in `LENGTH_SCHEMA_1`.
+
+**27.4 Hinges.** No window of the reference set (11 casements) and no fixture window changes hinge slot; only
+the weight inside the pick moves (for example 33.7 -> 33.4, 21.4 -> 21.2, 18.5 -> 18.3 kg). t36 passes untouched.
+The leaf always gets LIGHTER (timber lost > glass gained, for every glazing type), so a pick can only move to a
+lighter row, and only when the rounded weight sat just above a weight limit that decides the row: side 18 / 21 /
+35 kg, top 10 / 16 / 24 / 50 kg. FYI, nothing to do.
+
+**27.5 Raw stock.** With the three leaf slots assigned (your engineered 63 x 75), the Pre-Cut raw section stays
+the assigned material, before and after (t38 §11, flat and schema-2 assignments). Without an assignment,
+double glazing stays `63x63` (the leaf DEPTH 57 happens to equal the sash stile face 57); **triple glazing has no
+match for depth 61, so its Pre-Cut group IS the finished section and moves from `67x61` to `64x61`** (a Production
+Pack stock length or offcut list saved under `sash-67x61` would no longer apply). Nothing to do unless you want
+another section.
+
+**27.6 Beading NaN.** `components.beading[i].finishedWidth` and `.thickness` are NaN for every beading record,
+casement AND sash, because the record's section is the word `'profile'`: `parseSection('profile')` gives
+`[NaN]` (`calculations.js:239-260`). Readers of `components.beading`: `bom.js:217` (purchase list),
+`ProductionPackPage.jsx:291` (copied into `merged.beading`, which nothing reads) and `:2226` (spraying list, PDF
+`sprayingPdfExport.js:74`); all use only `elementName`, `length`, `quantity`. The only code that reads
+`finishedWidth` is `buildBoxPrecut` (`calculations.js:1654`), never called. **Nothing depends on the NaN.** Not
+fixed (brief).
+
+**27.7 Anything else.**
+
+- **a. Cloud write-back.** The migrated profile reaches Supabase only with the first Window Settings edit after
+  the deploy (BUILD-LOG Stage 1); until then the cloud row keeps 67 / 111 / 8 and every client migrates it on
+  load. Two older hazards found while tracing it, not touched: `projectStore.saveSettings` upserts the whole
+  `constants` it loaded at login, including the old `windowProfiles`, so a Settings save after a profile edit in
+  the same session can put the old profile back in the cloud; and `windowProfileStore` is not reloaded on an
+  in-app sign-in (only on a page load). Say if a write on load is wanted.
+- **b. Cut list rounding.** The cut list and the Pre-Cut "finished" column print every member in whole mm
+  (`Math.round`, round half up): the 906.5 transom prints **907** there, while the frame sheet and bSuite print
+  906.5. Same rule as every leaf today (446.2 -> 446). Not changed: it would move the sash fixtures. Should the
+  cut list show one decimal?
+- **c. Arched blank plans.** The narrower leaf ring changes some leaf top rail plans: 1000 x rise 200
+  three-centre from ONE 180 board to 2 x 150 (rule C.4: the one-board waste 0.532 > 0.45 and two pieces now fit a
+  150 board); the arched V1 cut-list note changes the same way. The gothic 600 leaf stays blocked (shorter edge
+  399.5, 0.5 under the 400 limit). Check the first arched order.
+- **d. Leaf sheet rounding.** The leaf sheet prints sizes on a 0.5 grid, the glass too: a 341.2 unit prints
+  "341" (as a 446.2 leaf prints "446"). Unchanged; the glass sheet and the schedule print 341.2.
+- **e. Samples.** `docs/handover/samples/*` were already out of date (pre-02.10 glass) and the suite rewrites 30
+  of them on every run; restored, not committed (history).
+- **f. `CasementDrawing2D.jsx` is imported nowhere**; it was updated to the one glass source anyway.
+- **g. `verify/parity/psw-casement-layouts.mjs` not run** (needs a PSW clone, outside this session).
+- **h. The Transom card's number input has no `step`**: 8.5 is accepted, stored and shown (t38 §10); what the
+  browser spinner arrows do from 8.5 was not checked. No layout change made.
+
+---
+
 ## 2026-09-21 — BAR GRID (one grid of glazing-bar lines): what is left for Piotr
 
 | # | Item | State | Ask |
