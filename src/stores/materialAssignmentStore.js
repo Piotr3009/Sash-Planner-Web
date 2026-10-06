@@ -98,9 +98,9 @@ export const CASEMENT_PARTS = {
       hint: 'External cill extension board, 85mm projection. Raw 34×95 incl. the 10×10 tongue.' },
   ],
   sash: [
-    { id: 'c_sash_stile',       name: 'Leaf Stiles',      section: '67×57', pcs: 2, materialType: 'hardwood' },
-    { id: 'c_sash_top_rail',    name: 'Leaf Top Rail',    section: '67×57', pcs: 1, materialType: 'hardwood' },
-    { id: 'c_sash_bottom_rail', name: 'Leaf Bottom Rail', section: '67×57', pcs: 1, materialType: 'hardwood' },
+    { id: 'c_sash_stile',       name: 'Leaf Stiles',      section: '64×57', pcs: 2, materialType: 'hardwood' },
+    { id: 'c_sash_top_rail',    name: 'Leaf Top Rail',    section: '64×57', pcs: 1, materialType: 'hardwood' },
+    { id: 'c_sash_bottom_rail', name: 'Leaf Bottom Rail', section: '64×57', pcs: 1, materialType: 'hardwood' },
     // arched-windows-v3 0.4: timber tracery board over the arched unit (one board, one side, CNC-cut)
     { id: 'c_tracery',          name: 'Tracery Board',    section: '18×blank', pcs: 1, materialType: 'hardwood',
       hint: 'Arched casement with a bar pattern: one board (profile tracery.boardThickness) cut on the CNC to the pane pattern, applied on one side of the glass. Engine-fed: blank W x H from the tracery export.' },

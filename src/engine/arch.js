@@ -1358,7 +1358,8 @@ export function buildArchBars({ outline, shape, pattern = 'none', h = 0, v = 0, 
 // planArchSegments, chainPoly) works unchanged). Radii per the casement
 // profile faces exactly like the arch: frame ring 0 → frameHead.face, leaf
 // ring leafAtJamb → leafAtJamb + leafTop.face, glass at leafInner − glassInset
-// (800 circle: 400 / 343, 360 / 293, glass 305.5).
+// (800 circle on the default profile, frame 68 / leafAtJamb 51 / leaf 64 / inset 11.5:
+// frame ring 400 / 332, leaf ring 349 / 285, glass 296.5).
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** Two half-arcs of a full circle, radius r, centre (0, 0): upper 0 → π, lower π → 2π. */

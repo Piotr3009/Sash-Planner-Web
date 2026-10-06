@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useProjectStore } from '../../stores/projectStore.js';
-import { getCasementProfile } from '../../engine/profile.js';
+import { getCasementProfile, casementGlassDeduction } from '../../engine/profile.js';
 import {
   CAD, CAD_SIZES, CAD_STROKES, CAD_DIMS, FONT_FAMILY, VIEWBOX_REF,
 } from './drawingTheme.js';
@@ -363,7 +363,11 @@ export default function CasementDrawing2D({ windowSpec, derived, batch }) {
     });
     tierGroups.forEach((tg) => {
       add(`${tg.name} leaf ${tg.n > 1 ? `×${tg.n} ` : ''}${fmt(tg.l.mm.leafW)} × ${fmt(tg.l.mm.leafH)}`, tg.l.cx + tg.l.w / 4, tg.l.cy - tg.l.h / 4);
-      add(`glass ${fmt(tg.l.mm.leafW - p.deductions.glass)} × ${fmt(tg.l.mm.leafH - p.deductions.glass)} · 24mm`, tg.l.cx + tg.l.w / 4, tg.l.cy + tg.l.h / 5, { muted: true });
+      // the engine's unit (the glass schedule); the profile deduction only if the unit is missing
+      const unit = dv.customGlassUnits?.[tg.l.i];
+      const gw = unit ? unit.width : tg.l.mm.leafW - casementGlassDeduction(p);
+      const gh = unit ? unit.height : tg.l.mm.leafH - casementGlassDeduction(p);
+      add(`glass ${fmt(gw)} × ${fmt(gh)} · 24mm`, tg.l.cx + tg.l.w / 4, tg.l.cy + tg.l.h / 5, { muted: true });
     });
     add(`C-CILL ${fmt(extW)} · ${secC}`, (X0 + W) / 2 + X0 / 2 + 40, YB - 5);
     add('apex = hinge side', null, null, { muted: true });
