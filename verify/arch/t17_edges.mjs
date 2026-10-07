@@ -9,7 +9,7 @@
  *
  * Findings this file documents (BLOCKERS.md §8, updated for v2):
  *   F1 (v1) the deepest ring (leaf inner = leafAtJamb + leafTop.face — 107 on
- *       the 57 frame, 118 since v4 Block F: 51 + 67) plus the contour allowance
+ *       the 57 frame, 118 since v4 Block F: 51 + 67, 115 with the 64 leaf) plus the contour allowance
  *       (10) had to sit above the arch-start line, so a three-centre haunch
  *       radius ≤ 117 mm was impossible.
  *   F2 (v2, P3) the haunch radius never drops below profile arch.minHaunchRadius
@@ -58,8 +58,8 @@ function expectThrows(name, fn, re) {
 }
 const section = (t) => console.log(`\n== ${t} ==`);
 const SHAPES = ['semi-circle', 'gothic-equilateral', 'gothic-drop', 'three-centre'];
-const deepest = P.deductions.leafAtJamb + P.elements.leafTop.face;     // 51 + 67 = 118 (v4 Block F; was 40 + 67 = 107)
-const tF = P.elements.frameHead.face, tL = P.elements.leafTop.face, A = P.arch.contourAllowance;   // 68 / 67 / 10
+const deepest = P.deductions.leafAtJamb + P.elements.leafTop.face;     // 51 + 64 = 115 (leaf 64, 06.10.2026; 118 with the 67 face; was 40 + 67 = 107)
+const tF = P.elements.frameHead.face, tL = P.elements.leafTop.face, A = P.arch.contourAllowance;   // 68 / 64 / 10
 const cillSide = P.deductions.leafFullHeight - P.deductions.leafAtJamb;   // 98 − 51 = 47 (unchanged by Block F)
 const finite = (v) => Number.isFinite(v);
 function planSane(plan) {
@@ -123,8 +123,9 @@ for (const Wd of [400, 1500]) {
   }
 }
 // F2 boundary (v2 P3): the haunch radius is at least 150, so the rise must exceed 150 — nothing else binds
-// the one literal check: the profile IS the v4 Block F spec (leafAtJamb 51 + leafTop.face 67 = 118, minHaunchRadius 150 → 32 to spare)
-check(`deepest ring offset read from the profile = ${deepest} (leafAtJamb ${P.deductions.leafAtJamb} + leafTop.face ${tL}) — below minHaunchRadius ${P.arch.minHaunchRadius} by ${P.arch.minHaunchRadius - deepest} (57 frame: 107, by 43)`, deepest === 51 + 67 && P.arch.minHaunchRadius === 150 && P.arch.minHaunchRadius - deepest === 32);
+// the one literal check: the profile IS the v4 Block F spec with the 64 leaf (leafAtJamb 51 + leafTop.face 64 = 115,
+// minHaunchRadius 150 -> 35 to spare; 118 and 32 with the 67 face before 06.10.2026)
+check(`deepest ring offset read from the profile = ${deepest} (leafAtJamb ${P.deductions.leafAtJamb} + leafTop.face ${tL}), below minHaunchRadius ${P.arch.minHaunchRadius} by ${P.arch.minHaunchRadius - deepest} (67 leaf: 118, by 32; 57 frame: 107, by 43)`, deepest === 51 + 64 && P.arch.minHaunchRadius === 150 && P.arch.minHaunchRadius - deepest === 35);
 expectThrows('three-centre rise 150 at W 1200 → equals the haunch minimum, no crown arc — readable', () => arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 2500, rise: 150 }, P), /rise 150mm must exceed the haunch radius 150mm/);
 check('three-centre rise 151 at W 1200 builds (r 150, crown R 101400.5, haunch spans 89.7°); its plan = the independent planner (planned or blocked alike)', (() => {
   const g = arch.buildArchGeometry({ shape: 'three-centre', width: 1200, height: 2500, rise: 151 }, P);

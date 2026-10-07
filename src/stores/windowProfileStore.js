@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { normalizeSashProfile, migrateCasementProfile, DEFAULT_SASH_PROFILE, DEFAULT_CASEMENT_PROFILE, setActiveWindowProfile, setActiveCasementProfile } from '../engine/profile.js';
+import { normalizeSashProfile, migrateCasementProfile, DEFAULT_SASH_PROFILE, DEFAULT_CASEMENT_PROFILE, setActiveWindowProfile, setActiveCasementProfile, casementGlassDeduction } from '../engine/profile.js';
 import { loadWindowProfiles, saveWindowProfiles } from '../services/cloudSync.js';
 
 let cloudSaveTimer = null;
@@ -11,6 +11,16 @@ const scheduleCloudSave = (profiles) => {
 
 // Deep clone helper for the plain-JSON profile object
 const clone = (o) => JSON.parse(JSON.stringify(o));
+
+// Keep the stored casement deductions.glass in step with the leaf face and
+// glassInset (06.10.2026): the readers take the deduction from
+// casementGlassDeduction, and the stored copy must never disagree with it.
+const syncGlassDeduction = (casement) => {
+  if (casement?.deductions && casement.geometry?.glassInset != null) {
+    casement.deductions.glass = casementGlassDeduction(casement);
+  }
+  return casement;
+};
 
 /**
  * Workshop window-construction profile (Window Settings page).
@@ -84,7 +94,7 @@ export const useWindowProfileStore = create(
           if (!casement.elements[elementKey]) return {};
           casement.elements[elementKey][field] =
             field === 'raw' ? String(value) : (Number(value) || 0);
-          return { casement };
+          return { casement: syncGlassDeduction(casement) };
         });
         get()._sync();
       },
@@ -93,7 +103,7 @@ export const useWindowProfileStore = create(
         set((s) => {
           const casement = clone(s.casement);
           casement.deductions[key] = Number(value) || 0;
-          return { casement };
+          return { casement: syncGlassDeduction(casement) };
         });
         get()._sync();
       },
@@ -115,7 +125,7 @@ export const useWindowProfileStore = create(
           const casement = clone(s.casement);
           if (!casement.geometry || !(key in casement.geometry)) return {};
           casement.geometry[key] = Number(value) || 0;
-          return { casement };
+          return { casement: syncGlassDeduction(casement) };
         });
         get()._sync();
       },
@@ -138,7 +148,7 @@ export const useWindowProfileStore = create(
           ['leafStile', 'leafTop', 'leafBottom'].forEach((k) => {
             if (casement.elements[k]) casement.elements[k].face = v;
           });
-          return { casement };
+          return { casement: syncGlassDeduction(casement) };
         });
         get()._sync();
       },
@@ -165,7 +175,7 @@ export const useWindowProfileStore = create(
           }
           if (!(path[path.length - 1] in node)) return {};
           node[path[path.length - 1]] = v;
-          return { casement };
+          return { casement: syncGlassDeduction(casement) };
         });
         get()._sync();
       },

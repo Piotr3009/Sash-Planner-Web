@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { uploadBsuiteProgram, removeBsuiteProgram } from '../services/bsuitePrograms.js';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
-import { kgPerM, VARIANT_ORDER } from '../engine/profile.js';
+import { kgPerM, VARIANT_ORDER, casementGlassDeduction } from '../engine/profile.js';
 import NumInput from '../components/NumInput.jsx';
 import { CONSTANTS, deriveWindowData } from '../engine/calculations.js';
 import { buildArchPlan, ArchError } from '../engine/arch.js';
@@ -832,8 +832,8 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
   // Live samples for a single-leaf window of the sample size.
   const leafW = W - 2 * d.leafAtJamb;
   const leafH = H - d.leafFullHeight;
-  // Glass follows the leaf member face — same formula as the engine.
-  const glassDed = Math.round(2 * (p.elements.leafStile.face - g.glassInset) * 10) / 10;
+  // Glass follows the leaf member face: the engine's ONE source (profile.js casementGlassDeduction).
+  const glassDed = casementGlassDeduction(p);
   const glassW = leafW - glassDed;
   const glassH = leafH - glassDed;
 

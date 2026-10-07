@@ -1,6 +1,6 @@
 import { resolveCasementLayout, fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from './casementLayouts.js';
 import { selectCasementHinges, summariseHinges, selectCasementLocks, summariseLocks } from './casementHardware.js';
-import { getWindowProfile, getCasementProfile, getDoorProfile, DEFAULT_DOOR_PROFILE, profileSashDepth, profileBoardWidth, boardWidthForDepth, profileBoxDepth, kgPerM } from './profile.js';
+import { getWindowProfile, getCasementProfile, getDoorProfile, DEFAULT_DOOR_PROFILE, profileSashDepth, profileBoardWidth, boardWidthForDepth, profileBoxDepth, kgPerM, casementGlassDeduction } from './profile.js';
 import { buildArchGeometry, buildSashArchGeometry, planArchSegments, buildGlassOutline, buildArchBars, glassOutlinePoly, chainAreaAboveLine, ArchError, isCircleShape, buildCircleGeometry, buildCircleGlassOutline, buildCircleBars } from './arch.js';
 import { buildTraceryForDerived } from './cnc/traceryExport.js';
 import { casementLeafBars, leafBarsToUnit } from './casementBarGrid.js';
@@ -655,11 +655,11 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     const secLeaf = `${els.leafStile.face}x${ld}`;
     // Glass follows the leaf member face: a wider member eats into the light
     // on BOTH sides (Piotr 04.08). glassInset = how deep the pane sits in the
-    // rebate, per side. Falls back to the stored deduction for old profiles.
+    // rebate, per side. ONE source for the deduction (profile.js
+    // casementGlassDeduction, 06.10.2026): 2 x (face - glassInset), the stored
+    // value only for an old profile without glassInset.
     const glassInset = p.geometry?.glassInset;
-    const glassDed = (glassInset == null)
-      ? ded.glass
-      : R(2 * (els.leafStile.face - glassInset));
+    const glassDed = casementGlassDeduction(p);
 
     // Bar counts per pane role (straight bars; on an arched leaf they are the
     // straight bars below the springing / across the clear width).
@@ -811,7 +811,7 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
         leafRects, panels: layoutDef.panels, bars: casBars, stile: els.leafStile.face,
     });
     if (leafBars) leafBars.forEach((b, i) => { leafSizes[i].bars = b; });
-    const unitInset = glassInset == null ? (els.leafStile.face - ded.glass / 2) : glassInset;
+    const unitInset = glassInset == null ? (els.leafStile.face - glassDed / 2) : glassInset;
 
     // ── Drawing-ready member runs (mm, exterior view) ──
     const landX = (b, side) => side === 'L'

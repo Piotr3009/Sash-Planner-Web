@@ -50,7 +50,7 @@ const M = await import(pathToFileURL(BUNDLE).href + `?t=${Date.now()}`);
 const { arch, profile, archDxf, dxfWriter, specification, calculations, cncExport, lists } = M;
 const P = profile.DEFAULT_CASEMENT_PROFILE;
 // v4 Block F (frame 68): every live expectation below is built from these — never from a number read off the engine
-const tF = P.elements.frameHead.face, oL = P.deductions.leafAtJamb, tL = P.elements.leafTop.face;   // 68 / 51 / 67 (the allowance A = 10 is asserted on the profile in section 1)
+const tF = P.elements.frameHead.face, oL = P.deductions.leafAtJamb, tL = P.elements.leafTop.face;   // 68 / 51 / 64 (leaf 64 since 06.10.2026, was 67; the allowance A = 10 is asserted on the profile in section 1)
 // The spec's C.5 table (Piotr 06.09) was computed on the frame the spec had then — its own premises: "Face 57 head
 // ring, allowance 10, finger 15" — with land 36, leafAtJamb 40, leafFullHeight 87, fanFromAxis 54. The table is
 // checked on that variant of the LIVE profile (arch / cnc / leaf members / glassInset are the live ones); section 2b
@@ -95,8 +95,8 @@ section('1 — profile v4: arch block, cnc block, migration');
   check('cnc block: minClampLength 450, clamp { base 130, minThickness 40, maxThickness 98, minPiece 140 }, clampClearance 20',
     P.cnc.minClampLength === 450 && P.cnc.clamp.base === 130 && P.cnc.clamp.minThickness === 40 && P.cnc.clamp.maxThickness === 98 && P.cnc.clamp.minPiece === 140 && P.cnc.clampClearance === 20);
   // the one literal frame check (v4 Block F option B): the live frame every section-2b / 3 / 4 / 6 expectation is derived from
-  check('profile v4 Block F: frameHead / frameJamb face 68, land 47 (rebate 21), leafAtJamb 51, leafFullHeight 98, fanFromAxis 65, leafTop.face 67 (the rings: frame r → r − 68, leaf r − 51 → r − 118)',
-    tF === 68 && P.elements.frameJamb.face === 68 && P.geometry.land === 47 && P.geometry.rebate === 21 && oL === 51 && P.deductions.leafFullHeight === 98 && P.deductions.fanFromAxis === 65 && tL === 67);
+  check('profile v4 Block F: frameHead / frameJamb face 68, land 47 (rebate 21), leafAtJamb 51, leafFullHeight 98, fanFromAxis 65, leafTop.face 64 since 06.10.2026, was 67 (the rings: frame r → r - 68, leaf r - 51 → r - 115)',
+    tF === 68 && P.elements.frameJamb.face === 68 && P.geometry.land === 47 && P.geometry.rebate === 21 && oL === 51 && P.deductions.leafFullHeight === 98 && P.deductions.fanFromAxis === 65 && tL === 64);
   const v11 = { ...P, arch: undefined, cnc: undefined };
   const m1 = profile.migrateCasementProfile({ ...v11, arch: { version: 3, finger: { length: 15, depth: 16, pitch: 3.8 }, stockWidths: [50, 63, 75, 95, 105, 180, 200], contourAllowance: 10, maxSegmentAngleDeg: 36, pieceRule: 'narrowest', minPieceLength: 150, minHaunchRadius: 150, limits: P.arch.limits, patterns: P.arch.patterns } });
   check('migration: a stored v3 arch block is replaced whole by the v4 default (stock list, 400, threshold; no 36° / pieceRule); cnc filled from the default',
@@ -275,8 +275,22 @@ section('3 — planner invariants on the engine output');
   const ish = independentPlan(shallow.leafTop)[0];
   const sp = shallow.plans.leafTop.pieces;
   // one whole chain on a horizontal chord: W_req = the leaf outer band's apex above the springing = rise − leafAtJamb + allowance (200 − 51 + 10 = 159; was 170)
-  check(`one-board plan: the 1000 × rise 200 leaf top rail fits ONE ${ish.def?.stock} board (W_req ${f1(ish.fewest?.wReq)} = rise − leafAtJamb + allowance ${200 - oL + A}, L ${f1(ish.fewest?.pieces[0].overall)} — independent; 57 frame: 180 board, W_req 170, L 940) — N starts at 1, no joints, both ends square`,
-    ish.def?.n === 1 && near(ish.fewest.wReq, 200 - oL + A, 0.5) && sp.length === 1 && sp[0].stock === ish.def.stock && sp[0].jointedEnds === 0 && near(sp[0].wReq, ish.fewest.wReq, 0.5) && near(sp[0].roughLength, ish.fewest.pieces[0].overall, 0.5), `${sp.length} × ${sp[0]?.stock}, W_req ${f1(sp[0]?.wReq)}, L ${f1(sp[0]?.roughLength)}`);
+  // Leaf 64 (06.10.2026): the one-board plan is still the FEWEST (N starts at 1), but the 64 ring makes the
+  // 2-piece plan fit a 150 board (W_req 148.05; 150.90 with the 67 face, so no narrower board then) within the
+  // limits, and the one-board waste is over wasteThreshold 0.45: the C.4 economy rule takes 2 x 150. The engine
+  // pieces are checked against the independent planner's choice, as before.
+  check(`one-board plan first: the 1000 × rise 200 leaf top rail's FEWEST plan is ONE ${ish.fewest?.stock} board (W_req ${f1(ish.fewest?.wReq)} = rise - leafAtJamb + allowance ${200 - oL + A}, L ${f1(ish.fewest?.pieces[0].overall)}, independent; 57 frame: 180 board, W_req 170, L 940), N starts at 1; with the 64 leaf the independent rule is ${ish.rule} ${ish.def?.n} × ${ish.def?.stock} and the engine cuts exactly that`,
+    ish.fewest?.n === 1 && ish.fewest.stock === 180 && near(ish.fewest.wReq, 200 - oL + A, 0.5) && ish.fewest.pieces.length === 1
+    && ish.rule === 'economy' && ish.def?.n === 2 && ish.def.stock === 150 && near(ish.def.wReq, 148.05, 0.05)
+    && sp.length === 2 && sp.every((p, i) => p.stock === ish.def.stock && p.jointedEnds === 1 && near(p.wReq, ish.def.wReq, 0.5) && near(p.roughLength, ish.def.pieces[i].overall, 0.5)),
+    `${sp.length} × ${sp[0]?.stock}, W_req ${f1(sp[0]?.wReq)}, L ${f1(sp[0]?.roughLength)}; independent ${ish.rule} ${ish.def?.n} × ${ish.def?.stock} W_req ${f1(ish.def?.wReq)}`);
+  // a one-board DEFAULT on the 64 leaf: the shallower 1000 × rise 180 (W_req = 180 − leafAtJamb + allowance = 139)
+  const sh180 = arch.buildArchPlan({ shape: 'three-centre', width: 1000, height: 1500, rise: 180 }, P);
+  const i180 = independentPlan(sh180.leafTop)[0];
+  const s180 = sh180.plans.leafTop.pieces;
+  check(`one-board plan: the 1000 × rise 180 leaf top rail fits ONE ${i180.def?.stock} board by default (W_req ${f1(i180.fewest?.wReq)} = rise - leafAtJamb + allowance ${180 - oL + A}, L ${f1(i180.fewest?.pieces[0].overall)}, independent rule ${i180.rule}), no joints, both ends square`,
+    i180.rule === 'fewest' && i180.def?.n === 1 && near(i180.fewest.wReq, 180 - oL + A, 0.5) && s180.length === 1 && s180[0].stock === i180.def.stock && s180[0].jointedEnds === 0 && near(s180[0].wReq, i180.fewest.wReq, 0.5) && near(s180[0].roughLength, i180.fewest.pieces[0].overall, 0.5),
+    `${s180.length} × ${s180[0]?.stock}, W_req ${f1(s180[0]?.wReq)}, L ${f1(s180[0]?.roughLength)}`);
   const gl = arch.buildArchPlan({ shape: 'gothic-equilateral', width: 1000, height: 2000 }, P);
   const igl = independentPlan(gl.leafTop);
   // verdict FLIPPED by the 68 frame (leafAtJamb 51): the leaf ring 949 / 882 (was 960 / 893) fits ONE 200 board per side (W_req 197.1 ≤ 200);

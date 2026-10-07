@@ -5,9 +5,10 @@
  * dark theme, DimChainH/DimChainV with bar cuts, glazing-bar crosses and
  * V-notches, Expand/Collapse. One drawing serves every pane of the same
  * leaf group (identical size + role); pane list goes in the title.
- * Vertogen: all four members are the same section (67), so the top/bottom
- * edges equal the stile face. The dashed inner line is the 24mm glass unit
- * edge — the glass enters 12.5 into the rebate past the visible daylight.
+ * Vertogen: all four members are the same section (64 since 06.10.2026, was 67),
+ * so the top/bottom edges equal the stile face. The dashed inner line is the
+ * 24mm glass unit edge: the glass enters glassInset (11.5) into the rebate past
+ * the visible daylight.
  *
  * Arched casement (arched-casement-v2 night 4, spec §4 D): the leaf top rail
  * is the C-ARCH TOP RAIL ring from derived.arch.geometry (the SAME ArcChain
@@ -18,7 +19,7 @@
  * branch below unchanged (byte-identical, verify/arch/t19.mjs).
  */
 import { useMemo, useState } from 'react';
-import { getCasementProfile } from '../../engine/profile.js';
+import { getCasementProfile, casementGlassDeduction } from '../../engine/profile.js';
 import { DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 import { casementRoleName, paneTitle } from './casementDrawUtils.js';
@@ -70,12 +71,13 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
     if (!mm) return null;
     const p = getCasementProfile();
     const stile = p.elements.leafStile.face;
-    const glassIn = p.deductions.glass / 2 - stile; // −12.5: unit edge inside the wood
+    // unit edge inside the wood: -glassInset (-11.5); the deduction from the ONE source
+    const glassIn = casementGlassDeduction(p) / 2 - stile;
     const pn = cas.layoutDef.panels[idx];
     const leafW = mm.leafW, leafH = mm.leafH;
     const glassX = stile, glassY = stile;
     const glassW = leafW - 2 * stile, glassH = leafH - 2 * stile;
-    const unitX = stile + glassIn, unitY = stile + glassIn; // 54.5 inset
+    const unitX = stile + glassIn, unitY = stile + glassIn; // 52.5 inset (64 - 11.5)
     const unitW = leafW - 2 * (stile + glassIn);
     const unitH = leafH - 2 * (stile + glassIn);
     const role = pn._role || 'main';
@@ -115,8 +117,9 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
       leafW, leafH, stile, glassX, glassY, glassW, glassH,
       unitX, unitY, unitW, unitH, vBars, hBars, arch,
       hinge: pn.hinge, role, bounds: cas.paneBounds?.[idx],
-      glassUnitW: leafW - p.deductions.glass,
-      glassUnitH: leafH - p.deductions.glass,
+      // the glass unit printed is the engine's unit (the glass schedule), not a second formula
+      glassUnitW: derived.customGlassUnits?.[idx]?.width ?? leafW - casementGlassDeduction(p),
+      glassUnitH: derived.customGlassUnits?.[idx]?.height ?? leafH - casementGlassDeduction(p),
     };
   }, [windowSpec, derived, group]);
 
@@ -166,7 +169,7 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
       barsD: arch.bars.map((b) => barBandD(b, txG, BAR_WIDTH / 2)),
       clipId,
       // haunch / gothic arcs: label outside near the corner; crown / semi-circle: inside the daylight
-      // v3 0.5: every R label inside the daylight (a haunch label outside collided with the top-rail 67 chain dim on three-centre sheets)
+      // v3 0.5: every R label inside the daylight (a haunch label outside collided with the top-rail chain dim, then 67, on three-centre sheets)
       radii: arch.leafOuter.map((a, k) => ({ r: a.r, at: arcLabelPoint(arch.leafInner[k], txL, isHaunchArc(a) ? -sw(22) : -sw(16)) })),
       springY: Y(arch.springingY),
       topY: arch.springingY,

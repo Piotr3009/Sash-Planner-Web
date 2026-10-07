@@ -114,7 +114,7 @@ const spacerLabel = (g) => `${g.spacer || '—'} · ${spacerTypeLabel(g.spacerTy
 const pct = (v, base) => (base > 0 ? `${Math.round((v / base) * 100)}%` : '—');
 const DEG = 180 / Math.PI;
 
-/** `arched · R 55.5/1305.5/55.5` — the GLASS radii (what the glazier cuts), or `rect`. */
+/** `arched · R 46.5/1296.5/46.5` (the t18 V1 arch on the default profile): the GLASS radii (what the glazier cuts), or `rect`. */
 function shapeLabel(shape) {
   if (!shape) return 'rect';
   const radii = [...new Set((shape.radii || []).map((r) => fmt(r)))];
