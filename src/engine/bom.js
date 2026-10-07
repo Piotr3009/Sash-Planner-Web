@@ -24,6 +24,7 @@ import { buildPrecutForWindow, buildHardwareList } from './lists.js';
 import { assignmentFor, legacyToCanonical } from './partRegistry.js';
 import { lockPartId, hingeWedgeMm, childRestrictorCounts, CHILD_RESTRICTOR_PART } from './casementHardware.js';
 import { isAcousticUnit } from './specification.js';
+import { DOOR_ITEM_SLOT, DOOR_PART_SLOT } from './doorHardware.js';
 
 /** Normalise a material catalog size ('150 x 38mm') to a raw-section key ('150x38'). */
 export function materialSizeToRaw(size) {
@@ -115,6 +116,37 @@ Object.assign(ELEMENT_TO_PART_ID, {
   'C-TRANSOM': 'c_transom',
 });
 
+// Doors (08.10.2026, doors to production): every D- element has a part. The
+// opening fanlight leaf is a casement leaf, so its members buy the casement
+// leaf timber (owner box item 11); the door astragal beads use the casement
+// bead names (C-TRIANGLE / C-GEORGIAN) and land on the casement rows.
+Object.assign(ELEMENT_TO_PART_ID, {
+  'D-FRAME HEAD': 'd_frame_head',
+  'D-FRAME JAMB (L)': 'd_frame_jamb',
+  'D-FRAME JAMB (R)': 'd_frame_jamb',
+  'D-FRAME CILL': 'd_frame_cill',
+  'D-FRAME CILL (INWARD)': 'd_frame_cill_inward',
+  'D-COUPLING POST': 'd_coupling_post',
+  'D-TRANSOM': 'd_transom_rail',
+  'D-STILE (L)': 'd_leaf_stile',
+  'D-STILE (R)': 'd_leaf_stile',
+  'D-MEETING STILE': 'd_leaf_meeting_stile',
+  'D-TOP RAIL': 'd_leaf_top_rail',
+  'D-BOTTOM RAIL': 'd_leaf_bottom_rail',
+  'D-MID RAIL': 'd_leaf_mid_rail',
+  'D-SIDE STILE': 'd_side_stile',
+  'D-SIDE TOP RAIL': 'd_side_top_rail',
+  'D-SIDE BOTTOM RAIL': 'd_side_bottom_rail',
+  'D-FAN STILE (L)': 'c_sash_stile',
+  'D-FAN STILE (R)': 'c_sash_stile',
+  'D-FAN TOP RAIL': 'c_sash_top_rail',
+  'D-FAN BOTTOM RAIL': 'c_sash_bottom_rail',
+  'D-GLAZING BEADING': 'd_glazing_beading',
+});
+// The standard door glass unit, double 6-12-6 (owner box item 8): its own row.
+// A door with a slim, triple or Laminate / Acoustic unit counts on the window rows.
+export const DOOR_GLASS_PART_ID = 'd_glass_double_6_12_6';
+
 // Box head/jamb parts split per frame type (raw board width differs)
 /**
  * makeRawResolver — elementName → raw stock section from Material Assignments.
@@ -168,6 +200,9 @@ export const HARDWARE_TO_SLOT_KEY = {
   // hinge slots now, not a client product.
   'Casement handle': 'casementHandles',
   'Trickle vents': 'trickleVents',
+  // Doors (08.10.2026): the door hardware lines show the product of the
+  // window's door ironmongery slot (doorHardware.js DOOR_ITEM_SLOT).
+  ...DOOR_ITEM_SLOT,
 };
 
 // Format a quantity for display by unit (pcs are whole; tubes/m/L/etc. keep 2dp)
@@ -229,23 +264,29 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
     setQty('bead_tape', beadTapeM / 2, 'm');       // 1mm (one side)
     setQty('bead_tape_2mm', beadTapeM / 2, 'm');   // 2mm (other side)
     // Casement has its own silicone row (c_silicone, below): feeding the sash
-    // row too counted every casement tube twice (05.10.2026).
-    if (derived.category !== 'casement') setQty('silicone', c.silicone?.tubes, 'tubes');
+    // row too counted every casement tube twice (05.10.2026). Doors count on
+    // the casement row as well (08.10.2026).
+    if (derived.category !== 'casement' && derived.category !== 'door') setQty('silicone', c.silicone?.tubes, 'tubes');
     setQty('seal_sliding_6070', c.seal6070?.meters, 'm');
     setQty('seal_bottom_6009', c.seal6009?.meters, 'm');
   }
 
   // ── Glass (sqm to purchase) ──
+  // Doors (owner box item 8, 08.10.2026): the door double is the 6-12-6 row;
+  // slim, triple and the Laminate / Acoustic unit take the window rows.
   const g = derived.consumables?.glass;
   if (g?.sqm) {
-    const acoustic = windowSpec.category !== 'door' && isAcousticUnit(windowSpec.glazing);
-    setQty(acoustic ? GLASS_ACOUSTIC_PART_ID : (GLASS_TYPE_TO_PART_ID[g.type] || 'glass_double'), g.sqm, 'm²');
+    const acoustic = isAcousticUnit(windowSpec.glazing);
+    const doorDouble = derived.category === 'door' && (g.type || 'double') === 'double';
+    setQty(acoustic ? GLASS_ACOUSTIC_PART_ID
+      : doorDouble ? DOOR_GLASS_PART_ID
+      : (GLASS_TYPE_TO_PART_ID[g.type] || 'glass_double'), g.sqm, 'm²');
   }
 
   // ── Weights (total window mass +5% = counterbalance to buy) ──
-  // Sash only: casement now reports real weights too (hinge selection), but
-  // a casement window has no counterweights to purchase.
-  if (derived.weights?.total && derived.category !== 'casement') {
+  // Sash only: casement and doors report real weights too (hinge selection,
+  // information), but they have no counterweights to purchase.
+  if (derived.weights?.total && derived.category !== 'casement' && derived.category !== 'door') {
     const wPid = (c?.weightType === 'slim') ? 'weights_slim' : 'weights_normal';
     setQty(wPid, derived.weights.total, 'kg');
   }
@@ -253,9 +294,10 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
   // ── Paint (litres) ──
   // Topcoat material depends on colour: 9016 (default white) → white paint;
   // any other colour → bespoke. Quantity (litres) is the same either way.
+  // Doors paint on the casement rows (08.10.2026), same area model.
   const p = derived.paint;
   if (p) {
-    const isCas = derived.category === 'casement';
+    const isCas = derived.category === 'casement' || derived.category === 'door';
     setQty(isCas ? 'c_paint_primer' : 'paint_primer', p.primer, 'L');
     setQty(isCas ? 'c_paint_preserver' : 'paint_preserver', Math.round((Number(p.primer) || 0) * PRESERVER_OF_PRIMER * 100) / 100, 'L');
     const hex = (windowSpec.color?.single || '').toUpperCase();
@@ -332,6 +374,60 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
     if (extPid) addMm(extPid, cw.cill.length || 0);
   }
 
+  // ── Doors (08.10.2026, doors to production) ──
+  // Hardware counts from the engine (doorHardware.js), the opening fanlight's
+  // casement hinge and lock picks, the panel boards, and the casement per-leaf
+  // consumables (packers, clips, silicone, bead tape, seals) on the casement rows.
+  const dw = derived.door;
+  if (derived.category === 'door' && dw) {
+    Object.entries(dw.hardware?.summary || {}).forEach(([pid, n]) => setQty(pid, n, 'pcs'));
+    const fan = dw.hardware?.fan;
+    if (fan) {
+      let fanWedgeMm = 0;
+      Object.entries(fan.hingeSummary || {}).forEach(([slotId, e]) => {
+        setQty(slotId, e.pairs, 'pairs');
+        fanWedgeMm += e.pairs * hingeWedgeMm(slotId);
+      });
+      addMm('c_wedge_packer', fanWedgeMm);
+      Object.entries(fan.lockSummary || {}).forEach(([slotId, e]) => {
+        setQty(lockPartId(slotId, 'LH'), e.LH, 'pcs');
+        setQty(lockPartId(slotId, 'RH'), e.RH, 'pcs');
+        setQty(lockPartId(slotId, 'TOP'), e.unhanded, 'pcs');
+      });
+    }
+    // Panel (half-glazed / three-quarter): two Tricoya boards and one MDF core per panel.
+    const panelM2 = (dw.panels || []).reduce((a, pn) => a + (Number(pn.area) || 0), 0);
+    const boards = (dw.panels || [])[0]?.boards?.tricoya || 0;
+    setQty('d_panel_tricoya_18', Math.round(panelM2 * boards * 10000) / 10000, 'm²');
+    setQty('d_panel_mdf_core', Math.round(panelM2 * 10000) / 10000, 'm²');
+    const panes = Array.isArray(derived.customGlassUnits) ? derived.customGlassUnits : [];
+    if (panes.length > 0) {
+      setQty('c_glazing_packer', panes.length * 8, 'pcs');
+      // Casement clip rule: fanlights 6; other panes 8 when taller than 500mm, else 6.
+      const clipsQty = panes.reduce((a, gl) => {
+        const isFan = String(gl.role || '').startsWith('fan');
+        return a + (isFan ? 6 : ((gl.height || 0) > 500 ? 8 : 6));
+      }, 0);
+      const gType = windowSpec.glazing?.type || 'double';
+      const clipsPid = isAcousticUnit(windowSpec.glazing) ? 'c_glass_clips_laminated'
+        : (gType === 'triple') ? 'c_glass_clips_triple' : 'c_glass_clips_double';
+      setQty(clipsPid, clipsQty, 'pcs');
+    }
+    const dc = derived.consumables || {};
+    setQty('c_silicone', dc.silicone?.tubes, 'tubes');
+    if (dc.beadTapeSide?.meters > 0) {
+      setQty('c_bead_tape_1mm', dc.beadTapeSide.meters, 'm');
+      setQty('c_bead_tape_2mm', dc.beadTapeSide.meters, 'm');
+    }
+    const whiteSeal = dc.sealColour === 'white';
+    setQty(whiteSeal ? 'c_seal_frame_white' : 'c_seal_frame_black', dc.sealFrame?.meters, 'm');
+    setQty(whiteSeal ? 'c_seal_hj_white' : 'c_seal_hj_black', dc.sealHeadJambs?.meters, 'm');
+    // Sill extension board: the door form's threshold extension (brief 3.7), on
+    // the timber cill only, by the same exact sizes as the casement form.
+    const doorExtPid = { 35: 'c_sill_ext_35', 60: 'c_sill_ext_60', 85: 'c_sill_ext_85' }[dw.cill?.extension];
+    if (doorExtPid) addMm(doorExtPid, dw.cill.length || 0);
+  }
+
   return map;
 }
 
@@ -355,7 +451,7 @@ export function resolvePartTotal(entry, yieldCoeff = 1.0) {
 export function buildWindowHardware(windowSpec, batch, ironmongeryItems = [], derived = null) {
   if (!windowSpec) return [];
   const cat = windowSpec.category || 'sash';
-  if (cat !== 'sash' && cat !== 'casement') return []; // door hardware later
+  if (cat !== 'sash' && cat !== 'casement' && cat !== 'door') return [];
   const lines = buildHardwareList(windowSpec, derived);
   const slots = {
     ...(batch?.defaults?.ironmongerySlots || {}),
@@ -428,6 +524,12 @@ export function buildWindowMaterialLines(win, { assignments, assignmentsData, ma
     }
   });
 
+  // Door ironmongery (08.10.2026): the product in the window's door slot
+  // (configurator, windowSpec.hardware.slots; batch defaults below it) is what
+  // that window buys on the row's count; without one, the row's own material.
+  const doorSlots = windowSpec.category === 'door'
+    ? { ...(batch?.defaults?.ironmongerySlots || {}), ...(windowSpec?.hardware?.slots || {}) }
+    : null;
   ALL_PARTS.forEach((part) => {
     const entry = partQtys[part.id];
     if (!entry) return;
@@ -435,6 +537,18 @@ export function buildWindowMaterialLines(win, { assignments, assignmentsData, ma
     const yieldCoeff = assignment?.yield || 1.0;
     const { total, unit } = resolvePartTotal(entry, yieldCoeff);
     if (!total) return;
+
+    const slotItemId = doorSlots && DOOR_PART_SLOT[part.id] ? doorSlots[DOOR_PART_SLOT[part.id]] : null;
+    const slotProduct = slotItemId ? (ironmongeryItems || []).find((m) => m.id === slotItemId) : null;
+    if (slotProduct) {
+      lines.push({
+        key: `mat:${slotProduct.id}`, name: slotProduct.name, unit,
+        costPerUnit: Number(slotProduct.cost_per_unit) || 0,
+        source: 'material', material: slotProduct, _assigned: true,
+        qty: total, part, yieldCoeff,
+      });
+      return;
+    }
 
     if (assignment?.material_id) {
       // Hinge / lock / restrictor rows are assigned from the Ironmongery

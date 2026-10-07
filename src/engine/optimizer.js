@@ -107,6 +107,11 @@ function bestFitDecreasing({ items, stockLength, kerf, endTrim, minimumPiece, pr
   }
 
   // ─── Phase 2: BFD on remaining cuts with standard stock ───
+  // Over-length guard (08.10.2026): a piece longer than the stock bar (less the
+  // two end trims) still gets a bar of its own, so nothing is silently dropped,
+  // and it is REPORTED: the bar carries overLength and the summary lists the
+  // piece (a door jamb with a fanlight can be longer than the stock).
+  const overLength = [];
   remainingCuts.forEach((cut) => {
     let bestBar = null;
     let bestBarIndex = -1;
@@ -136,6 +141,10 @@ function bestFitDecreasing({ items, stockLength, kerf, endTrim, minimumPiece, pr
         stockLength: stockLength,
         isOffcut: false,
       };
+      if (cut.length + 2 * endTrim > stockLength) {
+        newBar.overLength = true;
+        overLength.push({ elementName: cut.elementName || '', windowName: cut.windowName || '', length: cut.length, stockLength });
+      }
       bars.push(newBar);
       bestBar = newBar;
       bestBarIndex = bars.length - 1;
@@ -174,7 +183,8 @@ function bestFitDecreasing({ items, stockLength, kerf, endTrim, minimumPiece, pr
     summary: {
       totalBars: summary.totalBars,
       wasteTotal: Math.round(summary.wasteTotal),
-      utilAvg: summary.totalBars ? summary.utilizationTotal / summary.totalBars : 0
+      utilAvg: summary.totalBars ? summary.utilizationTotal / summary.totalBars : 0,
+      ...(overLength.length ? { overLength } : {}),
     }
   };
 }

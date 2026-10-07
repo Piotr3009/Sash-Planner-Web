@@ -10,8 +10,11 @@
 // Colour by part for the Pre-Cut and Cut List (Piotr 05.10.2026).
 // One colour = one compartment on the bench: pre-cut pieces are sorted by
 // colour and the cut stage takes them from that compartment. The left and
-// right of a pair share a colour. Casement only for now: any other part has
-// no colour and keeps the single default colour.
+// right of a pair share a colour. Casement and doors (08.10.2026); any other
+// part has no colour and keeps the single default colour. The door family
+// mirrors the casement colours (frame head, jambs, cill, post, transom, leaf
+// stiles, meeting stile, rails, mid rail, side panel, fan) and has its own key
+// sheet (precutPdfExport, COLOUR KEY · DOOR).
 
 export const PART_COLOUR_GROUPS = [
   { id: 'frame_head', family: 'frame', name: 'Frame Head', note: 'top of the frame', hex: '#F5E050' },
@@ -22,6 +25,20 @@ export const PART_COLOUR_GROUPS = [
   { id: 'leaf_stiles', family: 'leaf', name: 'Leaf Stiles', note: 'left and right together', hex: '#FFFFFF' },
   { id: 'leaf_top_rail', family: 'leaf', name: 'Leaf Top Rail', note: 'top of the leaf', hex: '#A98BE8' },
   { id: 'leaf_bottom_rail', family: 'leaf', name: 'Leaf Bottom Rail', note: 'bottom of the leaf', hex: '#EE7D5B' },
+  // Doors: own families (door_frame / door_leaf), so the casement key sheet
+  // never lists them; colours mirror the casement compartments.
+  { id: 'door_frame_head', family: 'door_frame', name: 'Door Frame Head', note: 'top of the frame', hex: '#F5E050' },
+  { id: 'door_frame_jambs', family: 'door_frame', name: 'Door Frame Jambs', note: 'left and right together', hex: '#7CC4F5' },
+  { id: 'door_frame_cill', family: 'door_frame', name: 'Door Frame Cill', note: 'outward or inward cill', hex: '#F2A03D' },
+  { id: 'door_post', family: 'door_frame', name: 'Coupling Post', note: 'between door and side panel', hex: '#5CCBA9' },
+  { id: 'door_transom', family: 'door_frame', name: 'Transom Rail', note: 'under the fanlight', hex: '#D99AC5' },
+  { id: 'door_leaf_stiles', family: 'door_leaf', name: 'Door Leaf Stiles', note: 'hinge and lock stiles', hex: '#FFFFFF' },
+  { id: 'door_meeting_stile', family: 'door_leaf', name: 'Meeting Stile', note: 'french, with the lip', hex: '#C9D4DE' },
+  { id: 'door_top_rail', family: 'door_leaf', name: 'Door Top Rail', note: 'top of the leaf', hex: '#A98BE8' },
+  { id: 'door_mid_rail', family: 'door_leaf', name: 'Door Mid Rail', note: 'between glass and panel', hex: '#8FB3E8' },
+  { id: 'door_bottom_rail', family: 'door_leaf', name: 'Door Bottom Rail', note: 'bottom of the leaf', hex: '#EE7D5B' },
+  { id: 'door_side_panel', family: 'door_leaf', name: 'Side Panel', note: 'fixed side panel members', hex: '#B5D99C' },
+  { id: 'door_fan', family: 'door_leaf', name: 'Fan Leaf', note: 'opening fanlight members', hex: '#E8C38F' },
 ];
 
 const BY_ID = Object.fromEntries(PART_COLOUR_GROUPS.map((g) => [g.id, g]));
@@ -36,6 +53,18 @@ const ELEMENT_TO_GROUP = {
   'C-STILE (L)': 'leaf_stiles', 'C-STILE (R)': 'leaf_stiles',
   'C-TOP RAIL': 'leaf_top_rail', 'C-ARCH TOP RAIL': 'leaf_top_rail', 'C-LEAF RING': 'leaf_top_rail',
   'C-BOTTOM RAIL': 'leaf_bottom_rail',
+  'D-FRAME HEAD': 'door_frame_head',
+  'D-FRAME JAMB (L)': 'door_frame_jambs', 'D-FRAME JAMB (R)': 'door_frame_jambs',
+  'D-FRAME CILL': 'door_frame_cill', 'D-FRAME CILL (INWARD)': 'door_frame_cill',
+  'D-COUPLING POST': 'door_post',
+  'D-TRANSOM': 'door_transom',
+  'D-STILE (L)': 'door_leaf_stiles', 'D-STILE (R)': 'door_leaf_stiles',
+  'D-MEETING STILE': 'door_meeting_stile',
+  'D-TOP RAIL': 'door_top_rail',
+  'D-MID RAIL': 'door_mid_rail',
+  'D-BOTTOM RAIL': 'door_bottom_rail',
+  'D-SIDE STILE': 'door_side_panel', 'D-SIDE TOP RAIL': 'door_side_panel', 'D-SIDE BOTTOM RAIL': 'door_side_panel',
+  'D-FAN STILE (L)': 'door_fan', 'D-FAN STILE (R)': 'door_fan', 'D-FAN TOP RAIL': 'door_fan', 'D-FAN BOTTOM RAIL': 'door_fan',
 };
 
 // Cut List group symbol (lists.js CUT_LIST_ORDER) to the same colour group.
@@ -48,6 +77,18 @@ const CUT_SYMBOL_TO_GROUP = {
   'C-ST-L/R': 'leaf_stiles',
   'C-TR': 'leaf_top_rail', 'C-ATR': 'leaf_top_rail', 'C-LFR': 'leaf_top_rail',
   'C-BR': 'leaf_bottom_rail',
+  'D-FH': 'door_frame_head',
+  'D-J-L/R': 'door_frame_jambs',
+  'D-CILL': 'door_frame_cill', 'D-CILL-IN': 'door_frame_cill',
+  'D-JC': 'door_post',
+  'D-T': 'door_transom',
+  'D-ST-L/R': 'door_leaf_stiles',
+  'D-MS': 'door_meeting_stile',
+  'D-TR': 'door_top_rail',
+  'D-MR': 'door_mid_rail',
+  'D-BR': 'door_bottom_rail',
+  'D-SP-ST': 'door_side_panel', 'D-SP-TR': 'door_side_panel', 'D-SP-BR': 'door_side_panel',
+  'D-FS-L/R': 'door_fan', 'D-FTR': 'door_fan', 'D-FBR': 'door_fan',
 };
 
 /** Colour group of a pre-cut item, or null when the part has no colour. */
