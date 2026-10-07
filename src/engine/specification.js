@@ -66,11 +66,12 @@ export function glassMakeupFor(glazing, profile) {
 // Until 07.10.2026 (door schema 1): double 6x16x6 and triple on ONE 28mm unit, leaf 61.
 export const DOOR_GLASS_MAKEUP = { double: '6x12x6' };
 export const DOOR_GLASS_THICKNESS = { double: 24, double_slim: 16, triple: 28 };
-export const DOOR_LEAF_DEPTH = 57;
-export const DOOR_FRAME_DEPTH = 93;
+// Read from the default door profile: the numbers live there and nowhere else.
+export const DOOR_LEAF_DEPTH = DEFAULT_DOOR_PROFILE.leafDepth;
+export const DOOR_FRAME_DEPTH = DEFAULT_DOOR_PROFILE.frameDepth;
 export const glassGas = (type) => (type === 'single' || type === 'passive') ? '' : 'argon';
 import { FAN_AXIS_OFFSET_TOP, FAN_AXIS_OFFSET_BOTTOM } from './casementLayouts.js';
-import { profileBoxDepth, getDoorProfile } from './profile.js';
+import { profileBoxDepth, getDoorProfile, DEFAULT_DOOR_PROFILE } from './profile.js';
 import {
   PSW_ARCH_SHAPE, PSW_ARCH_RISE_RATIO, PSW_SASH_RADIO_SHAPE, LEGACY_ARCH_SHAPES, ARCH_RISE_RATIO, GOTHIC_PROFILE_RATIO,
   ARCH_BAR_PATTERNS, isArchShape, isRoundShape, resolveRoundShape, ArchError, CIRCLE_SHAPE, patternsForShape,
