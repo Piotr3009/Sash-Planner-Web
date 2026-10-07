@@ -513,6 +513,9 @@ function checkSheets(M, label, w, f) {
     const k = paths.findIndex((p) => /fill-opacity=/.test(p[2]));
     const gap = k > 0 ? R1(yStart(paths[k - 1][1]) - yStart(paths[k][1])) : null;
     ok(gap === f.bottom, `${label} front elevation (arched): the daylight closes ${gap} above the leaf bottom = the bottom rail ${f.bottom}`);
+    // and its arcs are the leaf top ring's inner radii (outer - the top rail)
+    const inner = derived.arch.geometry.leafTop.inner.map((a) => R1(a.r));
+    ok(inner.every((r) => S2.elevation.includes(`A ${r} ${r}`) || S2.elevation.includes(`A${r} ${r}`)), `${label} front elevation (arched): daylight arcs drawn at the leaf inner radii ${inner.join(' / ')} (outer - ${f.top})`);
   }
   // the glass PDF table prints every schedule row (the glazier's order)
   // and never the one-number height (leaf H - the width deduction), the value a single deduction would give
@@ -580,8 +583,12 @@ const sample = () => { const { derived, spec } = derive(LIVE, cas('sample', 1000
   p = st.getState().casement;
   const c = checkSheets(LIVE, 'stiles 70 040L', byId('040L-1000x1200'), { stile: 70, top: 70, bottom: 67 });
   ok(faces(p) === '70 / 70 / 67' && c.rows[0].width === 781 && c.rows[0].height === 988, `stiles / top rail 70, bottom rail 67: schedule ${c.rows[0].width} x ${c.rows[0].height} = 898 - 117 x 1102 - 114 (58.5 + 55.5)`);
+  checkSheets(LIVE, 'stiles 70 arched V1', byId('arched-V1'), { stile: 70, top: 70, bottom: 67 });
   g = settingsGlass(renderSettings(LIVE)); row = sample();
   ok(g && g.w === 117 && g.h === 114 && g.sw === row.width && g.sh === row.height, `stiles 70: Window Settings glass W = leaf - ${g?.w}, H = leaf - ${g?.h}, sample ${g?.sw} x ${g?.sh} = schedule`);
+  st.getState().setCasementGeometry('glassInset', 12);
+  ok(st.getState().casement.deductions.glass === 116 && LIVE.profile.casementGlassDeductions(st.getState().casement).height === 113,
+    `glassInset 12 typed: stored deductions.glass ${st.getState().casement.deductions.glass} = 2 x (70 - 12), height deduction (70 - 12) + (67 - 12) = 113`);
   st.getState().resetToDefaults();
   ok(faces(st.getState().casement) === '64 / 64 / 67' && st.getState().casement.deductions.glass === 105, 'reset to defaults: 64 / 64 / 67, glass 105');
   // sensitivity: on the START tree the same bottom-rail edit changes nothing (one deduction both ways, the sheet draws 64)
@@ -594,6 +601,15 @@ const sample = () => { const { derived, spec } = derive(LIVE, cas('sample', 1000
   ok(srow.height === 997 && smg && smg.bottom === 64,
     `sensitivity: on START a bottom rail of 70 left the schedule at ${srow.width} x ${srow.height} and the leaf sheet drew a ${smg?.bottom} bottom rail (what this tura fixes)`);
   ss.getState().resetToDefaults();
+  // and the older one (06.10.2026): on REF a face of 70 left the leaf sheet on the stale deductions.glass 111
+  const rs = REF.profileStore.useWindowProfileStore;
+  rs.getState().setCasementLeafFace(70);
+  const { spec: r0, derived: e0 } = derive(REF, byId('040L-1000x1200'));
+  const rsub = texts(render(REF.LeafDetail, { windowSpec: r0, derived: e0, group: REF.cdu.groupCasementLeaves(e0)[0], projectNumber: 'P-1' })).join('\n').match(GLASS_RE);
+  const rrow = REF.lists.buildGlassListForWindow(e0, r0)[0];
+  ok(rsub && `${rsub[1]} x ${rsub[2]}` !== `${rrow.width} x ${rrow.height}`,
+    `sensitivity: on REF the same face 70 left the leaf sheet at ${rsub?.[1]} x ${rsub?.[2]} against the schedule ${rrow.width} x ${rrow.height} (the stale deductions.glass the 06.10 tura removed)`);
+  rs.getState().resetToDefaults();
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -613,12 +629,14 @@ section('11 - raw stock, Pre-Cut groups, hinge picks');
     for (const [name, asg, data] of [['flat', flat, null], ['schema 2', null, schema2]]) {
       const a = leafRaw(LIVE, w, LIVE.bom.makeRawResolver({ assignments: asg, assignmentsData: data, materials: mats }));
       const c = leafRaw(START, w, START.bom.makeRawResolver({ assignments: asg, assignmentsData: data, materials: mats }));
-      ok(a.length > 0 && a.length === c.length && a.every((x) => x.split(':')[1] === '63x75'),
+      const r = leafRaw(REF, w, REF.bom.makeRawResolver({ assignments: asg, assignmentsData: data, materials: mats }));
+      ok(a.length > 0 && a.length === c.length && a.length === r.length && [a, c, r].every((x) => x.every((y) => y.split(':')[1] === '63x75')),
         `${w.id} (${name} assignment): every leaf Pre-Cut item on the assigned 63x75, the bottom rail in the same group (${a.length} items, finished ${[...new Set(a.map((x) => x.split(':')[2]))]})`);
     }
-    const a = leafRaw(LIVE, w, undefined), c = leafRaw(START, w, undefined);
-    ok(JSON.stringify(a.map((x) => x.split(':')[1])) === JSON.stringify(c.map((x) => x.split(':')[1])) && group(a, /BOTTOM/) === group(a, /STILE/),
-      `${w.id} (no assignment): fallback raw ${[...new Set(a.map((x) => x.split(':')[1]))]} = START; the bottom rail in the stiles' group (the fallback reads the depth 57)`);
+    const a = leafRaw(LIVE, w, undefined), c = leafRaw(START, w, undefined), r = leafRaw(REF, w, undefined);
+    const raws = (x) => JSON.stringify(x.map((y) => y.split(':')[1]));
+    ok(raws(a) === raws(c) && raws(a) === raws(r) && group(a, /BOTTOM/) === group(a, /STILE/),
+      `${w.id} (no assignment): fallback raw ${[...new Set(a.map((x) => x.split(':')[1]))]} = START = REF; the bottom rail in the stiles' group (the fallback reads the depth 57)`);
   }
   // Triple glazing (leaf depth 61): no sash face is 61, so without an assignment the Pre-Cut raw section IS the
   // finished one: the bottom rail 67x61 becomes its OWN group next to the stiles' and top rail's 64x61 (BLOCKERS 28.2).
@@ -628,7 +646,8 @@ section('11 - raw stock, Pre-Cut groups, hinge picks');
     ok(a.length === 4 && group(a, /STILE|TOP/) === '64x61' && group(a, /BOTTOM/) === '67x61' && group(c, /./) === '64x61' && group(b, /./) === '67x61',
       `triple 040L (no assignment): stiles and top rail ${group(a, /STILE|TOP/)}, bottom rail ${group(a, /BOTTOM/)} (its own Pre-Cut group; START all ${group(c, /./)}, REF all ${group(b, /./)})`);
     const aa = leafRaw(LIVE, tri, LIVE.bom.makeRawResolver({ assignments: flat, assignmentsData: null, materials: mats }));
-    ok(aa.length === 4 && aa.every((x) => x.split(':')[1] === '63x75'), 'triple 040L (assigned): one group, the assigned 63x75');
+    const bb = leafRaw(REF, tri, REF.bom.makeRawResolver({ assignments: flat, assignmentsData: null, materials: mats }));
+    ok(aa.length === 4 && aa.every((x) => x.split(':')[1] === '63x75') && bb.every((x) => x.split(':')[1] === '63x75'), 'triple 040L (assigned): one group, the assigned 63x75, as REF');
   }
   const slots = (M) => Object.fromEntries((M.materials.ALL_PARTS || []).filter((p) => /^c_sash_/.test(p.id)).map((p) => [p.id, p.section]));
   const sl = slots(LIVE), sst = slots(START), sr = slots(REF);
@@ -636,6 +655,8 @@ section('11 - raw stock, Pre-Cut groups, hinge picks');
     `Assign Materials: Leaf Stiles ${sl.c_sash_stile}, Top Rail ${sl.c_sash_top_rail}, Bottom Rail ${sl.c_sash_bottom_rail} (START 64×57, REF 67×57), same ids`, JSON.stringify(sl));
   const strip = (arr) => JSON.stringify((arr || []).map((p) => (p.id === 'c_sash_bottom_rail' ? { ...p, section: '' } : p)));
   ok(strip(LIVE.materials.ALL_PARTS) === strip(START.materials.ALL_PARTS), 'Assign Materials: every other part and field unchanged against START');
+  const stripAll = (arr) => JSON.stringify((arr || []).map((p) => (/^c_sash_(stile|top_rail|bottom_rail)$/.test(p.id) ? { ...p, section: '' } : p)));
+  ok(stripAll(LIVE.materials.ALL_PARTS) === stripAll(REF.materials.ALL_PARTS), 'Assign Materials: every other part and field unchanged against REF');
   // hinges: the leaf weight moves (bottom rail + 0.104 kg/m, glass - 3 mm), no window of the set changes slot
   for (const w of SET) {
     const a = L[w.id].derived.casement.hardware.hingePicks, c = S[w.id].derived.casement.hardware.hingePicks;
