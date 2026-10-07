@@ -9,6 +9,15 @@ Verdicts per phase, in execution order.
 Owner decisions (Piotr, 06.10.2026): **A.** the four casement leaf members are 64 wide everywhere (were 67);
 **B.** the transom seat is 8.5 (was 8; the joint needs 8.6, 8.5 is enough).
 
+### Verdict ✅ leaf 64 / glass 105 / seat 8.5 in the default and in every migrated profile, one glass source, suite green twice
+
+Engine default and any stored profile (migrated by `leafSchema` / `lengthSchema`) give leaf 64, glass deduction
+105, transom seat 8.5. Every reader takes the glass deduction from `casementGlassDeduction()` and the sheets print
+the engine's unit. The reference set moves exactly as specified (sections 64x57, glass + 6, transoms + 0.5,
+906.5 / 1706.5 / 840.5, Pre-Cut 927); frame, mullions, sash and door are identical to 5459f5b. **Full suite twice
+on the final tree: 24 harnesses, 2536 checks, 0 failures; `npm run build` OK (16.2 s).** Independent review: PASS
+WITH FINDINGS, fixed or answered (Stage 6). Not merged; BLOCKERS 27 holds the decisions for Piotr.
+
 ### Stage 0: baseline and impact analysis (no code changes)
 
 Starting commit **5459f5b** (`main`, 06.10.2026). `git diff f6a86db 5459f5b -- src` is empty: the facts the brief
@@ -332,6 +341,61 @@ only, their checks compute from the profile.
 |---|---|---|---|---|---|
 | arched V1 three-centre 1000x1500 start 1300 | 99/1349/99 | 32/1282/32 → **35/1285/35** | 43.5/1293.5/43.5 → **46.5/1296.5/46.5** | 787×1291 → **793×1297** | 106.5, 102.5 → **103.5, 99.5** |
 | circle 800 sunburst (fixed) | 349/349 | 282/282 → **285/285** | 293.5 → **296.5** | 587×587 → **593×593** | 106.5, 106.5 → **103.5, 103.5** |
+
+### Stage 6: independent review, final suite, Done when
+
+**Independent review** (one agent that had not seen the work; read-only; it re-derived the numbers by hand,
+audited every changed assertion and read every fixture diff, ran the suite and the build). **Verdict: PASS WITH
+FINDINGS.** Its hand numbers (040L leaf / glass / daylight / beading / leaf and window weights / m² / tape, the
+three transoms and Pre-Cut, 120 1800 x 1500, the deduction 105, the arched ring 64 and glass line 52.5, V1
+C-ATR 920.0, circle 1991.8, the haunch note 35) all match the engine, the logs and t38. "Nothing was deleted or
+weakened"; the casement fixtures moved only in the allowed categories; the sash fixtures are byte-identical; the
+helper's rounding equals the old engine expression on faces 50 to 80 and six insets. Its findings and what was done:
+
+| # | finding | done |
+|---|---|---|
+| 1 | Stage 6 of BUILD-LOG incomplete, no PR yet | this section, the verdict, the PR |
+| 2 | the cut list / Pre-Cut finished column print the 906.5 transom as 907 | kept: the whole-mm rule covers every member (446.2 -> 446) and the sash cut list is pinned byte for byte by `rect-sash-base.json`; a one-decimal cut list would also move every casement leaf length in the fixture outside the allowed categories. Piotr decides: BLOCKERS 27.7 b |
+| 3 | t38 §6 daylight checks were tautologies | fixed: the daylight is read off the rendered leaf sheet (770 x 974, 704 x 1274, reference 764 x 968 / 698 x 1268) |
+| 4 | no check left where the engine default is ONE whole-chain board | fixed: t16 and t25 add the 1000 x rise 180 leaf top rail, ONE 150 board, W_req 139, no joint (t25 against the independent planner) |
+| 5 | t34 m² checked only on the pinned 67 profile | fixed: also on the default profile |
+| 6 | the "sheet = schedule" proof covered whole sizes only | fixed: 052L (727 x 341.2) on the glass sheet and the production elevation (exact) and the leaf sheet (its 0.5 grid, "341"; BLOCKERS 27.7 d) |
+| 7 | "151.05 with the 67 face" is wrong | fixed: 150.90 (engine and independent planner on 5459f5b), still above 150 |
+| 8 | a stored `glassInset: null` keeps the old `deductions.glass`; a leaf element without `face` gives NaN | not changed: neither can come from the UI or the cloud (the migration fills a missing `glassInset` from the default; `face` is always written), and the engine had the same fallback before |
+| 9 | the leaf sheet's dashed unit outline still comes from the deduction, not from the derived unit | not changed: it now uses the one-source helper, consistent by construction (t38 §12 byte identity) |
+| 10 | t24_stage4 got a comment edit although the brief says "untouched" | fixed: the file is byte-identical to 5459f5b again |
+| 11 | the re-blessed t26 fixture stores the masked date | harmless: the check masks both sides |
+
+**Final suite, run twice on the final tree (665a42a + this log), identical both times: 24 harnesses, 2536
+checks, 0 failures. `npm run build` OK (16.2 s).**
+
+| harness | checks | | harness | checks | | harness | checks |
+|---|---|---|---|---|---|---|---|
+| t16 | 369 (was 368) | | t23 | 81 | | t33_bar_grid | 43 |
+| t17_edges | 70 | | t24_stage4 | 26 | | parity t31_bars_8x8 | 18 |
+| t18 | 179 | | t25 | 226 (was 225) | | parity t32_bsuite | 54 |
+| t19 | 280 | | t26 | 38 | | parity t34_glass_minus1 | 46 (was 41) |
+| t20 | 117 | | t27 | 87 | | parity t35_locks | 51 |
+| t20_bars | 31 | | t28 | 50 | | parity t36_hinges | 110 |
+| t21 | 120 | | t29 | 34 | | parity t37_single_window_bom | 47 |
+| t22 | 118 | | t30_preview | 30 | | **parity t38_leaf_64_seat_85 (new)** | **311** |
+
+2218 at the start + 311 (t38) + 1 (t16) + 1 (t25) + 5 (t34) = 2536. `psw-casement-layouts` rc 2 (no PSW clone),
+not counted, as at the start.
+
+**Done when.**
+
+1. No 67 left for the casement leaf in `src`. `grep -rnP '(?<![\d.#])67(?![\d])' src` (outside `src/3d` and
+   the welcome SVG) leaves only: history notes ("was 67", `profile.js:105, 107, 125, 163, 204, 429, 439`,
+   `CasementLeafDetail2D.jsx:8, 172`), the glass schema 1 history `profile.js:489`, the migration's table of the
+   OLD default `LEAF_SCHEMA_1` (`profile.js:520, 523`, it must hold 67 to recognise it) and a paint colour name
+   (`config.js:85`, "Farrow's Cream 67"). The four `src/3d` hits are sash hardware positions (out of scope).
+2. Default profile and a migrated stored profile: 64 / 105 / 8.5 (t38 §0, §9; t34).
+3. One source: `deductions.glass` is read in `src` only by the helper's fallback and the glass schema 1
+   migration (`profile.js`); the store and the migration WRITE it in step (t38 §10, §13).
+4. Reference set as specified, controls identical (t38 §1 to §8, §12; the before / after table in Stage 5).
+5. Suite green twice, build green, counts above.
+6. PR opened, not merged; BUILD-LOG, BLOCKERS 27 and `docs/handover/CASEMENT-LEAF-64.md` written.
 
 ---
 
