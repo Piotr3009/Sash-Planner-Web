@@ -42,6 +42,12 @@ function fmt(n) {
   return Number.isInteger(r) ? r.toString() : r.toFixed(1);
 }
 
+// The glass in the subtitle is the glass schedule size (0.1 mm), not the 0.5 grid
+// of the dimensions: Piotr 07.10.2026, 021 1000 x 1200 prints 793 x 248.2.
+function fmtGlass(n) {
+  return String(Math.round(n * 10) / 10);
+}
+
 function computeSegments(from, to, cutPairs) {
   if (cutPairs.length === 0) return [{ a: from, b: to }];
   const sorted = [...cutPairs].sort((p, q) => p[0] - q[0]);
@@ -190,7 +196,7 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
   const projNum = projectNumber || '';
   const hingeTxt = geom.hinge === 'fixed' ? 'fixed (dummy sash)' : `hinge ${geom.hinge}`;
   const titleText = `${paneTitle(group)} — Front${projNum ? ` — ${projNum}` : ''} — ${winName}`;
-  const subtitleText = `${fmt(geom.leafW)} × ${fmt(geom.leafH)} · glass ${fmt(geom.glassUnitW)} × ${fmt(geom.glassUnitH)} · 24mm · ${hingeTxt}`;
+  const subtitleText = `${fmt(geom.leafW)} × ${fmt(geom.leafH)} · glass ${fmtGlass(geom.glassUnitW)} × ${fmtGlass(geom.glassUnitH)} · 24mm · ${hingeTxt}`;
   const archLine = arch ? `${arch.AG.label} · stile ${fmt(arch.straightStile)} · rise ${fmt(geom.leafH - arch.straightStile)} · top rail ${radiiText(arch.leafOuter)} · C-ATR ${fmt(arch.railLength)}` : '';
   const titleY = oy + geom.leafH + MGN_BOT_DIM + MGN_TITLE * 0.4;
 

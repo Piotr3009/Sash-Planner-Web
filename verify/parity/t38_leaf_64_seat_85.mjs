@@ -459,12 +459,12 @@ function checkSheets(M, label, w, f) {
   const sch = rows.map((r) => `${r.width} x ${r.height}`);
   const S2 = sheetsOf(M, spec, derived);
   const rect = !derived.arch;
-  // leaf sheet: subtitle glass = the schedule unit of that leaf (on the sheet's 0.5 grid); the drawn daylight
+  // leaf sheet: subtitle glass = the schedule unit of that leaf, exactly (0.1 mm, not the 0.5 grid); the drawn daylight
   // sits stile / top rail / bottom rail inside the leaf; the vertical chain prints both rails
   S2.leaf.forEach(({ group, svg }) => {
     const u = derived.customGlassUnits[group.rep], lf = derived.casement.leaves[group.rep];
     const m = texts(svg).join('\n').match(GLASS_RE);
-    ok(m && m[1] === half(u.width) && m[2] === half(u.height) && sch.includes(`${u.width} x ${u.height}`),
+    ok(m && m[1] === String(u.width) && m[2] === String(u.height) && sch.includes(`${u.width} x ${u.height}`),
       `${label} leaf sheet ${group.key}: prints glass ${m ? `${m[1]} x ${m[2]}` : '?'} = schedule ${u.width} x ${u.height}`);
     if (rect) {
       const mg = memberMargins(svg, lf.leafW, lf.leafH, lf.leafW - 2 * f.stile, lf.leafH - f.top - f.bottom);
@@ -528,8 +528,15 @@ function checkSheets(M, label, w, f) {
 const F64 = { stile: 64, top: 64, bottom: 67 };
 for (const [id, label] of [['040L-1000x1200', '040L'], ['021-1000x1200', '021'], ['040L-1000x1200-bars', '040L bars'], ['arched-V1', 'arched V1']]) checkSheets(LIVE, label, byId(id), F64);
 {
+  // the owner box literals on the 021 leaf sheets (the glass is printed to 0.1 mm, as in the schedule)
+  const { spec, derived } = derive(LIVE, byId('021-1000x1200'));
+  const subs = sheetsOf(LIVE, spec, derived).leaf.map(({ svg }) => texts(svg).join('\n').match(GLASS_RE)).map((m) => (m ? `${m[1]} x ${m[2]}` : '?'));
+  ok(JSON.stringify(subs.slice().sort()) === JSON.stringify(['793 x 248.2', '793 x 606.8']), `021 1000 x 1200 leaf sheets print glass ${subs.join(' and ')} (793 x 248.2, 793 x 606.8)`);
+}
+{
   // A unit that is NOT a whole number (052L 1800 x 1500: 727 x 338.2 fan, 727 x 816.8): the glass sheet and the
-  // production elevation print the schedule exactly; the leaf sheet prints every size on its 0.5 grid (BLOCKERS 27.7 d)
+  // production elevation print the schedule exactly; so does the leaf sheet's glass (its dimensions stay on the 0.5
+  // grid, BLOCKERS 27.7 d)
   const r = checkSheets(LIVE, '052L', byId('052L-1800x1500'), F64);
   ok(JSON.stringify(r.rows.map((x) => [x.width, x.height])) === '[[727,338.2],[727,816.8],[727,1294]]', `052L: schedule ${r.rows.map((x) => `${x.width} x ${x.height}`).join(', ')}`);
 }
@@ -683,7 +690,16 @@ section('12 - nothing else moved: the live tree with the old numbers pinned');
       const a = derive(LIVE, w), b = X[w.id];
       ok(JSON.stringify(a.derived) === JSON.stringify(b.derived), `${name} pinned, ${w.id}: derived byte-identical to ${name}`);
       const sa = sheetsOf(LIVE, a.spec, a.derived), sb = sheetsOf(M, b.spec, b.derived);
-      ok(JSON.stringify(sa) === JSON.stringify(sb), `${name} pinned, ${w.id}: elevation, production elevation, ${sa.leaf.length} leaf and ${sa.glass.length} glass sheets byte-identical`);
+      // one intended difference: the leaf sheet's subtitle glass is the schedule size (0.1 mm), where the old
+      // trees printed it on the 0.5 grid (021 fan 251.2 -> "251"); everything else byte for byte
+      // (the circle's ring sheet, CircleFixedDrawing2D, has no such subtitle: byte for byte as it is)
+      const ring = a.derived.arch?.shape === 'circle';
+      const exact = sa.leaf.every(({ group, svg }) => {
+        const u = a.derived.customGlassUnits[group.rep], m = svg.match(GLASS_RE);
+        return ring ? !m : m && m[1] === String(u.width) && m[2] === String(u.height);
+      });
+      const grid = (sh) => ({ ...sh, leaf: sh.leaf.map((l) => ({ ...l, svg: l.svg.replace(GLASS_RE, (x, gw, gh) => `glass ${half(+gw)} × ${half(+gh)} · 24mm`) })) });
+      ok(exact && JSON.stringify(grid(sa)) === JSON.stringify(sb), `${name} pinned, ${w.id}: elevation, production elevation, ${sa.leaf.length} leaf and ${sa.glass.length} glass sheets byte-identical, except the leaf sheets' glass printed to 0.1 mm (= the schedule)`);
     }
     LIVE.profile.setActiveCasementProfile(null);
   }
