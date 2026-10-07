@@ -76,7 +76,8 @@ only the stiles and the top rail 64. As built:
 - 040L 1000 x 1200: leaf 898 x 1102, **glass 793 x 994**, daylight 770 x 971, beading 4110. 021 1000 x 1200: glass
   **793 x 248.2** and **793 x 606.8**.
 - Sheets (leaf, front elevation, production elevation, glass, glass PDF): the bottom rail drawn and dimensioned 67,
-  the vertical daylight `leaf H - 131`, the glass of the glass schedule.
+  the vertical daylight `leaf H - 131`, the glass of the glass schedule (the leaf sheet prints it to 0.1 mm; its
+  dimension chains stay on the 0.5 grid).
 - Window Settings: each leaf card shows its own section; Stiles and Top rail edit both together, Bottom rail its
   own; the readout shows glass W and glass H.
 - Assign Materials: Leaf Bottom Rail `67×57`.

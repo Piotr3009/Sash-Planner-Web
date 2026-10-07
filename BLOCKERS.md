@@ -4,6 +4,81 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-10-07 · TURA PC: CASEMENT BOTTOM RAIL 67, items for Piotr (branch `claude/casement-bottom-rail-67`)
+
+**28.1 What happens at merge.** Every casement window is recalculated again. Your stored workshop profile (leaf
+schema 2: 64 / 64 / 64, glass 105, seat 8.5) migrates on the first load after the deploy to **64 / 64 / 67** (leaf
+schema 3), in memory and in localStorage, on every client; the cloud row keeps the old copy until the first edit of
+any Window Settings field, but every load migrates it the same way (as on 06.10, BLOCKERS 27.1). No batch is frozen
+(27.2), so **windows already in production packs change too**; a reprint will not match a pack printed today.
+
+| window type | what changes | what does not |
+|---|---|---|
+| every casement leaf (opening, fanlight, fixed) | bottom rail 67x57 (triple 67x61) in the cut list, Pre-Cut and drawings; glass height - 3 (040L 1000 x 1200: 793 x 997 -> 793 x 994; 021: 251.2 -> 248.2, 609.8 -> 606.8); vertical daylight - 3 (974 -> 971); the leaf sheet prints the glass at the schedule size, to 0.1 mm (was its 0.5 grid, 27.7 d: 021 now reads 248.2 / 606.8 there too, as on the glass sheet); glazing beading about - 7 per pane (4117 -> 4110), astragal beading and bead tape follow; glass m² a little lower; horizontal bars re-spaced in the new daylight (up to 1.5 mm); leaf weight + 0 to 0.1 kg, window timber + 0 to 0.6 kg | leaf outer sizes, member lengths, frame, transoms (seat 8.5), mullions, locks, hinge slots (28.3), seals, Pre-Cut lengths, BOM timber metres |
+| arched casements | as above: the glass 3 mm shorter at the bottom (V1 793 x 1297 -> 793 x 1294); with a bar pattern the tracery board blank follows the glass | the ring (top rail 64), the arch, the frame |
+| circle fixed windows | nothing (no bottom rail) | |
+| sash windows, doors | nothing (t38 §8, sash fixtures byte-identical) | |
+
+You decide when to merge.
+
+**28.2 Pre-Cut groups.** With your assignment (one engineered 63 x 75 on Leaf Stiles, Leaf Top Rail and Leaf Bottom
+Rail) the bottom rail stays in **the same Pre-Cut group** as the stiles and the top rail (63x75), for double and
+triple glazing (t38 §11). Without an assignment: double glazing keeps one group too (`63x63`: the fallback reads
+the depth 57, not the face); **triple glazing splits**: stiles and top rail `64x61`, the bottom rail its own `67x61`
+group (own optimiser bars, offcut key `sash-67x61`). Display note: the Pre-Cut panel titles a group with its first
+item's finished section (`PreCutPanel.jsx:51-53`, pre-existing), so a shared group reads "64x57" while it also holds
+the 67x57 bottom rails. Nothing to do unless you want the fallback or the title changed.
+
+**28.3 Hinges.** No window changes hinge slot: the 11 casements of the reference set, the 4 fixture windows and the
+t36 set keep their picks. Only the weight inside the pick moves, by + 0 to 0.1 kg (120 1800 x 1500: 31.2 -> 31.3;
+fixture R1 33.4 -> 33.5). A slot can move only for a leaf that sits within 0.1 kg under a weight limit (side
+18 / 21 / 35 kg, top 10 / 16 / 24 / 50 kg), and then to the next heavier row. FYI, nothing to do.
+
+**28.4 3D.** Changed (own commit ca0304f): every casement leaf drawn by `CasementWindow` and `ArchedCasementWindow`
+has a 67 bottom rail; the glass is 3 mm shorter and its centre 1.5 mm higher; the bars sit in the new daylight; the
+handle on the bottom rail of a top-hung leaf is 1.5 mm higher (on the 67 rail's centre). Not changed, on purpose:
+`FixFrameWindow`'s rectangle reuses `CasementPanel` as a fixed FRAME and keeps 64 all round (the brief forbids
+changing the fixed-frame 3D; PC's own preview never sends a rectangle there, only the configurator can).
+**Question: should that fixed-frame rectangle also get a 67 bottom member?** One prop on one line. Also: the 3D
+reads no profile face (constants only), so a hand-edited bottom rail of 70 shows 67 in the 3D, as before for every
+face. The arched 3D straight floor moved 3 mm (28.5 h). Before / after renders:
+`docs/handover/samples/leaf-bottom-67/`.
+
+**28.5 Skipped or outside the brief, with the reason.**
+
+a) **Assign Materials subtitle** "stiles, rails, one section all round (vertogen)" (`MaterialAssignmentsPage.jsx:654`,
+   the "Leaf (sash)" group) is no longer true. The brief allows only the slot label (now `67×57`), so the subtitle
+   was left. Proposed copy: "stiles and top rail, bottom rail".
+b) **Glass clips** (`bom.js:308-311`): a main pane gets 8 clips when its glass is taller than 500, else 6. A leaf
+   605.01 to 608 high (for example a single-leaf window 703 to 706 high) now gets 6 instead of 8. Correct by the
+   rule, but say if the threshold should follow the leaf instead.
+c) **Window Settings sample.** The readout shows "glass W = leaf − 105 · glass H = leaf − 108 · sample 793 × 1294":
+   the page's sample window is 1000 x 1500, so the brief's "793 x 994" (a 1000 x 1200 window) appears only with that
+   sample typed in. The readout keeps the minus and times signs the page already used. No change to the sample
+   default (not asked).
+d) **Batch snapshot and active profile.** The Production Pack, project and window pages derive with the batch
+   snapshot, while the casement sheets read the faces from the active profile (pre-existing). With no frozen batch
+   both are the same profile, so nothing shows; if freezing is ever wired (27.2), the sheets should take the faces
+   from the snapshot too.
+e) **The brief's section 3 on `glassPdfExport.js`** was stale: the glass PDF has no glass formula; it prints the
+   glass schedule rows, so it follows the engine with no change (t38 §10 and §13 prove it).
+f) **PSW.** `docs/handover/PSW-BAR-GRID-PORT.md` quotes the 3D bar plan with `SASH_RAIL * 2`; PSW is out of scope.
+   When PSW takes this change: glass `leafH - 64 - 67`, centre 1.5 above the leaf centre (`CasementWindow.jsx`).
+g) **Tracery.** On an arched leaf with a bar pattern the timber tracery board is the glass outline moved out by 6.5,
+   so its blank height follows the 3 mm (not in the brief's list of allowed differences; a direct consequence of
+   the glass height).
+h) **3D straight floor.** `archedCasementGeometry` draws a frame taller than asked when it is lower than rise + the
+   cill side, gap, bottom rail and bead; with the 67 rail that floor is 3 mm higher (128). Only for frames that the
+   engine refuses anyway (straight part below the rise at least 900, `arch.limits.minStraightBelowRise`). The
+   independent review flagged it too (its finding 6); left as is.
+i) **t39 needs Playwright's Chromium** (the global node install, as in this environment); without it the harness
+   exits 2 and is not counted, like `psw-casement-layouts`.
+j) **`CasementDrawing2D` bars** (production elevation, imported nowhere, 27.7 f): its bars are an equal split of
+   its own daylight, not the engine's `cas.leaves[i].bars.frame` (as before this tura; review finding 7). Its
+   daylight and glass now follow the 64 / 64 / 67 rule; the bar source was not changed.
+
+---
+
 ## 2026-10-06 · TURA PC: CASEMENT LEAF 64 AND TRANSOM SEAT 8.5, items for Piotr (branch `claude/casement-leaf-64`)
 
 **27.1 What happens at merge.** After merge and deploy, the stored workshop profile (leaf 67, glass 111, seat 8,
