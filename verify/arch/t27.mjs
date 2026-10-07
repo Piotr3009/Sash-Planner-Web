@@ -53,9 +53,10 @@ check('casement: frameHead 68 / frameJamb 68 / land 47 / rebate 21 / gap 4 / lea
   E.frameHead.face === 68 && E.frameJamb.face === 68 && G.land === 47 && G.rebate === 21 && G.gap === 4 && D.leafAtJamb === 51 && D.leafFullHeight === 98 && D.fanFromAxis === 65 && P.frameSchema === 2,
   JSON.stringify([E.frameHead.face, E.frameJamb.face, G.land, G.rebate, G.gap, D.leafAtJamb, D.leafFullHeight, D.fanFromAxis, P.frameSchema]));
 // glassInset 11.5 since 02.10.2026 (glass schema 2: 1mm smaller all round) — it was 12.5 through Block F and is not a Block F number
-// leaf members 64 since 06.10.2026 (leaf schema 2, Piotr) - they were 67 through Block F and are not a Block F number either
-check('casement UNCHANGED by Block F: cill 68 / mullion 68 / transom 68 / leaf members 64 (leaf schema 2, 06.10.2026; 67 in Block F) / glassInset 11.5 (glass schema 2, 02.10.2026) / gapCill 6 / cillVisible 41 / lowerFromAxis 64',
-  E.frameCill.face === 68 && E.mullion.face === 68 && E.transom.face === 68 && E.leafStile.face === 64 && E.leafTop.face === 64 && E.leafBottom.face === 64 && P.leafSchema === 2 && G.glassInset === 11.5 && P.glassSchema === 2 && G.gapCill === 6 && G.cillVisible === 41 && D.lowerFromAxis === 64);
+// leaf members: stiles and top rail 64, bottom rail 67 since 07.10.2026 (leaf schema 3, Piotr; all four 64 on
+// 06.10.2026, leaf schema 2) - they were 67 all round through Block F and are not a Block F number either
+check('casement UNCHANGED by Block F: cill 68 / mullion 68 / transom 68 / leaf stiles 64, top rail 64, bottom rail 67 (leaf schema 3, 07.10.2026; 67 all round in Block F) / glassInset 11.5 (glass schema 2, 02.10.2026) / gapCill 6 / cillVisible 41 / lowerFromAxis 64',
+  E.frameCill.face === 68 && E.mullion.face === 68 && E.transom.face === 68 && E.leafStile.face === 64 && E.leafTop.face === 64 && E.leafBottom.face === 67 && P.leafSchema === 3 && G.glassInset === 11.5 && P.glassSchema === 2 && G.gapCill === 6 && G.cillVisible === 41 && D.lowerFromAxis === 64);
 check('identity: land + rebate = frame face (option B — the rebate stays, the land grows)', G.land + G.rebate === E.frameHead.face && E.frameJamb.face === E.frameHead.face);
 check('identity: leafAtJamb = land + gap', D.leafAtJamb === G.land + G.gap);
 check('identity: leafFullHeight = leafAtJamb + gapCill + cillVisible (top layer + cill layer)', D.leafFullHeight === D.leafAtJamb + G.gapCill + G.cillVisible);
@@ -83,9 +84,11 @@ check(`door: leafAtMullionAxis unchanged = mullionLand/2 + gap = ${dGeo.mullionL
 section('2 — casement 040L 1000 × 1500: leaf, glass, cut list from the profile formulas; old numbers via a schema-1 variant');
 const W = 1000, H = 1500;
 const tF = E.frameHead.face, oL = D.leafAtJamb, tL = E.leafTop.face, gI = G.glassInset;
+const tS = E.leafStile.face, tB = E.leafBottom.face;
 const leafW = W - 2 * oL, leafH = H - D.leafFullHeight;
-const glassW = leafW - 2 * (tL - gI), glassH = leafH - 2 * (tL - gI);
-console.log(`  formula: leaf = (W − 2·leafAtJamb) × (H − leafFullHeight) = (${W} − 2·${oL}) × (${H} − ${D.leafFullHeight}) = ${leafW} × ${leafH}; glass = leaf − 2·(${tL} − ${gI}) = ${glassW} × ${glassH}`);
+// width: the two stiles; height: the top rail and the bottom rail, each on its own (07.10.2026: 64 / 67)
+const glassW = leafW - 2 * (tS - gI), glassH = leafH - (tL - gI) - (tB - gI);
+console.log(`  formula: leaf = (W − 2·leafAtJamb) × (H − leafFullHeight) = (${W} − 2·${oL}) × (${H} − ${D.leafFullHeight}) = ${leafW} × ${leafH}; glass = leaf W − 2·(${tS} − ${gI}) × leaf H − (${tL} − ${gI}) − (${tB} − ${gI}) = ${glassW} × ${glassH}`);
 const cas1000 = (fc = {}) => deriveItem(M, { id: 'c1', width: W, height: H, name: 'C1' }, { windowCategory: 'casement', casementLayout: '040L', ...fc });
 {
   const { spec, derived } = cas1000();
@@ -103,7 +106,7 @@ const cas1000 = (fc = {}) => deriveItem(M, { id: 'c1', width: W, height: H, name
   check(`cut list: leaf stiles ${leafH}, top rail ${leafW} (vertogen: full leaf dimensions, deducts ${P.lengths.stileDeduct || 0} / ${P.lengths.topRailDeduct || 0})`,
     stile && top && near(stile.length, leafH - (P.lengths.stileDeduct || 0)) && near(top.length, leafW - (P.lengths.topRailDeduct || 0)), JSON.stringify([stile, top]));
   const glass = M.lists.buildGlassListForWindow(derived, spec);
-  check(`glass list: one unit ${glassW} × ${glassH} (leaf − 2·(leafTop.face − glassInset))`, glass.length === 1 && near(glass[0].width, glassW) && near(glass[0].height, glassH), JSON.stringify(glass.map((g) => [g.width, g.height])));
+  check(`glass list: one unit ${glassW} × ${glassH} (leaf W − 2·(leafStile.face − glassInset), leaf H − (leafTop.face − glassInset) − (leafBottom.face − glassInset))`, glass.length === 1 && near(glass[0].width, glassW) && near(glass[0].height, glassH), JSON.stringify(glass.map((g) => [g.width, g.height])));
   check('no bare 57 / 920 / 1413 left in the derived record JSON (the 57-face numbers are gone from a 1000 × 1500 casement)', !/\b(920|1413)\b/.test(JSON.stringify(derived)) && !/"section":"57x/.test(JSON.stringify(cut)), '');
 }
 {

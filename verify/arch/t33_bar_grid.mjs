@@ -41,6 +41,10 @@ const M = await bundleTree(resolve(ROOT, 'src'), 't33', [
 ]);
 const P = M.profile.DEFAULT_CASEMENT_PROFILE;
 const STILE = P.elements.leafStile.face;   // 64 (leaf schema 2, 06.10.2026; 67 before)
+// the daylight is the leaf inset by the stiles left and right, the top rail at the top and the bottom rail
+// at the bottom (leaf schema 3, 07.10.2026: 64 / 64 / 67; one face all round before)
+const TOP = P.elements.leafTop.face;       // 64
+const BOT = P.elements.leafBottom.face;    // 67
 const BAR = M.barGrid.BAR_WIDTH;           // 22
 
 let pass = 0, fail = 0;
@@ -58,7 +62,7 @@ const src = (p) => readFileSync(resolve(ROOT, 'src', p), 'utf8');
 
 // ── independent formula: equal panes on the daylight, then the grid + 1/3 rule ──
 function ownLines(rect, hCount) {
-  const top = rect.y + STILE, glassH = rect.h - 2 * STILE;
+  const top = rect.y + TOP, glassH = rect.h - TOP - BOT;
   const pane = (glassH - hCount * BAR) / (hCount + 1);
   return Array.from({ length: hCount }, (_, j) => top + (j + 1) * pane + j * BAR + BAR / 2);
 }
@@ -69,8 +73,8 @@ function gridLines(derived, hCount, i) {
   let ref = -1;
   panels.forEach((p, k) => { if ((p._role || 'main') === 'main' && (ref < 0 || rects[k].h > rects[ref].h)) ref = k; });
   const refLines = ownLines(rects[ref], hCount);
-  const pane = (rects[ref].h - 2 * STILE - hCount * BAR) / (hCount + 1);
-  const lo = rects[i].y + STILE, hi = rects[i].y + rects[i].h - STILE;
+  const pane = (rects[ref].h - TOP - BOT - hCount * BAR) / (hCount + 1);
+  const lo = rects[i].y + TOP, hi = rects[i].y + rects[i].h - BOT;
   if (rects[i].h === rects[ref].h && rects[i].y === rects[ref].y) return { lines: refLines, dropped: 0 };
   const kept = refLines.filter((c) => (c - BAR / 2) - lo >= pane / 3 - 1e-9 && hi - (c + BAR / 2) >= pane / 3 - 1e-9);
   return { lines: kept, dropped: refLines.length - kept.length };
@@ -99,10 +103,10 @@ check('right light = left light, bit for bit', JSON.stringify(L[3].bars.frame.hB
   const localY = L[2].bars.local.hBars.map((b) => b.cy);
   check('leaf coordinates = frame lines − leaf y', sameList(localY, midY.map((y) => y - r2.y)), JSON.stringify(localY));
   const unit = D.customGlassUnits[2];
-  check('glass unit axes = leaf lines - (stile - glassInset) = - 52.5 (64 - 11.5); counts on the unit', sameList(unit.bars.y, localY.map((y) => y - (STILE - P.geometry.glassInset))) && unit.bars.h === 2 && unit.bars.v === 1, JSON.stringify(unit.bars));
-  const sliver = (midY[0] - BAR / 2) - (r2.y + STILE);
-  const pane = (D.casement.leafRects[0].h - 2 * STILE - 3 * BAR) / 4;
-  check(`the top pane under the fan is a sliver of ${sliver.toFixed(1)} (≥ pane/3 = ${(pane / 3).toFixed(1)}); the dropped line would have left ${((sideY[0] - BAR / 2) - (r2.y + STILE)).toFixed(1)}`, sliver >= pane / 3 && (sideY[0] - BAR / 2) - (r2.y + STILE) < pane / 3);
+  check('glass unit axes = leaf lines - (top rail - glassInset) = - 52.5 (64 - 11.5); counts on the unit', sameList(unit.bars.y, localY.map((y) => y - (TOP - P.geometry.glassInset))) && unit.bars.h === 2 && unit.bars.v === 1, JSON.stringify(unit.bars));
+  const sliver = (midY[0] - BAR / 2) - (r2.y + TOP);
+  const pane = (D.casement.leafRects[0].h - TOP - BOT - 3 * BAR) / 4;
+  check(`the top pane under the fan is a sliver of ${sliver.toFixed(1)} (≥ pane/3 = ${(pane / 3).toFixed(1)}); the dropped line would have left ${((sideY[0] - BAR / 2) - (r2.y + TOP)).toFixed(1)}`, sliver >= pane / 3 && (sideY[0] - BAR / 2) - (r2.y + TOP) < pane / 3);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -112,12 +116,13 @@ section('2 — the fan height decides: 15 % → 2 bars (the transom band eats li
   const axisFor = (ratio) => M.layouts.FAN_AXIS_OFFSET_TOP + innerH * ratio;   // fanlightAxis = frame top → transom axis
   const low = cas('G131L', 2100, 1400, { casementLayout: '131', casementHBars: 3, casementVBars: 1, fanlightAxis: axisFor(0.15) }).derived;
   const high = cas('G131H', 2100, 1400, { casementLayout: '131', casementHBars: 3, casementVBars: 1, fanlightAxis: axisFor(0.5) }).derived;
-  // fan 15 %: the transom axis sits 291.6 from the top; transom land 13 + gap 4 + leaf rail 64 (67 before
-  // 06.10.2026) put the lower daylight about 19 mm above the sides' first line (19.4 with the 64 leaf, the
-  // check prints it), under pane/3 -> dropped
-  const lowSliver = (low.casement.leaves[0].bars.frame.hBars[0].cy - BAR / 2) - (low.casement.leafRects[2].y + STILE);
+  // fan 15 %: the transom axis sits 291.6 from the top; transom land 13 + gap 4 + top rail 64 (67 before
+  // 06.10.2026) put the lower daylight about 19 mm above the sides' first line (19.4 with the 64 leaf all
+  // round; 18.6 since the bottom rail is 67 (07.10.2026): the sides' pane shrinks 3 / 4 = 0.75, so their first
+  // line rises 0.75; the check prints it), under pane/3 -> dropped
+  const lowSliver = (low.casement.leaves[0].bars.frame.hBars[0].cy - BAR / 2) - (low.casement.leafRects[2].y + TOP);
   check(`fan 15 %: line 1 would leave a ${lowSliver.toFixed(1)} mm sliver → dropped, the light under the fan carries 2 lines (independent formula ${gridLines(low, 3, 2).lines.length})`,
-    low.casement.leaves[2].bars.counts.h === 2 && low.casement.leaves[2].bars.dropped === 1 && gridLines(low, 3, 2).lines.length === 2 && lowSliver < ((low.casement.leafRects[0].h - 2 * STILE - 3 * BAR) / 4) / 3, JSON.stringify(low.casement.leaves[2].bars.counts));
+    low.casement.leaves[2].bars.counts.h === 2 && low.casement.leaves[2].bars.dropped === 1 && gridLines(low, 3, 2).lines.length === 2 && lowSliver < ((low.casement.leafRects[0].h - TOP - BOT - 3 * BAR) / 4) / 3, JSON.stringify(low.casement.leaves[2].bars.counts));
   check('fan 15 %: the sides are untouched (3 own lines)', low.casement.leaves[0].bars.counts.h === 3 && !low.casement.leaves[0].bars.aligned);
   check('fan 50 %: the light under it carries 1 line (4 panes), dropped 2', high.casement.leaves[2].bars.counts.h === 1 && high.casement.leaves[2].bars.dropped === 2, JSON.stringify(high.casement.leaves[2].bars.counts));
   check('fan 50 %: that one line IS the sides\' third line', high.casement.leaves[2].bars.frame.hBars[0].cy === high.casement.leaves[0].bars.frame.hBars[2].cy);
@@ -126,10 +131,10 @@ section('2 — the fan height decides: 15 % → 2 bars (the transom band eats li
   const g = P.geometry;
   const one = cas('G131_1', 2100, 1400, { casementLayout: '131', casementHBars: 1, casementVBars: 1 }).derived;
   const side = one.casement.leafRects[0];
-  const pane = (side.h - 2 * STILE - 1 * BAR) / 2;
-  const line1 = side.y + STILE + pane + BAR / 2;
+  const pane = (side.h - TOP - BOT - 1 * BAR) / 2;
+  const line1 = side.y + TOP + pane + BAR / 2;
   // lower leaf top = T + transomLandBelow + gapBelowTransom; sliver = (line1 − 11) − (leafTop + stile)
-  const T0 = (line1 - BAR / 2) - pane / 3 - g.transomLandBelow - g.gapBelowTransom - STILE;
+  const T0 = (line1 - BAR / 2) - pane / 3 - g.transomLandBelow - g.gapBelowTransom - TOP;
   const ratio0 = (T0 - M.layouts.FAN_AXIS_OFFSET_TOP) / innerH;
   check(`the boundary fan axis ${T0.toFixed(1)} is inside the 15..50 % clamp (${(ratio0 * 100).toFixed(1)} %)`, ratio0 > 0.15 && ratio0 < 0.5);
   const keep = cas('G131K', 2100, 1400, { casementLayout: '131', casementHBars: 1, casementVBars: 1, fanlightAxis: T0 - 1 }).derived;
@@ -182,9 +187,12 @@ section('3 — every consumer prints the engine numbers');
   // 3D plan: the same rule on the 3D glass rects (equal split reference, y up)
   const innerW = 2100 - 2 * 68, innerH = 1400 - 136;
   const def = M.layouts.resolveCasementLayout({ code: '131', innerW, innerH, height: 1400, fanlightRatio: 0.3, fan2Ratio: 0.3, middleSectionMm: 800, geo: { frameFace: 68, bottomFace: 68, mullionW: 68 } });
+  // the 3D leaf (p.h + 2 x rebate 21 - 2 x gap 4) has a 64 top rail and a 67 bottom rail (07.10.2026), so its
+  // glass is leaf H - 131 and sits 1.5 above the leaf centre (CasementWindow hBarPlan; t40 renders it)
   const lights = def.panels.map((p) => {
-    const glassH = (p.h + 21 * 2 - 4 * 2) - 64 * 2;
-    const lo = p.y - glassH / 2, hi = p.y + glassH / 2;
+    const leafH = p.h + 21 * 2 - 4 * 2;
+    const glassH = leafH - 64 - 67;
+    const lo = p.y - leafH / 2 + 67, hi = p.y + leafH / 2 - 64;
     const n = p._role === 'fan' ? 0 : 3;
     return { role: p._role, lo, hi, lines: Array.from({ length: n }, (_, i) => lo + (glassH / (n + 1)) * (i + 1)) };
   });

@@ -12,9 +12,10 @@ const scheduleCloudSave = (profiles) => {
 // Deep clone helper for the plain-JSON profile object
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
-// Keep the stored casement deductions.glass in step with the leaf face and
-// glassInset (06.10.2026): the readers take the deduction from
-// casementGlassDeduction, and the stored copy must never disagree with it.
+// Keep the stored casement deductions.glass in step with the stile face and
+// glassInset (06.10.2026): it holds the WIDTH deduction, the readers take both
+// deductions from casementGlassDeductions, and the stored copy must never
+// disagree with them. The height deduction (top and bottom rails) is not stored.
 const syncGlassDeduction = (casement) => {
   if (casement?.deductions && casement.geometry?.glassInset != null) {
     casement.deductions.glass = casementGlassDeduction(casement);
@@ -140,12 +141,14 @@ export const useWindowProfileStore = create(
         get()._sync();
       },
 
-      // Vertogen: all four leaf members share ONE section — one input, three writes.
+      // Stiles and top rail share ONE width (Piotr 07.10.2026): one input, two
+      // writes. The bottom rail has its own width (setCasementElementField
+      // 'leafBottom'), so this setter never touches it.
       setCasementLeafFace: (value) => {
         set((s) => {
           const casement = clone(s.casement);
           const v = Number(value) || 0;
-          ['leafStile', 'leafTop', 'leafBottom'].forEach((k) => {
+          ['leafStile', 'leafTop'].forEach((k) => {
             if (casement.elements[k]) casement.elements[k].face = v;
           });
           return { casement: syncGlassDeduction(casement) };

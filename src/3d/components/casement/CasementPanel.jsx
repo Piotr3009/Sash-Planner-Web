@@ -7,7 +7,10 @@
  *   - Glazing edge (toward glass): chamfer 9×15 on EXT, ovolo R11(18×14) on INT
  *   - Both decorations on glazing side ONLY (identical to sash windows)
  * 
- * Dims: 64mm face × 57mm depth
+ * Dims: stiles and top rail 64mm face, bottom rail 67mm face (Piotr 07.10.2026,
+ * the `bottomRail` prop; CasementWindow passes SASH_BOTTOM_RAIL), all 57mm deep.
+ * The glass sits between the 64 top rail and the 67 bottom rail, so its centre
+ * is (67 - 64) / 2 = 1.5mm above the leaf centre.
  * Construction: Rails full width, stiles between rails.
  */
 import React, { useMemo } from 'react';
@@ -17,7 +20,8 @@ import WindowCasementHandle from './WindowCasementHandle';
 
 const mm = (v) => v / 1000;
 
-const SASH_RAIL = 64;
+const SASH_RAIL = 64;          // stiles and top rail
+const SASH_BOTTOM_RAIL = 67;   // casement leaf bottom rail (Piotr 07.10.2026)
 const SASH_DEPTH = 57;
 const MAX_ANGLE = 70;
 
@@ -91,8 +95,8 @@ function buildRightStileShape() {
 // Shape XY: X=depth(0=EXT, D=INT), Y=face(0=outer, F=glazing)
 // Extrude along Z → width, rotation [0,PI/2,0]: X→-worldZ, Y→worldY, Z→worldX
 
-function buildBottomRailShape() {
-  // Glazing at Y=F (top)
+function buildBottomRailShape(F) {
+  // Glazing at Y=F (top); F = the bottom rail face
   const pts = [
     [0, 0],             // EXT-outer
     [0, F - EBW],       // EXT face before chamfer
@@ -120,17 +124,21 @@ function buildTopRailShape() {
 }
 
 // ═══ SashFrame ═══
-function SashFrame({ width, height, mat, matInt, spacerColor, glassFinish, hBars, hBarPositions, vBars }) {
+function SashFrame({ width, height, mat, matInt, spacerColor, glassFinish, hBars, hBarPositions, vBars, bottomRail = SASH_RAIL }) {
   const W = mm(width);
   const H = mm(height);
+  const FB = mm(bottomRail);   // bottom rail face
 
   // BOTH stiles and rails go full extent — overlap at corners = natural miter
   const glassW = width - SASH_RAIL * 2;
-  const glassH = height - SASH_RAIL * 2;
+  const glassH = height - SASH_RAIL - bottomRail;
+  // the glass sits between the top rail and the bottom rail: its centre is half
+  // their difference above the leaf centre (1.5mm with 64 / 67, 0 when equal)
+  const glassY = mm((bottomRail - SASH_RAIL) / 2);
 
   const lStile = useMemo(() => buildLeftStileShape(), []);
   const rStile = useMemo(() => buildRightStileShape(), []);
-  const bRail = useMemo(() => buildBottomRailShape(), []);
+  const bRail = useMemo(() => buildBottomRailShape(FB), [FB]);
   const tRail = useMemo(() => buildTopRailShape(), []);
 
   const stileSettings = useMemo(() => ({ depth: H, bevelEnabled: false }), [H]);
@@ -149,9 +157,9 @@ function SashFrame({ width, height, mat, matInt, spacerColor, glassFinish, hBars
     return shapeFromPts(pts);
   }, []);
   const bRailExt = useMemo(() => {
-    const pts = [[0,0],[0,F-EBW],[EBD,F],[halfDepth,F],[halfDepth,0]];
+    const pts = [[0,0],[0,FB-EBW],[EBD,FB],[halfDepth,FB],[halfDepth,0]];
     return shapeFromPts(pts);
-  }, []);
+  }, [FB]);
   const tRailExt = useMemo(() => {
     const pts = [[0,F],[0,EBW],[EBD,0],[halfDepth,0],[halfDepth,F]];
     return shapeFromPts(pts);
@@ -173,12 +181,12 @@ function SashFrame({ width, height, mat, matInt, spacerColor, glassFinish, hBars
     return shapeFromPts(pts);
   }, []);
   const bRailInt = useMemo(() => {
-    const pts = [[halfDepth,0],[halfDepth,F],[D-IBR,F]];
-    const arc = ovoloArc(D-IBR, F-IBR, IBR, Math.PI/2, 0, OVOLO_N);
+    const pts = [[halfDepth,0],[halfDepth,FB],[D-IBR,FB]];
+    const arc = ovoloArc(D-IBR, FB-IBR, IBR, Math.PI/2, 0, OVOLO_N);
     pts.push(...arc);
     pts.push([D,0]);
     return shapeFromPts(pts);
-  }, []);
+  }, [FB]);
   const tRailInt = useMemo(() => {
     const pts = [[halfDepth,F],[halfDepth,0],[D-IBR,0]];
     const arc = ovoloArc(D-IBR, IBR, IBR, -Math.PI/2, 0, OVOLO_N);
@@ -237,7 +245,7 @@ function SashFrame({ width, height, mat, matInt, spacerColor, glassFinish, hBars
 
       {/* ─── Glazing ─── */}
       {glassW > 0 && glassH > 0 && (
-        <CasementGlazing width={glassW} height={glassH} hBars={hBars} hBarPositions={hBarPositions} vBars={vBars} barMaterial={mat} barMaterialInt={mi} spacerColor={spacerColor} glassFinish={glassFinish} position={[0, 0, 0]} />
+        <CasementGlazing width={glassW} height={glassH} hBars={hBars} hBarPositions={hBarPositions} vBars={vBars} barMaterial={mat} barMaterialInt={mi} spacerColor={spacerColor} glassFinish={glassFinish} position={[0, glassY, 0]} />
       )}
     </group>
   );
@@ -258,6 +266,10 @@ export default function CasementPanel({
   vBars = 0,
   ironmongery = 'brass',
   position = [0, 0, 0],
+  // bottom rail face (mm). The default keeps one face all round, which is what
+  // FixFrameWindow's rectangle (a fixed frame, not a casement leaf) draws;
+  // CasementWindow passes SASH_BOTTOM_RAIL (67) for every casement leaf.
+  bottomRail = SASH_RAIL,
 }) {
   const mat = material;
   const W = mm(width);
@@ -284,6 +296,7 @@ export default function CasementPanel({
   const handleScale = 0.001;
   const REBATE = 21; // mm hidden behind frame
   const stileCenter = mm(REBATE + (SASH_RAIL - REBATE) / 2); // visible center
+  const bottomRailCenter = mm(REBATE + (bottomRail - REBATE) / 2); // visible center of the bottom rail
   const intZ = -D / 2 - 0.001; // just outside interior face
 
   // Handle Y: 400mm from bottom, or center if panel < 800mm
@@ -301,13 +314,13 @@ export default function CasementPanel({
     handleRot = [0, -Math.PI / 2, 0];
   } else if (hingeType === 'top') {
     // Handle on bottom rail, interior face, horizontal
-    handlePos = [0, -H / 2 + stileCenter, intZ];
+    handlePos = [0, -H / 2 + bottomRailCenter, intZ];
     handleRot = [Math.PI / 2, 0, Math.PI / 2];
   }
 
   const content = (
     <group>
-      <SashFrame width={width} height={height} mat={mat} matInt={materialInt} spacerColor={spacerColor} glassFinish={glassFinish} hBars={hBars} hBarPositions={hBarPositions} vBars={vBars} />
+      <SashFrame width={width} height={height} mat={mat} matInt={materialInt} spacerColor={spacerColor} glassFinish={glassFinish} hBars={hBars} hBarPositions={hBarPositions} vBars={vBars} bottomRail={bottomRail} />
       {handlePos && hingeType !== 'fixed' && (
         <group position={handlePos} rotation={handleRot} scale={[handleScale, handleScale, handleScale]}>
           <WindowCasementHandle rotationDeg={hingeType === 'left' ? -handleDeg : handleDeg} metalColor={handleColors.metalColor} lockColor={handleColors.lockColor} />
@@ -371,4 +384,4 @@ export default function CasementPanel({
   return <group position={position}>{content}</group>;
 }
 
-export { SASH_RAIL, SASH_DEPTH, MAX_ANGLE };
+export { SASH_RAIL, SASH_BOTTOM_RAIL, SASH_DEPTH, MAX_ANGLE };

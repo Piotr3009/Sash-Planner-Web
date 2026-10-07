@@ -6,9 +6,10 @@
  * seal (profile glass.edgeCover — 10mm since 02.10.2026), 18mm spacer bars on
  * the wood-bar centre lines, chain + overall dimensions. One drawing per
  * UNIQUE glass size; the pane list (P1, P2…) goes in the title. Unit = the
- * engine's unit (derived.customGlassUnits = leaf - casementGlassDeduction, 105 =
- * 2 x (64 - 11.5) on the default profile: glass enters 11.5 into the rebate), so
- * the unit origin sits at stile - 11.5 in leaf coordinates.
+ * engine's unit (derived.customGlassUnits = leaf - casementGlassDeductions: width
+ * 105 = 2 x (64 - 11.5), height 108 = (64 - 11.5) + (67 - 11.5) on the default
+ * profile: glass enters 11.5 into the rebate), so the unit origin sits at
+ * stile - 11.5 / top rail - 11.5 in leaf coordinates.
  *
  * Arched casement (arched-casement-v2 night 4, spec §4 D + E; v3 Block 0.2 /
  * 0.3): the unit IS derived.arch.glassOutline — the SAME ArcChain the glazier
@@ -22,7 +23,7 @@
  * (byte-identical, verify/arch/t19.mjs).
  */
 import { useMemo } from 'react';
-import { getCasementProfile, casementGlassDeduction } from '../../engine/profile.js';
+import { getCasementProfile, casementGlassDeductions } from '../../engine/profile.js';
 import { readGlassProfile, glassEdgeArcs, barEndRows, useBarTable } from '../../engine/glassBars.js';
 import { DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
@@ -58,11 +59,12 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
     if (!cas?.leaves) return null;
     const mm = cas.leaves[idx];
     if (!mm) return null;
-    // Unit = the engine's unit (derived.customGlassUnits: leaf - casementGlassDeduction, the ONE
-    // source), so the sheet prints the glass schedule; the deduction only if the unit is missing.
+    // Unit = the engine's unit (derived.customGlassUnits: leaf - casementGlassDeductions, the ONE
+    // source), so the sheet prints the glass schedule; the deductions only if the unit is missing.
     const unit = derived.customGlassUnits?.[idx];
-    const glassW = unit ? unit.width : mm.leafW - casementGlassDeduction(p);
-    const glassH = unit ? unit.height : mm.leafH - casementGlassDeduction(p);
+    const ded = casementGlassDeductions(p);
+    const glassW = unit ? unit.width : mm.leafW - ded.width;
+    const glassH = unit ? unit.height : mm.leafH - ded.height;
     // Edge seal (perimeter spacer line) per glass type — the number the glass PDF and the glazier DXF draw
     const edgeSeal = readGlassProfile(p, windowSpec.glazing?.type || 'double').edgeCover;
     // Spacer bars on the wood bar centre lines — the engine unit carries them

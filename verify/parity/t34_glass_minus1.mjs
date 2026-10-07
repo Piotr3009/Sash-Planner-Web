@@ -20,7 +20,9 @@
  * 06.10.2026 (leaf 64, deduction 105, BUILD-LOG): the reference tree has the 67 leaf, so the casement
  * and fixed units are derived with the live code on a profile whose leaf is PINNED at 67 (leaf schema 2,
  * so the migration keeps it): "live = ref - 2" still proves the glass -1 mm per side and nothing else.
- * The default 64 profile is checked on its own: unit = ref - 2 + 2 x (67 - 64) = ref + 4. The migration
+ * The default profile is checked on its own: since 07.10.2026 (leaf schema 3) its stiles and top rail are
+ * 64 and its bottom rail stays 67, so unit width = ref - 2 + 2 x (67 - 64) = ref + 4 and unit height =
+ * ref - 2 + (67 - 64) = ref + 1 (the top rail gives 3, the bottom rail nothing). The migration
  * expectations follow the leaf schema: the stored deduction is re-derived from the migrated face.
  *
  * Run: node verify/parity/t34_glass_minus1.mjs [git-ref]   (default 12670b6)
@@ -98,13 +100,14 @@ for (const [name, W] of Object.entries(WINDOWS)) {
   }
 }
 
-// ── the default profile (leaf 64, 06.10.2026): casement and fixed units = ref - 2 + 6 = ref + 4 ──
+// ── the default profile (stiles and top rail 64, bottom rail 67; 07.10.2026): casement and fixed units =
+//    width ref - 2 + 2 x 3 = ref + 4, height ref - 2 + 3 = ref + 1 (789 x 1293 -> 793 x 1294) ──
 for (const name of LEAF67) {
   const W = WINDOWS[name];
   const L = deriveItem(LIVE, W.item, W.fc), R = deriveItem(REF, W.item, W.fc);
   const uL = units(LIVE, L.spec, L.derived);
   const uR = units(REF, R.spec, R.derived);
-  uL.forEach(([w, h], i) => ok(near(w, uR[i][0] + 4) && near(h, uR[i][1] + 4), `${name} on the default profile (leaf 64): unit ${i + 1} ${w}×${h} = ref ${uR[i][0]}×${uR[i][1]} - 2 + 6 each way`));
+  uL.forEach(([w, h], i) => ok(near(w, uR[i][0] + 4) && near(h, uR[i][1] + 1), `${name} on the default profile (stiles / top rail 64, bottom rail 67): unit ${i + 1} ${w}×${h} = ref ${uR[i][0]}×${uR[i][1]} - 2 + 6 in width, - 2 + 3 in height`));
   const sqL = L.derived.consumables?.glass?.sqm, sqR = R.derived.consumables?.glass?.sqm;
   const areaL = uL.reduce((a, [w, h]) => a + w * h, 0) / 1e6, areaR = uR.reduce((a, [w, h]) => a + w * h, 0) / 1e6;
   ok(near(sqL - sqR, areaL - areaR, 0.02), `${name} on the default profile: m² moved by the unit area (${sqR} → ${sqL})`);
@@ -131,10 +134,11 @@ const edited = JSON.parse(JSON.stringify(stored)); edited.geometry.glassInset = 
 const m2 = LIVE.profile.migrateCasementProfile(edited);
 ok(m2.geometry.glassInset === 12 && m2.glass.edgeCover.triple === 9 && m2.glass.edgeCover.double === 10 && m2.deductions.glass === 104,
   `migration: hand-edited 12 / triple 9 kept, untouched keys move; the deduction follows the inset and the 64 leaf: 2 x (64 - 12) = 104 (was the stored 111)`);
-// a copy on the CURRENT schemas (glass 2, and since 06.10.2026 leaf 2 / length 2) is left alone
+// a copy on glass schema 2, leaf schema 2 and length schema 2 holding the 67 leaf (hand edits) is left alone:
+// since 07.10.2026 the leaf schema 2 rule moves only a bottom rail that still equals 64
 const v2 = JSON.parse(JSON.stringify(stored)); v2.glassSchema = 2; v2.leafSchema = 2; v2.lengthSchema = 2;
 const m3 = LIVE.profile.migrateCasementProfile(v2);
-ok(m3.geometry.glassInset === 12.5 && m3.deductions.glass === 109 && m3.glass.edgeCover.double === 11 && m3.elements.leafStile.face === 67, `migration: a copy on the current schemas is left alone (12.5 / 109 / 11 / leaf 67 stay; 109 = 2 x (67 - 12.5))`);
+ok(m3.geometry.glassInset === 12.5 && m3.deductions.glass === 109 && m3.glass.edgeCover.double === 11 && m3.elements.leafStile.face === 67, `migration: a copy on glass schema 2 and leaf schema 2 holding the 67 leaf (hand edits) is left alone (12.5 / 109 / 11 / leaf 67 stay; 109 = 2 x (67 - 12.5))`);
 // the same glass-schema-2 copy without the leaf schema: the glass keys stay, the leaf moves, the deduction follows
 const v2l = JSON.parse(JSON.stringify(stored)); v2l.glassSchema = 2;
 const m3l = LIVE.profile.migrateCasementProfile(v2l);

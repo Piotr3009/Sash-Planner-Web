@@ -94,7 +94,10 @@ export function alignMainBarLines(lights, { barW = BAR_WIDTH, minSliverRatio = M
  *   leafRects: derived.casement.leafRects (mm, origin = frame top-left, y down)
  *   panels:    layoutDef.panels (roles)
  *   bars:      windowSpec.casement.bars
- *   stile:     leaf member face (the daylight is the leaf inset by it)
+ *   stile:     stile face (the daylight is the leaf inset by it left and right)
+ *   top:       top rail face (the daylight inset at the top; default = stile)
+ *   bottom:    bottom rail face (the daylight inset at the bottom; default = stile)
+ *              Piotr 07.10.2026: stiles and top rail 64, bottom rail 67.
  * Returns per leaf:
  *   { counts: { v, h }, aligned, dropped,
  *     frame: { vBars, hBars },   // frame coordinates (the elevation sheet)
@@ -103,16 +106,16 @@ export function alignMainBarLines(lights, { barW = BAR_WIDTH, minSliverRatio = M
  * The counts are the bars the leaf REALLY carries (a light under a fan may
  * carry fewer than windowSpec asks for).
  */
-export function casementLeafBars({ leafRects, panels, bars, stile, barW = BAR_WIDTH }) {
+export function casementLeafBars({ leafRects, panels, bars, stile, top = stile, bottom = stile, barW = BAR_WIDTH }) {
   const per = (leafRects || []).map((r, i) => {
     const role = panels?.[i]?._role || 'main';
     const counts = casementBarCounts(bars, role);
-    const glassW = r.w - 2 * stile, glassH = r.h - 2 * stile;
-    const frame = computeBarPositions({ glassX: r.x + stile, glassY: r.y + stile, glassW, glassH, vCount: counts.v, hCount: counts.h, barW });
-    const local = computeBarPositions({ glassX: stile, glassY: stile, glassW, glassH, vCount: counts.v, hCount: counts.h, barW });
+    const glassW = r.w - 2 * stile, glassH = r.h - (top + bottom);
+    const frame = computeBarPositions({ glassX: r.x + stile, glassY: r.y + top, glassW, glassH, vCount: counts.v, hCount: counts.h, barW });
+    const local = computeBarPositions({ glassX: stile, glassY: top, glassW, glassH, vCount: counts.v, hCount: counts.h, barW });
     return { role, counts, r, glassH, frame, local };
   });
-  const lights = per.map((p) => ({ role: p.role, lo: p.r.y + stile, hi: p.r.y + stile + p.glassH, lines: p.frame.hBars.map((b) => b.cy) }));
+  const lights = per.map((p) => ({ role: p.role, lo: p.r.y + top, hi: p.r.y + top + p.glassH, lines: p.frame.hBars.map((b) => b.cy) }));
   const aligned = alignMainBarLines(lights, { barW });
   return per.map((p, i) => {
     const a = aligned[i];
@@ -132,12 +135,13 @@ export function casementLeafBars({ leafRects, panels, bars, stile, barW = BAR_WI
 /**
  * The same bars in GLASS-UNIT coordinates (origin = the unit's top-left
  * corner; the unit reaches glassInset beyond the daylight on every side).
+ * x is measured from the stile, y from the top rail (top, default = stile).
  * Returns { x: [...], y: [...] } — bar centre lines, sorted.
  */
-export function leafBarsToUnit(leafBars, stile, glassInset) {
-  const origin = stile - glassInset;
+export function leafBarsToUnit(leafBars, stile, glassInset, top = stile) {
+  const originX = stile - glassInset, originY = top - glassInset;
   return {
-    x: leafBars.local.vBars.map((b) => b.cx - origin),
-    y: leafBars.local.hBars.map((b) => b.cy - origin),
+    x: leafBars.local.vBars.map((b) => b.cx - originX),
+    y: leafBars.local.hBars.map((b) => b.cy - originY),
   };
 }

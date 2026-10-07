@@ -102,11 +102,14 @@ export const DEFAULT_CASEMENT_PROFILE = {
   // by key in migrateCasementProfile — only values that still equal the OLD
   // default (12.5 / 109 / 11) move, a workshop edit is kept.
   glassSchema: 2,
-  // Leaf schema (Piotr 06.10.2026): 2 = the four leaf members 64 wide (were 67).
-  // A stored copy below 2 is migrated face by face in migrateCasementProfile:
-  // a face moves only while it still equals the OLD default 67, a hand-edited
-  // face is kept. The glass deduction follows the face (casementGlassDeduction).
-  leafSchema: 2,
+  // Leaf schema (Piotr 07.10.2026): 3 = stiles and top rail 64, bottom rail 67
+  // (schema 2, 06.10.2026: all four members 64; schema 1: all four 67). A stored
+  // copy below 3 is migrated face by face in migrateCasementProfile, by the
+  // schema it is on: a face moves only while it still equals that schema's
+  // default, a hand-edited face is kept. The glass deductions follow the faces:
+  // width from the stiles, height from the top and bottom rails
+  // (casementGlassDeductions).
+  leafSchema: 3,
   // Length schema (Piotr 06.10.2026): 2 = transom seat 8.5 (was 8; the joint
   // needs 8.6, 8.5 is enough). A stored copy below 2 moves lengths.transomSeat
   // only while it still equals 8; a hand-edited seat is kept.
@@ -120,9 +123,9 @@ export const DEFAULT_CASEMENT_PROFILE = {
     frameCill:  { face: 68 },   // profiled section; envelope 68×93 — UNCHANGED by Block F
     mullion:    { face: 68 },   // visible land 26 (13 per side)
     transom:    { face: 68 },
-    leafStile:  { face: 64 },   // vertogen: all four leaf members one section,
-    leafTop:    { face: 64 },   // each cut to the FULL leaf dimension
-    leafBottom: { face: 64 },   // leaf schema 2 (Piotr 06.10.2026): 64, was 67
+    leafStile:  { face: 64 },   // vertogen: every leaf member cut to the FULL leaf
+    leafTop:    { face: 64 },   // dimension; stiles and top rail share one width,
+    leafBottom: { face: 67 },   // the bottom rail its own (leaf schema 3, Piotr 07.10.2026: 67)
   },
   geometry: {
     land: 47,             // frame land — visible frame margin (68 − 21; v4 Block F)
@@ -156,13 +159,14 @@ export const DEFAULT_CASEMENT_PROFILE = {
     // Middle tier (transom above AND below, 3-tier 013/023):
     // UNCONFIRMED — awaiting Piotr; provisional symmetric 2×17 like mullions.
     middleTierFromAxes: 34,
-    // Glass: DERIVED from the leaf member face — glass = leaf − 2×(face −
-    // glassInset). Kept here as the resolved value for display/back-compat;
-    // the engine computes it so changing the leaf face resizes the glass
-    // (Piotr 04.08). 105 = 2 x (64 - 11.5) (leaf schema 2; was 111 with the
-    // 67 face, 109 with 67 and 12.5). Every reader takes it from
-    // casementGlassDeduction(); the stored value is kept in step on migrate and
-    // on every write of the face or glassInset (windowProfileStore).
+    // Glass: DERIVED from the leaf member faces (Piotr 04.08, 07.10.2026):
+    //   glass W = leaf W - 2 x (leafStile - glassInset)                    = leaf W - 105
+    //   glass H = leaf H - (leafTop - glassInset) - (leafBottom - glassInset) = leaf H - 108
+    // This key holds the WIDTH deduction as the resolved value for display /
+    // back-compat: 105 = 2 x (64 - 11.5) (111 with the 67 stile, 109 with 67 and
+    // 12.5). Every reader takes both numbers from casementGlassDeductions();
+    // the stored value is kept in step on migrate and on every write of a face
+    // or glassInset (windowProfileStore).
     glass: 105,
   },
   lengths: {
@@ -426,17 +430,20 @@ export function migrateCasementProfile(profile) {
   // inset / 109 deduction / 11 edge cover — each moves to the new default only
   // while it equals the old one.
   const gs = migrateGlassSchema(profile, D);
-  // Leaf schema 2 and length schema 2 (06.10.2026): a stored leaf face of 67
-  // moves to 64 and a stored transom seat of 8 to 8.5, each only while it still
-  // equals the old default.
+  // Leaf schema 3 (07.10.2026) and length schema 2 (06.10.2026): the leaf faces
+  // move by the schema the copy is on (schema 1: a face of 67 moves to today's
+  // default, so 64 / 64 / 67; schema 2: the bottom rail 64 moves to 67) and a
+  // stored transom seat of 8 to 8.5, each only while it still equals the old
+  // default.
   const ls = migrateLeafSchema(profile, D);
   const ns = migrateLengthSchema(profile, D);
   const elements = { ...D.elements, ...profile.elements, ...fs.elements, ...ls.elements };
   const geometry = { ...D.geometry, ...profile.geometry, ...fs.geometry, ...gs.geometry };
   const deductions = { ...D.deductions, ...profile.deductions, ...fs.deductions, ...gs.deductions };
-  // One source for the glass deduction: wherever glassInset is a number the
-  // stored value is rewritten to the derived one, so no reader can meet a 111
-  // next to a 64 face, or a 105 next to a hand-edited 67.
+  // One source for the glass deductions: wherever glassInset is a number the
+  // stored value (the WIDTH deduction) is rewritten to the derived one, so no
+  // reader can meet a 111 next to a 64 stile, or a 105 next to a hand-edited 67.
+  // The height deduction is never stored: it is derived from the two rails.
   if (glassInsetOf({ geometry }) != null) deductions.glass = casementGlassDeduction({ elements, geometry, deductions });
   return {
     ...D, ...profile,
@@ -517,15 +524,24 @@ function migrateFrameSchema(profile, D) {
   return out;
 }
 
-// Old defaults of leaf schema 1 (the four leaf members 67 wide) and the
-// schema-2 faces they map to (Piotr 06.10.2026: 64). Returns only the faces that
-// must move; the element object keeps every other key it carries.
+// Old defaults of the leaf schemas, by the schema a stored copy is on, and the
+// faces they map to (today's default: stiles 64, top rail 64, bottom rail 67).
+// Schema 1 (until 06.10.2026): the four members 67, so every face of 67 moves
+// to today's default (the bottom rail stays 67). Schema 2 (06.10.2026): the four
+// members 64, so only the bottom rail moves, 64 to 67 (Piotr 07.10.2026); the
+// stiles and the top rail of a schema 2 copy are already today's. Each copy is
+// read on its OWN schema only, never chained, so a hand edit made under schema 1
+// is never taken for a schema 2 default. Returns only the faces that must move;
+// the element object keeps every other key it carries.
 const LEAF_SCHEMA_1 = { elements: { leafStile: { face: 67 }, leafTop: { face: 67 }, leafBottom: { face: 67 } } };
+const LEAF_SCHEMA_2 = { elements: { leafBottom: { face: 64 } } };
 function migrateLeafSchema(profile, D) {
   const out = { elements: {} };
-  if ((Number(profile.leafSchema) || 1) >= D.leafSchema) return out;
-  for (const k of Object.keys(LEAF_SCHEMA_1.elements)) {
-    if (profile.elements?.[k]?.face === LEAF_SCHEMA_1.elements[k].face) out.elements[k] = { ...profile.elements[k], face: D.elements[k].face };
+  const schema = Number(profile.leafSchema) || 1;
+  if (schema >= D.leafSchema) return out;
+  const old = schema >= 2 ? LEAF_SCHEMA_2 : LEAF_SCHEMA_1;
+  for (const k of Object.keys(old.elements)) {
+    if (profile.elements?.[k]?.face === old.elements[k].face) out.elements[k] = { ...profile.elements[k], face: D.elements[k].face };
   }
   return out;
 }
@@ -559,16 +575,36 @@ function glassInsetOf(profile) {
 }
 
 /**
- * The casement glass deduction: leaf size minus glass unit size, each way.
- * ONE source for every reader (the engine, the leaf / glass / elevation sheets,
- * Window Settings): 2 x (leafStile.face - geometry.glassInset), rounded to 0.1
- * like the engine. deductions.glass is read only when the profile has no
- * glassInset (a copy stored before the key existed). Default profile: 105.
+ * The casement glass WIDTH deduction: leaf width minus glass unit width,
+ * 2 x (leafStile.face - geometry.glassInset), rounded to 0.1 like the engine.
+ * It is also the value kept in deductions.glass. deductions.glass is read only
+ * when the profile has no glassInset (a copy stored before the key existed).
+ * Default profile: 105. Readers that size a glass unit take BOTH directions from
+ * casementGlassDeductions() below; this one never sizes a height.
  */
 export function casementGlassDeduction(profile = getCasementProfile()) {
   const inset = glassInsetOf(profile);
   if (inset == null) return profile?.deductions?.glass;
   return Math.round(2 * (Number(profile.elements.leafStile.face) - inset) * 10) / 10;
+}
+
+/**
+ * The casement glass deductions, one per direction (Piotr 07.10.2026: the bottom
+ * rail has its own width). ONE source for every reader (the engine, the leaf /
+ * glass / elevation sheets, Window Settings), both rounded to 0.1 like the engine:
+ *   width  = 2 x (leafStile.face - glassInset)                          (105)
+ *   height = (leafTop.face - glassInset) + (leafBottom.face - glassInset) (108)
+ * Without glassInset (a copy stored before the key existed) both fall back to
+ * deductions.glass, as they always did.
+ */
+export function casementGlassDeductions(profile = getCasementProfile()) {
+  const width = casementGlassDeduction(profile);
+  const inset = glassInsetOf(profile);
+  if (inset == null) return { width, height: profile?.deductions?.glass };
+  const els = profile.elements;
+  const top = Number((els.leafTop || els.leafStile).face);
+  const bottom = Number((els.leafBottom || els.leafStile).face);
+  return { width, height: Math.round(((top - inset) + (bottom - inset)) * 10) / 10 };
 }
 
 // ─── DOOR PROFILE v1 ────────────────────────────────────────────────────────

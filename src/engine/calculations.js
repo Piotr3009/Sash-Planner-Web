@@ -1,6 +1,6 @@
 import { resolveCasementLayout, fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from './casementLayouts.js';
 import { selectCasementHinges, summariseHinges, selectCasementLocks, summariseLocks } from './casementHardware.js';
-import { getWindowProfile, getCasementProfile, getDoorProfile, DEFAULT_DOOR_PROFILE, profileSashDepth, profileBoardWidth, boardWidthForDepth, profileBoxDepth, kgPerM, casementGlassDeduction } from './profile.js';
+import { getWindowProfile, getCasementProfile, getDoorProfile, DEFAULT_DOOR_PROFILE, profileSashDepth, profileBoardWidth, boardWidthForDepth, profileBoxDepth, kgPerM, casementGlassDeductions } from './profile.js';
 import { buildArchGeometry, buildSashArchGeometry, planArchSegments, buildGlassOutline, buildArchBars, glassOutlinePoly, chainAreaAboveLine, ArchError, isCircleShape, buildCircleGeometry, buildCircleGlassOutline, buildCircleBars } from './arch.js';
 import { buildTraceryForDerived } from './cnc/traceryExport.js';
 import { casementLeafBars, leafBarsToUnit } from './casementBarGrid.js';
@@ -652,14 +652,20 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     const secCill = `${els.frameCill.face}x${fd}`;
     const secMull = `${els.mullion.face}x${fd}`;
     const secTrans = `${els.transom.face}x${fd}`;
+    // Leaf member sections (Piotr 07.10.2026): stiles from leafStile, the top
+    // rail (and the arched top rail, the circle's leaf ring) from leafTop, the
+    // bottom rail from leafBottom: 64x57 / 64x57 / 67x57 on the default profile.
     const secLeaf = `${els.leafStile.face}x${ld}`;
-    // Glass follows the leaf member face: a wider member eats into the light
-    // on BOTH sides (Piotr 04.08). glassInset = how deep the pane sits in the
-    // rebate, per side. ONE source for the deduction (profile.js
-    // casementGlassDeduction, 06.10.2026): 2 x (face - glassInset), the stored
-    // value only for an old profile without glassInset.
+    const secLeafTop = `${els.leafTop.face}x${ld}`;
+    const secLeafBottom = `${els.leafBottom.face}x${ld}`;
+    // Glass follows the leaf member faces: a member eats into the light on its
+    // own side (Piotr 04.08). glassInset = how deep the pane sits in the rebate,
+    // per side. ONE source for the deductions (profile.js casementGlassDeductions,
+    // 07.10.2026): width 2 x (stile - glassInset), height (top - glassInset) +
+    // (bottom - glassInset); the stored value only for an old profile without
+    // glassInset.
     const glassInset = p.geometry?.glassInset;
-    const glassDed = casementGlassDeduction(p);
+    const { width: glassDedW, height: glassDedH } = casementGlassDeductions(p);
 
     // Bar counts per pane role (straight bars; on an arched leaf they are the
     // straight bars below the springing / across the clear width).
@@ -808,10 +814,11 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     //    the sheets, the glass rows, the glass PDF / DXF and the astragal run
     //    read these numbers. Arched / circle leaves keep their arch bar list.
     const leafBars = (archSpec || isCircle) ? null : casementLeafBars({
-        leafRects, panels: layoutDef.panels, bars: casBars, stile: els.leafStile.face,
+        leafRects, panels: layoutDef.panels, bars: casBars,
+        stile: els.leafStile.face, top: els.leafTop.face, bottom: els.leafBottom.face,
     });
     if (leafBars) leafBars.forEach((b, i) => { leafSizes[i].bars = b; });
-    const unitInset = glassInset == null ? (els.leafStile.face - glassDed / 2) : glassInset;
+    const unitInset = glassInset == null ? (els.leafStile.face - glassDedW / 2) : glassInset;
 
     // ── Drawing-ready member runs (mm, exterior view) ──
     const landX = (b, side) => side === 'L'
@@ -916,7 +923,7 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
         const fnL = hingeFn(pn.hinge, 'L'), fnR = hingeFn(pn.hinge, 'R');
         if (isCircle) {
             // circle: the leaf is ONE ring — no stiles, no rails
-            sash.push(mk('sash', 'C-LEAF RING', secLeaf, AG.leafTop.lengths.centre, 1, `C-LFR-${pcode}`,
+            sash.push(mk('sash', 'C-LEAF RING', secLeafTop, AG.leafTop.lengths.centre, 1, `C-LFR-${pcode}`,
                 [archNotes(archPlans.leafTop, AG.leafTop), noteBase].filter(Boolean).join(' · ')));
             if (archTracery) {
                 const T = archTracery.T, bb = archTracery.geom.bbox;
@@ -935,13 +942,13 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
         sash.push(mk('sash', 'C-STILE (R)', secLeaf, stileLen, 1, `C-ST/R-${pcode}`,
             [fnR, noteBase].filter(Boolean).join(' · ')));
         if (archSpec) {
-            sash.push(mk('sash', 'C-ARCH TOP RAIL', secLeaf, AG.leafTop.lengths.centre, 1, `C-ATR-${pcode}`,
+            sash.push(mk('sash', 'C-ARCH TOP RAIL', secLeafTop, AG.leafTop.lengths.centre, 1, `C-ATR-${pcode}`,
                 [archNotes(archPlans.leafTop, AG.leafTop), noteBase].filter(Boolean).join(' · ')));
         } else {
-            sash.push(mk('sash', 'C-TOP RAIL', secLeaf, R(s.leafW - (p.lengths.topRailDeduct || 0)), 1, `C-TR-${pcode}`,
+            sash.push(mk('sash', 'C-TOP RAIL', secLeafTop, R(s.leafW - (p.lengths.topRailDeduct || 0)), 1, `C-TR-${pcode}`,
                 [pn.hinge === 'top' ? 'hinge' : '', noteBase].filter(Boolean).join(' · ')));
         }
-        sash.push(mk('sash', 'C-BOTTOM RAIL', secLeaf, R(s.leafW - (p.lengths.bottomRailDeduct || 0)), 1, `C-BR-${pcode}`,
+        sash.push(mk('sash', 'C-BOTTOM RAIL', secLeafBottom, R(s.leafW - (p.lengths.bottomRailDeduct || 0)), 1, `C-BR-${pcode}`,
             [pn.hinge === 'top' ? 'lock' : '', noteBase].filter(Boolean).join(' · ')));
         // v3 0.4: tracery board — qty = sides, section = board thickness x blank W,
         // length = blank H (bounding box of the board outline + contourAllowance)
@@ -982,13 +989,13 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
             },
         }]
         : layoutDef.panels.map((pn, i) => ({
-            width: Math.max(0, R(leafSizes[i].leafW - glassDed)),
-            height: Math.max(0, R(leafSizes[i].leafH - glassDed)),
+            width: Math.max(0, R(leafSizes[i].leafW - glassDedW)),
+            height: Math.max(0, R(leafSizes[i].leafH - glassDedH)),
             location: `${layout} P${i + 1} ${pn.hinge === 'fixed' ? 'fixed' : pn.hinge}`,
             role: pn._role || 'main',
             qty: 1,
             // the bars this unit REALLY carries: counts + axes from the unit's top-left corner
-            bars: { ...leafBars[i].counts, ...leafBarsToUnit(leafBars[i], els.leafStile.face, unitInset) },
+            bars: { ...leafBars[i].counts, ...leafBarsToUnit(leafBars[i], els.leafStile.face, unitInset, els.leafTop.face) },
         }));
     const glassSqm = archSpec ? archOutline.area / 1e6 : paneGlass.reduce((a, g) => a + (g.width * g.height) / 1e6, 0);
     const openers = layoutDef.panels.filter((pn) => pn.hinge !== 'fixed').length;
@@ -1014,10 +1021,17 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
     const leafWeights = layoutDef.panels.map((pn, i) => {
         if (pn.hinge === 'fixed') return null;
         const s = leafSizes[i];
-        // Arched leaf: the timber run is 2 straight stiles + bottom rail + the
-        // curved top rail at its centre line; the pane weight from the true area.
-        const leafRun = isCircle ? AG.leafTop.lengths.centre : archSpec ? (2 * AG.leafStraightStile + s.leafW + AG.leafTop.lengths.centre) : (2 * s.leafH + 2 * s.leafW);
-        const frameKg = kgPerM(els.leafStile.face, ld) * (leafRun / 1000);
+        // Timber per member, each with its own face (07.10.2026: the bottom rail
+        // is wider): 2 stiles + top rail + bottom rail at full leaf dimensions.
+        // Arched leaf: the 2 straight stiles + the bottom rail + the curved top
+        // rail at its centre line; circle: the ring only. The pane weight from
+        // the true area.
+        const run = isCircle ? { stiles: 0, top: AG.leafTop.lengths.centre, bottom: 0 }
+            : archSpec ? { stiles: 2 * AG.leafStraightStile, top: AG.leafTop.lengths.centre, bottom: s.leafW }
+            : { stiles: 2 * s.leafH, top: s.leafW, bottom: s.leafW };
+        const frameKg = kgPerM(els.leafStile.face, ld) * (run.stiles / 1000)
+            + kgPerM(els.leafTop.face, ld) * (run.top / 1000)
+            + kgPerM(els.leafBottom.face, ld) * (run.bottom / 1000);
         const paneArea = archSpec ? archOutline.area : paneGlass[i].width * paneGlass[i].height;
         const paneKg = (paneArea / 1e6) * glassKgPerSqm;
         return { panel: i + 1, hinge: pn.hinge, weightKg: R((frameKg + paneKg) * wMargin) };

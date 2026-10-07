@@ -24,7 +24,7 @@ import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import { Text, Line } from '@react-three/drei';
 import { resolveFrameDims, FRAME_FACE, EXT_FACE, FRAME_DEPTH, EXT_DEPTH, INT_DEPTH, BOTTOM_FACE, BOTTOM_INNER_FACE, GASKET_W, GASKET_T, mm } from './CasementFrame';
-import { SASH_RAIL, SASH_DEPTH, MAX_ANGLE } from './CasementPanel';
+import { SASH_RAIL, SASH_BOTTOM_RAIL, SASH_DEPTH, MAX_ANGLE } from './CasementPanel';
 import { GLASS_UNIT_DEPTH } from './CasementGlazing';
 import WindowCasementHandle from './WindowCasementHandle';
 import { safeArchedCasementGeometry, contourAt, sampleArc, PSW_BAR_PATTERN_SETTINGS } from './archedCasementGeometry.js';
@@ -36,6 +36,7 @@ const LEAF_GAP = 4; // mm gap between leaf and frame (all round)
 const DIMS = Object.freeze({
   frameFace: FRAME_FACE, extFace: EXT_FACE, bottomFace: BOTTOM_FACE, bottomInner: BOTTOM_INNER_FACE,
   leafGap: LEAF_GAP, leafFace: SASH_RAIL, gasketW: GASKET_W,
+  leafBottomFace: SASH_BOTTOM_RAIL,   // the leaf's bottom rail 67 (Piotr 07.10.2026); the ring and stiles stay leafFace 64
   innerMargin: 10,   // bead 9 + spacer 1 inside the daylight — the deepest ring the leaf draws
 });
 

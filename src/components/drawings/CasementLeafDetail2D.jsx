@@ -5,10 +5,12 @@
  * dark theme, DimChainH/DimChainV with bar cuts, glazing-bar crosses and
  * V-notches, Expand/Collapse. One drawing serves every pane of the same
  * leaf group (identical size + role); pane list goes in the title.
- * Vertogen: all four members are the same section (64 since 06.10.2026, was 67),
- * so the top/bottom edges equal the stile face. The dashed inner line is the
- * 24mm glass unit edge: the glass enters glassInset (11.5) into the rebate past
- * the visible daylight.
+ * Vertogen: stiles and top rail share one section (64), the bottom rail has its
+ * own (67, Piotr 07.10.2026), so the daylight is the leaf inset by the stile left
+ * and right, by the top rail at the top and by the bottom rail at the bottom. The
+ * dashed inner line is the 24mm glass unit edge: the glass enters glassInset
+ * (11.5) into the rebate past the visible daylight; its size is the engine's unit
+ * (the glass schedule).
  *
  * Arched casement (arched-casement-v2 night 4, spec §4 D): the leaf top rail
  * is the C-ARCH TOP RAIL ring from derived.arch.geometry (the SAME ArcChain
@@ -19,7 +21,7 @@
  * branch below unchanged (byte-identical, verify/arch/t19.mjs).
  */
 import { useMemo, useState } from 'react';
-import { getCasementProfile, casementGlassDeduction } from '../../engine/profile.js';
+import { getCasementProfile, casementGlassDeductions } from '../../engine/profile.js';
 import { DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 import { casementRoleName, paneTitle } from './casementDrawUtils.js';
@@ -38,6 +40,12 @@ const C = {
 function fmt(n) {
   const r = Math.round(n * 2) / 2;
   return Number.isInteger(r) ? r.toString() : r.toFixed(1);
+}
+
+// The glass in the subtitle is the glass schedule size (0.1 mm), not the 0.5 grid
+// of the dimensions: Piotr 07.10.2026, 021 1000 x 1200 prints 793 x 248.2.
+function fmtGlass(n) {
+  return String(Math.round(n * 10) / 10);
 }
 
 function computeSegments(from, to, cutPairs) {
@@ -71,15 +79,20 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
     if (!mm) return null;
     const p = getCasementProfile();
     const stile = p.elements.leafStile.face;
-    // unit edge inside the wood: -glassInset (-11.5); the deduction from the ONE source
-    const glassIn = casementGlassDeduction(p) / 2 - stile;
+    const top = p.elements.leafTop.face;
+    const bottom = p.elements.leafBottom.face;
+    // unit edge inside the wood: -glassInset (-11.5); the deductions from the ONE source
+    const ded = casementGlassDeductions(p);
+    const glassIn = ded.width / 2 - stile;
     const pn = cas.layoutDef.panels[idx];
     const leafW = mm.leafW, leafH = mm.leafH;
-    const glassX = stile, glassY = stile;
-    const glassW = leafW - 2 * stile, glassH = leafH - 2 * stile;
-    const unitX = stile + glassIn, unitY = stile + glassIn; // 52.5 inset (64 - 11.5)
-    const unitW = leafW - 2 * (stile + glassIn);
-    const unitH = leafH - 2 * (stile + glassIn);
+    const glassX = stile, glassY = top;
+    const glassW = leafW - 2 * stile, glassH = leafH - (top + bottom);
+    const unitX = stile + glassIn, unitY = top + glassIn; // 52.5 inset (64 - 11.5)
+    // the unit drawn IS the engine's unit (the glass schedule); the deductions only if it is missing
+    const unit = derived.customGlassUnits?.[idx];
+    const unitW = unit ? unit.width : leafW - ded.width;
+    const unitH = unit ? unit.height : leafH - ded.height;
     const role = pn._role || 'main';
     // bars from the engine grid (casementBarGrid.js) in leaf coordinates —
     // a light under a fan carries the window lines that cross it, not its own count
@@ -114,12 +127,12 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
       };
     }
     return {
-      leafW, leafH, stile, glassX, glassY, glassW, glassH,
+      leafW, leafH, stile, top, bottom, glassX, glassY, glassW, glassH,
       unitX, unitY, unitW, unitH, vBars, hBars, arch,
       hinge: pn.hinge, role, bounds: cas.paneBounds?.[idx],
       // the glass unit printed is the engine's unit (the glass schedule), not a second formula
-      glassUnitW: derived.customGlassUnits?.[idx]?.width ?? leafW - casementGlassDeduction(p),
-      glassUnitH: derived.customGlassUnits?.[idx]?.height ?? leafH - casementGlassDeduction(p),
+      glassUnitW: unitW,
+      glassUnitH: unitH,
     };
   }, [windowSpec, derived, group]);
 
@@ -183,7 +196,7 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
   const projNum = projectNumber || '';
   const hingeTxt = geom.hinge === 'fixed' ? 'fixed (dummy sash)' : `hinge ${geom.hinge}`;
   const titleText = `${paneTitle(group)} — Front${projNum ? ` — ${projNum}` : ''} — ${winName}`;
-  const subtitleText = `${fmt(geom.leafW)} × ${fmt(geom.leafH)} · glass ${fmt(geom.glassUnitW)} × ${fmt(geom.glassUnitH)} · 24mm · ${hingeTxt}`;
+  const subtitleText = `${fmt(geom.leafW)} × ${fmt(geom.leafH)} · glass ${fmtGlass(geom.glassUnitW)} × ${fmtGlass(geom.glassUnitH)} · 24mm · ${hingeTxt}`;
   const archLine = arch ? `${arch.AG.label} · stile ${fmt(arch.straightStile)} · rise ${fmt(geom.leafH - arch.straightStile)} · top rail ${radiiText(arch.leafOuter)} · C-ATR ${fmt(arch.railLength)}` : '';
   const titleY = oy + geom.leafH + MGN_BOT_DIM + MGN_TITLE * 0.4;
 
@@ -198,10 +211,10 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
   const topDimY = oy + geom.leafH + 24 * ts;
   const topExtLineEnd = oy + geom.leafH + 4 * ts;
 
-  // Left dim chain
-  const leftCuts = [0, geom.stile];
+  // Left dim chain: top rail · (bars) · bottom rail
+  const leftCuts = [0, geom.top];
   hBarsDim.forEach((hb) => { leftCuts.push(hb.top); leftCuts.push(hb.bot); });
-  leftCuts.push(geom.leafH - geom.stile);
+  leftCuts.push(geom.leafH - geom.bottom);
   leftCuts.push(geom.leafH);
   const leftDimX = ox - 24 * ts;
   const leftExtLineEnd = ox - 4 * ts;
@@ -211,9 +224,9 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
   topLabels[topLabels.length - 1] = fmt(geom.stile);
   if (topLabels.length === 3) topLabels[1] = fmt(geom.leafW - 2 * geom.stile);
   const leftLabels = Array(leftCuts.length - 1).fill(undefined);
-  leftLabels[0] = fmt(geom.stile);
-  leftLabels[leftLabels.length - 1] = fmt(geom.stile);
-  if (leftLabels.length === 3) leftLabels[1] = fmt(geom.leafH - 2 * geom.stile);
+  leftLabels[0] = fmt(geom.top);
+  leftLabels[leftLabels.length - 1] = fmt(geom.bottom);
+  if (leftLabels.length === 3) leftLabels[1] = fmt(geom.leafH - (geom.top + geom.bottom));
 
   return (
     <div className="w-full relative">
@@ -402,8 +415,8 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
               { key: 'leafStile', x: X(0), y: Y(topY), w: geom.stile, h: geom.leafH - topY },
               { key: 'leafStile', x: X(geom.leafW - geom.stile), y: Y(topY), w: geom.stile, h: geom.leafH - topY },
               AP ? { key: 'leafTopRail', d: AP.topRailZoneD }
-                 : { key: 'leafTopRail', x: X(geom.stile), y: Y(0), w: geom.leafW - 2 * geom.stile, h: geom.stile },
-              { key: 'leafBottomRail', x: X(geom.stile), y: Y(geom.leafH - geom.stile), w: geom.leafW - 2 * geom.stile, h: geom.stile },
+                 : { key: 'leafTopRail', x: X(geom.stile), y: Y(0), w: geom.leafW - 2 * geom.stile, h: geom.top },
+              { key: 'leafBottomRail', x: X(geom.stile), y: Y(geom.leafH - geom.bottom), w: geom.leafW - 2 * geom.stile, h: geom.bottom },
             ];
             return (
               <g>
