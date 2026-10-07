@@ -138,7 +138,7 @@ ok(m2.geometry.glassInset === 12 && m2.glass.edgeCover.triple === 9 && m2.glass.
 // since 07.10.2026 the leaf schema 2 rule moves only a bottom rail that still equals 64
 const v2 = JSON.parse(JSON.stringify(stored)); v2.glassSchema = 2; v2.leafSchema = 2; v2.lengthSchema = 2;
 const m3 = LIVE.profile.migrateCasementProfile(v2);
-ok(m3.geometry.glassInset === 12.5 && m3.deductions.glass === 109 && m3.glass.edgeCover.double === 11 && m3.elements.leafStile.face === 67, `migration: a copy on the current schemas is left alone (12.5 / 109 / 11 / leaf 67 stay; 109 = 2 x (67 - 12.5))`);
+ok(m3.geometry.glassInset === 12.5 && m3.deductions.glass === 109 && m3.glass.edgeCover.double === 11 && m3.elements.leafStile.face === 67, `migration: a copy on glass schema 2 and leaf schema 2 holding the 67 leaf (hand edits) is left alone (12.5 / 109 / 11 / leaf 67 stay; 109 = 2 x (67 - 12.5))`);
 // the same glass-schema-2 copy without the leaf schema: the glass keys stay, the leaf moves, the deduction follows
 const v2l = JSON.parse(JSON.stringify(stored)); v2l.glassSchema = 2;
 const m3l = LIVE.profile.migrateCasementProfile(v2l);

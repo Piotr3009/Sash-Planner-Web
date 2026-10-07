@@ -306,7 +306,7 @@ const leafSheetTexts = (M, spec, derived, k = 0) => texts(render(M.LeafDetail, {
   const sec = (re) => [...new Set(recs(d, re).map((r) => r.section))].join();
   ok(sec(/^C-STILE/) === '64x57' && sec(/^C-TOP RAIL$/) === '64x57' && sec(BOTTOM_RE) === '67x57', `040L: stiles ${sec(/^C-STILE/)}, top rail ${sec(/^C-TOP RAIL$/)}, bottom rail ${sec(BOTTOM_RE)}`);
   const t040 = leafSheetTexts(LIVE, spec, d);
-  ok(t040.includes('770') && t040.includes('971') && !t040.includes('974') && !t040.includes('968'), '040L: daylight 770 x 971 printed on the leaf sheet (START 770 x 974, REF 764 x 968)', JSON.stringify(t040.slice(0, 10)));
+  ok(t040.includes('770') && t040.includes('971') && !t040.includes('974') && !t040.includes('764') && !t040.includes('968'), '040L: daylight 770 x 971 printed on the leaf sheet (START 770 x 974, REF 764 x 968)', JSON.stringify(t040.slice(0, 10)));
   ok(d.components.beading.length === 1 && d.components.beading[0].length === 4110, '040L: glazing beading 4110 (START 4117)', JSON.stringify(d.components.beading));
   ok(c.leafWeights[0].weightKg === 26.8, `040L: leaf weight 26.8 kg (START ${S['040L-1000x1200'].derived.casement.leafWeights[0].weightKg})`, JSON.stringify(c.leafWeights));
   ok(d.weights.timber === 26 && d.weights.glass === 16.6 && d.weights.total === 44.6, '040L: weights 26.0 / 16.6 / 44.6 (START 25.9 / 16.6 / 44.6)', JSON.stringify(d.weights));
@@ -319,7 +319,7 @@ const leafSheetTexts = (M, spec, derived, k = 0) => texts(render(M.LeafDetail, {
   ok(ec.leaves.every((l) => l.leafW === 832 && l.leafH === 1402), '120: leaves 832 x 1402');
   ok(e.customGlassUnits.every((u) => u.width === 727 && u.height === 1294), '120: glass units 727 x 1294', JSON.stringify(e.customGlassUnits.map((u) => [u.width, u.height])));
   const t120 = leafSheetTexts(LIVE, L['120-1800x1500'].spec, e);
-  ok(t120.includes('704') && t120.includes('1271') && !t120.includes('1274') && !t120.includes('1268'), '120: daylight 704 x 1271 printed on the leaf sheet (START 704 x 1274)', JSON.stringify(t120.slice(0, 10)));
+  ok(t120.includes('704') && t120.includes('1271') && !t120.includes('1274') && !t120.includes('698') && !t120.includes('1268'), '120: daylight 704 x 1271 printed on the leaf sheet (START 704 x 1274, REF 698 x 1268)', JSON.stringify(t120.slice(0, 10)));
   ok(e.components.beading[0].length === 9297, '120: glazing beading 9297 (START 9310)', JSON.stringify(e.components.beading));
   ok(ec.leafWeights.every((x) => x.weightKg === 31.3), '120: leaf weights 31.3 / 31.3 kg (START 31.2)', JSON.stringify(ec.leafWeights));
   ok(e.consumables.glass.sqm === 1.88, '120: glass 1.88 m2 (START 1.89)', String(e.consumables.glass.sqm));
@@ -385,10 +385,10 @@ section('9 - migration of stored profiles');
   ok(faces(m4) === '67 / 67 / 67' && m4.deductions.glass === 111 && m4.lengths.transomSeat === 8, 'a schema 2 copy holding 67 / 67 / 67 (hand edits) is left alone: 67 is not the schema 2 bottom rail 64');
   const s70 = clone(old); ['leafStile', 'leafTop', 'leafBottom'].forEach((k) => { s70.elements[k].face = 70; });
   const m5 = mig(s70);
-  ok(faces(m5) === '70 / 70 / 70' && ded(m5).width === 117 && ded(m5).height === 117, `schema 1 copy hand-edited 70 / 70 / 70 stays, glass W ${ded(m5).width} / H ${ded(m5).height}`);
+  ok(faces(m5) === '70 / 70 / 70' && ded(m5).width === 117 && ded(m5).height === 117 && m5.deductions.glass === 117, `schema 1 copy hand-edited 70 / 70 / 70 stays, glass W ${ded(m5).width} / H ${ded(m5).height}, stored deductions.glass ${m5.deductions.glass}`);
   const s72 = clone(old); s72.elements.leafBottom.face = 72;
   const m6 = mig(s72);
-  ok(faces(m6) === '64 / 64 / 72' && ded(m6).width === 105 && ded(m6).height === 113, `schema 1 copy, bottom rail edited to 72: ${faces(m6)}, glass W ${ded(m6).width} / H ${ded(m6).height} = 52.5 + 60.5`);
+  ok(faces(m6) === '64 / 64 / 72' && ded(m6).width === 105 && ded(m6).height === 113 && m6.deductions.glass === 105, `schema 1 copy, bottom rail edited to 72: ${faces(m6)}, glass W ${ded(m6).width} / H ${ded(m6).height} = 52.5 + 60.5, stored deductions.glass ${m6.deductions.glass} (the stiles' width)`);
   const s9 = clone(old); s9.lengths.transomSeat = 9;
   ok(mig(s9).lengths.transomSeat === 9 && faces(mig(s9)) === '64 / 64 / 67', 'hand-edited seat 9 stays 9 (the faces still move)');
   // glass schema 1 (02.10.2026 history): inset 12.5, glass 109, edge cover 11, leaf 67, no schema counters at all
@@ -576,6 +576,9 @@ const sample = () => { const { derived, spec } = derive(LIVE, cas('sample', 1000
   let g = settingsGlass(renderSettings(LIVE)), row = sample();
   ok(g && g.w === 105 && g.h === 111 && g.sw === row.width && g.sh === row.height && g.sh === 1291, `bottom rail 70: Window Settings glass W = leaf - ${g?.w}, H = leaf - ${g?.h}, sample ${g?.sw} x ${g?.sh} = schedule`);
   // the Stiles / Top rail card writes the stiles and the top rail together, never the bottom rail
+  st.getState().setCasementLeafFace(66);
+  p = st.getState().casement;
+  ok(faces(p) === '66 / 66 / 70' && p.deductions.glass === 109, `stiles / top rail 66 typed with the bottom rail at 70: stored faces ${faces(p)} (the bottom rail untouched), deductions.glass ${p.deductions.glass} = 2 x (66 - 11.5)`);
   st.getState().setCasementLeafFace(70);
   p = st.getState().casement;
   ok(faces(p) === '70 / 70 / 70' && p.deductions.glass === 117, `stiles / top rail 70 typed after it: stored faces ${faces(p)} (the bottom rail keeps its own 70), deductions.glass ${p.deductions.glass} = 2 x (70 - 11.5)`);
