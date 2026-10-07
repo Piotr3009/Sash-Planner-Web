@@ -79,14 +79,14 @@ export default function WindowDetailPage() {
   const windowSpec = useMemo(() => (item ? normaliseToWindowSpec(item, spec) : null), [item, spec]);
   const derived = useMemo(() => {
     if (!windowSpec) return null;
-    try { return withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, () => deriveWindowData(windowSpec, settings)); }
+    try { return withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, () => deriveWindowData(windowSpec, settings)); }
     catch (e) { console.warn('Calculation failed:', e); return null; }
   }, [windowSpec, settings]);
   // Arched casement CNC export — planned under the batch's profile snapshot,
   // exactly like `derived` above; `skip` doubles as the button tooltip.
   const archExport = useMemo(() => {
     if (!windowSpec) return { skip: 'no data' };
-    return withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, () => archParamsForWindow(windowSpec, item?.name));
+    return withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, () => archParamsForWindow(windowSpec, item?.name));
   }, [windowSpec, item?.name, currentBatch]);
 
   const [tab, setTab] = useState('3d');
@@ -134,7 +134,7 @@ export default function WindowDetailPage() {
           {((windowSpec?.category || 'sash') === 'casement' || !!windowSpec?.arch?.shape) && (
             <button
               onClick={() => {
-                const r = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, () => exportArchDxfForWindow(windowSpec, item.name));
+                const r = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, () => exportArchDxfForWindow(windowSpec, item.name));
                 if (r.error) alert(`Arch DXF unavailable: ${r.error}`);
               }}
               disabled={!!archExport.skip}
@@ -148,10 +148,10 @@ export default function WindowDetailPage() {
           )}
           {((windowSpec?.category || 'sash') === 'casement' || !!windowSpec?.arch?.shape) && (() => {
             // v3 0.4: tracery board (DXF for VCarve + LSP for AutoCAD) — only with a bar pattern in the arch
-            const tr = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, () => traceryParamsForWindow(windowSpec, derived, item?.name));
+            const tr = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, () => traceryParamsForWindow(windowSpec, derived, item?.name));
             const cls = `btn text-sm bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 ${tr.skip ? 'opacity-40 cursor-not-allowed' : ''}`;
             const run = (fn, label) => {
-              const r = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, () => fn(windowSpec, derived, item?.name));
+              const r = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, () => fn(windowSpec, derived, item?.name));
               if (r.error) alert(`${label} unavailable: ${r.error}`);
               else if (r.warnings?.length) alert(`${label}: ${r.warnings.join('; ')}`);
             };
@@ -165,7 +165,7 @@ export default function WindowDetailPage() {
             // 12.09: bSuite worklist for ONE window (Piotr: single window first, the pack is built from them)
             <button
               onClick={async () => {
-                const r = await withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement,
+                const r = await withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door,
                   () => exportBsuiteFramesMerged([{ windowSpec, derived, name: item?.name }], item?.name || 'window', undefined, null, downloadBsuiteProgram));
                 if (r.error) { alert(`bSuite frames unavailable: ${r.error}`); return; }
                 const sk = r.skipped?.length ? `\nSkipped: ${r.skipped.map((x) => `${x.element} (${x.reason})`).join(', ')}` : '';

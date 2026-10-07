@@ -227,7 +227,7 @@ export default function ProductionPackPage() {
       const b = win._batch || batch;
       let derived = null;
       try {
-        derived = withProfiles(b?.defaults?._profileSnapshot?.sash, b?.defaults?._profileSnapshot?.casement, () => deriveWindowData(windowSpec, settings));
+        derived = withProfiles(b?.defaults?._profileSnapshot?.sash, b?.defaults?._profileSnapshot?.casement, b?.defaults?._profileSnapshot?.door, () => deriveWindowData(windowSpec, settings));
       } catch (e) {
         console.warn(`Calc failed for ${win.name}:`, e);
       }

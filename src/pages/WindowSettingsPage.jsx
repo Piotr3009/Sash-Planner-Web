@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { uploadBsuiteProgram, removeBsuiteProgram } from '../services/bsuitePrograms.js';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
-import { kgPerM, VARIANT_ORDER, casementGlassDeductions } from '../engine/profile.js';
+import { kgPerM, VARIANT_ORDER, casementGlassDeductions, DEFAULT_DOOR_PROFILE } from '../engine/profile.js';
 import NumInput from '../components/NumInput.jsx';
 import { CONSTANTS, deriveWindowData } from '../engine/calculations.js';
 import { buildArchPlan, ArchError } from '../engine/arch.js';
@@ -15,6 +15,7 @@ import CasementFrameDetail2D from '../components/drawings/CasementFrameDetail2D.
 import CasementLeafDetail2D from '../components/drawings/CasementLeafDetail2D.jsx';
 import CasementSection2D from '../components/drawings/CasementSection2D.jsx';
 import { groupCasementLeaves } from '../components/drawings/casementDrawUtils.js';
+import DoorElevation2D from '../components/drawings/DoorElevation2D.jsx';
 
 // ─── Element metadata: engine names, groups, editable fields, length rules ───
 const RAW_OPTIONS = ['63x63', '63x95'];
@@ -141,6 +142,9 @@ export default function WindowSettingsPage() {
 
   if (typeId === 'casement') {
     return <CasementSettings sampleW={sampleW} sampleH={sampleH} setSampleW={setSampleW} setSampleH={setSampleH} />;
+  }
+  if (typeId === 'door') {
+    return <DoorSettings />;
   }
   if (typeId && typeId !== 'sash') {
     return (
@@ -1306,6 +1310,315 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
             </>
           ) : (
             <div className="card p-6 text-center text-xs text-ink-400">Sample drawings unavailable.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Doors (08.10.2026, doors to production) ────────────────────────────────
+// The door profile card, in the casement card's layout: depths, frame and leaf
+// faces with their cut deductions, the panel boards, the french lip, the leaf
+// size rules with their composition hints, lands and gaps, the hinge rule, the
+// hardware variant defaults and the opening fanlight rule. Every field writes
+// the door profile through setDoorPath; the sample door on the right is the
+// live engine.
+const DOOR_FRAME_ROWS = [
+  { key: 'frameHead', name: 'Frame head', lenKey: 'headDeduct', base: 'total W' },
+  { key: 'frameJamb', name: 'Frame jamb', qty: '×2', lenKey: 'jambDeduct', base: 'total H' },
+  { key: 'frameCill', name: 'Frame cill', lenKey: 'cillDeduct', base: 'total W + ext' },
+  { key: 'transomRail', name: 'Transom rail', lenKey: 'transomDeduct', base: 'total W' },
+];
+const DOOR_LEAF_ROWS = [
+  { key: 'leafStile', name: 'Stiles', qty: '×2', lenKey: 'stileDeduct', base: 'leaf H' },
+  { key: 'leafTop', name: 'Top rail', lenKey: 'topRailDeduct', base: 'leaf W' },
+  { key: 'leafBottom', name: 'Bottom rail', lenKey: 'bottomRailDeduct', base: 'leaf W' },
+  { key: 'leafMid', name: 'Mid rail', lenKey: 'midRailDeduct', base: 'leaf W', note: 'half-glazed / three-quarter' },
+  { key: 'leafMeeting', name: 'Meeting stile', lenKey: 'meetingStileDeduct', base: 'leaf H', note: 'french, 94 + lip' },
+];
+
+function DoorSettings() {
+  const door = useWindowProfileStore((s) => s.door) || DEFAULT_DOOR_PROFILE;
+  const setPath = useWindowProfileStore((s) => s.setDoorPath);
+  const resetDoor = useWindowProfileStore((s) => s.resetDoorToDefaults);
+  const [sampleW, setSampleW] = useState(1600);
+  const [sampleH, setSampleH] = useState(2100);
+  const [sampleType, setSampleType] = useState('french');
+  const [depthLock, setDepthLock] = useState(true);
+  const [frameLock, setFrameLock] = useState(true);
+  const [leafLock, setLeafLock] = useState(true);
+  const [rulesLock, setRulesLock] = useState(true);
+  const [advLock, setAdvLock] = useState(true);
+  const [hwLock, setHwLock] = useState(true);
+
+  const p = door;
+  const g = p.geometry || {}, d = p.deductions || {}, L = p.lengths || {};
+  const H = p.hardware || {}, HG = p.hinges || {}, PN = p.panel || {};
+  const W = Number(sampleW) || 1600;
+  const Hh = Number(sampleH) || 2100;
+  const num = (v, fb = 0) => (v === '' ? '' : Number(v) || fb);
+  const inputCls = 'w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm';
+  const selectCls = 'px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm';
+
+  // Live sample door: the engine with this profile (french by default, so the
+  // meeting stiles and both leaves show).
+  const sample = useMemo(() => {
+    try {
+      const ws = normaliseToWindowSpec({ name: 'SAMPLE', width: W, height: Hh, windowCategory: 'door', doorType: sampleType, glassType: 'double' });
+      return { ws, derived: deriveWindowData(ws) };
+    } catch (err) {
+      console.error('WindowSettings door sample derive failed:', err);
+      return null;
+    }
+  }, [W, Hh, sampleType, p]);
+  const dr = sample?.derived?.door;
+  const leaf0 = dr?.leaves?.[0];
+  const glass0 = sample?.derived?.customGlassUnits?.[0];
+
+  // Composition hints (geometry -> expected rule value)
+  const hJ = g.land + g.gap;
+  const hFull = g.land + g.gap + g.gapCill + g.cillVisible;
+  const hNo = g.land + g.gap + g.gapCill;
+
+  const FaceCard = ({ r, locked }) => {
+    const face = p.elements?.[r.key]?.face;
+    const dedV = L[r.lenKey] ?? 0;
+    return (
+      <div className="p-2 rounded-lg border border-surface-500 bg-surface-700/30">
+        <div className="flex items-center justify-between gap-1">
+          <span className="text-[12px] font-medium truncate text-ink-100">{r.name} {r.qty || ''}</span>
+          <span className="text-[10px] text-ink-400">{face} × {r.key.startsWith('leaf') ? p.leafDepth : p.frameDepth}</span>
+        </div>
+        <div className="flex items-center gap-1.5 mt-1 text-[11px] text-ink-300">
+          <span>Face</span>
+          <NumInput value={face} onCommit={(v) => setPath(['elements', r.key, 'face'], v)} disabled={locked}
+            className={`w-14 px-1 py-0.5 bg-surface-800 border border-surface-500 text-ink-50 rounded text-[11px] text-center ${locked ? 'opacity-50 cursor-not-allowed' : ''}`} />
+          <span className="font-mono">L = {r.base} −</span>
+          <NumInput value={dedV} onCommit={(v) => setPath(['lengths', r.lenKey], v)} disabled={locked}
+            className={`w-12 px-1 py-0.5 bg-surface-800 border border-surface-500 text-ink-50 rounded text-[11px] text-center ${locked ? 'opacity-50 cursor-not-allowed' : ''}`} />
+        </div>
+        {r.note && <div className="text-[10px] text-ink-500 mt-0.5">{r.note}</div>}
+      </div>
+    );
+  };
+
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-ink-50">Window Settings · Doors</h1>
+          <div className="text-xs text-ink-400">Door profile (schema {p.schema}) · single and french · feeds cut lists, drawings, BOM, hardware and weights · per-tenant</div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 text-xs text-ink-400">
+            Sample door:
+            <select value={sampleType} onChange={(e) => setSampleType(e.target.value)} className={selectCls + ' text-xs'}>
+              <option value="single-external">Single</option>
+              <option value="french">French</option>
+            </select>
+            <NumInput value={sampleW} onCommit={(v) => setSampleW(num(v, 1600))}
+              className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs text-center" />
+            ×
+            <NumInput value={sampleH} onCommit={(v) => setSampleH(num(v, 2100))}
+              className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs text-center" />
+            mm
+          </div>
+          <button
+            onClick={() => { if (window.confirm('Reset the door profile to defaults?')) resetDoor(); }}
+            className="px-3 py-1.5 text-xs rounded-lg border border-surface-500 text-ink-200 bg-surface-700 hover:bg-surface-600 transition-colors">
+            Reset doors to defaults
+          </button>
+        </div>
+      </div>
+
+      <div className="flex gap-5 items-start">
+        {/* ══ LEFT 2/3: settings ══ */}
+        <div className="w-2/3 min-w-0">
+
+          <div className={`card p-4 mb-4 ${depthLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-ink-200">Depths &amp; glazing</div>
+              <LockToggle locked={depthLock} onToggle={() => setDepthLock((x) => !x)} />
+            </div>
+            <fieldset disabled={depthLock} className={`flex flex-wrap gap-x-6 gap-y-2 items-end text-xs border-0 p-0 m-0 min-w-0 ${depthLock ? 'opacity-60' : ''}`}>
+              <PathField label="Frame depth (mm)" value={p.frameDepth} onCommit={(v) => setPath(['frameDepth'], v)} />
+              <PathField label="Leaf depth (mm)" value={p.leafDepth} onCommit={(v) => setPath(['leafDepth'], v)} />
+              <PathField label="Leaf depth, triple (mm)" value={p.leafDepthTriple} onCommit={(v) => setPath(['leafDepthTriple'], v)} />
+              <PathField label="Glass into rebate / side" value={g.glassInset} onCommit={(v) => setPath(['geometry', 'glassInset'], v)} />
+              <PathField label="French lip (each leaf)" value={p.frenchLip} onCommit={(v) => setPath(['frenchLip'], v)} hint="meeting stile laps the centre line" />
+              <div className="text-ink-300 pb-1.5 text-[11px]">
+                {leaf0 && glass0 ? (
+                  <>sample leaf <span className="text-accent-400 font-medium">{leaf0.w} × {leaf0.h}</span>
+                    <span className="text-ink-500"> · glass </span>
+                    <span className="text-accent-400 font-medium">{glass0.width} × {glass0.height}</span>
+                    {dr?.isFrench && <span className="text-ink-500"> · half {dr.half} + lip {dr.lip}</span>}</>
+                ) : 'n/a'}
+              </div>
+            </fieldset>
+          </div>
+
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm font-semibold text-ink-50">Frame</div>
+            <LockToggle locked={frameLock} onToggle={() => setFrameLock((x) => !x)} />
+          </div>
+          <div className={`grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-1.5 mb-2 ${frameLock ? '' : 'ring-1 ring-amber-500/40 rounded-lg p-1'}`}>
+            {DOOR_FRAME_ROWS.map((r) => <FaceCard key={r.key} r={r} locked={frameLock} />)}
+          </div>
+          <fieldset disabled={frameLock} className={`flex flex-wrap gap-x-5 gap-y-3 items-end text-xs border-0 p-0 m-0 mb-4 min-w-0 ${frameLock ? 'opacity-60' : ''}`}>
+            <PathField label="Inward cill, inside face" value={p.cillInward?.faceInternal} onCommit={(v) => setPath(['cillInward', 'faceInternal'], v)} hint="unrebated" />
+            <PathField label="Inward cill, outside face" value={p.cillInward?.faceExternal} onCommit={(v) => setPath(['cillInward', 'faceExternal'], v)} hint="fall" />
+            <PathField label="Coupling post" value={p.couplingPost?.width} onCommit={(v) => setPath(['couplingPost', 'width'], v)} hint="2 × jamb" />
+            <PathField label="Side panel members" value={p.sidePanel?.member} onCommit={(v) => setPath(['sidePanel', 'member'], v)} hint={`× ${p.sidePanel?.depth}`} />
+          </fieldset>
+
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm font-semibold text-ink-50">Leaf</div>
+            <LockToggle locked={leafLock} onToggle={() => setLeafLock((x) => !x)} />
+          </div>
+          <div className={`grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-1.5 mb-2 ${leafLock ? '' : 'ring-1 ring-amber-500/40 rounded-lg p-1'}`}>
+            {DOOR_LEAF_ROWS.map((r) => <FaceCard key={r.key} r={r} locked={leafLock} />)}
+          </div>
+          <fieldset disabled={leafLock} className={`flex flex-wrap gap-x-5 gap-y-3 items-end text-xs border-0 p-0 m-0 mb-4 min-w-0 ${leafLock ? 'opacity-60' : ''}`}>
+            <PathField label="Panel board" value={PN.boardThickness} onCommit={(v) => setPath(['panel', 'boardThickness'], v)} hint="Tricoya MDF" />
+            <PathField label="Panel boards" value={PN.boards} onCommit={(v) => setPath(['panel', 'boards'], v)} hint="pcs" />
+            <PathField label="Panel core" value={PN.coreThickness} onCommit={(v) => setPath(['panel', 'coreThickness'], v)} hint="MDF, to confirm" />
+            <PathField label="Panel density" value={PN.densityKgM3} onCommit={(v) => setPath(['panel', 'densityKgM3'], v)} hint="kg/m³, weight only" />
+          </fieldset>
+
+          <div className={`card p-4 mb-4 ${rulesLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-ink-200">Leaf size rules
+                <span className="text-ink-500 font-normal"> · the hint shows what each minus is built from</span>
+              </div>
+              <LockToggle locked={rulesLock} onToggle={() => setRulesLock((x) => !x)} />
+            </div>
+            <fieldset disabled={rulesLock} className={`grid grid-cols-2 gap-x-6 gap-y-3 text-xs border-0 p-0 m-0 min-w-0 ${rulesLock ? 'opacity-60' : ''}`}>
+              <RuleField label="Leaf W at jamb: −" value={d.leafAtJamb} onCommit={(v) => setPath(['deductions', 'leafAtJamb'], v)}
+                hint={`land ${g.land} + gap ${g.gap}`} hintVal={hJ} />
+              <RuleField label="Leaf H, timber cill: H −" value={d.leafFullHeight} onCommit={(v) => setPath(['deductions', 'leafFullHeight'], v)}
+                hint={`${g.land}+${g.gap} + ${g.gapCill}+${g.cillVisible}`} hintVal={hFull} sample={Hh - d.leafFullHeight} />
+              <RuleField label="Leaf H, no timber cill: H −" value={d.leafNoThreshold} onCommit={(v) => setPath(['deductions', 'leafNoThreshold'], v)}
+                hint={`${g.land}+${g.gap} + ${g.gapCill}`} hintVal={hNo} sample={Hh - d.leafNoThreshold} />
+              <RuleField label="Opening fan H: transom H − head −" value={d.fanAtHead} onCommit={(v) => setPath(['deductions', 'fanAtHead'], v)}
+                hint={`land ${g.land} + gap ${g.gap}`} hintVal={hJ} />
+              <RuleField label="Opening fan H: − rail" value={d.fanAtRail} onCommit={(v) => setPath(['deductions', 'fanAtRail'], v)}
+                hint={`land ${g.land} + gap ${g.gap}`} hintVal={hJ} />
+              <div className="text-[10px] text-ink-500">
+                Opening fanlight = a casement leaf (Casement settings: leaf faces, glass rule, hinges and locks), W = frame W − 2 × {d.leafAtJamb}. Fixed fanlight: glass in the frame.
+              </div>
+            </fieldset>
+          </div>
+
+          <div className={`card p-4 mb-4 ${advLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-ink-200">Advanced construction
+                <span className="text-ink-500 font-normal"> · lands &amp; fitting gaps</span>
+              </div>
+              <LockToggle locked={advLock} onToggle={() => setAdvLock((x) => !x)} />
+            </div>
+            <fieldset disabled={advLock} className={`flex flex-wrap gap-x-5 gap-y-3 items-end text-xs border-0 p-0 m-0 min-w-0 ${advLock ? 'opacity-60' : ''}`}>
+              {[
+                ['land', 'Frame land'], ['rebate', 'Rebate'], ['gap', 'Leaf gap'],
+                ['gapCill', 'Gap at cill'], ['cillVisible', 'Cill visible'], ['glazingRebate', 'Glazing rebate'],
+              ].map(([k, label]) => (
+                <div key={k}>
+                  <div className="text-ink-400 mb-1">{label}</div>
+                  <NumInput value={g[k]} onCommit={(v) => setPath(['geometry', k], v)} className={inputCls} />
+                </div>
+              ))}
+            </fieldset>
+          </div>
+
+          <div className={`card p-4 ${hwLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-ink-200">Hinges &amp; hardware
+                <span className="text-ink-500 font-normal"> · counts and the variants the buyer selects (Winkhaus, BJ Waller)</span>
+              </div>
+              <LockToggle locked={hwLock} onToggle={() => setHwLock((x) => !x)} />
+            </div>
+            <fieldset disabled={hwLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${hwLock ? 'opacity-60' : ''}`}>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Hinges per leaf</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <PathField label="Hinges" value={HG.perLeaf} onCommit={(v) => setPath(['hinges', 'perLeaf'], v)} hint="per leaf" />
+                <PathField label="Hinges, tall leaf" value={HG.perLeafTall} onCommit={(v) => setPath(['hinges', 'perLeafTall'], v)} />
+                <PathField label="Tall above" value={HG.tallAbove} onCommit={(v) => setPath(['hinges', 'tallAbove'], v)} hint="leaf H, mm" />
+                <PathField label="Top hinge" value={HG.fromTop} onCommit={(v) => setPath(['hinges', 'fromTop'], v)} hint="below leaf top" />
+                <PathField label="Middle hinge" value={HG.aboveCentre} onCommit={(v) => setPath(['hinges', 'aboveCentre'], v)} hint="above centre" />
+                <PathField label="Bottom hinge" value={HG.fromBottom} onCommit={(v) => setPath(['hinges', 'fromBottom'], v)} hint="above leaf bottom" />
+              </div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">ThunderBolt (single door kit)</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <PathField label="Door thickness" value={H.doorThickness} onCommit={(v) => setPath(['hardware', 'doorThickness'], v)} hint={`leaf ${p.leafDepth}`} />
+                <div>
+                  <div className="text-ink-400 mb-1">Backset</div>
+                  <select value={H.backset} onChange={(e) => setPath(['hardware', 'backset'], e.target.value)} className={selectCls}>
+                    {[45, 55].map((v) => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Faceplate</div>
+                  <select value={H.faceplate} onChange={(e) => setPath(['hardware', 'faceplate'], e.target.value)} className={selectCls}>
+                    {['radius', 'square'].map((v) => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Keeps</div>
+                  <select value={H.keeps} onChange={(e) => setPath(['hardware', 'keeps'], e.target.value)} className={selectCls}>
+                    {['full length', 'individual'].map((v) => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+                <PathField label="Handle height" value={H.handleHeight} onCommit={(v) => setPath(['hardware', 'handleHeight'], v)} hint="above floor, drawings" />
+              </div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">FGTE (double door kit, french with two handles)</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <div>
+                  <div className="text-ink-400 mb-1">Shootbolts</div>
+                  <select value={H.fgteShootbolts} onChange={(e) => setPath(['hardware', 'fgteShootbolts'], e.target.value)} className={selectCls}>
+                    <option value="slave">slave only</option>
+                    <option value="both">master and slave</option>
+                  </select>
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Slave backset</div>
+                  <select value={H.fgteSlaveBackset} onChange={(e) => setPath(['hardware', 'fgteSlaveBackset'], e.target.value)} className={selectCls}>
+                    {[35, 45].map((v) => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Lock centre line</div>
+                  <select value={H.fgteCentreLine} onChange={(e) => setPath(['hardware', 'fgteCentreLine'], e.target.value)} className={selectCls}>
+                    {[12, 22].map((v) => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Cill keep (timber cill)</div>
+                  <select value={H.cillKeep} onChange={(e) => setPath(['hardware', 'cillKeep'], e.target.value)} className={selectCls}>
+                    {['yes', 'no'].map((v) => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="text-[10px] text-ink-500">
+                Defaults to confirm with the supplier (BLOCKERS). Handing is printed per door: LH anti-clockwise closing, RH clockwise closing.
+              </div>
+            </fieldset>
+          </div>
+        </div>
+
+        {/* ══ RIGHT 1/3: live drawing ══ */}
+        <div className="w-1/3 min-w-0 shrink-0 sticky top-4">
+          {sample?.derived ? (
+            <>
+              <div className="text-sm font-semibold text-ink-50 mb-2">
+                Drawing <span className="text-ink-500 font-normal text-xs">· {W} × {Hh} · {sampleType === 'french' ? 'French' : 'Single'}</span>
+              </div>
+              <div className="card p-2"><DoorElevation2D windowSpec={sample.ws} derived={sample.derived} /></div>
+              <div className="text-[10px] text-ink-500 mt-2">
+                Live from the engine: every field on the left reshapes it.
+              </div>
+            </>
+          ) : (
+            <div className="card p-6 text-center text-xs text-ink-400">Sample drawing unavailable.</div>
           )}
         </div>
       </div>

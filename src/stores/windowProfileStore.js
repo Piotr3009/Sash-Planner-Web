@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { normalizeSashProfile, migrateCasementProfile, DEFAULT_SASH_PROFILE, DEFAULT_CASEMENT_PROFILE, setActiveWindowProfile, setActiveCasementProfile, casementGlassDeduction } from '../engine/profile.js';
+import { normalizeSashProfile, migrateCasementProfile, migrateDoorProfile, DEFAULT_SASH_PROFILE, DEFAULT_CASEMENT_PROFILE, DEFAULT_DOOR_PROFILE, setActiveWindowProfile, setActiveCasementProfile, setActiveDoorProfile, casementGlassDeduction } from '../engine/profile.js';
 import { loadWindowProfiles, saveWindowProfiles } from '../services/cloudSync.js';
 
 let cloudSaveTimer = null;
@@ -23,17 +23,26 @@ const syncGlassDeduction = (casement) => {
   return casement;
 };
 
+// Door profile keys the Window Settings Doors card may write (setDoorPath):
+// the first path segment must be one of these, and the last one must already
+// exist in the profile, so a typo can never grow it. String-valued leaves are
+// the hardware variant names; every other leaf is a finite number.
+const DOOR_PATH_ROOTS = ['frameDepth', 'leafDepth', 'leafDepthTriple', 'frenchLip', 'elements', 'geometry', 'deductions', 'cillInward', 'sidePanel', 'couplingPost', 'panel', 'hinges', 'hardware', 'lengths'];
+const DOOR_STRING_LEAVES = ['faceplate', 'keeps', 'fgteShootbolts', 'cillKeep'];
+
 /**
- * Workshop window-construction profile (Window Settings page).
- * Currently sash only; casement/fix/doors will get their own keys later.
+ * Workshop window-construction profile (Window Settings page): sash, casement
+ * and doors (08.10.2026), saved and loaded together as windowProfiles.
  * Every mutation pushes the fresh profile into the engine via
- * setActiveWindowProfile so calculations pick it up immediately.
+ * setActiveWindowProfile / setActiveCasementProfile / setActiveDoorProfile so
+ * calculations pick it up immediately.
  */
 export const useWindowProfileStore = create(
   persist(
     (set, get) => ({
       sash: clone(DEFAULT_SASH_PROFILE),
       casement: clone(DEFAULT_CASEMENT_PROFILE),
+      door: clone(DEFAULT_DOOR_PROFILE),
 
       setVariantField: (variantKey, field, value) => {
         set((s) => {
@@ -216,6 +225,34 @@ export const useWindowProfileStore = create(
         get()._sync();
       },
 
+      // ── Doors (08.10.2026): one generic setter for the Doors card. `path` =
+      // ['elements', 'leafStile', 'face'] or ['frenchLip']; roots whitelisted
+      // (DOOR_PATH_ROOTS), the key must already exist, numbers must be finite.
+      setDoorPath: (path, value) => {
+        if (!Array.isArray(path) || !path.length || !DOOR_PATH_ROOTS.includes(path[0])) return;
+        const leaf = path[path.length - 1];
+        const isString = path[0] === 'hardware' && DOOR_STRING_LEAVES.includes(leaf);
+        const v = isString ? String(value ?? '') : Number(value);
+        if (!isString && (value === '' || value == null || !Number.isFinite(v))) return;
+        set((s) => {
+          const door = clone(s.door);
+          let node = door;
+          for (let i = 0; i < path.length - 1; i++) {
+            if (node[path[i]] == null || typeof node[path[i]] !== 'object') return {};
+            node = node[path[i]];
+          }
+          if (!(leaf in node)) return {};
+          node[leaf] = v;
+          return { door };
+        });
+        get()._sync();
+      },
+
+      resetDoorToDefaults: () => {
+        set({ door: clone(DEFAULT_DOOR_PROFILE) });
+        get()._sync();
+      },
+
       resetToDefaults: () => {
         set({ sash: clone(DEFAULT_SASH_PROFILE), casement: clone(DEFAULT_CASEMENT_PROFILE) });
         get()._sync();
@@ -224,23 +261,27 @@ export const useWindowProfileStore = create(
       _sync: () => {
         setActiveWindowProfile(get().sash);
         setActiveCasementProfile(get().casement);
-        scheduleCloudSave({ sash: get().sash, casement: get().casement });
+        setActiveDoorProfile(get().door);
+        scheduleCloudSave({ sash: get().sash, casement: get().casement, door: get().door });
       },
 
       // Pull tenant profiles from Supabase (called once after rehydrate)
       loadFromCloud: async () => {
         try {
           const cloud = await loadWindowProfiles();
-          if (cloud?.sash || cloud?.casement) {
+          if (cloud?.sash || cloud?.casement || cloud?.door) {
             const migratedCas = cloud.casement
               ? (migrateCasementProfile(cloud.casement) || clone(DEFAULT_CASEMENT_PROFILE))
               : null;
+            const migratedDoor = cloud.door ? migrateDoorProfile(cloud.door) : null;
             set({
               ...(cloud.sash ? { sash: normalizeSashProfile(cloud.sash) } : {}),
               ...(migratedCas ? { casement: migratedCas } : {}),
+              ...(migratedDoor ? { door: migratedDoor } : {}),
             });
             setActiveWindowProfile(get().sash);
             setActiveCasementProfile(get().casement);
+            setActiveDoorProfile(get().door);
           }
         } catch (err) {
           console.error('windowProfile loadFromCloud', err);
@@ -259,6 +300,13 @@ export const useWindowProfileStore = create(
           const m = migrateCasementProfile(state.casement) || clone(DEFAULT_CASEMENT_PROFILE);
           setActiveCasementProfile(m);
           setTimeout(() => useWindowProfileStore.setState({ casement: m }), 0);
+        }
+        // Doors (08.10.2026): a stored copy below schema 2 is migrated key by
+        // key, in the store as well as in the engine (the Doors card reads it).
+        if (state?.door) {
+          const d = migrateDoorProfile(state.door);
+          setActiveDoorProfile(d);
+          setTimeout(() => useWindowProfileStore.setState({ door: d }), 0);
         }
         // Tenant profile from Supabase wins over the local cache
         setTimeout(() => useWindowProfileStore.getState().loadFromCloud(), 0);
