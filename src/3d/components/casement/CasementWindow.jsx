@@ -29,7 +29,7 @@ import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import { Text, Line } from '@react-three/drei';
 import CasementFrame, { resolveFrameDims, FRAME_FACE, EXT_FACE, FRAME_DEPTH, EXT_DEPTH, INT_DEPTH, REBATE_STEP, MULLION_W, BOTTOM_FACE, BOTTOM_EXT_OUTER, BOTTOM_INNER_FACE, GASKET_T, mm } from './CasementFrame';
-import CasementPanel, { SASH_RAIL } from './CasementPanel';
+import CasementPanel, { SASH_RAIL, SASH_BOTTOM_RAIL } from './CasementPanel';
 import {
   casementLayoutDef,
   resolveCasementLayout,
@@ -116,10 +116,14 @@ export default function CasementWindow({
   // under a fan shows the lines that cross its glass (a sliver lower than 1/3
   // of a pane drops the bar). Fans keep their own count. Same rule as the
   // engine sheets (casementBarGrid.js); here on the 3D glass rects, y up.
+  // The glass of a leaf runs from the bottom rail (SASH_BOTTOM_RAIL, 67) to the
+  // top rail (SASH_RAIL, 64), so its centre sits 1.5 above the leaf centre p.y
+  // (Piotr 07.10.2026); the plan is in mm from that glass centre.
   const hBarPlan = useMemo(() => {
     const lights = (layoutDef.panels || []).map((p) => {
-      const glassH = (p.h + REBATE_STEP * 2 - leafGap * 2) - SASH_RAIL * 2;
-      const lo = p.y - glassH / 2, hi = p.y + glassH / 2;
+      const leafH = p.h + REBATE_STEP * 2 - leafGap * 2;
+      const glassH = leafH - SASH_RAIL - SASH_BOTTOM_RAIL;
+      const lo = p.y - leafH / 2 + SASH_BOTTOM_RAIL, hi = p.y + leafH / 2 - SASH_RAIL;
       const n = p._role === 'fan' ? fanHBars : p._role === 'fan2' ? fan2HBars : hBars;
       const lines = [];
       for (let i = 1; i <= (n || 0); i++) lines.push(lo + (glassH / (n + 1)) * i);
@@ -176,6 +180,7 @@ export default function CasementWindow({
             vBars={p._role === 'fan' ? fanVBars : p._role === 'fan2' ? fan2VBars : vBars}
             ironmongery={ironmongery}
             position={[mm(p.x), mm(p.y) + openingCenterY, leafZ]}
+            bottomRail={SASH_BOTTOM_RAIL}
           />
         );
       })}

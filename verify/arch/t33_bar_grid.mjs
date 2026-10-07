@@ -187,9 +187,12 @@ section('3 — every consumer prints the engine numbers');
   // 3D plan: the same rule on the 3D glass rects (equal split reference, y up)
   const innerW = 2100 - 2 * 68, innerH = 1400 - 136;
   const def = M.layouts.resolveCasementLayout({ code: '131', innerW, innerH, height: 1400, fanlightRatio: 0.3, fan2Ratio: 0.3, middleSectionMm: 800, geo: { frameFace: 68, bottomFace: 68, mullionW: 68 } });
+  // the 3D leaf (p.h + 2 x rebate 21 - 2 x gap 4) has a 64 top rail and a 67 bottom rail (07.10.2026), so its
+  // glass is leaf H - 131 and sits 1.5 above the leaf centre (CasementWindow hBarPlan; t40 renders it)
   const lights = def.panels.map((p) => {
-    const glassH = (p.h + 21 * 2 - 4 * 2) - 64 * 2;
-    const lo = p.y - glassH / 2, hi = p.y + glassH / 2;
+    const leafH = p.h + 21 * 2 - 4 * 2;
+    const glassH = leafH - 64 - 67;
+    const lo = p.y - leafH / 2 + 67, hi = p.y + leafH / 2 - 64;
     const n = p._role === 'fan' ? 0 : 3;
     return { role: p._role, lo, hi, lines: Array.from({ length: n }, (_, i) => lo + (glassH / (n + 1)) * (i + 1)) };
   });

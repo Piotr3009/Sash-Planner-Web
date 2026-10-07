@@ -94,8 +94,10 @@ export function contourAt(base, delta, tx) {
 
 /**
  * Everything the 3D needs, in mm around the window centre (y up).
- * dims: { frameFace, extFace, bottomFace, bottomInner, leafGap, leafFace, gasketW, innerMargin }
+ * dims: { frameFace, extFace, bottomFace, bottomInner, leafGap, leafFace, leafBottomFace, gasketW, innerMargin }
  *   — the 3D constants (CasementFrame / CasementPanel), never literals here;
+ *   leafFace = the leaf ring (top rail and stiles), leafBottomFace = the leaf's
+ *   bottom rail (absent = leafFace; ArchedCasementWindow passes 67, 07.10.2026);
  *   innerMargin = the deepest inset drawn inside the leaf daylight (bead + spacer).
  */
 export function archedCasementGeometry({
@@ -104,10 +106,11 @@ export function archedCasementGeometry({
 }) {
   const W = Number(width);
   const D = dims;
+  const leafBottomFace = D.leafBottomFace ?? D.leafFace;
   const { shape, rise, profile } = resolveArchProps({ archShape, width: W, archRise, archProfile });
   // PSW forces the frame to at least rise + 50; the leaf below the springing
   // (cill side + gap + leaf face + bead) needs more than that to exist at all
-  const minStraight = Math.max(MIN_STRAIGHT_3D, D.bottomInner + D.leafGap + D.leafFace + (D.innerMargin || 0));
+  const minStraight = Math.max(MIN_STRAIGHT_3D, D.bottomInner + D.leafGap + leafBottomFace + (D.innerMargin || 0));
   const effectiveH = Math.max(Number(height), rise + minStraight);
   const start = effectiveH - rise;
   const H = effectiveH;
@@ -133,7 +136,7 @@ export function archedCasementGeometry({
   const leafBottom = -H / 2 + D.bottomInner + D.leafGap;                  // 3D y of the leaf bottom
   const leafOuterArcs = offsetArcs(base, leafOuterOff);
   const leafInnerArcs = offsetArcs(base, leafInnerOff);
-  const leafInnerBase = { arcs: leafInnerArcs, yBottom: leafBottom + D.leafFace - springY };
+  const leafInnerBase = { arcs: leafInnerArcs, yBottom: leafBottom + leafBottomFace - springY };
   const leafOuter = contourUnder(leafOuterArcs, leafBottom - springY, tx);
   const leafInner = contourUnder(leafInnerArcs, leafInnerBase.yBottom, tx);
   const leafW = W - 2 * leafOuterOff;
@@ -141,7 +144,7 @@ export function archedCasementGeometry({
 
   // Glass outline + bars in the engine's glass frame (origin = glass bottom-left, y up)
   const xg = W / 2 - leafInnerOff;
-  const glassBottom = leafBottom + D.leafFace;                            // 3D y
+  const glassBottom = leafBottom + leafBottomFace;                        // 3D y (the bottom rail's glazing edge, as leafInnerBase)
   const outline = buildGlassOutline(leafInnerArcs, xg, springY - glassBottom);
   const allowed = patternsForShape(shape);
   const pattern = allowed.includes(barPattern) ? barPattern : 'none';
