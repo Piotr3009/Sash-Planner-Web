@@ -25,6 +25,12 @@
  * ref - 2 + (67 - 64) = ref + 1 (the top rail gives 3, the bottom rail nothing). The migration
  * expectations follow the leaf schema: the stored deduction is re-derived from the migrated face.
  *
+ * 08.10.2026 (doors to production, door schema 2: leaf 57, land 47, leafAtJamb 51, leafFullHeight 98): the
+ * door is derived the same way, with the live code on a door profile PINNED at the reference tree's door
+ * construction (leaf 61, land 43, rebate 25, leafAtJamb 47, leafFullHeight 94; stored as schema 2 so the
+ * migration keeps it): "door units = ref - 2" still proves the glass -1 mm per side and nothing else. The
+ * door on the default profile is t41's subject (798 x 2002 leaf, 633 x 1751 glass).
+ *
  * Run: node verify/parity/t34_glass_minus1.mjs [git-ref]   (default 12670b6)
  */
 import { execFileSync } from 'node:child_process';
@@ -54,6 +60,12 @@ for (const k of ['leafStile', 'leafTop', 'leafBottom']) P67.elements[k].face = 6
 P67.deductions.glass = 111;
 const withLeaf67 = (fn) => { LIVE.profile.setActiveCasementProfile(P67); try { return fn(); } finally { LIVE.profile.setActiveCasementProfile(null); } };
 const LEAF67 = new Set(['casement', 'fixed']);
+// the live door profile with the reference tree's door construction (schema-1 numbers, glassInset 11.5 live)
+const DOOR1 = JSON.parse(JSON.stringify(LIVE.profile.DEFAULT_DOOR_PROFILE));
+Object.assign(DOOR1, { leafDepth: 61 });
+Object.assign(DOOR1.geometry, { land: 43, rebate: 25 });
+Object.assign(DOOR1.deductions, { leafAtJamb: 47, leafFullHeight: 94, leafNoThreshold: 53 });
+const withDoor1 = (fn) => LIVE.profile.withProfiles(null, null, DOOR1, fn);
 const near = (a, b, tol = 0.051) => Math.abs(a - b) <= tol;
 
 const WINDOWS = {
@@ -73,7 +85,8 @@ function units(M, spec, derived) {
 }
 
 for (const [name, W] of Object.entries(WINDOWS)) {
-  const L = LEAF67.has(name) ? withLeaf67(() => deriveItem(LIVE, W.item, W.fc)) : deriveItem(LIVE, W.item, W.fc);
+  const L = LEAF67.has(name) ? withLeaf67(() => deriveItem(LIVE, W.item, W.fc))
+    : name === 'door' ? withDoor1(() => deriveItem(LIVE, W.item, W.fc)) : deriveItem(LIVE, W.item, W.fc);
   const R = deriveItem(REF, W.item, W.fc);
   const uL = units(LIVE, L.spec, L.derived);
   const uR = units(REF, R.spec, R.derived);

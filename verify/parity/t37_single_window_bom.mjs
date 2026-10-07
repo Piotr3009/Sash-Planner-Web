@@ -129,7 +129,10 @@ const byKey = (rows) => Object.fromEntries(rows.map((r) => [r.key, r]));
 
 // Engine-picked casement hardware, by NAME (typed here — not the flag the
 // engine sets on its own lines): the rows of Assign Materials › Ironmongery.
-const isEngineItem = (item) => /^(Side Hinges|Top Hung Hinges|Espag Lock Kit|Lock — sash)/.test(item) || item === 'Child restrictor' || item === 'Wedge packers';
+// 08.10.2026 (doors to production): the door hardware lines are engine picks too — every count is a
+// door Assign Materials row (d_hinges, d_lock_*_kit, d_cylinder, d_handle_set, d_bolts, d_threshold_*).
+const isEngineItem = (item) => /^(Side Hinges|Top Hung Hinges|Espag Lock Kit|Lock — sash)/.test(item) || item === 'Child restrictor' || item === 'Wedge packers'
+  || /^(Door hinges|Multipoint lock, (single|double) door kit|Door cylinder|Door handle set|Door bolts|Door threshold)$/.test(item);
 // …and everything else a casement window may list: the products the client chooses.
 const CLIENT_CASEMENT_ITEMS = ['Casement handle', 'Trickle vents'];
 
@@ -165,7 +168,7 @@ const referenceList = (windows, ctx) => {
     }
     const slots = { ...(batch?.defaults?.ironmongerySlots || {}), ...(windowSpec.hardware?.slots || {}) };
     const slotOf = { 'Sash lock': 'locks', 'Finger lift': 'fingerLifts', 'Sash pull handle': 'pullHandles', 'Pulley wheels': 'pulleys', 'Window stopper': 'stoppers', 'Trickle vent': 'trickleVents', 'Casement handle': 'casementHandles', 'Trickle vents': 'trickleVents' };
-    if (windowSpec.category === 'door') continue;
+    // 08.10.2026: doors are walked like every window (until then: `if door continue`, no door hardware)
     for (const h of lists.buildHardwareList(windowSpec, derived)) {
       if (isEngineItem(h.item)) continue;
       const product = IRN.find((m) => m.id === slots[slotOf[h.item]]) || null;
@@ -344,7 +347,17 @@ section('4 — hardware: no card for an engine-picked line');
   const badSash = SASHES.filter((w) => JSON.stringify(card(w).map((g) => [g.line.item, g.line.quantity])) !== JSON.stringify(lists.buildHardwareList(w.windowSpec, w.derived).map((h) => [h.item, h.quantity])));
   ok(badSash.length === 0 && card(SASHES[0]).length >= 5, `sash windows: one card per hardware line, as before (${card(SASHES[0]).length} on a standard sash)`, badSash.map((w) => w.id).join(','));
   ok(card(SASHES[0]).find((g) => g.line.item === 'Sash lock')?.product?.id === 'irn-sashlock', 'sash: the lock card carries the batch default product');
-  ok(WINS.filter((w) => w.derived.category === 'door').every((w) => card(w).length === 0), 'doors: no hardware cards (door ironmongery is not counted yet — unchanged)');
+  // 08.10.2026 (doors to production): door ironmongery IS counted now, on the door Assign Materials rows,
+  // so a door shows no hardware CARD (every door line is an engine pick, as casement hinges and locks are)
+  // and its rows carry the counts of the owner box (3.5). Until 07.10.2026 the pin was "no hardware at all".
+  ok(WINS.filter((w) => w.derived.category === 'door').every((w) => card(w).length === 0), 'doors: no hardware cards (every door hardware line is an engine pick on a d_* row)');
+  const doorRows = (id) => bom.buildWindowPartQtys(WINS.find((w) => w.id === id).derived, WINS.find((w) => w.id === id).windowSpec, {});
+  const ds = doorRows('D-single'), df = doorRows('D-french');
+  ok(ds.d_hinges?.qty === 3 && ds.d_lock_single_kit?.qty === 1 && ds.d_cylinder?.qty === 1 && ds.d_handle_set?.qty === 1
+    && df.d_hinges?.qty === 6 && df.d_lock_single_kit?.qty === 1 && df.d_bolts?.qty === 2 && df.d_cylinder?.qty === 1 && df.d_handle_set?.qty === 1,
+    'doors: the hardware counts sit on the door rows (single 3 hinges + kit + cylinder + handle; french one handle 6 + kit + 2 bolts + cylinder + handle)');
+  ok(WINS.filter((w) => w.derived.category === 'door').every((w) => lists.buildHardwareList(w.windowSpec, w.derived).every((h) => isEngineItem(h.item) && h.enginePart === true)),
+    'doors: every door hardware line is an engine pick (typed here and flagged by the engine)');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

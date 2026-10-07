@@ -177,7 +177,13 @@ section('0 - profile numbers');
   ok(same(stripRef(P), stripRef(Q)), 'against REF every other key of the casement profile is unchanged (frame 68 x 93, leaf depth 57, deductions.leaf*, every other length)');
   const stripStart = (p) => { const c = clone(p); delete c.leafSchema; delete c.elements.leafBottom; return c; };
   ok(same(stripStart(P), stripStart(T)), 'against START only leafBottom.face and leafSchema moved (stiles, top rail, glass 105, seat 8.5, frame, every deduction and length equal)');
-  ok([REF, START].every((M) => same(LIVE.profile.DEFAULT_DOOR_PROFILE, M.profile.DEFAULT_DOOR_PROFILE) && same(LIVE.profile.DEFAULT_SASH_PROFILE, M.profile.DEFAULT_SASH_PROFILE)), 'door and sash default profiles unchanged against both trees');
+  ok([REF, START].every((M) => same(LIVE.profile.DEFAULT_SASH_PROFILE, M.profile.DEFAULT_SASH_PROFILE)), 'sash default profile unchanged against both trees');
+  // 08.10.2026: the doors tura moved the door profile to schema 2 (owner box; t41). Both trees carry
+  // door schema 1; the casement change of THIS harness never touched it: migrated, each tree's door
+  // profile equals the live default on every number the engine reads.
+  const DKEYS = ['frameDepth', 'leafDepth', 'geometry', 'deductions', 'elements', 'frenchLip', 'cillInward', 'sidePanel', 'couplingPost', 'lengths'];
+  ok([REF, START].every((M) => { const m = LIVE.profile.migrateDoorProfile(clone(M.profile.DEFAULT_DOOR_PROFILE)); return M.profile.DEFAULT_DOOR_PROFILE.schema === 1 && DKEYS.every((k) => same(m[k], LIVE.profile.DEFAULT_DOOR_PROFILE[k])); }),
+    'door default profile: schema 1 in both trees; migrated (doors tura, schema 2) it equals the live default on every key the engine reads');
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -351,7 +357,7 @@ for (const id of ['arched-V1', 'circle-800']) {
 
 // ═════════════════════════════════════════════════════════════════════════════
 section('8 - sash and door: nothing moves');
-for (const id of ['sash', 'door']) {
+for (const id of ['sash']) {
   for (const [M, X, name] of [[REF, F, 'REF'], [START, S, 'START']]) {
     ok(JSON.stringify(L[id].derived) === JSON.stringify(X[id].derived), `${id}: derived deep-equal to ${name}`);
     const ca = LIVE.lists.buildCutListForWindow(L[id].derived, L[id].spec), cb = M.lists.buildCutListForWindow(X[id].derived, X[id].spec);
@@ -359,6 +365,22 @@ for (const id of ['sash', 'door']) {
     ok(JSON.stringify(ca) === JSON.stringify(cb) && JSON.stringify(ga) === JSON.stringify(gb), `${id}: cut list and glass schedule equal to ${name} (${ga.map((r) => `${r.width} x ${r.height}`).join(', ')})`);
   }
 }
+
+// 08.10.2026: the door itself moved in the doors tura (door schema 2, t41), so it no longer equals
+// either tree. What this harness pins for the door is that the casement leaf faces never reach it:
+// with the casement leaf pinned at 67 all round, or at 70 all round (leaf schema 3, so the migration
+// keeps them), the door derives, lists and schedules byte for byte as on the default profile.
+for (const f of [67, 70]) {
+  const P = clone(LIVE.profile.DEFAULT_CASEMENT_PROFILE);
+  for (const k of ['leafStile', 'leafTop', 'leafBottom']) P.elements[k].face = f;
+  P.deductions.glass = LIVE.profile.casementGlassDeduction(P);
+  const x = LIVE.profile.withProfiles(null, P, () => derive(LIVE, DOOR));
+  ok(JSON.stringify(x.derived) === JSON.stringify(L.door.derived), `door: derived with the casement leaf pinned at ${f} all round deep-equal to the default (the casement leaf never reaches a door)`);
+  const ca = LIVE.lists.buildCutListForWindow(L.door.derived, L.door.spec), cb = LIVE.lists.buildCutListForWindow(x.derived, x.spec);
+  const ga = LIVE.lists.buildGlassListForWindow(L.door.derived, L.door.spec), gb = LIVE.lists.buildGlassListForWindow(x.derived, x.spec);
+  ok(JSON.stringify(ca) === JSON.stringify(cb) && JSON.stringify(ga) === JSON.stringify(gb), `door: cut list and glass schedule equal with the casement leaf at ${f} (${ga.map((r) => `${r.width} x ${r.height}`).join(', ')})`);
+}
+ok(recs(L.door.derived, /^D-(STILE|TOP RAIL|BOTTOM RAIL)/).every((r) => /^(94|180)x57$/.test(r.section)), 'door leaf members carry the door faces 94 / 180 (never the casement 64 / 67)');
 
 // ═════════════════════════════════════════════════════════════════════════════
 section('9 - migration of stored profiles');
@@ -663,10 +685,20 @@ section('11 - raw stock, Pre-Cut groups, hinge picks');
   const sl = slots(LIVE), sst = slots(START), sr = slots(REF);
   ok(sl.c_sash_stile === '64×57' && sl.c_sash_top_rail === '64×57' && sl.c_sash_bottom_rail === '67×57' && sst.c_sash_bottom_rail === '64×57' && sr.c_sash_bottom_rail === '67×57',
     `Assign Materials: Leaf Stiles ${sl.c_sash_stile}, Top Rail ${sl.c_sash_top_rail}, Bottom Rail ${sl.c_sash_bottom_rail} (START 64×57, REF 67×57), same ids`, JSON.stringify(sl));
-  const strip = (arr) => JSON.stringify((arr || []).map((p) => (p.id === 'c_sash_bottom_rail' ? { ...p, section: '' } : p)));
-  ok(strip(LIVE.materials.ALL_PARTS) === strip(START.materials.ALL_PARTS), 'Assign Materials: every other part and field unchanged against START');
-  const stripAll = (arr) => JSON.stringify((arr || []).map((p) => (/^c_sash_(stile|top_rail|bottom_rail)$/.test(p.id) ? { ...p, section: '' } : p)));
-  ok(stripAll(LIVE.materials.ALL_PARTS) === stripAll(REF.materials.ALL_PARTS), 'Assign Materials: every other part and field unchanged against REF');
+  // 08.10.2026, doors tura: the door rows (d_*) are appended after every existing row, and the hints of the
+  // casement rows that now carry doors say "also doors" (plus the acoustic glass and sash preserver hints,
+  // whose door sentence changed). Those hints are set aside by name, each checked to mention doors; every
+  // other part and field is compared as before.
+  const DOOR_HINTS = new Set(['glass_acoustic', 'paint_preserver', 'c_silicone', 'c_bead_tape_1mm', 'c_bead_tape_2mm', 'c_seal_frame_black', 'c_seal_frame_white', 'c_seal_hj_black', 'c_seal_hj_white',
+    'c_paint_primer', 'c_paint_preserver', 'c_paint_white_9016', 'c_paint_bespoke', 'c_triangle_beading_ext', 'c_georgian_middle_beading', 'c_glass_clips_double', 'c_glass_clips_triple', 'c_glass_clips_laminated', 'c_glazing_packer']);
+  const windowRows = (M) => (M.materials.ALL_PARTS || []).filter((p) => !/^d_/.test(p.id));
+  const noDoorHint = (p) => (DOOR_HINTS.has(p.id) ? { ...p, hint: '' } : p);
+  ok(windowRows(LIVE).filter((p) => DOOR_HINTS.has(p.id)).every((p) => /door/i.test(p.hint)) && (LIVE.materials.ALL_PARTS || []).findIndex((p) => /^d_/.test(p.id)) === windowRows(LIVE).length,
+    'Assign Materials (doors tura): the door rows come after every window row; the set-aside hints all mention doors');
+  const strip = (arr) => JSON.stringify((arr || []).map(noDoorHint).map((p) => (p.id === 'c_sash_bottom_rail' ? { ...p, section: '' } : p)));
+  ok(strip(windowRows(LIVE)) === strip(windowRows(START)), 'Assign Materials: every other part and field unchanged against START');
+  const stripAll = (arr) => JSON.stringify((arr || []).map(noDoorHint).map((p) => (/^c_sash_(stile|top_rail|bottom_rail)$/.test(p.id) ? { ...p, section: '' } : p)));
+  ok(stripAll(windowRows(LIVE)) === stripAll(windowRows(REF)), 'Assign Materials: every other part and field unchanged against REF');
   // hinges: the leaf weight moves (bottom rail + 0.104 kg/m, glass - 3 mm), no window of the set changes slot
   for (const w of SET) {
     const a = L[w.id].derived.casement.hardware.hingePicks, c = S[w.id].derived.casement.hardware.hingePicks;
