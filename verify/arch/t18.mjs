@@ -76,13 +76,13 @@ function probe(path) {
 // profile numbers the vectors assume (v4 Block F, frame schema 2) — the ONE literal check below; everything downstream is a formula of these
 const tF = P.elements.frameHead.face, oL = P.deductions.leafAtJamb, tL = P.elements.leafTop.face, gI = P.geometry.glassInset;
 const cillSide = P.deductions.leafFullHeight - P.deductions.leafAtJamb;          // 98 − 51 = 47 (unchanged)
-const glassBottom = cillSide + (P.elements.leafBottom.face - gI);                // 47 + 64 - 11.5 = 99.5 (leaf 64, 06.10.2026; 102.5 with 67, 101.5 with 67 and 12.5)
+const glassBottom = cillSide + (P.elements.leafBottom.face - gI);                // 47 + 67 - 11.5 = 102.5 (bottom rail 67, 07.10.2026; 99.5 with the 64 rail of 06.10.2026, 101.5 with 67 and 12.5)
 const glassOff = oL + tL - gI;                                                   // 51 + 64 - 11.5 = 103.5 (106.5 with 67, 105.5 with 67 and 12.5)
 const r05 = (v) => Math.round(v * 2) / 2;                                        // the engine's bar-length rounding (0.5 mm)
 const fmt1 = (v) => { const r = Math.round(v * 10) / 10; return Number.isInteger(r) ? String(r) : r.toFixed(1); };   // PDF / bar-row number format (1 dp, integers bare)
 check('profile numbers behind the §3 vectors (v4 Block F): faces 68 / 68 / 64 (leaf 64 since 06.10.2026, was 67), land 47, leafAtJamb 51, leafFullHeight 98, fanFromAxis 65, glassInset 11.5, minHaunchRadius 150, frameSchema 2, glassSchema 2',
   tF === 68 && P.elements.frameJamb.face === 68 && tL === 64 && P.geometry.land === 47 && oL === 51 && P.deductions.leafFullHeight === 98 && P.deductions.fanFromAxis === 65 && gI === 11.5 && P.arch.minHaunchRadius === 150 && P.frameSchema === 2 && P.glassSchema === 2);
-check('derived constants: glass bottom edge 99.5 = (98 - 51) + (64 - 11.5) from the frame bottom (102.5 with the 67 leaf, 101.5 before 02.10), glass offset 103.5 = 51 + 64 - 11.5 from the frame outer (106.5 with 67, 105.5 before 02.10)', glassBottom === 99.5 && glassOff === 103.5);
+check('derived constants: glass bottom edge 102.5 = (98 - 51) + (67 - 11.5) from the frame bottom (the bottom rail 67 since 07.10.2026; 99.5 with the 64 rail of 06.10.2026, 101.5 before 02.10), glass offset 103.5 = 51 + 64 - 11.5 from the frame outer (stiles and top rail 64; 106.5 with 67, 105.5 before 02.10)', glassBottom === 102.5 && glassOff === 103.5);
 
 // PC item → windowSpec → derived, the way the app does it (window saved by the configurator)
 const pcItem = (id, width, height, fields) => specification.normaliseToWindowSpec(
@@ -413,10 +413,11 @@ section('4 — glazier DXF: ezdxf round-trip, samples docs/handover/samples/samp
   // (1293 / 1293 / 1574.18; were 1304 / 1304 / 1587.41 at the 57 face) — stacked 300 apart from y = 0 downwards
   const hts = [(1300 - glassBottom) + (200 - glassOff), (1000 - glassBottom) + (1000 - 2 * glassOff) / 2, (1800 - 1000 * Math.sqrt(3) / 2 - glassBottom) + Math.sqrt((1000 - glassOff) ** 2 - 500 ** 2)];
   const bottoms = [-hts[0], -hts[0] - 300 - hts[1], -hts[0] - 300 - hts[1] - 300 - hts[2]];
-  // night 7 stage 1: the rectangular window R (leaf glass 789 x 1293) is the 4th
+  // night 7 stage 1: the rectangular window R (leaf glass 793 x 1294 since 07.10.2026) is the 4th
   // block, stacked under GO1 by the same 300 gap — the three arched bottoms are
   // UNCHANGED, which is the regression that matters here
-  const rectH = 1500 - P.deductions.leafFullHeight - P.deductions.glass;
+  // the unit height takes the HEIGHT deduction (top rail + bottom rail, 07.10.2026): 1402 - (52.5 + 55.5) = 1294
+  const rectH = 1500 - P.deductions.leafFullHeight - ((tL - gI) + (P.elements.leafBottom.face - gI));
   const bottoms4 = [...bottoms, bottoms[2] - 300 - rectH];
   check(`merged: 4 contours stacked top-down exactly 300 mm apart on their TRUE extents (arc apex, not the springing vertices) — bottoms at ${bottoms4.map((b) => b.toFixed(1)).join(' / ')}`,
     mc.length === 4 && mc.every((c, i) => near(c.bbox[1], bottoms4[i], 0.01)), mc.map((c) => c.bbox.map((v) => v.toFixed(1)).join(',')).join(' | '));
