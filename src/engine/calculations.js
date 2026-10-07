@@ -1644,12 +1644,30 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight, settings = {}) {
                 leftPanel: leftW ? { x: 0, w: leftW } : null,
                 rightPanel: rightW ? { x: R(doorX + frameWidth), w: rightW } : null,
                 midRailAxis: axis,
+                // French meeting: the ACTIVE leaf laps the passive one on the face it
+                // opens to (exterior outward, interior inward), so the passive leaf
+                // (bolted) closes first and the active leaf swings free.
+                meetingLap: isFrench ? { leaf: 'active', face: inward ? 'interior' : 'exterior' } : null,
                 transom: transomH ? {
                     h: transomH, railH: railFace,
                     cavity: R(transomH - railFace),
                     type: transomType,
                     bars: tr.bars || 'none',
                     fanPanes, fanLeaves,
+                    // The visible frame band between the fanlight and the door leaf top,
+                    // as the profile numbers place them: from the fan daylight bottom
+                    // (fixed pane: glass bottom less the inset; opening leaf: leaf bottom
+                    // + gap) to the door leaf top less the gap. With the owner's fan rule
+                    // (51 at the rail) and the door top (51 below the zone top) it is
+                    // wider than the one 68 rail of the cut list: the rail lap is the
+                    // owner's drawing check (BLOCKERS 5.4); sheets and 3D draw this band.
+                    band: (() => {
+                        const top = transomType === 'opening'
+                            ? R(transomH - ded.fanAtRail + geo.gap)
+                            : R(transomH - (railFace - inset) - inset);
+                        const bottom = R(leafY - geo.gap);
+                        return { y: top, h: R(bottom - top) };
+                    })(),
                 } : null,
             },
         },
