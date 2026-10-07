@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useProjectStore } from '../../stores/projectStore.js';
-import { getCasementProfile, casementGlassDeduction } from '../../engine/profile.js';
+import { getCasementProfile, casementGlassDeductions } from '../../engine/profile.js';
 import {
   CAD, CAD_SIZES, CAD_STROKES, CAD_DIMS, FONT_FAMILY, VIEWBOX_REF,
 } from './drawingTheme.js';
@@ -198,7 +198,11 @@ export default function CasementDrawing2D({ windowSpec, derived, batch }) {
     if (!ws || !dv || !cas || !cas.leafRects) return null;
     const p = getCasementProfile();
     const g = p.geometry;
+    // stiles and top rail 64, bottom rail 67 (Piotr 07.10.2026): the daylight is
+    // the leaf inset by each member on its own side
     const stile = p.elements.leafStile.face;
+    const top = p.elements.leafTop.face;
+    const bottom = p.elements.leafBottom.face;
     const extW = Number(ws.frame?.width) || 0;
     const extH = Number(ws.frame?.height) || 0;
     if (!extW || !extH) return null;
@@ -246,7 +250,8 @@ export default function CasementDrawing2D({ windowSpec, derived, batch }) {
       if (botLine - y2 < minGap) y2 = botLine - minGap;
       const w = x2 - x, h = y2 - y;
       const inset = Math.max(stile * s, 4);
-      const gx = x + inset, gy = y + inset, gw = w - 2 * inset, gh = h - 2 * inset;
+      const insetT = Math.max(top * s, 4), insetB = Math.max(bottom * s, 4);
+      const gx = x + inset, gy = y + insetT, gw = w - 2 * inset, gh = h - insetT - insetB;
       const role = pn._role || 'main';
       const nV = role === 'fan' ? (bars.fanV || 0) : role === 'fan2' ? (bars.fan2V || 0) : (bars.v || 0);
       const nH = role === 'fan' ? (bars.fanH || 0) : role === 'fan2' ? (bars.fan2H || 0) : (bars.h || 0);
@@ -294,11 +299,11 @@ export default function CasementDrawing2D({ windowSpec, derived, batch }) {
     const vLabels = [{ y: (Y0 + landT) / 2 + 4, t: fmt(g.land) }];
     leftCol.forEach((l, idx) => {
       const ty = sy(l.rect.y), by = sy(l.rect.y + l.rect.h);
-      const gty = sy(l.rect.y + stile), gby = sy(l.rect.y + l.rect.h - stile);
+      const gty = sy(l.rect.y + top), gby = sy(l.rect.y + l.rect.h - bottom);
       vTicks.push(ty, gty, gby, by);
-      vLabels.push({ y: (ty + gty) / 2 + 4, t: fmt(stile) });
-      vLabels.push({ y: (gty + gby) / 2 + 4, t: fmt(l.mm.leafH - 2 * stile) });
-      vLabels.push({ y: (gby + by) / 2 + 4, t: fmt(stile) });
+      vLabels.push({ y: (ty + gty) / 2 + 4, t: fmt(top) });
+      vLabels.push({ y: (gty + gby) / 2 + 4, t: fmt(l.mm.leafH - top - bottom) });
+      vLabels.push({ y: (gby + by) / 2 + 4, t: fmt(bottom) });
       if (!l.bounds.bottomIsCill) {
         const b1 = sy(l.bounds.bottomAxisT - g.transomLandAbove);
         const b2y = sy(l.bounds.bottomAxisT + g.transomLandBelow);
@@ -365,8 +370,9 @@ export default function CasementDrawing2D({ windowSpec, derived, batch }) {
       add(`${tg.name} leaf ${tg.n > 1 ? `×${tg.n} ` : ''}${fmt(tg.l.mm.leafW)} × ${fmt(tg.l.mm.leafH)}`, tg.l.cx + tg.l.w / 4, tg.l.cy - tg.l.h / 4);
       // the engine's unit (the glass schedule); the profile deduction only if the unit is missing
       const unit = dv.customGlassUnits?.[tg.l.i];
-      const gw = unit ? unit.width : tg.l.mm.leafW - casementGlassDeduction(p);
-      const gh = unit ? unit.height : tg.l.mm.leafH - casementGlassDeduction(p);
+      const ded = casementGlassDeductions(p);
+      const gw = unit ? unit.width : tg.l.mm.leafW - ded.width;
+      const gh = unit ? unit.height : tg.l.mm.leafH - ded.height;
       add(`glass ${fmt(gw)} × ${fmt(gh)} · 24mm`, tg.l.cx + tg.l.w / 4, tg.l.cy + tg.l.h / 5, { muted: true });
     });
     add(`C-CILL ${fmt(extW)} · ${secC}`, (X0 + W) / 2 + X0 / 2 + 40, YB - 5);

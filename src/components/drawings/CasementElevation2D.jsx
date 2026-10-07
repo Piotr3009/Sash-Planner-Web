@@ -40,12 +40,16 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
     if (!fw || !fh) return null;
     const p = getCasementProfile();
     const g = p.geometry;
+    // daylight = the leaf inset by the stile left and right, the top rail at the
+    // top and the bottom rail at the bottom (64 / 64 / 67, Piotr 07.10.2026)
     const stile = p.elements.leafStile.face;
+    const top = p.elements.leafTop.face;
+    const bottom = p.elements.leafBottom.face;
 
     const leaves = cas.leafRects.map((r, i) => {
       const pn = cas.layoutDef.panels[i];
-      const glassX = r.x + stile, glassY = r.y + stile;
-      const glassW = r.w - 2 * stile, glassH = r.h - 2 * stile;
+      const glassX = r.x + stile, glassY = r.y + top;
+      const glassW = r.w - 2 * stile, glassH = r.h - top - bottom;
       // bars from the engine grid (casementBarGrid.js) in frame coordinates —
       // one set of lines for the window, a light under a fan shows its share
       const barPos = cas.leaves[i]?.bars?.frame || { vBars: [], hBars: [] };
@@ -73,7 +77,7 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
     }
 
     return {
-      fw, fh, g, stile, leaves, arch,
+      fw, fh, g, stile, bottom, leaves, arch,
       mullions: cas.mullionRuns || [],
       transoms: cas.transomRuns || [],
       cill: cas.cill || { wider: false, extension: 0, length: fw },
@@ -116,7 +120,7 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
       outerD: archedOutlineD(arch.outer, txF, Y(fh)),
       landD: archedOutlineD(arch.land, txF, Y(fh - g.cillVisible)),
       leafD: archedOutlineD(arch.leafOuter, txF, Y(lf.r.y + lf.r.h)),
-      daylightD: archedOutlineD(arch.daylight, txF, Y(lf.r.y + lf.r.h - geom.stile)),
+      daylightD: archedOutlineD(arch.daylight, txF, Y(lf.r.y + lf.r.h - geom.bottom)),
       barsD: arch.bars.map((b) => barBandD(b, txG, BAR_WIDTH / 2)),
       clipId,
       radii: arch.outer.map((a) => ({ r: a.r, at: arcLabelPoint(a, txF, sw(14)) })),

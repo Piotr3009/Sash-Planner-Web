@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { uploadBsuiteProgram, removeBsuiteProgram } from '../services/bsuitePrograms.js';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
-import { kgPerM, VARIANT_ORDER, casementGlassDeduction } from '../engine/profile.js';
+import { kgPerM, VARIANT_ORDER, casementGlassDeductions } from '../engine/profile.js';
 import NumInput from '../components/NumInput.jsx';
 import { CONSTANTS, deriveWindowData } from '../engine/calculations.js';
 import { buildArchPlan, ArchError } from '../engine/arch.js';
@@ -832,10 +832,11 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
   // Live samples for a single-leaf window of the sample size.
   const leafW = W - 2 * d.leafAtJamb;
   const leafH = H - d.leafFullHeight;
-  // Glass follows the leaf member face: the engine's ONE source (profile.js casementGlassDeduction).
-  const glassDed = casementGlassDeduction(p);
-  const glassW = leafW - glassDed;
-  const glassH = leafH - glassDed;
+  // Glass follows the leaf member faces: the engine's ONE source (profile.js
+  // casementGlassDeductions), width from the stiles, height from the two rails.
+  const glassDed = casementGlassDeductions(p);
+  const glassW = leafW - glassDed.width;
+  const glassH = leafH - glassDed.height;
 
   // Composition hints (geometry → expected rule value):
   const hJ = g.land + g.gap;
@@ -847,8 +848,13 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
   const allRows = [...CAS_FRAME_ROWS, ...CAS_LEAF_ROWS];
   const sel = allRows.find((r) => r.key === selected) || allRows[0];
   const isLeafRow = sel.depth === 'leaf';
-  const selFace = isLeafRow ? p.elements.leafStile.face : p.elements[sel.key].face;
-  const commitFace = (v) => (isLeafRow ? setLeafFace(v) : setEl(sel.key, 'face', v));
+  // Stiles and top rail share one width (setLeafFace writes both); the bottom
+  // rail has its own (Piotr 07.10.2026), written alone.
+  const isBottomRail = sel.key === 'leafBottom';
+  const selFace = isBottomRail ? p.elements.leafBottom.face
+    : isLeafRow ? p.elements.leafStile.face : p.elements[sel.key].face;
+  const commitFace = (v) => (isBottomRail ? setEl('leafBottom', 'face', v)
+    : isLeafRow ? setLeafFace(v) : setEl(sel.key, 'face', v));
   const depthOf = (r) => (r.depth === 'leaf' ? p.leafDepth : p.frameDepth);
   // Drawings report their own element keys — translate to the selected card.
   const pickFromDrawing = (k) => setSelected(CAS_DRAW_TO_ROW[k] || k);
@@ -856,7 +862,7 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
 
   const Card = ({ r, locked }) => {
     const active = selected === r.key;
-    const face = r.depth === 'leaf' ? p.elements.leafStile.face : p.elements[r.key].face;
+    const face = p.elements[r.key].face;   // every card its own section (leaf cards too)
     const ded = p.lengths[r.lenKey] || 0;
     const sign = r.sign || '−';
     const smp = r.sampleLeaf
@@ -937,8 +943,9 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
                   className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
               </div>
               <div className="text-ink-300 pb-1.5 text-[11px]">
-                glass = leaf − <span className="text-accent-400 font-medium">{glassDed}</span>
-                <span className="text-ink-500"> = 2 × ({p.elements.leafStile.face} − {g.glassInset}) · sample </span>
+                glass W = leaf − <span className="text-accent-400 font-medium">{glassDed.width}</span>
+                <span className="text-ink-500"> · </span>glass H = leaf − <span className="text-accent-400 font-medium">{glassDed.height}</span>
+                <span className="text-ink-500"> · sample </span>
                 <span className="text-accent-400 font-medium">{glassW} × {glassH}</span>
                 <span className="text-ink-500"> · triple deepens the LEAF rebate only — frame stays {p.frameDepth}</span>
               </div>
@@ -974,9 +981,11 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
                     className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
                 </div>
                 <div className="text-[10px] text-ink-500 pb-2">
-                  {isLeafRow
-                    ? 'One section for all four leaf members — editing it writes stiles and both rails (windows have equal members all round).'
-                    : `Depth follows Frame depth (${p.frameDepth}).`}
+                  {isBottomRail
+                    ? 'Bottom rail width. Stiles and top rail are edited on their own cards.'
+                    : isLeafRow
+                      ? 'Stiles and top rail share one width. The bottom rail has its own card.'
+                      : `Depth follows Frame depth (${p.frameDepth}).`}
                 </div>
               </div>
             </fieldset>
