@@ -106,6 +106,16 @@ const faceInput = () => elementCard().locator('input[type="number"]').first();
 const hint = async () => (await elementCard().locator('div.pb-2').first().innerText()).trim();
 const selected = async () => (await elementCard().locator('span.font-semibold').first().innerText()).trim();
 const typeFace = async (v) => { const i = faceInput(); await i.fill(String(v)); await i.blur(); await page.waitForTimeout(50); };
+// NumInput copies a new value into its text in a useEffect, one render after the card click: read the Face input
+// once it shows `want` (up to 2 s, like Playwright's toHaveValue), else return what it settled on
+const faceValue = async (want) => {
+  for (let k = 0; k < 80; k++) {
+    const v = await faceInput().inputValue();
+    if (v === want) return v;
+    await page.waitForTimeout(25);
+  }
+  return faceInput().inputValue();
+};
 
 // ═════════════════════════════════════════════════════════════════════════════
 section('1 - each leaf card shows its own section');
@@ -132,7 +142,7 @@ const HINT_BR = 'Bottom rail width. Stiles and top rail are edited on their own 
 for (const [name, face, h] of [['Stiles', 64, HINT_ST], ['Top rail', 64, HINT_ST], ['Bottom rail', 67, HINT_BR]]) {
   await card(name).click();
   const sel = await selected();
-  const v = await faceInput().inputValue();
+  const v = await faceValue(String(face));
   ok(sel.startsWith(name) && v === String(face), `${name} selected: Face input shows ${v}`);
   const ht = await hint();
   ok(ht === h, `${name} selected: hint "${ht}"`);
@@ -153,7 +163,8 @@ section('4 - which faces each card writes');
   ok(/glass W = leaf − 105 · glass H = leaf − 111 · sample 793 × 1291\b/.test(r), `readout after the bottom rail 70: "${r.split(' · triple')[0]}"`, r);
 
   await card('Stiles').click();
-  ok(await faceInput().inputValue() === '64', 'Stiles selected again: Face input shows the stile 64, not the bottom rail 70');
+  const vs = await faceValue('64');
+  ok(vs === '64', `Stiles selected again: Face input shows ${vs} (the stile 64, not the bottom rail 70)`);
   await typeFace(66);
   f = await faces();
   ok(f.stile === 66 && f.top === 66 && f.bottom === 70 && f.glass === 109, `Stiles 66 typed: faces ${f.stile} / ${f.top} / ${f.bottom} (bottom rail kept), deductions.glass ${f.glass} = 2 x (66 - 11.5)`);
@@ -162,13 +173,15 @@ section('4 - which faces each card writes');
   ok(/glass W = leaf − 109 · glass H = leaf − 113 · sample 789 × 1289\b/.test(r), `readout after the stiles 66: "${r.split(' · triple')[0]}"`, r);
 
   await card('Top rail').click();
-  ok(await faceInput().inputValue() === '66', 'Top rail selected: Face input shows the shared stile / top rail 66');
+  const vt = await faceValue('66');
+  ok(vt === '66', `Top rail selected: Face input shows ${vt} (the shared stile / top rail 66)`);
   await typeFace(65);
   f = await faces();
   ok(f.stile === 65 && f.top === 65 && f.bottom === 70, `Top rail 65 typed: faces ${f.stile} / ${f.top} / ${f.bottom} (written together, bottom rail kept)`);
 
   await card('Bottom rail').click();
-  ok(await faceInput().inputValue() === '70', 'Bottom rail selected again: Face input shows 70');
+  const vb = await faceValue('70');
+  ok(vb === '70', `Bottom rail selected again: Face input shows ${vb} (the bottom rail 70, not the stile 65)`);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
