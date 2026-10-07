@@ -56,3 +56,35 @@ PSW (Prime-Sash-Windows) is not in this repository; nothing there was read or ch
    fixed deduction; with 64 every unit is 6 mm larger each way.
 4. **Transom length**: check whether PSW computes or prints a casement transom length with a seat of 8; PC now
    uses 8.5.
+
+## C. Correction 07.10.2026: the bottom rail is 67
+
+Owner box (Piotr, 07.10.2026), branch `claude/casement-bottom-rail-67`, from `main` at bdd2092 (= 95a83e9, the merge
+of PR #11, plus the brief). Section A above made all four leaf members 64; the owner wants the **bottom rail 67** and
+only the stiles and the top rail 64. As built:
+
+- `profile.js`: `leafStile` 64, `leafTop` 64, **`leafBottom` 67**; **`leafSchema: 3`**. A stored copy migrates by
+  the schema it is on: schema 1 (67 all round) moves each face of 67 to today's default (64 / 64 / 67); schema 2
+  (64 all round) moves only the bottom rail 64 -> 67; schema 3 is left alone; a hand-edited face is kept.
+- **Two glass deductions, one source**: `casementGlassDeductions(profile)` = width `2 x (stile - 11.5)` = 105,
+  height `(top - 11.5) + (bottom - 11.5)` = 52.5 + 55.5 = 108. `deductions.glass` keeps the width (105).
+  `casementGlassDeduction` (the width) is kept for the store and the migration.
+- Engine: stiles 64x57, top rail / arched top rail / leaf ring 64x57, **bottom rail 67x57** (triple 67x61); glass
+  `leaf W - 105` x `leaf H - 108` for every rectangular pane; the bar daylight `leaf - 2 x 64` x `leaf - 64 - 67`;
+  leaf weight per member. The arched glass already took the bottom rail (glass bottom 47 + 55.5 = 102.5 above the
+  frame bottom), so the arched unit is the outline with no deduction on top: the bottom rail counted once.
+- 040L 1000 x 1200: leaf 898 x 1102, **glass 793 x 994**, daylight 770 x 971, beading 4110. 021 1000 x 1200: glass
+  **793 x 248.2** and **793 x 606.8**.
+- Sheets (leaf, front elevation, production elevation, glass, glass PDF): the bottom rail drawn and dimensioned 67,
+  the vertical daylight `leaf H - 131`, the glass of the glass schedule.
+- Window Settings: each leaf card shows its own section; Stiles and Top rail edit both together, Bottom rail its
+  own; the readout shows glass W and glass H.
+- Assign Materials: Leaf Bottom Rail `67×57`.
+- 3D: `SASH_BOTTOM_RAIL = 67` (exported beside `SASH_RAIL = 64`); `CasementWindow` and `ArchedCasementWindow` draw
+  the 67 bottom rail, the glass `- 64 - 67` with its centre 1.5 mm higher. `FixFrameWindow`'s rectangle keeps 64.
+
+Proof: `node verify/parity/t38_leaf_64_seat_85.mjs` (against 5459f5b AND bdd2092), `t39_settings_leaf_cards.mjs`
+(Window Settings in Chromium), `t40_bottom_rail_3d.mjs` (the 3D components); BUILD-LOG 07.10.2026; BLOCKERS 28.
+
+For PSW (not in this repository): the items above still apply with **64 / 64 / 67**: a glass height deduction of
+108 (not 105) and a 3D bottom rail of 67 with the glass centre 1.5 mm higher.
