@@ -4,6 +4,71 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-10-08 · TURA PC: DOORS TO PRODUCTION, SINGLE AND FRENCH (branch `claude/doors-production`)
+
+Owner box (Piotr, 08.10.2026): the door frame is the casement frame (68 face, 93 deep, rebate 21, land 47, gap 4,
+cill 68 x 93 with 41 visible; inward cill unrebated 40 to 35; aluminium / low-profile threshold without a timber
+cill, counted in pieces). Leaf 57 deep (61 triple): stiles 94, top rail 94, bottom rail 180, mid rail 94, french
+meeting stile 100 (94 + the 6 lip). Single leaf W - 102; french half (W - 102) / 2, each leaf half + 6. Height
+H - 98 with a timber cill (both directions), H - 57 without. Single 900 x 2100: leaf 798 x 2002, glass 633 x 1751.
+French 1600 x 2100: half 749, leaf 755 x 2002, glass 584 x 1751. Door glass double 6x12x6 (24). Half glazed and
+three quarter with a mid rail and a panel (2 x 18 Tricoya + MDF core). Opening fanlight = a casement leaf.
+Winkhaus hardware from BJ Waller: hinges 3 / 4 per leaf, ThunderBolt single kit or FGTE double kit, cylinders,
+handles, bolts, thresholds.
+
+### Stage 0: baseline and sweep (no code changes)
+
+Starting commit **410cb5d** (`main` on 08.10.2026: the merge of PR #12, 7a333d8, plus the new CLAUDE.md and
+`docs/handover/DOORS-AUDIT-2026-10-07.md`). `git diff 7a333d8 410cb5d` touches those two files only, so the audit
+(written on 7a333d8) applies to this commit unchanged.
+
+**Suite on the starting commit: 26 harnesses, 2748 checks, 0 failures. `npm run build` OK (16.0 s).** Run as
+before: `verify/arch/t*.mjs` minus the `*baseline*` generators, plus `verify/parity/*.mjs`, each with `node <file>`,
+after `npm ci` and `pip install ezdxf` (ezdxf 1.4.4; the first run failed t16 / t17_edges / t18 / t20 / t22 / t23 /
+t25 on the missing module, rerun after the install). `verify/parity/psw-casement-layouts.mjs` exits rc 2 (no PSW
+clone at `../psw`): not a failure, not counted. The files the suite rewrites in `docs/handover/samples/` were
+restored with `git checkout` after every run; the first run also ran the two `*baseline*` generators, which rewrote
+`verify/arch/fixtures/rect-casement-sheets.json` (commit stamp only): restored, and the runner now skips them.
+
+| harness | checks | | harness | checks | | harness | checks |
+|---|---|---|---|---|---|---|---|
+| t16 | 369 | | t23 | 81 | | t33_bar_grid | 43 |
+| t17_edges | 70 | | t24_stage4 | 26 | | parity t31_bars_8x8 | 18 |
+| t18 | 179 | | t25 | 226 | | parity t32_bsuite | 54 |
+| t19 | 280 | | t26 | 38 | | parity t34_glass_minus1 | 46 |
+| t20 | 117 | | t27 | 87 | | parity t35_locks | 51 |
+| t20_bars | 31 | | t28 | 50 | | parity t36_hinges | 110 |
+| t21 | 120 | | t29 | 34 | | parity t37_single_window_bom | 47 |
+| t22 | 118 | | t30_preview | 30 | | parity t38_leaf_64_seat_85 | 468 |
+| | | | | | | parity t39_settings_leaf_cards | 23 |
+| | | | | | | parity t40_bottom_rail_3d | 32 |
+
+**Reference set, BEFORE** (live engine on 410cb5d, `normaliseToWindowSpec` then `deriveWindowData`, default
+profiles; the script is kept in the session scratchpad and re-run for the AFTER table). Every door feeds four BOM
+rows only (glass on the WINDOW double row, paint on the SASH rows) and has no hardware line, no weight, no beading:
+
+| door | leaves | glass | makeup / mm | BOM rows | hardware lines |
+|---|---|---|---|---|---|
+| single 900 x 2100 outward | 806 x 2006 | 641 x 1755 | 6x16x6 / 28 | glass_double, paint_primer, paint_preserver, paint_white_9016 | 0 |
+| single inward | 806 x 2006 | 641 x 1755 | 6x16x6 / 28 | same 4 | 0 |
+| single aluminium threshold | 806 x 2047 | 641 x 1796 | 6x16x6 / 28 | same 4 | 0 |
+| single half-glazed | 806 x 2006 (no mid rail, no panel) | 641 x 1755 | 6x16x6 / 28 | same 4 | 0 |
+| single three-quarter | 806 x 2006 (no mid rail, no panel) | 641 x 1755 | 6x16x6 / 28 | same 4 | 0 |
+| french 1600 x 2100 lockType single | 756 x 2006, 756 x 2006 | 591 x 1755 x 2 | 6x16x6 / 28 | same 4 | 0 |
+| french lockType double | 756 x 2006 x 2 | 591 x 1755 x 2 | 6x16x6 / 28 | same 4 | 0 |
+| french + side panels 500 / 500 | 756 x 2006 x 2; panels 406 x 2006 (57 members) | 591 x 1755 x 2, 315 x 1915 x 2 | 6x16x6 / 28 | same 4 | 0 |
+| french + fanlight 450 fixed | 756 x 2006 x 2 | 591 x 1755 x 2, 1487 x 337 | 6x16x6 / 28 | same 4 | 0 |
+| french + fanlight 450 opening | 756 x 2006 x 2 (no fan leaf) | 591 x 1755 x 2, 1487 x 337 "(opening, 64 sash pending)" | 6x16x6 / 28 | same 4 | 0 |
+| single bars h 2 / v 1 | 806 x 2006 | 641 x 1755 (no bars) | 6x16x6 / 28 | same 4 | 0 |
+
+Members today: stiles 94x61 L2006, top rail 94x61 L806, bottom rail 180x61 L806 (french: four 94 stiles, no meeting
+stile, no mid rail); frame head / jambs / cill 68x93; inward cill 40x93; coupling post 136x93 x2; transom 68x93
+L1464. Pre-cut: leaf members group as raw `94x61` / `180x61`, side panel members as `63x63` (sash section map), frame
+members under `undefined` with no material. Controls: casement 040L 1000 x 1200 (leaf 898 x 1102, glass 793 x 994)
+and sash 1000 x 1600; their derived data is the "controls unchanged" reference of Stage 7.
+
+---
+
 ## 2026-10-07 · TURA PC: CASEMENT BOTTOM RAIL 67 (branch `claude/casement-bottom-rail-67`)
 
 Owner box (Piotr, 07.10.2026): every casement leaf (opening, fanlight, fixed) has **stiles 64, top rail 64, bottom
