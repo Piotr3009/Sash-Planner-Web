@@ -110,7 +110,7 @@ export function casementLeafBars({ leafRects, panels, bars, stile, top = stile, 
   const per = (leafRects || []).map((r, i) => {
     const role = panels?.[i]?._role || 'main';
     const counts = casementBarCounts(bars, role);
-    const glassW = r.w - 2 * stile, glassH = r.h - top - bottom;
+    const glassW = r.w - 2 * stile, glassH = r.h - (top + bottom);
     const frame = computeBarPositions({ glassX: r.x + stile, glassY: r.y + top, glassW, glassH, vCount: counts.v, hCount: counts.h, barW });
     const local = computeBarPositions({ glassX: stile, glassY: top, glassW, glassH, vCount: counts.v, hCount: counts.h, barW });
     return { role, counts, r, glassH, frame, local };

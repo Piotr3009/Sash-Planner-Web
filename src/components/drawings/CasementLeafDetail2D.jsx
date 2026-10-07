@@ -81,7 +81,7 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
     const pn = cas.layoutDef.panels[idx];
     const leafW = mm.leafW, leafH = mm.leafH;
     const glassX = stile, glassY = top;
-    const glassW = leafW - 2 * stile, glassH = leafH - top - bottom;
+    const glassW = leafW - 2 * stile, glassH = leafH - (top + bottom);
     const unitX = stile + glassIn, unitY = top + glassIn; // 52.5 inset (64 - 11.5)
     // the unit drawn IS the engine's unit (the glass schedule); the deductions only if it is missing
     const unit = derived.customGlassUnits?.[idx];
@@ -220,7 +220,7 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
   const leftLabels = Array(leftCuts.length - 1).fill(undefined);
   leftLabels[0] = fmt(geom.top);
   leftLabels[leftLabels.length - 1] = fmt(geom.bottom);
-  if (leftLabels.length === 3) leftLabels[1] = fmt(geom.leafH - geom.top - geom.bottom);
+  if (leftLabels.length === 3) leftLabels[1] = fmt(geom.leafH - (geom.top + geom.bottom));
 
   return (
     <div className="w-full relative">

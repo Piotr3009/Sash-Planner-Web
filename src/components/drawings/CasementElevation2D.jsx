@@ -49,7 +49,7 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
     const leaves = cas.leafRects.map((r, i) => {
       const pn = cas.layoutDef.panels[i];
       const glassX = r.x + stile, glassY = r.y + top;
-      const glassW = r.w - 2 * stile, glassH = r.h - top - bottom;
+      const glassW = r.w - 2 * stile, glassH = r.h - (top + bottom);
       // bars from the engine grid (casementBarGrid.js) in frame coordinates —
       // one set of lines for the window, a light under a fan shows its share
       const barPos = cas.leaves[i]?.bars?.frame || { vBars: [], hBars: [] };

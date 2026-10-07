@@ -251,7 +251,7 @@ export default function CasementDrawing2D({ windowSpec, derived, batch }) {
       const w = x2 - x, h = y2 - y;
       const inset = Math.max(stile * s, 4);
       const insetT = Math.max(top * s, 4), insetB = Math.max(bottom * s, 4);
-      const gx = x + inset, gy = y + insetT, gw = w - 2 * inset, gh = h - insetT - insetB;
+      const gx = x + inset, gy = y + insetT, gw = w - 2 * inset, gh = h - (insetT + insetB);
       const role = pn._role || 'main';
       const nV = role === 'fan' ? (bars.fanV || 0) : role === 'fan2' ? (bars.fan2V || 0) : (bars.v || 0);
       const nH = role === 'fan' ? (bars.fanH || 0) : role === 'fan2' ? (bars.fan2H || 0) : (bars.h || 0);
@@ -302,7 +302,7 @@ export default function CasementDrawing2D({ windowSpec, derived, batch }) {
       const gty = sy(l.rect.y + top), gby = sy(l.rect.y + l.rect.h - bottom);
       vTicks.push(ty, gty, gby, by);
       vLabels.push({ y: (ty + gty) / 2 + 4, t: fmt(top) });
-      vLabels.push({ y: (gty + gby) / 2 + 4, t: fmt(l.mm.leafH - top - bottom) });
+      vLabels.push({ y: (gty + gby) / 2 + 4, t: fmt(l.mm.leafH - (top + bottom)) });
       vLabels.push({ y: (gby + by) / 2 + 4, t: fmt(bottom) });
       if (!l.bounds.bottomIsCill) {
         const b1 = sy(l.bounds.bottomAxisT - g.transomLandAbove);
