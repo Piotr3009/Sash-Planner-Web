@@ -129,7 +129,7 @@ const byKey = (rows) => Object.fromEntries(rows.map((r) => [r.key, r]));
 
 // Engine-picked casement hardware, by NAME (typed here — not the flag the
 // engine sets on its own lines): the rows of Assign Materials › Ironmongery.
-// 08.10.2026 (doors to production): the door hardware lines are engine picks too — every count is a
+// 08.10.2026 (doors to production): the door hardware lines are engine picks too: every count is a
 // door Assign Materials row (d_hinges, d_lock_*_kit, d_cylinder, d_handle_set, d_bolts, d_threshold_*).
 const isEngineItem = (item) => /^(Side Hinges|Top Hung Hinges|Espag Lock Kit|Lock — sash)/.test(item) || item === 'Child restrictor' || item === 'Wedge packers'
   || /^(Door hinges|Multipoint lock, (single|double) door kit|Door cylinder|Door handle set|Door bolts|Door threshold)$/.test(item);

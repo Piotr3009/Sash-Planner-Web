@@ -42,6 +42,9 @@
  *  15  Assign Materials rows (ids, order, no duplicates, no em dash)
  *  16  the window's door slot product, optimiser over-length guard
  *  17  controls: casement and sash equal to START
+ *  18  door sheets (SSR of the components the screen and the PDFs mount): the door
+ *      sheet plan, no NaN / undefined / long dash, the schedule glass, meeting stile 100,
+ *      the frame chain 47 / 4, the plan section, the glass drawings, the dimension rule
  *
  * Run: node verify/parity/t41_doors_production.mjs [start]
  */
@@ -49,6 +52,9 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve, dirname, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { checkDimRule } from '../arch/lib/dimRule.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const AUDIT = resolve(ROOT, '.audit');
@@ -533,7 +539,7 @@ section('15 - Assign Materials rows');
   ok(byId.d_frame_head.section === '68×93' && byId.d_frame_cill_inward.section === '40×93' && byId.d_coupling_post.section === '136×93' && byId.d_leaf_meeting_stile.section === '100×57' && byId.d_leaf_bottom_rail.section === '180×57' && byId.d_side_stile.section === '57×57',
     'section labels with the multiplication sign, from the door profile');
   ok(store.DOOR_PARTS.ironmongery.every((p) => p.hint && p.defaultCategory) && /3 hinges, 4 when the leaf is taller than 2100/.test(byId.d_hinges.hint), 'ironmongery rows carry the counting rule (hint) and their catalogue tab');
-  ok(!JSON.stringify(store.DOOR_ALL_PARTS).match(/[–—]/), 'no en / em dash in the door rows');
+  ok(!JSON.stringify(store.DOOR_ALL_PARTS).match(/[\u2013\u2014]/), 'no en / em dash in the door rows');
   ok(['c_silicone', 'c_bead_tape_1mm', 'c_seal_frame_black', 'c_paint_primer', 'c_glazing_packer', 'c_glass_clips_double', 'c_triangle_beading_ext'].every((id) => /also doors/.test(byId[id].hint)), 'casement rows that carry doors say "also doors"');
   ok(['cylinders', 'doorHandles', 'doorHinges', 'multipointLocks', 'thresholds', 'bolts'].every((k) => store.DOOR_PARTS.ironmongery.some((p) => p.defaultCategory === k) || k === 'thresholds'), 'every door ironmongery category has a row');
 }
@@ -589,6 +595,99 @@ section('17 - controls: casement and sash equal to START');
   }
   ok(JSON.stringify(profile.DEFAULT_CASEMENT_PROFILE) === JSON.stringify(START.profile.DEFAULT_CASEMENT_PROFILE) && JSON.stringify(profile.DEFAULT_SASH_PROFILE) === JSON.stringify(START.profile.DEFAULT_SASH_PROFILE),
     'casement and sash default profiles equal to START');
+}
+
+section('18 - door sheets: the components the screen, the PDFs and the pack mount');
+{
+  // Bundle the door sheets the way verify/arch/lib/sheets.mjs bundles the casement
+  // ones, and render through DoorSheet + doorSheetPlan (DrawingsPanel, its PDF rig,
+  // the Elements PDF and the production pack mount exactly these), the elevation
+  // and one DoorGlassDrawing2D per groupDoorGlass group.
+  const entry = resolve(AUDIT, 't41-sheets-entry.mjs');
+  const rel = (p) => './' + relative(AUDIT, resolve(ROOT, 'src', p)).replace(/\\/g, '/');
+  writeFileSync(entry, [
+    `export { default as DoorSheet } from '${rel('components/drawings/DoorSheet.jsx')}';`,
+    `export { default as Elevation } from '${rel('components/drawings/DoorElevation2D.jsx')}';`,
+    `export { default as Glass } from '${rel('components/drawings/DoorGlassDrawing2D.jsx')}';`,
+    `export * as ddu from '${rel('components/drawings/doorDrawUtils.js')}';`,
+    `export * as specification from '${rel('engine/specification.js')}';`,
+    `export * as calculations from '${rel('engine/calculations.js')}';`,
+    `export * as lists from '${rel('engine/lists.js')}';`,
+  ].join('\n'));
+  const out = resolve(AUDIT, 't41-sheets-bundle.mjs');
+  execFileSync('npx', ['-y', 'esbuild@0.25.0', entry, '--bundle', '--format=esm', '--platform=node',
+    '--loader:.jsx=jsx', '--loader:.js=jsx', '--jsx=automatic', '--define:import.meta.env={}',
+    '--external:react', '--external:react-dom', '--external:react/jsx-runtime', '--external:jspdf', '--external:three',
+    `--outfile=${out}`], { cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit'] });
+  const SH = await import(pathToFileURL(out).href + `?t=${Date.now()}`);
+  const render = (C, props) => renderToStaticMarkup(React.createElement(C, props));
+  const sk = (w, h, fc) => mk(SH, w, h, { windowCategory: 'door', ...fc });
+  const SET = {
+    'single 900 x 2100 outward': sk(900, 2100, { doorType: 'single-external' }),
+    'single inward': sk(900, 2100, { doorType: 'single-external', doorOpenDirection: 'inward' }),
+    'single aluminium threshold': sk(900, 2100, { doorType: 'single-external', thresholdType: 'aluminium' }),
+    'single half-glazed': sk(900, 2100, { doorType: 'single-external', doorStyle: 'half-glazed' }),
+    'single three-quarter': sk(900, 2100, { doorType: 'single-external', doorStyle: 'three-quarter' }),
+    'french lockType single': sk(1600, 2100, { doorType: 'french', lockType: 'single' }),
+    'french lockType double': sk(1600, 2100, { doorType: 'french', lockType: 'double' }),
+    'french side panels 500 / 500': sk(1600, 2100, { doorType: 'french', sidePanels: 'both', sideLeftWidth: 500, sideRightWidth: 500 }),
+    'french fanlight 450 fixed': sk(1600, 2100, { doorType: 'french', transomType: 'fixed', transomHeight: 450 }),
+    'french fanlight 450 opening': sk(1600, 2100, { doorType: 'french', transomType: 'opening', transomHeight: 450 }),
+    'single bars h2 v1': sk(900, 2100, { doorType: 'single-external', doorHBars: 2, doorVBars: 1 }),
+    'single triple': sk(900, 2100, { doorType: 'single-external', glassType: 'triple' }),
+    'single 900 x 2248 (4 hinges)': sk(900, 2248, { doorType: 'single-external' }),
+  };
+  const fmt = (v) => String(Math.round(Number(v) * 10) / 10);
+  for (const [name, { spec, derived }] of Object.entries(SET)) {
+    const dr = derived.door;
+    const plan = SH.ddu.doorSheetPlan(derived);
+    // the plan: frame, leaf, one per side panel, one per opening fan leaf, the plan section
+    const wantKeys = ['doorframe', 'doorleaf', ...(dr.panelLeaves || []).map((pl) => `doorside-${pl.side}`),
+      ...(dr.fanLeaves || []).map((_, i) => `doorfan-${i}`), 'doorsection'];
+    ok(JSON.stringify(plan.map((p) => p.key)) === JSON.stringify(wantKeys), `${name}: sheet plan ${plan.map((p) => p.key).join(', ')}`);
+    const sheets = { elevation: render(SH.Elevation, { windowSpec: spec, derived, projectNumber: 'P-1' }) };
+    for (const p of plan) sheets[p.key] = render(SH.DoorSheet, { sheet: p, windowSpec: spec, derived, projectNumber: 'P-1' });
+    const groups = SH.ddu.groupDoorGlass(derived, spec);
+    groups.forEach((g, i) => { sheets[`glass${i}`] = render(SH.Glass, { windowSpec: spec, derived, group: g }); });
+    const bad = Object.entries(sheets).filter(([, m]) => !/^<svg|<svg/.test(m) || /NaN|undefined|[\u2013\u2014]/.test(m)).map(([k]) => k);
+    ok(bad.length === 0, `${name}: ${Object.keys(sheets).length} sheets render as svg with no NaN / undefined / long dash`, bad.join(', '));
+    const dimBad = Object.entries(sheets).map(([k, m]) => [k, checkDimRule(m)]).filter(([, r]) => !r.ok).map(([k, r]) => `${k}: ${r.why}`);
+    ok(dimBad.length === 0, `${name}: every sheet keeps the dimension rule (width on top, heights right, chains bottom / left)`, dimBad.join(' | '));
+    // the leaf sheet prints the glass of the schedule (the glass list rows), every door leaf
+    const rows = lists.buildGlassListForWindow(derived, spec);
+    const mainRows = rows.filter((r) => r.role === 'main');
+    ok(mainRows.length === dr.leaves.length && mainRows.every((r) => sheets.doorleaf.includes(`${fmt(r.width)} × ${fmt(r.height)}`)),
+      `${name}: leaf sheet prints the schedule glass ${mainRows.map((r) => `${r.width} × ${r.height}`).join(', ')}`);
+    // one glass drawing per unique unit, its size = the schedule rows
+    ok(rows.every((r) => groups.some((g) => g.w === r.width && g.h === r.height)) && groups.every((g, i) => sheets[`glass${i}`].includes(`${fmt(g.w)} × ${fmt(g.h)}`)),
+      `${name}: glass drawings ${groups.map((g) => `${g.w} × ${g.h}`).join(', ')} = the glass schedule`);
+    // the frame sheet layer chain: land 47 and gap 4 (it printed 43 / -43)
+    ok(sheets.doorframe.includes(`>${DP.geometry.land}<`) && sheets.doorframe.includes(`>${DP.geometry.gap}<`) && !/>-?43</.test(sheets.doorframe),
+      `${name}: frame sheet chain prints land ${DP.geometry.land} and gap ${DP.geometry.gap}, never 43 / -43`);
+    // the plan section is a real drawing (it was a placeholder card)
+    ok(/<svg/.test(sheets.doorsection) && !/Not drawn yet/.test(sheets.doorsection), `${name}: the plan section is an svg drawing`);
+    // the hinge rule from derived
+    const nh = dr.leaves[0].hinges.length;
+    ok(sheets.doorleaf.includes(`${nh} hinges per leaf`) && nh === (dr.leafH > DP.hinges.tallAbove ? DP.hinges.perLeafTall : DP.hinges.perLeaf),
+      `${name}: leaf sheet prints ${nh} hinges per leaf (leaf ${dr.leafH})`);
+    if (dr.isFrench) {
+      ok(sheets.doorleaf.includes('D-MS') && sheets.doorleaf.includes(`>${DP.elements.leafMeeting.face}<`) && sheets.doorsection.includes(`>${DP.elements.leafMeeting.face}<`),
+        `${name}: the meeting stile ${DP.elements.leafMeeting.face} (D-MS) printed on the leaf sheet and the plan section`);
+    }
+    if (dr.panels?.length) {
+      ok(sheets.doorleaf.includes('D-MR') && dr.panels.every((pn) => sheets.doorleaf.includes(`panel ${fmt(pn.w)} × ${fmt(pn.h)}`)),
+        `${name}: leaf sheet prints D-MR and the panel ${dr.panels.map((pn) => `${pn.w} × ${pn.h}`).join(', ')}`);
+    }
+    if (spec.glazing.type === 'triple') ok(sheets.doorleaf.includes(`leaf depth ${DP.leafDepthTriple}`), `${name}: leaf depth ${DP.leafDepthTriple} printed (from the cut list record)`);
+    if ((dr.fanLeaves || []).length) ok(dr.fanLeaves.every((_, i) => /<svg/.test(sheets[`doorfan-${i}`]) && sheets[`doorfan-${i}`].includes(`${fmt(dr.fanLeaves[i].w)}`)),
+      `${name}: fan leaf sheet drawn at ${dr.fanLeaves.map((f) => `${f.w} × ${f.h}`).join(', ')}`);
+    ok(/Threshold: /.test(sheets.elevation), `${name}: the threshold is named on the elevation`);
+  }
+  // the four reference numbers of the box, read off the rendered leaf sheet
+  const leafOf = (k) => render(SH.DoorSheet, { sheet: SH.ddu.doorSheetPlan(SET[k].derived)[1], windowSpec: SET[k].spec, derived: SET[k].derived, projectNumber: 'P-1' });
+  ok(leafOf('single 900 x 2100 outward').includes('633 × 1751'), 'box: single 900 x 2100 leaf sheet prints glass 633 × 1751');
+  ok(leafOf('french lockType double').includes('584 × 1751'), 'box: french 1600 x 2100 leaf sheet prints glass 584 × 1751');
+  ok(leafOf('single half-glazed').includes('633 × 883'), 'box: half-glazed single leaf sheet prints glass 633 × 883');
 }
 
 console.log(`\n${passes} pass, ${fails} fail`);
