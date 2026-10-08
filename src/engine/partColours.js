@@ -102,13 +102,14 @@ const CUT_SYMBOL_TO_GROUP = {
 // ─── Colour by WINDOW (Piotr 08.10.2026) ───
 // The second colour mode of the Pre-Cut: one colour = one window of the pack,
 // by the window's position in the pack (window 1 is always colour 1). Ten
-// colours, the same set the parts use; from the eleventh window the colours
+// colours (the part palette plus white and brown; red and brown stronger since
+// 08.10.2026 so they read on paper); from the eleventh window the colours
 // repeat (11 = colour 1) and nothing more happens, by owner decision. Works
 // for every pack type, sash included. The Cut List is not coloured in this
 // mode, only the Pre-Cut (screen, PDF, labels).
 export const WINDOW_COLOURS = [
-  '#F5E050', '#F2A03D', '#EE7D5B', '#D99AC5', '#A98BE8',
-  '#7CC4F5', '#5CCBA9', '#9BD36A', '#FFFFFF', '#C8A36A',
+  '#F5E050', '#F2A03D', '#E9603C', '#D99AC5', '#A98BE8',
+  '#7CC4F5', '#5CCBA9', '#9BD36A', '#FFFFFF', '#B5823F',
 ];
 export const COLOUR_MODES = ['off', 'part', 'window'];
 export const COLOUR_MODE_LABELS = { off: 'Off', part: 'Per part', window: 'Per window' };

@@ -1665,12 +1665,16 @@ function PreCutTab({ merged, windowsData = [], settings, batch, pp, isPPMode, pr
     return localOptimization.boxSapele?.find((g) => String(g.preCutWidth) === group.section);
   };
 
+  // The groups as the PDFs see them: stock length of the pack and the material (shared
+  // by the Pre-Cut PDF and the labels PDF).
+  const buildExportGroups = () => allGroups.map((g) => ({
+    ...g,
+    stockLength: stockLengths[g.key] || g.defaultStock,
+    materialInfo: ((m) => (m?.mixed ? null : m))(getMaterialForGroup(g.items)),
+  }));
+
   const handleExportPDF = (content = 'both') => {
-    const exportGroups = allGroups.map((g) => ({
-      ...g,
-      stockLength: stockLengths[g.key] || g.defaultStock,
-      materialInfo: ((m) => (m?.mixed ? null : m))(getMaterialForGroup(g.items)),
-    }));
+    const exportGroups = buildExportGroups();
     const projList = isPPMode
       ? [...new Set((pp?.assignments || []).map((a) => {
           const proj = (projects || []).find((p) => p.id === a.projectId);
@@ -1700,7 +1704,7 @@ function PreCutTab({ merged, windowsData = [], settings, batch, pp, isPPMode, pr
   // per pre-cut piece in bar order, the colour strip of the active mode.
   const handleExportLabels = () => {
     exportPreCutLabelsPDF({
-      groups: exportGroups,
+      groups: buildExportGroups(),
       optimization: localOptimization,
       settings, batch, pp, isPPMode,
       colourMode, windowList, windowIndexOf: windowIndex,
