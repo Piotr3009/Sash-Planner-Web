@@ -11,8 +11,9 @@ import {
   GOTHIC_PROFILE_RATIO, ROUND_AUTO_RATIO, LEGACY_ARCH_SHAPES, PATTERNS_FOR_SHAPE, ARCH_BAR_PATTERN_LABELS,
   isHubPattern, isGothicShape, resolveRoundShape, buildArchPlan, buildSashArchGeometry, planArchSegments, buildCirclePlan,
 } from '../engine/arch.js';
-import { getCasementProfile, getWindowProfile } from '../engine/profile.js';
-import { casementFrameDims, doorFrameDims } from '../utils/windowSpecToConfig.js';
+import { DEFAULT_DOOR_PROFILE, getCasementProfile, getDoorProfile, getWindowProfile } from '../engine/profile.js';
+import { casementFrameDims, doorFrameDims, doorGeometryFromSpec } from '../utils/windowSpecToConfig.js';
+import { normaliseToWindowSpec } from '../engine/specification.js';
 import { CONSTANTS } from '../engine/calculations.js';
 import CasementLayoutPicker from '../components/configurator/CasementLayoutPicker.jsx';
 import NumInput from '../components/NumInput.jsx';
@@ -371,7 +372,8 @@ export default function ConfiguratorPage() {
     setDoorType(w.doorType || 'single-external');
     setDoorShape(w.doorShape || 'standard');
     setDoorStyle(w.doorStyle || 'full-glass');
-    setDoorPaneling(w.paneling || 'flat');
+    // the window record stores doorPaneling (save below); paneling is the old / PSW name
+    setDoorPaneling(w.doorPaneling || w.paneling || 'flat');
     setDoorHB(w.doorHBars || 0);
     setDoorVB(w.doorVBars || 0);
     setSidePanels(w.sidePanels || 'none');
@@ -584,7 +586,12 @@ export default function ConfiguratorPage() {
   // ─── Effective values ───
   const isSingle = colourMode === 'single';
   const hasGasFill = glassType !== 'single' && glassType !== 'passive'; // sealed units only
-  const frameDepth = FRAME_DEPTHS[frameType] || 164;
+  // Doors (08.10.2026): the door frame is 93 deep from the door profile, not a
+  // sash box depth (brief 6.1); the batch type check is repeated here because
+  // isDoor is declared below.
+  const frameDepth = (batch?.type === 'door' || batch?.type === 'doors')
+    ? (Number(getDoorProfile().frameDepth) || DEFAULT_DOOR_PROFILE.frameDepth)
+    : (FRAME_DEPTHS[frameType] || 164);
   const effectiveLBars = sameBars ? uBars : lBars;
   const isCasement = batch?.type === 'casement';
   const isDoor = batch?.type === 'door' || batch?.type === 'doors';
@@ -671,6 +678,29 @@ export default function ConfiguratorPage() {
         transomType: isFrench ? transomType : 'none',
         transomHeight, transomBars: isFrench ? transomBars : 'none',
         thresholdType: threshold, thresholdExtension: thresholdExt,
+        // Doors to production (08.10.2026): the 3D draws the door from the
+        // engine's door geometry (leaf sizes, members, glass, panel, hinges,
+        // fanlight), derived from the same keys the Save below stores.
+        doorGeo: (() => {
+          try {
+            return doorGeometryFromSpec(normaliseToWindowSpec(
+              { id: 'configurator', name: 'door', width: extW, height: extH },
+              { fullConfig: {
+                windowCategory: 'door', extWidth: extW, extHeight: extH,
+                glassType, glassSpec, glassCoating, glassGas, glassFinish: gFin, frostedLocation: frostLoc,
+                spacerColor, spacerType, sealColour,
+                doorType, doorShape, doorStyle, doorPaneling, centerMullion: false,
+                doorHinge: hingeSide, doorOpenDirection: openDirection, lockType, doorBarType,
+                doorHBars: doorHB, doorVBars: doorVB,
+                sidePanels, sideLeftWidth: sideLeftW, sideRightWidth: sideRightW,
+                sideStyle, sideHBars: sideHB, sideVBars: sideVB,
+                transomType: isFrench ? transomType : 'none',
+                transomHeight, transomBars: isFrench ? transomBars : 'none',
+                thresholdType: threshold, thresholdExtension: thresholdExt,
+              } },
+            ));
+          } catch { return null; }
+        })(),
         doorOpening: 0,
         woodColor, woodColorExt: isSingle ? woodColor : woodColorExt,
         woodColorInt: isSingle ? woodColor : woodColorInt, sameColor: isSingle,
@@ -757,7 +787,7 @@ export default function ConfiguratorPage() {
       spacerColor, sashType, splitRatio, headType, openingType: opening,
       boxType: frameType === 'slim' ? 'slim' : 'standard', boxDepth: frameDepth,
     });
-  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, isArched, isFixedCas, isCircle, pcArchShape, isGothicUi, casArchProfile, casArchRiseSource, archStartNum, archRiseNum, casArchHinge, casArchPattern, isCustomHub, casArchSpokes, casArchRings, isArchedSash, sashArchHB, sashArchVB, sashLowerHB, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType]);
+  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, isArched, isFixedCas, isCircle, pcArchShape, isGothicUi, casArchProfile, casArchRiseSource, archStartNum, archRiseNum, casArchHinge, casArchPattern, isCustomHub, casArchSpokes, casArchRings, isArchedSash, sashArchHB, sashArchVB, sashLowerHB, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType, glassSpec, glassCoating, glassGas, spacerType]);
   useEffect(() => { sync(); }, [sync]);
 
   // ─── B4: Listen for 3D ready event and re-sync ───
