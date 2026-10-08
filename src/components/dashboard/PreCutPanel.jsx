@@ -281,6 +281,13 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
                         Bars: {optGroup.summary.totalBars} · Waste: {optGroup.summary.wasteTotal} mm · Util: {(optGroup.summary.utilAvg * 100).toFixed(1)}%
                       </div>
                     </div>
+                    {/* 08.10.2026: a piece longer than the stock bar is reported, never dropped
+                        (optimizer.js; a door jamb with a fanlight can exceed it) */}
+                    {optGroup.summary.overLength?.length > 0 && (
+                      <div className="text-[11px] text-amber-400 mb-2">
+                        Longer than the stock bar ({optGroup.summary.overLength[0].stockLength} mm): {optGroup.summary.overLength.map((o) => `${o.windowName ? `${o.windowName} ` : ''}${o.elementName} ${o.length}`).join(', ')}. Order longer stock or joint the piece.
+                      </div>
+                    )}
                     <div className="space-y-1">
                       {(() => {
                         const maxStock = Math.max(...optGroup.bars.map((b) => b.stockLength || stock));

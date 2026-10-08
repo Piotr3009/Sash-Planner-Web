@@ -120,6 +120,31 @@ const ENGINE_NAME_MAP = {
   // Bars
   'vertical glazing bar':        { symbol: 'VGB', name: 'Vertical Glazing Bar', group: 'bar', mirror: false },
   'horizontal glazing bar':      { symbol: 'HGB', name: 'Horizontal Glazing Bar', group: 'bar', mirror: false },
+  // Doors (08.10.2026, doors to production): one symbol per door part. Until
+  // then the fallback gave DFRA to head, jamb and cill alike and DSID to every
+  // side panel member. The leaf stile / top / bottom keep the symbols the
+  // fallback already printed (DSTI / DTOP / DBOT). partId = the Assign
+  // Materials row (the fan leaf buys the casement leaf rows).
+  'd-frame head':                { partId: 'd_frame_head', symbol: 'DFH', name: 'Door Frame Head', group: 'door', mirror: false },
+  'd-frame jamb (l)':            { partId: 'd_frame_jamb', symbol: 'DFJ', name: 'Door Frame Jamb', group: 'door', mirror: true },
+  'd-frame jamb (r)':            { partId: 'd_frame_jamb', symbol: 'DFJ', name: 'Door Frame Jamb', group: 'door', mirror: true },
+  'd-frame cill':                { partId: 'd_frame_cill', symbol: 'DFC', name: 'Door Frame Cill', group: 'door', mirror: false },
+  'd-frame cill (inward)':       { partId: 'd_frame_cill_inward', symbol: 'DFCI', name: 'Door Frame Cill (inward)', group: 'door', mirror: false },
+  'd-coupling post':             { partId: 'd_coupling_post', symbol: 'DCP', name: 'Door Coupling Post', group: 'door', mirror: false },
+  'd-transom':                   { partId: 'd_transom_rail', symbol: 'DTR', name: 'Door Transom Rail', group: 'door', mirror: false },
+  'd-stile (l)':                 { partId: 'd_leaf_stile', symbol: 'DSTI', name: 'Door Leaf Stile', group: 'door', mirror: true },
+  'd-stile (r)':                 { partId: 'd_leaf_stile', symbol: 'DSTI', name: 'Door Leaf Stile', group: 'door', mirror: true },
+  'd-meeting stile':             { partId: 'd_leaf_meeting_stile', symbol: 'DMS', name: 'Door Meeting Stile', group: 'door', mirror: false },
+  'd-top rail':                  { partId: 'd_leaf_top_rail', symbol: 'DTOP', name: 'Door Leaf Top Rail', group: 'door', mirror: false },
+  'd-bottom rail':               { partId: 'd_leaf_bottom_rail', symbol: 'DBOT', name: 'Door Leaf Bottom Rail', group: 'door', mirror: false },
+  'd-mid rail':                  { partId: 'd_leaf_mid_rail', symbol: 'DMR', name: 'Door Leaf Mid Rail', group: 'door', mirror: false },
+  'd-side stile':                { partId: 'd_side_stile', symbol: 'DSS', name: 'Side Panel Stile', group: 'door', mirror: true },
+  'd-side top rail':             { partId: 'd_side_top_rail', symbol: 'DST', name: 'Side Panel Top Rail', group: 'door', mirror: false },
+  'd-side bottom rail':          { partId: 'd_side_bottom_rail', symbol: 'DSB', name: 'Side Panel Bottom Rail', group: 'door', mirror: false },
+  'd-fan stile (l)':             { partId: 'c_sash_stile', symbol: 'DFS', name: 'Fan Leaf Stile', group: 'door', mirror: true },
+  'd-fan stile (r)':             { partId: 'c_sash_stile', symbol: 'DFS', name: 'Fan Leaf Stile', group: 'door', mirror: true },
+  'd-fan top rail':              { partId: 'c_sash_top_rail', symbol: 'DFT', name: 'Fan Leaf Top Rail', group: 'door', mirror: false },
+  'd-fan bottom rail':           { partId: 'c_sash_bottom_rail', symbol: 'DFB', name: 'Fan Leaf Bottom Rail', group: 'door', mirror: false },
 };
 
 /**

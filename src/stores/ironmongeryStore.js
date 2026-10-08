@@ -39,6 +39,8 @@ export const IRONMONGERY_CATEGORIES = [
   { key: 'multipointLocks', label: 'Multipoint Locks', windowType: 'door' },
   { key: 'thresholds', label: 'Thresholds', windowType: 'door' },
   { key: 'bolts', label: 'Bolts', windowType: 'door' },
+  // Euro cylinders for the door locks (08.10.2026, doors to production).
+  { key: 'cylinders', label: 'Cylinders', windowType: 'door' },
   { key: 'other', label: 'Others', windowType: 'sash' },
 ];
 

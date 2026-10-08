@@ -32,11 +32,24 @@ const MARGIN = 1.35;     // padding around the window in frame
 const SETTLE_MS = 350;   // let React commit the model + R3F settle before capture
 
 // Distance so that max(width,height) fits a square canvas at FOV (deg).
-function fitDistance(config) {
-  const w = (config.width || 1200) / 1000;
-  const h = (config.height || 1800) / 1000;
+// `box` (doors) overrides the size with the whole assembly.
+function fitDistance(config, box = null) {
+  const w = box ? box.w : (config.width || 1200) / 1000;
+  const h = box ? box.h : (config.height || 1800) / 1000;
   const half = (Math.max(w, h) * MARGIN) / 2;
   return half / Math.tan(((FOV / 2) * Math.PI) / 180);
+}
+
+// Doors (08.10.2026): the door group's origin is the centre of the door frame,
+// while side panels and a fanlight make the assembly wider, taller and off
+// centre. Frame the whole assembly from the engine totals (doorGeo, in mm,
+// origin top-left, y down); the interior view mirrors x (group rotated by PI).
+function doorFraming(config, side) {
+  const g = config.doorGeo;
+  if (!g || !(g.totalWidth > 0) || !(g.totalHeight > 0) || !(g.doorH > 0)) return null;
+  const cx = (g.totalWidth / 2 - (g.doorX + g.doorW / 2)) / 1000;
+  const cy = ((g.transomH || 0) + g.doorH / 2 - g.totalHeight / 2) / 1000;
+  return { x: side === 'interior' ? -cx : cx, y: cy, w: g.totalWidth / 1000, h: g.totalHeight / 1000 };
 }
 
 function CaptureScene({ config, side, onCaptured }) {
@@ -45,14 +58,15 @@ function CaptureScene({ config, side, onCaptured }) {
 
   // Fixed straight-front camera, sized to the current window.
   useLayoutEffect(() => {
-    const dist = fitDistance(config);
-    camera.position.set(0, 0, dist);
+    const box = doorFraming(config, side);
+    const dist = fitDistance(config, box);
+    camera.position.set(box ? box.x : 0, box ? box.y : 0, dist);
     camera.fov = FOV;
     camera.near = 0.01;
     camera.far = dist * 4 + 10;
-    camera.lookAt(0, 0, 0);
+    camera.lookAt(box ? box.x : 0, box ? box.y : 0, 0);
     camera.updateProjectionMatrix();
-  }, [config, camera]);
+  }, [config, camera, side]);
 
   // After settle: force a render of the current scene, then read the buffer.
   useEffect(() => {
@@ -115,6 +129,8 @@ function CaptureScene({ config, side, onCaptured }) {
             sillExtension={config.sillExtension || 0}
             sillWider={config.sillWider || false}
             sealColour={config.sealColour || 'black'}
+            ironmongery={config.ironmongery || 'brass'}
+            doorGeo={config.doorGeo || null}
             showGuides={false}
           />
         ) : (

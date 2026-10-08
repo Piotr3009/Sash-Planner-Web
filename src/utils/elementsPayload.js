@@ -22,6 +22,7 @@
  * design (Piotr 03.08) — only the contract and the mechanics are shared.
  */
 import { groupCasementLeaves, paneTitle } from '../components/drawings/casementDrawUtils.js';
+import { doorSheetPlan } from '../components/drawings/doorDrawUtils.js';
 import { svgNodeToPng } from './svgRaster.js';
 
 /**
@@ -63,11 +64,28 @@ export function elementsPlan(windowSpec, derived) {
     return { category, supported: true, leafGroups: [], rig: drawings.map((d) => d.key), hero: null, drawings, cill: null };
   }
 
-  // Doors DO derive now (engine v1: frame + leaf + glass), but they have no
-  // element detail drawings yet — only the elevation. Keeping supported:false
-  // here means the Elements tab still says "engine pending" instead of
-  // printing empty frames; revisit when DoorFrameDetail2D / DoorLeafDetail2D
-  // land. Fix frame has no engine at all.
+  // Doors (08.10.2026, doors to production): the frame detail is the hero
+  // sheet, then the leaf sheet (both leaves of a french door), one sheet per
+  // side panel and per opening fan leaf, and the plan section. One plan
+  // (doorDrawUtils.doorSheetPlan) for the Drawings panel, its PDF rig and the
+  // production pack. No cill page: the door cill shows on the frame sheet.
+  if (category === 'door' || category === 'doors') {
+    const sheets = doorSheetPlan(derived);
+    if (!sheets.length) return { category: 'door', supported: false, leafGroups: [], doorSheets: [], rig: [], hero: null, drawings: [], cill: null };
+    const heroSheet = sheets.find((x) => x.sheet === 'frame') || sheets[0];
+    return {
+      category: 'door',
+      supported: true,
+      leafGroups: [],
+      doorSheets: sheets,
+      rig: sheets.map((x) => x.key),
+      hero: { key: heroSheet.key, label: heroSheet.label },
+      drawings: sheets.filter((x) => x.key !== heroSheet.key).map((x) => ({ key: x.key, label: x.label })),
+      cill: null,
+    };
+  }
+
+  // Fix frame has no engine at all.
   return { category, supported: false, leafGroups: [], rig: [], hero: null, drawings: [], cill: null };
 }
 

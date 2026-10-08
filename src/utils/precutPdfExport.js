@@ -298,6 +298,15 @@ function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf, colourBy
   doc.setFontSize(10);
   tc(doc, C.gray);
   doc.text(`Bars: ${optGroup.summary.totalBars}  ·  Waste: ${optGroup.summary.wasteTotal} mm  ·  Utilization: ${(optGroup.summary.utilAvg * 100).toFixed(1)}%`, x, y);
+  // 08.10.2026: pieces longer than the stock bar (reported by optimizer.js, never dropped)
+  const over = optGroup.summary.overLength || [];
+  if (over.length) {
+    y += 6;
+    doc.setFont('helvetica', 'bold');
+    tc(doc, C.black);
+    doc.text(`Longer than the stock bar (${over[0].stockLength} mm): ${over.map((o) => `${o.windowName ? `${o.windowName} ` : ''}${o.elementName} ${o.length}`).join(', ')}`.slice(0, 160), x, y);
+    doc.setFont('helvetica', 'normal');
+  }
   y += 8;
 
   return y;
@@ -465,7 +474,30 @@ const KEY_LEAF = [
   [40, 356, 120, 30, 'leaf_bottom_rail'],
 ];
 
-function drawColourKeyPage(doc, PG, topY) {
+// Door key (08.10.2026): a door frame with a side panel (coupling post) and a
+// fanlight rail, and a french leaf (hinge stile, meeting stile, mid rail).
+const KEY_DOOR_FRAME = [
+  [126, 110, 176, 24, 'door_transom'],
+  [100, 32, 26, 322, 'door_post'],
+  [12, 32, 26, 322, 'door_frame_jambs'], [302, 32, 26, 322, 'door_frame_jambs'],
+  [12, 6, 316, 26, 'door_frame_head'],
+  [2, 354, 336, 32, 'door_frame_cill'],
+];
+const KEY_DOOR_LEAF = [
+  [40, 36, 120, 160, null],
+  [40, 220, 120, 110, null],
+  [10, 6, 30, 380, 'door_leaf_stiles'], [160, 6, 30, 380, 'door_meeting_stile'],
+  [40, 6, 120, 30, 'door_top_rail'],
+  [40, 196, 120, 24, 'door_mid_rail'],
+  [40, 330, 120, 56, 'door_bottom_rail'],
+];
+const KEY_SHEETS = {
+  casement: { title: 'COLOUR KEY · CASEMENT', frame: KEY_FRAME, leaf: KEY_LEAF, families: ['frame', 'leaf'] },
+  door: { title: 'COLOUR KEY · DOOR', frame: KEY_DOOR_FRAME, leaf: KEY_DOOR_LEAF, families: ['door_frame', 'door_leaf'] },
+};
+
+function drawColourKeyPage(doc, PG, topY, kind = 'casement') {
+  const K = KEY_SHEETS[kind] || KEY_SHEETS.casement;
   const k = PG.w / 297;      // A4 landscape = 1
   const u = 0.2646 * k;      // one grid unit in mm
   const byId = Object.fromEntries(PART_COLOUR_GROUPS.map((g) => [g.id, g]));
@@ -475,7 +507,7 @@ function drawColourKeyPage(doc, PG, topY) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18 * k);
   tc(doc, C.black);
-  doc.text('COLOUR KEY · CASEMENT', x0, y);
+  doc.text(K.title, x0, y);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10 * k);
   tc(doc, C.dark);
@@ -514,8 +546,8 @@ function drawColourKeyPage(doc, PG, topY) {
     });
   };
 
-  drawPart('FRAME', KEY_FRAME, 'frame', x0);
-  drawPart('LEAF', KEY_LEAF, 'leaf', x0 + 610 * u);
+  drawPart('FRAME', K.frame, K.families[0], x0);
+  drawPart('LEAF', K.leaf, K.families[1], x0 + 610 * u);
 }
 
 // ─── MAIN EXPORT ───
@@ -645,8 +677,11 @@ export function exportPreCutPDF({
   });
 
   // Colour by part: one key sheet at the end, to hang by the saw.
-  if (colourByPart && content !== 'list' && summaryGroups.some((sg) => colourGroupsIn(sg.items).length)) {
-    drawColourKeyPage(doc, PG, beginPage());
+  // Casement and door parts each have their own key sheet (08.10.2026).
+  if (colourByPart && content !== 'list') {
+    const fams = new Set(summaryGroups.flatMap((sg) => colourGroupsIn(sg.items).map((g) => g.family)));
+    if (fams.has('frame') || fams.has('leaf')) drawColourKeyPage(doc, PG, beginPage(), 'casement');
+    if (fams.has('door_frame') || fams.has('door_leaf')) drawColourKeyPage(doc, PG, beginPage(), 'door');
   }
 
   // Resolve the {tot} placeholder to the real page count on every page.

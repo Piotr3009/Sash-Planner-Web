@@ -46,7 +46,8 @@ export function groupCasementLeaves(derived) {
 export function casementPaneFinish(role, glazing) {
   const gz = glazing || {};
   if (gz.finish !== 'frosted') return gz.finish || 'clear';
-  const isFan = role === 'fan' || role === 'fan2';
+  // A door fanlight (role 'fanlight', 08.10.2026) is a fan too.
+  const isFan = role === 'fan' || role === 'fan2' || role === 'fanlight';
   if (isFan && (gz.frostedLocation || 'bottom') === 'bottom') return 'clear';
   return 'frosted';
 }

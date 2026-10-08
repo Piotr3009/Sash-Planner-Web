@@ -56,6 +56,7 @@ export function exportBomPDF(info) {
       ];
 
   const rows = (info.rows || []).map((r) => ({
+    note: r.note || null,
     cells: hidePrices
       ? [
           `${r.name}${r.ironmongery ? ' (irn)' : ''}${r.assigned === false ? ' — unassigned' : ''}`,

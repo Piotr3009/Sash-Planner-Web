@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { profileBoxDepth, getWindowProfile, getCasementProfile } from '../engine/profile.js';
+import { profileBoxDepth, getWindowProfile, getCasementProfile, getDoorProfile } from '../engine/profile.js';
 import * as cloud from '../services/cloudSync.js';
 
 // ─── Production settings (preserved from original — used by calculations engine) ───
@@ -376,6 +376,7 @@ export const useProjectStore = create((set, get) => ({
                 takenAt: new Date().toISOString(),
                 sash: JSON.parse(JSON.stringify(getWindowProfile())),
                 casement: JSON.parse(JSON.stringify(getCasementProfile())),
+                door: JSON.parse(JSON.stringify(getDoorProfile())),
               },
             }
           : b.defaults;

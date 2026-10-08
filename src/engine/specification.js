@@ -33,7 +33,7 @@ function detectGridMode(spec, item) {
 export const GLASS_MAKEUP = { double: '4x16x4', double_slim: '4x8x4', triple: '4x8x4x8x4', passive: '', single: '' };
 export const GLASS_THICKNESS = { double: 24, double_slim: 16, triple: 28 };
 // Laminate / Acoustic SPEC (Piotr 01.10.2026): the unit is 4 × 14 × 6.8 = 24.8mm whatever the
-// glass TYPE chip says (windows only — doors keep their own makeup), and it takes 24.8mm clips.
+// glass TYPE chip says, and it takes 24.8mm clips. Doors too since 08.10.2026 (owner box item 8).
 export const ACOUSTIC_MAKEUP = '4x14x6.8';
 export const ACOUSTIC_THICKNESS = 24.8;
 /**
@@ -57,16 +57,21 @@ export function glassMakeupFor(glazing, profile) {
   return profile?.glassMakeup?.[type] ?? (GLASS_MAKEUP[type] ?? GLASS_MAKEUP.double);
 }
 
-// Doors take THICKER panes than windows (Piotr 04.08): minimum 6mm glass, and
-// double/triple deliberately land on the SAME 28mm unit, so one rebate depth
-// serves both. Leaf member 61mm, frame 93mm with a deeper rebate.
-export const DOOR_GLASS_MAKEUP = { double: '6x16x6', triple: '4x8x4x8x4' };
-export const DOOR_GLASS_THICKNESS = 28;
-export const DOOR_LEAF_DEPTH = 61;
-export const DOOR_FRAME_DEPTH = 93;
+// Door glass (owner box item 8, 08.10.2026): the standard door unit is a
+// double 6 × 12 × 6 = 24mm (6mm panes, the same 24mm thickness as the 4-16-4
+// window unit, so the same rebate), so the door leaf is the casement 57 again
+// (61 with a triple, as casement). Slim and triple take the WINDOW makeups
+// (GLASS_MAKEUP, so the workshop's sash profile glassMakeup), and the
+// Laminate / Acoustic rule (isAcousticUnit, 24.8) applies to doors as well.
+// Until 07.10.2026 (door schema 1): double 6x16x6 and triple on ONE 28mm unit, leaf 61.
+export const DOOR_GLASS_MAKEUP = { double: '6x12x6' };
+export const DOOR_GLASS_THICKNESS = { double: 24, double_slim: 16, triple: 28 };
+// Read from the default door profile: the numbers live there and nowhere else.
+export const DOOR_LEAF_DEPTH = DEFAULT_DOOR_PROFILE.leafDepth;
+export const DOOR_FRAME_DEPTH = DEFAULT_DOOR_PROFILE.frameDepth;
 export const glassGas = (type) => (type === 'single' || type === 'passive') ? '' : 'argon';
 import { FAN_AXIS_OFFSET_TOP, FAN_AXIS_OFFSET_BOTTOM } from './casementLayouts.js';
-import { profileBoxDepth } from './profile.js';
+import { profileBoxDepth, getDoorProfile, DEFAULT_DOOR_PROFILE } from './profile.js';
 import {
   PSW_ARCH_SHAPE, PSW_ARCH_RISE_RATIO, PSW_SASH_RADIO_SHAPE, LEGACY_ARCH_SHAPES, ARCH_RISE_RATIO, GOTHIC_PROFILE_RATIO,
   ARCH_BAR_PATTERNS, isArchShape, isRoundShape, resolveRoundShape, ArchError, CIRCLE_SHAPE, patternsForShape,
@@ -337,9 +342,12 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
   const category = rawCategory === 'doors' ? 'door' : rawCategory;
   const isDoorCategory = category === 'door';
   // Frame depth — stored on the window; legacy windows fall back to the profile
-  const frameDepth = item?.frameDepth
-    || (isDoorCategory ? DOOR_FRAME_DEPTH
-      : profileBoxDepth(glassType === 'triple' ? 'triple' : frameType));
+  // Doors: always the door profile's frame depth (93). The configurator saved
+  // the SASH box depth (164) on doors until 08.10.2026, so a stored value is
+  // not read for a door.
+  const frameDepth = isDoorCategory
+    ? (Number(getDoorProfile().frameDepth) || DOOR_FRAME_DEPTH)
+    : (item?.frameDepth || profileBoxDepth(glassType === 'triple' ? 'triple' : frameType));
 
   // Opening type — new: item.openingType
   const openingType = item?.openingType || item?.opening_type || fc.openingType || 'both';
@@ -437,7 +445,9 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
         return 'single';   // 'multipoint' / 'standard' legacy → single handle
       })(),
       barType: item?.doorBarType || fc.doorBarType || 'astragal',
-      leafDepth: DOOR_LEAF_DEPTH,
+      // Informational: the engine reads the leaf depth from the door profile
+      // (57, 61 with a triple unit).
+      leafDepth: Number(glassType === 'triple' ? (getDoorProfile().leafDepthTriple || getDoorProfile().leafDepth) : getDoorProfile().leafDepth) || DOOR_LEAF_DEPTH,
       threshold: item?.thresholdType || fc.thresholdType || 'standard',
       thresholdExtension: Number(item?.thresholdExtension ?? fc.thresholdExtension) || 0,
       bars: {
@@ -452,7 +462,8 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
         barsH: Number(item?.sideHBars ?? fc.sideHBars) || 0,
         barsV: Number(item?.sideVBars ?? fc.sideVBars) || 0,
       },
-      // Coupled transom — french only; the engine/3D ignore it otherwise.
+      // Fanlight (coupled transom). The configurator offers it on a french
+      // door only; the engine builds whatever transom.type says, on any door type.
       transom: {
         type: item?.transomType || fc.transomType || 'none',
         height: Number(item?.transomHeight ?? fc.transomHeight) || 450,
@@ -490,11 +501,15 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       frostedLocation,
       coating: item?.glassCoating || fc.glassCoating || 'standard',
       gas: item?.glassGas ?? fc.glassGas ?? glassGas(glassType),
-      thickness: isDoorCategory ? DOOR_GLASS_THICKNESS : (isAcousticUnit({ spec: glassSpec, type: glassType }) ? ACOUSTIC_THICKNESS : (GLASS_THICKNESS[glassType] ?? 24)),
+      thickness: isAcousticUnit({ spec: glassSpec, type: glassType }) ? ACOUSTIC_THICKNESS
+        : isDoorCategory ? (DOOR_GLASS_THICKNESS[glassType] ?? GLASS_THICKNESS[glassType] ?? 24)
+        : (GLASS_THICKNESS[glassType] ?? 24),
       // Explicit per-window override only; otherwise undefined so consumers
       // fall back to the workshop profile's glassMakeup (live, snapshot-aware).
+      // A door double is the 6x12x6 door unit; a door slim / triple / Laminate
+      // / Acoustic unit takes the window makeup through the same fallback.
       makeup: item?.makeup ?? item?.glazing?.makeup
-        ?? (isDoorCategory ? (DOOR_GLASS_MAKEUP[glassType] || DOOR_GLASS_MAKEUP.double) : undefined),
+        ?? ((isDoorCategory && !isAcousticUnit({ spec: glassSpec, type: glassType }) && DOOR_GLASS_MAKEUP[glassType]) || undefined),
       toughened: glassSpec === 'toughened',
       frosted: glassFinish === 'frosted',
       spacerColour: spacerColor,

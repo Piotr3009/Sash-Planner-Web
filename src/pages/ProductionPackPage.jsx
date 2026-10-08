@@ -49,6 +49,10 @@ import CasementFrameDetail2D from '../components/drawings/CasementFrameDetail2D.
 import CasementLeafDetail2D from '../components/drawings/CasementLeafDetail2D.jsx';
 import CasementSection2D from '../components/drawings/CasementSection2D.jsx';
 import CasementElevation2D from '../components/drawings/CasementElevation2D.jsx';
+import DoorElevation2D from '../components/drawings/DoorElevation2D.jsx';
+import DoorSheet from '../components/drawings/DoorSheet.jsx';
+import DoorGlassDrawing2D from '../components/drawings/DoorGlassDrawing2D.jsx';
+import { groupDoorGlass } from '../components/drawings/doorDrawUtils.js';
 import { elementsPlan, buildElementsPayload, buildCillInset } from '../utils/elementsPayload.js';
 import GlassDrawing2D from '../components/drawings/GlassDrawing2D.jsx';
 import CasementGlassDrawing2D from '../components/drawings/CasementGlassDrawing2D.jsx';
@@ -150,9 +154,9 @@ export default function ProductionPackPage() {
 
     // Overview section bytes
     const ovWindows = windowsData.map((wd) => ({
-      projectNum: wd.win._projectNumber, name: wd.win.name, type: wd.win.sashType || 'double',
+      projectNum: wd.win._projectNumber, name: wd.win.name, type: overviewCells(wd).type,
       width: wd.win.width, height: wd.win.height, bars: winBarsLabel(wd),
-      head: wd.win.headType || 'flat', glass: wd.win.glassFinish || 'clear', opening: wd.win.openingType || 'both',
+      head: overviewCells(wd).head, glass: wd.win.glassFinish || 'clear', opening: overviewCells(wd).opening,
     }));
     const overviewBytes = exportOverviewPDF({ ...baseInfo, isPPMode, windows: ovWindows, returnDoc: true });
 
@@ -227,7 +231,7 @@ export default function ProductionPackPage() {
       const b = win._batch || batch;
       let derived = null;
       try {
-        derived = withProfiles(b?.defaults?._profileSnapshot?.sash, b?.defaults?._profileSnapshot?.casement, () => deriveWindowData(windowSpec, settings));
+        derived = withProfiles(b?.defaults?._profileSnapshot?.sash, b?.defaults?._profileSnapshot?.casement, b?.defaults?._profileSnapshot?.door, () => deriveWindowData(windowSpec, settings));
       } catch (e) {
         console.warn(`Calc failed for ${win.name}:`, e);
       }
@@ -283,7 +287,9 @@ export default function ProductionPackPage() {
       allGlass.push(...glass.map((g) => ({ ...g, windowName: win.name, _projectNumber: win._projectNumber })));
 
       // Hardware
-      const hw = buildHardwareList(windowSpec);
+      // doors (08.10.2026): the door hardware lines need the engine picks (derived);
+      // sash and casement keep the call they had
+      const hw = buildHardwareList(windowSpec, windowSpec?.category === 'door' ? derived : null);
       allHardware.push(...hw.map((h) => ({ ...h, windowName: win.name, _projectNumber: win._projectNumber })));
 
       // Beading
@@ -647,12 +653,37 @@ export default function ProductionPackPage() {
 // PDFs used win.upperBars here, which is a sash-only field → casement always
 // showed "none" while the Glass PDF was right (Piotr 02.08).
 function winBarsLabel(wd) {
-  if ((wd?.windowSpec?.category || 'sash') === 'casement') {
+  if ((wd?.windowSpec?.category || 'sash') === 'casement' || wd?.windowSpec?.category === 'door') {
     const rows = buildGlassListForWindow(wd.derived, wd.windowSpec) || [];
     const uniq = [...new Set(rows.map((r) => r.bars).filter(Boolean))];
     return uniq.length ? uniq.join(' / ') : 'none';
   }
   return wd?.win?.upperBars || 'none';
+}
+
+// Overview cells of one window (Type, Head, Opening, Box), ONE helper for the
+// screen, its PDF and the Book. A door (08.10.2026): Type single / french, the
+// style in the Head column, opening direction · lock · threshold in the Opening
+// column, the door profile depth (93) from the engine in the Box column. Sash
+// and casement keep their fields exactly as before.
+function overviewCells(wd) {
+  const win = wd?.win || {};
+  const d = wd?.windowSpec?.door;
+  if (wd?.windowSpec?.category === 'door' && d) {
+    const lock = d.type === 'french' ? (d.lockType === 'double' ? '2 handles' : '1 handle') : 'single kit';
+    return {
+      type: d.type === 'french' ? 'french' : 'single',
+      head: d.style || 'full-glass',
+      opening: `${d.openDirection || 'outward'} · ${lock} · ${d.threshold || 'standard'}`,
+      box: wd?.derived?.door?.frameDepth ?? wd?.windowSpec?.frame?.depth,
+    };
+  }
+  return {
+    type: win.sashType || 'double',
+    head: win.headType || 'flat',
+    opening: win.openingType || 'both',
+    box: win.frameDepth || (win.glassType === 'triple' ? 172 : win.frameType === 'slim' ? 144 : 164),
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -663,9 +694,9 @@ function OverviewTab({ batch, pp, isPPMode, windowsData, registerExport }) {
     const company = useProjectStore.getState().settings.company || {};
     const projects = [...new Set(windowsData.map(({ win }) => win._projectNumber).filter(Boolean))];
     const windows = windowsData.map((wd) => ({
-      projectNum: wd.win._projectNumber, name: wd.win.name, type: wd.win.sashType || 'double',
+      projectNum: wd.win._projectNumber, name: wd.win.name, type: overviewCells(wd).type,
       width: wd.win.width, height: wd.win.height, bars: winBarsLabel(wd),
-      head: wd.win.headType || 'flat', glass: wd.win.glassFinish || 'clear', opening: wd.win.openingType || 'both',
+      head: overviewCells(wd).head, glass: wd.win.glassFinish || 'clear', opening: overviewCells(wd).opening,
     }));
     exportOverviewPDF({
       companyName: company.companyName || 'COMPANY NAME',
@@ -737,14 +768,14 @@ function OverviewTab({ batch, pp, isPPMode, windowsData, registerExport }) {
                 <tr key={win.id} className="border-b border-surface-500/50 hover:bg-surface-700/30">
                   {isPPMode && <td className="px-4 py-2.5 text-accent-400 font-medium">{win._projectNumber}</td>}
                   <td className="px-4 py-2.5 text-ink-100 font-medium">{win.name}</td>
-                  <td className="px-4 py-2.5 text-ink-300">{win.sashType || 'double'}</td>
+                  <td className="px-4 py-2.5 text-ink-300">{overviewCells(wd).type}</td>
                   <td className="px-4 py-2.5 text-right text-ink-200">{win.width} mm</td>
                   <td className="px-4 py-2.5 text-right text-ink-200">{win.height} mm</td>
-                  <td className="px-4 py-2.5 text-right text-ink-200">{win.frameDepth || (win.glassType === 'triple' ? 172 : win.frameType === 'slim' ? 144 : 164)} mm</td>
+                  <td className="px-4 py-2.5 text-right text-ink-200">{overviewCells(wd).box} mm</td>
                   <td className="px-4 py-2.5 text-ink-300">{winBarsLabel(wd)}</td>
-                  <td className="px-4 py-2.5 text-ink-300">{win.headType || 'flat'}</td>
+                  <td className="px-4 py-2.5 text-ink-300">{overviewCells(wd).head}</td>
                   <td className="px-4 py-2.5 text-ink-300">{win.glassFinish || 'clear'}</td>
-                  <td className="px-4 py-2.5 text-ink-300">{win.openingType || 'both'}</td>
+                  <td className="px-4 py-2.5 text-ink-300">{overviewCells(wd).opening}</td>
                   <td className="px-4 py-2.5 text-center text-ink-200">{buildVentGrilles(windowSpec)}</td>
                   <td className="px-4 py-2.5 text-center">
                     <Link to={`/projects/${win._projectId}/batches/${win._batchId || win.batch_id}/windows/${win.id}`}
@@ -900,7 +931,9 @@ function ElevationsTab({ windowsData, pp, batch, registerExport }) {
             ) : (
               <>
                 <div ref={(el) => { refs.current[win.id] = el; }}>
-                  {plan.category === 'casement'
+                  {plan.category === 'door'
+                    ? <DoorElevation2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} />
+                    : plan.category === 'casement'
                     ? <CasementElevation2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} />
                     : <FrontElevation2D windowSpec={windowSpec} derived={derived} />}
                 </div>
@@ -1036,7 +1069,8 @@ function SectionsTab({ windowsData, pp, batch, registerExport }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: 2D Elements — per window, cards by category via elementsPlan():
 // sash = Box + Upper + Lower · casement = Frame + leaf groups (+ hidden cill
-// rig for the de-duplicated closing PDF page) · fix/door = "engine pending"
+// rig for the de-duplicated closing PDF page) · door = the door sheet plan
+// (08.10.2026) · fix frame = "engine pending"
 // ═══════════════════════════════════════════════════════════════
 function ElementsTab({ windowsData, pp, batch, registerExport }) {
   const [expandedDrawing, setExpandedDrawing] = useState(null); // { windowSpec, derived, type: 'box'|'upper'|'lower', title }
@@ -1100,6 +1134,20 @@ function ElementsTab({ windowsData, pp, batch, registerExport }) {
             /* fix / door: engine pending — mark clearly, never fake zeros. */
             <div className="card p-6 text-center text-xs text-ink-400">
               Elements for “{plan.category}” are not yet calculated — engine pending. This window is excluded from the Elements PDF.
+            </div>
+          ) : plan.category === 'door' ? (
+            /* Doors (08.10.2026): one card per door sheet of the plan (frame, leaves,
+               side panels, opening fan leaves, plan section), refs by plan key. */
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+              {plan.doorSheets.map((sh) => (
+                <div key={sh.key} className="card p-4 cursor-zoom-in"
+                  onClick={() => setExpandedDrawing({ windowSpec, derived, type: 'doorsheet', sheet: sh, title: `${win.name}: ${sh.label}`, projectNumber: win._projectNumber })}>
+                  <div className="text-xs font-semibold text-ink-200 mb-2">{sh.label}</div>
+                  <div ref={(el) => { refs.current[`${win.id}-${sh.key}`] = el; }}>
+                    <DoorSheet sheet={sh} windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : plan.category === 'casement' ? (
             <>
@@ -1202,6 +1250,9 @@ function ElementsTab({ windowsData, pp, batch, registerExport }) {
               )}
               {expandedDrawing.type === 'leaf' && (
                 <CasementLeafDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} group={expandedDrawing.group} projectNumber={expandedDrawing.projectNumber} />
+              )}
+              {expandedDrawing.type === 'doorsheet' && (
+                <DoorSheet sheet={expandedDrawing.sheet} windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} projectNumber={expandedDrawing.projectNumber} />
               )}
             </div>
           </div>
@@ -1395,7 +1446,17 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport, ex
 
       {/* Glass drawings per window — upper + lower */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {windowsData.flatMap(({ win, windowSpec, derived }) => (windowSpec?.category || 'sash') === 'casement'
+        {windowsData.flatMap(({ win, windowSpec, derived }) => windowSpec?.category === 'door'
+          // Doors (08.10.2026): one drawing per unique door unit (door leaves, side panels, fanlights)
+          ? groupDoorGlass(derived, windowSpec).map((gp) => (
+            <div key={`${win.id}-${gp.key}`} className="card p-4">
+              <div className="text-xs font-semibold text-ink-200 mb-2">
+                {isPPMode && win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name}: Glass {gp.w} × {gp.h} · ×{gp.panes.length}
+              </div>
+              <DoorGlassDrawing2D windowSpec={windowSpec} derived={derived} group={gp} />
+            </div>
+          ))
+          : (windowSpec?.category || 'sash') === 'casement'
           ? groupCasementGlass(derived, windowSpec).map((gp) => (
             <div key={`${win.id}-${gp.key}`} className="card p-4">
               <div className="text-xs font-semibold text-ink-200 mb-2">
@@ -1707,6 +1768,13 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
                         Bars: {optGroup.summary.totalBars} · Waste: {optGroup.summary.wasteTotal} mm · Util: {(optGroup.summary.utilAvg * 100).toFixed(1)}%
                       </div>
                     </div>
+                    {/* 08.10.2026: a piece longer than the stock bar is reported, never dropped
+                        (optimizer.js; a door jamb with a fanlight can exceed it) */}
+                    {optGroup.summary.overLength?.length > 0 && (
+                      <div className="text-[11px] text-amber-400 mb-2">
+                        Longer than the stock bar ({optGroup.summary.overLength[0].stockLength} mm): {optGroup.summary.overLength.map((o) => `${o.windowName ? `${o.windowName} ` : ''}${o.elementName} ${o.length}`).join(', ')}. Order longer stock or joint the piece.
+                      </div>
+                    )}
                     {/* Bars — scaled proportionally to longest bar */}
                     <div className="space-y-1">
                       {(() => {
@@ -2133,6 +2201,8 @@ const SPRAY_BEADINGS = {
   // casement (C- records from deriveCasementWindow); the triangle (ext) stays on the leaf, like the sash one
   'C-GLAZING BEADING': 'Glazing',
   'C-GEORGIAN MIDDLE BEADING': 'Georgian',
+  // doors (08.10.2026): the door glazing bead; door astragal beads use the C- names above
+  'D-GLAZING BEADING': 'Glazing',
 };
 const SPRAY_BAR_LEN_M = 3;            // beading supplied in 3 m bars
 const ceilHalf = (x) => Math.ceil(x * 2) / 2;   // round up to nearest 0.5
@@ -2193,8 +2263,19 @@ function SprayingTab({ windowsData, batch, pp, registerExport }) {
       const sW = Math.round(derived.sashWidth || 0);
       const tH = Math.round(derived.topSashHeight || 0);
       const bH = Math.round(derived.bottomSashHeight || 0);
-      // Casement (Piotr 21.09.2026): frame, then every leaf, then the fans — one row per pane, leaf size
-      const elements = derived.category === 'casement'
+      // Doors (08.10.2026): the frame of the whole assembly, every door leaf, each
+      // side panel leaf and each opening fan leaf, at the engine sizes.
+      const R0 = (v) => Math.round(Number(v) || 0);
+      const dr = derived.door;
+      const elements = derived.category === 'door' && dr
+        ? [
+            { element: 'Frame', size: `${R0(dr.totalWidth)} × ${R0(dr.totalHeight)}`, sort: 0 },
+            ...(dr.leaves || []).map((lf, i) => ({ element: dr.isFrench ? `Leaf P${i + 1} ${lf.role}` : 'Leaf', size: `${R0(lf.w)} × ${R0(lf.h)}`, sort: 1 })),
+            ...(dr.panelLeaves || []).map((pl) => ({ element: `Side panel ${pl.side}`, size: `${R0(pl.w)} × ${R0(pl.h)}`, sort: 2 })),
+            ...(dr.fanLeaves || []).map((fl, i) => ({ element: `Fan leaf${dr.fanLeaves.length > 1 ? ` ${i + 1}` : ''}`, size: `${R0(fl.w)} × ${R0(fl.h)}`, sort: 2 })),
+          ]
+        // Casement (Piotr 21.09.2026): frame, then every leaf, then the fans; one row per pane, leaf size
+        : derived.category === 'casement'
         ? [
             { element: 'Frame', size: `${fw} × ${fh}`, sort: 0 },
             ...(derived.casement?.leaves || []).map((lf, i) => {
@@ -2425,6 +2506,8 @@ function BOMTab({ batch, pp, isPPMode, windowsData, registerExport }) {
         estCost: r.costPerUnit > 0 ? `£${(r.qty * r.costPerUnit).toFixed(2)}` : '—',
         ironmongery: r.source === 'ironmongery',
         assigned: r._assigned,
+        // door lock kit variants (08.10.2026): quantity and variant, for the buyer
+        note: r.notes ? r.notes.map((n) => `${formatQty(n.qty, r.unit)} x ${n.note}`).join('; ') : null,
       })),
       total: `£${totalCost.toFixed(2)}`,
     });
@@ -2465,6 +2548,7 @@ function BOMTab({ batch, pp, isPPMode, windowsData, registerExport }) {
                       )}
                       <div>
                         <div className={`font-medium ${row._assigned ? 'text-ink-100' : 'text-ink-300 italic'}`}>{row.name}</div>
+                        {row.notes?.map((n) => <div key={n.note} className="text-[10px] text-ink-300">{formatQty(n.qty, row.unit)} × {n.note}</div>)}
                         <div className="text-[10px] text-ink-400 flex items-center gap-2">
                           {(row.material?.item_number || row.product?.item_number) && <span>{row.material?.item_number || row.product?.item_number}</span>}
                           {row.source === 'ironmongery' && <span className="text-[8px] px-1 py-0.5 rounded bg-surface-600 text-ink-400 border border-surface-500">ironmongery</span>}

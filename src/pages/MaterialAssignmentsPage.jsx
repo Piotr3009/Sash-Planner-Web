@@ -4,7 +4,7 @@ import MaterialPicker from '../components/MaterialPicker.jsx';
 import { useParams } from 'react-router-dom';
 import { useMaterialStore } from '../stores/materialStore.js';
 import { useIronmongeryStore, IRONMONGERY_CATEGORIES } from '../stores/ironmongeryStore.js';
-import { useMaterialAssignmentStore, SASH_WINDOW_PARTS, ALL_PARTS, CASEMENT_PARTS, CASEMENT_ALL_PARTS } from '../stores/materialAssignmentStore.js';
+import { useMaterialAssignmentStore, SASH_WINDOW_PARTS, ALL_PARTS, CASEMENT_PARTS, CASEMENT_ALL_PARTS, DOOR_PARTS, DOOR_ALL_PARTS, DOOR_SHARED_GLASS_IDS } from '../stores/materialAssignmentStore.js';
 import { liveSectionsFor, PART_REGISTRY, REGISTRY_VARIANTS } from '../engine/partRegistry.js';
 import { deriveWindowData } from '../engine/calculations.js';
 import { normaliseToWindowSpec } from '../engine/specification.js';
@@ -51,7 +51,7 @@ function PartRow({ part, assignment, materials, categories, subcategoriesByCateg
   const [open, setOpen] = useState(false);
   // Ironmongery rows open on their own catalogue tab (hinges → Casement Hinges)
   // until the user picks a filter; '' saved by the user means "All" and stays.
-  const selCat = assignment?.category ?? defaultCategory ?? '';
+  const selCat = assignment?.category ?? part.defaultCategory ?? defaultCategory ?? '';
   const selSub = assignment?.subcategory || '';
   const catLabel = (c) => categoryLabels?.[c] || c;
 
@@ -523,9 +523,16 @@ export default function MaterialAssignmentsPage() {
 
   // Stats — only for current type
   const isCasement = typeId === 'casement';
+  const isDoors = typeId === 'doors' || typeId === 'door';
   const typeParts = isSash
     ? [...REG_BOX_PARTS, ...REG_SASH_PARTS, ...SASH_WINDOW_PARTS.beading, ...SASH_WINDOW_PARTS.glass, ...SASH_WINDOW_PARTS.paint, ...SASH_WINDOW_PARTS.consumables, ...customPartRows]
-    : isCasement ? CASEMENT_ALL_PARTS : [];
+    : isCasement ? CASEMENT_ALL_PARTS : isDoors ? DOOR_ALL_PARTS : [];
+  // Doors (08.10.2026): the ironmongery tabs a door row may pick from, the
+  // door categories (cylinders included) and the shared ones.
+  const doorIronCategories = useMemo(() => {
+    const doorKeys = new Set(IRONMONGERY_CATEGORIES.filter((c) => c.windowType === 'door' || c.windowType === 'all').map((c) => c.key));
+    return ironCategories.filter((k) => doorKeys.has(k));
+  }, [ironCategories]);
   // Counter counts EVERY unit (part × variant), not families — the base
   // assignment still fills all four variants in one click via inheritance,
   // so the counter tells the whole truth without extra clicking.
@@ -547,8 +554,8 @@ export default function MaterialAssignmentsPage() {
   const totalParts = unitCounts.total;
   const assignedCount = unitCounts.assigned;
 
-  // Coming soon for the remaining types (casement is live)
-  if (!isSash && !isCasement) {
+  // Coming soon for the remaining types (sash, casement and doors are live)
+  if (!isSash && !isCasement && !isDoors) {
     return (
       <div className="p-6">
         <div className="mb-5">
@@ -806,6 +813,57 @@ export default function MaterialAssignmentsPage() {
           </div>
         </div>
         </div>}
+
+        {/* ══ Doors (08.10.2026, doors to production): own rows for timber, the
+             6-12-6 unit, the panel boards, the door bead and the ironmongery;
+             consumables, seals, clips, packers, astragal beads and paint are
+             the casement rows. ══ */}
+        {isDoors && (() => {
+          const common = {
+            assignments, onAssign: setAssignment, onFilter: setFilter, onYieldChange: setYield,
+            onRemove: removeAssignment, selectedPart, onSelect: toggleSelect,
+          };
+          const timber = { ...common, materials, categories, subcategoriesByCategory, disabled: locked };
+          const sharedGlass = SASH_WINDOW_PARTS.glass.filter((g) => DOOR_SHARED_GLASS_IDS.includes(g.id));
+          return (
+            <div className="max-w-5xl">
+              <PartGroupSection defaultOpen title="🪵 Frame"
+                subtitle={`${DOOR_PARTS.frame.length} parts · head, jambs, cill (outward / inward), coupling post, transom rail · the casement frame section`}
+                parts={DOOR_PARTS.frame} {...timber} />
+              <PartGroupSection defaultOpen title="🪵 Leaf"
+                subtitle={`${DOOR_PARTS.leaf.length} parts · stiles, meeting stile (french), top, bottom and mid rail · full leaf dimensions`}
+                parts={DOOR_PARTS.leaf} {...timber} />
+              <PartGroupSection title="🪵 Panel"
+                subtitle={`${DOOR_PARTS.panel.length} boards · half-glazed and three-quarter doors · m² from the engine`}
+                parts={DOOR_PARTS.panel} {...timber} />
+              <PartGroupSection title="🪵 Side panel"
+                subtitle={`${DOOR_PARTS.sidePanel.length} parts · fixed side panel leaf members`}
+                parts={DOOR_PARTS.sidePanel} {...timber} />
+              <PartGroupSection title="🔩 Ironmongery"
+                subtitle={`${DOOR_PARTS.ironmongery.length} rows · counts from the engine (hint "?" = the rule) · a product set in the window's door slot wins for that window`}
+                parts={DOOR_PARTS.ironmongery}
+                {...common} materials={ironItems} categories={doorIronCategories}
+                subcategoriesByCategory={ironSubcategoriesByCategory} categoryLabels={ironCategoryLabels}
+                disabled={locked} />
+              <PartGroupSection title="🧊 Door Glass"
+                subtitle="the 6-12-6 door unit · door leaves, side panels and fanlights"
+                parts={DOOR_PARTS.glass} {...timber} />
+              <PartGroupSection title="🧊 Glass shared with windows"
+                subtitle="read-only here · a door with slim, triple or the Laminate / Acoustic spec counts on these window rows (assign them on the Sash / Casement page)"
+                parts={sharedGlass} {...timber} disabled />
+              <PartGroupSection title="📏 Door Beading"
+                subtitle="door glazing bead · pane and panel perimeters + 15% · astragal beads on the casement rows"
+                parts={DOOR_PARTS.beading} {...timber} />
+              <div className="card p-4 mb-3 text-[11px] text-ink-300">
+                <div className="text-xs font-semibold text-ink-100 mb-1">Consumables and Paint: doors use the casement rows</div>
+                Silicone, bead tape 1mm / 2mm, frame and head &amp; jambs seals, glass clips, glazing packers, astragal beads
+                (triangle ext / georgian middle), paint (primer, preserver, topcoat) and the sill extension boards of a door
+                count on the Casement rows, whose hints say "also doors". The opening fanlight is a casement leaf: its timber,
+                hinges and lock count on the Casement leaf, hinge and lock rows.
+              </div>
+            </div>
+          );
+        })()}
 
         {isSash && <div className="flex gap-5 items-start">
         <div className="flex-1 min-w-0">
