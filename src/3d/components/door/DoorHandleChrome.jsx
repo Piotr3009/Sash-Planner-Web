@@ -80,6 +80,11 @@ function makeRoseBaseGeometry() {
   return geo;
 }
 
+// Height of the lever spindle above the backplate centre (m). Exported so the
+// door assembly can put the SPINDLE (the lock centre line) at the engine's
+// handle height (doors to production, brief 5.1).
+export const SPINDLE_Y = 0.06;
+
 // ===== Main component =====
 // Chrome door handle with backplate + curved lever.
 // Details (screw heads, euro cylinder keyhole) rendered as dark visual markers
@@ -89,18 +94,21 @@ export default function DoorHandleChrome({
   rotation = [0, 0, 0],
   scale = 1,
   side = "right", // "right" = lever points right, "left" = mirrored
+  // Doors to production (brief 5.1), optional: the ironmongery finish colour
+  // (DoorAssembly maps windowSpec.hardware.finish). Absent: chrome, as before.
+  color = null,
 }) {
   const metal = useMemo(
     () =>
       new THREE.MeshPhysicalMaterial({
-        color: "#bfc3c9",
+        color: color || "#bfc3c9",
         metalness: 1,
         roughness: 0.18,
         clearcoat: 0.55,
         clearcoatRoughness: 0.12,
         envMapIntensity: 1.2,
       }),
-    []
+    [color]
   );
 
   const screwMat = useMemo(
@@ -160,7 +168,7 @@ export default function DoorHandleChrome({
         <mesh
           geometry={roseBaseGeometry}
           material={metal}
-          position={[0.0, 0.06, 0.008]}
+          position={[0.0, SPINDLE_Y, 0.008]}
           castShadow
           receiveShadow
         />
@@ -169,7 +177,7 @@ export default function DoorHandleChrome({
         <mesh
           geometry={neckGeometry}
           material={metal}
-          position={[0.006, 0.06, 0.008]}
+          position={[0.006, SPINDLE_Y, 0.008]}
           castShadow
           receiveShadow
         />
@@ -178,13 +186,13 @@ export default function DoorHandleChrome({
         <mesh
           geometry={leverGeometry}
           material={metal}
-          position={[0.01, 0.06, 0.008]}
+          position={[0.01, SPINDLE_Y, 0.008]}
           castShadow
           receiveShadow
         />
 
         {/* Small spindle cap detail */}
-        <mesh position={[0.001, 0.06, 0.008]} material={metal} castShadow receiveShadow>
+        <mesh position={[0.001, SPINDLE_Y, 0.008]} material={metal} castShadow receiveShadow>
           <cylinderGeometry args={[0.004, 0.004, 0.012, 24]} />
         </mesh>
       </group>
