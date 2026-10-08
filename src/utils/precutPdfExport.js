@@ -298,6 +298,15 @@ function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf, colourBy
   doc.setFontSize(10);
   tc(doc, C.gray);
   doc.text(`Bars: ${optGroup.summary.totalBars}  ·  Waste: ${optGroup.summary.wasteTotal} mm  ·  Utilization: ${(optGroup.summary.utilAvg * 100).toFixed(1)}%`, x, y);
+  // 08.10.2026: pieces longer than the stock bar (reported by optimizer.js, never dropped)
+  const over = optGroup.summary.overLength || [];
+  if (over.length) {
+    y += 6;
+    doc.setFont('helvetica', 'bold');
+    tc(doc, C.black);
+    doc.text(`Longer than the stock bar (${over[0].stockLength} mm): ${over.map((o) => `${o.windowName ? `${o.windowName} ` : ''}${o.elementName} ${o.length}`).join(', ')}`.slice(0, 160), x, y);
+    doc.setFont('helvetica', 'normal');
+  }
   y += 8;
 
   return y;

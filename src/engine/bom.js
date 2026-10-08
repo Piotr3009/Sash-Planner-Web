@@ -530,6 +530,16 @@ export function buildWindowMaterialLines(win, { assignments, assignmentsData, ma
   const doorSlots = windowSpec.category === 'door'
     ? { ...(batch?.defaults?.ironmongerySlots || {}), ...(windowSpec?.hardware?.slots || {}) }
     : null;
+  // Door lock kits and FGTE cylinders come in variants the buyer selects on
+  // the supplier page (handing, backset, height band...): the variant of the
+  // engine's hardware row travels with the line as its note, and the
+  // purchase-list row lists its variants with their quantities (brief 3.5,
+  // the purchase list note; mergeMaterialLines).
+  const doorVariant = {};
+  if (windowSpec.category === 'door') {
+    (derived.door?.hardware?.detail || []).forEach((d) => { if (d.variant && d.partId) doorVariant[d.partId] = d.variant; });
+  }
+  const withVariant = (l) => (doorVariant[l.part?.id] ? { ...l, note: doorVariant[l.part.id] } : l);
   ALL_PARTS.forEach((part) => {
     const entry = partQtys[part.id];
     if (!entry) return;
@@ -541,12 +551,12 @@ export function buildWindowMaterialLines(win, { assignments, assignmentsData, ma
     const slotItemId = doorSlots && DOOR_PART_SLOT[part.id] ? doorSlots[DOOR_PART_SLOT[part.id]] : null;
     const slotProduct = slotItemId ? (ironmongeryItems || []).find((m) => m.id === slotItemId) : null;
     if (slotProduct) {
-      lines.push({
+      lines.push(withVariant({
         key: `mat:${slotProduct.id}`, name: slotProduct.name, unit,
         costPerUnit: Number(slotProduct.cost_per_unit) || 0,
         source: 'material', material: slotProduct, _assigned: true,
         qty: total, part, yieldCoeff,
-      });
+      }));
       return;
     }
 
@@ -556,7 +566,7 @@ export function buildWindowMaterialLines(win, { assignments, assignmentsData, ma
       const mat = materials.find((m) => m.id === assignment.material_id)
         || (ironmongeryItems || []).find((m) => m.id === assignment.material_id);
       if (mat) {
-        lines.push({
+        lines.push(withVariant({
           key: `mat:${mat.id}`,
           name: mat.name,
           unit,
@@ -565,12 +575,12 @@ export function buildWindowMaterialLines(win, { assignments, assignmentsData, ma
           material: mat,
           _assigned: true,
           qty: total, part, yieldCoeff,
-        });
+        }));
         return;
       }
     }
     // Unassigned — one line per part so the user sees what needs assigning
-    lines.push({
+    lines.push(withVariant({
       key: `part:${part.id}`,
       name: part.name,
       unit,
@@ -579,7 +589,7 @@ export function buildWindowMaterialLines(win, { assignments, assignmentsData, ma
       material: null,
       _assigned: false,
       qty: total, part, yieldCoeff,
-    });
+    }));
   });
 
   // ── ironmongeryStore products (via batch slots) ──
@@ -626,17 +636,26 @@ export function buildWindowMaterialLines(win, { assignments, assignmentsData, ma
 export function mergeMaterialLines(lines) {
   // key → { qty, name, unit, costPerUnit, source, material/product, _assigned }
   const acc = {};
+  const notes = {};   // key -> Map(variant note -> qty): door lock kit variants (08.10.2026)
   (lines || []).forEach((l) => {
     if (!acc[l.key]) {
       // The first line of a key names the row; the single-window detail
-      // (part / yieldCoeff / custom / line) stays behind.
-      const { key, qty, part, yieldCoeff, custom, line, ...fields } = l;
+      // (part / yieldCoeff / custom / line / note) stays behind.
+      const { key, qty, part, yieldCoeff, custom, line, note, ...fields } = l;
       acc[l.key] = { qty: 0, ...fields };
     }
     acc[l.key].qty += l.qty;
+    if (l.note) {
+      if (!notes[l.key]) notes[l.key] = new Map();
+      notes[l.key].set(l.note, (notes[l.key].get(l.note) || 0) + l.qty);
+    }
   });
 
-  const rows = Object.entries(acc).map(([key, v]) => ({ key, ...v }));
+  // A row whose lines carry variant notes lists them: [{ note, qty }] (the
+  // buyer picks each variant on the supplier page); other rows have no notes key.
+  const rows = Object.entries(acc).map(([key, v]) => (notes[key]
+    ? { key, ...v, notes: [...notes[key]].map(([note, qty]) => ({ note, qty })) }
+    : { key, ...v }));
   // Assigned first, then unassigned; alphabetical within each group
   rows.sort((a, b) => {
     if (a._assigned !== b._assigned) return a._assigned ? -1 : 1;

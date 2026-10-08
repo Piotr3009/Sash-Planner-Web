@@ -108,6 +108,8 @@ export default function ProjectDetailPage() {
         estCost: r.costPerUnit > 0 ? `£${(r.qty * r.costPerUnit).toFixed(2)}` : '—',
         ironmongery: r.source === 'ironmongery',
         assigned: r._assigned,
+        // door lock kit variants (08.10.2026): quantity and variant, for the buyer
+        note: r.notes ? r.notes.map((n) => `${formatQty(n.qty, r.unit)} x ${n.note}`).join('; ') : null,
       })),
       total: `£${totalCost.toFixed(2)}`,
     });
@@ -332,6 +334,7 @@ export default function ProjectDetailPage() {
                               )}
                               <div>
                                 <div className={`font-medium ${row._assigned ? 'text-ink-100' : 'text-ink-300 italic'}`}>{row.name}</div>
+                                {row.notes?.map((n) => <div key={n.note} className="text-[10px] text-ink-300">{formatQty(n.qty, row.unit)} × {n.note}</div>)}
                                 <div className="text-[10px] text-ink-400 flex items-center gap-2">
                                   {(row.material?.item_number || row.product?.item_number) && <span>{row.material?.item_number || row.product?.item_number}</span>}
                                   {row.source === 'ironmongery' && <span className="text-[8px] px-1 py-0.5 rounded bg-surface-600 text-ink-400 border border-surface-500">ironmongery</span>}

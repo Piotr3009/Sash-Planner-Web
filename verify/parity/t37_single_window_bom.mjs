@@ -199,7 +199,12 @@ for (const [name, ctx] of Object.entries(CTX)) {
     if (JSON.stringify(bom.mergeWindowMaterials(WINS, ctx)) !== JSON.stringify(bom.mergeMaterialLines(WINS.flatMap((w) => linesOf(w, ctx))))) bad.push(`${name}/ALL`);
   }
   ok(bad.length === 0, 'mergeWindowMaterials(windows) = mergeMaterialLines(the lines of every window), row for row', bad.join(' '));
-  const rowKeys = ['key', 'qty', 'name', 'unit', 'costPerUnit', 'source', 'material', 'product', '_assigned'];
+  // 08.10.2026 (doors to production, brief 3.5 "the purchase list note"): a row may list the variants of its
+  // lines with their quantities (`notes`, door lock kits only); a sum over windows, not one window's detail
+  const rowKeys = ['key', 'qty', 'name', 'unit', 'costPerUnit', 'source', 'material', 'product', '_assigned', 'notes'];
+  const noted = bom.mergeWindowMaterials(WINS, CTX.none).filter((r) => r.notes);
+  ok(noted.length > 0 && noted.every((r) => /^part:d_(lock_single_kit|lock_double_kit|cylinder)$/.test(r.key) && near(r.notes.reduce((a, n) => a + n.qty, 0), r.qty)),
+    `variant notes only on the door lock rows, their quantities add up to the row (${noted.map((r) => r.key).join(', ')})`);
   const extra = [...new Set(bom.mergeWindowMaterials(WINS, CTX.all).flatMap((r) => Object.keys(r)))].filter((k) => !rowKeys.includes(k));
   ok(extra.length === 0, 'a purchase-list row carries the row fields only — no single-window detail leaks into it', extra.join(','));
   ok(bom.mergeWindowMaterials([], CTX.all).length === 0 && bom.mergeWindowMaterials([{ derived: null, windowSpec: null }, { derived: WINS[0].derived, windowSpec: null }], CTX.all).length === 0 && bom.buildWindowMaterialLines(null, CTX.all).length === 0,

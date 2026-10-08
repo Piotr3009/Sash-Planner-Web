@@ -192,6 +192,15 @@ export function drawReportTable(doc, PG, { info, startY, title, columns, rows, t
       doc.setFontSize(c.mono ? 10 : 9.5);
       doc.text(String(val ?? ''), x + c.dx, y, c.align === 'right' ? { align: 'right' } : undefined);
     });
+    // optional note under the row (08.10.2026: the door lock kit variants the
+    // buyer selects), small and grey, in the first text column
+    if (row.note) {
+      const tx = x + (columns.find((c) => !c.auto)?.dx || 0);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); tc(doc, RC.gray);
+      doc.text(String(row.note), tx, y + 3.6);
+      tc(doc, RC.black);
+      y += 4;
+    }
     y += rowH; zebra++;
   });
 

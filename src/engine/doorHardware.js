@@ -179,12 +179,21 @@ export function selectDoorHardware({ leaves, isFrench, lockType, inward, thresho
       detail: [
         `master on the active leaf ${handWords}`,
         `${family === 'both' ? 'master and slave shootbolts' : 'slave shootbolts only'}`,
-        band ? `leaf ${leafH} → height band ${band.lo}-${band.hi}` : `leaf ${leafH} → ! no height band, verify size`,
+        band ? `leaf ${leafH}: height band ${band.lo}-${band.hi}` : `leaf ${leafH}: no height band, verify size`,
         `slave backset ${H.fgteSlaveBackset}`,
         `lock centre line ${H.fgteCentreLine}`,
         `shootbolt keep cill option ${fgte.cillKeep}`,
-      ].join(' · ') });
-    detail.push({ item: DOOR_HARDWARE_ITEMS.cylinder, partId: 'd_cylinder', quantity: 2, detail: 'keyed alike (FGTE pair)' });
+      ].join(' · '),
+      // the attributes the buyer selects on the supplier page (purchase list note)
+      variant: [
+        handing ? `${handing} ${HANDING_WORDS[handing]}` : null,
+        family === 'both' ? 'master and slave shootbolts' : 'slave shootbolts only',
+        band ? `height band ${band.lo}-${band.hi}` : 'no height band',
+        `slave backset ${H.fgteSlaveBackset}`,
+        `centre line ${H.fgteCentreLine}`,
+        `cill keep ${fgte.cillKeep}`,
+      ].filter(Boolean).join(' · ') });
+    detail.push({ item: DOOR_HARDWARE_ITEMS.cylinder, partId: 'd_cylinder', quantity: 2, detail: 'keyed alike (FGTE pair)', variant: 'keyed alike pair' });
     detail.push({ item: DOOR_HARDWARE_ITEMS.handle, partId: 'd_handle_set', quantity: 2, detail: 'one per leaf' });
   } else {
     add('d_lock_single_kit', 1);
@@ -197,7 +206,15 @@ export function selectDoorHardware({ leaves, isFrench, lockType, inward, thresho
         `backset ${H.backset}`,
         `faceplate ${H.faceplate}`,
         `keeps ${H.keeps}`,
-      ].join(' · ') });
+      ].join(' · '),
+      // the attributes the buyer selects on the supplier page (purchase list note)
+      variant: [
+        handing ? `${handing} ${HANDING_WORDS[handing]}` : null,
+        `door thickness ${H.doorThickness}`,
+        `backset ${H.backset}`,
+        `faceplate ${H.faceplate}`,
+        `keeps ${H.keeps}`,
+      ].filter(Boolean).join(' · ') });
     detail.push({ item: DOOR_HARDWARE_ITEMS.cylinder, partId: 'd_cylinder', quantity: 1, detail: '' });
     detail.push({ item: DOOR_HARDWARE_ITEMS.handle, partId: 'd_handle_set', quantity: 1, detail: isFrench ? 'active leaf' : '' });
     if (isFrench) {

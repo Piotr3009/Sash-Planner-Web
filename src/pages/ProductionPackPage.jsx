@@ -287,7 +287,9 @@ export default function ProductionPackPage() {
       allGlass.push(...glass.map((g) => ({ ...g, windowName: win.name, _projectNumber: win._projectNumber })));
 
       // Hardware
-      const hw = buildHardwareList(windowSpec);
+      // doors (08.10.2026): the door hardware lines need the engine picks (derived);
+      // sash and casement keep the call they had
+      const hw = buildHardwareList(windowSpec, windowSpec?.category === 'door' ? derived : null);
       allHardware.push(...hw.map((h) => ({ ...h, windowName: win.name, _projectNumber: win._projectNumber })));
 
       // Beading
@@ -1766,6 +1768,13 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
                         Bars: {optGroup.summary.totalBars} · Waste: {optGroup.summary.wasteTotal} mm · Util: {(optGroup.summary.utilAvg * 100).toFixed(1)}%
                       </div>
                     </div>
+                    {/* 08.10.2026: a piece longer than the stock bar is reported, never dropped
+                        (optimizer.js; a door jamb with a fanlight can exceed it) */}
+                    {optGroup.summary.overLength?.length > 0 && (
+                      <div className="text-[11px] text-amber-400 mb-2">
+                        Longer than the stock bar ({optGroup.summary.overLength[0].stockLength} mm): {optGroup.summary.overLength.map((o) => `${o.windowName ? `${o.windowName} ` : ''}${o.elementName} ${o.length}`).join(', ')}. Order longer stock or joint the piece.
+                      </div>
+                    )}
                     {/* Bars — scaled proportionally to longest bar */}
                     <div className="space-y-1">
                       {(() => {
@@ -2497,6 +2506,8 @@ function BOMTab({ batch, pp, isPPMode, windowsData, registerExport }) {
         estCost: r.costPerUnit > 0 ? `£${(r.qty * r.costPerUnit).toFixed(2)}` : '—',
         ironmongery: r.source === 'ironmongery',
         assigned: r._assigned,
+        // door lock kit variants (08.10.2026): quantity and variant, for the buyer
+        note: r.notes ? r.notes.map((n) => `${formatQty(n.qty, r.unit)} x ${n.note}`).join('; ') : null,
       })),
       total: `£${totalCost.toFixed(2)}`,
     });
@@ -2537,6 +2548,7 @@ function BOMTab({ batch, pp, isPPMode, windowsData, registerExport }) {
                       )}
                       <div>
                         <div className={`font-medium ${row._assigned ? 'text-ink-100' : 'text-ink-300 italic'}`}>{row.name}</div>
+                        {row.notes?.map((n) => <div key={n.note} className="text-[10px] text-ink-300">{formatQty(n.qty, row.unit)} × {n.note}</div>)}
                         <div className="text-[10px] text-ink-400 flex items-center gap-2">
                           {(row.material?.item_number || row.product?.item_number) && <span>{row.material?.item_number || row.product?.item_number}</span>}
                           {row.source === 'ironmongery' && <span className="text-[8px] px-1 py-0.5 rounded bg-surface-600 text-ink-400 border border-surface-500">ironmongery</span>}

@@ -26,8 +26,9 @@ export function doorSheetPlan(derived) {
   const dr = derived?.door;
   if (!dr) return [];
   const plan = [
-    { key: 'doorframe', label: 'Frame Detail', sheet: 'frame', props: {} },
-    { key: 'doorleaf', label: dr.isFrench ? 'Leaf Detail (both leaves)' : 'Leaf Detail', sheet: 'leaf', props: {} },
+    // the tab names the owner knows (Frame / Leaf / Sections) are kept
+    { key: 'doorframe', label: 'Frame', sheet: 'frame', props: {} },
+    { key: 'doorleaf', label: 'Leaf', sheet: 'leaf', props: {} },
   ];
   (dr.panelLeaves || []).forEach((pl) => {
     plan.push({ key: `doorside-${pl.side}`, label: `Side Panel ${pl.side === 'left' ? 'Left' : 'Right'}`, sheet: 'side', props: { side: pl.side } });
@@ -36,7 +37,7 @@ export function doorSheetPlan(derived) {
   fans.forEach((fl, i) => {
     plan.push({ key: `doorfan-${i}`, label: fans.length > 1 ? `Fanlight ${i + 1} (${fl.over}${fl.side ? ` ${fl.side}` : ''})` : 'Fanlight Leaf', sheet: 'fan', props: { index: i } });
   });
-  plan.push({ key: 'doorsection', label: 'Plan Section', sheet: 'section', props: {} });
+  plan.push({ key: 'doorsection', label: 'Sections', sheet: 'section', props: {} });
   return plan;
 }
 

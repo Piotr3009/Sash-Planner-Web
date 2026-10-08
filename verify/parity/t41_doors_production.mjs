@@ -31,7 +31,7 @@
  *   4  styles: mid rail, glass and panel (half-glazed, three-quarter)
  *   5  hardware: counts, hinges 3 / 4, handing, FGTE band, thresholds, detail lines
  *   6  BOM part quantities: every D- part maps, glass rows, casement rows, paint
- *   7  pre-cut: one assigned material = one group; unassigned never 63x63
+ *   7  pre-cut: one assigned material = one group; unassigned by the section map, else the finished section
  *   8  cut list: door groups, notes kept when rows merge
  *   9  fanlight: opening = casement leaf + casement picks; fixed as before
  *  10  side panels and bars (door, side panel, transom 'match')
@@ -341,7 +341,16 @@ section('7 - pre-cut: one assigned material = one group');
   const un = lists.buildPrecutForWindow(F.derived, F.spec, {}, null);
   const secs = un.sashEngineering.map((g) => g.section);
   ok(!secs.includes('63x63') && secs.includes('94x57') && secs.includes('100x57') && secs.includes('180x57') && un.boxSapele.length === 0,
-    `unassigned: by finished section (${secs.join(', ')}), never the sash 63x63, frame members in the same list`);
+    `unassigned: leaf and frame members by finished section (${secs.join(', ')}), never the sash profile fallback 63x63, frame members in the same list`);
+  // a 57x57 side panel member is what the workshop section map names (57x57 -> 63x63 raw); a
+  // section map entry for a door section is honoured, the sash profile fallback never is
+  const unS = lists.buildPrecutForWindow(french(1600, 2100, { sidePanels: 'left', sideLeftWidth: 500 }).derived, french(1600, 2100, { sidePanels: 'left', sideLeftWidth: 500 }).spec, {}, null);
+  const sideGroup = unS.sashEngineering.find((g) => g.items.some((i) => i.elementName === 'D-SIDE STILE'));
+  ok(sideGroup?.section === '63x63' && sideGroup.items.every((i) => /^D-SIDE /.test(i.elementName)) && unS.sashEngineering.some((g) => g.section === '94x57'),
+    `unassigned side panel members (57x57) follow the workshop section map: ${sideGroup?.section}, their own group; the leaf stays 94x57`);
+  const unM = lists.buildPrecutForWindow(F.derived, F.spec, { sectionMap: { '94x57': '100x63' } }, null);
+  ok(unM.sashEngineering.some((g) => g.section === '100x63' && g.items.some((i) => i.elementName === 'D-STILE (L)' || i.elementName === 'D-STILE (R)')),
+    'a section map entry for a door section (94x57 -> 100x63) is honoured');
   const sel = bom.assignedMaterialForItems(pre.sashEngineering[0].items, { assignments: LIVE.partRegistry.expandAssignments(data), assignmentsData: data, materials });
   ok(sel?.id === 'oak', 'the pre-cut group header names the assigned material');
   const sym = (n) => LIVE.partSymbols.getPartSymbol(n).symbol;
@@ -553,7 +562,24 @@ section('16 - the window door slot, optimiser over-length');
   const lines = bom.buildWindowMaterialLines({ derived: S.derived, windowSpec: spec, batch: null }, ctx);
   const l = (k) => lines.find((x) => x.key === k);
   ok(l('mat:irn-hinge')?.qty === 3 && l('mat:irn-cyl')?.qty === 1 && !l('part:d_hinges') && !l('part:d_cylinder'), 'a product in the window\'s door slot is bought on the row\'s count (3 hinges, 1 cylinder)');
-  ok(l('part:d_lock_single_kit')?.qty === 1 && l('part:d_handle_set')?.qty === 1, 'rows without a slot product stay on their row');
+  // the lock kit line carries its variant as its note (brief 3.5, the purchase list note); the row key
+  // does not change, the purchase-list row lists its variants with their quantities
+  const kit = lines.find((x) => x.part?.id === 'd_lock_single_kit');
+  ok(kit?.qty === 1 && kit.key === 'part:d_lock_single_kit' && l('part:d_handle_set')?.qty === 1, 'rows without a slot product stay on their row');
+  ok(/^(LH anti-clockwise closing|RH clockwise closing) · door thickness 56 · backset 45 · faceplate radius · keeps full length$/.test(kit?.note || ''), `ThunderBolt variant note: "${kit?.note}"`);
+  const R = door(900, 2100, { doorHinge: 'right' });
+  const two = bom.mergeWindowMaterials([{ derived: S.derived, windowSpec: S.spec, batch: null }, { derived: R.derived, windowSpec: R.spec, batch: null }], ctx);
+  const same = bom.mergeWindowMaterials([{ derived: S.derived, windowSpec: S.spec, batch: null }, { derived: S.derived, windowSpec: S.spec, batch: null }], ctx);
+  const kitRow = (rows) => rows.find((r) => r.key === 'part:d_lock_single_kit');
+  ok(kitRow(two)?.qty === 2 && kitRow(two).notes?.length === 2 && kitRow(two).notes.every((n) => n.qty === 1) && new Set(kitRow(two).notes.map((n) => n.note.slice(0, 2))).size === 2
+    && kitRow(same)?.qty === 2 && kitRow(same).notes?.length === 1 && kitRow(same).notes[0].qty === 2,
+    `purchase list: one kit row x2 listing its variants (${(kitRow(two)?.notes || []).map((n) => `${n.qty} ${n.note.slice(0, 2)}`).join(' + ')}); two equal doors: one variant x2`);
+  ok(two.filter((r) => r.notes).every((r) => /^part:d_(lock_single_kit|lock_double_kit|cylinder)$/.test(r.key)), 'only the lock kit (and FGTE cylinder) rows carry variant notes');
+  const FD = french(1600, 2100, { lockType: 'double' });
+  const fl = bom.buildWindowMaterialLines({ derived: FD.derived, windowSpec: FD.spec, batch: null }, ctx);
+  const fk = fl.find((x) => x.part?.id === 'd_lock_double_kit');
+  ok(/slave shootbolts only · height band 1965-2161 · slave backset 45 · centre line 22 · cill keep yes$/.test(fk?.note || '') && fl.find((x) => x.part?.id === 'd_cylinder')?.note === 'keyed alike pair',
+    `FGTE variant note: "${fk?.note}"; cylinders "keyed alike pair"`);
   ok(!lines.some((x) => x.line), 'no hardware line counted twice (door lines are engine parts)');
   const det = bom.windowHardwareDetailRows(spec, null, IRN, S.derived);
   ok(det.some((r) => r.item === 'Winkhaus hinge' && /weight for information/.test(r.detail)) && det.every((r) => !('assigned' in r)), 'BOM PDF detail: the slot product name with the engine detail');
