@@ -409,7 +409,8 @@ export function buildMergedGlassEntities(items) {
 export function glassDxfParamsForWindow(windowSpec, derived, name) {
   if (!windowSpec) return { skip: 'no data' };
   const category = windowSpec.category || 'sash';
-  if (category !== 'casement' && category !== 'sash') return { skip: 'not a casement or sash window' };
+  // Doors (08.10.2026): rectangular units from the glass schedule, bars from the rows.
+  if (category !== 'casement' && category !== 'sash' && category !== 'door') return { skip: 'not a casement or sash window' };
   if (!derived) return { skip: 'window could not be calculated' };
   // night 7 stage 1: EVERY glass unit goes in the file, shaped or not — only a
   // window that carries no glass at all is skipped

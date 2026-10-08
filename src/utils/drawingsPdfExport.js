@@ -190,6 +190,7 @@ export function exportElementsPDF(info) {
     const ds = win.drawings || [];
     const hadHero = !!(win.hero && win.hero.image);
     if (!ds.length && hadHero) return;    // hero only — no empty grid sheet
+    if (!ds.length) return;               // nothing drawn for this window: no empty sheet (08.10.2026)
     for (let i = 0; i < Math.max(1, ds.length); i += perPage) {
       pages.push({ win, drawings: ds.slice(i, i + perPage), cont: i > 0 || hadHero });
     }

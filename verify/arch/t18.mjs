@@ -424,11 +424,12 @@ section('4 — glazier DXF: ezdxf round-trip, samples docs/handover/samples/samp
   const pb = glassDxf.polyBBox([[0, 0, 0], [811, 0, 0], [811, 898.5, 1], [0, 898.5, 0]], true);
   check('polyBBox: a semi-circle contour (bulge 1) reaches the apex 1304, not the vertex top 898.5', near(pb.maxY, 1304, 1e-6) && near(pb.minY, 0, 1e-9) && near(pb.maxX, 811, 1e-9));
   check('merged: labels TC1 / SC1 / GO1 in the TEXT layer', ['TC1', 'SC1', 'GO1'].every((n) => pm.texts.some((t) => t.text.startsWith(`${n} - G1 GLASS`))));
-  // a pack with nothing to export is now a pack with NO GLASS at all (a door):
-  // a rectangular window is legitimate glass and exports
-  const door = specification.normaliseToWindowSpec({ id: 'D', name: 'D', width: 1000, height: 2100 }, { fullConfig: { windowCategory: 'door', doorLayout: 'D01' } });
-  const none = glassDxf.exportGlassDxfMerged([{ windowSpec: door, derived: derive(door), name: 'D' }], 'Pack 2');
-  check('merged with no glass at all (a door) → error + skipped, no download', none.error === 'No glass units in this pack' && none.skipped.length === 1 && clicks === clicksBefore + 1, JSON.stringify(none));
+  // a pack with nothing to export is now a pack with NO GLASS at all: a rectangular
+  // window is legitimate glass and exports. 08.10.2026: a door exports its units now,
+  // so the empty pack is a fix frame window (no engine, no glass) instead of a door.
+  const fix = specification.normaliseToWindowSpec({ id: 'X', name: 'X', width: 1000, height: 1200 }, { fullConfig: { windowCategory: 'fix-frame' } });
+  const none = glassDxf.exportGlassDxfMerged([{ windowSpec: fix, derived: derive(fix), name: 'X' }], 'Pack 2');
+  check('merged with no glass at all (a fix frame window) → error + skipped, no download', none.error === 'No glass units in this pack' && none.skipped.length === 1 && clicks === clicksBefore + 1, JSON.stringify(none));
   URL.createObjectURL = origCreate; URL.revokeObjectURL = origRevoke; delete globalThis.document;
 }
 

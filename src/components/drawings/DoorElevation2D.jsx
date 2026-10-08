@@ -1,311 +1,342 @@
 /**
  * DoorElevation2D.jsx
  *
- * Exterior view of a door assembly — always drawn from OUTSIDE (Piotr 05.08),
- * same system as CasementElevation2D: mm coordinates, dark theme, non-scaling
- * strokes, Dim helpers from drawingUtils. ALL geometry comes from
- * derived.door.zones (engine single source) — this sheet computes no widths
- * itself, so it can never disagree with the cut list or the Leaf sheet.
+ * Exterior view of a door assembly, always drawn from OUTSIDE (Piotr 05.08),
+ * in the casement drawing system: mm coordinates, dark theme, non-scaling
+ * strokes, the Dim helpers of drawingUtils, the overall width at the TOP and
+ * the heights on the RIGHT (Piotr 06.09). Every position comes from
+ * derived.door (deriveDoorWindow, doors to production 08.10.2026): the leaves
+ * with their daylights, mid rails, panels, bars, hinges and handle height, the
+ * fixed side panel leaves, the opening fan leaves or the fixed fan panes, the
+ * coupling posts and the transom band. The sheet computes no widths itself,
+ * so it cannot disagree with the cut list, the leaf sheet or the 3D.
  *
  * ASSEMBLY (v4, Piotr 09.08): side panels are coupled OUTSIDE the door frame,
- * each with its own width, so the drawing spans leftPanel + door + rightPanel.
- * Head and cill are single pieces across the whole assembly; between a panel
- * and the door stands ONE coupling post 114 with two rebates — only its
- * visible band is drawn (72 outward · 93 inward, engine zones.posts), never
- * the full member, because from outside the leaves cover the rebates.
+ * each with its own width; head and cill run across the whole assembly; ONE
+ * coupling post (2 x the jamb face) stands between a panel and the door. From
+ * outside only the band the leaves leave free is seen: the land on each side,
+ * the full jamb face on the door side of an inward door (its rebate is on the
+ * interior). The fanlight sits above the door zone; the band between the fan
+ * and the door leaves is drawn as zones.transom.band.
  *
- * Members are read from the gap between the leaf outline and the glass, same
- * as the sash and casement sheets (Piotr 09.08 — "patrz sash or casement,
- * dokładnie tak narysuj"); no separate hairlines over the glass. Glass sizes
- * are deliberately NOT dimensioned here — the glass schedule owns them.
- * Handle sits 1000mm off the floor, constant, matching DoorPanel.jsx:929.
+ * FRENCH: two leaves, no centre mullion; each leaf runs the lip past the
+ * centre line on its meeting stile, so the leaves overlap by twice the lip.
+ * The leaf lapping on the exterior (zones.meetingLap) is drawn in front and
+ * the hidden meeting edge of the other one dashed. With one handle (lockType
+ * single) the passive leaf carries bolts top and bottom; with two handles the
+ * FGTE kit carries the shootbolts (a note).
  *
- * FRENCH: two leaves, NO centre mullion ever — the meeting stiles are rebated
- * 6mm with a 3mm clearance (94 + 94 − 6 = 182 meeting band). The passive leaf
- * carries bolts top + bottom.
+ * Members are read from the gap between the leaf outline and the glass, the
+ * sash and casement way; glass sizes live on the leaf and glass sheets.
  */
 import { useMemo } from 'react';
-import { getDoorProfile } from '../../engine/profile.js';
-import { computeBarPositions, DimH, DimV, TitleBlock, Label } from './drawingUtils.jsx';
-import { COLORS, STROKES } from './drawingTheme.js';
+import { DimH, DimV, TitleBlock, Label } from './drawingUtils.jsx';
+import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
+import {
+  NS, num, fmt, safely, NoSheet, doorProfileParts, thresholdText,
+  OpeningSymbol, BarBands, HingeBarrels, HandleSymbol,
+} from './doorSheetParts.jsx';
 
-const NS = { vectorEffect: 'non-scaling-stroke' };
-const BAR_WIDTH = 22;
-const HANDLE_FLOOR_MM = 1000;   // constant, matches the 3D door panel
-// Hinge barrel as modelled in 3D (DoorWindow.jsx) — 10mm wide, 102mm tall.
-const HINGE_H = 102;
-const HINGE_W = 10;
+const STYLE_NAMES = { 'half-glazed': 'Half glazed', 'three-quarter': 'Three quarter' };
 
-function fmt(n) {
-  const r = Math.round(n * 2) / 2;
-  return Number.isInteger(r) ? r.toString() : r.toFixed(1);
-}
+function buildElevation(windowSpec, derived) {
+  const dr = derived?.door;
+  const z = dr?.zones;
+  const m = dr?.members;
+  if (!windowSpec || !dr || !z || !m) return null;
+  const W = num(z.totalWidth);
+  const H = num(z.totalHeight);
+  if (!(W > 0 && H > 0)) return null;
+  const pp = doorProfileParts();
+  const inward = !!dr.inward;
+  const tz = z.transom && num(z.transom.h, 0) > 0 ? z.transom : null;
+  const zoneTop = tz ? num(tz.h, 0) : 0;
+  const bottomVis = dr.hasTimberCill ? (inward ? pp.cillInward.faceExternal : pp.cillVisible) : 0;
+  const frames = (z.frames || []).length ? z.frames : [{ x: 0, w: W, kind: 'door' }];
 
-/**
- * Hinge centres — identical spacing to the 3D model, y grows downwards:
- * top 200 below leaf top · middle 100 above centre · bottom 150 above leaf
- * bottom. 4th hinge between top and middle above 2100mm leaf height
- * (Piotr 05.08 + 09.08 — "3 do 2100, 4 powyżej").
- */
-function hingePositions(leafY, leafH) {
-  const top = leafY + 200;
-  const middle = leafY + leafH / 2 - 100;
-  const bottom = leafY + leafH - 150;
-  return leafH > 2100
-    ? [top, (top + middle) / 2, middle, bottom]
-    : [top, middle, bottom];
+  // Openings of the frame as seen from outside, per frame (a coupling post
+  // shows the land, or the jamb face on the door side of an inward door).
+  const visOf = (f) => (f.kind === 'door' && inward ? m.frameJamb : m.land);
+  const openings = [];
+  frames.forEach((f) => {
+    const v = visOf(f);
+    if (tz) {
+      openings.push({ x: f.x + m.land, y: m.land, w: f.w - 2 * m.land, h: tz.band.y - m.land, fan: true });
+      const top = tz.band.y + tz.band.h + (v - m.land);
+      openings.push({ x: f.x + v, y: top, w: f.w - 2 * v, h: H - bottomVis - top });
+    } else {
+      openings.push({ x: f.x + v, y: v, w: f.w - 2 * v, h: H - bottomVis - v });
+    }
+  });
+
+  const leaves = dr.leaves || [];
+  const french = !!dr.isFrench && leaves.length === 2;
+  // The door frame opening across (what an inward door's jamb faces leave seen)
+  const doorFrame = frames.find((f) => f.kind === 'door') || null;
+  const doorVis = doorFrame ? visOf(doorFrame) : 0;
+  const doorOpen = doorFrame
+    ? { x0: doorFrame.x + doorVis, x1: doorFrame.x + doorFrame.w - doorVis }
+    : { x0: 0, x1: W };
+  const lap = z.meetingLap || null;
+  const otherRole = (r) => (r === 'active' ? 'passive' : 'active');
+  const frontRole = french && lap ? (lap.face === 'exterior' ? lap.leaf : otherRole(lap.leaf)) : null;
+  const kit = dr.hardware?.kit || (french && dr.lockType === 'double' ? 'fgte' : 'thunderbolt');
+  const hasHandle = (l) => l.role === 'single' || l.role === 'active' || (french && kit === 'fgte');
+  const hasBolts = (l) => french && kit !== 'fgte' && l.role === 'passive';
+  const handleLeaf = leaves.find(hasHandle) || null;
+
+  return {
+    dr, z, m, pp, W, H, inward, tz, zoneTop, bottomVis, frames, openings,
+    leaves, french, frontRole, kit, hasHandle, hasBolts, handleLeaf, doorOpen,
+    fanLeaves: dr.fanLeaves || [],
+    fanPanes: tz?.fanPanes || [],
+    panelLeaves: dr.panelLeaves || [],
+  };
 }
 
 export default function DoorElevation2D({ windowSpec, derived, projectNumber }) {
-  const geom = useMemo(() => {
-    const dr = derived?.door;
-    if (!windowSpec || !dr || !dr.zones) return null;
-    const doorW = Number(windowSpec.frame?.width ?? 0);
-    const doorH = Number(windowSpec.frame?.height ?? 0);
-    if (!doorW || !doorH) return null;
+  const geom = useMemo(() => safely(() => buildElevation(windowSpec, derived)), [windowSpec, derived]);
+  if (!geom) return <NoSheet />;
 
-    const p = getDoorProfile();
-    const g = p.geometry;
-    const els = p.elements;
-    const d = windowSpec.door || {};
-    const z = dr.zones;
+  const { dr, z, m, pp, W, H, inward, tz, zoneTop, bottomVis, openings, leaves, french, frontRole } = geom;
 
-    const totalW = Number(z.totalWidth) || doorW;
-    const totalH = Number(z.totalHeight) || doorH;
-    const dy = totalH - doorH;              // transom zone above the door zone
-    const inward = !!dr.inward;
-
-    const stile = els.leafStile.face;
-    const topRail = els.leafTop.face;
-    const bottomRail = els.leafBottom.face;
-    const midFace = els.leafMid.face;
-    const style = d.style || 'full-glass';
-    const spMember = dr.sidePanelMember || 57;
-    const inset = g.glassInset;
-    const leafY = dy + g.land + g.gap;
-
-    const bars = d.bars || {};
-    const mkLeaf = (leaf, member, vCount, hCount) => {
-      const glassX = leaf.x + member;
-      const glassY = leafY + (member === stile ? topRail : member);
-      const glassW = Math.max(0, leaf.w - 2 * member);
-      const glassH = Math.max(0, leaf.h - (member === stile ? topRail + bottomRail : 2 * member));
-      let midRailY = null;
-      if (member === stile && style === 'three-quarter') midRailY = leafY + leaf.h * 0.75 - midFace / 2;
-      if (member === stile && style === 'half-glazed') midRailY = leafY + leaf.h * 0.5 - midFace / 2;
-      return {
-        ...leaf, y: leafY, member, glassX, glassY, glassW, glassH, midRailY,
-        barPos: computeBarPositions({
-          glassX, glassY, glassW, glassH,
-          vCount: Number(vCount) || 0, hCount: Number(hCount) || 0, barW: BAR_WIDTH,
-        }),
-      };
-    };
-
-    return {
-      doorW, doorH, totalW, totalH, dy, g, els, inward,
-      stile, topRail, bottomRail, midFace, style, spMember, inset, leafY,
-      zones: z,
-      leaves: (dr.leaves || []).map((l) => mkLeaf(l, stile, bars.v, bars.h)),
-      panelLeaves: (dr.panelLeaves || []).map((l) => mkLeaf(l, spMember, d.sideBars?.v, d.sideBars?.h)),
-      isFrench: (dr.type || '') === 'french',
-      frenchOverlap: Number(dr.overlap) || 0,
-      hinge: d.hingeSide || 'left',
-      hasTimberCill: !!dr.hasTimberCill,
-      threshold: dr.threshold || 'standard',
-    };
-  }, [windowSpec, derived]);
-
-  if (!geom) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
-
-  const { doorW, doorH, totalW, totalH, dy, g, zones } = geom;
-
-  const layoutSc = Math.max(totalW, totalH) / 500;
-  const DM = 75 * layoutSc;
-  const M = 85 * layoutSc;
-  const TITLE_AREA = 50 * layoutSc;
-  const svgW = M + totalW + DM * 2 + M;
-  const svgH = M + totalH + DM + TITLE_AREA;
-  const ox = M, oy = M;
+  // ── Layout (mm = SVG units, the casement elevation convention) ──
+  const layoutSc = Math.max(W, H) / 500;
+  const ML = 60 * layoutSc;
+  const MR = 120 * layoutSc;
+  const MT = 70 * layoutSc;
+  const svgW = ML + W + MR;
+  const ts = svgW / VIEWBOX_REF;
+  const ox = ML, oy = MT;
   const X = (x) => ox + x;
   const Y = (y) => oy + y;
-  const sw = (n) => n * layoutSc;
+  const dash = `${6 * ts},${4 * ts}`;
+  const axisDash = `${8 * ts},${3 * ts},${2 * ts},${3 * ts}`;
 
-  const bottomLand = geom.hasTimberCill ? g.cillVisible : 0;
-  const tz = zones.transom;
-  // Rail bottom edge flush with the door opening top (3D convention).
-  const railTopY = tz ? dy - (tz.railH - geom.els.frameHead.face) : 0;
-  const railBottomY = tz ? dy + g.land + g.gap : 0;
-
+  // ── Notes under the title: the threshold, the style, the meeting, the hardware ──
   const winName = windowSpec?.name || 'Door';
   const projNum = projectNumber || '';
-  const activeLeaf = geom.leaves.find((l) => l.role !== 'passive') || geom.leaves[0];
-  // Subtitle stays as short as the sash sheet — the long version overflowed
-  // the viewBox and got clipped (Piotr 09.08). Detail lives on the drawing.
-  const titleText = `Front Elevation${projNum ? ` — ${projNum}` : ''} — ${winName}`;
-  const subtitleText = `${windowSpec.door?.type || 'single-external'} · ${totalW} × ${totalH} · ${geom.inward ? 'inward' : 'outward'} · open ${geom.hinge} · exterior`;
+  const hingeSide = windowSpec?.door?.hingeSide || 'left';
+  const hingeCount = (leaves[0]?.hinges || []).length;
+  const handleY = num(geom.handleLeaf?.handleY);
+  const hw = dr.hardware || {};
+  const lockText = !french
+    ? 'Lock: multipoint lock, ThunderBolt single door kit'
+    : geom.kit === 'fgte'
+      ? 'Lock: FGTE double door kit, a handle on each leaf, passive leaf shootbolts in the kit'
+      : 'Lock: ThunderBolt kit on the active leaf, bolts top and bottom on the passive leaf';
+  const notes = [
+    `Threshold: ${thresholdText(dr, pp)}`,
+    STYLE_NAMES[dr.style]
+      ? `${STYLE_NAMES[dr.style]}: mid rail ${fmt(m.mid)}, axis ${fmt(z.midRailAxis)} below the leaf top, ${dr.paneling || 'flat'} panel below`
+      : '',
+    french
+      ? `Meeting stile ${fmt(m.meeting)} on each leaf, lip ${fmt(dr.lip)} past the centre line, active leaf laps on the ${z.meetingLap?.face || 'exterior'}`
+      : '',
+    [
+      hingeCount ? `${hingeCount} hinges per leaf` : '',
+      handleY != null ? `handle ${fmt(H - handleY)} above the floor` : '',
+      hw.handing ? `handing ${hw.handing}${hw.handingWords ? ` (${hw.handingWords})` : ''}` : '',
+    ].filter(Boolean).join(' · '),
+    lockText,
+  ].filter(Boolean);
 
-  const renderLeaf = (leaf, i, passive, showFurniture) => {
-    const hinges = showFurniture ? hingePositions(leaf.y, leaf.h) : [];
-    const hingeEdgeX = leaf.hinge === 'right' ? leaf.x + leaf.w : leaf.x;
-    const closeEdgeX = leaf.hinge === 'right' ? leaf.x : leaf.x + leaf.w;
-    const furnX = leaf.hinge === 'right'
-      ? leaf.x + geom.stile / 2
-      : leaf.x + leaf.w - geom.stile / 2;
-    const handleY = leaf.y + leaf.h - HANDLE_FLOOR_MM;
+  const bottomAnn = (geom.frames.length > 1 ? 76 : 50) * ts;
+  const TITLE = (44 + 18 * notes.length) * ts;
+  const svgH = MT + H + bottomAnn + TITLE;
+  const titleY = oy + H + bottomAnn + 16 * ts;
+  const noteFs = SIZES.code * ts;
+
+  const titleText = `Front Elevation${projNum ? ` · ${projNum}` : ''} · ${winName}`;
+  const subtitleText = `${french ? 'French door' : 'Single door'} · ${fmt(W)} × ${fmt(H)} mm · ${inward ? 'inward' : 'outward'} · open ${hingeSide} · exterior view`;
+
+  // ── One door leaf: outline (hidden edges dashed), glass, mid rail gap, panel, bars, symbol, furniture ──
+  const renderDoorLeaf = (leaf, i) => {
+    const back = french && frontRole && leaf.role !== frontRole;
+    const meetEdgeX = leaf.meetingSide === 'L' ? leaf.x : leaf.meetingSide === 'R' ? leaf.x + leaf.w : null;
+    // The bottom edge is never lapped (the cill or the threshold lies below
+    // it), so it is seen in both directions, except where an inward door's
+    // jamb faces cover its ends (the door frame opening, as drawn above).
+    const bY = leaf.y + leaf.h;
+    const bX0 = Math.max(leaf.x, geom.doorOpen.x0);
+    const bX1 = Math.min(leaf.x + leaf.w, geom.doorOpen.x1);
+    const edges = [
+      { k: 't', x1: leaf.x, y1: leaf.y, x2: leaf.x + leaf.w, y2: leaf.y },
+      { k: 'b', x1: bX0, y1: bY, x2: bX1, y2: bY, seen: true },
+      bX0 > leaf.x ? { k: 'bl', x1: leaf.x, y1: bY, x2: bX0, y2: bY, lapped: true } : null,
+      bX1 < leaf.x + leaf.w ? { k: 'br', x1: bX1, y1: bY, x2: leaf.x + leaf.w, y2: bY, lapped: true } : null,
+      { k: 'l', x1: leaf.x, y1: leaf.y, x2: leaf.x, y2: leaf.y + leaf.h, meeting: leaf.meetingSide === 'L' },
+      { k: 'r', x1: leaf.x + leaf.w, y1: leaf.y, x2: leaf.x + leaf.w, y2: leaf.y + leaf.h, meeting: leaf.meetingSide === 'R' },
+    ].filter(Boolean);
+    // Outward: only the meeting edge of the leaf behind is hidden. Inward:
+    // the frame face laps over the head and jamb edges; a meeting edge is
+    // seen unless it belongs to the leaf behind.
+    const hidden = (e) => (e.seen ? false : e.lapped ? true : inward ? (!e.meeting || back) : (e.meeting && back));
+    const lockEdgeX = leaf.hinge === 'left' ? leaf.x + leaf.w : leaf.x;
+    const inDir = leaf.hinge === 'left' ? -1 : 1;
+    const backset = leaf.role === 'passive' && geom.kit === 'fgte'
+      ? num(dr.hardware?.fgte?.slaveBackset, pp.backset) : pp.backset;
+    const day = leaf.daylight;
+    const pd = leaf.panel?.daylight || null;
+    const boltW = 3 * ts, boltL = 28 * ts;
+    const meetFace = leaf.meetingSide === 'R' ? leaf.stileR : leaf.stileL;
+    const boltX = meetEdgeX != null ? meetEdgeX + (leaf.meetingSide === 'R' ? -1 : 1) * meetFace / 2 : null;
     return (
-      <g key={i}>
-        <rect x={X(leaf.x)} y={Y(leaf.y)} width={leaf.w} height={leaf.h}
-          fill="none" stroke={COLORS.sash}
-          strokeWidth={passive || !showFurniture ? STROKES.sashLight : STROKES.sash} {...NS} />
-        <rect x={X(leaf.glassX)} y={Y(leaf.glassY)} width={leaf.glassW} height={leaf.glassH}
-          fill={COLORS.glass} fillOpacity={COLORS.glassOpacity}
-          stroke={COLORS.glass} strokeWidth={STROKES.glassLight} {...NS} />
-        {leaf.midRailY != null && (
-          <rect x={X(leaf.x + leaf.member)} y={Y(leaf.midRailY)}
-            width={leaf.w - 2 * leaf.member} height={geom.midFace}
-            fill={COLORS.bg} stroke={COLORS.sash} strokeWidth={STROKES.glassLight} {...NS} />
+      <g key={`lf${i}`}>
+        {edges.map((e) => (
+          <line key={e.k} x1={X(e.x1)} y1={Y(e.y1)} x2={X(e.x2)} y2={Y(e.y2)} stroke={COLORS.sash}
+            strokeWidth={hidden(e) ? STROKES.sashLight : STROKES.sash} {...NS}
+            strokeDasharray={hidden(e) ? dash : undefined} />
+        ))}
+        {day && day.w > 0 && day.h > 0 && (
+          <rect x={X(day.x)} y={Y(day.y)} width={day.w} height={day.h}
+            fill={COLORS.glass} fillOpacity={COLORS.glassOpacity}
+            stroke={COLORS.glass} strokeWidth={STROKES.glassLight} {...NS} />
         )}
-        {leaf.barPos.vBars.map((vb, k) => (
-          <rect key={`vb${k}`} x={X(vb.left)} y={Y(leaf.glassY)} width={BAR_WIDTH}
-            height={leaf.midRailY != null ? leaf.midRailY - leaf.glassY : leaf.glassH}
-            fill="none" stroke={COLORS.bar} strokeWidth={STROKES.bar} {...NS} />
-        ))}
-        {leaf.midRailY == null && leaf.barPos.hBars.map((hb, k) => (
-          <rect key={`hb${k}`} x={X(leaf.glassX)} y={Y(hb.top)}
-            width={leaf.glassW} height={BAR_WIDTH}
-            fill="none" stroke={COLORS.bar} strokeWidth={STROKES.bar} {...NS} />
-        ))}
-        {showFurniture && <>
-          <path d={`M ${X(closeEdgeX)} ${Y(leaf.y + leaf.h / 2)}
-                    L ${X(hingeEdgeX)} ${Y(leaf.y)}
-                    M ${X(closeEdgeX)} ${Y(leaf.y + leaf.h / 2)}
-                    L ${X(hingeEdgeX)} ${Y(leaf.y + leaf.h)}`}
-            fill="none" stroke={COLORS.meeting} strokeWidth={STROKES.meeting} {...NS}
-            strokeDasharray={`${sw(6)},${sw(4)}`} />
-          {hinges.map((hy, k) => (
-            <rect key={`hg${k}`} x={X(hingeEdgeX - HINGE_W / 2)} y={Y(hy - HINGE_H / 2)}
-              width={HINGE_W} height={HINGE_H} rx={HINGE_W / 2}
-              fill={COLORS.label} stroke={COLORS.label}
-              strokeWidth={STROKES.sashLight} {...NS} />
-          ))}
-          {passive ? (
-            <>
-              <rect x={X(furnX - 8)} y={Y(leaf.y + 40)} width={16} height={90}
-                fill="none" stroke={COLORS.sillDetail} strokeWidth={STROKES.sashLight} {...NS} />
-              <rect x={X(furnX - 8)} y={Y(leaf.y + leaf.h - 130)} width={16} height={90}
-                fill="none" stroke={COLORS.sillDetail} strokeWidth={STROKES.sashLight} {...NS} />
-              <Label x={X(furnX)} y={Y(leaf.y + 170)} text="BOLTS" vbw={svgW} />
-            </>
-          ) : (
-            <>
-              <circle cx={X(furnX)} cy={Y(handleY)} r={geom.stile * 0.3}
-                fill="none" stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} />
-              <DimV x={ox + totalW + DM * 0.35} y1={Y(handleY)} y2={Y(totalH)}
-                extFrom={X(totalW)} label={`handle ${HANDLE_FLOOR_MM}`} small vbw={svgW} />
-            </>
-          )}
-        </>}
+        <BarBands day={day} bars={leaf.bars} X={X} Y={Y} />
+        {pd && pd.w > 0 && pd.h > 0 && (
+          <>
+            <rect x={X(pd.x)} y={Y(pd.y)} width={pd.w} height={pd.h}
+              fill={COLORS.frameFill} stroke={COLORS.sash} strokeWidth={STROKES.glassLight} {...NS} />
+            <Label x={X(pd.x + pd.w / 2)} y={Y(pd.y + pd.h / 2) + 5 * ts} text="PANEL" vbw={svgW} />
+          </>
+        )}
+        <OpeningSymbol r={leaf} hinge={leaf.hinge} X={X} Y={Y} dash={dash} />
+        <HingeBarrels edgeX={leaf.hingeEdgeX} ys={leaf.hinges} barrel={pp.barrel} w={2.4 * ts} X={X} Y={Y} />
+        {geom.hasHandle(leaf) && num(leaf.handleY) != null && (
+          <HandleSymbol cx={X(lockEdgeX + inDir * backset)} cy={Y(leaf.handleY)} r={5 * ts} lever={16 * ts}
+            towards={leaf.hinge === 'left' ? 'left' : 'right'} />
+        )}
+        {geom.hasBolts(leaf) && boltX != null && (
+          <g>
+            <rect x={X(boltX) - boltW / 2} y={Y(leaf.y)} width={boltW} height={boltL}
+              fill="none" stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} />
+            <rect x={X(boltX) - boltW / 2} y={Y(leaf.y + leaf.h) - boltL} width={boltW} height={boltL}
+              fill="none" stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} />
+          </g>
+        )}
       </g>
     );
   };
 
+  const doorOrder = french && frontRole
+    ? [...leaves.filter((l) => l.role !== frontRole), ...leaves.filter((l) => l.role === frontRole)]
+    : leaves;
+  const rightX = (k) => ox + W + (22 + 26 * k) * ts;
+  const showHandleDim = handleY != null && handleY > 0 && handleY < H;
+  const rightSlots = (showHandleDim ? 1 : 0) + (tz ? 1 : 0);
+
   return (
-    <div className="w-full flex justify-center">
+    <div className="w-full">
       <svg viewBox={`0 0 ${svgW} ${svgH}`} xmlns="http://www.w3.org/2000/svg"
-        className="max-h-[72vh] w-auto max-w-full" style={{ background: COLORS.bg }}>
+        className="w-full h-auto" style={{ background: COLORS.bg }}>
 
-        {/* ── FRAME body: outer band of the whole assembly ── */}
+        {/* ── FRAME: the whole assembly less its openings (as seen from outside) ── */}
         <path
-          d={`M ${X(0)} ${Y(0)} H ${X(totalW)} V ${Y(totalH)} H ${X(0)} Z
-              M ${X(g.land)} ${Y(g.land)} H ${X(totalW - g.land)}
-              V ${Y(totalH - bottomLand)} H ${X(g.land)} Z`}
+          d={[`M ${X(0)} ${Y(0)} H ${X(W)} V ${Y(H)} H ${X(0)} Z`,
+            ...openings.filter((o) => o.w > 0 && o.h > 0).map((o) => `M ${X(o.x)} ${Y(o.y)} H ${X(o.x + o.w)} V ${Y(o.y + o.h)} H ${X(o.x)} Z`)].join(' ')}
           fillRule="evenodd" fill={COLORS.frameFill} stroke="none" />
-        <rect x={X(0)} y={Y(0)} width={totalW} height={totalH}
+        <rect x={X(0)} y={Y(0)} width={W} height={H}
           fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frame} {...NS} />
-        <rect x={X(g.land)} y={Y(g.land)} width={totalW - 2 * g.land}
-          height={totalH - g.land - bottomLand}
-          fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
-
-        {/* ── COUPLING POST — one 114 member, only the band the leaves do NOT
-             cover is visible from outside (72 outward · 93 inward) ── */}
-        {(zones.posts || []).map((po, i) => (
-          <rect key={`po${i}`} x={X(po.visX)} y={Y(g.land)}
-            width={po.visW} height={totalH - g.land - bottomLand}
-            fill={COLORS.frameFill} stroke={COLORS.frame}
-            strokeWidth={STROKES.frameLight} {...NS} />
+        {openings.filter((o) => o.w > 0 && o.h > 0).map((o, i) => (
+          <rect key={`op${i}`} x={X(o.x)} y={Y(o.y)} width={o.w} height={o.h}
+            fill={o.fan && geom.fanPanes.length ? COLORS.frameFill : 'none'}
+            stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
         ))}
 
-        {/* ── TRANSOM: one rail across the assembly, one fan pane per frame ── */}
-        {tz && <>
-          {(tz.fanPanes || []).map((fp, i) => (
-            <rect key={`fp${i}`} x={X(fp.x)} y={Y(geom.els.frameHead.face - geom.inset)}
-              width={fp.w} height={fp.h}
-              fill={COLORS.glass} fillOpacity={COLORS.glassOpacity}
-              stroke={COLORS.glass} strokeWidth={STROKES.glassLight} {...NS} />
-          ))}
-          <rect x={X(g.land)} y={Y(railTopY)}
-            width={totalW - 2 * g.land} height={railBottomY - railTopY}
-            fill={COLORS.frameFill} stroke={COLORS.frame}
-            strokeWidth={STROKES.frameLight} {...NS} />
-          <Label x={X(totalW / 2)} y={Y((railTopY + railBottomY) / 2) + sw(3)}
-            text={`TRANSOM ${tz.railH}${tz.type === 'opening' ? ' · opening fan' : ''}`} vbw={svgW} />
-        </>}
-
-        {/* Inward-opening: the frame laps OVER the leaf — show the lap edge. */}
-        {geom.inward && (
-          <rect x={X(g.land)} y={Y(dy + g.land)}
-            width={totalW - 2 * g.land} height={doorH - g.land - bottomLand}
-            fill="none" stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS}
-            strokeDasharray={`${sw(5)},${sw(3)}`} />
-        )}
-
-        {/* ── CILL — one piece across the assembly ── */}
-        {geom.hasTimberCill && (
-          <line x1={X(0)} y1={Y(totalH - g.cillVisible)} x2={X(totalW)} y2={Y(totalH - g.cillVisible)}
+        {/* ── CILL (timber, one piece across the assembly) or the threshold product under the door ── */}
+        {dr.hasTimberCill ? (
+          <line x1={X(0)} y1={Y(H - bottomVis)} x2={X(W)} y2={Y(H - bottomVis)}
             stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} />
+        ) : (
+          <rect x={X(z.doorX)} y={Y(H - pp.gapCill)} width={z.doorW} height={pp.gapCill}
+            fill={COLORS.frameFill} stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} />
         )}
 
-        {/* ── LEAVES: fixed panels first, then the door ── */}
-        {geom.panelLeaves.map((pn, i) => renderLeaf(pn, `p${i}`, false, false))}
-        {geom.leaves.map((leaf, i) => renderLeaf(leaf, i, leaf.role === 'passive', true))}
+        {/* ── FANLIGHT: fixed panes glazed into the frame, or opening top hung leaves ── */}
+        {geom.fanPanes.map((fp, i) => {
+          const day = { x: fp.x + m.inset, y: fp.y + m.inset, w: fp.w - 2 * m.inset, h: fp.h - 2 * m.inset };
+          return (
+            <g key={`fp${i}`}>
+              <rect x={X(day.x)} y={Y(day.y)} width={day.w} height={day.h}
+                fill={COLORS.glass} fillOpacity={COLORS.glassOpacity}
+                stroke={COLORS.glass} strokeWidth={STROKES.glassLight} {...NS} />
+              <BarBands day={day} bars={fp.bars} X={X} Y={Y} />
+            </g>
+          );
+        })}
+        {geom.fanLeaves.map((fl, i) => (
+          <g key={`fl${i}`}>
+            <rect x={X(fl.x)} y={Y(fl.y)} width={fl.w} height={fl.h}
+              fill="none" stroke={COLORS.sash} strokeWidth={STROKES.sash} {...NS} />
+            {fl.daylight && (
+              <rect x={X(fl.daylight.x)} y={Y(fl.daylight.y)} width={fl.daylight.w} height={fl.daylight.h}
+                fill={COLORS.glass} fillOpacity={COLORS.glassOpacity}
+                stroke={COLORS.glass} strokeWidth={STROKES.glassLight} {...NS} />
+            )}
+            <BarBands day={fl.daylight} bars={fl.bars} X={X} Y={Y} />
+            <OpeningSymbol r={fl} hinge="top" X={X} Y={Y} dash={dash} />
+          </g>
+        ))}
 
-        {/* French meeting note — sizing truth in one line */}
-        {geom.isFrench && geom.leaves.length === 2 && (
-          <Label x={X(geom.leaves[0].x + geom.leaves[0].w)} y={Y(dy + g.land) - sw(8)}
-            text={`meeting ${geom.stile}+${geom.stile}−${geom.frenchOverlap}=${2 * geom.stile - geom.frenchOverlap} · rebated ${geom.frenchOverlap} · 3 clearance`}
-            vbw={svgW} />
+        {/* ── FIXED SIDE PANEL LEAVES (bars from the side panel spec) ── */}
+        {geom.panelLeaves.map((pn, i) => (
+          <g key={`pn${i}`}>
+            <rect x={X(pn.x)} y={Y(pn.y)} width={pn.w} height={pn.h}
+              fill="none" stroke={COLORS.sash} strokeWidth={STROKES.sash} {...NS} />
+            {pn.daylight && (
+              <rect x={X(pn.daylight.x)} y={Y(pn.daylight.y)} width={pn.daylight.w} height={pn.daylight.h}
+                fill={COLORS.glass} fillOpacity={COLORS.glassOpacity}
+                stroke={COLORS.glass} strokeWidth={STROKES.glassLight} {...NS} />
+            )}
+            <BarBands day={pn.daylight} bars={pn.bars} X={X} Y={Y} />
+          </g>
+        ))}
+
+        {/* ── DOOR LEAVES: the leaf behind first, the lapping leaf in front ── */}
+        {doorOrder.map((leaf, i) => renderDoorLeaf(leaf, i))}
+
+        {/* French centre line */}
+        {french && num(z.meetingX) != null && (
+          <line x1={X(z.meetingX)} y1={Y(leaves[0].y) - 10 * ts} x2={X(z.meetingX)} y2={Y(leaves[0].y + leaves[0].h) + 10 * ts}
+            stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={axisDash} />
         )}
 
-        {/* ── DIMENSIONS ── */}
-        {[...geom.panelLeaves, ...geom.leaves].map((lf, i) => (
-          <DimH key={`ld${i}`} y={oy + totalH + DM * 0.3} x1={X(lf.x)} x2={X(lf.x + lf.w)}
-            extFrom={Y(totalH)} label={fmt(lf.w)} small vbw={svgW} />
-        ))}
-        {(zones.frames || []).length > 1 && (zones.frames || []).map((f, i) => (
-          <DimH key={`fd${i}`} y={oy + totalH + DM * 0.65} x1={X(f.x)} x2={X(f.x + f.w)}
-            extFrom={Y(totalH)} label={`${f.kind === 'door' ? 'door' : `${f.side} panel`} ${fmt(f.w)}`}
-            small vbw={svgW} />
-        ))}
-        <DimH y={oy + totalH + DM} x1={X(0)} x2={X(totalW)} extFrom={Y(totalH)}
-          label={fmt(totalW)} vbw={svgW} />
-        {(zones.posts || []).length > 0 && (
-          <Label x={X(zones.posts[0].axis)} y={Y(totalH) + DM * 1.25}
-            text={`post ${zones.posts[0].w} · ${fmt(zones.posts[0].visW)} visible`} vbw={svgW} />
+        {/* ── DIMENSIONS: width at the top, heights on the right, widths along the bottom ── */}
+        <DimH y={oy - 30 * ts} x1={X(0)} x2={X(W)} extFrom={Y(0)} label={fmt(W)} vbw={svgW} />
+        {leaves[0] && (
+          <DimV x={ox - 24 * ts} y1={Y(leaves[0].y)} y2={Y(leaves[0].y + leaves[0].h)} extFrom={X(0)}
+            label={`leaf ${fmt(leaves[0].h)}`} small vbw={svgW} />
+        )}
+        {showHandleDim && (
+          <DimV x={rightX(0)} y1={Y(handleY)} y2={Y(H)} extFrom={X(W)}
+            label={`handle ${fmt(H - handleY)}`} small vbw={svgW} />
         )}
         {tz && (
-          <DimV x={ox + totalW + DM * 0.8} y1={Y(0)} y2={Y(dy)} extFrom={X(totalW)}
-            label={`fan ${fmt(tz.h)}`} small vbw={svgW} />
+          <>
+            <DimV x={rightX(showHandleDim ? 1 : 0)} y1={Y(0)} y2={Y(zoneTop)} extFrom={X(W)}
+              label={`fan ${fmt(zoneTop)}`} small vbw={svgW} />
+            <DimV x={rightX(showHandleDim ? 1 : 0)} y1={Y(zoneTop)} y2={Y(H)} extFrom={X(W)}
+              label={fmt(H - zoneTop)} small vbw={svgW} />
+          </>
         )}
-        <DimV x={ox + totalW + DM * 0.8} y1={Y(dy)} y2={Y(totalH)} extFrom={X(totalW)}
-          label={fmt(doorH)} small={!!tz} vbw={svgW} />
-        {tz && (
-          <DimV x={ox + totalW + DM * 1.15} y1={Y(0)} y2={Y(totalH)} extFrom={X(totalW)}
-            label={fmt(totalH)} vbw={svgW} />
-        )}
+        <DimV x={rightX(rightSlots)} y1={Y(0)} y2={Y(H)} extFrom={X(W)} label={fmt(H)} vbw={svgW} />
 
-        <TitleBlock x={svgW / 2} y={oy + totalH + DM + TITLE_AREA * 0.5}
-          title={titleText} subtitle={subtitleText} vbw={svgW} />
+        {[...geom.panelLeaves, ...leaves].map((lf, i) => (
+          <DimH key={`lw${i}`} y={oy + H + 24 * ts} x1={X(lf.x)} x2={X(lf.x + lf.w)} extFrom={Y(H)}
+            label={fmt(lf.w)} small vbw={svgW} />
+        ))}
+        {geom.frames.length > 1 && geom.frames.map((f, i) => (
+          <DimH key={`fw${i}`} y={oy + H + 50 * ts} x1={X(f.x)} x2={X(f.x + f.w)} extFrom={Y(H)}
+            label={`${f.kind === 'door' ? 'door' : `${f.side} panel`} ${fmt(f.w)}`} small vbw={svgW} />
+        ))}
+
+        {/* ── TITLE + notes ── */}
+        <TitleBlock x={svgW / 2} y={titleY} title={titleText} subtitle={subtitleText} vbw={svgW} />
+        {notes.map((t, i) => (
+          <text key={`n${i}`} x={svgW / 2} y={titleY + (42 + 18 * i) * ts} fill={COLORS.subtitle} fontSize={noteFs}
+            fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>{t}</text>
+        ))}
       </svg>
     </div>
   );
