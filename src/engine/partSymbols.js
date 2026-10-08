@@ -125,26 +125,46 @@ const ENGINE_NAME_MAP = {
   // side panel member. The leaf stile / top / bottom keep the symbols the
   // fallback already printed (DSTI / DTOP / DBOT). partId = the Assign
   // Materials row (the fan leaf buys the casement leaf rows).
-  'd-frame head':                { partId: 'd_frame_head', symbol: 'DFH', name: 'Door Frame Head', group: 'door', mirror: false },
-  'd-frame jamb (l)':            { partId: 'd_frame_jamb', symbol: 'DFJ', name: 'Door Frame Jamb', group: 'door', mirror: true },
-  'd-frame jamb (r)':            { partId: 'd_frame_jamb', symbol: 'DFJ', name: 'Door Frame Jamb', group: 'door', mirror: true },
-  'd-frame cill':                { partId: 'd_frame_cill', symbol: 'DFC', name: 'Door Frame Cill', group: 'door', mirror: false },
-  'd-frame cill (inward)':       { partId: 'd_frame_cill_inward', symbol: 'DFCI', name: 'Door Frame Cill (inward)', group: 'door', mirror: false },
-  'd-coupling post':             { partId: 'd_coupling_post', symbol: 'DCP', name: 'Door Coupling Post', group: 'door', mirror: false },
-  'd-transom':                   { partId: 'd_transom_rail', symbol: 'DTR', name: 'Door Transom Rail', group: 'door', mirror: false },
-  'd-stile (l)':                 { partId: 'd_leaf_stile', symbol: 'DSTI', name: 'Door Leaf Stile', group: 'door', mirror: true },
-  'd-stile (r)':                 { partId: 'd_leaf_stile', symbol: 'DSTI', name: 'Door Leaf Stile', group: 'door', mirror: true },
-  'd-meeting stile':             { partId: 'd_leaf_meeting_stile', symbol: 'DMS', name: 'Door Meeting Stile', group: 'door', mirror: false },
-  'd-top rail':                  { partId: 'd_leaf_top_rail', symbol: 'DTOP', name: 'Door Leaf Top Rail', group: 'door', mirror: false },
-  'd-bottom rail':               { partId: 'd_leaf_bottom_rail', symbol: 'DBOT', name: 'Door Leaf Bottom Rail', group: 'door', mirror: false },
-  'd-mid rail':                  { partId: 'd_leaf_mid_rail', symbol: 'DMR', name: 'Door Leaf Mid Rail', group: 'door', mirror: false },
-  'd-side stile':                { partId: 'd_side_stile', symbol: 'DSS', name: 'Side Panel Stile', group: 'door', mirror: true },
-  'd-side top rail':             { partId: 'd_side_top_rail', symbol: 'DST', name: 'Side Panel Top Rail', group: 'door', mirror: false },
-  'd-side bottom rail':          { partId: 'd_side_bottom_rail', symbol: 'DSB', name: 'Side Panel Bottom Rail', group: 'door', mirror: false },
-  'd-fan stile (l)':             { partId: 'c_sash_stile', symbol: 'DFS', name: 'Fan Leaf Stile', group: 'door', mirror: true },
-  'd-fan stile (r)':             { partId: 'c_sash_stile', symbol: 'DFS', name: 'Fan Leaf Stile', group: 'door', mirror: true },
-  'd-fan top rail':              { partId: 'c_sash_top_rail', symbol: 'DFT', name: 'Fan Leaf Top Rail', group: 'door', mirror: false },
-  'd-fan bottom rail':           { partId: 'c_sash_bottom_rail', symbol: 'DFB', name: 'Fan Leaf Bottom Rail', group: 'door', mirror: false },
+  'd-frame head':                { partId: 'd_frame_head', symbol: 'FH', name: 'Door Frame Head', group: 'door', mirror: false },
+  'd-frame jamb (l)':            { partId: 'd_frame_jamb', symbol: 'J-L', name: 'Door Frame Jamb Left', group: 'door', mirror: true },
+  'd-frame jamb (r)':            { partId: 'd_frame_jamb', symbol: 'J-R', name: 'Door Frame Jamb Right', group: 'door', mirror: true },
+  'd-frame cill':                { partId: 'd_frame_cill', symbol: 'CILL', name: 'Door Frame Cill', group: 'door', mirror: false },
+  'd-frame cill (inward)':       { partId: 'd_frame_cill_inward', symbol: 'CILL-IN', name: 'Door Frame Cill (inward)', group: 'door', mirror: false },
+  'd-coupling post':             { partId: 'd_coupling_post', symbol: 'CP', name: 'Door Coupling Post', group: 'door', mirror: false },
+  'd-transom':                   { partId: 'd_transom_rail', symbol: 'T', name: 'Door Transom Rail', group: 'door', mirror: false },
+  'd-stile (l)':                 { partId: 'd_leaf_stile', symbol: 'ST-L', name: 'Door Leaf Stile Left', group: 'door', mirror: true },
+  'd-stile (r)':                 { partId: 'd_leaf_stile', symbol: 'ST-R', name: 'Door Leaf Stile Right', group: 'door', mirror: true },
+  'd-meeting stile':             { partId: 'd_leaf_meeting_stile', symbol: 'MS', name: 'Door Meeting Stile', group: 'door', mirror: false },
+  'd-top rail':                  { partId: 'd_leaf_top_rail', symbol: 'TR', name: 'Door Leaf Top Rail', group: 'door', mirror: false },
+  'd-bottom rail':               { partId: 'd_leaf_bottom_rail', symbol: 'BR', name: 'Door Leaf Bottom Rail', group: 'door', mirror: false },
+  'd-mid rail':                  { partId: 'd_leaf_mid_rail', symbol: 'MR', name: 'Door Leaf Mid Rail', group: 'door', mirror: false },
+  'd-side stile':                { partId: 'd_side_stile', symbol: 'SP-ST', name: 'Side Panel Stile', group: 'door', mirror: true },
+  'd-side top rail':             { partId: 'd_side_top_rail', symbol: 'SP-TR', name: 'Side Panel Top Rail', group: 'door', mirror: false },
+  'd-side bottom rail':          { partId: 'd_side_bottom_rail', symbol: 'SP-BR', name: 'Side Panel Bottom Rail', group: 'door', mirror: false },
+  'd-fan stile (l)':             { partId: 'c_sash_stile', symbol: 'FS-L', name: 'Fan Leaf Stile Left', group: 'door', mirror: true },
+  'd-fan stile (r)':             { partId: 'c_sash_stile', symbol: 'FS-R', name: 'Fan Leaf Stile Right', group: 'door', mirror: true },
+  'd-fan top rail':              { partId: 'c_sash_top_rail', symbol: 'FTR', name: 'Fan Leaf Top Rail', group: 'door', mirror: false },
+  'd-fan bottom rail':           { partId: 'c_sash_bottom_rail', symbol: 'FBR', name: 'Fan Leaf Bottom Rail', group: 'door', mirror: false },
+  // Casement (08.10.2026, Piotr: no C prefix anywhere; before this the fallback
+  // printed CFRA for head, jamb and cill alike). partId = the Assign Materials row.
+  'c-frame head':                { partId: 'c_frame_head', symbol: 'FH', name: 'Frame Head', group: 'casement', mirror: false },
+  'c-frame jamb (l)':            { partId: 'c_frame_jamb', symbol: 'J-L', name: 'Frame Jamb Left', group: 'casement', mirror: true },
+  'c-frame jamb (r)':            { partId: 'c_frame_jamb', symbol: 'J-R', name: 'Frame Jamb Right', group: 'casement', mirror: true },
+  'c-frame cill':                { partId: 'c_frame_cill', symbol: 'CILL', name: 'Frame Cill', group: 'casement', mirror: false },
+  'c-mullion':                   { partId: 'c_mullion', symbol: 'M', name: 'Mullion', group: 'casement', mirror: false },
+  'c-transom':                   { partId: 'c_transom', symbol: 'T', name: 'Transom', group: 'casement', mirror: false },
+  'c-stile (l)':                 { partId: 'c_sash_stile', symbol: 'ST-L', name: 'Leaf Stile Left', group: 'casement', mirror: true },
+  'c-stile (r)':                 { partId: 'c_sash_stile', symbol: 'ST-R', name: 'Leaf Stile Right', group: 'casement', mirror: true },
+  'c-top rail':                  { partId: 'c_sash_top_rail', symbol: 'TR', name: 'Leaf Top Rail', group: 'casement', mirror: false },
+  'c-bottom rail':               { partId: 'c_sash_bottom_rail', symbol: 'BR', name: 'Leaf Bottom Rail', group: 'casement', mirror: false },
+  'c-arch head':                 { partId: 'c_frame_head', symbol: 'AH', name: 'Arched Frame Head', group: 'casement', mirror: false },
+  'c-arch top rail':             { partId: 'c_sash_top_rail', symbol: 'ATR', name: 'Arched Leaf Top Rail', group: 'casement', mirror: false },
+  'c-frame ring':                { partId: 'c_frame_head', symbol: 'FRR', name: 'Frame Ring', group: 'casement', mirror: false },
+  'c-leaf ring':                 { partId: 'c_sash_top_rail', symbol: 'LFR', name: 'Leaf Ring', group: 'casement', mirror: false },
+  'c-tracery':                   { partId: 'c_tracery', symbol: 'TRY', name: 'Tracery Board', group: 'casement', mirror: false },
+  // Arched sash members (the S- prefix dropped the same way)
+  's-arch head':                 { partId: 'head', symbol: 'AH', name: 'Arched Box Head', group: 'box', mirror: false },
+  's-arch top rail':             { partId: 'top_rail', symbol: 'ATR', name: 'Arched Top Rail', group: 'sash', mirror: false },
 };
 
 /**
@@ -164,11 +184,22 @@ export function getPartSymbol(elementName) {
   const byId = PART_SYMBOLS[lower.replace(/\s+/g, '_')];
   if (byId) return byId;
 
-  // Fallback
+  // Fallback: the window type prefix (C- / D- / S-) says nothing inside a pack
+  // of one type (Piotr 08.10.2026), so it never reaches a symbol.
   return {
-    symbol: elementName.replace(/[^A-Za-z]/g, '').slice(0, 4).toUpperCase(),
-    name: elementName,
+    symbol: displayElementName(elementName).replace(/[^A-Za-z]/g, '').slice(0, 4).toUpperCase(),
+    name: displayElementName(elementName),
     group: 'other',
     mirror: false,
   };
+}
+
+/**
+ * An engine element name as the screens, PDFs and labels print it: without
+ * the window type prefix (C- casement, D- door, S- sash arch), which says
+ * nothing inside a pack of one type (Piotr 08.10.2026). The engine names
+ * themselves never change: they key the Assign Materials and colour maps.
+ */
+export function displayElementName(elementName) {
+  return String(elementName || '').replace(/^[CDS]-/, '');
 }

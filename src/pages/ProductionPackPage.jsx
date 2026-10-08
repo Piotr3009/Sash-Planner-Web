@@ -29,7 +29,7 @@ import {
 import { optimisePrecut } from '../engine/optimizer.js';
 import { exportGlassPDF, prepGlassRefImages } from '../utils/glassPdfExport.js';
 import { uploadGlassRef, deleteGlassRef } from '../services/glassRefs.js';
-import { exportPreCutPDF } from '../utils/precutPdfExport.js';
+import { exportPreCutPDF, exportPreCutLabelsPDF } from '../utils/precutPdfExport.js';
 import { exportSprayingPDF } from '../utils/sprayingPdfExport.js';
 import { exportCutListPDF } from '../utils/cutListPdfExport.js';
 import { exportOverviewPDF } from '../utils/overviewPdfExport.js';
@@ -39,8 +39,8 @@ import { exportElevationsPDF, exportElementsPDF, exportSectionsPDF } from '../ut
 import { buildProductionBook } from '../utils/productionBookExport.js';
 import { svgNodeToPng, loadImageSize } from '../utils/svgRaster.js';
 import { getColorName } from '../config.js';
-import { getPartSymbol } from '../engine/partSymbols.js';
-import { partColourForElement, partColourForCutSymbol, barLabelThatFits } from '../engine/partColours.js';
+import { getPartSymbol, displayElementName } from '../engine/partSymbols.js';
+import { partColourForElement, barLabelThatFits, windowColourForIndex, normaliseColourMode, COLOUR_MODES, COLOUR_MODE_LABELS } from '../engine/partColours.js';
 
 import FrontElevation2D from '../components/drawings/FrontElevation2D.jsx';
 import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
@@ -638,7 +638,7 @@ export default function ProductionPackPage() {
         {tab === 'sections'   && <SectionsTab windowsData={windowsData} pp={pp} batch={batch} registerExport={registerExport} />}
         {tab === 'elements'   && <ElementsTab windowsData={windowsData} pp={pp} batch={batch} registerExport={registerExport} />}
         {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} batch={batch} pp={pp} registerExport={registerExport} exportFormat={exportFormat} />}
-        {tab === 'precut'     && <PreCutTab merged={merged} settings={settings} batch={batch} pp={pp} isPPMode={isPPMode} projects={projects} registerExport={registerExport} exportFormat={exportFormat} />}
+        {tab === 'precut'     && <PreCutTab merged={merged} windowsData={windowsData} settings={settings} batch={batch} pp={pp} isPPMode={isPPMode} projects={projects} registerExport={registerExport} exportFormat={exportFormat} />}
         {tab === 'cutlist'    && <CutListTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} pp={pp} batch={batch} registerExport={registerExport} exportFormat={exportFormat} />}
         {tab === 'spraying'   && <SprayingTab windowsData={windowsData} batch={batch} pp={pp} registerExport={registerExport} />}
         {tab === 'bom'        && <BOMTab merged={merged} batch={batch} pp={pp} isPPMode={isPPMode} windowsData={windowsData} registerExport={registerExport} />}
@@ -1503,7 +1503,7 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport, ex
 // ═══════════════════════════════════════════════════════════════
 // TAB: Pre-Cut List — grouped by section, BLO with offcuts
 // ═══════════════════════════════════════════════════════════════
-function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerExport, exportFormat }) {
+function PreCutTab({ merged, windowsData = [], settings, batch, pp, isPPMode, projects, registerExport, exportFormat }) {
   // Material assignment lookup
   const assignments = useMaterialAssignmentStore((s) => s.assignments);
   const assignmentsData = useMaterialAssignmentStore((s) => s.data);
@@ -1520,9 +1520,30 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
   const [stockLengths, setStockLengths] = useState(savedPrecut?.stockLengths || {});
   const [offcutsMap, setOffcutsMap] = useState(savedPrecut?.offcuts || {}); // key → [length, ...]
   const [offcutInput, setOffcutInput] = useState({}); // key → current input string (not persisted)
-  // Colour by part (05.10.2026): on unless switched off for this pack; drives
-  // the bars here, the Pre-Cut PDF and the colour chips of the Cut List.
-  const [colourByPart, setColourByPart] = useState(savedPrecut?.colourByPart !== false);
+  // Colour mode (05.10.2026 per part, 08.10.2026 per window): saved with the
+  // pack. 'part' colours the bars, the Pre-Cut PDF and the Cut List chips;
+  // 'window' colours the bars, the PDF and the labels by window (the Cut
+  // List stays plain); 'off' is one colour as before.
+  const [colourMode, setColourMode] = useState(() => normaliseColourMode(savedPrecut));
+  const colourByPart = colourMode === 'part';
+  // Window order of the pack: the first window is colour 1 (per window mode and the labels).
+  const windowIndex = useMemo(() => {
+    const byId = new Map(); const byKey = new Map();
+    windowsData.forEach(({ win }, i) => {
+      if (win?.id != null) byId.set(String(win.id), i);
+      byKey.set(`${win?._projectNumber || ''}|${win?.name || ''}`, i);
+    });
+    return (detail) => {
+      if (!detail || typeof detail === 'number') return null;
+      if (detail.windowId != null && byId.has(String(detail.windowId))) return byId.get(String(detail.windowId));
+      const k = `${detail.projectNumber ?? detail._projectNumber ?? ''}|${detail.windowName || ''}`;
+      return byKey.has(k) ? byKey.get(k) : null;
+    };
+  }, [windowsData]);
+  const windowColourOf = (detail) => (colourMode === 'window' ? windowColourForIndex(windowIndex(detail)) : null);
+  const windowList = useMemo(() => windowsData.map(({ win }, i) => ({
+    index: i, id: win?.id, name: win?.name || '', projectNumber: win?._projectNumber || '', colour: windowColourForIndex(i),
+  })), [windowsData]);
   // Width of the tab, to tell whether a piece label fits its piece on screen.
   const tabEl = useRef(null);
   const [tabWidth, setTabWidth] = useState(0);
@@ -1543,8 +1564,8 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
     if (!didMountPrecut.current) { didMountPrecut.current = true; return; }
     const targetId = isPPMode ? pp?.id : batch?.id;
     if (!targetId) return;
-    persistPrecut(targetId, isPPMode, { stockLengths, offcuts: offcutsMap, colourByPart });
-  }, [stockLengths, offcutsMap, colourByPart]);
+    persistPrecut(targetId, isPPMode, { stockLengths, offcuts: offcutsMap, colourMode, colourByPart: colourMode === 'part' });
+  }, [stockLengths, offcutsMap, colourMode]);
 
   if (!merged?.precut) {
     return <div className="card p-8 text-center text-ink-400">No pre-cut data available.</div>;
@@ -1668,20 +1689,45 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
       format: exportFormat,
       content,
       colourByPart,
+      colourMode,
+      windowList,
+      windowIndexOf: windowIndex,
     });
   };
   registerExport('precut', handleExportPDF);
 
+  // Labels (08.10.2026): one A4 sheet of 44 labels (48.5 x 25.4), one label
+  // per pre-cut piece in bar order, the colour strip of the active mode.
+  const handleExportLabels = () => {
+    exportPreCutLabelsPDF({
+      groups: exportGroups,
+      optimization: localOptimization,
+      settings, batch, pp, isPPMode,
+      colourMode, windowList, windowIndexOf: windowIndex,
+    });
+  };
+
   return (
     <div className="space-y-4" ref={attachTab}>
-      <div className="flex items-center justify-end gap-3">
-        <span className="text-xs text-ink-300">Colour by part</span>
-        <button type="button" role="switch" aria-checked={colourByPart} aria-label="Colour by part"
-          onClick={() => setColourByPart((v) => !v)}
-          title="Colour the pieces by part (casement): screen, Pre-Cut PDF and Cut List"
-          className={`w-14 h-7 rounded-full text-[11px] font-bold transition-colors ${colourByPart ? 'bg-accent-500 text-white' : 'bg-surface-500 text-ink-200'}`}>
-          {colourByPart ? 'ON' : 'OFF'}
+      <div className="flex items-center justify-end gap-3 flex-wrap">
+        <button type="button" onClick={handleExportLabels}
+          title="One A4 sheet of 44 labels (48.5 x 25.4 mm), one per pre-cut piece in bar order, with the colour of the active mode"
+          className="px-3 py-1.5 text-[11px] rounded-lg border border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500">
+          Labels PDF (A4 · 44)
         </button>
+        <span className="text-xs text-ink-300">Colours</span>
+        <div role="radiogroup" aria-label="Pre-cut colours" className="inline-flex rounded-lg border border-surface-500 overflow-hidden">
+          {COLOUR_MODES.map((m) => (
+            <button key={m} type="button" role="radio" aria-checked={colourMode === m}
+              onClick={() => setColourMode(m)}
+              title={m === 'part' ? 'One colour per part: screen, Pre-Cut PDF, labels and the Cut List chips'
+                : m === 'window' ? 'One colour per window of the pack (ten colours, then they repeat): screen, Pre-Cut PDF and labels'
+                : 'No colours'}
+              className={`px-3 py-1.5 text-[11px] font-bold transition-colors ${colourMode === m ? 'bg-accent-500 text-white' : 'bg-surface-600 text-ink-200 hover:bg-surface-500'}`}>
+              {COLOUR_MODE_LABELS[m]}
+            </button>
+          ))}
+        </div>
       </div>
       {allGroups.map((group) => {
         const optGroup = getOptGroup(group);
@@ -1811,12 +1857,18 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
                                     // it fits the piece, otherwise the dimension alone (same font).
                                     // A coloured piece carries no part symbol, the colour says what
                                     // it is: project number, window and dimension only.
+                                    // Per window (08.10.2026): the colour says the window, so the label is the
+                                    // part symbol and the dimension; the symbols carry no C- / D- prefix.
                                     const partColour = colourByPart ? partColourForElement(elName) : null;
+                                    const winColour = windowColourOf(detail);
+                                    const pieceColour = partColour || winColour;
                                     const barPx = Math.max(0, tabWidth - 208) * (barWidthPct / 100);
                                     const piecePx = barPx * (cutLen / barStock);
                                     const fullText = partColour
                                       ? `${[projNum, winName].filter(Boolean).join('-')} ${cutLen}`.trim()
-                                      : `${label} ${cutLen}`.trim();
+                                      : winColour
+                                        ? `${sym?.symbol || ''} ${cutLen}`.trim()
+                                        : `${label} ${cutLen}`.trim();
                                     const shown = tabWidth
                                       ? barLabelThatFits(fullText, String(cutLen), piecePx - 4, (t) => t.length * 4.6)
                                       : String(cutLen);
@@ -1826,11 +1878,11 @@ function PreCutTab({ merged, settings, batch, pp, isPPMode, projects, registerEx
                                         style={{
                                           left: `${left}%`,
                                           width: `${width}%`,
-                                          background: partColour ? partColour.hex : (bar.isOffcut ? 'rgba(217,161,53,0.6)' : 'rgba(0,180,160,0.6)'),
-                                          color: partColour ? '#111111' : undefined,
-                                          fontWeight: partColour ? 700 : undefined,
+                                          background: pieceColour ? pieceColour.hex : (bar.isOffcut ? 'rgba(217,161,53,0.6)' : 'rgba(0,180,160,0.6)'),
+                                          color: pieceColour ? '#111111' : undefined,
+                                          fontWeight: pieceColour ? 700 : undefined,
                                         }}
-                                        title={`${label} ${cutLen} mm${elName ? ' — ' + elName : ''}${partColour ? ' · ' + partColour.name : ''}`}>
+                                        title={`${label} ${cutLen} mm${elName ? ' · ' + displayElementName(elName) : ''}${partColour ? ' · ' + partColour.name : ''}${winColour ? ` · window ${winColour.index + 1}` : ''}`}>
                                         <span className="truncate">{shown}</span>
                                       </div>
                                     );
@@ -1945,7 +1997,7 @@ function CurvedMembersSection({ windowsData }) {
               {list.map((r, i) => (
                 <tr key={`${r.windowId}-${r.elementName}-${i}`} className="border-b border-surface-600/60">
                   <td className="px-4 py-1.5 text-ink-100 font-medium">{r.windowName}</td>
-                  <td className="px-2 py-1.5"><span className="font-mono text-accent-400">{r.code}</span> <span className="text-ink-200">{r.elementName}</span> <span className="text-ink-500">{r.section}</span></td>
+                  <td className="px-2 py-1.5"><span className="font-mono text-accent-400">{r.code}</span> <span className="text-ink-200">{displayElementName(r.elementName)}</span> <span className="text-ink-500">{r.section}</span></td>
                   <td className="px-2 py-1.5 text-ink-300">{r.shape}</td>
                   <td className="px-2 py-1.5 text-ink-300 tabular-nums">{fmtR(r.radii)}</td>
                   <td className="px-2 py-1.5 text-right text-ink-200 tabular-nums">{Math.round(r.length)}</td>
@@ -2031,6 +2083,7 @@ function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat,
     const groups = buildGroupedCutList(merged.cutList);
     return groups.map((g) => ({
       element: g.label,
+      engineElement: g.element,
       section: g.section,
       symbolInfo: { symbol: g.symbol, name: g.label, mirror: g.mirror },
       items: g.rows.map((r) => ({ length: r.length, windowName: r.window, _projectNumber: r.projectNum, quantity: r.qty, section: g.section, mismatch: r.mismatch })),
@@ -2043,8 +2096,9 @@ function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat,
 
   // Colour by part: the switch lives on the Pre-Cut tab and is saved with the
   // pack; a group shows the colour of the compartment its pieces were put in.
-  const colourByPart = (isPPMode ? pp?.precutSettings : batch?.defaults?.precutSettings)?.colourByPart !== false;
-  const groupColour = (symbol) => (colourByPart ? partColourForCutSymbol(symbol) : null);
+  // Per part only: the per window mode leaves the Cut List plain (Piotr 08.10.2026).
+  const colourByPart = normaliseColourMode(isPPMode ? pp?.precutSettings : batch?.defaults?.precutSettings) === 'part';
+  const groupColour = (element) => (colourByPart ? partColourForElement(element) : null);
 
   const handleExport = () => {
     const company = useProjectStore.getState().settings.company || {};
@@ -2052,7 +2106,7 @@ function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat,
     const groups = byElement.map((g) => {
       const m = getMaterialForElement(g.element);
       return {
-        colour: groupColour(g.symbolInfo?.symbol)?.hex || null,
+        colour: groupColour(g.engineElement)?.hex || null,
         symbol: g.symbolInfo?.symbol || '',
         element: g.element,
         mirror: g.symbolInfo?.mirror,
@@ -2110,9 +2164,9 @@ function CutListTab({ merged, isPPMode, pp, batch, registerExport, exportFormat,
               ))}
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  {groupColour(sym.symbol) && (
+                  {groupColour(group.engineElement) && (
                     <span className="w-5 h-5 rounded-sm border border-surface-300 shrink-0"
-                      style={{ background: groupColour(sym.symbol).hex }} title={groupColour(sym.symbol).name} />
+                      style={{ background: groupColour(group.engineElement).hex }} title={groupColour(group.engineElement).name} />
                   )}
                   <span className="text-xs font-mono font-bold text-accent-400 bg-accent-500/10 px-1.5 py-0.5 rounded">{sym.symbol}</span>
                   <span className="text-sm font-semibold text-ink-50">{group.element}</span>
@@ -2630,7 +2684,7 @@ function GroupedElementTable({ items, isPPMode }) {
             return (
             <tr key={i} className="border-b border-surface-500/30">
               {isPPMode && <td className="px-4 py-2 text-accent-400 text-[10px]">{g.projects.join(', ')}</td>}
-              <td className="px-4 py-2 text-ink-100">{g.element} <span className="text-accent-400 font-mono text-[10px]">({sym.symbol})</span>{sym.mirror ? <span className="text-purple-400 text-[9px] ml-1">⟷</span> : ''}</td>
+              <td className="px-4 py-2 text-ink-100">{displayElementName(g.element)} <span className="text-accent-400 font-mono text-[10px]">({sym.symbol})</span>{sym.mirror ? <span className="text-purple-400 text-[9px] ml-1">⟷</span> : ''}</td>
               <td className="px-4 py-2 text-right text-ink-100 font-mono">{g.length} mm</td>
               <td className="px-4 py-2 text-right text-ink-300 font-mono">{g.finishedLength} mm</td>
               <td className="px-4 py-2 text-ink-300">{g.section}</td>

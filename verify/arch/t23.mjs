@@ -211,7 +211,8 @@ const DC = derive(CIRCLE);
   check('circle without a pattern: no tracery record, bars empty, cut list = the two rings only', noPat.components.sash.length === 1 && noPat.arch.bars.length === 0 && noPat.arch.tracery === null);
   expectThrows('a circle that is not fixed → ArchError', () => derive(cas('CO', 800, 800, { casementKind: 'opening', archShape: 'circle' })), /fixed window/);
   const lists = M.lists.buildCutList ? null : null; void lists;
-  check('cut list order carries C-FRAME RING (C-FRR) and C-LEAF RING (C-LFR) rows', M.lists.CUT_LIST_ORDER.some((r) => r.match === 'C-FRAME RING' && r.symbol === 'C-FRR') && M.lists.CUT_LIST_ORDER.some((r) => r.match === 'C-LEAF RING' && r.symbol === 'C-LFR'));
+  // symbols without the C prefix since 08.10.2026 (the engine codes C-FRR / C-LFR-P1 above are unchanged)
+  check('cut list order carries C-FRAME RING (FRR) and C-LEAF RING (LFR) rows', M.lists.CUT_LIST_ORDER.some((r) => r.match === 'C-FRAME RING' && r.symbol === 'FRR') && M.lists.CUT_LIST_ORDER.some((r) => r.match === 'C-LEAF RING' && r.symbol === 'LFR'));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

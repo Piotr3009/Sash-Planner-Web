@@ -293,8 +293,9 @@ section('3 — cut list, glass unit, paint / seals / weights; rectangular caseme
   check('hinge right → 040R', derive(pcItem('C1', 1000, 1500, { archShape: 'three-centre', archStart: 1300, archHinge: 'right' })).casement.layout === '040R');
   const cut = lists.buildCutListForWindow(d, spec).map((r) => ({ ...r, windowName: 'V1' }));
   const groups = lists.buildGroupedCutList(cut);
-  check('grouped cut list: C-AH right after the frame head slot, C-ATR after the leaf top rail, no "?" group', groups.map((x) => x.symbol).join(' ') === 'C-AH C-J-L/R C-CILL C-ST-L/R C-ATR C-BR' && !groups.some((x) => x.symbol === '?'), groups.map((x) => x.symbol).join(' '));
-  check(`C-AH group: ${Math.round(ahLen)} × 1, C-ATR group: ${Math.round(atrLen)} × 1 (integer cut list = round of the centre lines)`, groups.find((x) => x.symbol === 'C-AH').rows[0].length === Math.round(ahLen) && groups.find((x) => x.symbol === 'C-ATR').rows[0].length === Math.round(atrLen));
+  // symbols without the C prefix since 08.10.2026
+  check('grouped cut list: AH right after the frame head slot, ATR after the leaf top rail, no "?" group', groups.map((x) => x.symbol).join(' ') === 'AH J-L/R CILL ST-L/R ATR BR' && !groups.some((x) => x.symbol === '?'), groups.map((x) => x.symbol).join(' '));
+  check(`AH group: ${Math.round(ahLen)} × 1, ATR group: ${Math.round(atrLen)} × 1 (integer cut list = round of the centre lines)`, groups.find((x) => x.symbol === 'AH').rows[0].length === Math.round(ahLen) && groups.find((x) => x.symbol === 'ATR').rows[0].length === Math.round(atrLen));
   const u = d.customGlassUnits[0];
   const radii1 = ringV1(glassOff);                                              // glass radii 44.5 / 1294.5 / 44.5
   check(`glass unit: ${Wg1} × ${apex1}, qty 1, role main, location "arched leaf", shape.kind arched`, u.width === Wg1 && near(u.height, apex1, 1e-6) && u.qty === 1 && u.role === 'main' && u.location === 'arched leaf' && u.shape?.kind === 'arched');
@@ -495,7 +496,8 @@ section('7 — profile v3 block and vocabulary');
 check('profile.arch v4: minHaunchRadius 150, hubRingRatios [0.3, 0.6, 0.8], intersecting 220 / 2 / 9 (mullion pitch restored 07.09; arcs keep the PSW shared radius)', P.arch.version === 4 && P.arch.minHaunchRadius === 150 && JSON.stringify(P.arch.patterns.hubRingRatios) === '[0.3,0.6,0.8]' && P.arch.patterns.intersecting.pitch === 220 && P.arch.patterns.intersecting.maxMullions === 9);
 check('ARCH_BAR_PATTERNS vocabulary (PSW six + v3 quad-hub-spoke + custom + Block 3 sunburst) and labels', JSON.stringify(arch.ARCH_BAR_PATTERNS) === '["none","half-hub","hub-spoke","double-hub-spoke","triple-hub-spoke","quad-hub-spoke","custom","intersecting","sunburst"]' && arch.ARCH_BAR_PATTERNS.every((p) => typeof arch.ARCH_BAR_PATTERN_LABELS[p] === 'string'));
 expectThrows('unknown pattern in an item throws at normalisation', () => pcItem('X', 1000, 1500, { archShape: 'three-centre', archStart: 1000, archBarPattern: 'star' }), /Unknown arch bar pattern "star"/);
-check('CUT_LIST_ORDER: C-AH directly after C-FH, C-ATR directly after C-TR', (() => { const s = lists.CUT_LIST_ORDER.map((x) => x.symbol); return s[s.indexOf('C-FH') + 1] === 'C-AH' && s[s.indexOf('C-TR') + 1] === 'C-ATR'; })());
+// symbols without the C prefix since 08.10.2026; the casement block is the first FH / TR in the order (the door block repeats them)
+check('CUT_LIST_ORDER: AH directly after FH, ATR directly after TR (casement block)', (() => { const s = lists.CUT_LIST_ORDER.filter((x) => x.match.startsWith('C-')).map((x) => x.symbol); return s[s.indexOf('FH') + 1] === 'AH' && s[s.indexOf('TR') + 1] === 'ATR'; })());
 check('bom ELEMENT_TO_PART_ID maps both curved members', bom.ELEMENT_TO_PART_ID['C-ARCH HEAD'] === 'c_frame_head' && bom.ELEMENT_TO_PART_ID['C-ARCH TOP RAIL'] === 'c_sash_top_rail');
 
 // ═══════════════════════════════════════════════════════════════════════════

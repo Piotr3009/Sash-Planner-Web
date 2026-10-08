@@ -13,6 +13,7 @@ const defaultSettings = {
   stockLengthSash: 5900,
   stockLengthBox: 3700,
   boxWidthAllowance: 20,
+  precutAllowance: 10,         // mm over the finished length on the Pre-Cut (Piotr 08.10.2026: 10, was a fixed 20)
   hornExtensionDefault: 70,
   glazingAllowanceWidth: 4,
   glazingAllowanceHeight: 4,

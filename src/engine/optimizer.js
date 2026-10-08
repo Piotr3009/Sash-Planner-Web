@@ -5,9 +5,14 @@
 
 function expandItems(items) {
   const expanded = [];
-  items.forEach(({ length, quantity, elementName, windowId, windowName, _projectNumber }) => {
+  items.forEach(({ length, quantity, elementName, windowId, windowName, _projectNumber, finishedLength, section }) => {
     for (let i = 0; i < quantity; i += 1) {
-      expanded.push({ length: Number(length), elementName, windowId, windowName: windowName || '', projectNumber: _projectNumber || '' });
+      // windowId, finishedLength and section ride along to the bar details:
+      // the colour by window and the labels need them (08.10.2026)
+      expanded.push({
+        length: Number(length), elementName, windowId, windowName: windowName || '', projectNumber: _projectNumber || '',
+        finishedLength: Number.isFinite(Number(finishedLength)) ? Number(finishedLength) : null, section: section || '',
+      });
     }
   });
   return expanded.filter((item) => Number.isFinite(item.length) && item.length > 0);
@@ -93,6 +98,9 @@ function bestFitDecreasing({ items, stockLength, kerf, endTrim, minimumPiece, pr
           elementName: cut.elementName || '',
           windowName: cut.windowName || '',
           projectNumber: cut.projectNumber || '',
+          windowId: cut.windowId ?? null,
+          finishedLength: cut.finishedLength ?? null,
+          section: cut.section || '',
         });
         bar.used += kerfAllowance + cut.length;
       });
@@ -159,6 +167,9 @@ function bestFitDecreasing({ items, stockLength, kerf, endTrim, minimumPiece, pr
       elementName: cut.elementName || '',
       windowName: cut.windowName || '',
       projectNumber: cut.projectNumber || '',
+      windowId: cut.windowId ?? null,
+      finishedLength: cut.finishedLength ?? null,
+      section: cut.section || '',
     });
     bestBar.used += kerfAllowance + cut.length;
     const remaining = barStock - (bestBar.used + endTrim);

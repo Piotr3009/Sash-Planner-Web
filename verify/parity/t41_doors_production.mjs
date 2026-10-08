@@ -316,10 +316,10 @@ section('6 - BOM part quantities');
   ok(q.c_glazing_packer?.qty === 8 && q.c_glass_clips_double?.qty === 8 && q.c_silicone?.qty > 0 && q.c_bead_tape_1mm?.qty > 0 && q.c_seal_frame_black?.qty > 0 && q.c_seal_hj_black?.qty > 0,
     'consumables on the casement rows: packers 8, clips 8 (pane > 500), silicone, bead tape, seals');
   ok(q.d_hinges?.qty === 3 && q.d_lock_single_kit?.qty === 1 && q.d_cylinder?.qty === 1 && q.d_handle_set?.qty === 1, 'hardware rows in the BOM');
-  ok(q.d_leaf_stile?.mm === 2 * (2002 + 20) && q.d_leaf_top_rail?.mm === 818 && q.d_leaf_bottom_rail?.mm === 818 && q.d_frame_jamb?.mm === 2 * 2120 && q.d_frame_head?.mm === 920 && q.d_frame_cill?.mm === 920,
-    'timber via the pre-cut lengths (+20 machining): stiles 2 x 2022, rails 818, jambs 2 x 2120, head 920, cill 920');
+  ok(q.d_leaf_stile?.mm === 2 * (2002 + 10) && q.d_leaf_top_rail?.mm === 808 && q.d_leaf_bottom_rail?.mm === 808 && q.d_frame_jamb?.mm === 2 * 2110 && q.d_frame_head?.mm === 910 && q.d_frame_cill?.mm === 910,
+    'timber via the pre-cut lengths (+10 allowance, Piotr 08.10.2026): stiles 2 x 2012, rails 808, jambs 2 x 2110, head 910, cill 910');
   const qf = pq(F);
-  ok(qf.d_leaf_meeting_stile?.mm === 2 * 2022 && qf.d_leaf_stile?.mm === 2 * 2022, 'french: meeting stiles 2 x 2022 on their own row, hinge stiles 2 x 2022');
+  ok(qf.d_leaf_meeting_stile?.mm === 2 * 2012 && qf.d_leaf_stile?.mm === 2 * 2012, 'french: meeting stiles 2 x 2012 on their own row, hinge stiles 2 x 2012');
   ok(qs.every((x) => !Object.keys(x).some((k) => /^c_frame|^c_mullion|^c_transom/.test(k))), 'door frame timber never lands on the casement frame rows');
 }
 
@@ -355,7 +355,7 @@ section('7 - pre-cut: one assigned material = one group');
   ok(sel?.id === 'oak', 'the pre-cut group header names the assigned material');
   const sym = (n) => LIVE.partSymbols.getPartSymbol(n).symbol;
   ok(['D-FRAME HEAD', 'D-FRAME JAMB (L)', 'D-FRAME CILL', 'D-COUPLING POST', 'D-TRANSOM', 'D-MEETING STILE', 'D-MID RAIL', 'D-SIDE STILE', 'D-SIDE TOP RAIL', 'D-SIDE BOTTOM RAIL', 'D-FAN STILE (L)', 'D-FAN TOP RAIL', 'D-FAN BOTTOM RAIL'].map(sym).join(' ')
-    === 'DFH DFJ DFC DCP DTR DMS DMR DSS DST DSB DFS DFT DFB', 'part symbols DFH DFJ DFC DCP DTR DMS DMR DSS DST DSB DFS DFT DFB');
+    === 'FH J-L CILL CP T MS MR SP-ST SP-TR SP-BR FS-L FTR FBR', 'part symbols without the D prefix (Piotr 08.10.2026): FH J-L CILL CP T MS MR SP-ST SP-TR SP-BR FS-L FTR FBR');
   const col = (n) => LIVE.partColours.partColourForElement(n)?.id;
   ok(['D-FRAME HEAD', 'D-FRAME JAMB (R)', 'D-FRAME CILL', 'D-COUPLING POST', 'D-TRANSOM', 'D-STILE (L)', 'D-MEETING STILE', 'D-TOP RAIL', 'D-MID RAIL', 'D-BOTTOM RAIL', 'D-SIDE STILE', 'D-FAN TOP RAIL'].every((n) => col(n)?.startsWith('door_')),
     'every door part has a door colour group');
@@ -368,17 +368,18 @@ section('8 - cut list');
   const cut = lists.buildCutListForWindow(F.derived, F.spec).map((r) => ({ ...r, windowName: 'F1' }));
   const g = lists.buildGroupedCutList(cut);
   const by = (s) => g.find((x) => x.symbol === s);
-  ok(by('D-ST-L/R')?.rows.length === 1 && by('D-ST-L/R').rows[0].qty === 2 && /hinge \(passive\)/.test(by('D-ST-L/R').rows[0].notes) && /hinge \(active\)/.test(by('D-ST-L/R').rows[0].notes),
-    `french hinge stiles: one row x2, notes "${by('D-ST-L/R')?.rows[0]?.notes}"`);
-  ok(by('D-MS')?.rows[0]?.qty === 2 && /meeting \(passive\)/.test(by('D-MS').rows[0].notes) && /meeting \(active\)/.test(by('D-MS').rows[0].notes), `meeting stiles: one row x2, notes "${by('D-MS')?.rows[0]?.notes}"`);
-  ok(by('D-TR')?.rows[0]?.qty === 2 && /passive/.test(by('D-TR').rows[0].notes) && /active/.test(by('D-TR').rows[0].notes), 'top rails: one row x2, active and passive noted');
+  // symbols without the D prefix since 08.10.2026 (Piotr: the prefix said nothing)
+  ok(by('ST-L/R')?.rows.length === 1 && by('ST-L/R').rows[0].qty === 2 && /hinge \(passive\)/.test(by('ST-L/R').rows[0].notes) && /hinge \(active\)/.test(by('ST-L/R').rows[0].notes),
+    `french hinge stiles: one row x2, notes "${by('ST-L/R')?.rows[0]?.notes}"`);
+  ok(by('MS')?.rows[0]?.qty === 2 && /meeting \(passive\)/.test(by('MS').rows[0].notes) && /meeting \(active\)/.test(by('MS').rows[0].notes), `meeting stiles: one row x2, notes "${by('MS')?.rows[0]?.notes}"`);
+  ok(by('TR')?.rows[0]?.qty === 2 && /passive/.test(by('TR').rows[0].notes) && /active/.test(by('TR').rows[0].notes), 'top rails: one row x2, active and passive noted');
   ok(!g.some((x) => x.symbol === '?'), 'no door element falls into the "?" safety net');
   const cas = mk(LIVE, 1000, 1200, { windowCategory: 'casement', casementLayout: '040L' });
   const gc = lists.buildGroupedCutList(lists.buildCutListForWindow(cas.derived, cas.spec).map((r) => ({ ...r, windowName: 'C1' })));
   ok(gc.every((x) => x.rows.every((r) => !('notes' in r))), 'casement groups unchanged: no notes key');
   const H = french(1600, 2100, { doorStyle: 'half-glazed', transomType: 'opening', transomHeight: 450 });
   const gh = lists.buildGroupedCutList(lists.buildCutListForWindow(H.derived, H.spec).map((r) => ({ ...r, windowName: 'H1' })));
-  ok(['D-MR', 'D-FS-L/R', 'D-FTR', 'D-FBR'].every((s) => gh.some((x) => x.symbol === s)), 'mid rail and fan leaf groups present');
+  ok(['MR', 'FS-L/R', 'FTR', 'FBR'].every((s) => gh.some((x) => x.symbol === s)), 'mid rail and fan leaf groups present (symbols without the D prefix)');
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -609,15 +610,27 @@ section('17 - controls: casement and sash equal to START');
     const noDoor = (x) => { const c = clone(x); delete c.door; return c; };
     ok(JSON.stringify(noDoor(a.spec)) === JSON.stringify(noDoor(b.spec)) && JSON.stringify({ ...a.spec.door, leafDepth: 0 }) === JSON.stringify({ ...b.spec.door, leafDepth: 0 }),
       `${name}: windowSpec equal to START but for the door block's informational leafDepth (${b.spec.door.leafDepth} -> ${a.spec.door.leafDepth})`);
+    // 08.10.2026: the pre-cut allowance is a setting, default 10 (START added a fixed 20).
+    // With 20 asked for, the live pre-cut and the BOM metres equal START exactly; at the
+    // default every straight piece is 10 shorter and nothing else moves.
+    const A20 = { precutAllowance: 20 };
     ok(JSON.stringify(lists.buildCutListForWindow(a.derived, a.spec)) === JSON.stringify(START.lists.buildCutListForWindow(b.derived, b.spec))
       && JSON.stringify(lists.buildGlassListForWindow(a.derived, a.spec)) === JSON.stringify(START.lists.buildGlassListForWindow(b.derived, b.spec))
-      && JSON.stringify(lists.buildPrecutForWindow(a.derived, a.spec, {}, null)) === JSON.stringify(START.lists.buildPrecutForWindow(b.derived, b.spec, {}, null))
+      && JSON.stringify(lists.buildPrecutForWindow(a.derived, a.spec, A20, null)) === JSON.stringify(START.lists.buildPrecutForWindow(b.derived, b.spec, {}, null))
       && JSON.stringify(lists.buildHardwareList(a.spec, a.derived)) === JSON.stringify(START.lists.buildHardwareList(b.spec, b.derived)),
-      `${name}: cut list, glass list, pre-cut and hardware list equal to START`);
-    ok(JSON.stringify(bom.buildWindowPartQtys(a.derived, a.spec, {})) === JSON.stringify(START.bom.buildWindowPartQtys(b.derived, b.spec, {})), `${name}: BOM part quantities equal to START`);
+      `${name}: cut list, glass list, pre-cut (allowance 20) and hardware list equal to START`);
+    const pcItems = (pc) => [...pc.sashEngineering.flatMap((g) => g.items), ...pc.boxSapele.flatMap((g) => g.items)];
+    const p10 = pcItems(lists.buildPrecutForWindow(a.derived, a.spec, {}, null)), p20 = pcItems(START.lists.buildPrecutForWindow(b.derived, b.spec, {}, null));
+    ok(p10.length === p20.length && p10.every((it, i) => JSON.stringify({ ...it, length: 0 }) === JSON.stringify({ ...p20[i], length: 0 }) && (it.blank ? it.length === p20[i].length : it.length === p20[i].length - 10)),
+      `${name}: default pre-cut = START with every straight piece 10 shorter (${p10.length} pieces)`);
+    ok(JSON.stringify(bom.buildWindowPartQtys(a.derived, a.spec, A20)) === JSON.stringify(START.bom.buildWindowPartQtys(b.derived, b.spec, {})), `${name}: BOM part quantities (allowance 20) equal to START`);
+    // 08.10.2026: Cut List symbols lost the C prefix and every group names its engine element
     const ga = lists.buildGroupedCutList(lists.buildCutListForWindow(a.derived, a.spec).map((r) => ({ ...r, windowName: 'W' })));
     const gb = START.lists.buildGroupedCutList(START.lists.buildCutListForWindow(b.derived, b.spec).map((r) => ({ ...r, windowName: 'W' })));
-    ok(JSON.stringify(ga) === JSON.stringify(gb), `${name}: grouped cut list equal to START`);
+    const sansElement = (g) => g.map(({ element, ...rest }) => rest);
+    const sansPrefix = (g) => g.map((x) => ({ ...x, symbol: String(x.symbol).replace(/^[CDS]-/, '') }));
+    ok(JSON.stringify(sansElement(ga)) === JSON.stringify(sansPrefix(gb)) && ga.every((x) => typeof x.element === 'string' && x.element.length > 0),
+      `${name}: grouped cut list equal to START but for the dropped C prefix; every group carries its element`);
   }
   ok(JSON.stringify(profile.DEFAULT_CASEMENT_PROFILE) === JSON.stringify(START.profile.DEFAULT_CASEMENT_PROFILE) && JSON.stringify(profile.DEFAULT_SASH_PROFILE) === JSON.stringify(START.profile.DEFAULT_SASH_PROFILE),
     'casement and sash default profiles equal to START');

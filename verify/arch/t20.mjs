@@ -419,7 +419,8 @@ section('6 — cut list / BOM / paint: C-TRACERY, elevation keeps 22, glass keep
   const bb = d.arch.tracery.bbox;
   check('C-TRACERY record: qty = sides (1), code C-TRY-P1, section boardThickness x blank W, length = blank H (bbox + contourAllowance)', !!rec && rec.quantity === 1 && rec.code === 'C-TRY-P1' && rec.section === `${T.boardThickness}x${Math.round((bb.maxX - bb.minX + 2 * P.arch.contourAllowance) * 10) / 10}` && near(rec.length, bb.maxY - bb.minY + 2 * P.arch.contourAllowance, 0.1), JSON.stringify(rec));
   const groups = lists.buildGroupedCutList(lists.buildCutListForWindow(d, spec).map((r) => ({ ...r, windowName: 'CT' })));
-  check('grouped cut list: C-TRY group after C-BR', groups.map((g) => g.symbol).join(' ').endsWith('C-BR C-TRY'), groups.map((g) => g.symbol).join(' '));
+  // symbols without the C prefix since 08.10.2026
+  check('grouped cut list: TRY group after BR', groups.map((g) => g.symbol).join(' ').endsWith('BR TRY'), groups.map((g) => g.symbol).join(' '));
   check('BOM slot: C-TRACERY → c_tracery', bom.ELEMENT_TO_PART_ID['C-TRACERY'] === 'c_tracery');
   const noPat = derive(pcItem('CN', 1000, 1500, { archShape: 'three-centre', archStart: 1000 }));
   check('no pattern → no C-TRACERY record, tracery null', !noPat.components.sash.some((c) => c.elementName === 'C-TRACERY') && noPat.arch.tracery === null);

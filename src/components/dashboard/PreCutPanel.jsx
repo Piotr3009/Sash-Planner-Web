@@ -7,7 +7,7 @@ import { useState, useMemo } from 'react';
 import { buildPrecutForWindow } from '../../engine/lists.js';
 import { effectiveAssignment, materialSizeToRaw, ELEMENT_TO_PART_ID, assignedMaterialForItems } from '../../engine/bom.js';
 import { optimisePrecut } from '../../engine/optimizer.js';
-import { getPartSymbol } from '../../engine/partSymbols.js';
+import { getPartSymbol, displayElementName } from '../../engine/partSymbols.js';
 import { useMaterialAssignmentStore } from '../../stores/materialAssignmentStore.js';
 import { useMaterialStore } from '../../stores/materialStore.js';
 import { exportPreCutPDF } from '../../utils/precutPdfExport.js';
@@ -449,7 +449,7 @@ function GroupedElementTable({ items }) {
             const sym = getPartSymbol(g.element);
             return (
               <tr key={i} className="border-b border-surface-500/30">
-                <td className="px-4 py-2 text-ink-100">{g.element} <span className="text-accent-400 font-mono text-[10px]">({sym.symbol})</span>{sym.mirror ? <span className="text-purple-400 text-[9px] ml-1">⟷</span> : ''}</td>
+                <td className="px-4 py-2 text-ink-100">{displayElementName(g.element)} <span className="text-accent-400 font-mono text-[10px]">({sym.symbol})</span>{sym.mirror ? <span className="text-purple-400 text-[9px] ml-1">⟷</span> : ''}</td>
                 <td className="px-4 py-2 text-right text-ink-100 font-mono">{g.length} mm</td>
                 <td className="px-4 py-2 text-right text-ink-300 font-mono">{g.finishedLength} mm</td>
                 <td className="px-4 py-2 text-ink-300">{g.section}</td>

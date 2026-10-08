@@ -68,28 +68,70 @@ const ELEMENT_TO_GROUP = {
 };
 
 // Cut List group symbol (lists.js CUT_LIST_ORDER) to the same colour group.
+// Since 08.10.2026 the symbols carry no C- / D- prefix, so a symbol alone no
+// longer says casement or door: colour the Cut List by the group's ELEMENT
+// (partColourForElement(group.element)); this table stays for callers that
+// still pass a symbol. Casement and door symbols that coincide (FH, J-L/R,
+// CILL, T, ST-L/R, TR, BR) share the same hex in both families.
 const CUT_SYMBOL_TO_GROUP = {
-  'C-FH': 'frame_head', 'C-AH': 'frame_head', 'C-FRR': 'frame_head',
-  'C-J-L/R': 'frame_jambs',
-  'C-CILL': 'frame_cill',
-  'C-M': 'mullion',
-  'C-T': 'transom',
-  'C-ST-L/R': 'leaf_stiles',
-  'C-TR': 'leaf_top_rail', 'C-ATR': 'leaf_top_rail', 'C-LFR': 'leaf_top_rail',
-  'C-BR': 'leaf_bottom_rail',
-  'D-FH': 'door_frame_head',
-  'D-J-L/R': 'door_frame_jambs',
-  'D-CILL': 'door_frame_cill', 'D-CILL-IN': 'door_frame_cill',
-  'D-JC': 'door_post',
-  'D-T': 'door_transom',
-  'D-ST-L/R': 'door_leaf_stiles',
-  'D-MS': 'door_meeting_stile',
-  'D-TR': 'door_top_rail',
-  'D-MR': 'door_mid_rail',
-  'D-BR': 'door_bottom_rail',
+  'FH': 'frame_head', 'AH': 'frame_head', 'FRR': 'frame_head',
+  'J-L/R': 'frame_jambs',
+  'CILL': 'frame_cill',
+  'M': 'mullion',
+  'T': 'transom',
+  'ST-L/R': 'leaf_stiles',
+  'TR': 'leaf_top_rail', 'ATR': 'leaf_top_rail', 'LFR': 'leaf_top_rail',
+  'BR': 'leaf_bottom_rail',
+  'CILL-IN': 'door_frame_cill',
+  'CP': 'door_post',
+  'MS': 'door_meeting_stile',
+  'MR': 'door_mid_rail',
+  'SP-ST': 'door_side_panel', 'SP-TR': 'door_side_panel', 'SP-BR': 'door_side_panel',
+  'FS-L/R': 'door_fan', 'FTR': 'door_fan', 'FBR': 'door_fan',
+  // the pre-08.10 symbols, for anything saved with them
+  'C-FH': 'frame_head', 'C-AH': 'frame_head', 'C-FRR': 'frame_head', 'C-J-L/R': 'frame_jambs', 'C-CILL': 'frame_cill',
+  'C-M': 'mullion', 'C-T': 'transom', 'C-ST-L/R': 'leaf_stiles', 'C-TR': 'leaf_top_rail', 'C-ATR': 'leaf_top_rail',
+  'C-LFR': 'leaf_top_rail', 'C-BR': 'leaf_bottom_rail',
+  'D-FH': 'door_frame_head', 'D-J-L/R': 'door_frame_jambs', 'D-CILL': 'door_frame_cill', 'D-CILL-IN': 'door_frame_cill',
+  'D-JC': 'door_post', 'D-T': 'door_transom', 'D-ST-L/R': 'door_leaf_stiles', 'D-MS': 'door_meeting_stile',
+  'D-TR': 'door_top_rail', 'D-MR': 'door_mid_rail', 'D-BR': 'door_bottom_rail',
   'D-SP-ST': 'door_side_panel', 'D-SP-TR': 'door_side_panel', 'D-SP-BR': 'door_side_panel',
   'D-FS-L/R': 'door_fan', 'D-FTR': 'door_fan', 'D-FBR': 'door_fan',
 };
+
+// ─── Colour by WINDOW (Piotr 08.10.2026) ───
+// The second colour mode of the Pre-Cut: one colour = one window of the pack,
+// by the window's position in the pack (window 1 is always colour 1). Ten
+// colours, the same set the parts use; from the eleventh window the colours
+// repeat (11 = colour 1) and nothing more happens, by owner decision. Works
+// for every pack type, sash included. The Cut List is not coloured in this
+// mode, only the Pre-Cut (screen, PDF, labels).
+export const WINDOW_COLOURS = [
+  '#F5E050', '#F2A03D', '#EE7D5B', '#D99AC5', '#A98BE8',
+  '#7CC4F5', '#5CCBA9', '#9BD36A', '#FFFFFF', '#C8A36A',
+];
+export const COLOUR_MODES = ['off', 'part', 'window'];
+export const COLOUR_MODE_LABELS = { off: 'Off', part: 'Per part', window: 'Per window' };
+
+/** The colour of the window at `index` (0-based position in the pack). */
+export function windowColourForIndex(index) {
+  // null / '' / booleans would coerce to 0 and steal colour 1: an unknown window has no colour.
+  if (index === null || index === undefined || index === '' || typeof index === 'boolean') return null;
+  const i = Number(index);
+  if (!Number.isInteger(i) || i < 0) return null;
+  return { index: i, hex: WINDOW_COLOURS[i % WINDOW_COLOURS.length], repeatOf: i >= WINDOW_COLOURS.length ? (i % WINDOW_COLOURS.length) : null };
+}
+
+/**
+ * The colour mode saved with a pack or batch (precutSettings). Packs saved
+ * before the window mode carry `colourByPart` only: true (or absent) was the
+ * part colours ON, false was OFF.
+ */
+export function normaliseColourMode(precutSettings) {
+  const m = precutSettings?.colourMode;
+  if (COLOUR_MODES.includes(m)) return m;
+  return precutSettings?.colourByPart === false ? 'off' : 'part';
+}
 
 /** Colour group of a pre-cut item, or null when the part has no colour. */
 export function partColourForElement(elementName) {

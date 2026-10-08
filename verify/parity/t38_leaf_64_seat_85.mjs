@@ -259,7 +259,7 @@ for (const w of SET) {
   ok(JSON.stringify(t('052L-1800x1500')) === '[840.5]', '052L 1800 x 1500: C-TRANSOM 840.5 = leaf 832 + 8.5', JSON.stringify(t('052L-1800x1500')));
   const pc = LIVE.lists.buildPrecutForWindow(L['021-1000x1200'].derived, L['021-1000x1200'].spec, {}, undefined);
   const tr = pc.sashEngineering.flatMap((g) => g.items).filter((it) => it.elementName === 'C-TRANSOM');
-  ok(tr.length === 1 && tr[0].length === 927, '021 1000 x 1200: Pre-Cut transom 927 = round(906.5 + 20) (REF 926)', JSON.stringify(tr));
+  ok(tr.length === 1 && tr[0].length === 917, '021 1000 x 1200: Pre-Cut transom 917 = round(906.5 + 10) (allowance 10 since 08.10.2026; REF 926 with +20)', JSON.stringify(tr));
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -780,7 +780,7 @@ section('14 - the half millimetre through the consumers');
   // No consumer may truncate, crash or print a long float. The engine record and the
   // drawing run carry one decimal (R); the cut list and the Pre-Cut round every member to
   // whole mm by their existing rule (lists.js, Math.round: a 446.2 leaf already prints 446),
-  // so 906.5 prints 907 there and 906.5 + 20 = 926.5 -> 927 on the Pre-Cut.
+  // so 906.5 prints 907 there and 906.5 + 10 = 916.5 -> 917 on the Pre-Cut (allowance 10, Piotr 08.10.2026).
   const oneDecimal = (v) => Number.isFinite(v) && Math.abs(v * 10 - Math.round(v * 10)) < 1e-9;
   for (const w of SET) {
     const { spec, derived } = L[w.id];
@@ -795,7 +795,7 @@ section('14 - the half millimetre through the consumers');
     const pc = LIVE.lists.buildPrecutForWindow(derived, spec, {}, undefined);
     const items = pc.sashEngineering.flatMap((g) => g.items);
     const pt = items.filter((it) => it.elementName === 'C-TRANSOM');
-    ok(items.every((it) => Number.isInteger(it.length) && Number.isInteger(it.finishedLength)) && pt.every((it, i) => it.length === Math.round(tr[i].length + 20) && it.finishedLength === Math.round(tr[i].length)),
+    ok(items.every((it) => Number.isInteger(it.length) && Number.isInteger(it.finishedLength)) && pt.every((it, i) => it.length === Math.round(tr[i].length + 10) && it.finishedLength === Math.round(tr[i].length)),
       `${w.id}: Pre-Cut whole mm, transom ${pt.map((it) => `${it.length} (finished ${it.finishedLength})`).join(', ') || 'none'}`);
     const opt = LIVE.optimizer.optimisePrecut(pc, { kerf: 3, endTrim: 10, minimumPiece: 200, stockLengthSash: 5900, stockLengthBox: 2500 });
     const cuts = opt.sashEngineering.flatMap((g) => g.bars.flatMap((b) => b.cuts));
@@ -803,7 +803,7 @@ section('14 - the half millimetre through the consumers');
       `${w.id}: optimiser places all ${cuts.length} Pre-Cut pieces, whole mm, no NaN`);
     const pq = LIVE.bom.buildWindowPartQtys(derived, spec, {}, undefined);
     const pqr = REF.bom.buildWindowPartQtys(F[w.id].derived, F[w.id].spec, {}, undefined);
-    if (pt.length) ok(pq.c_transom.mm === pt.reduce((a, it) => a + it.length * (it.quantity || 1), 0) && pq.c_transom.mm - pqr.c_transom.mm === pt.length * (pt[0].length - Math.round(F[w.id].derived.casement.transomRuns[0].length + 20)),
+    if (pt.length) ok(pq.c_transom.mm === pt.reduce((a, it) => a + it.length * (it.quantity || 1), 0) && pq.c_transom.mm - pqr.c_transom.mm === pt.length * (pt[0].length - Math.round(F[w.id].derived.casement.transomRuns[0].length + 20))   /* REF tree still adds 20 */,
       `${w.id}: BOM c_transom ${pq.c_transom.mm} mm (REF ${pqr.c_transom.mm}) = the Pre-Cut pieces; purchase list ${LIVE.bom.formatQty(pq.c_transom.mm / 1000, 'm')}`);
   }
   // the frame sheet is the drawing that prints the transom length (0.5 grid)
