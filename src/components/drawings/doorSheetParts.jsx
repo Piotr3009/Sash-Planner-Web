@@ -23,6 +23,7 @@
 import { BAR_WIDTH } from '../../engine/casementBarGrid.js';
 import { getDoorProfile, DEFAULT_DOOR_PROFILE, getWindowProfile } from '../../engine/profile.js';
 import { glassMakeupFor } from '../../engine/specification.js';
+import { displayCode } from '../../engine/partSymbols.js';
 import { DimH, DimV, DimChainH, DimChainV, Label } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
 
@@ -107,10 +108,10 @@ export function sectionText(section) {
   return s.face != null && s.depth != null ? `${fmt(s.face)}×${fmt(s.depth)}` : '';
 }
 
-/** One member label: code, cut length and section of a cut list record. */
+/** One member label: code (without the D- prefix), cut length and section of a cut list record. */
 export function recordText(rec, extra = '') {
   if (!rec) return '';
-  const parts = [`${rec.code || rec.elementName} ${fmt(rec.length)}`];
+  const parts = [`${displayCode(rec.code || rec.elementName)} ${fmt(rec.length)}`];
   const sec = sectionText(rec.section);
   if (sec) parts.push(sec);
   if (extra) parts.push(extra);

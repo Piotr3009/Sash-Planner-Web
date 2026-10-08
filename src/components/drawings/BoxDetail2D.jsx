@@ -167,7 +167,7 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
           <text x={X(fw / 2)} y={A ? Y(fh - A.geometry.head.thickness / 2) + 8 * totalW / VIEWBOX_REF : Y(fh - BOX.headH / 2) + 8 * totalW / VIEWBOX_REF} fill={COL.label}
             fontSize={tfs(SIZES.label, totalW)} fontWeight={WEIGHTS.label}
             fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}>
-            {A ? `S-ARCH HEAD ${Math.round(A.geometry.head.thickness)}` : `${linerPrefix} HEAD LINER`}
+            {A ? `ARCH HEAD ${Math.round(A.geometry.head.thickness)}` : `${linerPrefix} HEAD LINER`}
           </text>
           {A && (
             <g>

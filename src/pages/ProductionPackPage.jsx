@@ -39,7 +39,7 @@ import { exportElevationsPDF, exportElementsPDF, exportSectionsPDF } from '../ut
 import { buildProductionBook } from '../utils/productionBookExport.js';
 import { svgNodeToPng, loadImageSize } from '../utils/svgRaster.js';
 import { getColorName } from '../config.js';
-import { getPartSymbol, displayElementName } from '../engine/partSymbols.js';
+import { getPartSymbol, displayElementName, displayCode } from '../engine/partSymbols.js';
 import { partColourForElement, barLabelThatFits, windowColourForIndex, normaliseColourMode, COLOUR_MODES, COLOUR_MODE_LABELS } from '../engine/partColours.js';
 
 import FrontElevation2D from '../components/drawings/FrontElevation2D.jsx';
@@ -2001,7 +2001,7 @@ function CurvedMembersSection({ windowsData }) {
               {list.map((r, i) => (
                 <tr key={`${r.windowId}-${r.elementName}-${i}`} className="border-b border-surface-600/60">
                   <td className="px-4 py-1.5 text-ink-100 font-medium">{r.windowName}</td>
-                  <td className="px-2 py-1.5"><span className="font-mono text-accent-400">{r.code}</span> <span className="text-ink-200">{displayElementName(r.elementName)}</span> <span className="text-ink-500">{r.section}</span></td>
+                  <td className="px-2 py-1.5"><span className="font-mono text-accent-400">{displayCode(r.code)}</span> <span className="text-ink-200">{displayElementName(r.elementName)}</span> <span className="text-ink-500">{r.section}</span></td>
                   <td className="px-2 py-1.5 text-ink-300">{r.shape}</td>
                   <td className="px-2 py-1.5 text-ink-300 tabular-nums">{fmtR(r.radii)}</td>
                   <td className="px-2 py-1.5 text-right text-ink-200 tabular-nums">{Math.round(r.length)}</td>

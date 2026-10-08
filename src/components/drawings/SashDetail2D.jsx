@@ -131,7 +131,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
   const glassFinish = windowSpec?.glass?.finish || 'clear';
   const A = geom.A;
   const subtitleText = A
-    ? `arched · ${A.geometry.label} · rise ${fmt(geom.apex)} · stile ${fmt(A.geometry.upperStraightStile)} · S-ATR ${fmt(A.geometry.topRail.lengths.centre)} · ${A.pattern !== 'none' ? A.pattern : `${A.barCounts?.h || 0}H × ${A.barCounts?.v || 0}V`}`
+    ? `arched · ${A.geometry.label} · rise ${fmt(geom.apex)} · stile ${fmt(A.geometry.upperStraightStile)} · ATR ${fmt(A.geometry.topRail.lengths.centre)} · ${A.pattern !== 'none' ? A.pattern : `${A.barCounts?.h || 0}H × ${A.barCounts?.v || 0}V`}`
     : `${geom.gridMode} · ${glassType} / ${glassFinish}`;
   // arched paths (sheet coords): outline = top rail ring outer + stiles, daylight = ring inner, unit + bars from the glass frame
   const AP = A ? (() => {

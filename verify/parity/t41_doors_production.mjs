@@ -710,12 +710,13 @@ section('18 - door sheets: the components the screen, the PDFs and the pack moun
     ok(sheets.doorleaf.includes(`${nh} hinges per leaf`) && nh === (dr.leafH > DP.hinges.tallAbove ? DP.hinges.perLeafTall : DP.hinges.perLeaf),
       `${name}: leaf sheet prints ${nh} hinges per leaf (leaf ${dr.leafH})`);
     if (dr.isFrench) {
-      ok(sheets.doorleaf.includes('D-MS') && sheets.doorleaf.includes(`>${DP.elements.leafMeeting.face}<`) && sheets.doorsection.includes(`>${DP.elements.leafMeeting.face}<`),
-        `${name}: the meeting stile ${DP.elements.leafMeeting.face} (D-MS) printed on the leaf sheet and the plan section`);
+      // member codes without the D- prefix on the sheets since 08.10.2026
+      ok(/>MS \d/.test(sheets.doorleaf) && !sheets.doorleaf.includes('D-MS') && sheets.doorleaf.includes(`>${DP.elements.leafMeeting.face}<`) && sheets.doorsection.includes(`>${DP.elements.leafMeeting.face}<`),
+        `${name}: the meeting stile ${DP.elements.leafMeeting.face} (MS) printed on the leaf sheet and the plan section`);
     }
     if (dr.panels?.length) {
-      ok(sheets.doorleaf.includes('D-MR') && dr.panels.every((pn) => sheets.doorleaf.includes(`panel ${fmt(pn.w)} × ${fmt(pn.h)}`)),
-        `${name}: leaf sheet prints D-MR and the panel ${dr.panels.map((pn) => `${pn.w} × ${pn.h}`).join(', ')}`);
+      ok(/>MR \d/.test(sheets.doorleaf) && !sheets.doorleaf.includes('D-MR') && dr.panels.every((pn) => sheets.doorleaf.includes(`panel ${fmt(pn.w)} × ${fmt(pn.h)}`)),
+        `${name}: leaf sheet prints MR and the panel ${dr.panels.map((pn) => `${pn.w} × ${pn.h}`).join(', ')}`);
     }
     if (spec.glazing.type === 'triple') ok(sheets.doorleaf.includes(`leaf depth ${DP.leafDepthTriple}`), `${name}: leaf depth ${DP.leafDepthTriple} printed (from the cut list record)`);
     if ((dr.fanLeaves || []).length) ok(dr.fanLeaves.every((_, i) => /<svg/.test(sheets[`doorfan-${i}`]) && sheets[`doorfan-${i}`].includes(`${fmt(dr.fanLeaves[i].w)}`)),

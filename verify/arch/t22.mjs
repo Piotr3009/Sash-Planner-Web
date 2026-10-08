@@ -247,7 +247,8 @@ for (const [name, spec] of CASES) {
     const o = archOrigin(S.box);
     const rel = svgArcs(S.box).filter((a) => a.r > 200).map((a) => ({ cx: a.cx - (o[0] + W / 2), cy: G.rise - (a.cy - o[1]), r: a.r }));   // the sill bulge arcs (r ~ 50) are the rectangular sill profile
     check(`${name}: box sheet — ${rel.length} head ring arcs on the engine head ring (outer + 80 inner)`, rel.length >= 2 && rel.every(onRing) && rel.some((a) => G.head.inner.some((k) => near(a.r, k.r, 0.01))));
-    check(`${name}: box sheet — S-ARCH HEAD 80 label, start / rise dims`, S.box.includes('S-ARCH HEAD 80') && S.box.includes('start ') && S.box.includes('rise '));
+    // sheet labels without the S- prefix since 08.10.2026 (the engine name S-ARCH HEAD is unchanged)
+    check(`${name}: box sheet — ARCH HEAD 80 label, start / rise dims`, S.box.includes('ARCH HEAD 80') && !S.box.includes('S-ARCH HEAD') && S.box.includes('start ') && S.box.includes('rise '));
   }
   {
     const o = archOrigin(S.upper);
@@ -255,7 +256,7 @@ for (const [name, spec] of CASES) {
     // sash sheet → arch frame: x − (ox + sashW/2), y → apex − (y − oy)
     const rel = svgArcs(S.upper).map((a) => ({ cx: a.cx - (o[0] + sashW / 2), cy: apex - (a.cy - o[1]), r: a.r }));
     check(`${name}: upper sash sheet — ${rel.length} arcs on the top rail ring / glass / bars`, rel.length >= 3 && rel.every(onRing), rel.filter((a) => !onRing(a)).map((a) => `${a.cx.toFixed(1)},${a.cy.toFixed(1)} r${a.r.toFixed(1)}`).join(' | '));
-    check(`${name}: upper sash sheet — ARCH TOP RAIL label, S-ATR length in the subtitle`, S.upper.includes('ARCH TOP RAIL') && S.upper.includes(`S-ATR ${Math.round(G.topRail.lengths.centre * 2) / 2}`));
+    check(`${name}: upper sash sheet — ARCH TOP RAIL label, ATR length in the subtitle`, S.upper.includes('ARCH TOP RAIL') && S.upper.includes(`· ATR ${Math.round(G.topRail.lengths.centre * 2) / 2}`) && !S.upper.includes('S-ATR'));
   }
   {
     // glass sheet: the shared arched sheet (CasementGlassDrawing2D) in the unit frame

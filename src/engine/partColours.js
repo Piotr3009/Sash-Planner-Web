@@ -14,7 +14,8 @@
 // part has no colour and keeps the single default colour. The door family
 // mirrors the casement colours (frame head, jambs, cill, post, transom, leaf
 // stiles, meeting stile, rails, mid rail, side panel, fan) and has its own key
-// sheet (precutPdfExport, COLOUR KEY · DOOR).
+// sheet (precutPdfExport, COLOUR KEY · DOOR). The bottom rail red is the
+// stronger one of the window palette (Piotr 08.10.2026, so it reads on paper).
 
 export const PART_COLOUR_GROUPS = [
   { id: 'frame_head', family: 'frame', name: 'Frame Head', note: 'top of the frame', hex: '#F5E050' },
@@ -24,7 +25,7 @@ export const PART_COLOUR_GROUPS = [
   { id: 'transom', family: 'frame', name: 'Transom', note: 'horizontal divider', hex: '#D99AC5' },
   { id: 'leaf_stiles', family: 'leaf', name: 'Leaf Stiles', note: 'left and right together', hex: '#FFFFFF' },
   { id: 'leaf_top_rail', family: 'leaf', name: 'Leaf Top Rail', note: 'top of the leaf', hex: '#A98BE8' },
-  { id: 'leaf_bottom_rail', family: 'leaf', name: 'Leaf Bottom Rail', note: 'bottom of the leaf', hex: '#EE7D5B' },
+  { id: 'leaf_bottom_rail', family: 'leaf', name: 'Leaf Bottom Rail', note: 'bottom of the leaf', hex: '#E04A2A' },
   // Doors: own families (door_frame / door_leaf), so the casement key sheet
   // never lists them; colours mirror the casement compartments.
   { id: 'door_frame_head', family: 'door_frame', name: 'Door Frame Head', note: 'top of the frame', hex: '#F5E050' },
@@ -36,7 +37,7 @@ export const PART_COLOUR_GROUPS = [
   { id: 'door_meeting_stile', family: 'door_leaf', name: 'Meeting Stile', note: 'french, with the lip', hex: '#C9D4DE' },
   { id: 'door_top_rail', family: 'door_leaf', name: 'Door Top Rail', note: 'top of the leaf', hex: '#A98BE8' },
   { id: 'door_mid_rail', family: 'door_leaf', name: 'Door Mid Rail', note: 'between glass and panel', hex: '#8FB3E8' },
-  { id: 'door_bottom_rail', family: 'door_leaf', name: 'Door Bottom Rail', note: 'bottom of the leaf', hex: '#EE7D5B' },
+  { id: 'door_bottom_rail', family: 'door_leaf', name: 'Door Bottom Rail', note: 'bottom of the leaf', hex: '#E04A2A' },
   { id: 'door_side_panel', family: 'door_leaf', name: 'Side Panel', note: 'fixed side panel members', hex: '#B5D99C' },
   { id: 'door_fan', family: 'door_leaf', name: 'Fan Leaf', note: 'opening fanlight members', hex: '#E8C38F' },
 ];
@@ -108,8 +109,8 @@ const CUT_SYMBOL_TO_GROUP = {
 // for every pack type, sash included. The Cut List is not coloured in this
 // mode, only the Pre-Cut (screen, PDF, labels).
 export const WINDOW_COLOURS = [
-  '#F5E050', '#F2A03D', '#E9603C', '#D99AC5', '#A98BE8',
-  '#7CC4F5', '#5CCBA9', '#9BD36A', '#FFFFFF', '#B5823F',
+  '#F5E050', '#F2A03D', '#E04A2A', '#D99AC5', '#A98BE8',
+  '#7CC4F5', '#5CCBA9', '#9BD36A', '#FFFFFF', '#A06A2C',
 ];
 export const COLOUR_MODES = ['off', 'part', 'window'];
 export const COLOUR_MODE_LABELS = { off: 'Off', part: 'Per part', window: 'Per window' };

@@ -22,6 +22,7 @@
 import { useMemo } from 'react';
 import { DimH, DimV, DimChainH, DimChainV, TitleBlock, Label } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
+import { displayCode } from '../../engine/partSymbols.js';
 import { NS, num, fmt, safely, NoSheet, doorProfileParts, doorRecords, recordText, thresholdText } from './doorSheetParts.jsx';
 
 function buildFrame(windowSpec, derived) {
@@ -94,11 +95,11 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
   const winName = windowSpec?.name || 'Door';
   const projNum = projectNumber || '';
   const codes = [
-    geom.head && `${geom.head.code} ${fmt(geom.head.length)}`,
-    geom.jambL && `D-J ×2 ${fmt(geom.jambL.length)}`,
-    geom.cill ? `${geom.cill.code} ${fmt(geom.cill.length)}` : `${dr.threshold} threshold`,
-    geom.post && `${geom.post.code}${num(geom.post.quantity, 1) > 1 ? ` ×${geom.post.quantity}` : ''} ${fmt(geom.post.length)}`,
-    geom.transom && `${geom.transom.code} ${fmt(geom.transom.length)}`,
+    geom.head && `${displayCode(geom.head.code)} ${fmt(geom.head.length)}`,
+    geom.jambL && `J ×2 ${fmt(geom.jambL.length)}`,
+    geom.cill ? `${displayCode(geom.cill.code)} ${fmt(geom.cill.length)}` : `${dr.threshold} threshold`,
+    geom.post && `${displayCode(geom.post.code)}${num(geom.post.quantity, 1) > 1 ? ` ×${geom.post.quantity}` : ''} ${fmt(geom.post.length)}`,
+    geom.transom && `${displayCode(geom.transom.code)} ${fmt(geom.transom.length)}`,
   ].filter(Boolean).join(' · ');
   const notes = [
     `Section: frame ${fmt(m.frameJamb)}×${fmt(dr.frameDepth)}, land ${fmt(m.land)} + rebate ${fmt(m.rebate)}; leaf ${fmt(dr.leafDepth)} deep in the rebate, gap ${fmt(m.gap)}`,
@@ -187,7 +188,7 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
             <text x={X(p.axis) + codeFs * 0.35} y={Y(midDoorY)} fill={COLORS.label} fontSize={codeFs}
               fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
               transform={`rotate(-90, ${X(p.axis) + codeFs * 0.35}, ${Y(midDoorY)})`}>
-              {geom.post ? `${geom.post.code} ${fmt(geom.post.length)} · ${fmt(p.w)}×${fmt(dr.frameDepth)}` : `D-JC ${fmt(p.w)}`}
+              {geom.post ? `${displayCode(geom.post.code)} ${fmt(geom.post.length)} · ${fmt(p.w)}×${fmt(dr.frameDepth)}` : `JC ${fmt(p.w)}`}
             </text>
           </g>
         ))}
@@ -201,7 +202,7 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
               fill={COLORS.frameFill} stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
             <text x={X(W / 2)} y={Y(tz.band.y + tz.band.h / 2) + codeFs * 0.35} fill={COLORS.label} fontSize={codeFs}
               fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>
-              {`${geom.transom ? recordText(geom.transom) : `D-T ${fmt(tz.railH)}`} · band ${fmt(tz.band.h)}`}
+              {`${geom.transom ? recordText(geom.transom) : `T ${fmt(tz.railH)}`} · band ${fmt(tz.band.h)}`}
             </text>
           </g>
         )}
@@ -227,7 +228,7 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
         {/* ── MEMBER CODES on the frame: head, jambs, cill ── */}
         <text x={X(W / 2)} y={Y(m.frameHead) + codeFs * 1.2} fill={COLORS.label} fontSize={codeFs}
           fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>
-          {geom.head ? recordText(geom.head) : `D-H ${fmt(W)}`}
+          {geom.head ? recordText(geom.head) : `H ${fmt(W)}`}
         </text>
         {[[geom.jambL, m.frameJamb + codeFs * 0.9], [geom.jambR, W - m.frameJamb - codeFs * 0.4]].map(([rec, x], i) => (
           <text key={`jl${i}`} x={X(x)} y={Y(midDoorY)} fill={COLORS.label} fontSize={codeFs}

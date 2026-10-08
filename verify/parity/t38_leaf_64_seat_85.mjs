@@ -731,7 +731,10 @@ section('12 - nothing else moved: the live tree with the old numbers pinned');
         return ring ? !m : m && m[1] === String(u.width) && m[2] === String(u.height);
       });
       const grid = (sh) => ({ ...sh, leaf: sh.leaf.map((l) => ({ ...l, svg: l.svg.replace(GLASS_RE, (x, gw, gh) => `glass ${half(+gw)} × ${half(+gh)} · 24mm`) })) });
-      ok(exact && JSON.stringify(grid(sa)) === JSON.stringify(sb), `${name} pinned, ${w.id}: elevation, production elevation, ${sa.leaf.length} leaf and ${sa.glass.length} glass sheets byte-identical, except the leaf sheets' glass printed to 0.1 mm (= the schedule)`);
+      // 08.10.2026: the sheets print member codes without the C- prefix (C-H -> H, C-M1 -> M1); the old
+      // trees are read with the prefix stripped the same way, so everything else stays byte for byte
+      const noPrefix = (sh) => JSON.parse(JSON.stringify(sh).replace(/(?<![A-Za-z0-9])C-(?=(H|CILL|J|M\d*|T\d*|AH|ATR|FRAME RING|LEAF RING)\b)/g, ''));
+      ok(exact && JSON.stringify(grid(sa)) === JSON.stringify(noPrefix(sb)), `${name} pinned, ${w.id}: elevation, production elevation, ${sa.leaf.length} leaf and ${sa.glass.length} glass sheets byte-identical, except the leaf sheets' glass printed to 0.1 mm (= the schedule)`);
     }
     LIVE.profile.setActiveCasementProfile(null);
   }
@@ -809,9 +812,9 @@ section('14 - the half millimetre through the consumers');
   // the frame sheet is the drawing that prints the transom length (0.5 grid)
   const { spec, derived } = L['021-1000x1200'];
   const frame = texts(render(LIVE.FrameDetail, { windowSpec: spec, derived, projectNumber: 'P-1' }));
-  ok(frame.some((t) => t === 'C-T 906.5'), 'frame sheet prints "C-T 906.5"', frame.filter((t) => /C-T/.test(t)).join(' | '));
+  ok(frame.some((t) => t === 'T 906.5'), 'frame sheet prints "T 906.5" (no C- prefix since 08.10.2026)', frame.filter((t) => /\bT /.test(t)).join(' | '));
   const cd = texts(render(LIVE.CasDrawing, { windowSpec: spec, derived, batch: null }));
-  ok(cd.some((t) => /^C-T · 906\.5 · /.test(t)), 'production elevation (CasementDrawing2D) prints "C-T · 906.5"', cd.filter((t) => /C-T/.test(t)).join(' | '));
+  ok(cd.some((t) => /^T · 906\.5 · /.test(t)), 'production elevation (CasementDrawing2D) prints "T · 906.5"', cd.filter((t) => /^T /.test(t)).join(' | '));
   // bSuite (src/utils/bsuiteExport.js is read only for this tura): the transom row carries 906.5
   const { rows } = LIVE.bsuite.buildBsuiteFrameRows(spec, derived, 'W1');
   const tRow = rows.find((r) => /^TRANSOM/.test(r.element || ''));

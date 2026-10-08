@@ -203,3 +203,13 @@ export function getPartSymbol(elementName) {
 export function displayElementName(elementName) {
   return String(elementName || '').replace(/^[CDS]-/, '');
 }
+
+/**
+ * An engine member code (C-H, C-M1, D-ST/L, D-MS, C-AH ...) as the drawing
+ * sheets print it: without the window type prefix, the sheet already says
+ * which window it is (Piotr 08.10.2026, "szkoda miejsca"). The codes in the
+ * records never change: the sheets look members up by them.
+ */
+export function displayCode(code) {
+  return String(code || '').replace(/^[CDS]-/, '');
+}

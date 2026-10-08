@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useProjectStore } from '../../stores/projectStore.js';
+import { displayCode } from '../../engine/partSymbols.js';
 import { getCasementProfile, casementGlassDeductions } from '../../engine/profile.js';
 import {
   CAD, CAD_SIZES, CAD_STROKES, CAD_DIMS, FONT_FAMILY, VIEWBOX_REF,
@@ -357,13 +358,13 @@ export default function CasementDrawing2D({ windowSpec, derived, batch }) {
     });
     const callouts = [];
     const add = (t, fx, fy, opts = {}) => callouts.push({ t, fx, fy, ...opts });
-    add(`C-H ${fmt(extW)} · ${secF}`, (X0 + W) / 2 + X0 / 2, Y0 + 5);
+    add(`H ${fmt(extW)} · ${secF}`, (X0 + W) / 2 + X0 / 2, Y0 + 5);
     (cas.mullionRuns || []).forEach((mu, i) => {
-      if (i === 0) add(`${uniq(cas.mullionRuns.map((x) => x.code)).join(' = ')} · ${fmt(mu.length)} · ${secM}${mu.full ? '' : ' · partial'}`,
+      if (i === 0) add(`${uniq(cas.mullionRuns.map((x) => displayCode(x.code))).join(' = ')} · ${fmt(mu.length)} · ${secM}${mu.full ? '' : ' · partial'}`,
         sx(mu.axisX), (Y0 + YB) / 2 - 40, { warn: !mu.full });
     });
     (cas.transomRuns || []).forEach((tr, i) => {
-      if (i === 0) add(`${uniq(cas.transomRuns.map((x) => x.code)).join(' = ')} · ${fmt(tr.length)} · ${secM}`,
+      if (i === 0) add(`${uniq(cas.transomRuns.map((x) => displayCode(x.code))).join(' = ')} · ${fmt(tr.length)} · ${secM}`,
         (sx(tr.x1) + sx(tr.x2)) / 2 - 30, sy(tr.axisT));
     });
     tierGroups.forEach((tg) => {
@@ -375,7 +376,7 @@ export default function CasementDrawing2D({ windowSpec, derived, batch }) {
       const gh = unit ? unit.height : tg.l.mm.leafH - ded.height;
       add(`glass ${fmt(gw)} × ${fmt(gh)} · 24mm`, tg.l.cx + tg.l.w / 4, tg.l.cy + tg.l.h / 5, { muted: true });
     });
-    add(`C-CILL ${fmt(extW)} · ${secC}`, (X0 + W) / 2 + X0 / 2 + 40, YB - 5);
+    add(`CILL ${fmt(extW)} · ${secC}`, (X0 + W) / 2 + X0 / 2 + 40, YB - 5);
     add('apex = hinge side', null, null, { muted: true });
     const unconfirmed = dv.components.sash.some((c) => /UNCONFIRMED/.test(c.notes || ''));
     if (unconfirmed) add('UNCONFIRMED rule on drawing — verify', null, null, { warn: true });
@@ -390,9 +391,9 @@ export default function CasementDrawing2D({ windowSpec, derived, batch }) {
     const leavesTxt = tierGroups.map((tg) =>
       `${tg.n} × ${fmt(tg.l.mm.leafW)}×${fmt(tg.l.mm.leafH)} (${tg.name})`).join(' · ');
     const compTxt = [
-      `C-H ${fmt(extW)}`, `C-CILL ${fmt(extW)}`, `C-J ×2 ${fmt(extH)}`,
-      ...(cas.mullionRuns || []).map((mu) => `${mu.code} ${fmt(mu.length)}`),
-      ...(cas.transomRuns || []).map((tr) => `${tr.code} ${fmt(tr.length)}`),
+      `H ${fmt(extW)}`, `CILL ${fmt(extW)}`, `J ×2 ${fmt(extH)}`,
+      ...(cas.mullionRuns || []).map((mu) => `${displayCode(mu.code)} ${fmt(mu.length)}`),
+      ...(cas.transomRuns || []).map((tr) => `${displayCode(tr.code)} ${fmt(tr.length)}`),
     ].join(' · ');
     const strip = [
       `${ws.name || 'Window'} · Casement ${cas.layout} · ${fmt(extW)} × ${fmt(extH)}${axesTxt ? ` · ${axesTxt}` : ''} · exterior view`,

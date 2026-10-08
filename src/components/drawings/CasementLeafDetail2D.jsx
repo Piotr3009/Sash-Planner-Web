@@ -197,7 +197,7 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
   const hingeTxt = geom.hinge === 'fixed' ? 'fixed (dummy sash)' : `hinge ${geom.hinge}`;
   const titleText = `${paneTitle(group)} — Front${projNum ? ` — ${projNum}` : ''} — ${winName}`;
   const subtitleText = `${fmt(geom.leafW)} × ${fmt(geom.leafH)} · glass ${fmtGlass(geom.glassUnitW)} × ${fmtGlass(geom.glassUnitH)} · 24mm · ${hingeTxt}`;
-  const archLine = arch ? `${arch.AG.label} · stile ${fmt(arch.straightStile)} · rise ${fmt(geom.leafH - arch.straightStile)} · top rail ${radiiText(arch.leafOuter)} · C-ATR ${fmt(arch.railLength)}` : '';
+  const archLine = arch ? `${arch.AG.label} · stile ${fmt(arch.straightStile)} · rise ${fmt(geom.leafH - arch.straightStile)} · top rail ${radiiText(arch.leafOuter)} · ATR ${fmt(arch.railLength)}` : '';
   const titleY = oy + geom.leafH + MGN_BOT_DIM + MGN_TITLE * 0.4;
 
   // Top dim chain: stile · (bars) · stile

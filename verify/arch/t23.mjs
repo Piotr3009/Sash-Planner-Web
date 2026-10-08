@@ -337,7 +337,7 @@ section('8 — sheets: circle sheets concentric on the engine radii; fixed recta
     check(`${k}: circle sheet (Ø 800), no NaN, ${arcs.length} arcs all concentric on the sheet centre, radii ∈ engine set`, /Ø 800/.test(svg) && !/NaN/.test(svg) && !!c && arcs.length >= 6 && arcs.every((a) => near(a.cx, c[0], 0.01) && near(a.cy, c[1], 0.01) && engineR.some((r) => near(a.r, r, 0.01))), arcs.filter((a) => !engineR.some((r) => near(a.r, r, 0.01))).map((a) => a.r.toFixed(2)).join(' '));
   }
   const rGtext = new RegExp(`R ${f1(rG)}`);
-  check(`elevation / leaf carry the glass + bars (R ${f1(rG)}), frame sheet does not; texts name the rings (${tF} / ${tL} face)`, rGtext.test(S.elevation) && rGtext.test(S.leaf[0].svg) && !rGtext.test(S.frame) && new RegExp(`C-FRAME RING ${tF} face`).test(S.frame) && new RegExp(`C-LEAF RING ${tL} face`).test(S.leaf[0].svg));
+  check(`elevation / leaf carry the glass + bars (R ${f1(rG)}), frame sheet does not; texts name the rings (${tF} / ${tL} face)`, rGtext.test(S.elevation) && rGtext.test(S.leaf[0].svg) && !rGtext.test(S.frame) && new RegExp(`[^-]FRAME RING ${tF} face`).test(S.frame) && new RegExp(`[^-]LEAF RING ${tL} face`).test(S.leaf[0].svg)); // ring names without the C- prefix since 08.10.2026
   const gsvg = S.glass[0].svg;
   const go = dataAttr(gsvg, 'data-arch-origin');
   const garcs = svgArcs(gsvg);
