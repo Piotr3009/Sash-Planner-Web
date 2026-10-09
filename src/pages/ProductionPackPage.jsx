@@ -116,11 +116,12 @@ const STATUS_CONFIG = {
 // window" colour mode every window of the pack has a colour (its position in
 // the pack, window 1 = colour 1, the same the pre-cut pieces and labels use),
 // and each of its sheets (elevation, elements, glass) carries a small tag in
-// that colour with the window number. Any other mode: no tags. The dashboard
-// and the single window preview never pass a tag (no pack, no position).
+// that colour with the window number inside and the window name under it.
+// Any other mode: no tags. The dashboard and the single window preview never
+// pass a tag (no pack, no position).
 function windowTagsOf(windowsData, precutSettings) {
   if (normaliseColourMode(precutSettings) !== 'window') return () => null;
-  const tags = new Map((windowsData || []).map(({ win }, i) => [String(win?.id), { number: i + 1, hex: windowColourForIndex(i)?.hex || null }]));
+  const tags = new Map((windowsData || []).map(({ win }, i) => [String(win?.id), { number: i + 1, hex: windowColourForIndex(i)?.hex || null, name: win?.name || '' }]));
   return (win) => tags.get(String(win?.id)) || null;
 }
 

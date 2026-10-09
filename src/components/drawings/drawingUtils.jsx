@@ -276,9 +276,11 @@ export function Label({ x, y, text, anchor = 'middle', opacity = 0.8, vbw }) {
 // ─── Window colour tag (Piotr 08.10.2026) ───
 // A small rectangle in the top right corner of a sheet in the window's colour of
 // the Pre-Cut "Per window" mode (one colour per position in the pack), the
-// window number inside and "window N" under it, so a sheet is matched to the
-// coloured pre-cut pieces and labels at a glance. Only the Production Pack
-// passes a tag ({ number, hex }) and only in that colour mode; single window
+// window number inside and the window NAME under it (Piotr 09.10.2026: the
+// name, e.g. W-1, not "window 1"; "window N" only when the window has no
+// name), so a sheet is matched to the coloured pre-cut pieces and labels at a
+// glance. Only the Production Pack passes a tag ({ number, hex, name }) and
+// only in that colour mode; single window
 // previews, the dashboard and the fixtures carry none. Drawn inside the SVG so
 // the Elevations and Elements PDFs (rasterised from the same SVG) carry it too.
 // Colours: the fill is the window colour (never a theme colour, so the print
@@ -290,7 +292,10 @@ export function WindowTag({ tag, vbw }) {
   const ts = vbw / VIEWBOX_REF;
   const w = 40 * ts, h = 27 * ts, m = 12 * ts;
   const x = vbw - m - w, y = m;
-  const numFs = 20 * ts, capFs = 9 * ts;
+  const caption = String(tag.name || '').trim() || `window ${n}`;
+  // the caption is centred under the box; a long name gets a smaller font so it
+  // stays within about twice the box width
+  const numFs = 20 * ts, capFs = 9 * ts * Math.min(1, 14 / Math.max(1, caption.length));
   return (
     <g data-window-tag={n}>
       <rect x={x} y={y} width={w} height={h} rx={3 * ts} fill={tag.hex}
@@ -298,7 +303,7 @@ export function WindowTag({ tag, vbw }) {
       <text x={x + w / 2} y={y + h / 2 + numFs * 0.36} fill="#111111" fontSize={numFs}
         fontFamily={FONT.family} textAnchor="middle" fontWeight="700">{n}</text>
       <text x={x + w / 2} y={y + h + capFs * 1.25} fill={COLORS.sash} fontSize={capFs}
-        fontFamily={FONT.family} textAnchor="middle">{`window ${n}`}</text>
+        fontFamily={FONT.family} textAnchor="middle">{caption}</text>
     </g>
   );
 }

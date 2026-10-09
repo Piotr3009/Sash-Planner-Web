@@ -93,7 +93,7 @@ const SHEETS = [
   ['sash lower', M.Sash, { windowSpec: sash.spec, derived: sash.derived, projectNumber: 'P-1', type: 'lower' }],
   ['sash glass', M.Glass, { windowSpec: sash.spec, derived: sash.derived, type: 'upper' }],
 ];
-const TAG = { number: 3, hex: '#E04A2A' };
+const TAG = { number: 3, hex: '#E04A2A', name: 'W-1' };
 const tagRe = /<g data-window-tag="3"><rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"[^>]*fill="#E04A2A"/;
 
 console.log('== 1 + 2 + 3: every sheet, with and without the tag ==');
@@ -105,12 +105,23 @@ for (const [name, C, props] of SHEETS) {
   const W = vb ? Number(vb[1]) : NaN;
   const [x, y, w, h] = m ? m.slice(1, 5).map(Number) : [];
   const inside = m && vb && x > W * 0.8 && x + w < W && y >= 0 && y < W * 0.05 && w > 0 && h > 0 && w < W * 0.1;
-  ok(!!m && withTag.includes('>3</text>') && withTag.includes('>window 3</text>'), `${name}: tag with number 3, colour and caption`, withTag.slice(0, 120));
+  ok(!!m && withTag.includes('>3</text>') && withTag.includes('>W-1</text>') && !withTag.includes('window 3'), `${name}: tag with number 3, the colour and the window name W-1 under it`, withTag.slice(0, 120));
   ok(inside, `${name}: tag is a rectangle in the top right corner (x ${x} of ${W})`, JSON.stringify({ x, y, w, h, W }));
-  ok(!/data-window-tag/.test(without) && !without.includes('window 3'), `${name}: no tag without the prop`);
+  ok(!/data-window-tag/.test(without) && !without.includes('W-1'), `${name}: no tag without the prop`);
   // the tag is the only difference (the sheet itself does not move)
   const stripped = withTag.replace(/<g data-window-tag="3">[\s\S]*?<\/g>/, '');
   ok(stripped === without, `${name}: with the tag removed the sheet equals the untagged one byte for byte`);
+}
+
+console.log('== 3b: caption fallback and long names ==');
+{
+  const base = { windowSpec: cas.spec, derived: cas.derived, projectNumber: 'P-1' };
+  const noName = svgOnly(render(M.CasFrame, { ...base, windowTag: { number: 7, hex: '#5CCBA9' } }));
+  ok(noName.includes('>window 7</text>'), 'a window without a name reads "window 7" under the box');
+  const longName = svgOnly(render(M.CasFrame, { ...base, windowTag: { number: 2, hex: '#F2A03D', name: 'Kitchen rear left' } }));
+  const fs = (svg) => Number((svg.match(/<text[^>]*font-size="([\d.]+)"[^>]*>Kitchen rear left<\/text>/) || [])[1]);
+  const fsShort = Number((svgOnly(render(M.CasFrame, { ...base, windowTag: TAG })).match(/<text[^>]*font-size="([\d.]+)"[^>]*>W-1<\/text>/) || [])[1]);
+  ok(longName.includes('>Kitchen rear left</text>') && fs(longName) > 0 && fs(longName) < fsShort, `a long name is printed whole in a smaller font (${fs(longName)} vs ${fsShort})`);
 }
 
 console.log('== 4: the pack rule (windowTagsOf) ==');
@@ -118,13 +129,13 @@ console.log('== 4: the pack rule (windowTagsOf) ==');
   // the page helper is private to ProductionPackPage; its rule is the one tested here
   const windowTagsOf = (windowsData, precutSettings) => {
     if (M.partColours.normaliseColourMode(precutSettings) !== 'window') return () => null;
-    const tags = new Map(windowsData.map(({ win }, i) => [String(win?.id), { number: i + 1, hex: M.partColours.windowColourForIndex(i)?.hex || null }]));
+    const tags = new Map(windowsData.map(({ win }, i) => [String(win?.id), { number: i + 1, hex: M.partColours.windowColourForIndex(i)?.hex || null, name: win?.name || '' }]));
     return (win) => tags.get(String(win?.id)) || null;
   };
-  const wd = Array.from({ length: 12 }, (_, i) => ({ win: { id: `w${i + 1}` } }));
+  const wd = Array.from({ length: 12 }, (_, i) => ({ win: { id: `w${i + 1}`, name: `W-${i + 1}` } }));
   const on = windowTagsOf(wd, { colourMode: 'window' });
-  ok(on(wd[0].win).number === 1 && on(wd[0].win).hex === M.partColours.WINDOW_COLOURS[0] && on(wd[2].win).hex === '#E04A2A' && on(wd[9].win).hex === '#A06A2C',
-    'per window: window 1 = colour 1, window 3 red, window 10 brown');
+  ok(on(wd[0].win).number === 1 && on(wd[0].win).name === 'W-1' && on(wd[0].win).hex === M.partColours.WINDOW_COLOURS[0] && on(wd[2].win).hex === '#E04A2A' && on(wd[9].win).hex === '#A06A2C',
+    'per window: window 1 = colour 1 named W-1, window 3 red, window 10 brown');
   ok(on(wd[10].win).number === 11 && on(wd[10].win).hex === M.partColours.WINDOW_COLOURS[0], 'window 11 keeps its number and repeats colour 1');
   ok(on({ id: 'zz' }) === null, 'a window outside the pack has no tag');
   ok(windowTagsOf(wd, { colourMode: 'part' })(wd[0].win) === null && windowTagsOf(wd, { colourMode: 'off' })(wd[0].win) === null && windowTagsOf(wd, undefined)(wd[0].win) === null && windowTagsOf(wd, { colourByPart: false })(wd[0].win) === null,
