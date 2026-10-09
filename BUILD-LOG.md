@@ -229,6 +229,36 @@ quantities include d_mullion 4748 mm, d_transom_rail 2287 mm, d_threshold_alu_do
   471, 233).
 
 
+### Stage 7: the window profile save merges with the cloud; batch type door
+
+- **`windowProfileStore.js`**: the store keeps `dirty` (plain data, persisted with the profiles) = the paths changed
+  since the last cloud load, at "profile.firstKey" (`casement.bsuite`, `door.deductions`, ...) or the whole kind
+  after a reset. Every setter goes through `_edit(paths, updater)`, which marks a path only when its value really
+  changed (a refused or same-value edit marks nothing, so a stale branch is never laid over the cloud). The save
+  (`saveToCloud`, 800 ms after the last edit, one save at a time) loads the cloud copy, lays ONLY the dirty paths
+  of memory over it (`mergeWindowProfiles`, pure: the cloud copy migrated on a clone first, a kind the cloud lacks
+  taken whole, the casement glass width deduction recomputed on the result), writes it, takes the merged object as
+  the local copy and clears the paths saved; an edit made while the save ran stays local and dirty; a failed load
+  or write keeps every path dirty. `loadFromCloud` keeps the unsaved paths on top. Loads: app start (as today; the
+  paths a reload restored from localStorage are saved right after), entering Window Settings (`useEffect` in
+  `WindowSettingsPage`), the tab coming back (`visibilitychange`, browser only). The cloud is an adapter
+  (`setWindowProfileCloud`) so a harness runs two tabs over one fake cloud.
+- **`cloudSync.js`**: `saveWindowProfiles` still merges into the other constants keys, now awaited (true / false).
+  Found by the sweep: `saveSettings` wrote the whole `projectStore.settings` as constants, and those carry the
+  window profiles and assignments loaded at login, so every Settings or glass reference save put the login-time
+  profiles back (BLOCKERS 27.7a). It now reads the current constants and writes the settings keys with the cloud's
+  `windowProfiles` / `assignments` (`settingsConstantsForSave`, pure). No DB change.
+- **Batch type door**: `projectStore.batchDefaultsFor(type)` maps 'door' to the doors defaults (the one place that
+  indexes `BATCH_DEFAULTS`); `createBatch` and the Batch Defaults page read it, and the page shows the door
+  ironmongery slots for both spellings. `moveToProduction` builds no defaults itself (it calls `createBatch`).
+- **New `verify/parity/t46_settings_save.mjs`** (37 checks): two store instances (one bundle imported under two
+  query strings) over one fake cloud: tab A adds a bSuite target, tab B (loaded earlier) changes a casement face,
+  both save, the cloud holds both and both tabs end clean with the merged copy; the same path in two tabs (the
+  later save wins, also for two sub-keys of one first key); refused / same-value edits, resets, a load with unsaved
+  paths, a failed save, an edit during a save, the pure merge; `settingsConstantsForSave`; `createBatch` 'door' /
+  'doors' / 'sash'. t39 (the Window Settings page in Chromium), t38, t24, t25 and t41 section 14 still pass.
+
+
 ## 2026-10-09 · TURA PC: SASH PROPORTIONS, COTTAGE 40/60 AND 1/3-2/3 (branch `claude/sash-proportions`)
 
 Owner box (Piotr, 09.10.2026): a new sash option `sashProportion` (`standard`, `cottage-40-60`, `cottage-1-3`, missing

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useProjectStore, BATCH_DEFAULTS } from '../stores/projectStore.js';
+import { useProjectStore, batchDefaultsFor } from '../stores/projectStore.js';
 import { GLASS_TYPES, GLASS_SPECS, SPACERS, SPACER_TYPES, RAL_GROUPS as RAL, FB_GROUPS as FB } from '../config.js';
 import { useIronmongeryStore, IRONMONGERY_CATEGORIES } from '../stores/ironmongeryStore.js';
 import IronmongeryPickerModal from '../components/IronmongeryPickerModal.jsx';
@@ -22,7 +22,7 @@ export default function BatchDefaultsPage() {
 
   const project = useProjectStore((s) => s.projects.find(p => p.id === projectId));
   const batch = project?.batches?.find(b => b.id === batchId);
-  const [d, setD] = useState(batch?.defaults || BATCH_DEFAULTS[batch?.type] || BATCH_DEFAULTS.sash);
+  const [d, setD] = useState(batch?.defaults || batchDefaultsFor(batch?.type));
 
   useEffect(() => { if (batch?.defaults) setD(batch.defaults); }, [batch?.id]);
 
@@ -102,7 +102,8 @@ export default function BatchDefaultsPage() {
           {/* 7. IRONMONGERY SLOTS */}
           <Sec title="Ironmongery — Assign Products">
             <div className="space-y-2">
-              {IRONMONGERY_CATEGORIES.filter(c => (c.windowType === (batch.type || 'sash') || c.windowType === 'all') && c.slot !== false).map(cat => {
+              {/* both batch spellings show the door slots (09.10.2026: 'doors' from the project page, 'door' from an estimate) */}
+              {IRONMONGERY_CATEGORIES.filter(c => (c.windowType === (batch.type === 'doors' ? 'door' : (batch.type || 'sash')) || c.windowType === 'all') && c.slot !== false).map(cat => {
                 const item = getSlotItem(cat.key);
                 return (
                   <div key={cat.key}

@@ -65,6 +65,12 @@ export default function WindowSettingsPage() {
   const setGlassMakeup = useWindowProfileStore((s) => s.setGlassMakeup);
   const setCillTwoPiece = useWindowProfileStore((s) => s.setCillTwoPiece);
   const resetToDefaults = useWindowProfileStore((s) => s.resetToDefaults);
+  const loadFromCloud = useWindowProfileStore((s) => s.loadFromCloud);
+  // Entering Window Settings reloads the profiles from the cloud (another
+  // computer may have saved since this tab loaded); unsaved local changes stay
+  // on top (owner box item 20, 09.10.2026). The tab coming back reloads too
+  // (windowProfileStore, visibilitychange).
+  useEffect(() => { loadFromCloud(); }, [loadFromCloud]);
 
   const [variantKey, setVariantKey] = useState('standard');
   const [selected, setSelected] = useState('bottomRail');

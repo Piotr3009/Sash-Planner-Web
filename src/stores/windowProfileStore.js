@@ -3,25 +3,84 @@ import { persist } from 'zustand/middleware';
 import { normalizeSashProfile, migrateCasementProfile, migrateDoorProfile, DEFAULT_SASH_PROFILE, DEFAULT_CASEMENT_PROFILE, DEFAULT_DOOR_PROFILE, setActiveWindowProfile, setActiveCasementProfile, setActiveDoorProfile, casementGlassDeduction } from '../engine/profile.js';
 import { loadWindowProfiles, saveWindowProfiles } from '../services/cloudSync.js';
 
-let cloudSaveTimer = null;
-const scheduleCloudSave = (profiles) => {
-  clearTimeout(cloudSaveTimer);
-  cloudSaveTimer = setTimeout(() => saveWindowProfiles(profiles), 800);
-};
-
 // Deep clone helper for the plain-JSON profile object
 const clone = (o) => JSON.parse(JSON.stringify(o));
+
+// ─── Cloud save that merges (Piotr 09.10.2026, owner box item 20) ──────────
+// Until 09.10.2026 every edit saved { sash, casement, door } from this tab's
+// memory WHOLE, so a tab opened before a change on another computer wrote its
+// stale copy over that change (the bSuite target lost on 07.10.2026). Now the
+// store records the paths it changed since its last cloud load ("profile" or
+// "profile.firstKey", e.g. 'casement.bsuite', 'door.deductions'); the save
+// loads the current cloud copy, overlays ONLY those paths from memory, writes
+// the merged object, takes it as the local copy and clears the paths saved.
+// A cloud load (app start, entering Window Settings, the tab coming back)
+// keeps the unsaved local paths on top of the cloud copy. The same path
+// changed in two tabs: the later save wins (BLOCKERS 31).
+//
+// The cloud is an adapter so a harness can run two tabs over one fake cloud
+// (setWindowProfileCloud); the default is the Supabase settings row.
+const KINDS = ['sash', 'casement', 'door'];
+let cloudAdapter = { load: loadWindowProfiles, save: saveWindowProfiles };
+export function setWindowProfileCloud(adapter) {
+  cloudAdapter = adapter || { load: loadWindowProfiles, save: saveWindowProfiles };
+}
+
+/** A copy of one profile kind as the engine reads it (the stored-copy migrations). */
+function migrateKind(kind, profile) {
+  if (!profile) return null;
+  if (kind === 'sash') return normalizeSashProfile(clone(profile));
+  if (kind === 'casement') return migrateCasementProfile(clone(profile)) || clone(DEFAULT_CASEMENT_PROFILE);
+  return migrateDoorProfile(clone(profile));
+}
+
+/**
+ * The cloud copy with the dirty paths of `local` laid over it. `cloud` and
+ * `local` are { sash, casement, door }; `dirty` holds 'kind' (the whole
+ * profile, a reset) or 'kind.firstKey'. A kind the cloud does not hold yet is
+ * taken whole from `local`. The casement glass width deduction is recomputed
+ * on the result (it is derived from the stile face and glassInset). Pure.
+ */
+export function mergeWindowProfiles(cloud, local, dirty) {
+  const out = {};
+  for (const kind of KINDS) {
+    const base = migrateKind(kind, cloud?.[kind]);
+    if (!base) { out[kind] = clone(local[kind]); continue; }
+    const paths = (dirty || []).filter((d) => d === kind || d.startsWith(`${kind}.`));
+    if (paths.includes(kind)) { out[kind] = clone(local[kind]); continue; }
+    for (const d of paths) {
+      const key = d.slice(kind.length + 1);
+      if (local[kind] && key in local[kind]) base[key] = clone(local[kind][key]);
+      else delete base[key];
+    }
+    out[kind] = kind === 'casement' ? syncGlassDeduction(base) : base;
+  }
+  return out;
+}
+
+const addDirty = (list, paths) => [...new Set([...(list || []), ...paths])];
+/** The value at 'kind' or 'kind.firstKey' of a { sash, casement, door } state. */
+const valueAt = (state, path) => {
+  const [kind, key] = String(path).split('.');
+  return key ? state?.[kind]?.[key] : state?.[kind];
+};
+let cloudSaveTimer = null;
+let saveChain = Promise.resolve();
+const scheduleCloudSave = (run) => {
+  clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(run, 800);
+};
 
 // Keep the stored casement deductions.glass in step with the stile face and
 // glassInset (06.10.2026): it holds the WIDTH deduction, the readers take both
 // deductions from casementGlassDeductions, and the stored copy must never
 // disagree with them. The height deduction (top and bottom rails) is not stored.
-const syncGlassDeduction = (casement) => {
+function syncGlassDeduction(casement) {
   if (casement?.deductions && casement.geometry?.glassInset != null) {
     casement.deductions.glass = casementGlassDeduction(casement);
   }
   return casement;
-};
+}
 
 // Door profile keys the Window Settings Doors card may write (setDoorPath):
 // the first path segment must be one of these, and the last one must already
@@ -48,116 +107,104 @@ export const useWindowProfileStore = create(
       door: clone(DEFAULT_DOOR_PROFILE),
 
       setVariantField: (variantKey, field, value) => {
-        set((s) => {
+        get()._edit(['sash.variants'], (s) => {
           const sash = clone(s.sash);
           if (!sash.variants[variantKey]) return {};
           sash.variants[variantKey][field] =
             field === 'label' ? String(value) : (Number(value) || 0);
           return { sash };
         });
-        get()._sync();
       },
 
       setElementField: (elementKey, field, value) => {
-        set((s) => {
+        get()._edit(['sash.elements'], (s) => {
           const sash = clone(s.sash);
           if (!sash.elements[elementKey]) return {};
           sash.elements[elementKey][field] =
             field === 'raw' ? String(value) : (Number(value) || 0);
           return { sash };
         });
-        get()._sync();
       },
 
       setGlassMakeup: (glassType, value) => {
-        set((s) => {
+        get()._edit(['sash.glassMakeup'], (s) => {
           const sash = clone(s.sash);
           sash.glassMakeup = { ...(sash.glassMakeup || {}), [glassType]: String(value) };
           return { sash };
         });
-        get()._sync();
       },
 
       setHornExtension: (value) => {
-        set((s) => {
+        get()._edit(['sash.hornExtension'], (s) => {
           const sash = clone(s.sash);
           sash.hornExtension = Number(value) || 0;
           return { sash };
         });
-        get()._sync();
       },
 
       setDeduction: (key, value) => {
-        set((s) => {
+        get()._edit(['sash.deductions'], (s) => {
           const sash = clone(s.sash);
           sash.deductions[key] = Number(value) || 0;
           return { sash };
         });
-        get()._sync();
       },
 
       setCillTwoPiece: (twoPiece) => {
-        set((s) => ({ sash: { ...clone(s.sash), cillTwoPiece: !!twoPiece } }));
-        get()._sync();
+        get()._edit(['sash.cillTwoPiece'], (s) => ({ sash: { ...clone(s.sash), cillTwoPiece: !!twoPiece } }));
       },
 
       setCasementElementField: (elementKey, field, value) => {
-        set((s) => {
+        get()._edit(['casement.elements'], (s) => {
           const casement = clone(s.casement);
           if (!casement.elements[elementKey]) return {};
           casement.elements[elementKey][field] =
             field === 'raw' ? String(value) : (Number(value) || 0);
           return { casement: syncGlassDeduction(casement) };
         });
-        get()._sync();
       },
 
       setCasementDeduction: (key, value) => {
-        set((s) => {
+        get()._edit(['casement.deductions'], (s) => {
           const casement = clone(s.casement);
           casement.deductions[key] = Number(value) || 0;
           return { casement: syncGlassDeduction(casement) };
         });
-        get()._sync();
       },
 
       setCasementDepth: (value) => {
-        set((s) => ({ casement: { ...clone(s.casement), depth: Number(value) || 57 } }));
-        get()._sync();
+        get()._edit(['casement.depth'], (s) => ({ casement: { ...clone(s.casement), depth: Number(value) || 57 } }));
       },
 
       // ── v1.1 profile setters (Window Settings — Casement rebuild, 04.08) ──
       setCasementTopField: (key, value) => {
         if (!['frameDepth', 'leafDepth', 'leafDepthTriple'].includes(key)) return;
-        set((s) => ({ casement: { ...clone(s.casement), [key]: Number(value) || 0 } }));
-        get()._sync();
+        get()._edit([`casement.${key}`], (s) => ({ casement: { ...clone(s.casement), [key]: Number(value) || 0 } }));
       },
 
       setCasementGeometry: (key, value) => {
-        set((s) => {
+        get()._edit(['casement.geometry'], (s) => {
           const casement = clone(s.casement);
           if (!casement.geometry || !(key in casement.geometry)) return {};
           casement.geometry[key] = Number(value) || 0;
           return { casement: syncGlassDeduction(casement) };
         });
-        get()._sync();
       },
 
       setCasementLength: (key, value) => {
-        set((s) => {
+        get()._edit(['casement.lengths'], (s) => {
           const casement = clone(s.casement);
           if (!casement.lengths || !(key in casement.lengths)) return {};
           casement.lengths[key] = Number(value) || 0;
           return { casement };
         });
-        get()._sync();
       },
 
       // Stiles and top rail share ONE width (Piotr 07.10.2026): one input, two
       // writes. The bottom rail has its own width (setCasementElementField
       // 'leafBottom'), so this setter never touches it.
       setCasementLeafFace: (value) => {
-        set((s) => {
+        get()._edit(['casement.elements'], (s) => {
           const casement = clone(s.casement);
           const v = Number(value) || 0;
           ['leafStile', 'leafTop'].forEach((k) => {
@@ -165,7 +212,6 @@ export const useWindowProfileStore = create(
           });
           return { casement: syncGlassDeduction(casement) };
         });
-        get()._sync();
       },
 
       // ── v4 (ARCHED-WINDOWS-v4 Block C) — the "CNC & arches" card ──────────
@@ -181,7 +227,7 @@ export const useWindowProfileStore = create(
         const isBsuite = path[0] === 'bsuite';
         const v = isBsuite ? (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'string' ? value : null) : Number(value);
         if (v === null || (!isBsuite && !Number.isFinite(v))) return;
-        set((s) => {
+        get()._edit([`casement.${path[0]}`], (s) => {
           const casement = clone(s.casement);
           let node = casement;
           for (let i = 0; i < path.length - 1; i++) {
@@ -192,7 +238,6 @@ export const useWindowProfileStore = create(
           node[path[path.length - 1]] = v;
           return { casement: syncGlassDeduction(casement) };
         });
-        get()._sync();
       },
 
       // 14.09: bSuite targets (computers with their own program paths) — replaced whole,
@@ -205,12 +250,11 @@ export const useWindowProfileStore = create(
           if (!t.programs || !['head', 'cill', 'jambL', 'jambR', 'mullion', 'transom'].every((k) => typeof t.programs[k]?.path === 'string')) return;
           ids.add(t.id);
         }
-        set((s) => {
+        get()._edit(['casement.bsuite'], (s) => {
           const casement = clone(s.casement);
           casement.bsuite = { ...casement.bsuite, targets: clone(targets), activeTarget: ids.has(activeTarget) ? activeTarget : targets[0].id };
           return { casement };
         });
-        get()._sync();
       },
 
       // Stock widths as a comma list ("63, 75, 95") → sorted positive numbers;
@@ -219,13 +263,12 @@ export const useWindowProfileStore = create(
         const widths = String(text ?? '').split(/[,\s;]+/).map(Number).filter((w) => Number.isFinite(w) && w > 0);
         if (!widths.length) return;
         const sorted = [...new Set(widths)].sort((a, b) => a - b);
-        set((s) => {
+        get()._edit(['casement.arch'], (s) => {
           const casement = clone(s.casement);
           if (!casement.arch) return {};
           casement.arch.stockWidths = sorted;
           return { casement };
         });
-        get()._sync();
       },
 
       // ── Doors (08.10.2026): one generic setter for the Doors card. `path` =
@@ -237,7 +280,7 @@ export const useWindowProfileStore = create(
         const isString = path[0] === 'hardware' && DOOR_STRING_LEAVES.includes(leaf);
         const v = isString ? String(value ?? '') : Number(value);
         if (!isString && (value === '' || value == null || !Number.isFinite(v))) return;
-        set((s) => {
+        get()._edit([`door.${path[0]}`], (s) => {
           const door = clone(s.door);
           let node = door;
           for (let i = 0; i < path.length - 1; i++) {
@@ -248,16 +291,26 @@ export const useWindowProfileStore = create(
           node[leaf] = v;
           return { door };
         });
-        get()._sync();
       },
 
       resetDoorToDefaults: () => {
-        set({ door: clone(DEFAULT_DOOR_PROFILE) });
-        get()._sync();
+        get()._edit(['door'], { door: clone(DEFAULT_DOOR_PROFILE) });
       },
 
       resetToDefaults: () => {
-        set({ sash: clone(DEFAULT_SASH_PROFILE), casement: clone(DEFAULT_CASEMENT_PROFILE) });
+        get()._edit(['sash', 'casement'], { sash: clone(DEFAULT_SASH_PROFILE), casement: clone(DEFAULT_CASEMENT_PROFILE) });
+      },
+
+      // Paths changed since the last cloud load / save ('kind' or 'kind.firstKey'), plain data.
+      dirty: [],
+
+      // One edit: apply the updater, mark the given paths dirty when their value really
+      // changed (a refused edit marks nothing), push to the engine, schedule the save.
+      _edit: (paths, updater) => {
+        const before = paths.map((p) => JSON.stringify(valueAt(get(), p)));
+        set(updater);
+        const changed = paths.filter((p, i) => JSON.stringify(valueAt(get(), p)) !== before[i]);
+        if (changed.length) set({ dirty: addDirty(get().dirty, changed) });
         get()._sync();
       },
 
@@ -265,23 +318,50 @@ export const useWindowProfileStore = create(
         setActiveWindowProfile(get().sash);
         setActiveCasementProfile(get().casement);
         setActiveDoorProfile(get().door);
-        scheduleCloudSave({ sash: get().sash, casement: get().casement, door: get().door });
+        if ((get().dirty || []).length) scheduleCloudSave(() => get().saveToCloud());
       },
 
-      // Pull tenant profiles from Supabase (called once after rehydrate)
+      // Save the dirty paths: load the cloud copy, overlay ONLY the dirty paths
+      // from memory, write the merged object, take it as the local copy. An
+      // edit made while the save ran stays on top and stays dirty. A failed
+      // load or write keeps every path dirty for the next save. Saves run one
+      // after the other. Returns the merged object (null when nothing saved).
+      saveToCloud: () => {
+        clearTimeout(cloudSaveTimer);
+        cloudSaveTimer = null;
+        saveChain = saveChain.then(async () => {
+          const dirty = [...(get().dirty || [])];
+          if (!dirty.length) return null;
+          const local = { sash: clone(get().sash), casement: clone(get().casement), door: clone(get().door) };
+          let merged;
+          try {
+            const cloud = await cloudAdapter.load();
+            merged = mergeWindowProfiles(cloud, local, dirty);
+            const ok = await cloudAdapter.save(merged);
+            if (ok === false) return null;
+          } catch (err) {
+            console.error('windowProfile saveToCloud', err);
+            return null;
+          }
+          const now = get();
+          const stillDirty = (now.dirty || []).filter((p) => !dirty.includes(p) || JSON.stringify(valueAt(now, p)) !== JSON.stringify(valueAt(local, p)));
+          set({ ...mergeWindowProfiles(merged, now, stillDirty), dirty: stillDirty });
+          setActiveWindowProfile(get().sash);
+          setActiveCasementProfile(get().casement);
+          setActiveDoorProfile(get().door);
+          return merged;
+        });
+        return saveChain;
+      },
+
+      // Pull tenant profiles from the cloud: app start, entering Window
+      // Settings, the tab coming back. Unsaved local paths stay on top.
       loadFromCloud: async () => {
         try {
-          const cloud = await loadWindowProfiles();
+          const cloud = await cloudAdapter.load();
           if (cloud?.sash || cloud?.casement || cloud?.door) {
-            const migratedCas = cloud.casement
-              ? (migrateCasementProfile(cloud.casement) || clone(DEFAULT_CASEMENT_PROFILE))
-              : null;
-            const migratedDoor = cloud.door ? migrateDoorProfile(cloud.door) : null;
-            set({
-              ...(cloud.sash ? { sash: normalizeSashProfile(cloud.sash) } : {}),
-              ...(migratedCas ? { casement: migratedCas } : {}),
-              ...(migratedDoor ? { door: migratedDoor } : {}),
-            });
+            const local = { sash: get().sash, casement: get().casement, door: get().door };
+            set(mergeWindowProfiles(cloud, local, get().dirty || []));
             setActiveWindowProfile(get().sash);
             setActiveCasementProfile(get().casement);
             setActiveDoorProfile(get().door);
@@ -311,11 +391,24 @@ export const useWindowProfileStore = create(
           setActiveDoorProfile(d);
           setTimeout(() => useWindowProfileStore.setState({ door: d }), 0);
         }
-        // Tenant profile from Supabase wins over the local cache
-        setTimeout(() => useWindowProfileStore.getState().loadFromCloud(), 0);
+        // Tenant profile from Supabase wins over the local cache, but for the
+        // paths this browser changed and has not saved yet (persisted `dirty`):
+        // those stay on top and are saved now.
+        setTimeout(async () => {
+          await useWindowProfileStore.getState().loadFromCloud();
+          if ((useWindowProfileStore.getState().dirty || []).length) useWindowProfileStore.getState().saveToCloud();
+        }, 0);
       },
     }
   )
 );
 
 // Cold start before rehydrate: engine falls back to defaults inside profile.js
+
+// The tab coming back (another computer may have saved meanwhile): reload,
+// keeping this tab's unsaved paths on top (owner box item 20). Browser only.
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') useWindowProfileStore.getState().loadFromCloud();
+  });
+}
