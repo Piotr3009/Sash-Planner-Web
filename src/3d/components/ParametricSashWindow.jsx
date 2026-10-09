@@ -1980,6 +1980,24 @@ function MullionPost({ height, position, material, materialInt, beadMaterial, be
   );
 }
 
+/**
+ * The two opening limits (mm) for a component height and meeting fraction
+ * (cottage, Piotr 09.10.2026): the lower sash rises into the upper part of the
+ * opening, the upper sash drops into the lower part, each less the 120 margin.
+ * The same numbers the component clamps with (its frame: sill 58.414 visible,
+ * jamb 28 set 23 into the sill, 3 gaps top and bottom); App.jsx sizes the two
+ * opening sliders with it.
+ */
+export function sashOpeningLimits(height, meetingFraction = 0.5) {
+  const upperVisibleTop = height / 2 + 58.414 - 23 - 28 - 3;
+  const lowerVisibleBottom = -height / 2 + 58.414 + 3;
+  const meeting = lowerVisibleBottom + (upperVisibleTop - lowerVisibleBottom) * meetingFraction;
+  return {
+    lowerLift: Math.max(0, upperVisibleTop - meeting - 120),
+    upperDrop: Math.max(0, meeting - lowerVisibleBottom - 120),
+  };
+}
+
 export default function ParametricSashWindow({
   width = 1200,
   height = 1800,
@@ -2010,6 +2028,11 @@ export default function ParametricSashWindow({
   fixUpperCustomBars = [],
   fixLowerCustomBars = [],
   headType = 'flat',
+  // Where the meeting line sits in the opening, a fraction from the bottom (cottage,
+  // Piotr 09.10.2026). PC passes the engine value for every sash window
+  // (windowSpecToConfig / the configurators, calculations.js meetingFractionFor);
+  // without it the line stays at half the opening (PSW, the welcome page).
+  meetingFraction = 0.5,
   explode = 0,
 }) {
   const cExt = woodColorExt || woodColor;
@@ -2121,7 +2144,7 @@ export default function ParametricSashWindow({
   const lowerVisibleBottomY = sillTopY + mm(config.bottomGap);
 
   const availableHeight = upperVisibleTopY - lowerVisibleBottomY;
-  const meetingY = lowerVisibleBottomY + availableHeight / 2;
+  const meetingY = lowerVisibleBottomY + availableHeight * meetingFraction;
 
   const upperSashHeight = (upperVisibleTopY - meetingY) * 1000 + config.upperMeetingRail / 2;
   const lowerSashHeight = (meetingY - lowerVisibleBottomY) * 1000 + config.lowerMeetingRail / 2;
@@ -2132,9 +2155,13 @@ export default function ParametricSashWindow({
   const yTopClosed = upperVisibleTopY - upperH / 2;
   const yBottomClosed = lowerVisibleBottomY + lowerH / 2;
 
-  const maxLift = Math.max(0, (meetingY - lowerVisibleBottomY) * 1000 - 120);
-  const lowerOpeningLift = Math.min(opening, maxLift);
-  const upperOpeningDrop = Math.min(upperOpening, maxLift);
+  // Two opening limits (the same 120 margin): the lower sash rises into the upper
+  // part of the opening, the upper sash drops into the lower part. Equal while the
+  // meeting line sat at half; a raised (cottage) line lets the upper sash drop further.
+  const maxLowerLift = Math.max(0, (upperVisibleTopY - meetingY) * 1000 - 120);
+  const maxUpperDrop = Math.max(0, (meetingY - lowerVisibleBottomY) * 1000 - 120);
+  const lowerOpeningLift = Math.min(opening, maxLowerLift);
+  const upperOpeningDrop = Math.min(upperOpening, maxUpperDrop);
 
   const sashCenterOffset = mm((sashDepth + config.interSashGap) / 2);
   const trackFrontZ = -sashCenterOffset;
@@ -2197,7 +2224,7 @@ export default function ParametricSashWindow({
     const fixLowerH = lowerSashHeight;
 
     // Center lower sash opening
-    const centerLowerLift = Math.min(opening, maxLift);
+    const centerLowerLift = Math.min(opening, maxLowerLift);
     // Upper sash in center is FIXED (no opening)
 
     // Mullion Y position and height
