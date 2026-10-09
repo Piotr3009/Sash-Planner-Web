@@ -4,6 +4,99 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-10-09 · TURA PC: SASH PROPORTIONS, COTTAGE 40/60 AND 1/3-2/3 (branch `claude/sash-proportions`)
+
+Owner box (Piotr, 09.10.2026): a new sash option `sashProportion` (`standard`, `cottage-40-60`, `cottage-1-3`, missing
+= standard, the PSW contract, saved in the estimate fullConfig like `splitRatio`). The sum of the two sashes stays
+frame H - profile deduction + meeting rail (default H - 92); standard keeps the bottom sash 33 taller than the top
+(equal glass); cottage puts the top sash at 40 % or 1/3 of the sum. Frame 1400 (sum 1308): standard 637.5 / 670.5,
+cottage 40/60 523.2 / 784.8, cottage 1/3-2/3 436 / 872. Double and triple only (triple: centre and FIX lights on one
+meeting rail line), glazing arch allowed, arched windows not, configurator minimum frame H 900. Price +5 % after the
+glazing arch and before colour. The 3D meeting rail sits where production puts it for EVERY sash window (standard
+moves up about 17 mm, approved 09.10.2026). Standard windows otherwise identical.
+
+### Stage 0: baseline and sweep (no code changes)
+
+Starting commit **719bfba** (`main` on 09.10.2026: "12", 44589f6, plus this tura's CLAUDE.md). Branch
+`claude/sash-proportions` from it; push to it works.
+
+**Suite on the starting commit: 29 harnesses, 3269 checks, 0 failures. `npm run build` OK (19.6 s).** Run as in the
+previous turas: `verify/arch/t*.mjs` minus the `*baseline*` generators, plus `verify/parity/*.mjs`, each with
+`node <file>`, after `npm ci` and `pip install ezdxf`; `docs/handover/samples/` restored with `git checkout` after
+every file. `verify/parity/psw-casement-layouts.mjs` exits rc 2 (no PSW clone, PSW is outside this session's
+repository scope): not run, not counted. Counts per file (harnesses that print one PASS line per check are counted
+by those lines):
+
+| harness | checks | | harness | checks | | harness | checks |
+|---|---|---|---|---|---|---|---|
+| t16 | 369 | | t24_stage4 | 26 | | parity t34_glass_minus1 | 46 |
+| t17_edges | 70 | | t25 | 226 | | parity t35_locks | 51 |
+| t18 | 179 | | t26 | 38 | | parity t36_hinges | 110 |
+| t19 | 280 | | t27 | 97 | | parity t37_single_window_bom | 50 |
+| t20 | 117 | | t28 | 51 | | parity t38_leaf_64_seat_85 | 471 |
+| t20_bars | 31 | | t29 | 34 | | parity t39_settings_leaf_cards | 23 |
+| t21 | 120 | | t30_preview | 30 | | parity t40_bottom_rail_3d | 73 |
+| t22 | 118 | | t33_bar_grid | 43 | | parity t41_doors_production | 343 |
+| t23 | 81 | | parity t31_bars_8x8 | 18 | | parity t42_precut_colours_labels | 32 |
+| | | | parity t32_bsuite | 54 | | parity t43_window_tag | 88 |
+
+**Reference set, BEFORE** (live engine on 719bfba: `normaliseToWindowSpec` then `deriveWindowData`, default
+profiles; the start commit has no `sashProportion`, so the three proportions of each frame derive the same and only
+the standard rows are shown; the script is kept in the session scratchpad and re-run for the AFTER table):
+
+| window (1000 wide unless noted) | total | top | bottom | upper unit | lower unit | weight kg (glass) | glass m² | glazing bead mm | bead tape m | silicone tubes |
+|---|---|---|---|---|---|---|---|---|---|---|
+| double 900 | 808 | 387.5 | 420.5 | 310.5 | 310.5 | 19.33 (8.55) | 0.45 | 4579.3 | 7.96 | 0.4 |
+| double 1400 | 1308 | 637.5 | 670.5 | 560.5 | 560.5 | 29.22 (15.98) | 0.82 | 5729.3 | 9.96 | 0.5 |
+| double 1800 | 1708 | 837.5 | 870.5 | 760.5 | 760.5 | 37.13 (21.93) | 1.11 | 6649.3 | 11.56 | 0.58 |
+| double 2000 | 1908 | 937.5 | 970.5 | 860.5 | 860.5 | 41.08 (24.9) | 1.26 | 7109.3 | 12.36 | 0.62 |
+| triple 1800 x 1400 | 1308 | 637.5 | 670.5 | 560.5 (all 3 sections) | 560.5 (all 3) | 27.25 (14.61) | 1.72 | 9409.3 | 16.36 | 0.82 |
+| glazing arch 1400 (headType arch) | 1308 | 637.5 | 670.5 | 560.5 | 560.5 | 29.22 (15.98) | 0.82 | 5729.3 | 9.96 | 0.5 |
+| double 1400 4x4 | 1308 | 637.5 | 670.5 | 560.5 | 560.5 | 29.22 (15.98) | 0.82 | 5729.3 | 9.96 | 0.5 |
+
+The standard rows match the owner box (section 3.3) to the digit. The glazing arch derives exactly as the flat head:
+`headType` is not read by the engine at all (only by pricing and the configurator 3D).
+
+**Sweep** (seven read-only agents: engine calculations, engine lists / BOM / spec / pricing, utils exports, pages,
+drawings, 3D, splitRatio trail + harnesses; then a completeness critic). Places that assume two equal sashes or
+compute the split on their own:
+
+1. `calculations.js deriveWindowData()` 1709-1712 and `calculateWindow()` 200-203: two copies of the split formula
+   (the second feeds only the discarded `result.sash`; `deriveWindowData` uses `calculateWindow` for bar positions).
+2. `calculateWeights()` 431-438: timber per sash is right, the GLASS is the upper pane x 2.
+3. `calculateConsumables()` 466-510: glass m², bead tape and silicone from the upper pane x 2 (seal 6070 already
+   uses top + bottom).
+4. `calculateBeadingComponents()` 541-569: receives only `topSashHeight`; glazing, triangle and Georgian beading are
+   the upper pane x 2.
+5. `calculateGlazingSummaryForWindow()` 359: one pane height for both sashes from `sashHeight / 2 - top rail -
+   bottom rail` (a legacy formula, also off for standard: 507 against a 537.5 daylight at H 1400; its only reader
+   is `aggregateComponents`, which nothing calls).
+6. `utils/dxfExport.js` 47-49: its own split from CONSTANTS (`floor((H - 92 - 33) / 2)`), never sees derived.
+7. `canvas-renderer.js` 170-171: `derived.sashHeight / 2` fallback (unreachable for a sash: derived always has both
+   heights; a casement derived reaches it with 0 heights). Its horizontal bars use the legacy single bar list over
+   the whole sash height and drop bars below each pane (at H 1400 4x4 the h bar is never drawn, standard included).
+8. `pages/WindowSettingsPage.jsx` 114-116: settings preview with its own standard split; standard only, left as is.
+9. 3D: `ParametricSashWindow.jsx` 2124 `meetingY` at half the opening and one `maxLift` (2135) for both sashes;
+   `src/3d/App.jsx` 871 one slider limit `height / 2 - 120` for both sliders; `ArchedSashWindow.jsx` 381 its own
+   half line (arched, out of scope); `utils/windowSpecToConfig.js` 272-274 hardcodes `sashType 'double'`,
+   `splitRatio`, `headType 'flat'` (previews and PDF captures draw every sash as a flat double, pre-existing).
+10. `arch.js` 532 `buildSashArchGeometry`: meeting line at H / 2 for an arched sash (cottage on arched is rejected).
+11. Dead or out-of-scope copies: `components/dashboard/MiniWindowSvg.jsx` 20 (meeting at half, only imported by the
+    unused `WindowCard.jsx`), `WindowCard.jsx` 49 prints the raw top height.
+
+Fed by derived and fine (checked): cut list, pre-cut, BOM timber (top and bottom stiles are separate parts), glass
+rows in `lists.js` (double and triple), glass PDF / DXF, Excel, sash sheets (`SashDetail2D`, `FrontElevation2D`,
+`GlassDrawing2D`, `VerticalSection2D`), spray list, `calculateSashComponentSet` and the triple component set (one
+top / bottom pair for FIX L, C, FIX R), hardware counts (no height rule), CNC jamb DXF (pulleys from the jamb top,
+no weight pocket). No weight catalogue and no rule linking weight length to sash travel exist in the engine (the
+BOM buys counterweights as one total kg). Where the value must travel (the `splitRatio` trail): `specification.js`
+372, `projectStore.js` 566 / 738 (both builders whitelist top-level fields; edit reloads from them),
+`ConfiguratorPage.jsx` (state, prefill, 3D sync, save, UI, spec panel), `EstimateConfiguratorPage.jsx` (the same,
+plus the price config: it is the only caller of `calculatePrice`), `windowSpecToConfig.js`, `src/3d/App.jsx` (nine
+places). `estimateStore` and `moveToProduction` pass the config whole.
+
+---
+
 ## 2026-10-08 · TURA PC: DOORS TO PRODUCTION, SINGLE AND FRENCH (branch `claude/doors-production`)
 
 Owner box (Piotr, 08.10.2026): the door frame is the casement frame (68 face, 93 deep, rebate 21, land 47, gap 4,
