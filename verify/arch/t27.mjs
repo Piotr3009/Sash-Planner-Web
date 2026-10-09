@@ -184,7 +184,7 @@ section('4 — casementLayouts: frameFace = the profile face, version 3, fan-axi
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-section('5 — doors: faces 68, the casement mullion between door and side panel, land / leafAtJamb from the profile (option B since night 7 stage 3; land 47 / leafAtJamb 51 since 08.10.2026; doors v3 09.10.2026)');
+section('5 - doors: faces 68, the casement mullion between door and side panel, land / leafAtJamb from the profile (option B since night 7 stage 3; land 47 / leafAtJamb 51 since 08.10.2026; doors v3 09.10.2026)');
 {
   const item = { id: 'd1', width: 1000, height: 2100, name: 'D1' };
   const { spec, derived } = deriveItem(M, item, { windowCategory: 'door', doorType: 'single-external', sidePanels: 'left', sideLeftWidth: 400, thresholdType: 'standard' });

@@ -76,7 +76,8 @@ function fakeCloud(initial) {
   return {
     row,
     adapter: {
-      load: async () => (row.windowProfiles ? clone(row.windowProfiles) : null),
+      // a failed read throws, as cloudSync.loadWindowProfiles does (review finding, 09.10.2026)
+      load: async () => { if (row.failLoad) throw new Error('read failed'); return row.windowProfiles ? clone(row.windowProfiles) : null; },
       save: async (profiles) => { if (row.fail) return false; row.windowProfiles = clone(profiles); row.writes += 1; return true; },
     },
   };
@@ -173,6 +174,15 @@ section('3 - the dirty list');
   const r = await A.getState().saveToCloud();
   ok(r === null && A.getState().dirty.length === 2 && C.row.windowProfiles.sash.hornExtension === 70, 'a failed save writes nothing and keeps the paths dirty');
   C.row.fail = false;
+  // a failed READ keeps everything dirty too and writes nothing (it never merges over an "empty" cloud and
+  // writes every kind whole: the stale overwrite of non-dirty paths this tura removes)
+  C.row.failLoad = true;
+  const writes0 = C.row.writes;
+  const r2 = await A.getState().saveToCloud();
+  await A.getState().loadFromCloud();   // a failed load keeps the local copy and the dirty list
+  ok(r2 === null && C.row.writes === writes0 && A.getState().dirty.length === 2 && A.getState().sash.hornExtension === 77 && C.row.windowProfiles.sash.hornExtension === 70,
+    'a failed cloud read: the save writes nothing, the paths stay dirty, a load keeps the local copy');
+  C.row.failLoad = false;
   // an edit made while the save runs stays on top and stays dirty
   const slow = { load: async () => { const v = await C.adapter.load(); A.getState().setHornExtension(80); return v; }, save: C.adapter.save };
   TAB_A.setWindowProfileCloud(slow);
@@ -218,6 +228,13 @@ section('4 - the Settings save never writes the login-time profiles');
   ok(!('windowProfiles' in out2) && !('assignments' in out2), 'a cloud without them: the save does not create them from the stale copy');
   const cs = readFileSync(resolve(ROOT, 'src/services/cloudSync.js'), 'utf8');
   ok(/settingsConstantsForSave\(settings, data\?\.constants\)/.test(cs), 'saveSettings reads the current constants and writes through settingsConstantsForSave');
+  // review finding (09.10.2026): a failed read writes nothing (the upsert replaces the whole constants column)
+  const fnBody = (name) => { const i = cs.indexOf(`export async function ${name}(`); return cs.slice(i, cs.indexOf('\n}\n', i)); };
+  const ss = fnBody('saveSettings'), sa = fnBody('saveAssignments'), sw = fnBody('saveWindowProfiles'), lw = fnBody('loadWindowProfiles');
+  const abortsBeforeUpsert = (body, re) => { const m = re.exec(body); return !!m && m.index < body.indexOf('.upsert('); };
+  ok(abortsBeforeUpsert(ss, /if \(error\) \{[^}]*return; \}/) && abortsBeforeUpsert(sa, /if \(readError\) \{[^}]*return; \}/) && abortsBeforeUpsert(sw, /if \(readError\) \{[^}]*return false; \}/),
+    'saveSettings, saveAssignments and saveWindowProfiles stop before the upsert when the read of constants fails');
+  ok(/if \(error\) \{[^}]*throw new Error/.test(lw), 'loadWindowProfiles throws on a failed read (null only for "no profiles yet")');
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

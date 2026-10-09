@@ -58,6 +58,9 @@ c. Not per sash, as at START: triple sash glass rows carry no bar pattern at all
    bars from the arch fields (`lowerHBars`), not from `lowerBars`; the PSW 3D fastener rule (a second fastener when
    `upperBars` is not none, below 1200 wide) and the PC lock rule (2 locks when any sash has bars) disagree for "1
    over 6". `MiniWindowSvg`, `WindowCard`, `HeroWindow` and `TechnicalDrawing2D` are imported by nothing (dead).
+   On a triple-section sash `derived.bars` describes the centre section's pane (647 wide on 1800) while the
+   beading keeps the full-width run of START ("Bars 3183 × 2"): the two disagree there; `derived.config` keeps the
+   legacy single pattern ("6 over 6" on a 6 over 1; nothing prints it).
 d. Custom bars: each sash keeps its own list and is checked against its own glass; a bar at or beyond the edge of
    its pane is a warning in `derived.bars.warnings` ("custom vertical bar at 900 mm lies outside the lower sash glass
    (708 wide)"), printed on the window detail page; the window still derives.
@@ -88,7 +91,10 @@ c. **3D render choices, not product data**: the aluminium strip fills the 51 und
    live profile (they are not echoed in `derived.door`).
 d. **Sheets**: on a crowded first chain row of the frame sheet a label is dropped or shortened (the 2400 case drops
    the 332 side light widths there; they print on the elevation and the side sheets). The leaf sheets are wider
-   (one column per hinge dimension).
+   (one column per hinge dimension). The frame sheet's vertical chain (logic from 08.10.2026) mixes conventions:
+   on the 2400 case it prints 47 / 21 / 374 / 21 / 1869 / 27 / 41, where 374 and 1869 run from the head and cill
+   rebate faces to the transom's visible band; the casement frame sheet prints the visible lands throughout (47 /
+   456 / 21 / 935 / 41). Owner check: say which reading the workshop wants and the door chain follows it.
 e. **The excluded-window note** is on the pack screen (header count and a line per window); the pack PDFs leave the
    window out without a note of their own. `EstimatePdfBuilder` still normalises outside a try (not one of the
    three pages).

@@ -8,7 +8,7 @@ import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignm
 import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
 import { SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, isCottageProportion } from '../engine/specification.js';
 import { deriveWindowData, sashBarPattern } from '../engine/calculations.js';
-import { deriveWindowBounded } from '../utils/windowBoundary.js';
+import { deriveWindowBounded, sashBarsLabel } from '../utils/windowBoundary.js';
 import { withProfiles, getCasementProfile, bsuiteActiveTarget } from '../engine/profile.js';
 import { buildGlassListForWindow, buildVentGrilles } from '../engine/lists.js';
 import { formatQty, buildWindowMaterialLines, windowBomCards, windowHardwareDetailRows } from '../engine/bom.js';
@@ -290,7 +290,8 @@ export default function WindowDetailPage() {
           ) : (
           <SpecSection title="Sashes & Bars">
             {(windowSpec?.category || 'sash') === 'sash' && <SpecRow label="Proportions" value={SASH_PROPORTION_LABELS[windowSpec?.sash?.proportion] || windowSpec?.sash?.proportion} />}
-            <SpecRow label="Grid" value={windowSpec?.sash.grid.mode} />
+            {/* the one pattern when both sashes agree, else "upper / lower" (6 over 1 printed "6x6" here) */}
+            <SpecRow label="Grid" value={sashBarsLabel(windowSpec)} />
             {/* bars per sash (Piotr 09.10.2026, owner box item 16): the pattern each sash is built with */}
             <SpecRow label="Upper" value={sashBarPattern(windowSpec, 'upper')} />
             {(!item.sameBars || sashBarPattern(windowSpec, 'upper') !== sashBarPattern(windowSpec, 'lower')) && <SpecRow label="Lower" value={sashBarPattern(windowSpec, 'lower')} />}

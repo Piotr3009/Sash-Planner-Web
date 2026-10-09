@@ -626,7 +626,12 @@ for (const [label, w, h, fc] of [['gothic arched 700 x 1800', 700, 1800, { sashT
     const wantV = d.bars.upper.positions.vertical;
     ok(nonBar(live) === nonBar(start) && vb.length === 2 * nv && hb.length === 2 * nh && vx.length === nv && hb.length === d.bars.upper.h + d.bars.lower.h,
       `canvas elevation, standard 1400 ${bars}: ${vb.length} vertical and ${hb.length} horizontal bar rects (one set per pane, derived.bars), every other draw call equal to START`);
-    void wantV;
+    // review finding (09.10.2026): the vertical bar centres themselves, from the pane's left edge (the glass
+    // fill of the upper pane), equal derived.bars.upper.positions.vertical
+    const paneFill = live.filter((c) => c[0] === 'fillRect' && near(c[3], 708 * sc, 0.01) && c[4] > 50)[0];
+    const fromPane = vx.map((x) => Math.round((x - paneFill[1] / sc) * 100) / 100);
+    ok(fromPane.length === wantV.length && fromPane.every((x, j) => near(x, wantV[j], 0.02)),
+      `canvas elevation, standard 1400 ${bars}: vertical bars at ${fromPane.join(' / ')} mm from the pane edge = derived.bars ${wantV.join(' / ')}`);
   }
   for (const [p, bars, n] of [['cottage-40-60', '4x4', 1], ['cottage-1-3', '9x9', 2]]) {
     const item = { id: 'c', name: 'C', width: 1000, height: 1400, sashProportion: p, upperBars: bars, lowerBars: bars };

@@ -404,7 +404,8 @@ quantities include d_mullion 4748 mm, d_transom_rail 2287 mm, d_threshold_alu_do
   `glazingItems` of `buildShoppingList` (calculateWindow's shopping list) is a different thing and stays.
 - **Keys this stage adds or removes** (everything else of a same-pattern window is byte-identical to START, t45
   section 8): `windowSpec.sash.grid.upper` / `.lower` (new), `derived.bars` (new), `derived.glazingItems` (removed).
-- **Fixtures re-baselined after reading the diff**: `rect-sash-base.json` (202 values): the five barred fixtures
+- **Fixtures re-baselined after reading the diff**: `rect-sash-base.json` (202 values by the baseline script's count,
+  142 leaf values by a plain JSON diff): the five barred fixtures
   carry their bars only in fullConfig and were baselined with no bars; they now derive WITH them (std_2x2 25
   values, triple_6x6 26, heritage_4x4 28, tg_9x9_cill 28, arch_head_flat_frame 25: `config` key / rows / cols /
   bars, `barPositions`, the triangle and Georgian beading rows (5 to 7 rows), bead tape and silicone, the glass row
@@ -414,8 +415,8 @@ quantities include d_mullion 4748 mm, d_transom_rail 2287 mm, d_threshold_alu_do
   draw their bars; the box and vertical sections and slim_none_horns are unchanged.
 - **Harnesses** (each changed assertion with its reason): t43 (the glazing summary assertions replaced by the
   removal check, the controls strip the new / removed keys, the canvas pins per pane), t38 (the sash control bars
-  on the item plus a check that fullConfig bars are now read), t37 (the S-bars window gains its beading rows),
-  t41 section 17 and t44 section 6 (controls strip `bars`, `grid.upper` / `grid.lower`, `glazingItems`).
+  on the item plus a check that fullConfig bars are now read), t37 (doors show one hardware card, the trickle
+  vents of box item 10; the relational S-bars checks needed no change), t41 section 17 and t44 section 6 (controls strip `bars`, `grid.upper` / `grid.lower`, `glazingItems`).
 - **New `verify/parity/t45_sash_bars_per_sash.mjs`** (120 checks): import rules (record, top level, fullConfig,
   'none', case, '2x3' error vs START); `derived.bars` for 6 over 1 and 1 over 2x2 at 1000 x 1400 by hand, cottage
   panes, custom lists with the out-of-pane warnings; glass rows, beading lengths and notes, bead tape; the glass DXF
@@ -498,6 +499,50 @@ BEFORE = 150500e (side panels outside W, the fan above H there):
 | sash 1000 x 1400 "6 over 1" (upper 6x6, lower none) | 6x6 on BOTH sashes: glass rows 731 x 560.5 bars 6x6 / 6x6; triangle and Georgian beading 4100.9 "Bars 1783 × 2"; bars in fullConfig only: none at all | upper 6x6: 2V 1H, v 232.33 / 475.67, h 268.75 over the 708 x 537.5 pane; lower none; glass rows bars 6x6 / none; triangle and Georgian 2050.45 "Bars 1783 + 0 + 15%"; bead tape 17.1 m; the same from fullConfig |
 | sash 1000 x 1400 upper none / lower 2x2 | 2x2 on both | upper none; lower 2x2: 1V at 354; glass rows none / 2x2; triangle and Georgian 618.13 "Bars 0 + 537.5" |
 | sash 1000 x 1400 2x2 on both | glass rows 2x2 / 2x2, beading "Bars 537.5 × 2" | unchanged (byte-identical but for `derived.bars`) |
+
+### Stage 9: independent review
+
+One review agent that had not seen the work (CLAUDE.md rule 10), read-only, on 150500e..201ae40. **Verdict: PASS
+WITH FINDINGS.**
+
+- **Box numbers re-derived by hand** against the live engine: every 3.10 and section 6 row matches (single 900 x 2100
+  on every threshold and direction 798 x 1998 / 633 x 1747; half-glazed axis 999, glass 881, panel daylight 610 x 772,
+  panel 644 x 806; three-quarter 1498.5 / 1380.5 / 644 x 306.5; french 1600 755 x 1998 / 584 x 1747; 2400 x 2400:
+  leaves (1600 - 34) / 2 + 6 = 789 by 2400 - 450 - 17 - 51 = 1882, glass 618 x 1631, side lights 332 x 1882 / 227 x
+  1661, fans 332 / 1566 / 332 x 385, mullions 2323 (2364), segments 340.5 / 1574.5 / 340.5, band 442 to 463, the
+  lower leaf at 467; french 1600 fixed fan 755 x 1582, fan 1498 x 385, transom 1506.5; single 1000 + 450: leaf 482,
+  light 382 x 1998, mullion 2023 (2064); seal 0.81 m and 1.57 m; vents 2; the opening 2400 BOM by hand; the sash 6
+  over 1 by hand: 232.33 / 475.67 / 268.75 on the upper pane, beading 1783 x 1.15 = 2050.45, the same from fullConfig).
+- **Assertions**: per file removed / added `ok(` lines t27 13 / 13, t29 1 / 1, t37 2 / 2, t38 3 / 4, t40 16 / 33,
+  t41 74 / 85, t43 6 / 9; every changed one carries its reason and moves to the new rule; none weakened while the
+  old check still held.
+- **Fixtures**: START derived with the bars on the record (minus `glazingItems`) equals the new `rect-sash-base`
+  (minus `bars`) for all 6 windows, glass / cut / pre-cut equal; all 42 sheets equal START rendered with the bars on
+  the record; `rect-casement-base` only lost `glazingItems: []`.
+- **Sheets** (rendered with cairosvg): frame M1 / M2 2323, T1 / T2 / T3, T 450, the 4 + 26 + 4 chain; half-glazed
+  leaf panel 644 x 806 with H1 149 / H2 848 / H3 1797 in separate columns; fixed fans without hinge or lock; side
+  light 64 / 180 with glass 227 x 1661; the panel edge detail; the 3D open render.
+- **Housekeeping**: CLAUDE.md, package.json and the lock file unchanged; every new file carries the Skylon header
+  (the generated PNG / SVG samples excepted); the only removed export is `HANDING_WORDS` (3.8), the glazing summary
+  functions were internal.
+
+Findings and what was done:
+
+1. (medium) `saveSettings` ignored a failed read of `settings.constants` and would then have written constants
+   without `windowProfiles` / `assignments`: it now writes nothing on a failed read. The same was true of
+   `saveAssignments` (pre-existing, same class): fixed the same way.
+2. (medium) `loadWindowProfiles` returned null on a read error, so a save merged over an "empty" cloud and wrote every
+   kind whole: it now throws; the store keeps its paths dirty and writes nothing; a load keeps the local copy. t46
+   gains the failed-read case and a check that the three saves stop before their upsert (37 to 40 checks).
+3. (low) t43 computed the expected canvas bar positions and never checked them: it now asserts them (354; 232.33 /
+   475.67 from the pane edge), 235 to 237 checks.
+4. (low) this log said t37 changed for the S-bars window: corrected (the door vents card).
+5. (low) an em dash on a modified t27 section title: now a hyphen.
+6. (low) the final suite counts and this verdict: below.
+7. (low, informational) the frame sheet's vertical chain mixes conventions (from 08.10.2026): reported, BLOCKERS 31.6 d.
+8. (low) the window detail "Grid" row printed "6x6" on a 6 over 1: it prints the per-sash label now ("6x6 / none",
+   the one pattern when both agree); the triple-section mismatch between `derived.bars` and the full-width beading
+   run, and `derived.config` keeping the legacy pattern: reported, BLOCKERS 31.4 c.
 
 ## 2026-10-09 · TURA PC: SASH PROPORTIONS, COTTAGE 40/60 AND 1/3-2/3 (branch `claude/sash-proportions`)
 
