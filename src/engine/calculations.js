@@ -1570,6 +1570,34 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight, settings = {}) {
         segments: transomSegments, band: transomBand,
     } : null;
 
+    // ── Visible frame openings (exterior view), one per field and tier: what
+    //    the sheets and the 3D draw between the frame members. The casement
+    //    lands (47 at a jamb / the head, 13 at a mullion axis, 8 above and 13
+    //    below the transom axis) down to the cill top (41 visible, the inward
+    //    cill's outside face 35) or the floor line without a timber cill. An
+    //    inward door field: its rebate faces the room, so from outside the
+    //    full member faces show on the door field (jamb 68, half the mullion
+    //    34, half the transom 34 below the axis, the head 68). ──
+    const bottomVisible = hasTimberCill ? (inward ? Number(p.cillInward.faceExternal) : Number(geo.cillVisible)) : 0;
+    const openings = [];
+    fields.forEach((f) => {
+        const lb = lowerBound(f);
+        if (T) {
+            const fb = fanBound(f);
+            const fx1 = fieldLandX(fb, 'L', frameWidth, geo), fx2 = fieldLandX(fb, 'R', frameWidth, geo);
+            const top = geo.land, bottom = T - geo.transomLandAbove;
+            openings.push({ kind: 'fan', over: f.kind, side: f.side || null, x: R(fx1), y: R(top), w: R(fx2 - fx1), h: R(bottom - top) });
+        }
+        const inwardDoor = inward && f.kind === 'door';
+        const x1 = inwardDoor ? (f.leftIsJamb ? fJamb : f.leftAxis + fMull / 2) : fieldLandX(lb, 'L', frameWidth, geo);
+        const x2 = inwardDoor ? (f.rightIsJamb ? frameWidth - fJamb : f.rightAxis - fMull / 2) : fieldLandX(lb, 'R', frameWidth, geo);
+        const top = T
+            ? (inwardDoor ? T + railFace / 2 : T + geo.transomLandBelow)
+            : (inwardDoor ? fHead : geo.land);
+        const bottom = frameHeight - bottomVisible;
+        openings.push({ kind: f.kind, over: null, side: f.side || null, x: R(x1), y: R(top), w: R(x2 - x1), h: R(bottom - top) });
+    });
+
     // ── BOX: head, jambs, mullions, cill, transom segments ──
     const box = [
         mk('box', 'D-FRAME HEAD', secHead, R(frameWidth - (L.headDeduct || 0)), 1, 'D-H',
@@ -1779,6 +1807,7 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight, settings = {}) {
                 frames: fields.map((f) => ({ x: f.x, w: f.w, kind: f.kind, ...(f.side ? { side: f.side } : {}) })),
                 joints: mullions.map((m) => m.axisX),
                 mullions,
+                openings, bottomVisible,
                 leftPanel: leftW ? { x: 0, w: R(leftW) } : null,
                 rightPanel: rightW ? { x: R(doorRight), w: R(rightW) } : null,
                 midRailAxis: axis,
