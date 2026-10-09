@@ -400,7 +400,7 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
   // Sash proportion (cottage, Piotr 09.10.2026): read like splitRatio. An unknown
   // value, or a cottage value on an arched sash, is an explicit error for this
   // window (never a silent standard). Only a sash reads it.
-  let sashProportion = 'standard';
+  let sashProportion = null;
   if (category === 'sash') {
     sashProportion = item?.sashProportion || fc.sashProportion || 'standard';
     const name = item?.name || item?.window_number || '?';
@@ -422,7 +422,8 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
     sash: {
       type: item?.sashType || fc.sashType || 'double',
       splitRatio: item?.splitRatio || fc.splitRatio || '1/4-1/2-1/4',
-      proportion: sashProportion,
+      // only a sash carries it (a casement / door windowSpec stays as it was)
+      ...(category === 'sash' ? { proportion: sashProportion } : {}),
       openingType,
       horns: hasHorns,
       hornType: hornsVal,

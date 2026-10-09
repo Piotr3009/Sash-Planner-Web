@@ -27,8 +27,9 @@ export async function exportWindowToExcel({ item, windowSpec, settings, derived 
     ['Generated', new Date().toLocaleString()],
     [],
     ['Calculated sash width', derived?.sashWidth ?? ''],
-    ['Top sash height', derived?.topSashHeight ?? ''],
-    ['Bottom sash height', derived?.bottomSashHeight ?? '']
+    // to 0.01 like the cut list (a cottage sash is not always a whole half mm)
+    ['Top sash height', derived?.topSashHeight != null ? Math.round(derived.topSashHeight * 100) / 100 : ''],
+    ['Bottom sash height', derived?.bottomSashHeight != null ? Math.round(derived.bottomSashHeight * 100) / 100 : '']
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), 'Summary');
 

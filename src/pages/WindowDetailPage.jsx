@@ -300,8 +300,8 @@ export default function WindowDetailPage() {
           ) : derived && (
             <SpecSection title="Calculated">
               <SpecRow label="Sash W" value={`${derived.sashWidth} mm`} />
-              <SpecRow label="Top H" value={`${Math.round(derived.topSashHeight * 10) / 10} mm`} />
-              <SpecRow label="Bot H" value={`${Math.round(derived.bottomSashHeight * 10) / 10} mm`} />
+              <SpecRow label="Top H" value={`${Math.round(derived.topSashHeight * 100) / 100} mm`} />
+              <SpecRow label="Bot H" value={`${Math.round(derived.bottomSashHeight * 100) / 100} mm`} />
             </SpecSection>
           )}
         </aside>
