@@ -25,7 +25,7 @@
 import { useMemo } from 'react';
 import { getCasementProfile, casementGlassDeductions } from '../../engine/profile.js';
 import { readGlassProfile, glassEdgeArcs, barEndRows, useBarTable } from '../../engine/glassBars.js';
-import { DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs, WindowTag } from './drawingUtils.jsx';
+import { DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 import { glassToSheet, archedOutlineD, barBandD, arcLabelPoint, barArcLabelPoint, isHaunchArc, radiiText, onCurve, closedChainD } from './archDrawUtils.js';
 
@@ -37,7 +37,7 @@ function fmt(n) {
   return Number.isInteger(r) ? r.toString() : r.toFixed(1);
 }
 
-export default function CasementGlassDrawing2D({ windowSpec, derived, group , windowTag }) {
+export default function CasementGlassDrawing2D({ windowSpec, derived, group }) {
   const geom = useMemo(() => {
     const cas = derived?.casement;
     if (!windowSpec || !group) return null;
@@ -335,7 +335,6 @@ export default function CasementGlassDrawing2D({ windowSpec, derived, group , wi
           <text x={totalW / 2} y={titleY + 40 * ts} fill={COLORS.subtitle} fontSize={SIZES.subtitle * ts}
             fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>{archLine}</text>
         )}
-        {windowTag ? <WindowTag tag={windowTag} vbw={totalW} /> : null}
       </svg>
     </div>
   );

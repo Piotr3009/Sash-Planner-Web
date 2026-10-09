@@ -22,7 +22,7 @@
  */
 import { useMemo, useState } from 'react';
 import { getCasementProfile, casementGlassDeductions } from '../../engine/profile.js';
-import { DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs, WindowTag } from './drawingUtils.jsx';
+import { DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 import { casementRoleName, paneTitle } from './casementDrawUtils.js';
 import { archToSheet, glassToSheet, archedOutlineD, ringBandD, barBandD, arcLabelPoint, isHaunchArc, radiiText } from './archDrawUtils.js';
@@ -61,7 +61,7 @@ function computeSegments(from, to, cutPairs) {
   return segs;
 }
 
-export default function CasementLeafDetail2D({ windowSpec, derived, group, onExpand, projectNumber, selectedElement, onElementClick , windowTag }) {
+export default function CasementLeafDetail2D({ windowSpec, derived, group, onExpand, projectNumber, selectedElement, onElementClick }) {
   const clickable = typeof onElementClick === 'function';
   const hl = (key) => clickable && selectedElement === key;
   const [expanded, setExpanded] = useState(false);
@@ -138,7 +138,7 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
 
   if (!geom) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
   // v3 Block 3: circle fixed window → ring sheet (after the hooks above)
-  if (derived?.arch?.shape === 'circle') return <CircleFixedDrawing2D windowSpec={windowSpec} derived={derived} projectNumber={projectNumber} view="leaf" windowTag={windowTag} />;
+  if (derived?.arch?.shape === 'circle') return <CircleFixedDrawing2D windowSpec={windowSpec} derived={derived} projectNumber={projectNumber} view="leaf" />;
 
   const layoutSc = Math.max(geom.leafW, geom.leafH) / 500;
   const sw = (n) => n * layoutSc;
@@ -197,7 +197,7 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
   const hingeTxt = geom.hinge === 'fixed' ? 'fixed (dummy sash)' : `hinge ${geom.hinge}`;
   const titleText = `${paneTitle(group)} — Front${projNum ? ` — ${projNum}` : ''} — ${winName}`;
   const subtitleText = `${fmt(geom.leafW)} × ${fmt(geom.leafH)} · glass ${fmtGlass(geom.glassUnitW)} × ${fmtGlass(geom.glassUnitH)} · 24mm · ${hingeTxt}`;
-  const archLine = arch ? `${arch.AG.label} · stile ${fmt(arch.straightStile)} · rise ${fmt(geom.leafH - arch.straightStile)} · top rail ${radiiText(arch.leafOuter)} · ATR ${fmt(arch.railLength)}` : '';
+  const archLine = arch ? `${arch.AG.label} · stile ${fmt(arch.straightStile)} · rise ${fmt(geom.leafH - arch.straightStile)} · top rail ${radiiText(arch.leafOuter)} · C-ATR ${fmt(arch.railLength)}` : '';
   const titleY = oy + geom.leafH + MGN_BOT_DIM + MGN_TITLE * 0.4;
 
   // Top dim chain: stile · (bars) · stile
@@ -456,7 +456,6 @@ export default function CasementLeafDetail2D({ windowSpec, derived, group, onExp
             <text x={totalW / 2} y={titleY + 40 * ts} fill={COLORS.subtitle} fontSize={SIZES.subtitle * ts}
               fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>{archLine}</text>
           )}
-          {windowTag ? <WindowTag tag={windowTag} vbw={totalW} /> : null}
         </svg>
       </div>
     </div>

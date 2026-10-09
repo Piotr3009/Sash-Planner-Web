@@ -13,7 +13,7 @@
  * an extension is present (it is an optional machining on the cill).
  */
 import { useMemo } from 'react';
-import { DimH, DimV, TitleBlock, WindowTag } from './drawingUtils.jsx';
+import { DimH, DimV, TitleBlock } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, STROKES } from './drawingTheme.js';
 import { CILL_BASE, CILL_PATH, CILL_PATH_GROOVED, buildExtensionPath } from './casementSectionAssets.js';
 
@@ -23,7 +23,7 @@ const NS = { vectorEffect: 'non-scaling-stroke' };
 // Catalogue of extension board projections (raw board = proj + tongue).
 const EXT_VARIANTS = [35, 60, 85];
 
-export default function CasementSection2D({ windowSpec, derived, projectNumber, selectedElement, onElementClick, fullWidth = false, showAllExtensions = false , windowTag }) {
+export default function CasementSection2D({ windowSpec, derived, projectNumber, selectedElement, onElementClick, fullWidth = false, showAllExtensions = false }) {
   const clickable = typeof onElementClick === 'function';
   const hl = (key) => clickable && selectedElement === key;
   const geom = useMemo(() => {
@@ -117,7 +117,6 @@ export default function CasementSection2D({ windowSpec, derived, projectNumber, 
         <TitleBlock x={totalW / 2} y={svgH - 14} title="CILL SECTION"
           subtitle={`ext ${showAllExtensions && !selBoard ? EXT_VARIANTS.join(' / ') : (selBoard?.proj ?? ext ?? 0)}mm${projectNumber ? ` · ${projectNumber}` : ''}`}
           vbw={totalW} scale={0.5} />
-        {windowTag ? <WindowTag tag={windowTag} vbw={totalW} /> : null}
       </svg>
     </div>
   );

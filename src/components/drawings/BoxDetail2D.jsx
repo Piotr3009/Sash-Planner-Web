@@ -2,7 +2,7 @@
  * BoxDetail2D.jsx
  */
 import { useMemo, useState } from 'react';
-import { FONT, DimH, DimV, DimChainH, DimChainV, tfs, WindowTag } from './drawingUtils.jsx';
+import { FONT, DimH, DimV, DimChainH, DimChainV, tfs } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 // Arched sash (v3 Block 1 H): the box head is the engine's ring (derived.arch.geometry.head), jambs stop at the springing
 import { archToSheet, ringBandD, arcLabelPoint, radiiText } from './archDrawUtils.js';
@@ -31,7 +31,7 @@ function bulgeArc(x1, y1, x2, y2, bulge) {
   return `A ${r} ${r} 0 ${la} ${sw} ${x2} ${y2}`;
 }
 
-export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumber, view = 'external', selectedElement, onElementClick , windowTag }) {
+export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumber, view = 'external', selectedElement, onElementClick }) {
   const isInternal = view === 'internal';
   const jambKey = isInternal ? 'intJambLiner' : 'extJambLiner';
   const headKey = isInternal ? 'intHeadLiner' : 'extHeadLiner';
@@ -167,7 +167,7 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
           <text x={X(fw / 2)} y={A ? Y(fh - A.geometry.head.thickness / 2) + 8 * totalW / VIEWBOX_REF : Y(fh - BOX.headH / 2) + 8 * totalW / VIEWBOX_REF} fill={COL.label}
             fontSize={tfs(SIZES.label, totalW)} fontWeight={WEIGHTS.label}
             fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}>
-            {A ? `ARCH HEAD ${Math.round(A.geometry.head.thickness)}` : `${linerPrefix} HEAD LINER`}
+            {A ? `S-ARCH HEAD ${Math.round(A.geometry.head.thickness)}` : `${linerPrefix} HEAD LINER`}
           </text>
           {A && (
             <g>
@@ -267,7 +267,6 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
             fontFamily={FONT.family} textAnchor="middle">
             {fw} × {fh} mm{A ? ` · ${A.geometry.label} · ${radiiText(A.geometry.arcs)}` : ''}
           </text>
-          {windowTag ? <WindowTag tag={windowTag} vbw={totalW} /> : null}
         </svg>
       </div>
     </div>

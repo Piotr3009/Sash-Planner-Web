@@ -15,9 +15,8 @@
  */
 import { useMemo } from 'react';
 import { getCasementProfile } from '../../engine/profile.js';
-import { displayCode } from '../../engine/partSymbols.js';
 import { offsetArcs } from '../../engine/arch.js';
-import { DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs, WindowTag } from './drawingUtils.jsx';
+import { DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 import { archToSheet, archedOutlineD, ringBandD, arcLabelPoint, radiiText } from './archDrawUtils.js';
 import CircleFixedDrawing2D from './CircleFixedDrawing2D.jsx';
@@ -29,7 +28,7 @@ function fmt(n) {
   return Number.isInteger(r) ? r.toString() : r.toFixed(1);
 }
 
-export default function CasementFrameDetail2D({ windowSpec, derived, projectNumber, selectedElement, onElementClick, onExpand , windowTag }) {
+export default function CasementFrameDetail2D({ windowSpec, derived, projectNumber, selectedElement, onElementClick, onExpand }) {
   const clickable = typeof onElementClick === 'function';
   const hl = (key) => clickable && selectedElement === key;
   // Piotr 07.09: the frame card was noticeably shorter than the leaf card next to it — the leaf had
@@ -72,7 +71,7 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
 
   if (!geom) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
   // v3 Block 3: circle fixed window → ring sheet (after the hooks above)
-  if (derived?.arch?.shape === 'circle') return <CircleFixedDrawing2D windowSpec={windowSpec} derived={derived} projectNumber={projectNumber} view="frame" windowTag={windowTag} />;
+  if (derived?.arch?.shape === 'circle') return <CircleFixedDrawing2D windowSpec={windowSpec} derived={derived} projectNumber={projectNumber} view="frame" />;
 
   const { fw, fh, g } = geom;
   const layoutSc = Math.max(fw, fh) / 500;
@@ -143,8 +142,8 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
   const projNum = projectNumber || '';
   const titleText = `Frame Detail${projNum ? ` — ${projNum}` : ''} — ${winName}`;
   const subtitleText = arch
-    ? `AH ${fmt(arch.headLength)} · CILL ${fmt(geom.cill.length)}${geom.cill.wider ? ' (wider)' : ''}${geom.cill.extension > 0 ? ` · proj ${geom.cill.extension}mm` : ''} · J ×2 ${fmt(arch.jambLength)}`
-    : `H ${fmt(fw)} · CILL ${fmt(geom.cill.length)}${geom.cill.wider ? ' (wider)' : ''}${geom.cill.extension > 0 ? ` · proj ${geom.cill.extension}mm` : ''} · J ×2 ${fmt(fh)}`;
+    ? `C-AH ${fmt(arch.headLength)} · C-CILL ${fmt(geom.cill.length)}${geom.cill.wider ? ' (wider)' : ''}${geom.cill.extension > 0 ? ` · proj ${geom.cill.extension}mm` : ''} · C-J ×2 ${fmt(arch.jambLength)}`
+    : `C-H ${fmt(fw)} · C-CILL ${fmt(geom.cill.length)}${geom.cill.wider ? ' (wider)' : ''}${geom.cill.extension > 0 ? ` · proj ${geom.cill.extension}mm` : ''} · C-J ×2 ${fmt(fh)}`;
   const archLine = arch ? `${arch.AG.label} · start ${fmt(arch.start)} · rise ${fmt(arch.rise)} · ${radiiText(arch.outer)}${arch.headNotes ? ` · ${arch.headNotes}` : ''}` : '';
   const titleY = oy + fh + bottomAnn + TITLE_AREA * 0.5;
 
@@ -199,7 +198,7 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
             <text x={X(mu.axisX)} y={Y(fh * 0.32) + i * annFs * 1.3} fill={COLORS.label}
               fontSize={annFs} fontFamily={FONT_FAMILY} textAnchor="middle"
               fontWeight={WEIGHTS.label} transform={`rotate(-90, ${X(mu.axisX) - annFs * 0.9}, ${Y(fh * 0.32)})`}>
-              {`${displayCode(mu.code)} ${fmt(mu.length)}${mu.full ? '' : ' · partial'}`}
+              {`${mu.code} ${fmt(mu.length)}${mu.full ? '' : ' · partial'}`}
             </text>
           </g>
         ))}
@@ -216,25 +215,25 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
             <text x={X((tr.x1 + tr.x2) / 2)} y={Y(tr.bandTop) - annFs * 0.6}
               fill={COLORS.label} fontSize={annFs} fontFamily={FONT_FAMILY}
               textAnchor="middle" fontWeight={WEIGHTS.label}>
-              {`${displayCode(tr.code)} ${fmt(tr.length)}`}
+              {`${tr.code} ${fmt(tr.length)}`}
             </text>
           </g>
         ))}
 
-        {/* ── Frame member codes (without the C- prefix, Piotr 08.10.2026) ── */}
+        {/* ── Frame member codes ── */}
         <text x={X(fw / 2)} y={AP ? AP.headLabelY : Y(g.land / 2) + annFs * 0.35} fill={COLORS.label} fontSize={annFs}
-          fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>{AP ? `AH ${fmt(arch.headLength)}` : `H ${fmt(fw)}`}</text>
+          fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>{AP ? `C-AH ${fmt(arch.headLength)}` : `C-H ${fmt(fw)}`}</text>
         <text x={X(fw / 2)} y={Y(fh - g.cillVisible / 2) + annFs * 0.35} fill={COLORS.label} fontSize={annFs}
-          fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>{`CILL ${fmt(geom.cill.length)}${geom.cill.extension > 0 ? ` · proj ${geom.cill.extension}mm` : ''}`}</text>
+          fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>{`C-CILL ${fmt(geom.cill.length)}${geom.cill.extension > 0 ? ` · proj ${geom.cill.extension}mm` : ''}`}</text>
         <text x={X(g.land / 2)} y={AP ? AP.jambLabelY : Y(fh / 2)} fill={COLORS.label} fontSize={annFs}
           fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
           transform={`rotate(-90, ${X(g.land / 2)}, ${AP ? AP.jambLabelY : Y(fh / 2)})`}>
-          {`J/L ${fmt(AP ? arch.jambLength : fh)}`}
+          {`C-J/L ${fmt(AP ? arch.jambLength : fh)}`}
         </text>
         <text x={X(fw - g.land / 2)} y={AP ? AP.jambLabelY : Y(fh / 2)} fill={COLORS.label} fontSize={annFs}
           fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
           transform={`rotate(-90, ${X(fw - g.land / 2)}, ${AP ? AP.jambLabelY : Y(fh / 2)})`}>
-          {`J/R ${fmt(AP ? arch.jambLength : fh)}`}
+          {`C-J/R ${fmt(AP ? arch.jambLength : fh)}`}
         </text>
 
         {/* ── ARCH: springing line, start / rise dims, radii ── */}
@@ -327,7 +326,6 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
           <text x={totalW / 2} y={titleY + 40 * ts} fill={COLORS.subtitle} fontSize={SIZES.subtitle * ts}
             fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>{archLine}</text>
         )}
-        {windowTag ? <WindowTag tag={windowTag} vbw={totalW} /> : null}
       </svg>
       </div>
     </div>
