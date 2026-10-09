@@ -35,8 +35,11 @@
  *   8  sheets and exports: cottage sheets print the derived numbers, standard sheets
  *      and the DXF equal START, the overview PDF prints the label for cottage only
  *   9  pages in a browser (Playwright, like t39): the configurator control, its 3D
- *      payload and save / edit; the window detail page row and warning; the pack
- *      overview type cell; the estimate PDF type row
+ *      payload and save / edit, an unknown stored value; the estimate configurator
+ *      price; the window detail page row and warning; the pack overview type cell;
+ *      the estimate PDF type row
+ * Bars: the engine reads upperBars / lowerBars from the window record (item), not
+ * from fullConfig, so every barred case here puts them on the item.
  *
  * Run: node verify/parity/t43_sash_proportions.mjs [git-ref]
  */
@@ -69,6 +72,7 @@ function bundleEngine(srcRoot, name) {
     `export * as wsc from '${rel('utils/windowSpecToConfig.js')}';`,
     `export * as dxf from '${rel('utils/dxfExport.js')}';`,
     `export * as overview from '${rel('utils/overviewPdfExport.js')}';`,
+    `export * as canvas from '${rel('engine/canvas-renderer.js')}';`,
     `export { default as FrontElevation } from '${rel('components/drawings/FrontElevation2D.jsx')}';`,
     `export { default as BoxDetail } from '${rel('components/drawings/BoxDetail2D.jsx')}';`,
     `export { default as SashDetail } from '${rel('components/drawings/SashDetail2D.jsx')}';`,
@@ -242,23 +246,35 @@ for (const H of [900, 1400, 1800, 2000]) {
       && bead(d, 'GLAZING BEADING') === bead(s, 'GLAZING BEADING') && d.consumables.beadTape.meters === s.consumables.beadTape.meters && d.consumables.silicone.tubes === s.consumables.silicone.tubes
       && d.consumables.seal6070.meters === s.consumables.seal6070.meters,
       `${H} ${p}: window totals equal standard (weight ${d.weights.total} kg, glass ${d.weights.glass} kg, ${d.consumables.glass.sqm} m2, glazing bead ${bead(d, 'GLAZING BEADING')}, tape ${d.consumables.beadTape.meters} m, silicone ${d.consumables.silicone.tubes})`);
-    // the old shortcut (upper pane x 2) would have under-counted a cottage window
+    // each sash its own glass, by hand from the derived heights (glass W 708, unit = light + 23, double 21 kg/m2);
+    // the old shortcut (upper pane x 2) would give the smaller numbers in brackets
     const gu = d.topSashHeight - 100, gl = d.bottomSashHeight - 133;
-    ok(gu < gl && near((gu + gl) * 2, (s.topSashHeight - 100) * 4, 1e-9), `${H} ${p}: each sash its own glass (${gu.toFixed(2)} + ${gl.toFixed(2)}), not the upper pane x 2 (${(gu * 2).toFixed(2)})`);
+    const r2 = (v) => Math.round(v * 100) / 100;
+    const kgHand = r2(708 * (gu + gl) / 1e6 * 21), sqmHand = r2((731 * (gu + 23) + 731 * (gl + 23)) / 1e6);
+    ok(d.weights.glass === kgHand && d.consumables.glass.sqm === sqmHand && kgHand > r2(708 * gu * 2 / 1e6 * 21),
+      `${H} ${p}: glass ${d.weights.glass} kg and ${d.consumables.glass.sqm} m2 from both panes (${gu.toFixed(2)} + ${gl.toFixed(2)}; upper x 2 would be ${r2(708 * gu * 2 / 1e6 * 21)} kg)`);
   }
   ok(near(w.standard.upperKg + w.standard.lowerKg, by.standard.derived.weights.total, 0.02), `${H} standard: top ${w.standard.upperKg} + bottom ${w.standard.lowerKg} = window ${by.standard.derived.weights.total} kg (0.02 rounding)`);
   SUMMARY.push([H, w]);
 }
 {
   const settings = { glazingAllowanceWidth: 0, glazingAllowanceHeight: 0 };
-  const s = CA.deriveWindowData(SP.normaliseToWindowSpec({ id: 'g', name: 'G', width: 1000, height: 1400, sashProportion: 'standard' }, { fullConfig: { upperBars: '4x4', lowerBars: '4x4' } }), settings);
-  const c = CA.deriveWindowData(SP.normaliseToWindowSpec({ id: 'g', name: 'G', width: 1000, height: 1400, sashProportion: 'cottage-40-60' }, { fullConfig: { upperBars: '4x4', lowerBars: '4x4' } }), settings);
-  ok(s.glazingItems.length === 1 && !('sash' in s.glazingItems[0]) && s.glazingItems[0].panes === 8, `standard glazing summary: one legacy row (${s.glazingItems[0].width} x ${s.glazingItems[0].height}, ${s.glazingItems[0].panes} panes)`);
+  const s = CA.deriveWindowData(SP.normaliseToWindowSpec({ id: 'g', name: 'G', width: 1000, height: 1400, sashProportion: 'standard', upperBars: '4x4', lowerBars: '4x4' }, { fullConfig: {} }), settings);
+  const c = CA.deriveWindowData(SP.normaliseToWindowSpec({ id: 'g', name: 'G', width: 1000, height: 1400, sashProportion: 'cottage-40-60', upperBars: '4x4', lowerBars: '4x4' }, { fullConfig: {} }), settings);
+  ok(s.config.rows === 2 && c.config.rows === 2, 'the 4x4 bars reach the engine (item level): 2 rows per sash');
+  // the summary reads windowSpec.sash.grid (a '4x4' mode is 4 rows x 4 columns there, the legacy convention)
+  const g = SP.normaliseToWindowSpec({ id: 'g', name: 'G', width: 1000, height: 1400, upperBars: '4x4', lowerBars: '4x4' }, { fullConfig: {} }).sash.grid;
+  ok(s.glazingItems.length === 1 && !('sash' in s.glazingItems[0]) && s.glazingItems[0].panes === g.rows * g.cols * 2, `standard glazing summary: one legacy row (${s.glazingItems[0].width} x ${s.glazingItems[0].height}, ${s.glazingItems[0].panes} panes)`);
   const [u, l] = c.glazingItems;
-  ok(c.glazingItems.length === 2 && u.sash === 'upper' && l.sash === 'lower' && near(u.height, (523.2 - 100) / 2, 0.01) && near(l.height, (784.8 - 133) / 2, 0.01) && u.panes + l.panes === 8 && u.width === s.glazingItems[0].width,
-    `cottage glazing summary: upper ${u?.width} x ${u?.height}, lower ${l?.width} x ${l?.height} (daylight / 2 rows), 4 + 4 panes`);
+  ok(c.glazingItems.length === 2 && u.sash === 'upper' && l.sash === 'lower' && near(u.height, (523.2 - 100) / g.rows, 0.01) && near(l.height, (784.8 - 133) / g.rows, 0.01)
+    && u.panes === g.rows * g.cols && l.panes === g.rows * g.cols && u.width === s.glazingItems[0].width,
+    `cottage glazing summary: upper ${u?.width} x ${u?.height}, lower ${l?.width} x ${l?.height} (each sash's daylight / ${g.rows} rows), ${u?.panes} + ${l?.panes} panes`);
   const bd = c.components.beading.find((r) => r.elementName === 'GLAZING BEADING');
   const perimU = 2 * (708 + (523.2 - 100)), perimL = 2 * (708 + (784.8 - 133));
+  const barU = (523.2 - 100) + 708, barL = (784.8 - 133) + 708;   // 4x4: one vertical over the light, one horizontal across
+  const tri = c.components.beading.find((r) => r.elementName === 'TRIANGLE BEADING (EXT)');
+  ok(tri && tri.notes === `Bars ${Math.round(barU * 100) / 100} + ${Math.round(barL * 100) / 100} + 15%` && near(tri.length, Math.round((barU + barL) * 1.15 * 100) / 100, 1e-9),
+    `cottage 4x4 bar beading: "${tri?.notes}" = ${tri?.length}`);
   ok(bd.notes === `Perim ${Math.round(perimU * 100) / 100} + ${Math.round(perimL * 100) / 100} + 15%` && near(bd.length, Math.round((perimU + perimL) * 1.15 * 100) / 100, 1e-9)
     && /× 2/.test(s.components.beading.find((r) => r.elementName === 'GLAZING BEADING').notes),
     `beading notes: cottage "${bd.notes}", standard keeps "× 2"`);
@@ -392,16 +408,69 @@ for (const p of PROPS) {
   }
 }
 
+{
+  // a fraction the component cannot draw (a configurator sends one per keystroke: at H 135, the default
+  // sash deduction, the engine fraction divides by zero) draws at half instead of breaking the model
+  ok(!Number.isFinite(CA.meetingFractionFor(135, 'standard')), `meetingFractionFor(135) is ${CA.meetingFractionFor(135, 'standard')} (H = the sash deduction)`);
+  const cfg = cfgFor(1400, 'standard');
+  const half = meetingOf(await meshes(L3, { ...cfg, meetingFraction: 0.5 }), 938);
+  for (const bad of [Infinity, -Infinity, NaN]) {
+    let err = '';
+    let m = null;
+    try { m = meetingOf(await meshes(L3, { ...cfg, meetingFraction: bad }), 938); } catch (e) { err = String(e?.message || e); }
+    ok(m && m.mids.length === 1 && m.mids[0] === half.mids[0], `meetingFraction ${bad}: the model renders, the line at half (${m?.mids[0]})`, err);
+  }
+  const lim = L3.PSW.sashOpeningLimits(1313, Infinity);
+  ok(Number.isFinite(lim.lowerLift) && near(lim.lowerLift, L3.PSW.sashOpeningLimits(1313, 0.5).lowerLift, 1e-9), 'sashOpeningLimits with a non-finite fraction: the limits of the half line (the sliders never get NaN)');
+}
+{
+  // the upper weights: they hang from the meeting line and rise as the upper sash drops; at a cottage
+  // drop they stop with their top at the jamb top, a standard window never reaches it
+  const weightsOf = (ms) => ms.filter((m) => m.kind === 'BoxGeometry' && near(mw(m), 45, 0.05) && near(mh(m), 180, 0.05));
+  const jambTop = 58.414 - 23 + 1400 / 2;
+  for (const p of ['standard', 'cottage-40-60', 'cottage-1-3']) {
+    const cfg = cfgFor(1400, p);
+    const lim = L3.PSW.sashOpeningLimits(cfg.height, cfg.meetingFraction);
+    const meet = opening3D[p].meetY;
+    const ws = weightsOf(await meshes(L3, { ...cfg, upperOpening: 5000 })).sort((a, b) => b.max[1] - a.max[1]);
+    const upperTop = ws[0]?.max[1], lowerTop = ws[ws.length - 1]?.max[1];
+    const free = meet + lim.upperDrop + 90;   // where an uncapped weight's top would be
+    const expectTop = Math.min(free, jambTop);
+    ok(ws.length === 4 && near(ws[0].max[1], ws[1].max[1], 0.01) && near(upperTop, expectTop, 0.05) && near(lowerTop, meet + 90, 0.05) && (p === 'standard' ? free < jambTop : free > jambTop),
+      `${p} 1400, upper sash fully down (${lim.upperDrop.toFixed(1)}): upper weights' top ${upperTop} (${p === 'standard' ? 'free, below' : 'stopped at'} the jamb top ${jambTop.toFixed(2)}; free would be ${free.toFixed(2)}), lower weights at rest ${lowerTop}`);
+  }
+  // the cap never binds on a standard window, any height, both 3D paths (preview: h = H; configurator: h = H - 87)
+  let worst = Infinity;
+  for (let H = 600; H <= 3000; H += 25) for (const h of [H, H - 87]) {
+    const f = CA.meetingFractionFor(H, 'standard');
+    const lim = L3.PSW.sashOpeningLimits(h, f);
+    const meeting = -h / 2 + 61.414 + (h - 57) * f;
+    worst = Math.min(worst, (58.414 - 23 + h / 2 - 90 - meeting) - lim.upperDrop);
+  }
+  ok(worst > 0, `standard frames 600 to 3000, both paths: the upper weight cap stays ${worst.toFixed(1)} mm or more above the full drop (never binds)`);
+}
+{
+  // a batch profile snapshot (meeting rail 53, bottom rail 120): the 3D takes the derived fraction
+  const P = LIVE.profile;
+  const snap = clone(P.DEFAULT_SASH_PROFILE);
+  snap.elements.meetingRail.face = 53; snap.elements.bottomRail.face = 120;
+  const { spec, d } = P.withProfiles(snap, null, null, () => { const sp = SP.normaliseToWindowSpec({ id: 's', name: 'S', width: 1000, height: 1400 }, { fullConfig: {} }); return { spec: sp, d: CA.deriveWindowData(sp, {}) }; });
+  const withDerived = LIVE.wsc.windowSpecToConfig(spec, d), without = LIVE.wsc.windowSpecToConfig(spec);
+  ok(withDerived.meetingFraction === d.meetingFraction && near(d.meetingFraction, ((1308 + 10 - 63) / 2 + 63 - 26.5) / (1318 - 53), 1e-12) && without.meetingFraction !== d.meetingFraction,
+    `snapshot meeting rail 53 / bottom rail 120: the preview config takes derived ${d.meetingFraction.toFixed(4)} (the active profile would give ${without.meetingFraction.toFixed(4)})`);
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 section('7 - controls: standard and the other products equal START');
 const STD_REF = [
   ['double 900', 1000, 900, {}], ['double 1400', 1000, 1400, {}], ['double 1800', 1000, 1800, {}], ['double 2000', 1000, 2000, {}],
   ['triple 1800 x 1400', 1800, 1400, { sashType: 'triple' }], ['glazing arch 1400', 1000, 1400, { headType: 'arch' }],
-  ['double 1400 4x4 horns', 1000, 1400, { upperBars: '4x4', lowerBars: '4x4', horns: 'A' }], ['slim 900 x 1400', 900, 1400, { frameType: 'slim' }],
-  ['heritage 1200 x 1700 9x9', 1200, 1700, { frameType: 'heritage', upperBars: '9x9', lowerBars: '9x9' }], ['triple glass 1000 x 1500', 1000, 1500, { glassType: 'triple' }],
+  ['double 1400 4x4 horns', 1000, 1400, { horns: 'A' }, { upperBars: '4x4', lowerBars: '4x4' }], ['slim 900 x 1400', 900, 1400, { frameType: 'slim' }],
+  ['heritage 1200 x 1700 9x9', 1200, 1700, { frameType: 'heritage' }, { upperBars: '9x9', lowerBars: '9x9' }], ['triple glass 1000 x 1500', 1000, 1500, { glassType: 'triple' }],
+  ['triple 1800 x 2000 6x6', 1800, 2000, { sashType: 'triple' }, { upperBars: '6x6', lowerBars: '6x6' }],
 ];
-for (const [name, w, h, fc] of STD_REF) {
-  const a = mk(LIVE, w, h, fc), b = mk(START, w, h, fc);
+for (const [name, w, h, fc, extra = {}] of STD_REF) {
+  const a = mk(LIVE, w, h, fc, extra), b = mk(START, w, h, fc, extra);
   ok(JSON.stringify(withoutNewKeys(a.derived)) === JSON.stringify(b.derived) && a.derived.sashProportion === 'standard' && !('sashProportion' in b.derived),
     `${name}: derived JSON byte-identical to START but for the two new keys`);
   const L = LIVE.lists, S = START.lists;
@@ -412,7 +481,23 @@ for (const [name, w, h, fc] of STD_REF) {
     && JSON.stringify(LIVE.bom.buildWindowPartQtys(a.derived, a.spec, {})) === JSON.stringify(START.bom.buildWindowPartQtys(b.derived, b.spec, {})),
     `${name}: cut list, glass list, pre-cut, hardware and BOM part quantities equal to START`);
   const sa = clone(a.spec), sb = clone(b.spec); delete sa.sash.proportion;
-  ok(JSON.stringify(sa) === JSON.stringify(sb) && a.spec.sash.proportion === 'standard', `${name}: windowSpec equal to START but for sash.proportion 'standard'`);
+  ok(JSON.stringify(sa) === JSON.stringify(sb) && a.spec.sash.proportion === 'standard', `${name}: windowSpec equal to START but for sash.proportion 'standard'${extra.upperBars ? ` (grid ${a.spec.sash.grid.mode})` : ''}`);
+}
+{
+  // standard under profiles with decimal rail faces (a batch snapshot can carry any): still byte-identical
+  const profiles = [[57.3, 43.6, 90.7, 57.2, 135.4], [58.8, 47.6, 93.1, 56.9, 136.4], [56.1, 41.3, 88.9, 57.7, 133.7], [60, 53, 120, 57, 141]];
+  let n = 0, bad = [];
+  for (const [top, meet, bottom, stile, ded] of profiles) {
+    const mkP = (M) => { const p = clone(M.profile.DEFAULT_SASH_PROFILE); p.elements.topRail.face = top; p.elements.meetingRail.face = meet; p.elements.bottomRail.face = bottom; p.elements.stiles.face = stile; p.deductions.sashHeight = ded; return p; };
+    for (const H of [900, 1137, 1400, 1777, 2150]) for (const [fc, extra] of [[{}, {}], [{}, { upperBars: '4x4', lowerBars: '4x4' }], [{ sashType: 'triple' }, { upperBars: '6x6', lowerBars: '6x6' }]]) {
+      const w = fc.sashType === 'triple' ? 1800 : 1000;
+      const a = LIVE.profile.withProfiles(mkP(LIVE), null, null, () => mk(LIVE, w, H, fc, extra));
+      const b = START.profile.withProfiles(mkP(START), null, null, () => mk(START, w, H, fc, extra));
+      n += 1;
+      if (JSON.stringify(withoutNewKeys(a.derived)) !== JSON.stringify(b.derived)) bad.push(`${top}/${meet}/${bottom} H${H} ${fc.sashType || 'double'} ${extra.upperBars || 'none'}`);
+    }
+  }
+  ok(bad.length === 0, `standard under ${profiles.length} profiles with decimal faces: ${n} windows byte-identical to START but for the two keys`, bad.slice(0, 5).join(' | '));
 }
 const OTHERS = [
   ['casement 040L 1000 x 1200', 1000, 1200, { windowCategory: 'casement', casementLayout: '040L' }],
@@ -442,6 +527,11 @@ for (const H of [900, 1400, 1800, 2000]) {
   const a = mk(LIVE, 1000, H), b = mk(START, 1000, H);
   const A = sheetsOf(LIVE, a.spec, a.derived), B = sheetsOf(START, b.spec, b.derived);
   ok(Object.keys(A).every((k) => A[k] === B[k]), `standard ${H}: the seven sash sheets byte-identical to START`);
+}
+for (const [label, w, h, fc] of [['gothic arched 700 x 1800', 700, 1800, { sashType: 'arched-group', archShape: 'gothic-arch' }], ['semi-circle arched 1000 x 2100', 1000, 2100, { sashType: 'arched-group', archShape: 'semi-circle' }]]) {
+  const a = mk(LIVE, w, h, fc), b = mk(START, w, h, fc);
+  const A = sheetsOf(LIVE, a.spec, a.derived), B = sheetsOf(START, b.spec, b.derived);
+  ok(Object.keys(A).every((k) => A[k] === B[k]), `standard ${label}: the seven sash sheets byte-identical to START (the vertical section label too)`);
 }
 {
   const fmt05 = (n) => { const r = Math.round(n * 2) / 2; return Number.isInteger(r) ? String(r) : r.toFixed(1); };
@@ -483,6 +573,39 @@ for (const H of [900, 1400, 1800, 2000]) {
   URL.createObjectURL = realCreate; URL.revokeObjectURL = realRevoke; delete globalThis.document;
 }
 {
+  // the canvas elevation (window PDF, estimate PDF): every call on a recording canvas
+  const drawCalls = (M, item) => {
+    const calls = [];
+    const ctx = new Proxy({}, { get: (t, k) => (k in t ? t[k] : (k === 'measureText' ? () => ({ width: 10 }) : (...args) => { calls.push([k, ...args.map((v) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v))]); })), set: (t, k, v) => { calls.push(['set', k, v]); return true; } });
+    globalThis.window = { devicePixelRatio: 1 };
+    const canvas = { width: 0, height: 0, getContext: () => ctx, getBoundingClientRect: () => ({ width: 800, height: 900 }) };
+    M.canvas.drawTechnicalElevation(canvas, M.specification.normaliseToWindowSpec(item, { fullConfig: {} }), {});
+    delete globalThis.window;
+    return calls;
+  };
+  for (const extra of [{}, { upperBars: '4x4', lowerBars: '4x4' }, { upperBars: '9x9', lowerBars: '9x9' }]) {
+    const item = { id: 'c', name: 'C', width: 1000, height: 1400, ...extra };
+    ok(JSON.stringify(drawCalls(LIVE, item)) === JSON.stringify(drawCalls(START, item)), `canvas elevation, standard 1400 ${extra.upperBars || 'no bars'}: every draw call equal to START`);
+  }
+  for (const [p, bars, n] of [['cottage-40-60', '4x4', 1], ['cottage-1-3', '9x9', 2]]) {
+    const item = { id: 'c', name: 'C', width: 1000, height: 1400, sashProportion: p, upperBars: bars, lowerBars: bars };
+    const calls = drawCalls(LIVE, item);
+    const d = mk(LIVE, 1000, 1400, {}, item).derived;
+    // the glass fills of the two panes, then the horizontal bars (full glass width, 18 high in px)
+    const fills = calls.filter((c) => c[0] === 'fillRect');
+    const sc = fills[1][3] / 1000;   // the frame outline: 1000 wide
+    const glassW = 708 * sc;         // sash 822 - 2 stiles of 57
+    const panes = fills.filter((c) => near(c[3], glassW, 0.01) && c[4] > 50).slice(0, 2);
+    const hb = fills.filter((c) => near(c[3], glassW, 0.01) && near(c[4], 18 * sc, 0.01));
+    const inPane = (pane) => hb.filter((b) => b[2] > pane[2] && b[2] < pane[2] + pane[4]).map((b) => (b[2] + b[4] / 2 - pane[2]) / sc);
+    const want = (gh) => Array.from({ length: n }, (_, j) => ((gh - n * 18) / (n + 1)) * (j + 1) + j * 18 + 9);
+    const up = inPane(panes[0]), lo = inPane(panes[1]);
+    const wu = want(d.topSashHeight - 100), wl = want(d.bottomSashHeight - 133);
+    ok(panes.length === 2 && up.length === n && lo.length === n && up.every((y, j) => near(y, wu[j], 0.05)) && lo.every((y, j) => near(y, wl[j], 0.05)),
+      `canvas elevation ${p} ${bars}: horizontal bars spaced in each pane (upper ${up.map((y) => y.toFixed(1)).join(', ')} / lower ${lo.map((y) => y.toFixed(1)).join(', ')} mm from the pane top)`);
+  }
+}
+{
   // overview PDF: the cottage label under the type, nothing for standard (dates and ids masked)
   const info = (windows) => ({ companyName: 'CO', companyAddress: '', title: 'Pack', projects: ['P1'], date: '09/10/2026', isPPMode: true, windows, returnDoc: true });
   const row = (name, type, extra = {}) => ({ projectNum: 'P1', name, type, width: 1000, height: 1400, bars: 'none', head: 'flat', glass: 'clear', opening: 'both', ...extra });
@@ -518,6 +641,9 @@ if (!chromium) {
     "import ConfiguratorPage from '../src/pages/ConfiguratorPage.jsx';",
     "import WindowDetailPage from '../src/pages/WindowDetailPage.jsx';",
     "import ProductionPackPage from '../src/pages/ProductionPackPage.jsx';",
+    "import EstimateConfiguratorPage from '../src/pages/EstimateConfiguratorPage.jsx';",
+    "import { useEstimateStore } from '../src/stores/estimateStore.js';",
+    'window.__est = useEstimateStore;',
     "import { useProjectStore } from '../src/stores/projectStore.js';",
     "import { exportEstimatePdf } from '../src/utils/estimatePdfExport.js';",
     'window.__store = useProjectStore;',
@@ -532,6 +658,7 @@ if (!chromium) {
     "  E(Route, { path: '/projects/:projectId/batches/:batchId/configurator', element: E(ConfiguratorPage) }),",
     "  E(Route, { path: '/projects/:projectId/batches/:batchId/windows/:windowId', element: E(WindowDetailPage) }),",
     "  E(Route, { path: '/projects/:projectId/batches/:batchId/production-pack', element: E(ProductionPackPage) }),",
+    "  E(Route, { path: '/estimates/:estimateId/configure', element: E(EstimateConfiguratorPage) }),",
     "  E(Route, { path: '*', element: E('div', { id: 'elsewhere' }, 'elsewhere') }))));",
   ].join('\n'));
   const bundleOut = resolve(AUDIT, 't43-pages-bundle.js');
@@ -659,6 +786,42 @@ if (!chromium) {
   }
   ok(/double \W+ Cottage 40\/60 \W+ flat head/.test(pdfTexts[0]) && !/Cottage/.test(pdfTexts[1]) && /double \W+ flat head/.test(pdfTexts[1]),
     'estimate PDF Type row: "double · Cottage 40/60 · flat head" for cottage, "double · flat head" for standard');
+  // ── estimate configurator: where the price reaches the screen ──
+  const estId = await page.evaluate(() => window.__est.getState().addEstimate({ title: 'T43' }).id);
+  await mount(`/estimates/${estId}/configure`);
+  await waitText('Sash proportions');
+  const unitPrice = async () => Number((await page.locator('span:text-is("This window (ex VAT)") + span').innerText()).replace(/[£,]/g, ''));
+  const cottageRow = () => page.locator('div.flex.justify-between', { has: page.locator('span:text-is("Cottage proportions")') });
+  await heightInput().fill('1400'); await heightInput().blur(); await page.waitForTimeout(200);
+  const pStd = await unitPrice();
+  await pchip('Cottage 40/60').click(); await page.waitForTimeout(300);
+  const pCot = await unitPrice();
+  const surcharge = (await cottageRow().count()) ? Number((await cottageRow().locator('span').nth(1).innerText()).replace(/[£,]/g, '')) : null;
+  pl = await lastPayload();
+  ok(pStd > 0 && near(pCot, pStd * 1.05, 0.011) && near(surcharge, pStd * 0.05, 0.011) && pl?.sashProportion === 'cottage-40-60' && pl?.meetingFraction === f4060,
+    `estimate configurator 1400: £${pStd} -> Cottage 40/60 £${pCot} (x 1.05), a "Cottage proportions" line £${surcharge}, the 3D line ${pl?.meetingFraction}`);
+  await heightInput().fill('850'); await heightInput().blur(); await page.waitForTimeout(300);
+  ok((await pchip('Cottage 40/60').isDisabled()) && (await cottageRow().count()) === 0 && (await specRow('Proportions').innerText()).includes('Standard'),
+    'estimate configurator 850: cottage disabled, back to standard, no cottage line in the price');
+  await heightInput().fill('1400'); await heightInput().blur(); await page.waitForTimeout(200);
+  await pchip('Cottage 1/3-2/3').click(); await page.waitForTimeout(200);
+  await page.locator('input[placeholder="Window name (max 7)"]').fill('E1');
+  await page.locator('button', { hasText: 'Add to estimate' }).click(); await page.waitForTimeout(300);
+  const estItem = await page.evaluate((id) => window.__est.getState().estimates.find((e) => e.id === id)?.items?.[0], estId);
+  ok(estItem?.config?.sashProportion === 'cottage-1-3' && estItem?.pricing?.sashProportion === 'cottage-1-3' && Number(estItem?.price?.breakdown?.cottageSurcharge) > 0,
+    `estimate item E1: config and pricing carry cottage-1-3, the stored price has cottageSurcharge ${estItem?.price?.breakdown?.cottageSurcharge}`);
+
+  // ── an unknown stored value (say a newer PSW one) in the configurator: said, not saved, the page lives ──
+  const oddId = await addWin({ windowName: 'ODD', extWidth: 1000, extHeight: 1400, sashProportion: 'cottage-30-70' });
+  const errsBefore = pageErrors.length;
+  await mount(`${cfgUrl}?edit=${oddId}`);
+  await waitText('Sash proportions');
+  const updateBtn = page.locator('button', { hasText: 'Update Window' });
+  ok((await page.locator('text=Unknown sash proportion "cottage-30-70": choose one of the three.').count()) === 1 && (await updateBtn.isDisabled()) && pageErrors.length === errsBefore,
+    'edit ODD (cottage-30-70): the configurator says "Unknown sash proportion ...", Update is disabled, no page error');
+  await pchip('Standard').click(); await page.waitForTimeout(200);
+  ok(!(await updateBtn.isDisabled()) && (await page.locator('text=Unknown sash proportion').count()) === 0, 'choosing Standard clears the error and allows the update');
+
   // the 3D canvas (no GPU) and the refused network (fonts, maps) may complain; nothing else may
   const relevant = pageErrors.filter((e) => !/WebGL|context|three|Canvas|GL_|Failed to fetch|net::/i.test(e));
   ok(relevant.length === 0, `no page errors outside the 3D canvas and the refused network (${pageErrors.length} in all)`, relevant.join(' | '));
