@@ -355,14 +355,18 @@ section('4 — hardware: no card for an engine-picked line');
   // 08.10.2026 (doors to production): door ironmongery IS counted now, on the door Assign Materials rows,
   // so a door shows no hardware CARD (every door line is an engine pick, as casement hinges and locks are)
   // and its rows carry the counts of the owner box (3.5). Until 07.10.2026 the pin was "no hardware at all".
-  ok(WINS.filter((w) => w.derived.category === 'door').every((w) => card(w).length === 0), 'doors: no hardware cards (every door hardware line is an engine pick on a d_* row)');
+  // doors v3 (09.10.2026, owner box item 10): trickle vents are counted on doors by the window rule, a
+  // client line on the trickleVents slot, so a door shows exactly ONE card, the vents; every other door
+  // line is still an engine pick on a d_* row
+  ok(WINS.filter((w) => w.derived.category === 'door').every((w) => { const c = card(w); return c.length === 1 && c[0].line.item === 'Trickle vents' && c[0].line.quantity === lists.buildVentGrilles(w.windowSpec); }),
+    'doors: one hardware card, the trickle vents (doors v3); every other door line is an engine pick on a d_* row');
   const doorRows = (id) => bom.buildWindowPartQtys(WINS.find((w) => w.id === id).derived, WINS.find((w) => w.id === id).windowSpec, {});
   const ds = doorRows('D-single'), df = doorRows('D-french');
   ok(ds.d_hinges?.qty === 3 && ds.d_lock_single_kit?.qty === 1 && ds.d_cylinder?.qty === 1 && ds.d_handle_set?.qty === 1
     && df.d_hinges?.qty === 6 && df.d_lock_single_kit?.qty === 1 && df.d_bolts?.qty === 2 && df.d_cylinder?.qty === 1 && df.d_handle_set?.qty === 1,
     'doors: the hardware counts sit on the door rows (single 3 hinges + kit + cylinder + handle; french one handle 6 + kit + 2 bolts + cylinder + handle)');
-  ok(WINS.filter((w) => w.derived.category === 'door').every((w) => lists.buildHardwareList(w.windowSpec, w.derived).every((h) => isEngineItem(h.item) && h.enginePart === true)),
-    'doors: every door hardware line is an engine pick (typed here and flagged by the engine)');
+  ok(WINS.filter((w) => w.derived.category === 'door').every((w) => lists.buildHardwareList(w.windowSpec, w.derived).filter((h) => h.item !== 'Trickle vents').every((h) => isEngineItem(h.item) && h.enginePart === true)),
+    'doors: every door hardware line but the vents is an engine pick (typed here and flagged by the engine)');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

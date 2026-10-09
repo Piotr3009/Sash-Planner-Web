@@ -310,6 +310,79 @@ quantities include d_mullion 4748 mm, d_transom_rail 2287 mm, d_threshold_alu_do
   the side light without a timber cill stands over an open 51 gap; the inward cill run, hinge barrel and handle
   backsets in `doorGeometryFromSpec` still read the live profile (not echoed in derived).
 
+### Stage 6: sash bars per sash, the per-window error, the pricing field, the dead glazing summary
+
+- **Import (`specification.js`)**: `readSashBars` reads each sash on its own: the window record (`upperBars` /
+  `lowerBars`, `upper_bars` / `lower_bars`), then the specification top level, then the estimate `fullConfig` (PSW
+  sometimes sends the bars only there), then 'none'. `windowSpec.sash.grid` gains `upper: { mode, customBars }` and
+  `lower: { mode, customBars }`; `grid.mode` / `rows` / `cols` / `customBars` stay (the lower wins unless it has
+  none, as before) for a window whose sashes agree. Custom lists per sash (`customBarsPerSash`): the record's list,
+  else the fullConfig list; a lower sash without its own list takes the upper one (the configurators' "same bars").
+  An 'N x M' the engine has no table for raises `BarPatternError` naming the window and the sash (START threw a
+  plain "Configuration "2x3" is not supported." deep in the engine). "6 over 1" is upper '6x6' (the PSW six-pane
+  pattern) over 'none': the vocabulary has no '2x3' ('2x2' / '3x3' already mean 2 / 3 panes per sash), so '2x3'
+  is that explicit error (BLOCKERS 31).
+- **Engine (`calculations.js`)**: `sashBarPattern(windowSpec, which)` (falls back to `grid.mode` for a windowSpec made
+  without the per-sash keys); consumables (bead tape, silicone) and beading (triangle and Georgian) take each sash's
+  run, the note prints "Bars U x 2" only when the glass AND the pattern agree, else "Bars U + L";
+  `derived.bars = { upper, lower, same, warnings }`, each `{ pattern, v, h, pane, positions, custom, warnings }`
+  with the bar centres over THAT sash's pane by the sheets' rule (equal panes between 22 bars), custom lists checked
+  against that sash's glass (a bar outside is a warning string, not a crash). `derived.barPositions` (the legacy
+  single list) is unchanged.
+- **Every surface**: glass rows (`bars` per unit), so the glass PDF table / sketch and the glass DXF follow;
+  `SashDetail2D` and `GlassDrawing2D` (each its own sash, the glass sheet from its row), `FrontElevation2D` (each
+  pane its own pattern); the canvas elevation (each pane from `derived.bars`: horizontal bars now INSIDE their pane;
+  START spaced them over the whole sash height, so a 4x4 standard window drew its horizontal bar in the meeting
+  rail); `windowSpecToConfig` sends `upperBars` / `lowerBars` and each sash's custom list to `ParametricSashWindow`
+  (already per sash); the project card ("Bars: 6x6 / none"), the window detail rows (Upper / Lower from the
+  normalised spec) and its glass table (it read `windowSpec.upperBars`, a field that never exists, and printed a
+  dash on every sash row), the pack overview and its PDF (`winBarsLabel` printed `win.upperBars` only). The cut list
+  and pre-cut have no sash bar rows by the existing rule (lists.js: astragal bars are bought as triangle /
+  Georgian beading). Triple sash glass rows carry no bar pattern, as at START.
+- **Per-window error (`src/utils/windowBoundary.js`, new)**: `deriveWindowBounded(win, derive)` normalises and
+  derives one window in a try (`SashProportionError`, `BarPatternError`, `ArchError` are "known" window data
+  errors; any other error is caught the same way, as the pages caught derive errors before); `splitBounded`,
+  `excludedWindowsNote`, `sashBarsLabel`. ProjectDetailPage: the failing window's card prints its message, the
+  project materials leave it out and the materials header says so. WindowDetailPage: the page renders with the
+  window name, Edit Configuration and the message instead of a blank page. ProductionPackPage: the header counts
+  the excluded windows ("N excluded"), a note under it names each with its message, and every tab, list, sheet and
+  PDF of the pack receives only the windows that derived. Before, `normaliseToWindowSpec` ran outside the try on
+  all three pages, so one bad window blanked the page.
+- **Pricing Settings**: "Cottage sash surcharge" right after "Arched head", bound to `pricing.cottageSash` (default
+  0.05 in `DEFAULT_PRICING`; `resolvePricing` gives a stored list without it the default), saved with the same
+  `savePricingSettings` as the arched head.
+- **Dead glazing summary (box item 17)**: the sweep (area 5) found no reader of `derived.glazingItems` in src,
+  verify, docs or the package scripts besides `aggregateComponents`, itself never called; the only consumer was a
+  test (t43 section 4). Deleted: `calculateGlazingSummaryForWindow`, `calculateGlazingSummaryPerSash`,
+  `aggregateComponents` and the `glazingItems` key of the sash, casement, door and empty derived. The local
+  `glazingItems` of `buildShoppingList` (calculateWindow's shopping list) is a different thing and stays.
+- **Keys this stage adds or removes** (everything else of a same-pattern window is byte-identical to START, t45
+  section 8): `windowSpec.sash.grid.upper` / `.lower` (new), `derived.bars` (new), `derived.glazingItems` (removed).
+- **Fixtures re-baselined after reading the diff**: `rect-sash-base.json` (202 values): the five barred fixtures
+  carry their bars only in fullConfig and were baselined with no bars; they now derive WITH them (std_2x2 25
+  values, triple_6x6 26, heritage_4x4 28, tg_9x9_cill 28, arch_head_flat_frame 25: `config` key / rows / cols /
+  bars, `barPositions`, the triangle and Georgian beading rows (5 to 7 rows), bead tape and silicone, the glass row
+  `bars`; plus `derived.bars` added and `glazingItems` removed); slim_none_horns only `bars` added and
+  `glazingItems` removed. `rect-casement-base.json`: `glazingItems: []` removed from the 4 windows, nothing else.
+  `rect-sash-sheets.json`: the elevation, both sash sheets and both glass sheets of the five barred windows now
+  draw their bars; the box and vertical sections and slim_none_horns are unchanged.
+- **Harnesses** (each changed assertion with its reason): t43 (the glazing summary assertions replaced by the
+  removal check, the controls strip the new / removed keys, the canvas pins per pane), t38 (the sash control bars
+  on the item plus a check that fullConfig bars are now read), t37 (the S-bars window gains its beading rows),
+  t41 section 17 and t44 section 6 (controls strip `bars`, `grid.upper` / `grid.lower`, `glazingItems`).
+- **New `verify/parity/t45_sash_bars_per_sash.mjs`** (120 checks): import rules (record, top level, fullConfig,
+  'none', case, '2x3' error vs START); `derived.bars` for 6 over 1 and 1 over 2x2 at 1000 x 1400 by hand, cottage
+  panes, custom lists with the out-of-pane warnings; glass rows, beading lengths and notes, bead tape; the glass DXF
+  units and entities equal the START units of a window with that pattern on both sashes; the canvas bar rects per
+  pane; the sash and glass sheets of each sash equal the START sheet of a window with that pattern on both sashes,
+  the elevation's bar count; the 3D config per sash and the ParametricSashWindow meshes (changing one sash's
+  pattern changes meshes in that sash only); controls: none / 2x2 / 4x4 / 6x6 / 9x9 / cottage / custom on both
+  sashes byte-identical to START (windowSpec, derived, glass, cut list, sheets, DXF, 3D config); the boundary
+  helpers; in Chromium: the project page cards (messages, "Bars: 6x6 / none" also for a PSW window with fullConfig
+  bars), the window detail page of each bad window and of the good ones, the pack (the excluded note and count, the
+  messages, the overview without the bad windows, the bars cells), Pricing Settings (the field after Arched head,
+  the 5 % fallback of a stored list, the save).
+
 ### Stage 7: the window profile save merges with the cloud; batch type door
 
 - **`windowProfileStore.js`**: the store keeps `dirty` (plain data, persisted with the profiles) = the paths changed

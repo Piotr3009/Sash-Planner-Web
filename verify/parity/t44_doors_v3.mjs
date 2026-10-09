@@ -276,8 +276,14 @@ section('6 - controls: casement and sash equal to the start of this tura');
   CTL.push(['sash cottage 1000 x 1400', 1000, 1400, { windowCategory: 'sash' }, { sashProportion: 'cottage-40-60' }]);
   let same = 0;
   const diffs = [];
+  // the same tura's sash items (box items 16 / 17): every windowSpec carries grid.upper / grid.lower, a sash
+  // derive carries derived.bars, no derive carries glazingItems; with the same pattern on both sashes these
+  // only reorganise data (t45 checks them); everything else byte for byte
+  const specOf = (sp) => { const c = clone(sp); if (c.sash?.grid) { delete c.sash.grid.upper; delete c.sash.grid.lower; } return c; };
+  const derOf = (d) => { const c = { ...d }; delete c.bars; delete c.glazingItems; return c; };
   for (const [name, w, h, fc, extra] of CTL) {
     const a = mk(LIVE, w, h, fc, extra), b = mk(START, w, h, fc, extra);
+    a.spec = specOf(a.spec); a.derived = derOf(a.derived); b.derived = derOf(b.derived);
     const A = JSON.stringify([a.spec, a.derived, lists.buildCutListForWindow(a.derived, a.spec), lists.buildGlassListForWindow(a.derived, a.spec), lists.buildPrecutForWindow(a.derived, a.spec, {}, null), lists.buildHardwareList(a.spec, a.derived), bom.buildWindowPartQtys(a.derived, a.spec, {})]);
     const Bs = JSON.stringify([b.spec, b.derived, START.lists.buildCutListForWindow(b.derived, b.spec), START.lists.buildGlassListForWindow(b.derived, b.spec), START.lists.buildPrecutForWindow(b.derived, b.spec, {}, null), START.lists.buildHardwareList(b.spec, b.derived), START.bom.buildWindowPartQtys(b.derived, b.spec, {})]);
     if (A === Bs) same += 1; else diffs.push(name);

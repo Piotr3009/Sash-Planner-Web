@@ -49,7 +49,7 @@ import { buildVentGrilles } from '../engine/lists.js';
 import { RAL_LOOKUP as RAL_COLORS } from '../config.js';
 import { fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from '../engine/casementLayouts.js';
 import { profileBoxDepth, getCasementProfile, getWindowProfile, getDoorProfile } from '../engine/profile.js';
-import { deriveWindowData, meetingFractionFor } from '../engine/calculations.js';
+import { deriveWindowData, meetingFractionFor, sashBarPattern } from '../engine/calculations.js';
 
 function resolveColor(name, ral) {
   if (!name && !ral) return '#F4F4F2'; // default white
@@ -198,9 +198,11 @@ export function windowSpecToConfig(windowSpec, derived = null) {
   const w = windowSpec.frame?.width || 1200;
   const h = windowSpec.frame?.height || 1800;
 
-  // Bars — windowSpec stores grid mode like '6x6', '3x3', 'none', 'custom'
-  const gridMode = windowSpec.sash?.grid?.mode || 'none';
-  const barsValue = gridMode === 'custom' ? 'custom' : gridMode;
+  // Bars per sash (Piotr 09.10.2026, owner box item 16): each sash its own
+  // pattern ('6x6', 'none', 'custom', ...), so "6 over 1" reaches the 3D; a
+  // windowSpec without the per-sash keys falls back to grid.mode for both.
+  const upperBarsValue = sashBarPattern(windowSpec, 'upper');
+  const lowerBarsValue = sashBarPattern(windowSpec, 'lower');
 
   // Custom bars — ParametricSashWindow expects per-sash arrays of {type:'v'|'h', mm}.
   // Primary source: rawSpec.fullConfig, which stores the exact per-sash bars the
@@ -213,15 +215,23 @@ export function windowSpecToConfig(windowSpec, derived = null) {
   let upperCustom = cleanBars(rawFc.upperCustomBars);
   let lowerCustom = cleanBars(rawFc.lowerCustomBars);
   if (upperCustom.length === 0 && lowerCustom.length === 0) {
-    // Legacy fallback: windowSpec grid keeps direction-keyed positions
-    // (vertical/horizontal) without the upper/lower split — apply to both sashes.
-    const cb = windowSpec.sash?.grid?.customBars || {};
-    const legacy = [
-      ...(Array.isArray(cb.vertical) ? cb.vertical : []).map(Number).filter(Number.isFinite).map((mm) => ({ type: 'v', mm })),
-      ...(Array.isArray(cb.horizontal) ? cb.horizontal : []).map(Number).filter(Number.isFinite).map((mm) => ({ type: 'h', mm })),
+    // windowSpec grid keeps direction-keyed positions (vertical/horizontal): per
+    // sash since 09.10.2026 (grid.upper / grid.lower, a lower sash without its own
+    // list takes the upper one); a windowSpec without them applies the single
+    // legacy list to both sashes.
+    const toList = (cb) => [
+      ...(Array.isArray(cb?.vertical) ? cb.vertical : []).map(Number).filter(Number.isFinite).map((mm) => ({ type: 'v', mm })),
+      ...(Array.isArray(cb?.horizontal) ? cb.horizontal : []).map(Number).filter(Number.isFinite).map((mm) => ({ type: 'h', mm })),
     ];
-    upperCustom = legacy;
-    lowerCustom = legacy;
+    const g = windowSpec.sash?.grid || {};
+    if (g.upper?.customBars || g.lower?.customBars) {
+      upperCustom = toList(g.upper?.customBars);
+      lowerCustom = toList(g.lower?.customBars);
+    } else {
+      const legacy = toList(g.customBars || {});
+      upperCustom = legacy;
+      lowerCustom = legacy;
+    }
   }
 
   // Horns
@@ -256,8 +266,8 @@ export function windowSpecToConfig(windowSpec, derived = null) {
   return {
     width: w,
     height: h,
-    upperBars: barsValue,
-    lowerBars: barsValue,
+    upperBars: upperBarsValue,
+    lowerBars: lowerBarsValue,
     upperCustomBars: upperCustom,
     lowerCustomBars: lowerCustom,
     showHorns: hasHorns,

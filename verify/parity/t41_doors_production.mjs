@@ -123,8 +123,8 @@ const R1 = (v) => Math.round(v * 10) / 10;
 const { specification, calculations, lists, bom, profile, store } = LIVE;
 const DP = profile.DEFAULT_DOOR_PROFILE;
 const CP = profile.DEFAULT_CASEMENT_PROFILE;
-const mk = (M, w, h, fc) => {
-  const spec = M.specification.normaliseToWindowSpec({ id: 'x', name: 'X', width: w, height: h }, { fullConfig: fc });
+const mk = (M, w, h, fc, extra = {}) => {
+  const spec = M.specification.normaliseToWindowSpec({ id: 'x', name: 'X', width: w, height: h, ...extra }, { fullConfig: fc });
   return { spec, derived: M.calculations.deriveWindowData(spec, {}) };
 };
 const door = (w, h, fc = {}) => mk(LIVE, w, h, { windowCategory: 'door', doorType: 'single-external', ...fc });
@@ -689,23 +689,29 @@ section('17 - controls: casement and sash equal to START');
     ['casement 040L 1000 x 1200', { windowCategory: 'casement', casementLayout: '040L' }, 1000, 1200],
     ['casement 022 1200 x 1500 bars', { windowCategory: 'casement', casementLayout: '022', casementHBars: 1, casementVBars: 1 }, 1200, 1500],
     ['sash 1000 x 1600', { windowCategory: 'sash', frameType: 'standard' }, 1000, 1600],
-    ['sash 1000 x 1500 2x2', { windowCategory: 'sash', frameType: 'standard', upperBars: '2x2', lowerBars: '2x2' }, 1000, 1500],
+    // doors v3 tura (09.10.2026, box item 16): bars only in the fullConfig are read now, so the 2x2 control
+    // carries its bars on the window record (read by both trees); t38 / t45 prove the fullConfig reading
+    ['sash 1000 x 1500 2x2', { windowCategory: 'sash', frameType: 'standard' }, 1000, 1500, { upperBars: '2x2', lowerBars: '2x2' }],
   ];
-  for (const [name, fc, w, h] of CTL) {
-    const a = mk(LIVE, w, h, fc), b = mk(START, w, h, fc);
+  for (const [name, fc, w, h, extra = {}] of CTL) {
+    const a = mk(LIVE, w, h, fc, extra), b = mk(START, w, h, fc, extra);
     // 09.10.2026 (sash proportions, brief 2.4): a sash derived carries two new keys and a sash
     // windowSpec sash.proportion; every other key stays byte for byte, the new ones are standard
     // (meeting fraction by hand: bottom = (H - 92 + 33) / 2, f = (bottom - 43 / 2) / (H - 92 - 43)).
     // A casement derives and specifies exactly as START (no new key at all).
     const isSash = fc.windowCategory === 'sash';
     const handFraction = (((h - 92 + 33) / 2) - 43 / 2) / (h - 92 - 43);
-    const noNewKeys = (d) => { const c = { ...d }; if (isSash) { delete c.sashProportion; delete c.meetingFraction; } return c; };
-    ok(JSON.stringify(noNewKeys(a.derived)) === JSON.stringify(b.derived)
+    // doors v3 tura (09.10.2026): a sash derive carries derived.bars (box item 16) and no derive carries the
+    // dead glazingItems (box item 17); START still has it
+    const noNewKeys = (d) => { const c = { ...d }; if (isSash) { delete c.sashProportion; delete c.meetingFraction; delete c.bars; } return c; };
+    const noGlazingItems = (d) => { const c = { ...d }; delete c.glazingItems; return c; };
+    ok(JSON.stringify(noNewKeys(a.derived)) === JSON.stringify(noGlazingItems(b.derived))
       && (isSash ? a.derived.sashProportion === 'standard' && near(a.derived.meetingFraction, handFraction, 1e-12) : !('sashProportion' in a.derived) && !('meetingFraction' in a.derived)),
       `${name}: derived deep-equal to START${isSash ? ` but for the two new keys (standard, meetingFraction ${a.derived.meetingFraction})` : ''}`);
     // every windowSpec carries the door defaults block; on a window only its informational
     // leafDepth moved (61 -> 57, the door profile), nothing reads it outside a door
-    const noDoor = (x) => { const c = clone(x); delete c.door; if (isSash && c.sash) delete c.sash.proportion; return c; };
+    // (and, doors v3 tura, the per-sash grid on every windowSpec: grid.upper / grid.lower, box item 16)
+    const noDoor = (x) => { const c = clone(x); delete c.door; if (isSash && c.sash) delete c.sash.proportion; if (c.sash?.grid) { delete c.sash.grid.upper; delete c.sash.grid.lower; } return c; };
     ok(JSON.stringify(noDoor(a.spec)) === JSON.stringify(noDoor(b.spec)) && JSON.stringify({ ...a.spec.door, leafDepth: 0 }) === JSON.stringify({ ...b.spec.door, leafDepth: 0 })
       && !('proportion' in b.spec.sash) && (isSash ? a.spec.sash.proportion === 'standard' : !('proportion' in a.spec.sash)),
       `${name}: windowSpec equal to START but for the door block's informational leafDepth (${b.spec.door.leafDepth} -> ${a.spec.door.leafDepth})${isSash ? ' and the new sash.proportion (standard)' : ''}`);

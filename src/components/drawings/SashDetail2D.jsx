@@ -2,7 +2,7 @@
  * SashDetail2D.jsx
  */
 import { useMemo, useState } from 'react';
-import { CONSTANTS } from '../../engine/calculations.js';
+import { CONSTANTS, sashBarPattern } from '../../engine/calculations.js';
 import { computeBarPositions, DimChainH, DimChainV, DimH, DimV, tfs, HORN_DEF, buildHornPath, WindowTag } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 // Arched sash (v3 Block 1 H): the upper sash outline / daylight / unit / bars are the engine's ArcChains
@@ -73,7 +73,8 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
     const rebateX = glassX - REBATE_OFFSET, rebateY = glassY - REBATE_OFFSET;
     const rebateW = glassW + 2 * REBATE_OFFSET;
     const rebateH = glassH + 2 * REBATE_OFFSET;
-    const gridMode = windowSpec.sash?.grid?.mode || 'none';
+    // bars per sash (Piotr 09.10.2026, owner box item 16): this sheet's own sash pattern
+    const gridMode = sashBarPattern(windowSpec, isUpper ? 'upper' : 'lower');
     const pattern = BAR_PATTERNS[gridMode] || BAR_PATTERNS['none'];
     const v = pattern.v, h = pattern.h;
     const { vBars, hBars, paneW, paneH } = computeBarPositions({

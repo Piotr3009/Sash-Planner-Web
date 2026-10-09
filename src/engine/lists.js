@@ -6,7 +6,7 @@
  * `bom.js` (`mergeWindowMaterials`) merges many windows into one list.
  */
 
-import { CONSTANTS, deriveWindowData } from './calculations.js';
+import { CONSTANTS, deriveWindowData, sashBarPattern } from './calculations.js';
 import { CASEMENT_HINGE_SLOTS, CASEMENT_LOCK_SLOTS, hingeWedgeMm, childRestrictorCounts } from './casementHardware.js';
 import { GLASS_MAKEUP, glassGas, glassMakeupFor } from './specification.js';
 import { profileRawForSection, getWindowProfile, getCasementProfile } from './profile.js';
@@ -435,8 +435,10 @@ export function buildGlassListForWindow(derived, windowSpec) {
     upperFinish = frostedLoc === 'both' ? 'frosted' : 'clear';
   }
 
-  // Bar pattern info for reference
-  const gridMode = windowSpec?.sash?.grid?.mode || 'none';
+  // Bar pattern of EACH sash (Piotr 09.10.2026, owner box item 16): the glass
+  // PDF table, its sketch and the glass DXF read row.bars, so they follow.
+  const barsUpper = sashBarPattern(windowSpec, 'upper');
+  const barsLower = sashBarPattern(windowSpec, 'lower');
 
   return [
     {
@@ -453,7 +455,7 @@ export function buildGlassListForWindow(derived, windowSpec) {
       makeup,
       coating,
       gas,
-      bars: gridMode,
+      bars: barsUpper,
     },
     {
       label: 'Lower Glass',
@@ -469,7 +471,7 @@ export function buildGlassListForWindow(derived, windowSpec) {
       makeup,
       coating,
       gas,
-      bars: gridMode,
+      bars: barsLower,
     },
   ];
 }

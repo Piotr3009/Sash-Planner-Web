@@ -388,54 +388,6 @@ function calculateBoxComponentSet(windowSpec, frameWidth, frameHeight) {
     return boxComponents;
 }
 
-function calculateGlazingSummaryForWindow(windowSpec, sashWidth, sashHeight, settings) {
-    const grid = windowSpec.sash?.grid ?? { rows: 2, cols: 2 };
-    const _f = sashFaces();
-    const clearWidth = Math.max(sashWidth - 2 * _f.stile, 0);
-    const clearHeight = Math.max((sashHeight / 2) - _f.top - _f.bottom, 0);
-
-    const paneWidth = Math.max(
-        clearWidth / Math.max(grid.cols ?? 1, 1) - settings.glazingAllowanceWidth,
-        0,
-    );
-    const paneHeight = Math.max(
-        clearHeight / Math.max(grid.rows ?? 1, 1) - settings.glazingAllowanceHeight,
-        0,
-    );
-
-    return {
-        windowId: windowSpec.id,
-        windowName: windowSpec.name,
-        width: round(paneWidth),
-        height: round(paneHeight),
-        rows: grid.rows,
-        cols: grid.cols,
-        panes: Math.max((grid.rows ?? 1) * (grid.cols ?? 1), 1) * 2,
-        thickness: Number(windowSpec.glazing?.thickness ?? 0),
-        makeup: windowSpec.glazing?.makeup ?? '',
-        toughened: Boolean(windowSpec.glazing?.toughened),
-        frosted: Boolean(windowSpec.glazing?.frosted),
-        spacerColour: windowSpec.glazing?.spacerColour ?? 'White',
-    };
-}
-
-// Cottage sashes (Piotr 09.10.2026): the two sashes have different glass, so the
-// summary carries one row per sash, each pane height from that sash's daylight
-// (upper: top - top rail - meeting rail, lower: bottom - meeting rail - bottom
-// rail). A standard window keeps the one legacy row above, byte for byte.
-function calculateGlazingSummaryPerSash(windowSpec, sashWidth, topSashHeight, bottomSashHeight, settings) {
-    const base = calculateGlazingSummaryForWindow(windowSpec, sashWidth, topSashHeight + bottomSashHeight, settings);
-    const grid = windowSpec.sash?.grid ?? { rows: 2, cols: 2 };
-    const _f = sashFaces();
-    const rows = Math.max(grid.rows ?? 1, 1);
-    const paneH = (daylight) => round(Math.max(Math.max(daylight, 0) / rows - settings.glazingAllowanceHeight, 0));
-    const panes = Math.max((grid.rows ?? 1) * (grid.cols ?? 1), 1);
-    return [
-        { ...base, sash: 'upper', height: paneH(topSashHeight - _f.top - _f.meet), panes },
-        { ...base, sash: 'lower', height: paneH(bottomSashHeight - _f.meet - _f.bottom), panes },
-    ];
-}
-
 const OFFCUT_FACTOR = 1.15; // 15% waste for off-cuts
 
 // ─── Frame-dependent finished sections ───
@@ -551,10 +503,11 @@ function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, to
     const glassHl = equalGlass ? glassHu : bottomSashHeight - _f.meet - _f.bottom;   // standard: equal by its rule
     const glassType = windowSpec.glazing?.type || 'double';
 
-    const gridMode = windowSpec.sash?.grid?.mode || 'none';
-    const pattern = BEADING_BAR_PATTERNS[gridMode] || BEADING_BAR_PATTERNS['none'];
-    const barU = (pattern.v * glassHu) + (pattern.h * glassW);
-    const barL = (pattern.v * glassHl) + (pattern.h * glassW);
+    // Bars per sash (Piotr 09.10.2026): each sash its own pattern
+    const patternU = sashBarCounts(windowSpec, 'upper');
+    const patternL = sashBarCounts(windowSpec, 'lower');
+    const barU = (patternU.v * glassHu) + (patternU.h * glassW);
+    const barL = (patternL.v * glassHl) + (patternL.h * glassW);
     const perimU = 2 * (glassW + glassHu);
     const perimL = 2 * (glassW + glassHl);
 
@@ -623,6 +576,20 @@ const BEADING_BAR_PATTERNS = {
     '4x4': { v: 1, h: 1 }, '6x6': { v: 2, h: 1 }, '8x8': { v: 3, h: 1 }, '9x9': { v: 2, h: 2 },
 };
 
+/**
+ * The bar pattern of one sash ('upper' | 'lower'), Piotr 09.10.2026 (owner box
+ * item 16): windowSpec.sash.grid.upper / .lower; a windowSpec made without them
+ * (older code, a hand-built spec) takes grid.mode for both sashes, as before.
+ */
+export function sashBarPattern(windowSpec, which) {
+    const g = windowSpec?.sash?.grid || {};
+    return g[which]?.mode || g.mode || 'none';
+}
+/** The v / h bar counts of one sash's pattern (custom and unknown: none). */
+function sashBarCounts(windowSpec, which) {
+    return BEADING_BAR_PATTERNS[sashBarPattern(windowSpec, which)] || BEADING_BAR_PATTERNS['none'];
+}
+
 function calculateBeadingComponents(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight, equalGlass = false) {
     const F = OFFCUT_FACTOR;
     const _f = sashFaces();
@@ -633,10 +600,11 @@ function calculateBeadingComponents(windowSpec, frameWidth, frameHeight, sashWid
     const glassHl = equalGlass ? glassHu : bottomSashHeight - _f.meet - _f.bottom;
     const equal = equalGlass;
 
-    const gridMode = windowSpec.sash?.grid?.mode || 'none';
-    const pattern = BEADING_BAR_PATTERNS[gridMode] || BEADING_BAR_PATTERNS['none'];
-    const barU = (pattern.v * glassHu) + (pattern.h * glassW);
-    const barL = (pattern.v * glassHl) + (pattern.h * glassW);
+    // Bars per sash (Piotr 09.10.2026): each sash its own pattern
+    const patternU = sashBarCounts(windowSpec, 'upper');
+    const patternL = sashBarCounts(windowSpec, 'lower');
+    const barU = (patternU.v * glassHu) + (patternU.h * glassW);
+    const barL = (patternL.v * glassHl) + (patternL.h * glassW);
 
     const rec = (name, lengthMm, notes) =>
         createComponentRecord(windowSpec, 'beading', name, 'profile', lengthMm, 1, notes);
@@ -652,7 +620,8 @@ function calculateBeadingComponents(windowSpec, frameWidth, frameHeight, sashWid
     // 2. Triangle beading ext (only if bars exist)
     if (barU + barL > 0) {
         const barTotal = round((barU + barL) * F);
-        const barNotes = equal ? `Bars ${round(barU)} × 2 + 15%` : `Bars ${round(barU)} + ${round(barL)} + 15%`;
+        // "× 2" only when both sashes carry the same run (equal glass AND the same pattern)
+        const barNotes = equal && barU === barL ? `Bars ${round(barU)} × 2 + 15%` : `Bars ${round(barU)} + ${round(barL)} + 15%`;
         beading.push(rec('TRIANGLE BEADING (EXT)', barTotal, barNotes));
         // 3. Georgian middle beading (internal) — same length, glued other side of glass
         beading.push(rec('GEORGIAN MIDDLE BEADING', barTotal, barNotes));
@@ -675,13 +644,50 @@ function calculateBeadingComponents(windowSpec, frameWidth, frameHeight, sashWid
     return beading;
 }
 
+/**
+ * Bars per sash for derived.bars (Piotr 09.10.2026, owner box item 16). The
+ * pane of each sash: width = sash (triple: centre section) - 2 stiles; height
+ * upper = top sash - top rail - meeting rail, lower = bottom sash - meeting rail
+ * - bottom rail (equal to the upper on a standard sash, the beading rule). A
+ * pattern's bar centres come from computeBarPositions over THAT pane (equal
+ * panes between 22 bars, the sheets' rule), measured from the pane's left /
+ * top edge; a custom list is taken as given (mm from the pane's left / top) and
+ * a bar outside its pane is reported in `warnings`, never a crash.
+ */
+function sashBarsFor(windowSpec, sashWidth, topSashHeight, bottomSashHeight, equalGlass) {
+    const _f = sashFaces();
+    const R2 = (v) => Math.round(v * 100) / 100;
+    const paneW = sashWidth - 2 * _f.stile;
+    const paneHu = topSashHeight - _f.top - _f.meet;
+    const paneHl = equalGlass ? paneHu : bottomSashHeight - _f.meet - _f.bottom;
+    const one = (which, paneH) => {
+        const pattern = sashBarPattern(windowSpec, which);
+        const pane = { w: R2(paneW), h: R2(paneH) };
+        if (pattern === 'custom') {
+            const list = windowSpec.sash?.grid?.[which]?.customBars || windowSpec.sash?.grid?.customBars || {};
+            const vertical = (list.vertical || []).map(Number).filter(Number.isFinite);
+            const horizontal = (list.horizontal || []).map(Number).filter(Number.isFinite);
+            const warnings = [
+                ...vertical.filter((x) => !(x > 0 && x < paneW)).map((x) => `custom vertical bar at ${x} mm lies outside the ${which} sash glass (${pane.w} wide)`),
+                ...horizontal.filter((y) => !(y > 0 && y < paneH)).map((y) => `custom horizontal bar at ${y} mm lies outside the ${which} sash glass (${pane.h} high)`),
+            ];
+            return { pattern, v: vertical.length, h: horizontal.length, pane, positions: { vertical, horizontal }, custom: true, warnings };
+        }
+        const c = BEADING_BAR_PATTERNS[pattern] || BEADING_BAR_PATTERNS['none'];
+        const pos = computeBarPositions({ glassX: 0, glassY: 0, glassW: paneW, glassH: paneH, vCount: c.v, hCount: c.h, barW: BAR_WIDTH });
+        return { pattern, v: c.v, h: c.h, pane, positions: { vertical: pos.vBars.map((b) => R2(b.cx)), horizontal: pos.hBars.map((b) => R2(b.cy)) }, custom: false, warnings: [] };
+    };
+    const upper = one('upper', paneHu);
+    const lower = one('lower', paneHl);
+    return { upper, lower, same: upper.pattern === lower.pattern, warnings: [...upper.warnings, ...lower.warnings] };
+}
+
 function emptyDerived(category, frameWidth, frameHeight) {
     return {
         unsupported: category,
         sashWidth: 0, sashHeight: 0, topSashHeight: 0, bottomSashHeight: 0,
         config: { key: 'none', rows: 0, cols: 0 },
         components: { sash: [], box: [], beading: [] },
-        glazingItems: [],
         barPositions: { vertical: [], horizontal: [] },
         weights: { timber: 0, glass: 0, total: 0 },
         paint: { areaSqm: 0 },
@@ -1166,7 +1172,6 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
         topSashHeight: 0, bottomSashHeight: 0,
         config: { key: 'none', rows: 0, cols: 0 },
         components: { sash, box, beading },
-        glazingItems: [],
         customGlassUnits: paneGlass,
         casement: {
             // v3 Block 3: present only on a fixed window (absent, not 'opening', so a
@@ -1823,7 +1828,6 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight, settings = {}) {
         },
         components: { sash, box, beading },
         customGlassUnits: glassUnits,
-        glazingItems: [],
         weights: {
             timber: R(timberKg),
             glass: R(glassKg),
@@ -1867,10 +1871,6 @@ export function deriveWindowData(windowSpec, settings = {}) {
         : calculateSashComponentSet(windowSpec, settings, sashWidth, topSashHeight, bottomSashHeight);
     const boxComponents = calculateBoxComponentSet(windowSpec, frameWidth, frameHeight);
     const tripleSections = isTripleSash ? tripleSectionWidths(windowSpec, sashWidth) : null;
-    // standard: the one legacy row; cottage: one row per sash (the panes differ)
-    const glazingItems = sashProportion === 'standard'
-        ? [calculateGlazingSummaryForWindow(windowSpec, sashWidth, sashHeight, settings)]
-        : calculateGlazingSummaryPerSash(windowSpec, sashWidth, topSashHeight, bottomSashHeight, settings);
 
     const result = calculateWindow(frameWidth, frameHeight, config.key, {
         rows: config.rows,
@@ -2033,31 +2033,18 @@ export function deriveWindowData(windowSpec, settings = {}) {
             };
         })(),
         components: { sash: sashComponents, box: boxComponents, beading: beadingComponents },
-        glazingItems,
         barPositions,
+        // Bars per sash (Piotr 09.10.2026, owner box item 16): each sash's pattern,
+        // its counts and its bar centres over ITS OWN pane (daylight, from the pane's
+        // left / top edge; equal panes between 22 bars, the sheets' rule), or its
+        // custom list; a custom bar outside its pane is a warning, never a crash.
+        bars: sashBarsFor(windowSpec, isTripleSash ? tripleSections.center : sashWidth, topSashHeight, bottomSashHeight, equalGlass),
         weights,
         paint,
         consumables,
         // arched sash (v3 Block 1): absent on a rectangular sash
         ...(sashArch ? { arch: sashArch, customGlassUnits: sashArch.customGlassUnits } : {}),
     };
-}
-
-function aggregateComponents(windows, settings) {
-    const sash = [];
-    const box = [];
-    const glazing = [];
-    const beading = [];
-
-    windows.forEach((windowSpec) => {
-        const derived = deriveWindowData(windowSpec, settings);
-        sash.push(...derived.components.sash);
-        box.push(...derived.components.box);
-        glazing.push(...derived.glazingItems);
-        beading.push(...derived.components.beading);
-    });
-
-    return { sash, box, glazing, beading };
 }
 
 function aggregateCutList(components) {

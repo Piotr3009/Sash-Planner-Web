@@ -130,7 +130,11 @@ const mk = (M, w, h, fc = {}, extra = {}) => {
   return { spec, derived: M.calculations.deriveWindowData(spec, {}) };
 };
 const recs = (d, name) => (d.components.sash || []).filter((r) => r.elementName === name);
-const withoutNewKeys = (d) => { const c = { ...d }; delete c.sashProportion; delete c.meetingFraction; return c; };
+const withoutNewKeys = (d) => { const c = { ...d }; delete c.sashProportion; delete c.meetingFraction; delete c.bars; return c; };
+// doors v3 tura (09.10.2026): derived.bars (the pattern and bar centres of each sash, box item 16) is new on
+// every sash derive, and derived.glazingItems (the dead glazing summary, box item 17) is gone; START keeps it.
+const withoutRetired = (d) => { const c = { ...d }; delete c.glazingItems; return c; };
+const specWithoutPerSash = (sp) => { const c = clone(sp); if (c.sash?.grid) { delete c.sash.grid.upper; delete c.sash.grid.lower; } return c; };
 const throwsName = (fn) => { try { fn(); return null; } catch (e) { return e; } };
 const { specification: SP, calculations: CA, lists: LI } = LIVE;
 
@@ -262,13 +266,14 @@ for (const H of [900, 1400, 1800, 2000]) {
   const s = CA.deriveWindowData(SP.normaliseToWindowSpec({ id: 'g', name: 'G', width: 1000, height: 1400, sashProportion: 'standard', upperBars: '4x4', lowerBars: '4x4' }, { fullConfig: {} }), settings);
   const c = CA.deriveWindowData(SP.normaliseToWindowSpec({ id: 'g', name: 'G', width: 1000, height: 1400, sashProportion: 'cottage-40-60', upperBars: '4x4', lowerBars: '4x4' }, { fullConfig: {} }), settings);
   ok(s.config.rows === 2 && c.config.rows === 2, 'the 4x4 bars reach the engine (item level): 2 rows per sash');
-  // the summary reads windowSpec.sash.grid (a '4x4' mode is 4 rows x 4 columns there, the legacy convention)
-  const g = SP.normaliseToWindowSpec({ id: 'g', name: 'G', width: 1000, height: 1400, upperBars: '4x4', lowerBars: '4x4' }, { fullConfig: {} }).sash.grid;
-  ok(s.glazingItems.length === 1 && !('sash' in s.glazingItems[0]) && s.glazingItems[0].panes === g.rows * g.cols * 2, `standard glazing summary: one legacy row (${s.glazingItems[0].width} x ${s.glazingItems[0].height}, ${s.glazingItems[0].panes} panes)`);
-  const [u, l] = c.glazingItems;
-  ok(c.glazingItems.length === 2 && u.sash === 'upper' && l.sash === 'lower' && near(u.height, (523.2 - 100) / g.rows, 0.01) && near(l.height, (784.8 - 133) / g.rows, 0.01)
-    && u.panes === g.rows * g.cols && l.panes === g.rows * g.cols && u.width === s.glazingItems[0].width,
-    `cottage glazing summary: upper ${u?.width} x ${u?.height}, lower ${l?.width} x ${l?.height} (each sash's daylight / ${g.rows} rows), ${u?.panes} + ${l?.panes} panes`);
+  // doors v3 tura (09.10.2026, box item 17): the glazing summary (derived.glazingItems) had no reader and
+  // is removed; each sash's own pane now comes with derived.bars (box item 16): the cottage 4x4 places its one
+  // horizontal bar in the middle of EACH pane (equal panes between 22 bars: (paneH - 22) / 2 + 11 = paneH / 2)
+  ok(!('glazingItems' in s) && !('glazingItems' in c), 'the dead glazing summary is gone (box item 17)');
+  const [bu, bl] = [c.bars.upper, c.bars.lower];
+  ok(bu.pattern === '4x4' && bl.pattern === '4x4' && near(bu.pane.h, 523.2 - 100, 0.01) && near(bl.pane.h, 784.8 - 133, 0.01)
+    && near(bu.positions.horizontal[0], (523.2 - 100) / 2, 0.01) && near(bl.positions.horizontal[0], (784.8 - 133) / 2, 0.01) && near(bu.positions.vertical[0], 708 / 2, 0.01),
+    `cottage 4x4 per sash: upper pane ${bu.pane.w} x ${bu.pane.h}, h bar at ${bu.positions.horizontal[0]}; lower pane ${bl.pane.h} high, h bar at ${bl.positions.horizontal[0]}`);
   const bd = c.components.beading.find((r) => r.elementName === 'GLAZING BEADING');
   const perimU = 2 * (708 + (523.2 - 100)), perimL = 2 * (708 + (784.8 - 133));
   const barU = (523.2 - 100) + 708, barL = (784.8 - 133) + 708;   // 4x4: one vertical over the light, one horizontal across
@@ -471,8 +476,8 @@ const STD_REF = [
 ];
 for (const [name, w, h, fc, extra = {}] of STD_REF) {
   const a = mk(LIVE, w, h, fc, extra), b = mk(START, w, h, fc, extra);
-  ok(JSON.stringify(withoutNewKeys(a.derived)) === JSON.stringify(b.derived) && a.derived.sashProportion === 'standard' && !('sashProportion' in b.derived),
-    `${name}: derived JSON byte-identical to START but for the two new keys`);
+  ok(JSON.stringify(withoutNewKeys(a.derived)) === JSON.stringify(withoutRetired(b.derived)) && a.derived.sashProportion === 'standard' && !('sashProportion' in b.derived),
+    `${name}: derived JSON byte-identical to START but for the two new keys (and, since 09.10.2026, derived.bars added / glazingItems removed)`);
   const L = LIVE.lists, S = START.lists;
   ok(JSON.stringify(L.buildCutListForWindow(a.derived, a.spec)) === JSON.stringify(S.buildCutListForWindow(b.derived, b.spec))
     && JSON.stringify(L.buildGlassListForWindow(a.derived, a.spec)) === JSON.stringify(S.buildGlassListForWindow(b.derived, b.spec))
@@ -480,8 +485,11 @@ for (const [name, w, h, fc, extra = {}] of STD_REF) {
     && JSON.stringify(L.buildHardwareList(a.spec, a.derived)) === JSON.stringify(S.buildHardwareList(b.spec, b.derived))
     && JSON.stringify(LIVE.bom.buildWindowPartQtys(a.derived, a.spec, {})) === JSON.stringify(START.bom.buildWindowPartQtys(b.derived, b.spec, {})),
     `${name}: cut list, glass list, pre-cut, hardware and BOM part quantities equal to START`);
-  const sa = clone(a.spec), sb = clone(b.spec); delete sa.sash.proportion;
-  ok(JSON.stringify(sa) === JSON.stringify(sb) && a.spec.sash.proportion === 'standard', `${name}: windowSpec equal to START but for sash.proportion 'standard'${extra.upperBars ? ` (grid ${a.spec.sash.grid.mode})` : ''}`);
+  // 09.10.2026 (box item 16): the windowSpec also carries grid.upper / grid.lower; on these windows both
+  // sashes have the same pattern, equal to the legacy grid.mode
+  const sa = specWithoutPerSash(a.spec), sb = clone(b.spec); delete sa.sash.proportion;
+  ok(JSON.stringify(sa) === JSON.stringify(sb) && a.spec.sash.proportion === 'standard' && a.spec.sash.grid.upper.mode === a.spec.sash.grid.mode && a.spec.sash.grid.lower.mode === a.spec.sash.grid.mode,
+    `${name}: windowSpec equal to START but for sash.proportion 'standard' and the per-sash grid (both ${a.spec.sash.grid.mode})${extra.upperBars ? ` (grid ${a.spec.sash.grid.mode})` : ''}`);
 }
 {
   // standard under profiles with decimal rail faces (a batch snapshot can carry any): still byte-identical
@@ -494,7 +502,7 @@ for (const [name, w, h, fc, extra = {}] of STD_REF) {
       const a = LIVE.profile.withProfiles(mkP(LIVE), null, null, () => mk(LIVE, w, H, fc, extra));
       const b = START.profile.withProfiles(mkP(START), null, null, () => mk(START, w, H, fc, extra));
       n += 1;
-      if (JSON.stringify(withoutNewKeys(a.derived)) !== JSON.stringify(b.derived)) bad.push(`${top}/${meet}/${bottom} H${H} ${fc.sashType || 'double'} ${extra.upperBars || 'none'}`);
+      if (JSON.stringify(withoutNewKeys(a.derived)) !== JSON.stringify(withoutRetired(b.derived))) bad.push(`${top}/${meet}/${bottom} H${H} ${fc.sashType || 'double'} ${extra.upperBars || 'none'}`);
     }
   }
   ok(bad.length === 0, `standard under ${profiles.length} profiles with decimal faces: ${n} windows byte-identical to START but for the two keys`, bad.slice(0, 5).join(' | '));
@@ -508,7 +516,9 @@ const OTHERS = [
 ];
 for (const [name, w, h, fc] of OTHERS) {
   const a = mk(LIVE, w, h, fc), b = mk(START, w, h, fc);
-  ok(JSON.stringify(a.derived) === JSON.stringify(b.derived) && JSON.stringify(a.spec) === JSON.stringify(b.spec), `${name}: derived and windowSpec deep-equal to START`);
+  // doors v3 tura (09.10.2026): every windowSpec carries the per-sash grid (box item 16) and no derived
+  // carries the dead glazingItems (box item 17); nothing else moved on these products
+  ok(JSON.stringify(a.derived) === JSON.stringify(withoutRetired(b.derived)) && JSON.stringify(specWithoutPerSash(a.spec)) === JSON.stringify(b.spec), `${name}: derived and windowSpec deep-equal to START (per-sash grid / glazingItems aside)`);
 }
 // doors v3 (09.10.2026) moved the door derive on purpose (every leaf 51 above the floor: H - 102,
 // was H - 98; the v3 rules are checked in t44_doors_v3). Here the door windowSpec stays equal to
@@ -520,7 +530,7 @@ for (const [name, w, h, fc] of [
 ]) {
   const a = mk(LIVE, w, h, fc), b = mk(START, w, h, fc);
   const la = a.derived.door.leaves, lb = b.derived.door.leaves, ga = a.derived.customGlassUnits, gb = b.derived.customGlassUnits;
-  ok(JSON.stringify(a.spec) === JSON.stringify(b.spec) && la.length === lb.length && la.every((l, i) => l.w === lb[i].w && l.h === lb[i].h - 4 && l.x === lb[i].x)
+  ok(JSON.stringify(specWithoutPerSash(a.spec)) === JSON.stringify(b.spec) && la.length === lb.length && la.every((l, i) => l.w === lb[i].w && l.h === lb[i].h - 4 && l.x === lb[i].x)
     && ga.length === gb.length && ga.every((g, i) => g.width === gb[i].width && g.height === gb[i].height - 4 && g.role === gb[i].role),
     `${name}: windowSpec deep-equal to START; derived = START with the leaf and glass 4 lower (doors v3: ${lb[0].h} -> ${la[0].h})`);
 }
@@ -595,9 +605,28 @@ for (const [label, w, h, fc] of [['gothic arched 700 x 1800', 700, 1800, { sashT
     delete globalThis.window;
     return calls;
   };
-  for (const extra of [{}, { upperBars: '4x4', lowerBars: '4x4' }, { upperBars: '9x9', lowerBars: '9x9' }]) {
-    const item = { id: 'c', name: 'C', width: 1000, height: 1400, ...extra };
-    ok(JSON.stringify(drawCalls(LIVE, item)) === JSON.stringify(drawCalls(START, item)), `canvas elevation, standard 1400 ${extra.upperBars || 'no bars'}: every draw call equal to START`);
+  {
+    const item = { id: 'c', name: 'C', width: 1000, height: 1400 };
+    ok(JSON.stringify(drawCalls(LIVE, item)) === JSON.stringify(drawCalls(START, item)), 'canvas elevation, standard 1400 no bars: every draw call equal to START');
+  }
+  // 09.10.2026 (box item 16): each pane draws its own sash's bars from derived.bars (the sheets' rule over
+  // that pane), so the standard 4x4 / 9x9 now draw their horizontal bars INSIDE each pane (START dropped them:
+  // the old list was spaced over the whole sash height) and the 9x9 verticals sit at the sheets' positions.
+  // Every call that is not a bar rectangle stays equal to START.
+  for (const [bars, nv, nh] of [['4x4', 1, 1], ['9x9', 2, 2]]) {
+    const item = { id: 'c', name: 'C', width: 1000, height: 1400, upperBars: bars, lowerBars: bars };
+    const live = drawCalls(LIVE, item), start = drawCalls(START, item);
+    const sc = live.filter((c) => c[0] === 'fillRect')[1][3] / 1000;
+    const isBar = (c) => (c[0] === 'fillRect' || c[0] === 'strokeRect') && (near(c[3], 18 * sc, 0.01) || near(c[4], 18 * sc, 0.01));
+    const nonBar = (calls) => JSON.stringify(calls.filter((c) => !isBar(c)));
+    const d = mk(LIVE, 1000, 1400, {}, item).derived;
+    const fills = live.filter((c) => c[0] === 'fillRect' && isBar(c));
+    const vb = fills.filter((c) => near(c[3], 18 * sc, 0.01)), hb = fills.filter((c) => near(c[4], 18 * sc, 0.01) && !near(c[3], 18 * sc, 0.01));
+    const vx = [...new Set(vb.map((c) => Math.round(((c[1] + c[3] / 2) / sc) * 100) / 100))];
+    const wantV = d.bars.upper.positions.vertical;
+    ok(nonBar(live) === nonBar(start) && vb.length === 2 * nv && hb.length === 2 * nh && vx.length === nv && hb.length === d.bars.upper.h + d.bars.lower.h,
+      `canvas elevation, standard 1400 ${bars}: ${vb.length} vertical and ${hb.length} horizontal bar rects (one set per pane, derived.bars), every other draw call equal to START`);
+    void wantV;
   }
   for (const [p, bars, n] of [['cottage-40-60', '4x4', 1], ['cottage-1-3', '9x9', 2]]) {
     const item = { id: 'c', name: 'C', width: 1000, height: 1400, sashProportion: p, upperBars: bars, lowerBars: bars };
@@ -610,9 +639,12 @@ for (const [label, w, h, fc] of [['gothic arched 700 x 1800', 700, 1800, { sashT
     const panes = fills.filter((c) => near(c[3], glassW, 0.01) && c[4] > 50).slice(0, 2);
     const hb = fills.filter((c) => near(c[3], glassW, 0.01) && near(c[4], 18 * sc, 0.01));
     const inPane = (pane) => hb.filter((b) => b[2] > pane[2] && b[2] < pane[2] + pane[4]).map((b) => (b[2] + b[4] / 2 - pane[2]) / sc);
-    const want = (gh) => Array.from({ length: n }, (_, j) => ((gh - n * 18) / (n + 1)) * (j + 1) + j * 18 + 9);
+    // 09.10.2026 (box item 16): the canvas draws derived.bars, each sash's centres over its own pane by the
+    // sheets' rule (equal panes between 22 bars); until then this cottage path spaced them with the 18 canvas bar
+    const want = (gh) => Array.from({ length: n }, (_, j) => ((gh - n * 22) / (n + 1)) * (j + 1) + j * 22 + 11);
     const up = inPane(panes[0]), lo = inPane(panes[1]);
     const wu = want(d.topSashHeight - 100), wl = want(d.bottomSashHeight - 133);
+    ok(wu.every((y, j) => near(y, d.bars.upper.positions.horizontal[j], 0.01)) && wl.every((y, j) => near(y, d.bars.lower.positions.horizontal[j], 0.01)), `${p} ${bars}: the hand positions equal derived.bars`);
     ok(panes.length === 2 && up.length === n && lo.length === n && up.every((y, j) => near(y, wu[j], 0.05)) && lo.every((y, j) => near(y, wl[j], 0.05)),
       `canvas elevation ${p} ${bars}: horizontal bars spaced in each pane (upper ${up.map((y) => y.toFixed(1)).join(', ')} / lower ${lo.map((y) => y.toFixed(1)).join(', ')} mm from the pane top)`);
   }

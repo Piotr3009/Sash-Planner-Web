@@ -8,7 +8,7 @@
  * Dim lines: overall frame width & height only.
  */
 import { useMemo } from 'react';
-import { CONSTANTS } from '../../engine/calculations.js';
+import { CONSTANTS, sashBarPattern } from '../../engine/calculations.js';
 import { computeBarPositions, DimH, DimV, TitleBlock, tfs, HORN_DEF, HORN_W, buildHornPath, WindowTag } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, STROKES, VIEWBOX_REF, WEIGHTS } from './drawingTheme.js';
 // Arched sash (ARCHED-WINDOWS-v3 Block 1 H): every arc is the engine's ArcChain (derived.arch) serialised
@@ -73,8 +73,10 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber , 
     const meetRail = CONSTANTS.MEETING_RAIL_WIDTH;
     const botRail = CONSTANTS.BOTTOM_RAIL_WIDTH;
 
+    // bars per sash (Piotr 09.10.2026, owner box item 16): each pane its own sash's pattern
     const gridMode = windowSpec.sash?.grid?.mode || 'none';
-    const pattern = BAR_PATTERNS[gridMode] || BAR_PATTERNS['none'];
+    const patternU = BAR_PATTERNS[sashBarPattern(windowSpec, 'upper')] || BAR_PATTERNS['none'];
+    const patternL = BAR_PATTERNS[sashBarPattern(windowSpec, 'lower')] || BAR_PATTERNS['none'];
 
     // Upper sash glass area (local to sash origin)
     const uGlassX = stile;
@@ -83,7 +85,7 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber , 
     const uGlassH = topSashH - topRail - meetRail;
     const uBars = computeBarPositions({
       glassX: uGlassX, glassY: uGlassY, glassW: uGlassW, glassH: uGlassH,
-      vCount: pattern.v, hCount: pattern.h, barW: BAR_WIDTH,
+      vCount: patternU.v, hCount: patternU.h, barW: BAR_WIDTH,
     });
 
     // Lower sash glass area (local to sash origin)
@@ -93,7 +95,7 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber , 
     const lGlassH = botSashH - meetRail - botRail;
     const lBars = computeBarPositions({
       glassX: lGlassX, glassY: lGlassY, glassW: lGlassW, glassH: lGlassH,
-      vCount: pattern.v, hCount: pattern.h, barW: BAR_WIDTH,
+      vCount: patternL.v, hCount: patternL.h, barW: BAR_WIDTH,
     });
 
     // arched sash: the engine's rings / outline / bars (null on every rectangular sash)

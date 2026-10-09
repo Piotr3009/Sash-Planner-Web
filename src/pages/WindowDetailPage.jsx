@@ -6,8 +6,9 @@ import { useProjectStore } from '../stores/projectStore.js';
 import { useMaterialStore } from '../stores/materialStore.js';
 import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignmentStore.js';
 import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
-import { parseSpecification, normaliseToWindowSpec, SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, isCottageProportion } from '../engine/specification.js';
-import { deriveWindowData } from '../engine/calculations.js';
+import { SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, isCottageProportion } from '../engine/specification.js';
+import { deriveWindowData, sashBarPattern } from '../engine/calculations.js';
+import { deriveWindowBounded } from '../utils/windowBoundary.js';
 import { withProfiles, getCasementProfile, bsuiteActiveTarget } from '../engine/profile.js';
 import { buildGlassListForWindow, buildVentGrilles } from '../engine/lists.js';
 import { formatQty, buildWindowMaterialLines, windowBomCards, windowHardwareDetailRows } from '../engine/bom.js';
@@ -77,13 +78,15 @@ export default function WindowDetailPage() {
     ? `${projectEntity.project_number || ''}${projectEntity.name ? ` (${projectEntity.name})` : ''}`.trim()
     : '';
 
-  const spec = useMemo(() => (item ? parseSpecification(item.specification) : null), [item]);
-  const windowSpec = useMemo(() => (item ? normaliseToWindowSpec(item, spec) : null), [item, spec]);
-  const derived = useMemo(() => {
-    if (!windowSpec) return null;
-    try { return withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, () => deriveWindowData(windowSpec, settings)); }
-    catch (e) { console.warn('Calculation failed:', e); return null; }
-  }, [windowSpec, settings]);
+  // The window normalised and derived inside its own boundary (owner box item 19):
+  // an unknown sash proportion or bar pattern, or an arch the engine refuses,
+  // shows its message on this page instead of a blank one.
+  const bounded = useMemo(() => (item
+    ? deriveWindowBounded(item, (ws) => withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, () => deriveWindowData(ws, settings)))
+    : null), [item, settings, currentBatch]);
+  const windowSpec = bounded?.windowSpec || null;
+  const derived = bounded?.derived || null;
+  const windowError = bounded?.error || null;
   // Arched casement CNC export — planned under the batch's profile snapshot,
   // exactly like `derived` above; `skip` doubles as the button tooltip.
   const archExport = useMemo(() => {
@@ -101,6 +104,29 @@ export default function WindowDetailPage() {
       <div className="p-8 max-w-4xl mx-auto">
         <Link to={backUrl} className="text-xs text-ink-400 hover:text-accent-400 transition-colors">← Back to project</Link>
         <div className="card p-8 mt-4 text-center text-ink-400">Window not found.</div>
+      </div>
+    );
+  }
+
+  if (windowError) {
+    return (
+      <div className="p-8 max-w-4xl mx-auto">
+        <Link to={backUrl} className="text-xs text-ink-400 hover:text-accent-400 transition-colors">← Back to project</Link>
+        <div className="flex items-end justify-between mt-2 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-ink-50">{item.name || `Window`}</h1>
+            <p className="text-sm text-ink-400">
+              {item.window_type || 'sash'} · {item.width}×{item.height} mm
+              {currentBatch && <span> · {currentBatch.label}</span>}
+            </p>
+          </div>
+          <Link to={editUrl} className="btn btn-primary text-sm">✏️ Edit Configuration</Link>
+        </div>
+        <div className="card p-6 border border-red-500/40" data-window-error={item.id}>
+          <div className="text-sm font-semibold text-red-400">This window cannot be calculated</div>
+          <p className="text-sm text-ink-100 mt-2">{windowError.message}</p>
+          <p className="text-xs text-ink-400 mt-2">Correct it in the configurator (Edit Configuration). The production pack and the project materials leave this window out until then; every other window is unaffected.</p>
+        </div>
       </div>
     );
   }
@@ -261,8 +287,9 @@ export default function WindowDetailPage() {
           <SpecSection title="Sashes & Bars">
             {(windowSpec?.category || 'sash') === 'sash' && <SpecRow label="Proportions" value={SASH_PROPORTION_LABELS[windowSpec?.sash?.proportion] || windowSpec?.sash?.proportion} />}
             <SpecRow label="Grid" value={windowSpec?.sash.grid.mode} />
-            <SpecRow label="Upper" value={item.upperBars || 'none'} />
-            {!item.sameBars && <SpecRow label="Lower" value={item.lowerBars || 'none'} />}
+            {/* bars per sash (Piotr 09.10.2026, owner box item 16): the pattern each sash is built with */}
+            <SpecRow label="Upper" value={sashBarPattern(windowSpec, 'upper')} />
+            {(!item.sameBars || sashBarPattern(windowSpec, 'upper') !== sashBarPattern(windowSpec, 'lower')) && <SpecRow label="Lower" value={sashBarPattern(windowSpec, 'lower')} />}
             <SpecRow label="Horns" value={windowSpec?.sash.hornType || 'none'} />
           </SpecSection>
           )}
@@ -323,8 +350,9 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
       // Single source: the engine row carries the label (barsV/barsH + type); doors too (08.10.2026).
       return g.bars || '—';
     }
-    const pat = g.sash === 'upper' ? (spec?.upperBars || spec?.bars?.upper)
-      : g.sash === 'lower' ? (spec?.lowerBars || spec?.bars?.lower) : null;
+    // sash rows carry their own sash's pattern (lists.js, 09.10.2026); this read
+    // spec.upperBars, a field the normalised spec never has, so it printed a dash
+    const pat = g.sash === 'upper' || g.sash === 'lower' ? g.bars : null;
     return pat && pat !== 'none' ? String(pat) : '—';
   };
   const rowArea = (g) =>
