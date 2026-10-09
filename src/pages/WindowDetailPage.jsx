@@ -207,7 +207,7 @@ export default function WindowDetailPage() {
         {/* Main content area */}
         <div className="xl:col-span-2">
           {tab === '3d' && (
-            <ThreeDPanel item={item} windowSpec={windowSpec} batch={currentBatch} editUrl={editUrl} />
+            <ThreeDPanel item={item} windowSpec={windowSpec} batch={currentBatch} editUrl={editUrl} derived={derived} />
           )}
 
           {tab === '2d' && (

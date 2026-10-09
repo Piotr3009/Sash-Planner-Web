@@ -4,6 +4,7 @@
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
 import { STROKE, COLORS, FONT, SIZES, STROKES, VIEWBOX_REF, DimH, DimV, TitleBlock, Label, DIM_OFFSET, MARGIN, tfs } from './drawingUtils.jsx';
+import { isCottageProportion } from '../../engine/specification.js';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
 
@@ -87,7 +88,7 @@ export default function VerticalSection2D({ windowSpec, derived }) {
           </g>
         ))}
 
-        <DimV x={-DIM_OFFSET} y1={0} y2={d.totalStackH} extFrom={0} label={`≈ ${Math.round(d.totalStackH * 10) / 10} mm`} vbw={totalW} />
+        <DimV x={-DIM_OFFSET} y1={0} y2={d.totalStackH} extFrom={0} label={`≈ ${isCottageProportion(derived?.sashProportion) ? Math.round(d.totalStackH * 10) / 10 : d.totalStackH} mm`} vbw={totalW} />
         <DimH y={d.totalStackH + DIM_OFFSET} x1={0} x2={d.depth} extFrom={d.totalStackH} label={`Depth: ${d.depth} mm`} vbw={totalW} />
         <TitleBlock x={d.depth / 2} y={d.totalStackH + DIM_OFFSET * 2 + 20}
           title="VERTICAL SECTION"

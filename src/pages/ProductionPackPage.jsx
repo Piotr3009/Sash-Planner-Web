@@ -815,7 +815,7 @@ function ThreeDTab({ windowsData, pp, batch, registerExport }) {
 
   // Stable list for the capture rig (id + spec), aligned to windowsData order.
   const captureList = useMemo(
-    () => windowsData.map((d) => ({ id: d.win.id, windowSpec: d.windowSpec })),
+    () => windowsData.map((d) => ({ id: d.win.id, windowSpec: d.windowSpec, derived: d.derived })),
     [windowsData]
   );
 
@@ -856,7 +856,7 @@ function ThreeDTab({ windowsData, pp, batch, registerExport }) {
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {windowsData.map(({ win, windowSpec }) => (
+        {windowsData.map(({ win, windowSpec, derived }) => (
           <div key={win.id} className="card overflow-hidden">
             <div className="px-4 py-2 border-b border-surface-500 flex items-center justify-between">
               <span className="text-sm font-medium text-ink-50">
@@ -868,7 +868,7 @@ function ThreeDTab({ windowsData, pp, batch, registerExport }) {
               </Link>
             </div>
             <div className="aspect-[4/3] bg-gradient-to-br from-surface-600 to-surface-700">
-              <WindowPreview3D windowSpec={windowSpec} side="exterior" />
+              <WindowPreview3D windowSpec={windowSpec} side="exterior" derived={derived} />
             </div>
           </div>
         ))}

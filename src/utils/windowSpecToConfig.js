@@ -75,7 +75,7 @@ function resolveColor(name, ral) {
  * Convert a windowSpec object (from specification.js normaliseToWindowSpec)
  * into props that ParametricSashWindow accepts.
  */
-export function windowSpecToConfig(windowSpec) {
+export function windowSpecToConfig(windowSpec, derived = null) {
   if (!windowSpec) return {};
 
   // Casement windows route to CasementWindow via casementProps; width/height
@@ -272,10 +272,13 @@ export function windowSpecToConfig(windowSpec) {
     sashType: 'double',
     splitRatio: '1/4-1/2-1/4',
     // cottage (Piotr 09.10.2026): the proportion and the meeting line fraction from
-    // the engine helper (every sash window, standard included: the 3D meeting line
-    // sits where production puts it)
+    // the engine (every sash window, standard included: the 3D meeting line sits
+    // where production puts it). A page that derived the window (under the batch
+    // profile snapshot) passes its derived data, so the 3D uses that very number.
     sashProportion: windowSpec.sash?.proportion || 'standard',
-    meetingFraction: meetingFractionFor(h, windowSpec.sash?.proportion || 'standard'),
+    meetingFraction: derived?.category === 'sash' && Number.isFinite(derived.meetingFraction)
+      ? derived.meetingFraction
+      : meetingFractionFor(h, windowSpec.sash?.proportion || 'standard'),
     headType: 'flat',
     // arched sash (v3 Block 1 I): the PSW `sashType 'arched'` branch of the shared App with PC's shape + real rise
     ...(windowSpec.category === 'sash' && windowSpec.arch?.shape && windowSpec.sash?.type !== 'triple' ? {

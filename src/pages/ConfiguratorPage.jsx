@@ -13,7 +13,7 @@ import {
 } from '../engine/arch.js';
 import { DEFAULT_DOOR_PROFILE, getCasementProfile, getDoorProfile, getWindowProfile } from '../engine/profile.js';
 import { casementFrameDims, doorFrameDims, doorGeometryFromSpec } from '../utils/windowSpecToConfig.js';
-import { normaliseToWindowSpec, SASH_PROPORTION_OPTIONS, SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, effectiveSashProportion } from '../engine/specification.js';
+import { normaliseToWindowSpec, SASH_PROPORTIONS, SASH_PROPORTION_OPTIONS, SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, effectiveSashProportion } from '../engine/specification.js';
 import { CONSTANTS, meetingFractionFor } from '../engine/calculations.js';
 import CasementLayoutPicker from '../components/configurator/CasementLayoutPicker.jsx';
 import NumInput from '../components/NumInput.jsx';
@@ -489,6 +489,8 @@ export default function ConfiguratorPage() {
   // below 900) sets the choice back to standard.
   const cottageAllowed = !isArchedSash && extH >= COTTAGE_MIN_FRAME_HEIGHT;
   const sashProp = effectiveSashProportion(sashProportion, { frameHeight: extH, arched: isArchedSash });
+  // a stored value the engine does not know (e.g. a newer PSW one): said next to the control, not saved, no 3D line from it
+  const proportionError = SASH_PROPORTIONS.includes(sashProp) ? null : `Unknown sash proportion "${sashProp}": choose one of the three.`;
   useEffect(() => { if (isArchedSash) setSashProportion('standard'); }, [isArchedSash]);
   // the circle's height is its diameter — the height input follows the width
   useEffect(() => {
@@ -795,10 +797,10 @@ export default function ConfiguratorPage() {
       doubleGlazing: glassType !== 'single',
       spacerColor, sashType, splitRatio, headType, openingType: opening,
       // the meeting line where production puts it (engine helper, every sash window)
-      sashProportion: sashProp, meetingFraction: meetingFractionFor(extH, sashProp),
+      sashProportion: sashProp, meetingFraction: proportionError ? undefined : meetingFractionFor(extH, sashProp),
       boxType: frameType === 'slim' ? 'slim' : 'standard', boxDepth: frameDepth,
     });
-  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, sashProp, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, isArched, isFixedCas, isCircle, pcArchShape, isGothicUi, casArchProfile, casArchRiseSource, archStartNum, archRiseNum, casArchHinge, casArchPattern, isCustomHub, casArchSpokes, casArchRings, isArchedSash, sashArchHB, sashArchVB, sashLowerHB, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType, glassSpec, glassCoating, glassGas, spacerType]);
+  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, sashProp, proportionError, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, isArched, isFixedCas, isCircle, pcArchShape, isGothicUi, casArchProfile, casArchRiseSource, archStartNum, archRiseNum, casArchHinge, casArchPattern, isCustomHub, casArchSpokes, casArchRings, isArchedSash, sashArchHB, sashArchVB, sashLowerHB, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType, glassSpec, glassCoating, glassGas, spacerType]);
   useEffect(() => { sync(); }, [sync]);
 
   // ─── B4: Listen for 3D ready event and re-sync ───
@@ -964,9 +966,9 @@ export default function ConfiguratorPage() {
             className={`px-3 py-2 border-2 rounded-lg text-sm w-56 bg-surface-800 ${winName.trim() ? 'border-accent-500 text-ink-50' : 'border-status-danger/50 text-ink-200'}`} />
           <button
             onClick={save}
-            disabled={shapeBlocked}
-            title={shapeBlocked ? `${isCircle ? 'Circle' : 'Arch'}: ${archError}` : undefined}
-            className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'} ${shapeBlocked ? 'opacity-40 cursor-not-allowed' : ''}`}
+            disabled={shapeBlocked || (isSash && !!proportionError)}
+            title={shapeBlocked ? `${isCircle ? 'Circle' : 'Arch'}: ${archError}` : (isSash && proportionError) || undefined}
+            className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'} ${shapeBlocked || (isSash && proportionError) ? 'opacity-40 cursor-not-allowed' : ''}`}
           >
             {isEditMode ? '✓ Update Window' : '✓ Save to Batch'}
           </button>
@@ -1028,6 +1030,7 @@ export default function ConfiguratorPage() {
               <Lbl>Sash proportions</Lbl>
               <HChips o={SASH_PROPORTION_OPTIONS} v={sashProp} c={setSashProportion} disabled={(x) => x.value !== 'standard' && !cottageAllowed} />
               {!cottageAllowed && <div className="text-[10px] text-ink-400 -mt-1 mb-2">Cottage needs a frame height of {COTTAGE_MIN_FRAME_HEIGHT} mm or more.</div>}
+              {proportionError && <div className="text-[11px] text-red-400 -mt-1 mb-2">{proportionError}</div>}
             </>}
             <Lbl>Head</Lbl><HChips o={HEAD_TYPES} v={headType} c={setHeadType} />
             {sashType !== 'triple' && <>

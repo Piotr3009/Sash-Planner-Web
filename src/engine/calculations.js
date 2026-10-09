@@ -458,7 +458,7 @@ const DOOR_GLASS_KG_PER_SQM = { double: 30 };
 
 // Timber and glass kg of each sash, the one weight formula of a rectangular sash
 // (calculateWeights sums it, sashWeightsFor splits it per sash).
-function sashWeightParts(windowSpec, sashWidth, topSashHeight, bottomSashHeight) {
+function sashWeightParts(windowSpec, sashWidth, topSashHeight, bottomSashHeight, equalGlass = false) {
     const sw = sashWidth / 1000; // to meters
     // kg/m derived from finished section (profile) × timber density
     const prof = getWindowProfile();
@@ -487,7 +487,8 @@ function sashWeightParts(windowSpec, sashWidth, topSashHeight, bottomSashHeight)
     const _f = sashFaces();
     const glassW = sashWidth - 2 * _f.stile;
     const upperGlassH = topSashHeight - _f.top - _f.meet;
-    const lowerGlassH = bottomSashHeight - _f.meet - _f.bottom;
+    // a standard sash has equal glass by its rule: the same number, bit for bit, under any profile
+    const lowerGlassH = equalGlass ? upperGlassH : bottomSashHeight - _f.meet - _f.bottom;
     const glassType = windowSpec.glazing?.type || 'double';
     const kgPerSqm = GLASS_KG_PER_SQM[glassType] || GLASS_KG_PER_SQM['double'];
     const upperGlass = (glassW * upperGlassH) / 1_000_000 * kgPerSqm;
@@ -495,8 +496,8 @@ function sashWeightParts(windowSpec, sashWidth, topSashHeight, bottomSashHeight)
     return { upperTimber, lowerTimber, upperGlass, lowerGlass, glassType, kgPerSqm };
 }
 
-function calculateWeights(windowSpec, sashWidth, topSashHeight, bottomSashHeight) {
-    const { upperTimber, lowerTimber, upperGlass, lowerGlass, glassType, kgPerSqm } = sashWeightParts(windowSpec, sashWidth, topSashHeight, bottomSashHeight);
+function calculateWeights(windowSpec, sashWidth, topSashHeight, bottomSashHeight, equalGlass = false) {
+    const { upperTimber, lowerTimber, upperGlass, lowerGlass, glassType, kgPerSqm } = sashWeightParts(windowSpec, sashWidth, topSashHeight, bottomSashHeight, equalGlass);
     const glassTotal = upperGlass + lowerGlass;
 
     const subtotal = upperTimber + lowerTimber + glassTotal;
@@ -522,7 +523,7 @@ export function sashWeightsFor(windowSpec, derived) {
     if (!derived || derived.category !== 'sash') return null;
     if (derived.weights?.upperKg != null) return { upperKg: derived.weights.upperKg, lowerKg: derived.weights.lowerKg };
     const width = derived.tripleSections ? derived.tripleSections.center : derived.sashWidth;
-    const p = sashWeightParts(windowSpec, width, derived.topSashHeight, derived.bottomSashHeight);
+    const p = sashWeightParts(windowSpec, width, derived.topSashHeight, derived.bottomSashHeight, (derived.sashProportion || 'standard') === 'standard');
     return { upperKg: round((p.upperTimber + p.upperGlass) * 1.05), lowerKg: round((p.lowerTimber + p.lowerGlass) * 1.05) };
 }
 
@@ -540,13 +541,13 @@ function paintFromAreaSqm(areaSqm) {
     };
 }
 
-function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight) {
+function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight, equalGlass = false) {
     const _f = sashFaces();
     const glassW = sashWidth - 2 * _f.stile;
     // Each sash its own glass height (equal on a standard sash; a cottage upper
     // pane is shorter and its lower pane taller, Piotr 09.10.2026)
     const glassHu = topSashHeight - _f.top - _f.meet;
-    const glassHl = bottomSashHeight - _f.meet - _f.bottom;
+    const glassHl = equalGlass ? glassHu : bottomSashHeight - _f.meet - _f.bottom;   // standard: equal by its rule
     const glassType = windowSpec.glazing?.type || 'double';
 
     const gridMode = windowSpec.sash?.grid?.mode || 'none';
@@ -621,14 +622,15 @@ const BEADING_BAR_PATTERNS = {
     '4x4': { v: 1, h: 1 }, '6x6': { v: 2, h: 1 }, '8x8': { v: 3, h: 1 }, '9x9': { v: 2, h: 2 },
 };
 
-function calculateBeadingComponents(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight) {
+function calculateBeadingComponents(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight, equalGlass = false) {
     const F = OFFCUT_FACTOR;
     const _f = sashFaces();
     const glassW = sashWidth - 2 * _f.stile;
     // Each sash its own glass height (a cottage upper pane is shorter, its lower one taller)
     const glassHu = topSashHeight - _f.top - _f.meet;
-    const glassHl = bottomSashHeight - _f.meet - _f.bottom;
-    const equal = glassHu === glassHl;   // every standard sash: the notes keep "× 2"
+    // a standard sash has equal glass by its rule (the same number, bit for bit, under any profile; the notes keep "× 2")
+    const glassHl = equalGlass ? glassHu : bottomSashHeight - _f.meet - _f.bottom;
+    const equal = equalGlass;
 
     const gridMode = windowSpec.sash?.grid?.mode || 'none';
     const pattern = BEADING_BAR_PATTERNS[gridMode] || BEADING_BAR_PATTERNS['none'];
@@ -1820,14 +1822,15 @@ export function deriveWindowData(windowSpec, settings = {}) {
         horizontal: result.components.sash.glazingBars.horizontal.positions,
     };
 
+    const equalGlass = sashProportion === 'standard';
     const beadingComponents = calculateBeadingComponents(
-        windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight
+        windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight, equalGlass
     );
 
     // Triple sash: counterweights balance only the centre (opening) section
-    let weights = calculateWeights(windowSpec, tripleSections ? tripleSections.center : sashWidth, topSashHeight, bottomSashHeight);
+    let weights = calculateWeights(windowSpec, tripleSections ? tripleSections.center : sashWidth, topSashHeight, bottomSashHeight, equalGlass);
     let paint = calculatePaint(frameWidth, frameHeight);
-    let consumables = calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight);
+    let consumables = calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight, equalGlass);
 
     // ── Arched sash (ARCHED-WINDOWS-v3 Block 1 C): the box head and the upper
     //    sash's top rail become rings on the frame contour (arch.js, rule C);

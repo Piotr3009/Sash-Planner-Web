@@ -155,7 +155,7 @@ export default function Window3DCaptureRig({ windows, side = 'exterior', size = 
   const doneRef = useRef(false);
 
   const config = useMemo(
-    () => (list[idx] ? windowSpecToConfig(list[idx].windowSpec) : null),
+    () => (list[idx] ? windowSpecToConfig(list[idx].windowSpec, list[idx].derived || null) : null),
     [list, idx]
   );
 

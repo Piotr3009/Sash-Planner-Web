@@ -139,7 +139,7 @@ function Scene({ config, side }) {
   );
 }
 
-export default function WindowPreview3D({ windowSpec, side }) {
+export default function WindowPreview3D({ windowSpec, side, derived = null }) {
   if (!windowSpec) {
     return (
       <div className="grid place-items-center h-full text-ink-400">
@@ -149,7 +149,8 @@ export default function WindowPreview3D({ windowSpec, side }) {
   }
 
   // Convert Planner windowSpec → ParametricSashWindow props
-  const config = useMemo(() => windowSpecToConfig(windowSpec), [windowSpec]);
+  // derived (when the page has it): the meeting line under the batch profile snapshot
+  const config = useMemo(() => windowSpecToConfig(windowSpec, derived), [windowSpec, derived]);
 
   // Camera position based on window size (a door: the whole assembly)
   const h = (config.doorGeo ? Math.max(config.doorGeo.totalHeight, config.doorGeo.totalWidth) : (config.height || 1800)) / 1000;

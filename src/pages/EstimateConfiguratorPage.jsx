@@ -6,7 +6,7 @@ import IronmongeryMatrixModal from '../components/IronmongeryMatrixModal.jsx';
 import { GLASS_TYPES, GLASS_FINISHES, FROSTED_LOCATIONS, SPACERS, SPACER_TYPES, SWATCHES, RAL_GROUPS, FB_GROUPS } from '../config.js';
 import { buildVentGrilles } from '../engine/lists.js';
 import { calculatePrice } from '../engine/pricing.js';
-import { SASH_PROPORTION_OPTIONS, SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, effectiveSashProportion } from '../engine/specification.js';
+import { SASH_PROPORTIONS, SASH_PROPORTION_OPTIONS, SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, effectiveSashProportion } from '../engine/specification.js';
 import { meetingFractionFor } from '../engine/calculations.js';
 
 // Reuse the SAME 3D viewer the production configurator uses (window.update3D bridge).
@@ -169,6 +169,8 @@ export default function EstimateConfiguratorPage() {
   // effective value is what the 3D shows, the price counts and the save stores
   const cottageAllowed = extH >= COTTAGE_MIN_FRAME_HEIGHT;
   const sashProp = effectiveSashProportion(sashProportion, { frameHeight: extH });
+  // a stored value the engine does not know (e.g. a newer PSW one): said next to the control, not saved, no 3D line from it
+  const proportionError = SASH_PROPORTIONS.includes(sashProp) ? null : `Unknown sash proportion "${sashProp}": choose one of the three.`;
   const isSingle = colourMode === 'single';
   const effectiveLBars = sameBars ? uBars : lBars;
   const effectiveLCustom = sameBars ? uCustom : lCustom;
@@ -199,10 +201,10 @@ export default function EstimateConfiguratorPage() {
       lowerGlass: gFin === 'frosted' ? 'frosted' : 'clear',
       spacerColor: spacer, sashType, splitRatio, headType, openingType: opening,
       // the meeting line where production puts it (engine helper, every sash window)
-      sashProportion: sashProp, meetingFraction: meetingFractionFor(extH, sashProp),
+      sashProportion: sashProp, meetingFraction: proportionError ? undefined : meetingFractionFor(extH, sashProp),
       boxType: glassType === 'triple' ? 'standard' : frameType, boxDepth: frameDepth,
     });
-  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, effectiveLCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, ironBespoke, derivedFinish, gFin, frostLoc, spacer, sashType, splitRatio, sashProp, headType, opening, glassType, frameType, frameDepth]);
+  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, effectiveLCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, ironBespoke, derivedFinish, gFin, frostLoc, spacer, sashType, splitRatio, sashProp, proportionError, headType, opening, glassType, frameType, frameDepth]);
   useEffect(() => { sync(); }, [sync]);
   useEffect(() => {
     const handler = () => sync();
@@ -261,7 +263,7 @@ export default function EstimateConfiguratorPage() {
   });
 
   const handleSave = () => {
-    if (!winName.trim()) return;
+    if (!winName.trim() || proportionError) return;
     const item = {
       windowName: winName.trim(),
       config: buildSaveConfig(),
@@ -300,7 +302,7 @@ export default function EstimateConfiguratorPage() {
         <div className="flex items-center gap-3">
           <input type="text" placeholder="Window name (max 7)" maxLength={7} value={winName} onChange={(e) => setWinName(e.target.value)}
             className={`px-3 py-2 border-2 rounded-lg text-sm w-56 bg-surface-800 ${winName.trim() ? 'border-accent-500 text-ink-50' : 'border-status-danger/50 text-ink-200'}`} />
-          <button onClick={handleSave} className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'}`}>
+          <button onClick={handleSave} disabled={!!proportionError} title={proportionError || undefined} className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'} ${proportionError ? 'opacity-40 cursor-not-allowed' : ''}`}>
             {isEditMode ? '✓ Update window' : '✓ Add to estimate'}
           </button>
         </div>
@@ -315,6 +317,7 @@ export default function EstimateConfiguratorPage() {
             <Lbl>Sash proportions</Lbl>
             <HChips o={SASH_PROPORTION_OPTIONS} v={sashProp} c={setSashProportion} disabled={(x) => x.value !== 'standard' && !cottageAllowed} />
             {!cottageAllowed && <div className="text-[10px] text-ink-400 -mt-1 mb-2">Cottage needs a frame height of {COTTAGE_MIN_FRAME_HEIGHT} mm or more.</div>}
+            {proportionError && <div className="text-[11px] text-red-400 -mt-1 mb-2">{proportionError}</div>}
             <Lbl>Head</Lbl><HChips o={HEAD_TYPES} v={headType} c={setHeadType} />
           </Sec>
 
