@@ -3,7 +3,7 @@
  */
 import { useMemo, useState } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
-import { computeBarPositions, DimChainH, DimChainV, DimH, DimV, tfs, HORN_DEF, buildHornPath } from './drawingUtils.jsx';
+import { computeBarPositions, DimChainH, DimChainV, DimH, DimV, tfs, HORN_DEF, buildHornPath, WindowTag } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 // Arched sash (v3 Block 1 H): the upper sash outline / daylight / unit / bars are the engine's ArcChains
 import { archToSheet, glassToSheet, archedOutlineD, barBandD, arcLabelPoint, isHaunchArc, radiiText } from './archDrawUtils.js';
@@ -41,7 +41,7 @@ function computeSegments(from, to, cutPairs) {
   return segs;
 }
 
-export default function SashDetail2D({ windowSpec, derived, type = 'upper', onExpand, projectNumber, selectedElement, onElementClick }) {
+export default function SashDetail2D({ windowSpec, derived, type = 'upper', onExpand, projectNumber, selectedElement, onElementClick , windowTag }) {
   const clickable = typeof onElementClick === 'function';
   const hl = (key) => clickable && selectedElement === key;
   const [expanded, setExpanded] = useState(false);
@@ -131,7 +131,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
   const glassFinish = windowSpec?.glass?.finish || 'clear';
   const A = geom.A;
   const subtitleText = A
-    ? `arched · ${A.geometry.label} · rise ${fmt(geom.apex)} · stile ${fmt(A.geometry.upperStraightStile)} · S-ATR ${fmt(A.geometry.topRail.lengths.centre)} · ${A.pattern !== 'none' ? A.pattern : `${A.barCounts?.h || 0}H × ${A.barCounts?.v || 0}V`}`
+    ? `arched · ${A.geometry.label} · rise ${fmt(geom.apex)} · stile ${fmt(A.geometry.upperStraightStile)} · ATR ${fmt(A.geometry.topRail.lengths.centre)} · ${A.pattern !== 'none' ? A.pattern : `${A.barCounts?.h || 0}H × ${A.barCounts?.v || 0}V`}`
     : `${geom.gridMode} · ${glassType} / ${glassFinish}`;
   // arched paths (sheet coords): outline = top rail ring outer + stiles, daylight = ring inner, unit + bars from the glass frame
   const AP = A ? (() => {
@@ -394,6 +394,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
             textAnchor="middle" fillOpacity={0.6}>
             {subtitleText}
           </text>
+          {windowTag ? <WindowTag tag={windowTag} vbw={totalW} /> : null}
         </svg>
       </div>
     </div>

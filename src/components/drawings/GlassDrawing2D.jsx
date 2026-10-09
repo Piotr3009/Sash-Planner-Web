@@ -14,7 +14,7 @@ import { buildGlassListForWindow } from '../../engine/lists.js';
 import { getCasementProfile } from '../../engine/profile.js';
 import { readGlassProfile } from '../../engine/glassBars.js';
 import { STROKE, COLORS, FONT, SIZES, WEIGHTS, STROKES, VIEWBOX_REF,
-  DimH, DimV, DimChainH, DimChainV, tfs, computeGlassBarPositions } from './drawingUtils.jsx';
+  DimH, DimV, DimChainH, DimChainV, tfs, computeGlassBarPositions, WindowTag } from './drawingUtils.jsx';
 import CasementGlassDrawing2D from './CasementGlassDrawing2D.jsx';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
@@ -40,7 +40,7 @@ function segmentsBetween(from, to, cutPairs) {
   return segs;
 }
 
-export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) {
+export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' , windowTag }) {
   // Arched sash (v3 Block 1 H): the upper unit is the engine's arched outline — the same sheet the
   // arched casement uses (outline, edge cover, spacer bands, bar-end dimensioning). Lower sash: rectangular below.
   const archedUpper = type === 'upper' && !!derived?.arch?.glassOutline && !derived?.casement;
@@ -276,6 +276,7 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' }) 
             ⚠ {d.errs.join(' · ')}
           </text>
         )}
+        {windowTag ? <WindowTag tag={windowTag} vbw={totalW} /> : null}
       </svg>
     </div>
   );
