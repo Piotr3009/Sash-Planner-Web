@@ -404,7 +404,9 @@ export function buildGlassListForWindow(derived, windowSpec) {
 
   // Sealed glass unit dimensions (verified against Excel; defaults 89/75/108).
   // Live rail/stile faces come from derived.sashDims (snapshot-aware), so a
-  // meeting rail of 53 or a bottom rail of 120 keeps both units correct & equal.
+  // meeting rail of 53 or a bottom rail of 120 keeps both units correct (equal
+  // on a standard sash; a cottage sash has a shorter upper and a taller lower
+  // unit, both from the derived sash heights, Piotr 09.10.2026).
   const sd = derived.sashDims || {};
   const fStile = Number(sd.stile) || CONSTANTS.STILE_WIDTH;
   const fTop = Number(sd.topRail) || CONSTANTS.TOP_RAIL_WIDTH;

@@ -50,7 +50,7 @@ export default function ExportControls({ item, windowSpec, settings, derived }) 
           title="DXF"
           description="2D outline frame + sash for CNC"
           busy={busy === 'dxf'}
-          onClick={() => wrap('dxf', () => exportWindowToDXF({ item, windowSpec }))}
+          onClick={() => wrap('dxf', () => exportWindowToDXF({ item, windowSpec, derived }))}
         />
       </div>
     </div>

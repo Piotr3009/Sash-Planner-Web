@@ -27,7 +27,13 @@ function rectPoints(x, y, w, h) {
   ];
 }
 
-export async function exportWindowToDXF({ item, windowSpec }) {
+export async function exportWindowToDXF({ item, windowSpec, derived }) {
+  // The sash outlines come from the derived data (deriveWindowData, under the
+  // batch profile): no formula of its own, so a cottage window is drawn with
+  // its real top and bottom sash (Piotr 09.10.2026).
+  if (!derived || !derived.topSashHeight || !derived.bottomSashHeight) {
+    throw new Error('DXF export needs the calculated window data');
+  }
   const w = Number(windowSpec.frame.width);
   const h = Number(windowSpec.frame.height);
 
@@ -42,11 +48,10 @@ export async function exportWindowToDXF({ item, windowSpec }) {
   const sillW = CONSTANTS.SILL_WIDTH;
   dxf += lwpolyline(rectPoints(jambW, sillW, w - 2 * jambW, h - headW - sillW), 'OPENING');
 
-  // Sash outlines (top + bottom)
-  const sashW = w - CONSTANTS.SASH_WIDTH_DEDUCTION;
-  const totalSashH = h - CONSTANTS.SASH_HEIGHT_DEDUCTION;
-  const topSashH = Math.floor((totalSashH - CONSTANTS.SASH_HEIGHT_DIFFERENCE) / 2);
-  const botSashH = topSashH + CONSTANTS.SASH_HEIGHT_DIFFERENCE;
+  // Sash outlines (top + bottom): derived heights, whole mm (the file's own rounding)
+  const sashW = derived.sashWidth;
+  const topSashH = Math.floor(derived.topSashHeight);
+  const botSashH = Math.floor(derived.bottomSashHeight);
   const sashX = (w - sashW) / 2;
   const innerY = sillW;
   dxf += lwpolyline(rectPoints(sashX, innerY, sashW, botSashH), 'SASH-BOTTOM');
