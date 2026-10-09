@@ -195,6 +195,40 @@ fixed fan stiles / tops), 67x57 (fixed fan bottoms), 68x93 (head, jambs, 2 mulli
 quantities include d_mullion 4748 mm, d_transom_rail 2287 mm, d_threshold_alu_double 1, d_threshold_seal 1.57 m.
 
 
+### Stage 3: tests for Stages 1 and 2
+
+- **New `verify/parity/t44_doors_v3.mjs`** (118 checks): bundles the live src and the start tree (git archive
+  150500e). Sections: the profile schema 3 and every row of 3.10 to 0.01 (leaf, glass, panel and its daylight, fan
+  leaves opening and fixed, side lights, mullion lengths, transom segments and band); thresholds (standard,
+  aluminium, low-profile, each outward and inward: leaf H 1998, effective type, the threshold product and the seal
+  only for an outward aluminium / low-profile door, the seal line on the hardware list, the timber cill on the cut
+  list; the seal across the door opening between mullion lands; the mullions to the floor without a timber cill);
+  trickle vents by room type on the hardware list and through the trickleVents slot in the BOM; the handing strings
+  (six cases, the internal kit handing, no Winkhaus word anywhere, the hints); the schema 2 to 3 migration (the
+  start tree's default as the stored copy: defaults move, hand edits stay, retired keys stay as stored,
+  idempotent, a schema-2 batch snapshot derives with v3); controls (every casement layout code, fixed, triple
+  glass, a decimal frame, sash none / 2x2 / 6x6 at two sizes, cottage: windowSpec, derived, cut list, glass list,
+  pre-cut, hardware list and BOM byte-identical to the start); Assign Materials rows (order, the five v3 rows
+  appended, the seal row, `PART_DEFAULT_FROM` against the rows, the counterpart resolution: own wins, unassigned
+  takes the counterpart with its yield, the pre-cut merges on the counterpart material, the BOM lines); the door BOM
+  part quantities of the reference set (read once, then checked by hand in the comment: 2400 x 2400 opening fan,
+  the same with a fixed fan on aluminium, the half-glazed panel boards); the shared helpers (both engines call
+  them, the door engine reads no retired key, the helpers by hand) and the visible openings.
+- **t41** sections 1 to 17 moved to the v3 rules, a "doors v3" reason at every changed assertion (leaf 1998, glass
+  1747, half-glazed 999 / 881 / 644 x 806, three-quarter 1498.5 / 1380.5 / 644 x 306.5, hinge centres 200 / 899
+  / 1848, frame H = leaf + 102 for the hinge cases, the handing strings and kit handing, vents on doors, the
+  threshold seal, the inward + aluminium case, BOM timber + 10 at 1998, the mullion in the pre-cut group, the side
+  light 64x57 / 180x57 groups, the symbols M / FF*, the fixed fan as a leaf, the transom segment 1506.5, jambs at
+  the overall H, side panels on a 2600 frame (door field 1600, leaves 789 between the mullions), the migration to
+  schema 3, the 33 door rows, the variant notes). The panel board check now rounds the panel area to 0.0001 first,
+  as the engine does (633 x 797 happened to round alike). Section 18 (sheets) follows Stage 4.
+- **t27** (door identities, section 5 door with a side panel, section 5b schema rows, the source gate), **t29**
+  section 6 (the engine mullion), **t34** (the reference door pinned through `leafAtFloor 47`), **t38** (the door
+  migration control compares the keys of the live default), **t43_sash_proportions** (the door controls: windowSpec
+  equal, derive 4 mm lower): each changed assertion carries its reason; assertion counts unchanged (97, 34, 46,
+  471, 233).
+
+
 ## 2026-10-09 · TURA PC: SASH PROPORTIONS, COTTAGE 40/60 AND 1/3-2/3 (branch `claude/sash-proportions`)
 
 Owner box (Piotr, 09.10.2026): a new sash option `sashProportion` (`standard`, `cottage-40-60`, `cottage-1-3`, missing

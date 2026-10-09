@@ -505,12 +505,24 @@ const OTHERS = [
   ['fixed casement 800 x 1200', 800, 1200, { windowCategory: 'casement', casementKind: 'fixed' }],
   ['circle 800', 800, 800, { windowCategory: 'casement', casementKind: 'fixed', archShape: 'circle' }],
   ['arched casement 1000 x 1500', 1000, 1500, { windowCategory: 'casement', casementType: 'arched', archShape: 'semi-circle', archRise: 200 }],
-  ['door single 900 x 2100', 900, 2100, { windowCategory: 'door', doorType: 'single-external' }],
-  ['door french 1600 x 2100', 1600, 2100, { windowCategory: 'door', doorType: 'french' }],
 ];
 for (const [name, w, h, fc] of OTHERS) {
   const a = mk(LIVE, w, h, fc), b = mk(START, w, h, fc);
   ok(JSON.stringify(a.derived) === JSON.stringify(b.derived) && JSON.stringify(a.spec) === JSON.stringify(b.spec), `${name}: derived and windowSpec deep-equal to START`);
+}
+// doors v3 (09.10.2026) moved the door derive on purpose (every leaf 51 above the floor: H - 102,
+// was H - 98; the v3 rules are checked in t44_doors_v3). Here the door windowSpec stays equal to
+// START (the sash proportion field never reaches a door) and the derive differs only by the 4 mm
+// of leaf height: widths, glass widths and roles equal, heights 4 less.
+for (const [name, w, h, fc] of [
+  ['door single 900 x 2100', 900, 2100, { windowCategory: 'door', doorType: 'single-external' }],
+  ['door french 1600 x 2100', 1600, 2100, { windowCategory: 'door', doorType: 'french' }],
+]) {
+  const a = mk(LIVE, w, h, fc), b = mk(START, w, h, fc);
+  const la = a.derived.door.leaves, lb = b.derived.door.leaves, ga = a.derived.customGlassUnits, gb = b.derived.customGlassUnits;
+  ok(JSON.stringify(a.spec) === JSON.stringify(b.spec) && la.length === lb.length && la.every((l, i) => l.w === lb[i].w && l.h === lb[i].h - 4 && l.x === lb[i].x)
+    && ga.length === gb.length && ga.every((g, i) => g.width === gb[i].width && g.height === gb[i].height - 4 && g.role === gb[i].role),
+    `${name}: windowSpec deep-equal to START; derived = START with the leaf and glass 4 lower (doors v3: ${lb[0].h} -> ${la[0].h})`);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

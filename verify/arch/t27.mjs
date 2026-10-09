@@ -73,14 +73,20 @@ const dGeo = DP.geometry, dDed = DP.deductions;
 // door schema 2 (owner box 08.10.2026): rebate 21, so 47 / 51 / 98 / 57 (schema 1: 25, 43 / 47 / 94 / 53)
 const dLand = DP.elements.frameJamb.face - dGeo.rebate;                 // 68 − 21 = 47
 const dEdge = dLand + dGeo.gap;                                          // 47 + 4 = 51
-const dFullH = dEdge + dGeo.gapCill + dGeo.cillVisible;                  // 51 + 6 + 41 = 98
-const dNoThr = dEdge + dGeo.gapCill;                                     // 51 + 6 = 57
-check('door: frameHead 68 / frameJamb 68 / couplingPost 136 / transomDeduct 136', DP.elements.frameHead.face === 68 && DP.elements.frameJamb.face === 68 && DP.couplingPost.width === 136 && DP.lengths.transomDeduct === 136);
-check('door identities: couplingPost = 2 × jamb face, transomDeduct = 2 × jamb face', DP.couplingPost.width === 2 * DP.elements.frameJamb.face && DP.lengths.transomDeduct === 2 * DP.elements.frameJamb.face);
+// doors v3 (09.10.2026): every door leaf stands leafAtFloor 51 above the floor whatever the
+// threshold, so the two stored leaf rules are the derived leafAtJamb + leafAtFloor = 102 (they
+// were 51 + 6 + 41 = 98 and 51 + 6 = 57, and are no longer read by the engine)
+const dFullH = dEdge + dDed.leafAtFloor;                                 // 51 + 51 = 102
+const dNoThr = dEdge + dDed.leafAtFloor;                                 // 51 + 51 = 102
+// doors v3: the transom is the casement transom (segments = field leaf W + seat 8.5), the
+// transomDeduct 136 rule is retired; the coupling post stays in the profile (not read), a
+// casement mullion 68 stands between the door and a side panel
+check('door: frameHead 68 / frameJamb 68 / couplingPost 136 kept / mullion 68 / transomSeat 8.5 (doors v3: transomDeduct retired)', DP.elements.frameHead.face === 68 && DP.elements.frameJamb.face === 68 && DP.couplingPost.width === 136 && DP.elements.mullion.face === 68 && DP.lengths.transomSeat === 8.5 && !('transomDeduct' in DP.lengths));
+check('door identities: couplingPost = 2 × jamb face (stored), mullion face and transom seat = the casement ones (doors v3)', DP.couplingPost.width === 2 * DP.elements.frameJamb.face && DP.elements.mullion.face === E.mullion.face && DP.lengths.transomSeat === P.lengths.transomSeat);
 check(`door OPTION B: land = jamb face − rebate = ${DP.elements.frameJamb.face} − ${dGeo.rebate} = ${dLand} (was 36)`, dGeo.land === dLand, String(dGeo.land));
 check(`door OPTION B: leafAtJamb = land + gap = ${dLand} + ${dGeo.gap} = ${dEdge} (was 40)`, dDed.leafAtJamb === dEdge, String(dDed.leafAtJamb));
-check(`door OPTION B: leafFullHeight = leafAtJamb + gapCill + cillVisible = ${dEdge} + ${dGeo.gapCill} + ${dGeo.cillVisible} = ${dFullH} (was 87)`, dDed.leafFullHeight === dFullH, String(dDed.leafFullHeight));
-check(`door OPTION B: leafNoThreshold = leafAtJamb + gapCill = ${dEdge} + ${dGeo.gapCill} = ${dNoThr} (was 46)`, dDed.leafNoThreshold === dNoThr, String(dDed.leafNoThreshold));
+check(`door: leafFullHeight = leafAtJamb + leafAtFloor = ${dEdge} + ${dDed.leafAtFloor} = ${dFullH} (doors v3; 98 on 08.10.2026, 87 before option B)`, dDed.leafFullHeight === dFullH, String(dDed.leafFullHeight));
+check(`door: leafNoThreshold = leafAtJamb + leafAtFloor = ${dEdge} + ${dDed.leafAtFloor} = ${dNoThr} (doors v3; 57 on 08.10.2026, 46 before option B)`, dDed.leafNoThreshold === dNoThr, String(dDed.leafNoThreshold));
 check('door OPTION B: land + rebate = frame face — the same invariant the casement frame keeps (the rebate, not the land, is fixed)', dGeo.land + dGeo.rebate === DP.elements.frameHead.face);
 // 08.10.2026 (doors to production, owner box item 1): the door rebate IS the casement rebate 21.
 // Until 07.10.2026 it was 25 = casement 21 + 4 (the 28mm door unit); section 5b keeps that
@@ -178,25 +184,30 @@ section('4 — casementLayouts: frameFace = the profile face, version 3, fan-axi
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-section('5 — doors: faces 68, coupling post 136, land / leafAtJamb from the profile (option B since night 7 stage 3; land 47 / leafAtJamb 51 since 08.10.2026)');
+section('5 — doors: faces 68, the casement mullion between door and side panel, land / leafAtJamb from the profile (option B since night 7 stage 3; land 47 / leafAtJamb 51 since 08.10.2026; doors v3 09.10.2026)');
 {
   const item = { id: 'd1', width: 1000, height: 2100, name: 'D1' };
   const { spec, derived } = deriveItem(M, item, { windowCategory: 'door', doorType: 'single-external', sidePanels: 'left', sideLeftWidth: 400, thresholdType: 'standard' });
   const dL = DP.deductions, dE = DP.elements;
-  const dLeafW = 1000 - 2 * dL.leafAtJamb, dLeafH = 2100 - dL.leafFullHeight;
-  console.log(`  door formula: leaf = (1000 − 2·${dL.leafAtJamb}) × (2100 − ${dL.leafFullHeight}) = ${dLeafW} × ${dLeafH} (option B: land ${DP.geometry.land} = face ${dE.frameJamb.face} − rebate ${DP.geometry.rebate})`);
+  // doors v3: W is the overall frame; the 400 side panel zone runs from the outer edge to the
+  // mullion axis, so the door field is 1000 − 400 = 600 between the axis (17) and the jamb (51);
+  // the leaf stands 51 above the floor (H − 51 − 51)
+  const dLeafW = (1000 - 400) - dL.leafAtMullionAxis - dL.leafAtJamb, dLeafH = 2100 - dL.leafAtJamb - dL.leafAtFloor;
+  console.log(`  door formula: leaf = (600 − ${dL.leafAtMullionAxis} − ${dL.leafAtJamb}) × (2100 − ${dL.leafAtJamb} − ${dL.leafAtFloor}) = ${dLeafW} × ${dLeafH} (option B: land ${DP.geometry.land} = face ${dE.frameJamb.face} − rebate ${DP.geometry.rebate})`);
   const lf = derived.door?.leaves?.[0];
   check(`single door 1000 × 2100: leaf ${dLeafW} × ${dLeafH}`, lf && near(lf.w, dLeafW) && near(lf.h, dLeafH), JSON.stringify(lf));
   const cut = M.lists.buildCutListForWindow(derived, spec);
   const row = (name) => cut.find((r) => (r.name || r.element || r.elementName) === name);
   const secFrame = `${dE.frameHead.face}x${DP.frameDepth}`;
-  const head = row('D-FRAME HEAD'), post = row('D-COUPLING POST'), jamb = row('D-FRAME JAMB (L)');
-  check(`D-FRAME HEAD section ${secFrame}, length = 1000 + 400 side panel − headDeduct ${DP.lengths.headDeduct || 0} = ${1400 - (DP.lengths.headDeduct || 0)}`, head && head.section === secFrame && near(head.length, 1400 - (DP.lengths.headDeduct || 0)), JSON.stringify(head));
+  const head = row('D-FRAME HEAD'), mull = row('D-MULLION'), jamb = row('D-FRAME JAMB (L)');
+  // doors v3: the head spans the overall frame W (was 1000 + 400 with the panel outside)
+  check(`D-FRAME HEAD section ${secFrame}, length = the overall frame 1000 − headDeduct ${DP.lengths.headDeduct || 0} = ${1000 - (DP.lengths.headDeduct || 0)} (doors v3)`, head && head.section === secFrame && near(head.length, 1000 - (DP.lengths.headDeduct || 0)), JSON.stringify(head));
   check(`D-FRAME JAMB section ${secFrame}, length 2100 − jambDeduct = ${2100 - (DP.lengths.jambDeduct || 0)}`, jamb && jamb.section === secFrame && near(jamb.length, 2100 - (DP.lengths.jambDeduct || 0)), JSON.stringify(jamb));
-  check(`D-COUPLING POST ${DP.couplingPost.width}x${DP.frameDepth} (2 × jamb face ${dE.frameJamb.face}), qty 1 (one side panel), jamb length`, post && post.section === `${2 * dE.frameJamb.face}x${DP.frameDepth}` && (post.qty ?? post.quantity) === 1 && near(post.length, 2100 - (DP.lengths.jambDeduct || 0)), JSON.stringify(post));
+  // doors v3: a casement mullion 68x93 (H − 77) instead of the 136 coupling post
+  check(`D-MULLION ${dE.mullion.face}x${DP.frameDepth}, qty 1 (one side panel), length 2100 − ${DP.lengths.mullion} (doors v3, was the coupling post 136)`, mull && mull.section === `${dE.mullion.face}x${DP.frameDepth}` && (mull.qty ?? mull.quantity) === 1 && near(mull.length, 2100 - DP.lengths.mullion) && !row('D-COUPLING POST'), JSON.stringify(mull));
   const panel = derived.door?.panelLeaves?.[0];
-  check(`side panel leaf = 400 − 2·${dL.leafAtJamb} = ${400 - 2 * dL.leafAtJamb} wide (same land / gap as the door)`, panel && near(panel.w, 400 - 2 * dL.leafAtJamb), JSON.stringify(panel));
-  check('no 114x / 57x93 frame section in the door cut list (side-panel members 57x57 are the fixed leaf, unchanged)', !cut.some((r) => /^114x|^57x93$/.test(String(r.section))), cut.map((r) => r.section).join(' '));
+  check(`side panel light = 400 − ${dL.leafAtJamb} − ${dL.leafAtMullionAxis} = ${400 - dL.leafAtJamb - dL.leafAtMullionAxis} wide (doors v3: the jamb and the mullion axis)`, panel && near(panel.w, 400 - dL.leafAtJamb - dL.leafAtMullionAxis), JSON.stringify(panel));
+  check('no 114x / 57x93 frame section in the door cut list (doors v3: side light members 64x57 / 180x57)', !cut.some((r) => /^114x|^57x93$/.test(String(r.section))), cut.map((r) => r.section).join(' '));
   const fr = deriveItem(M, { id: 'f1', width: 1200, height: 2100, name: 'F1' }, { windowCategory: 'door', doorType: 'french' });
   // 08.10.2026 (owner box item 5): half = (W − 2·leafAtJamb − clearance) / 2, each leaf = half + lip
   // (until 07.10.2026: (W − 2·leafAtJamb + frenchOverlap) / 2)
@@ -206,23 +217,27 @@ section('5 — doors: faces 68, coupling post 136, land / leafAtJamb from the pr
   check(`french 1200: D-FRAME HEAD ${secFrame} — the 68 face on every door type`, frCut.find((r) => (r.name || r.element || r.elementName) === 'D-FRAME HEAD')?.section === secFrame);
   // leaf POSITION follows the land too: the leaf starts one leafAtJamb inside the
   // door frame, and that frame starts after the 400 side panel
-  check(`single door with a 400 side panel: leaf x = 400 + leafAtJamb = ${400 + dL.leafAtJamb} (was 440, then 447)`, near(lf.x, 400 + dL.leafAtJamb), String(lf?.x));
+  check(`single door with a 400 side panel: leaf x = the mullion axis 400 + leafAtMullionAxis = ${400 + dL.leafAtMullionAxis} (doors v3; was 451, 447, 440)`, near(lf.x, 400 + dL.leafAtMullionAxis), String(lf?.x));
   const frLeaves = fr.derived.door.leaves;
   check(`french 1200: leaves at x ${dL.leafAtJamb} and ${1200 - dL.leafAtJamb - fLeaf} (the pair stays symmetric about the frame centre)`,
     near(frLeaves[0].x, dL.leafAtJamb) && near(frLeaves[1].x, 1200 - dL.leafAtJamb - fLeaf), JSON.stringify(frLeaves.map((l) => l.x)));
-  // threshold 'none' takes leafNoThreshold instead of leafFullHeight
+  // doors v3: no threshold (an unknown 'none' value has no timber cill) still stands the leaf
+  // 51 above the floor: H − leafAtJamb − leafAtFloor (was H − leafNoThreshold 57 = 2043)
   const noThr = deriveItem(M, { id: 'd3', width: 1000, height: 2100, name: 'D3' }, { windowCategory: 'door', doorType: 'single-external', thresholdType: 'none' });
-  check(`door without a threshold: leaf height = 2100 − leafNoThreshold ${dL.leafNoThreshold} = ${2100 - dL.leafNoThreshold} (was 2054)`,
-    near(noThr.derived.door.leaves[0].h, 2100 - dL.leafNoThreshold), JSON.stringify(noThr.derived.door.leaves[0]));
-  // the coupling post's visible band (door.zones.posts) is land + land outward,
-  // land + frame face inward — both follow the land, so both moved with option B
-  const po = derived.door?.zones?.posts?.[0];
-  check(`coupling post visible band (outward) = land + land = ${2 * DP.geometry.land} (was 72), post ${DP.couplingPost.width} wide centred on the joint`,
-    po && near(po.visW, 2 * DP.geometry.land) && near(po.w, DP.couplingPost.width) && near(po.x, po.axis - DP.couplingPost.width / 2), JSON.stringify(po));
+  check(`door without a threshold: leaf height = 2100 − ${dL.leafAtJamb} − ${dL.leafAtFloor} = ${2100 - dL.leafAtJamb - dL.leafAtFloor} (doors v3; was 2043, 2054)`,
+    near(noThr.derived.door.leaves[0].h, 2100 - dL.leafAtJamb - dL.leafAtFloor), JSON.stringify(noThr.derived.door.leaves[0]));
+  // doors v3: the mullion's visible band is the casement mullion land (13 + 13) centred on the
+  // axis; the openings either side show it (was the coupling post: land + land = 94 outward)
+  const mu = derived.door?.zones?.mullions?.[0];
+  const op = derived.door?.zones?.openings || [];
+  const panelOp = op.find((o) => o.kind === 'panel'), doorOp = op.find((o) => o.kind === 'door');
+  check(`mullion visible band (outward) = mullionLand ${DP.geometry.mullionLand} centred on the axis 400 (doors v3, was the 94 post band)`,
+    mu && near(mu.axisX, 400) && near(mu.x2 - mu.x1, DP.geometry.mullionLand) && panelOp && doorOp && near(doorOp.x - (panelOp.x + panelOp.w), DP.geometry.mullionLand), JSON.stringify(mu));
   const inw = deriveItem(M, { id: 'd4', width: 1000, height: 2100, name: 'D4' }, { windowCategory: 'door', doorType: 'single-external', sidePanels: 'left', sideLeftWidth: 400, thresholdType: 'standard', doorOpenDirection: 'inward' });
-  const ipo = inw.derived.door?.zones?.posts?.[0];
-  check(`coupling post visible band (INWARD) = land + frame face = ${DP.geometry.land} + ${dE.frameHead.face} = ${DP.geometry.land + dE.frameHead.face} (was 104)`,
-    inw.derived.door.inward === true && ipo && near(ipo.visW, DP.geometry.land + dE.frameHead.face), JSON.stringify([inw.derived.door.inward, ipo]));
+  const iop = inw.derived.door?.zones?.openings || [];
+  const ip = iop.find((o) => o.kind === 'panel'), id = iop.find((o) => o.kind === 'door');
+  check(`mullion seen from outside on an INWARD door = half land ${DP.geometry.mullionLand / 2} + half face ${dE.mullion.face / 2} = ${DP.geometry.mullionLand / 2 + dE.mullion.face / 2} (doors v3: the door side shows the full face; was the post 47 + 68 = 115)`,
+    inw.derived.door.inward === true && ip && id && near(id.x - (ip.x + ip.w), DP.geometry.mullionLand / 2 + dE.mullion.face / 2), JSON.stringify([ip, id]));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -264,17 +279,19 @@ section('5b — doors option B: every number against the tree before the change 
   check('the OLD tree really carried option A (land 36, rebate step 68 − 36 = 32 ≠ rebate 25)', ODP.geometry.land === 36 && ODP.elements.frameHead.face - ODP.geometry.land !== ODP.geometry.rebate);
   check('the option-B tree carries option B (land 43, rebate step 68 − 43 = 25 = the rebate)', BDP.elements.frameHead.face - BDP.geometry.land === BDP.geometry.rebate && BDP.geometry.land === 43);
   check('the live tree keeps option B with the casement rebate (land 47, rebate step 68 − 47 = 21 = the rebate)', DP.elements.frameHead.face - DP.geometry.land === DP.geometry.rebate && DP.geometry.land === 47 && DP.geometry.rebate === 21);
-  // door schema 2 (owner box 08.10.2026): the same numbers, option-B tree → live
+  // door schema 2 (owner box 08.10.2026), then schema 3 (doors v3, 09.10.2026): the option-B
+  // tree → live. The widths are the schema-2 ones (v3 left them); the leaf rules and heights are
+  // the v3 ones: 102 / 102 stored, H − 51 − 51 = 1998 (schema 2 gave 98 / 57 / 2002)
   const liveSingle = doorOf(M, 1000, 2100, FC1), liveFrench = doorOf(M, 1200, 2100, FCF);
   const rows2 = [
     ['schema 2 land', BDP.geometry.land, DP.geometry.land, 43, 47],
     ['schema 2 leafAtJamb', BDP.deductions.leafAtJamb, DP.deductions.leafAtJamb, 47, 51],
-    ['schema 2 leafFullHeight', BDP.deductions.leafFullHeight, DP.deductions.leafFullHeight, 94, 98],
-    ['schema 2 leafNoThreshold', BDP.deductions.leafNoThreshold, DP.deductions.leafNoThreshold, 53, 57],
+    ['schema 3 leafFullHeight', BDP.deductions.leafFullHeight, DP.deductions.leafFullHeight, 94, 102],
+    ['schema 3 leafNoThreshold', BDP.deductions.leafNoThreshold, DP.deductions.leafNoThreshold, 53, 102],
     ['schema 2 door 1000 leaf W', nowSingle.leaves[0].w, liveSingle.leaves[0].w, 906, 898],
-    ['schema 2 door 2100 leaf H', nowSingle.leaves[0].h, liveSingle.leaves[0].h, 2006, 2002],
+    ['schema 3 door 2100 leaf H', nowSingle.leaves[0].h, liveSingle.leaves[0].h, 2006, 1998],
     ['schema 2 french 1200 leaf W', nowFrench.leaves[0].w, liveFrench.leaves[0].w, 556, 555],
-    ['schema 2 french 1200 leaf H', nowFrench.leaves[0].h, liveFrench.leaves[0].h, 2006, 2002],
+    ['schema 3 french 1200 leaf H', nowFrench.leaves[0].h, liveFrench.leaves[0].h, 2006, 1998],
   ];
   for (const [what, was, now, expWas, expNow] of rows2) {
     console.log(`  ${what.padEnd(28)} ${String(was).padStart(6)} → ${String(now).padStart(6)}`);
@@ -374,7 +391,11 @@ section('8 — src/engine grep gate: no bare 57 / 36 / 40 / 114 in casement / do
   }
   check(`no unlisted bare 57 / 36 / 40 / 114 in ${files.length} engine files`, hits.length === 0, hits.join(' | '));
   const calc = strip(readFileSync(resolve(dir, 'calculations.js'), 'utf8')).join('\n');
-  check('calculations.js door fallbacks read DEFAULT_DOOR_PROFILE (sidePanel.member / couplingPost.width / sidePanel.depth), no `?? 57` / `?? 114`', /DEFAULT_DOOR_PROFILE\.sidePanel\.member/.test(calc) && /DEFAULT_DOOR_PROFILE\.couplingPost\.width/.test(calc) && !/\?\? 57\b|\?\? 114\b/.test(calc));
+  // doors v3: the door engine reads the schema-3 blocks (sidePanel, fixedFan, panel, geometry,
+  // deductions, lengths) with DEFAULT_DOOR_PROFILE under them (DD); the side member and the
+  // coupling post are no longer read
+  check('calculations.js door fallbacks read DEFAULT_DOOR_PROFILE (const DD = DEFAULT_DOOR_PROFILE; sidePanel / fixedFan / geometry / deductions merged over DD), no `?? 57` / `?? 114`',
+    /const DD = DEFAULT_DOOR_PROFILE;/.test(calc) && /\.\.\.DD\.sidePanel/.test(calc) && /\.\.\.DD\.fixedFan/.test(calc) && /\.\.\.DD\.geometry/.test(calc) && /\.\.\.DD\.deductions/.test(calc) && !/\?\? 57\b|\?\? 114\b/.test(calc));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

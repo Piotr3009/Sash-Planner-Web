@@ -182,8 +182,12 @@ section('0 - profile numbers');
   // door schema 1; the casement change of THIS harness never touched it: migrated, each tree's door
   // profile equals the live default on every number the engine reads.
   const DKEYS = ['frameDepth', 'leafDepth', 'geometry', 'deductions', 'elements', 'frenchLip', 'cillInward', 'sidePanel', 'couplingPost', 'lengths'];
-  ok([REF, START].every((M) => { const m = LIVE.profile.migrateDoorProfile(clone(M.profile.DEFAULT_DOOR_PROFILE)); return M.profile.DEFAULT_DOOR_PROFILE.schema === 1 && DKEYS.every((k) => same(m[k], LIVE.profile.DEFAULT_DOOR_PROFILE[k])); }),
-    'door default profile: schema 1 in both trees; migrated (doors tura, schema 2) it equals the live default on every key the engine reads');
+  // doors v3 (09.10.2026, schema 3): a migrated copy keeps the keys the engine no longer reads as
+  // they were stored (sidePanel.member, fanAtHead / fanAtRail, transomDeduct); the comparison is
+  // on every key of the live default (the keys the engine reads), in the default's order
+  const onLiveKeys = (v, d) => (d && typeof d === 'object' && !Array.isArray(d) ? Object.fromEntries(Object.keys(d).map((k) => [k, onLiveKeys(v?.[k], d[k])])) : v);
+  ok([REF, START].every((M) => { const m = LIVE.profile.migrateDoorProfile(clone(M.profile.DEFAULT_DOOR_PROFILE)); return M.profile.DEFAULT_DOOR_PROFILE.schema === 1 && DKEYS.every((k) => same(onLiveKeys(m[k], LIVE.profile.DEFAULT_DOOR_PROFILE[k]), LIVE.profile.DEFAULT_DOOR_PROFILE[k])); }),
+    'door default profile: schema 1 in both trees; migrated (schema 3 since doors v3) it equals the live default on every key the engine reads');
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

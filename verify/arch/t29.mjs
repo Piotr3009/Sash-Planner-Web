@@ -189,10 +189,14 @@ section('6 — door with side panels: the coupling post is 2 × the profile jamb
   check(`DoorFrame.resolveFrameDims({ ${face}, ${DP.geometry.land} }) → the profile numbers; defaults stay the PSW 57 / 36`,
     JSON.stringify(doorFrame.resolveFrameDims({ frameFace: face, extFace: DP.geometry.land })) === JSON.stringify({ frameFace: face, extFace: DP.geometry.land }) &&
     doorFrame.DEFAULT_FRAME_DIMS.frameFace === 57 && doorFrame.DEFAULT_FRAME_DIMS.extFace === 36);
+  // doors v3 (09.10.2026): the engine puts a casement MULLION (68, land 13 + 13 either side of
+  // the axis) between the door and the side panel instead of the coupling post; the doorGeo 3D
+  // draws the frame from the engine openings, the legacy PSW pair above stays for doors without
+  // doorGeo (the profile keeps couplingPost 136 for stored copies)
   const der = calculations.deriveWindowData(spec({ id: 'd', name: 'D', width: 1000, height: 2100 }, { windowCategory: 'door', doorType: 'single-external', sidePanels: 'left', sideLeftWidth: 400, thresholdType: 'standard' }), {});
-  const post = der.door.zones.posts[0];
-  check(`the ENGINE post agrees with the 3D pair: width ${DP.couplingPost.width}, visible band 2 × land = ${2 * DP.geometry.land} (option B)`,
-    near(post.w, DP.couplingPost.width, 0.01) && near(post.visW, 2 * DP.geometry.land, 0.01), JSON.stringify(post));
+  const mu = der.door.zones.mullions[0];
+  check(`the ENGINE mullion (doors v3): axis 400, face ${DP.elements.mullion.face}, visible band mullionLand ${DP.geometry.mullionLand} (13 + 13), length 2100 − ${DP.lengths.mullion}`,
+    near(mu.axisX, 400, 0.01) && near(mu.x2 - mu.x1, DP.geometry.mullionLand, 0.01) && near(mu.length, 2100 - DP.lengths.mullion, 0.01) && DP.elements.mullion.face === 68 && !der.door.zones.posts, JSON.stringify(mu));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
