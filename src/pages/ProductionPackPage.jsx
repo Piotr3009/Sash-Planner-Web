@@ -112,6 +112,18 @@ const STATUS_CONFIG = {
 };
 
 // ─── Main Component ───
+// Window colour tags on the sheets (Piotr 08.10.2026): in the Pre-Cut "Per
+// window" colour mode every window of the pack has a colour (its position in
+// the pack, window 1 = colour 1, the same the pre-cut pieces and labels use),
+// and each of its sheets (elevation, elements, glass) carries a small tag in
+// that colour with the window number. Any other mode: no tags. The dashboard
+// and the single window preview never pass a tag (no pack, no position).
+function windowTagsOf(windowsData, precutSettings) {
+  if (normaliseColourMode(precutSettings) !== 'window') return () => null;
+  const tags = new Map((windowsData || []).map(({ win }, i) => [String(win?.id), { number: i + 1, hex: windowColourForIndex(i)?.hex || null }]));
+  return (win) => tags.get(String(win?.id)) || null;
+}
+
 export default function ProductionPackPage() {
   const { projectId, batchId, ppId } = useParams();
   const navigate = useNavigate();
@@ -634,9 +646,9 @@ export default function ProductionPackPage() {
       <main className="max-w-[1400px] mx-auto p-6">
         {tab === 'overview'   && <OverviewTab batch={batch} pp={pp} isPPMode={isPPMode} windowsData={windowsData} registerExport={registerExport} />}
         {tab === '3d'         && <ThreeDTab windowsData={windowsData} pp={pp} batch={batch} registerExport={registerExport} />}
-        {tab === 'elevations' && <ElevationsTab windowsData={windowsData} pp={pp} batch={batch} registerExport={registerExport} />}
+        {tab === 'elevations' && <ElevationsTab windowsData={windowsData} pp={pp} batch={batch} isPPMode={isPPMode} registerExport={registerExport} />}
         {tab === 'sections'   && <SectionsTab windowsData={windowsData} pp={pp} batch={batch} registerExport={registerExport} />}
-        {tab === 'elements'   && <ElementsTab windowsData={windowsData} pp={pp} batch={batch} registerExport={registerExport} />}
+        {tab === 'elements'   && <ElementsTab windowsData={windowsData} pp={pp} batch={batch} isPPMode={isPPMode} registerExport={registerExport} />}
         {tab === 'glass'      && <GlassTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} batch={batch} pp={pp} registerExport={registerExport} exportFormat={exportFormat} />}
         {tab === 'precut'     && <PreCutTab merged={merged} windowsData={windowsData} settings={settings} batch={batch} pp={pp} isPPMode={isPPMode} projects={projects} registerExport={registerExport} exportFormat={exportFormat} />}
         {tab === 'cutlist'    && <CutListTab merged={merged} windowsData={windowsData} isPPMode={isPPMode} pp={pp} batch={batch} registerExport={registerExport} exportFormat={exportFormat} />}
@@ -875,9 +887,11 @@ function ThreeDTab({ windowsData, pp, batch, registerExport }) {
 // ═══════════════════════════════════════════════════════════════
 // TAB: 2D Elevations
 // ═══════════════════════════════════════════════════════════════
-function ElevationsTab({ windowsData, pp, batch, registerExport }) {
+function ElevationsTab({ windowsData, pp, batch, isPPMode, registerExport }) {
   const [busy, setBusy] = useState(false);
   const refs = useRef({});
+  const precutSettings = isPPMode ? pp?.precutSettings : batch?.defaults?.precutSettings;
+  const tagOf = useMemo(() => windowTagsOf(windowsData, precutSettings), [windowsData, precutSettings]);
 
   const handleExport = async () => {
     if (busy || !windowsData.length) return;
@@ -932,10 +946,10 @@ function ElevationsTab({ windowsData, pp, batch, registerExport }) {
               <>
                 <div ref={(el) => { refs.current[win.id] = el; }}>
                   {plan.category === 'door'
-                    ? <DoorElevation2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} />
+                    ? <DoorElevation2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} windowTag={tagOf(win)} />
                     : plan.category === 'casement'
-                    ? <CasementElevation2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} />
-                    : <FrontElevation2D windowSpec={windowSpec} derived={derived} />}
+                    ? <CasementElevation2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} windowTag={tagOf(win)} />
+                    : <FrontElevation2D windowSpec={windowSpec} derived={derived} windowTag={tagOf(win)} />}
                 </div>
                 {/* Off-screen rig: cill section feeds the elevation-PDF inset. */}
                 {plan.cill && (
@@ -1072,10 +1086,12 @@ function SectionsTab({ windowsData, pp, batch, registerExport }) {
 // rig for the de-duplicated closing PDF page) · door = the door sheet plan
 // (08.10.2026) · fix frame = "engine pending"
 // ═══════════════════════════════════════════════════════════════
-function ElementsTab({ windowsData, pp, batch, registerExport }) {
-  const [expandedDrawing, setExpandedDrawing] = useState(null); // { windowSpec, derived, type: 'box'|'upper'|'lower', title }
+function ElementsTab({ windowsData, pp, batch, isPPMode, registerExport }) {
+  const [expandedDrawing, setExpandedDrawing] = useState(null); // { windowSpec, derived, type: 'box'|'upper'|'lower', title, windowTag }
   const [busy, setBusy] = useState(false);
   const refs = useRef({});
+  const precutSettings = isPPMode ? pp?.precutSettings : batch?.defaults?.precutSettings;
+  const tagOf = useMemo(() => windowTagsOf(windowsData, precutSettings), [windowsData, precutSettings]);
 
   const handleExport = async () => {
     if (busy || !windowsData.length) return;
@@ -1118,6 +1134,7 @@ function ElementsTab({ windowsData, pp, batch, registerExport }) {
     <div className="space-y-8">
       {windowsData.map(({ win, windowSpec, derived }) => {
         const plan = elementsPlan(windowSpec, derived);
+        const windowTag = tagOf(win);
         return (
         <div key={win.id} className="space-y-4">
           <div className="flex items-center justify-between border-b border-surface-500 pb-2">
@@ -1141,10 +1158,10 @@ function ElementsTab({ windowsData, pp, batch, registerExport }) {
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
               {plan.doorSheets.map((sh) => (
                 <div key={sh.key} className="card p-4 cursor-zoom-in"
-                  onClick={() => setExpandedDrawing({ windowSpec, derived, type: 'doorsheet', sheet: sh, title: `${win.name}: ${sh.label}`, projectNumber: win._projectNumber })}>
+                  onClick={() => setExpandedDrawing({ windowSpec, derived, type: 'doorsheet', sheet: sh, title: `${win.name}: ${sh.label}`, projectNumber: win._projectNumber, windowTag })}>
                   <div className="text-xs font-semibold text-ink-200 mb-2">{sh.label}</div>
                   <div ref={(el) => { refs.current[`${win.id}-${sh.key}`] = el; }}>
-                    <DoorSheet sheet={sh} windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} />
+                    <DoorSheet sheet={sh} windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} windowTag={windowTag} />
                   </div>
                 </div>
               ))}
@@ -1155,16 +1172,16 @@ function ElementsTab({ windowsData, pp, batch, registerExport }) {
                 <div className="card p-4">
                   <div className="text-xs font-semibold text-ink-200 mb-2">Frame Detail</div>
                   <div ref={(el) => { refs.current[`${win.id}-frame`] = el; }}>
-                    <CasementFrameDetail2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber}
-                      onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'frame', title: `${win.name} — Frame Detail`, projectNumber: win._projectNumber })} />
+                    <CasementFrameDetail2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} windowTag={windowTag}
+                      onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'frame', title: `${win.name} — Frame Detail`, projectNumber: win._projectNumber, windowTag })} />
                   </div>
                 </div>
                 {plan.leafGroups.map((gp, k) => (
                   <div key={gp.key} className="card p-4">
                     <div className="text-xs font-semibold text-ink-200 mb-2">{plan.drawings[k].label}</div>
                     <div ref={(el) => { refs.current[`${win.id}-leaf${k}`] = el; }}>
-                      <CasementLeafDetail2D windowSpec={windowSpec} derived={derived} group={gp} projectNumber={win._projectNumber}
-                        onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'leaf', group: gp, title: `${win.name} — ${plan.drawings[k].label}`, projectNumber: win._projectNumber })} />
+                      <CasementLeafDetail2D windowSpec={windowSpec} derived={derived} group={gp} projectNumber={win._projectNumber} windowTag={windowTag}
+                        onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'leaf', group: gp, title: `${win.name} — ${plan.drawings[k].label}`, projectNumber: win._projectNumber, windowTag })} />
                     </div>
                   </div>
                 ))}
@@ -1184,8 +1201,8 @@ function ElementsTab({ windowsData, pp, batch, registerExport }) {
               <div className="text-xs font-semibold text-ink-200 mb-2">Box Detail</div>
               {derived ? (
                 <div ref={(el) => { refs.current[`${win.id}-box`] = el; }}>
-                  <BoxDetail2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber}
-                    onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'box', title: `${win.name} — Box Detail`, projectNumber: win._projectNumber })} />
+                  <BoxDetail2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} windowTag={windowTag}
+                    onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'box', title: `${win.name} — Box Detail`, projectNumber: win._projectNumber, windowTag })} />
                 </div>
               ) : (
                 <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
@@ -1195,8 +1212,8 @@ function ElementsTab({ windowsData, pp, batch, registerExport }) {
               <div className="text-xs font-semibold text-ink-200 mb-2">Upper Sash</div>
               {derived ? (
                 <div ref={(el) => { refs.current[`${win.id}-upper`] = el; }}>
-                  <SashDetail2D windowSpec={windowSpec} derived={derived} type="upper" projectNumber={win._projectNumber}
-                    onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'upper', title: `${win.name} — Upper Sash`, projectNumber: win._projectNumber })} />
+                  <SashDetail2D windowSpec={windowSpec} derived={derived} type="upper" projectNumber={win._projectNumber} windowTag={windowTag}
+                    onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'upper', title: `${win.name} — Upper Sash`, projectNumber: win._projectNumber, windowTag })} />
                 </div>
               ) : (
                 <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
@@ -1206,8 +1223,8 @@ function ElementsTab({ windowsData, pp, batch, registerExport }) {
               <div className="text-xs font-semibold text-ink-200 mb-2">Lower Sash</div>
               {derived ? (
                 <div ref={(el) => { refs.current[`${win.id}-lower`] = el; }}>
-                  <SashDetail2D windowSpec={windowSpec} derived={derived} type="lower" projectNumber={win._projectNumber}
-                    onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'lower', title: `${win.name} — Lower Sash`, projectNumber: win._projectNumber })} />
+                  <SashDetail2D windowSpec={windowSpec} derived={derived} type="lower" projectNumber={win._projectNumber} windowTag={windowTag}
+                    onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'lower', title: `${win.name} — Lower Sash`, projectNumber: win._projectNumber, windowTag })} />
                 </div>
               ) : (
                 <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
@@ -1237,22 +1254,22 @@ function ElementsTab({ windowsData, pp, batch, registerExport }) {
             </div>
             <div className="card p-6 overflow-auto flex-1">
               {expandedDrawing.type === 'box' && (
-                <BoxDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} projectNumber={expandedDrawing.projectNumber} />
+                <BoxDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} projectNumber={expandedDrawing.projectNumber} windowTag={expandedDrawing.windowTag} />
               )}
               {expandedDrawing.type === 'upper' && (
-                <SashDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} type="upper" projectNumber={expandedDrawing.projectNumber} />
+                <SashDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} type="upper" projectNumber={expandedDrawing.projectNumber} windowTag={expandedDrawing.windowTag} />
               )}
               {expandedDrawing.type === 'lower' && (
-                <SashDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} type="lower" projectNumber={expandedDrawing.projectNumber} />
+                <SashDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} type="lower" projectNumber={expandedDrawing.projectNumber} windowTag={expandedDrawing.windowTag} />
               )}
               {expandedDrawing.type === 'frame' && (
-                <CasementFrameDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} projectNumber={expandedDrawing.projectNumber} />
+                <CasementFrameDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} projectNumber={expandedDrawing.projectNumber} windowTag={expandedDrawing.windowTag} />
               )}
               {expandedDrawing.type === 'leaf' && (
-                <CasementLeafDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} group={expandedDrawing.group} projectNumber={expandedDrawing.projectNumber} />
+                <CasementLeafDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} group={expandedDrawing.group} projectNumber={expandedDrawing.projectNumber} windowTag={expandedDrawing.windowTag} />
               )}
               {expandedDrawing.type === 'doorsheet' && (
-                <DoorSheet sheet={expandedDrawing.sheet} windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} projectNumber={expandedDrawing.projectNumber} />
+                <DoorSheet sheet={expandedDrawing.sheet} windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} projectNumber={expandedDrawing.projectNumber} windowTag={expandedDrawing.windowTag} />
               )}
             </div>
           </div>
@@ -1266,6 +1283,8 @@ function ElementsTab({ windowsData, pp, batch, registerExport }) {
 // TAB: Glass Schedule
 // ═══════════════════════════════════════════════════════════════
 function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport, exportFormat }) {
+  const glassPrecutSettings = isPPMode ? pp?.precutSettings : batch?.defaults?.precutSettings;
+  const tagOf = useMemo(() => windowTagsOf(windowsData, glassPrecutSettings), [windowsData, glassPrecutSettings]);
   // Per-pack PDF reference selection (Piotr 04.08): the tenant LIBRARY lives in
   // Settings (up to 6 images, uploaded once); each pack TICKS up to 3 of them
   // for its Glass PDF header. Selection persists on the pack itself.
@@ -1453,7 +1472,7 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport, ex
               <div className="text-xs font-semibold text-ink-200 mb-2">
                 {isPPMode && win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name}: Glass {gp.w} × {gp.h} · ×{gp.panes.length}
               </div>
-              <DoorGlassDrawing2D windowSpec={windowSpec} derived={derived} group={gp} />
+              <DoorGlassDrawing2D windowSpec={windowSpec} derived={derived} group={gp} windowTag={tagOf(win)} />
             </div>
           ))
           : (windowSpec?.category || 'sash') === 'casement'
@@ -1462,7 +1481,7 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport, ex
               <div className="text-xs font-semibold text-ink-200 mb-2">
                 {isPPMode && win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — Glass {gp.w} × {gp.h} · ×{gp.panes.length}
               </div>
-              <CasementGlassDrawing2D windowSpec={windowSpec} derived={derived} group={gp} />
+              <CasementGlassDrawing2D windowSpec={windowSpec} derived={derived} group={gp} windowTag={tagOf(win)} />
             </div>
           ))
           : [
@@ -1471,7 +1490,7 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport, ex
               {isPPMode && win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — Upper Glass
             </div>
             {derived ? (
-              <GlassDrawing2D windowSpec={windowSpec} derived={derived} type="upper" />
+              <GlassDrawing2D windowSpec={windowSpec} derived={derived} type="upper" windowTag={tagOf(win)} />
             ) : (
               <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
             )}
@@ -1481,7 +1500,7 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport, ex
               {isPPMode && win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — Lower Glass
             </div>
             {derived ? (
-              <GlassDrawing2D windowSpec={windowSpec} derived={derived} type="lower" />
+              <GlassDrawing2D windowSpec={windowSpec} derived={derived} type="lower" windowTag={tagOf(win)} />
             ) : (
               <div className="text-xs text-ink-400 py-8 text-center">No data.</div>
             )}

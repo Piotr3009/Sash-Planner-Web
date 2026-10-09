@@ -23,7 +23,7 @@
  * the casement leaf sheet.
  */
 import { useMemo } from 'react';
-import { DimChainH, DimChainV, DimH, DimV, TitleBlock } from './drawingUtils.jsx';
+import { DimChainH, DimChainV, DimH, DimV, TitleBlock, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
 import {
   NS, num, fmt, fmtGlass, safely, NoSheet, doorProfileParts, leafMemberRecords, recordText,
@@ -62,7 +62,7 @@ function buildLeaves(windowSpec, derived) {
   return { dr, pp, french, kit, items, depth, plan, meetWin };
 }
 
-export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber }) {
+export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber , windowTag }) {
   const geom = useMemo(() => safely(() => buildLeaves(windowSpec, derived)), [windowSpec, derived]);
   if (!geom) return <NoSheet />;
 
@@ -299,6 +299,7 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber })
           <text key={`n${i}`} x={svgW / 2} y={titleY + (42 + 18 * i) * ts} fill={COLORS.subtitle} fontSize={codeFs}
             fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>{t}</text>
         ))}
+        {windowTag ? <WindowTag tag={windowTag} vbw={svgW} /> : null}
       </svg>
     </div>
   );

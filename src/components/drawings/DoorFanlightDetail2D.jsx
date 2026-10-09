@@ -48,7 +48,7 @@ function buildFan(windowSpec, derived, index) {
   };
 }
 
-export default function DoorFanlightDetail2D({ windowSpec, derived, projectNumber, index = 0 }) {
+export default function DoorFanlightDetail2D({ windowSpec, derived, projectNumber, index = 0, windowTag }) {
   const geom = useMemo(() => safely(() => buildFan(windowSpec, derived, index)), [windowSpec, derived, index]);
   if (geom?.none) return <NoSheet text="No opening fanlight." />;
   if (!geom) return <NoSheet />;
@@ -78,6 +78,7 @@ export default function DoorFanlightDetail2D({ windowSpec, derived, projectNumbe
 
   return (
     <LeafSheet
+      windowTag={windowTag}
       leaf={fl}
       faces={{ left: mb.stile, right: mb.stile, top: mb.top, bottom: mb.bottom }}
       hinge="top"

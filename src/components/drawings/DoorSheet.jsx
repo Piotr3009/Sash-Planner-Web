@@ -27,8 +27,8 @@ const SHEETS = {
   section: DoorSection2D,
 };
 
-export default function DoorSheet({ sheet, windowSpec, derived, projectNumber }) {
+export default function DoorSheet({ sheet, windowSpec, derived, projectNumber, windowTag }) {
   const Comp = SHEETS[sheet?.sheet];
   if (!Comp) return null;
-  return <Comp windowSpec={windowSpec} derived={derived} projectNumber={projectNumber} {...(sheet.props || {})} />;
+  return <Comp windowSpec={windowSpec} derived={derived} projectNumber={projectNumber} windowTag={windowTag} {...(sheet.props || {})} />;
 }

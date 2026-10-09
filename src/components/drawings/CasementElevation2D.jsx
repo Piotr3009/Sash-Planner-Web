@@ -18,7 +18,7 @@
 import { useMemo } from 'react';
 import { getCasementProfile } from '../../engine/profile.js';
 import { offsetArcs } from '../../engine/arch.js';
-import { DimH, DimV, TitleBlock, Label, tfs } from './drawingUtils.jsx';
+import { DimH, DimV, TitleBlock, Label, tfs, WindowTag } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, DIMS, VIEWBOX_REF } from './drawingTheme.js';
 import { archToSheet, glassToSheet, archedOutlineD, barBandD, arcLabelPoint, radiiText } from './archDrawUtils.js';
 import CircleFixedDrawing2D from './CircleFixedDrawing2D.jsx';
@@ -31,7 +31,7 @@ function fmt(n) {
   return Number.isInteger(r) ? r.toString() : r.toFixed(1);
 }
 
-export default function CasementElevation2D({ windowSpec, derived, projectNumber }) {
+export default function CasementElevation2D({ windowSpec, derived, projectNumber , windowTag }) {
   const geom = useMemo(() => {
     const cas = derived?.casement;
     if (!windowSpec || !cas?.leafRects) return null;
@@ -86,7 +86,7 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
 
   if (!geom) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
   // v3 Block 3: a circle fixed window has no straight member — its own sheet (after the hooks above)
-  if (derived?.arch?.shape === 'circle') return <CircleFixedDrawing2D windowSpec={windowSpec} derived={derived} projectNumber={projectNumber} view="elevation" />;
+  if (derived?.arch?.shape === 'circle') return <CircleFixedDrawing2D windowSpec={windowSpec} derived={derived} projectNumber={projectNumber} view="elevation" windowTag={windowTag} />;
 
   const { fw, fh, g } = geom;
 
@@ -295,6 +295,7 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
           <text x={totalW / 2} y={titleY + 40 * ts} fill={COLORS.subtitle} fontSize={SIZES.subtitle * ts}
             fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>{archLine}</text>
         )}
+        {windowTag ? <WindowTag tag={windowTag} vbw={totalW} /> : null}
       </svg>
     </div>
   );

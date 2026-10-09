@@ -20,7 +20,7 @@
  * leaves are dashed ghosts so the joiner sees where they land.
  */
 import { useMemo } from 'react';
-import { DimH, DimV, DimChainH, DimChainV, TitleBlock, Label } from './drawingUtils.jsx';
+import { DimH, DimV, DimChainH, DimChainV, TitleBlock, Label, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
 import { displayCode } from '../../engine/partSymbols.js';
 import { NS, num, fmt, safely, NoSheet, doorProfileParts, doorRecords, recordText, thresholdText } from './doorSheetParts.jsx';
@@ -71,7 +71,7 @@ function buildFrame(windowSpec, derived) {
   };
 }
 
-export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }) {
+export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber , windowTag }) {
   const geom = useMemo(() => safely(() => buildFrame(windowSpec, derived)), [windowSpec, derived]);
   if (!geom) return <NoSheet />;
 
@@ -274,6 +274,7 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }
           <text key={`n${i}`} x={svgW / 2} y={titleY + (42 + 18 * i) * ts} fill={COLORS.subtitle} fontSize={codeFs}
             fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>{t}</text>
         ))}
+        {windowTag ? <WindowTag tag={windowTag} vbw={svgW} /> : null}
       </svg>
     </div>
   );

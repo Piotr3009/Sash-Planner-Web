@@ -7,7 +7,7 @@
  */
 import { useMemo } from 'react';
 import { CONSTANTS } from '../../engine/calculations.js';
-import { computeBarPositions, DimH, DimV, TitleBlock, tfs, HORN_DEF, HORN_W, buildHornPath } from './drawingUtils.jsx';
+import { computeBarPositions, DimH, DimV, TitleBlock, tfs, HORN_DEF, HORN_W, buildHornPath, WindowTag } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, STROKES, VIEWBOX_REF, WEIGHTS } from './drawingTheme.js';
 // Arched sash (ARCHED-WINDOWS-v3 Block 1 H): every arc is the engine's ArcChain (derived.arch) serialised
 // by archDrawUtils — box head ring, upper sash top rail ring, upper glass outline, bars — never re-derived here.
@@ -54,7 +54,7 @@ function fmt(n) {
   return Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(1);
 }
 
-export default function FrontElevation2D({ windowSpec, derived, projectNumber }) {
+export default function FrontElevation2D({ windowSpec, derived, projectNumber , windowTag }) {
   const geom = useMemo(() => {
     if (!windowSpec || !derived) return null;
 
@@ -343,6 +343,7 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber })
           <text x={totalW / 2} y={oy + fh + DM + TITLE_AREA * 0.5 + 40 * (totalW / VIEWBOX_REF)} fill={COLORS.subtitle} fontSize={SIZES.subtitle * (totalW / VIEWBOX_REF)}
             fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>{archLine}</text>
         )}
+        {windowTag ? <WindowTag tag={windowTag} vbw={totalW} /> : null}
       </svg>
     </div>
   );

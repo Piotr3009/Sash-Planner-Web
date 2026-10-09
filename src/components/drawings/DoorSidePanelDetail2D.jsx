@@ -39,7 +39,7 @@ function buildSidePanel(windowSpec, derived, side) {
   };
 }
 
-export default function DoorSidePanelDetail2D({ windowSpec, derived, projectNumber, side = 'left' }) {
+export default function DoorSidePanelDetail2D({ windowSpec, derived, projectNumber, side = 'left', windowTag }) {
   const geom = useMemo(() => safely(() => buildSidePanel(windowSpec, derived, side)), [windowSpec, derived, side]);
   if (geom?.none) return <NoSheet text="No side panel." />;
   if (!geom) return <NoSheet />;
@@ -71,6 +71,7 @@ export default function DoorSidePanelDetail2D({ windowSpec, derived, projectNumb
 
   return (
     <LeafSheet
+      windowTag={windowTag}
       leaf={pn}
       faces={{ left: pn.member, right: pn.member, top: pn.member, bottom: pn.member }}
       hinge="fixed"

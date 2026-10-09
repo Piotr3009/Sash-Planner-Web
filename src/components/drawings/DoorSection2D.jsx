@@ -25,14 +25,14 @@
  * the leaf depth (a diagram of the build, not a profile drawing).
  */
 import { useMemo } from 'react';
-import { DimH, DimV, TitleBlock, Label } from './drawingUtils.jsx';
+import { DimH, DimV, TitleBlock, Label, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
 import {
   NS, fmt, safely, NoSheet, doorPlan, PlanBody, planDetailWindows, planDetailSize, PlanDetail,
   glassSpecText, idOf,
 } from './doorSheetParts.jsx';
 
-export default function DoorSection2D({ windowSpec, derived, projectNumber }) {
+export default function DoorSection2D({ windowSpec, derived, projectNumber , windowTag }) {
   const geom = useMemo(() => safely(() => {
     const plan = doorPlan(windowSpec, derived);
     if (!plan) return null;
@@ -171,6 +171,7 @@ export default function DoorSection2D({ windowSpec, derived, projectNumber }) {
           <text key={`n${i}`} x={svgW / 2} y={titleY + 42 + 18 * i} fill={COLORS.subtitle} fontSize={codeFs}
             fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>{t}</text>
         ))}
+        {windowTag ? <WindowTag tag={windowTag} vbw={svgW} /> : null}
       </svg>
     </div>
   );

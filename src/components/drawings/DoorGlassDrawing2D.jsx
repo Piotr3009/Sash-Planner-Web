@@ -27,7 +27,7 @@
 import { useMemo } from 'react';
 import { getCasementProfile, DEFAULT_CASEMENT_PROFILE } from '../../engine/profile.js';
 import { readGlassProfile } from '../../engine/glassBars.js';
-import { DimChainH, DimChainV, DimH, DimV } from './drawingUtils.jsx';
+import { DimChainH, DimChainV, DimH, DimV, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 import { NS, num, fmtGlass, safely, NoSheet, glassSpecText, SheetTitle } from './doorSheetParts.jsx';
 
@@ -55,7 +55,7 @@ function buildGlass(windowSpec, derived, group) {
   };
 }
 
-export default function DoorGlassDrawing2D({ windowSpec, derived, group }) {
+export default function DoorGlassDrawing2D({ windowSpec, derived, group , windowTag }) {
   const geom = useMemo(() => safely(() => buildGlass(windowSpec, derived, group)), [windowSpec, derived, group]);
   if (!geom) return <NoSheet />;
 
@@ -146,6 +146,7 @@ export default function DoorGlassDrawing2D({ windowSpec, derived, group }) {
         <DimV x={ox + w + 34 * ts} y1={Y(0)} y2={Y(h)} extFrom={X(w)} label={fmtGlass(h)} vbw={svgW} />
 
         <SheetTitle x={svgW / 2} y={titleY} title={`${fmtGlass(w)} × ${fmtGlass(h)} mm`} subtitle={spec} notes={notes} ts={ts} vbw={svgW} />
+        {windowTag ? <WindowTag tag={windowTag} vbw={svgW} /> : null}
       </svg>
     </div>
   );

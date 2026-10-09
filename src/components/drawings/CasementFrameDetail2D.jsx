@@ -17,7 +17,7 @@ import { useMemo } from 'react';
 import { getCasementProfile } from '../../engine/profile.js';
 import { displayCode } from '../../engine/partSymbols.js';
 import { offsetArcs } from '../../engine/arch.js';
-import { DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs } from './drawingUtils.jsx';
+import { DimChainH, DimChainV, DimH, DimV, TitleBlock, tfs, WindowTag } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 import { archToSheet, archedOutlineD, ringBandD, arcLabelPoint, radiiText } from './archDrawUtils.js';
 import CircleFixedDrawing2D from './CircleFixedDrawing2D.jsx';
@@ -29,7 +29,7 @@ function fmt(n) {
   return Number.isInteger(r) ? r.toString() : r.toFixed(1);
 }
 
-export default function CasementFrameDetail2D({ windowSpec, derived, projectNumber, selectedElement, onElementClick, onExpand }) {
+export default function CasementFrameDetail2D({ windowSpec, derived, projectNumber, selectedElement, onElementClick, onExpand , windowTag }) {
   const clickable = typeof onElementClick === 'function';
   const hl = (key) => clickable && selectedElement === key;
   // Piotr 07.09: the frame card was noticeably shorter than the leaf card next to it — the leaf had
@@ -72,7 +72,7 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
 
   if (!geom) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
   // v3 Block 3: circle fixed window → ring sheet (after the hooks above)
-  if (derived?.arch?.shape === 'circle') return <CircleFixedDrawing2D windowSpec={windowSpec} derived={derived} projectNumber={projectNumber} view="frame" />;
+  if (derived?.arch?.shape === 'circle') return <CircleFixedDrawing2D windowSpec={windowSpec} derived={derived} projectNumber={projectNumber} view="frame" windowTag={windowTag} />;
 
   const { fw, fh, g } = geom;
   const layoutSc = Math.max(fw, fh) / 500;
@@ -327,6 +327,7 @@ export default function CasementFrameDetail2D({ windowSpec, derived, projectNumb
           <text x={totalW / 2} y={titleY + 40 * ts} fill={COLORS.subtitle} fontSize={SIZES.subtitle * ts}
             fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>{archLine}</text>
         )}
+        {windowTag ? <WindowTag tag={windowTag} vbw={totalW} /> : null}
       </svg>
       </div>
     </div>

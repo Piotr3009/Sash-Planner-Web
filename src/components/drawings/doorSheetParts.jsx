@@ -24,7 +24,7 @@ import { BAR_WIDTH } from '../../engine/casementBarGrid.js';
 import { getDoorProfile, DEFAULT_DOOR_PROFILE, getWindowProfile } from '../../engine/profile.js';
 import { glassMakeupFor } from '../../engine/specification.js';
 import { displayCode } from '../../engine/partSymbols.js';
-import { DimH, DimV, DimChainH, DimChainV, Label } from './drawingUtils.jsx';
+import { DimH, DimV, DimChainH, DimChainV, Label, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
 
 export const NS = { vectorEffect: 'non-scaling-stroke' };
@@ -679,7 +679,7 @@ export function PlanDetail({ plan, dr, win, left, top, s, ts, vbw, clipId }) {
  *   faces  { left, right, top, bottom } member faces
  *   labels [{ place: 'left'|'right'|'top'|'bottom', text }]
  */
-export function LeafSheet({ leaf, faces, hinge, labels, title, subtitle, notes = [] }) {
+export function LeafSheet({ leaf, faces, hinge, labels, title, subtitle, notes = [], windowTag }) {
   const W = leaf.w, H = leaf.h;
   const layoutSc = Math.max(W, H) / 500;
   const ML = 80 * layoutSc, MR = 110 * layoutSc, MT = 80 * layoutSc, MB = 80 * layoutSc;
@@ -748,6 +748,7 @@ export function LeafSheet({ leaf, faces, hinge, labels, title, subtitle, notes =
         <DimV x={ox + W + 40 * ts} y1={Y(leaf.y)} y2={Y(leaf.y + H)} extFrom={X(leaf.x + W)} label={fmt(H)} vbw={svgW} />
         <DimH y={oy - 30 * ts} x1={X(leaf.x)} x2={X(leaf.x + W)} extFrom={Y(leaf.y)} label={fmt(W)} vbw={svgW} />
         <SheetTitle x={svgW / 2} y={titleY} title={title} subtitle={subtitle} notes={allNotes} ts={ts} vbw={svgW} />
+        {windowTag ? <WindowTag tag={windowTag} vbw={svgW} /> : null}
       </svg>
     </div>
   );

@@ -17,7 +17,7 @@
  */
 import { useMemo } from 'react';
 import { getCasementProfile } from '../../engine/profile.js';
-import { DimH, DimV, TitleBlock, tfs } from './drawingUtils.jsx';
+import { DimH, DimV, TitleBlock, tfs, WindowTag } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 import { archToSheet, glassToSheet, closedChainD, ringBandD, barBandD, arcLabelPoint } from './archDrawUtils.js';
 
@@ -31,7 +31,7 @@ function fmt(n) {
 
 const VIEW_TITLE = { elevation: 'Front Elevation', frame: 'Frame Detail', leaf: 'Leaf Detail' };
 
-export default function CircleFixedDrawing2D({ windowSpec, derived, projectNumber, view = 'elevation' }) {
+export default function CircleFixedDrawing2D({ windowSpec, derived, projectNumber, view = 'elevation' , windowTag }) {
   const geom = useMemo(() => {
     const A = derived?.arch;
     if (!windowSpec || !A?.geometry || A.geometry.shape !== 'circle' || !A.glassOutline) return null;
@@ -143,6 +143,7 @@ export default function CircleFixedDrawing2D({ windowSpec, derived, projectNumbe
         <TitleBlock x={totalW / 2} y={titleY} title={titleText} subtitle={subtitleText} vbw={totalW} />
         <text x={totalW / 2} y={titleY + 40 * ts} fill={COLORS.subtitle} fontSize={SIZES.subtitle * ts}
           fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>{line3}</text>
+        {windowTag ? <WindowTag tag={windowTag} vbw={totalW} /> : null}
       </svg>
     </div>
   );
