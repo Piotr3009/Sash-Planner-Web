@@ -4,6 +4,114 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-10-09 · TURA PC: SASH PROPORTIONS (COTTAGE 40/60 AND 1/3-2/3), items for Piotr (branch `claude/sash-proportions`)
+
+**30.1 Places that assumed two equal sashes, and what they do now.**
+
+| place | before | now |
+|---|---|---|
+| `calculations.js deriveWindowData()` and `calculateWindow()` | two copies of the split formula | both call `sashHeightsFor(frameHeight, proportion)`, the one exported helper; `meetingFractionFor()` gives the 3D line |
+| `calculateWeights()` | upper pane x 2 for the glass | each sash its own glass (`sashWeightParts`); `sashWeightsFor()` gives the kg of each sash |
+| `calculateConsumables()` | glass m², bead tape, silicone from the upper pane x 2 | each sash its own pane |
+| `calculateBeadingComponents()` | only received the top sash; glazing / triangle / Georgian beading = upper pane x 2 | receives both; notes read "Perim U + L" for cottage, "× 2" for standard |
+| `calculateGlazingSummaryForWindow()` | one pane height for both sashes | standard: unchanged (one row); cottage: one row per sash (30.3) |
+| `utils/dxfExport.js` | own split from CONSTANTS | the derived sash width and heights (whole mm, its own floor), passed from Export Controls |
+| `ParametricSashWindow.jsx` | meeting line at half the opening, one opening limit | `meetingFraction` from the engine for every PC sash window (previews take the page's derived value, so the batch profile); two limits (lower lift = upper part less 120, upper drop = lower part less 120); the upper weights stop at the jamb top (30.2) |
+| `src/3d/App.jsx` | one slider limit `height / 2 - 120` | two, from `sashOpeningLimits()` (the component's own clamps) |
+| `canvas-renderer.js` 170-171 | `sashHeight / 2` fallback; h bars from one list over the whole sash | fallback unchanged (unreachable for a sash; a casement derived with 0 heights still reaches it); a cottage window spaces each pane's h bars over that pane, standard keeps the legacy list (30.4 e) |
+| `WindowSettingsPage.jsx` 114-116 | settings preview, own standard split | unchanged (standard only, as the brief says) |
+| `ArchedSashWindow.jsx`, `arch.js buildSashArchGeometry` | meeting line at H / 2 | unchanged: cottage on an arched window is an explicit error (30.4 f) |
+| `MiniWindowSvg.jsx`, `WindowCard.jsx` | half line, raw top height | unchanged: dead code (nothing imports `WindowCard`), Dashboard out of scope |
+
+**30.2 Weights.** PC has no counterweight catalogue and no per-sash pick: the BOM buys one total kg per window
+(`weights_normal` / `weights_slim`), and the window total does not move with the proportion (the timber and the glass
+of the two sashes add up to the same), so the BOM does not change. Per sash (engine, `sashWeightsFor`, +5 % like
+the total), 1000 wide double:
+
+| frame | standard top / bottom | cottage 40/60 top / bottom | cottage 1/3-2/3 top / bottom |
+|---|---|---|---|
+| 900 | 9.1 / 10.23 kg | 7.83 / 11.5 kg | 6.77 / 12.57 kg |
+| 1400 | 14.05 / 15.17 kg | 11.79 / 17.43 kg | 10.06 / 19.16 kg |
+| 1800 | 18 / 19.13 kg | 14.95 / 22.18 kg | 12.7 / 24.43 kg |
+| 2000 | 19.98 / 21.11 kg | 16.53 / 24.55 kg | 14.02 / 27.07 kg |
+
+No rule in the engine links weight length or cord to sash travel (cord = 3 x frame H, no weight pocket in the CNC
+jamb). **Travel question for you:** a cottage top sash travels further (1400 cottage 1/3-2/3: about 783 mm against
+569 standard in the 3D), so its weights rise further in the box. Please confirm the box height leaves room at the top
+(weight length + travel under the pulley); if the workshop splits weights per sash (top lighter, bottom heavier),
+say so and the BOM can buy two rows instead of one total. The 3D draws both weight sets from the meeting line (a
+simplified model); at a large cottage top-sash drop the upper weights now stop with their top at the jamb top
+instead of leaving the box (review finding; a standard window never reaches that height, so it draws as before).
+
+**30.3 Glazing summary.** `derived.glazingItems` keeps the one legacy row on a standard window (byte-identical; its
+height formula `sashHeight / 2 - top rail - bottom rail` gives 507 at H 1400 against a 537.5 daylight, but nothing
+reads `glazingItems` today: its only reader, `aggregateComponents`, is never called). A cottage window gets two rows,
+`sash: 'upper'` and `sash: 'lower'`, each with `panes = rows x cols` and the pane height from that sash's daylight
+(upper: top - top rail - meeting rail; lower: bottom - meeting rail - bottom rail) divided by the rows, less the
+allowance. The glass orders (glass schedule, glass PDF, glass DXF) come from `lists.js` and already had one row per
+sash. Say if the legacy row should be corrected for standard too.
+
+**30.4 Skipped, interpreted or outside the brief, with the reason.**
+
+a. **Standard PDFs print no "Standard" label.** Owner box item 9 (standard PDFs identical) wins over Stage 4.2: the
+   pack overview (screen and PDF) and the estimate PDF add the label for cottage only; the window detail page and
+   both configurators show `Standard` too (screen only).
+b. **Estimate configurator** (`EstimateConfiguratorPage`): it is where `splitRatio` travels and the only caller of
+   `calculatePrice`, so it got the same control, 900 rule, 3D fraction, save / edit and the price key; the breakdown
+   shows a "Cottage proportions" line when it applies.
+c. **No Pricing Settings field for `cottageSash`.** The default 0.05 applies to every tenant (a stored price list
+   falls back to it). Say if it should be editable next to "Arched head".
+d. **Previews and PDF captures draw every sash as a flat double** (`windowSpecToConfig.js` hardcodes `sashType
+   'double'`, `splitRatio` and `headType 'flat'`, pre-existing). The meeting line is right there, but a triple
+   cottage window previews as a double. Not changed (it would change triple / glazing-arch previews of existing
+   windows). The configurators draw triple and the glazing arch.
+e. **One bar pattern for both sashes** (pre-existing): `detectGridMode` keeps one pattern (the lower wins) and every
+   sheet, glass row and beading run puts it on both sashes, so the usual cottage "6 over 1" cannot be made. Custom
+   bars: the editors cap a bar at the frame width, the lower sash takes the upper list by default, and nothing checks a
+   bar against each sash's glass; on a cottage window an h bar that fits the tall lower pane can sit outside the short
+   upper one (the 3D then draws it outside the glass). The canvas elevation of the window and estimate PDFs spaces a
+   cottage window's h bars per pane, but keeps the legacy list on a standard window, which drops the h bar of a 1400
+   4x4 altogether (pre-existing; fixing it would change standard PDFs). All worth a tura of their own.
+f. **Arched windows.** Cottage on an arched window raises `SashProportionError` (as asked); the arched 3D
+   (`ArchedSashWindow`) keeps its meeting line at half, so "every sash window" in box item 7 holds for rectangular
+   sashes only. Found on the way: `ArchedSashWindow.jsx` uses `JambWithPartingBead` (lines 505, 526) without
+   importing it, so the arched sash 3D should throw when it renders; and the configurator saves an arched sash's
+   frame fields inside the casement-only branch (`frameShape` stays standard), pre-existing, not touched.
+g. **The explicit error stops the whole page today** (pack, project and window pages), like `ArchError`:
+   `ProjectDetailPage`, `ProductionPackPage` and `WindowDetailPage` call `normaliseToWindowSpec` outside their try. A
+   value PSW might add later (say `cottage-30-70`) would blank the pack until PC learns it. Proposal: catch it per
+   window and show the message.
+h. **Display rounding kept per brief** (the workshop sash sheet can read up to 0.25 mm off the cut list on a cottage
+   window): the sash sheets print the sash height to 0.5 mm (523.2 prints 523), the glass
+   sheets to 0.1. The window detail page and the Excel summary now print the heights to 0.01 (they printed the raw
+   float; standard reads the same).
+i. **A stored cottage window below 900** still derives, shows the warning line on the detail page, and is saved as
+   standard if it is edited in the configurator (the configurator cannot make cottage below 900).
+j. **3D edge cases:** a stored cottage 1/3-2/3 window below about 825 frame H has an upper sash shorter than the 3D's
+   140 mm minimum clear glass (the glass overflows the sash in the 3D only); the triple 3D always shows the axes gizmo
+   (pre-existing debug).
+k. **Harness notes:** the brief's `t43_sash_proportions.mjs` sits next to the older `t43_window_tag.mjs`;
+   `psw-casement-layouts.mjs` was not run (no PSW clone in this session's repository scope). t38 and t41 are red on
+   the Stage 2 to Stage 7 commits (their sash controls were adapted to the two new keys only in Stage 8); every
+   harness is green from Stage 8 on. The engine reads `upperBars` / `lowerBars` from the window record, never from an
+   estimate's fullConfig: a PSW import that carries bars only in fullConfig would arrive without bars (pre-existing).
+l. **The single-window DXF export is dead code:** `ExportControls` (its only caller) is imported by nothing that
+   renders it. It now draws from derived anyway.
+m. **An unknown stored value in a configurator** (say a newer PSW one) is shown next to the control ("Unknown sash
+   proportion ...: choose one of the three."), the save is blocked and the 3D gets no line from it, until a chip is
+   picked. A direct `calculatePrice` call with an unknown value adds no surcharge (the configurators never send one).
+n. **Small code notes:** `sashOpeningLimits` (the 3D sliders) repeats the component's frame numbers (58.414 / 23 /
+   28 / 3; t43 checks the two agree); `pricing.js` now imports the value list from `specification.js` (it still does
+   not import `calculations.js`); a triple window carrying a stray `frameShape 'arched'` gets `windowSpec.arch.shape`,
+   so a cottage value raises the error as the brief words it, although the engine draws a triple rectangular.
+
+**30.5 What happens at merge.** Standard windows: numbers, lists, BOM, glass, weights, sheets, DXF and PDFs as
+today (proved against 719bfba). The 3D meeting rail of every rectangular sash window moves to the production split
+(1400: up about 17 mm), and the 3D opening sliders get two limits. Cottage windows exist only once PSW or a
+configurator writes `sashProportion`.
+
+---
+
 ## 2026-10-08 · TURA PC: DOORS TO PRODUCTION, SINGLE AND FRENCH, items for Piotr (branch `claude/doors-production`)
 
 **29.1 What happens at merge.** Every door is recalculated; no batch is frozen, so doors already quoted or in a

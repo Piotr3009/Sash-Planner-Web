@@ -11,6 +11,8 @@
  */
 
 import { CONSTANTS, deriveWindowData } from './calculations.js';
+import { isCottageProportion } from './specification.js';
+import { computeBarPositions } from './casementBarGrid.js';
 
 const STYLES = {
   background: '#ffffff',
@@ -203,6 +205,15 @@ export function drawTechnicalElevation(canvas, windowSpec, settings = {}) {
   ctx.strokeStyle = STYLES.barStroke;
   ctx.lineWidth = 1;
 
+  // A cottage sash (Piotr 09.10.2026) spaces each pane's horizontal bars over that
+  // pane's own glass: the legacy list above is one list over the whole sash height
+  // and lands in the wrong place once the panes differ. A standard window keeps the
+  // legacy list, so its drawing stays exactly as it was.
+  const paneHBars = isCottageProportion(derived.sashProportion) && bars === derived.barPositions
+    ? (glassHpx) => computeBarPositions({ glassX: 0, glassY: 0, glassW: 0, glassH: glassHpx / finalScale, vCount: 0,
+        hCount: derived.config?.horizontalBars || 0, barW: C.GLAZING_BAR_WIDTH }).hBars.map((b) => b.cy)
+    : null;
+
   const drawBars = (baseY, glassH) => {
     if (glassH <= 0) return;
     if (bars?.vertical) {
@@ -212,8 +223,9 @@ export function drawTechnicalElevation(canvas, windowSpec, settings = {}) {
         ctx.strokeRect(bx, baseY, BAR_W, glassH);
       });
     }
-    if (bars?.horizontal) {
-      bars.horizontal.forEach((pos) => {
+    const horizontal = paneHBars ? paneHBars(glassH) : bars?.horizontal;
+    if (horizontal) {
+      horizontal.forEach((pos) => {
         const by = baseY + pos * finalScale - BAR_W / 2;
         if (pos * finalScale < glassH) {
           ctx.fillRect(glassX, by, glassW, BAR_W);

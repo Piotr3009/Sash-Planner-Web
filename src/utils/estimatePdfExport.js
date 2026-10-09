@@ -9,7 +9,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { drawTechnicalElevation } from '../engine/canvas-renderer.js';
-import { normaliseToWindowSpec } from '../engine/specification.js';
+import { normaliseToWindowSpec, SASH_PROPORTION_LABELS, isCottageProportion } from '../engine/specification.js';
 
 const A4 = { w: 210, h: 297 };
 const MARGIN = 15;
@@ -138,7 +138,8 @@ export function exportEstimatePdf(estimate, opts = {}) {
     const colourTxt = c.colourMode === 'dual' ? 'Dual (ext/int)' : 'Single';
     const specRows = [
       ['Size (frame)', `${c.extWidth} × ${c.extHeight} mm`],
-      ['Type', `${c.sashType || 'double'} · ${c.headType || 'flat'} head`],
+      // cottage sash (Piotr 09.10.2026): the proportion next to the type; a standard window prints as before
+      ['Type', `${c.sashType || 'double'}${isCottageProportion(c.sashProportion) ? ` · ${SASH_PROPORTION_LABELS[c.sashProportion]}` : ''} · ${c.headType || 'flat'} head`],
       ['Bars', `${c.upperBars || 'none'}${c.sameBars ? '' : ` / ${c.lowerBars || 'none'}`}`],
       ['Glass', `${c.glassType || 'double'} · ${c.glassFinish || 'clear'}`],
       ['Colour', colourTxt],

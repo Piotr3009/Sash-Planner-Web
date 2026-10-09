@@ -13,8 +13,8 @@ import {
 } from '../engine/arch.js';
 import { DEFAULT_DOOR_PROFILE, getCasementProfile, getDoorProfile, getWindowProfile } from '../engine/profile.js';
 import { casementFrameDims, doorFrameDims, doorGeometryFromSpec } from '../utils/windowSpecToConfig.js';
-import { normaliseToWindowSpec } from '../engine/specification.js';
-import { CONSTANTS } from '../engine/calculations.js';
+import { normaliseToWindowSpec, SASH_PROPORTIONS, SASH_PROPORTION_OPTIONS, SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, effectiveSashProportion } from '../engine/specification.js';
+import { CONSTANTS, meetingFractionFor } from '../engine/calculations.js';
 import CasementLayoutPicker from '../components/configurator/CasementLayoutPicker.jsx';
 import NumInput from '../components/NumInput.jsx';
 import {
@@ -188,6 +188,7 @@ export default function ConfiguratorPage() {
   const [winName, setWinName] = useState('');
   const [sashType, setSashType] = useState('double');
   const [splitRatio, setSplitRatio] = useState('1/4-1/2-1/4');
+  const [sashProportion, setSashProportion] = useState('standard');   // cottage (Piotr 09.10.2026)
   const [headType, setHeadType] = useState('flat');
   const [sashFrameShape, setSashFrameShape] = useState('standard');   // v3 Block 1: Standard | Arched
   const [sashArchHB, setSashArchHB] = useState(0);                    // upper sash straight bars (h)
@@ -298,6 +299,7 @@ export default function ConfiguratorPage() {
     setWinName(copyName ? (w.name || '') : '');
     setSashType(w.sashType || 'double');
     setSplitRatio(w.splitRatio || '1/4-1/2-1/4');
+    setSashProportion(w.sashProportion || 'standard');
     setHeadType(w.headType || 'flat');
     setSashFrameShape(w.frameShape === 'arched' || w.sashType === 'arched-group' ? 'arched' : 'standard');
     setSashArchHB(Number(w.archHBars) || 0);
@@ -481,6 +483,15 @@ export default function ConfiguratorPage() {
   const archLimits = isArched || isCircle ? ((isArchedSash ? getWindowProfile()?.sashArch?.limits : getCasementProfile()?.arch?.limits) || {}) : null;
   const extW = Number(inW) || 400;
   const extH = isCircle ? extW : (Number(inH) || 400);
+  // Sash proportions (cottage, Piotr 09.10.2026): double and triple only, not on an
+  // arched sash, cottage from a 900 frame up. The effective value is what the 3D
+  // shows and the save stores; leaving the range (arched, or a height committed
+  // below 900) sets the choice back to standard.
+  const cottageAllowed = !isArchedSash && extH >= COTTAGE_MIN_FRAME_HEIGHT;
+  const sashProp = effectiveSashProportion(sashProportion, { frameHeight: extH, arched: isArchedSash });
+  // a stored value the engine does not know (e.g. a newer PSW one): said next to the control, not saved, no 3D line from it
+  const proportionError = SASH_PROPORTIONS.includes(sashProp) ? null : `Unknown sash proportion "${sashProp}": choose one of the three.`;
+  useEffect(() => { if (isArchedSash) setSashProportion('standard'); }, [isArchedSash]);
   // the circle's height is its diameter — the height input follows the width
   useEffect(() => {
     if (isCircle && Number(inH) !== Number(inW)) setInH(Number(inW) || 400);
@@ -785,9 +796,11 @@ export default function ConfiguratorPage() {
       lowerGlass: gFin === 'frosted' ? 'frosted' : 'clear',
       doubleGlazing: glassType !== 'single',
       spacerColor, sashType, splitRatio, headType, openingType: opening,
+      // the meeting line where production puts it (engine helper, every sash window)
+      sashProportion: sashProp, meetingFraction: proportionError ? undefined : meetingFractionFor(extH, sashProp),
       boxType: frameType === 'slim' ? 'slim' : 'standard', boxDepth: frameDepth,
     });
-  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, isArched, isFixedCas, isCircle, pcArchShape, isGothicUi, casArchProfile, casArchRiseSource, archStartNum, archRiseNum, casArchHinge, casArchPattern, isCustomHub, casArchSpokes, casArchRings, isArchedSash, sashArchHB, sashArchVB, sashLowerHB, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType, glassSpec, glassCoating, glassGas, spacerType]);
+  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, sashProp, proportionError, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, isArched, isFixedCas, isCircle, pcArchShape, isGothicUi, casArchProfile, casArchRiseSource, archStartNum, archRiseNum, casArchHinge, casArchPattern, isCustomHub, casArchSpokes, casArchRings, isArchedSash, sashArchHB, sashArchVB, sashLowerHB, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType, glassSpec, glassCoating, glassGas, spacerType]);
   useEffect(() => { sync(); }, [sync]);
 
   // ─── B4: Listen for 3D ready event and re-sync ───
@@ -799,6 +812,7 @@ export default function ConfiguratorPage() {
 
   // ─── Save ───
   const save = () => {
+    if (isSash && proportionError) return;   // an unknown stored proportion: said next to the control, never saved
     const config = {
       windowName: winName, windowCategory: batch?.type || 'sash',
       extWidth: extW, extHeight: extH, inputWidth: inW, inputHeight: inH, measurementType: 'box-to-box',
@@ -811,7 +825,7 @@ export default function ConfiguratorPage() {
       upperGlass: gFin === 'frosted' && frostLoc === 'both' ? 'frosted' : 'clear',
       lowerGlass: gFin === 'frosted' ? 'frosted' : 'clear',
       glassType, glassSpec, glassCoating, glassGas, casementBarType: casBarType, sealColour, sillExtension: sillExt, sillWider, glassFinish: gFin, frostedLocation: frostLoc,
-      spacerColor, spacerType, sashType, splitRatio, headType, openingType: opening,
+      spacerColor, spacerType, sashType, splitRatio, sashProportion: sashProp, headType, openingType: opening,
       ventRoomType, ventSoleWindow,
       frameType, frameDepth, pas24, childRestrictor,
       ...(isCasement ? {
@@ -954,8 +968,8 @@ export default function ConfiguratorPage() {
           <button
             onClick={save}
             disabled={shapeBlocked}
-            title={shapeBlocked ? `${isCircle ? 'Circle' : 'Arch'}: ${archError}` : undefined}
-            className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'} ${shapeBlocked ? 'opacity-40 cursor-not-allowed' : ''}`}
+            title={shapeBlocked ? `${isCircle ? 'Circle' : 'Arch'}: ${archError}` : (isSash && proportionError) || undefined}
+            className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'} ${shapeBlocked || (isSash && proportionError) ? 'opacity-40 cursor-not-allowed' : ''}`}
           >
             {isEditMode ? '✓ Update Window' : '✓ Save to Batch'}
           </button>
@@ -1013,6 +1027,12 @@ export default function ConfiguratorPage() {
           {isSash && <Sec t="Sash Type">
             <HChips o={SASH_TYPES} v={sashType} c={setSashType} />
             {sashType === 'triple' && <select value={splitRatio} onChange={e => setSplitRatio(e.target.value)} className="w-full px-3 py-2 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs mb-2">{SPLIT_RATIOS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}</select>}
+            {!isArchedSash && <>
+              <Lbl>Sash proportions</Lbl>
+              <HChips o={SASH_PROPORTION_OPTIONS} v={sashProp} c={setSashProportion} disabled={(x) => x.value !== 'standard' && !cottageAllowed} />
+              {!cottageAllowed && <div className="text-[10px] text-ink-400 -mt-1 mb-2">Cottage needs a frame height of {COTTAGE_MIN_FRAME_HEIGHT} mm or more.</div>}
+              {proportionError && <div className="text-[11px] text-red-400 -mt-1 mb-2">{proportionError}</div>}
+            </>}
             <Lbl>Head</Lbl><HChips o={HEAD_TYPES} v={headType} c={setHeadType} />
             {sashType !== 'triple' && <>
               <Lbl>Frame shape</Lbl><HChips o={SASH_FRAME_SHAPES} v={sashFrameShape} c={setSashFrameShape} />
@@ -1048,7 +1068,7 @@ export default function ConfiguratorPage() {
                 <Lbl>Height (mm)</Lbl>
                 <input type="number" min={dimConstraints.minH} max={dimConstraints.maxH} step={10} value={inH}
                   onChange={e => setInH(e.target.value === '' ? '' : Number(e.target.value))}
-                  onBlur={e => { const v = Number(e.target.value); setInH(isNaN(v) || v < dimConstraints.minH ? dimConstraints.minH : v > dimConstraints.maxH ? dimConstraints.maxH : v); }}
+                  onBlur={e => { const v = Number(e.target.value); const nv = isNaN(v) || v < dimConstraints.minH ? dimConstraints.minH : v > dimConstraints.maxH ? dimConstraints.maxH : v; setInH(nv); if (nv < COTTAGE_MIN_FRAME_HEIGHT) setSashProportion('standard'); }}
                   className="w-full px-3 py-2 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
               </div>
             </div>
@@ -1325,7 +1345,7 @@ export default function ConfiguratorPage() {
         <div className="w-64 shrink-0 border-l border-surface-500 bg-surface-900 overflow-y-auto text-xs">
           <div className="px-4 py-2 bg-surface-700 border-b border-surface-500 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Specification</div>
           <SG t="Dimensions"><SR l="Frame" v={`${extW} × ${extH}`} /><SR l="Depth" v={`${frameDepth}mm`} /></SG>
-          {isSash && <SG t="Product"><SR l="Sash" v={sashType} /><SR l="Head" v={headType} />{isArchedSash && <SR l="Frame" v={`arched · ${pcArchShape || '—'} · rise ${archRiseNum}`} />}</SG>}
+          {isSash && <SG t="Product"><SR l="Sash" v={sashType} />{!isArchedSash && <SR l="Proportions" v={SASH_PROPORTION_LABELS[sashProp] || sashProp} />}<SR l="Head" v={headType} />{isArchedSash && <SR l="Frame" v={`arched · ${pcArchShape || '—'} · rise ${archRiseNum}`} />}</SG>}
           {isCasement && isArched && <SG t="Layout">
             <SR l="Type" v={`Arched · ${isGothicUi ? `Gothic (${casArchProfile})` : `Round (${pcArchShape || '?'})`}`} />
             <SR l="Arch starts at" v={`${archStartNum} mm · ${casArchRiseSource === 'ratio' ? 'auto' : 'custom'}`} />
@@ -1421,7 +1441,7 @@ export default function ConfiguratorPage() {
 // ─── UI Components ───
 function Sec({ t, children }) { return <div className="px-4 py-3 border-b border-surface-500"><div className="text-xs font-semibold text-ink-100 uppercase tracking-wider mb-2">{t}</div>{children}</div>; }
 function Lbl({ children }) { return <div className="text-xs text-ink-400 font-medium mb-1 mt-1.5">{children}</div>; }
-function HChips({ o, v, c }) { return <div className="flex flex-wrap gap-1.5 mb-2">{o.map(x => <button key={String(x.value)} onClick={() => c(x.value)} className={`px-2.5 py-1 text-[11px] rounded-lg border transition-all ${v === x.value ? 'border-accent-500 bg-accent-500/15 text-accent-400 font-medium' : 'border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500'}`}>{x.label}</button>)}</div>; }
+function HChips({ o, v, c, disabled }) { return <div className="flex flex-wrap gap-1.5 mb-2">{o.map(x => { const off = !!disabled?.(x); return <button key={String(x.value)} disabled={off} onClick={() => { if (!off) c(x.value); }} className={`px-2.5 py-1 text-[11px] rounded-lg border transition-all ${off ? 'border-surface-500 text-ink-500 bg-surface-700 opacity-50 cursor-not-allowed' : v === x.value ? 'border-accent-500 bg-accent-500/15 text-accent-400 font-medium' : 'border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500'}`}>{x.label}</button>; })}</div>; }
 function GChips({ o, v, c }) { return <div className="grid grid-cols-4 gap-1 mb-2">{o.map(x => <button key={x.value} onClick={() => c(x.value)} className={`px-1.5 py-1 text-[11px] rounded border transition-all ${v === x.value ? 'border-accent-500 bg-accent-500/15 text-accent-400 font-medium' : 'border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500'}`}>{x.label}</button>)}</div>; }
 
 // ─── Colour picker field: single row of 5 small swatches + custom, RAL + F&B dropdowns ───

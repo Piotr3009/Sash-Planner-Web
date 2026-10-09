@@ -16,7 +16,7 @@ import { useMaterialStore } from '../stores/materialStore.js';
 import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
 import { mergeWindowMaterials, formatQty, makeRawResolver, assignedMaterialForItems } from '../engine/bom.js';
 import { summarizeWindows } from '../utils/batchSummary.js';
-import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
+import { parseSpecification, normaliseToWindowSpec, SASH_PROPORTION_LABELS, isCottageProportion } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
 import { withProfiles, getCasementProfile, bsuiteActiveTarget } from '../engine/profile.js';
 import {
@@ -167,7 +167,7 @@ export default function ProductionPackPage() {
 
     // Overview section bytes
     const ovWindows = windowsData.map((wd) => ({
-      projectNum: wd.win._projectNumber, name: wd.win.name, type: overviewCells(wd).type,
+      projectNum: wd.win._projectNumber, name: wd.win.name, type: overviewCells(wd).type, proportion: overviewCells(wd).proportion,
       width: wd.win.width, height: wd.win.height, bars: winBarsLabel(wd),
       head: overviewCells(wd).head, glass: wd.win.glassFinish || 'clear', opening: overviewCells(wd).opening,
     }));
@@ -693,6 +693,10 @@ function overviewCells(wd) {
   }
   return {
     type: win.sashType || 'double',
+    // cottage sash (Piotr 09.10.2026): the proportion next to the type; '' on a
+    // standard sash, so its overview (screen and PDF) reads exactly as before
+    proportion: wd?.windowSpec?.category === 'sash' && isCottageProportion(wd?.windowSpec?.sash?.proportion)
+      ? SASH_PROPORTION_LABELS[wd.windowSpec.sash.proportion] : '',
     head: win.headType || 'flat',
     opening: win.openingType || 'both',
     box: win.frameDepth || (win.glassType === 'triple' ? 172 : win.frameType === 'slim' ? 144 : 164),
@@ -707,7 +711,7 @@ function OverviewTab({ batch, pp, isPPMode, windowsData, registerExport }) {
     const company = useProjectStore.getState().settings.company || {};
     const projects = [...new Set(windowsData.map(({ win }) => win._projectNumber).filter(Boolean))];
     const windows = windowsData.map((wd) => ({
-      projectNum: wd.win._projectNumber, name: wd.win.name, type: overviewCells(wd).type,
+      projectNum: wd.win._projectNumber, name: wd.win.name, type: overviewCells(wd).type, proportion: overviewCells(wd).proportion,
       width: wd.win.width, height: wd.win.height, bars: winBarsLabel(wd),
       head: overviewCells(wd).head, glass: wd.win.glassFinish || 'clear', opening: overviewCells(wd).opening,
     }));
@@ -781,7 +785,7 @@ function OverviewTab({ batch, pp, isPPMode, windowsData, registerExport }) {
                 <tr key={win.id} className="border-b border-surface-500/50 hover:bg-surface-700/30">
                   {isPPMode && <td className="px-4 py-2.5 text-accent-400 font-medium">{win._projectNumber}</td>}
                   <td className="px-4 py-2.5 text-ink-100 font-medium">{win.name}</td>
-                  <td className="px-4 py-2.5 text-ink-300">{overviewCells(wd).type}</td>
+                  <td className="px-4 py-2.5 text-ink-300">{overviewCells(wd).type}{overviewCells(wd).proportion ? ` · ${overviewCells(wd).proportion}` : ''}</td>
                   <td className="px-4 py-2.5 text-right text-ink-200">{win.width} mm</td>
                   <td className="px-4 py-2.5 text-right text-ink-200">{win.height} mm</td>
                   <td className="px-4 py-2.5 text-right text-ink-200">{overviewCells(wd).box} mm</td>
@@ -812,7 +816,7 @@ function ThreeDTab({ windowsData, pp, batch, registerExport }) {
 
   // Stable list for the capture rig (id + spec), aligned to windowsData order.
   const captureList = useMemo(
-    () => windowsData.map((d) => ({ id: d.win.id, windowSpec: d.windowSpec })),
+    () => windowsData.map((d) => ({ id: d.win.id, windowSpec: d.windowSpec, derived: d.derived })),
     [windowsData]
   );
 
@@ -853,7 +857,7 @@ function ThreeDTab({ windowsData, pp, batch, registerExport }) {
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {windowsData.map(({ win, windowSpec }) => (
+        {windowsData.map(({ win, windowSpec, derived }) => (
           <div key={win.id} className="card overflow-hidden">
             <div className="px-4 py-2 border-b border-surface-500 flex items-center justify-between">
               <span className="text-sm font-medium text-ink-50">
@@ -865,7 +869,7 @@ function ThreeDTab({ windowsData, pp, batch, registerExport }) {
               </Link>
             </div>
             <div className="aspect-[4/3] bg-gradient-to-br from-surface-600 to-surface-700">
-              <WindowPreview3D windowSpec={windowSpec} side="exterior" />
+              <WindowPreview3D windowSpec={windowSpec} side="exterior" derived={derived} />
             </div>
           </div>
         ))}

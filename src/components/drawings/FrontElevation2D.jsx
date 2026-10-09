@@ -2,7 +2,9 @@
  * FrontElevation2D.jsx
  *
  * Composite view: Box (frame) + Upper Sash + Lower Sash
- * positioned together. Center of box Y = meeting rail line.
+ * positioned together. The sash stack is centred on the box; the meeting rail
+ * sits where the derived top / bottom sash heights put it (a cottage window
+ * has it higher, Piotr 09.10.2026).
  * Dim lines: overall frame width & height only.
  */
 import { useMemo } from 'react';

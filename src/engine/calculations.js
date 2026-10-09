@@ -5,7 +5,7 @@ import { buildArchGeometry, buildSashArchGeometry, planArchSegments, buildGlassO
 import { buildTraceryForDerived } from './cnc/traceryExport.js';
 import { casementLeafBars, leafBarsToUnit, computeBarPositions, BAR_WIDTH } from './casementBarGrid.js';
 import { selectDoorHardware, doorHingePositions } from './doorHardware.js';
-import { isAcousticUnit } from './specification.js';
+import { isAcousticUnit, SASH_PROPORTIONS, SashProportionError } from './specification.js';
 
 /**
  * calculations.js - ETAP 3
@@ -115,6 +115,44 @@ function totalSashHeightFor(frameHeight) {
     return frameHeight - p.deductions.sashHeight + mr;
 }
 
+/**
+ * Top and bottom sash heights for a sash proportion (cottage, Piotr 09.10.2026;
+ * the same numbers as PSW). The ONE place the split is computed: every caller
+ * (deriveWindowData, calculateWindow, the 3D meeting line) goes through here.
+ * The total is the same for every proportion (frame H - profile sashHeight
+ * deduction + meeting rail face, default H - 92).
+ *   standard:       top = (total - diff) / 2, bottom = top + diff (diff = bottom
+ *                   rail - top rail, default 33: equal glass, today's rule)
+ *   cottage-40-60:  top = total x 0.4, bottom = total - top
+ *   cottage-1-3:    top = total / 3,   bottom = total - top
+ * No rounding here (displays keep their own). A missing value is standard; an
+ * unknown value throws (never a silent standard).
+ */
+export function sashHeightsFor(frameHeight, proportion = 'standard') {
+    const p = proportion || 'standard';
+    if (!SASH_PROPORTIONS.includes(p)) throw new SashProportionError(`Unknown sash proportion "${p}" (allowed: ${SASH_PROPORTIONS.join(', ')})`);
+    const total = totalSashHeightFor(frameHeight);
+    if (p === 'standard') {
+        const diff = sashFaces().diff;
+        const top = (total - diff) / 2;
+        return { total, top, bottom: top + diff };
+    }
+    const top = p === 'cottage-40-60' ? total * 0.4 : total / 3;
+    return { total, top, bottom: total - top };
+}
+
+/**
+ * Where the meeting line sits in the opening, as a fraction from the bottom
+ * (the 3D draws it there, brief 3.4): the lower sash shows bottom - meet / 2 of
+ * the total - meet the two sashes cover. Standard 1400 0.5130, cottage-40-60
+ * 0.6034, cottage-1-3 0.6723.
+ */
+export function meetingFractionFor(frameHeight, proportion = 'standard') {
+    const { total, bottom } = sashHeightsFor(frameHeight, proportion);
+    const meet = sashFaces().meet;
+    return (bottom - meet / 2) / (total - meet);
+}
+
 
 export const CONFIGURATIONS = Object.freeze({
     'none': {
@@ -197,10 +235,7 @@ export function calculateWindow(frameWidth, frameHeight, configuration = '2x2', 
     validateInputs(frameWidth, frameHeight, configData);
 
     const sashWidth = frameWidth - getWindowProfile().deductions.sashWidth;
-    const totalSashHeight = totalSashHeightFor(frameHeight);
-    const sashDiff = sashFaces().diff;
-    const topSashHeight = (totalSashHeight - sashDiff) / 2;
-    const bottomSashHeight = topSashHeight + sashDiff;
+    const { total: totalSashHeight, top: topSashHeight, bottom: bottomSashHeight } = sashHeightsFor(frameHeight, options.sashProportion);
     // For legacy compatibility, sashHeight = totalSashHeight
     const sashHeight = totalSashHeight;
 
@@ -383,6 +418,23 @@ function calculateGlazingSummaryForWindow(windowSpec, sashWidth, sashHeight, set
     };
 }
 
+// Cottage sashes (Piotr 09.10.2026): the two sashes have different glass, so the
+// summary carries one row per sash, each pane height from that sash's daylight
+// (upper: top - top rail - meeting rail, lower: bottom - meeting rail - bottom
+// rail). A standard window keeps the one legacy row above, byte for byte.
+function calculateGlazingSummaryPerSash(windowSpec, sashWidth, topSashHeight, bottomSashHeight, settings) {
+    const base = calculateGlazingSummaryForWindow(windowSpec, sashWidth, topSashHeight + bottomSashHeight, settings);
+    const grid = windowSpec.sash?.grid ?? { rows: 2, cols: 2 };
+    const _f = sashFaces();
+    const rows = Math.max(grid.rows ?? 1, 1);
+    const paneH = (daylight) => round(Math.max(Math.max(daylight, 0) / rows - settings.glazingAllowanceHeight, 0));
+    const panes = Math.max((grid.rows ?? 1) * (grid.cols ?? 1), 1);
+    return [
+        { ...base, sash: 'upper', height: paneH(topSashHeight - _f.top - _f.meet), panes },
+        { ...base, sash: 'lower', height: paneH(bottomSashHeight - _f.meet - _f.bottom), panes },
+    ];
+}
+
 const OFFCUT_FACTOR = 1.15; // 15% waste for off-cuts
 
 // ─── Frame-dependent finished sections ───
@@ -404,7 +456,9 @@ const GLASS_KG_PER_SQM = {
 // Slim, triple and Laminate / Acoustic door units take the window rates above.
 const DOOR_GLASS_KG_PER_SQM = { double: 30 };
 
-function calculateWeights(windowSpec, sashWidth, topSashHeight, bottomSashHeight) {
+// Timber and glass kg of each sash, the one weight formula of a rectangular sash
+// (calculateWeights sums it, sashWeightsFor splits it per sash).
+function sashWeightParts(windowSpec, sashWidth, topSashHeight, bottomSashHeight, equalGlass = false) {
     const sw = sashWidth / 1000; // to meters
     // kg/m derived from finished section (profile) × timber density
     const prof = getWindowProfile();
@@ -428,14 +482,23 @@ function calculateWeights(windowSpec, sashWidth, topSashHeight, bottomSashHeight
         sw * KG_PER_METER.bottomRail +
         sw * KG_PER_METER.meetingRail;
 
-    // Glass — both sashes (glassH identical for upper & lower)
+    // Glass: each sash its own daylight (equal on a standard sash, not on a
+    // cottage one: the upper pane is shorter, the lower one taller)
     const _f = sashFaces();
     const glassW = sashWidth - 2 * _f.stile;
-    const glassH = topSashHeight - _f.top - _f.meet;
+    const upperGlassH = topSashHeight - _f.top - _f.meet;
+    // a standard sash has equal glass by its rule: the same number, bit for bit, under any profile
+    const lowerGlassH = equalGlass ? upperGlassH : bottomSashHeight - _f.meet - _f.bottom;
     const glassType = windowSpec.glazing?.type || 'double';
     const kgPerSqm = GLASS_KG_PER_SQM[glassType] || GLASS_KG_PER_SQM['double'];
-    const glassSqmPerSash = (glassW * glassH) / 1_000_000;
-    const glassTotal = glassSqmPerSash * kgPerSqm * 2;
+    const upperGlass = (glassW * upperGlassH) / 1_000_000 * kgPerSqm;
+    const lowerGlass = (glassW * lowerGlassH) / 1_000_000 * kgPerSqm;
+    return { upperTimber, lowerTimber, upperGlass, lowerGlass, glassType, kgPerSqm };
+}
+
+function calculateWeights(windowSpec, sashWidth, topSashHeight, bottomSashHeight, equalGlass = false) {
+    const { upperTimber, lowerTimber, upperGlass, lowerGlass, glassType, kgPerSqm } = sashWeightParts(windowSpec, sashWidth, topSashHeight, bottomSashHeight, equalGlass);
+    const glassTotal = upperGlass + lowerGlass;
 
     const subtotal = upperTimber + lowerTimber + glassTotal;
     const total = round(subtotal * 1.05); // +5% silicone, clips, etc.
@@ -447,6 +510,21 @@ function calculateWeights(windowSpec, sashWidth, topSashHeight, bottomSashHeight
         glassType,
         kgPerSqm,
     };
+}
+
+/**
+ * Weight of each sash (kg, +5% like the window total) for a derived sash
+ * window: the top sash and the bottom sash a counterweight pair balances. The
+ * same formula as derived.weights (sashWeightParts); the arched sash carries
+ * its own upperKg / lowerKg. Triple: the centre (opening) section, as the total.
+ * Call it under the same profile as the derivation (withProfiles).
+ */
+export function sashWeightsFor(windowSpec, derived) {
+    if (!derived || derived.category !== 'sash') return null;
+    if (derived.weights?.upperKg != null) return { upperKg: derived.weights.upperKg, lowerKg: derived.weights.lowerKg };
+    const width = derived.tripleSections ? derived.tripleSections.center : derived.sashWidth;
+    const p = sashWeightParts(windowSpec, width, derived.topSashHeight, derived.bottomSashHeight, (derived.sashProportion || 'standard') === 'standard');
+    return { upperKg: round((p.upperTimber + p.upperGlass) * 1.05), lowerKg: round((p.lowerTimber + p.lowerGlass) * 1.05) };
 }
 
 function calculatePaint(frameWidth, frameHeight) {
@@ -463,23 +541,29 @@ function paintFromAreaSqm(areaSqm) {
     };
 }
 
-function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight) {
+function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight, equalGlass = false) {
     const _f = sashFaces();
     const glassW = sashWidth - 2 * _f.stile;
-    const glassH = topSashHeight - _f.top - _f.meet;
+    // Each sash its own glass height (equal on a standard sash; a cottage upper
+    // pane is shorter and its lower pane taller, Piotr 09.10.2026)
+    const glassHu = topSashHeight - _f.top - _f.meet;
+    const glassHl = equalGlass ? glassHu : bottomSashHeight - _f.meet - _f.bottom;   // standard: equal by its rule
     const glassType = windowSpec.glazing?.type || 'double';
 
     const gridMode = windowSpec.sash?.grid?.mode || 'none';
     const pattern = BEADING_BAR_PATTERNS[gridMode] || BEADING_BAR_PATTERNS['none'];
-    const barPerSash = (pattern.v * glassH) + (pattern.h * glassW);
-    const perimPerSash = 2 * (glassW + glassH);
+    const barU = (pattern.v * glassHu) + (pattern.h * glassW);
+    const barL = (pattern.v * glassHl) + (pattern.h * glassW);
+    const perimU = 2 * (glassW + glassHu);
+    const perimL = 2 * (glassW + glassHl);
 
     // Glass area (m²) — the SEALED UNIT size (clear light + the rebate each side),
     // the same numbers as the glass schedule / order, as casement and doors
     // already do (Piotr 02.10.2026; before: the clear light, under-counted).
     const unitW = glassW + 2 * CONSTANTS.GLASS_REBATE;
-    const unitH = glassH + 2 * CONSTANTS.GLASS_REBATE;
-    const glassSqm = round((unitW * unitH) / 1_000_000 * 2);
+    const unitHu = glassHu + 2 * CONSTANTS.GLASS_REBATE;
+    const unitHl = glassHl + 2 * CONSTANTS.GLASS_REBATE;
+    const glassSqm = round((unitW * unitHu) / 1_000_000 + (unitW * unitHl) / 1_000_000);
 
     // Cord — 3× frame height in meters
     const cordM = round((3 * frameHeight) / 1000);
@@ -502,11 +586,11 @@ function calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, to
     // Spacer 2mm — 4 per window
     const spacer2mmQty = 4;
 
-    // Bead tape — (perim × 2 + bars × 4) × 2 sashes, NO off-cut
-    const beadTapeM = round(((perimPerSash * 2) + (barPerSash * 4)) * 2 / 1000);
+    // Bead tape: (perim × 2 + bars × 4) per sash, both sashes, NO off-cut
+    const beadTapeM = round((((perimU * 2) + (barU * 4)) + ((perimL * 2) + (barL * 4))) / 1000);
 
-    // Silicone — 0.1 tube per meter of (perim + bars) × 2 sashes
-    const siliconeMeters = ((perimPerSash + barPerSash) * 2) / 1000;
+    // Silicone: 0.1 tube per meter of (perim + bars), both sashes
+    const siliconeMeters = ((perimU + barU) + (perimL + barL)) / 1000;
     const siliconeTubes = round(0.1 * siliconeMeters);
 
     // Weights — slim counterweights for slim AND heritage boxes (lighter glass, shallower box)
@@ -538,34 +622,39 @@ const BEADING_BAR_PATTERNS = {
     '4x4': { v: 1, h: 1 }, '6x6': { v: 2, h: 1 }, '8x8': { v: 3, h: 1 }, '9x9': { v: 2, h: 2 },
 };
 
-function calculateBeadingComponents(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight) {
+function calculateBeadingComponents(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight, equalGlass = false) {
     const F = OFFCUT_FACTOR;
     const _f = sashFaces();
     const glassW = sashWidth - 2 * _f.stile;
-    const glassH = topSashHeight - _f.top - _f.meet;
+    // Each sash its own glass height (a cottage upper pane is shorter, its lower one taller)
+    const glassHu = topSashHeight - _f.top - _f.meet;
+    // a standard sash has equal glass by its rule (the same number, bit for bit, under any profile; the notes keep "× 2")
+    const glassHl = equalGlass ? glassHu : bottomSashHeight - _f.meet - _f.bottom;
+    const equal = equalGlass;
 
     const gridMode = windowSpec.sash?.grid?.mode || 'none';
     const pattern = BEADING_BAR_PATTERNS[gridMode] || BEADING_BAR_PATTERNS['none'];
-    const barPerSash = (pattern.v * glassH) + (pattern.h * glassW);
+    const barU = (pattern.v * glassHu) + (pattern.h * glassW);
+    const barL = (pattern.v * glassHl) + (pattern.h * glassW);
 
     const rec = (name, lengthMm, notes) =>
         createComponentRecord(windowSpec, 'beading', name, 'profile', lengthMm, 1, notes);
 
     const beading = [];
 
-    // 1. Glazing beading — perimeter of glass area × 2 sashes
-    const perimPerSash = 2 * (glassW + glassH);
-    beading.push(rec('GLAZING BEADING', round(perimPerSash * 2 * F),
-        `Perim ${round(perimPerSash)} × 2 + 15%`));
+    // 1. Glazing beading: perimeter of the glass area of both sashes
+    const perimU = 2 * (glassW + glassHu);
+    const perimL = 2 * (glassW + glassHl);
+    beading.push(rec('GLAZING BEADING', round((perimU + perimL) * F),
+        equal ? `Perim ${round(perimU)} × 2 + 15%` : `Perim ${round(perimU)} + ${round(perimL)} + 15%`));
 
     // 2. Triangle beading ext (only if bars exist)
-    if (barPerSash > 0) {
-        const barTotal = round(barPerSash * 2 * F);
-        beading.push(rec('TRIANGLE BEADING (EXT)', barTotal,
-            `Bars ${round(barPerSash)} × 2 + 15%`));
+    if (barU + barL > 0) {
+        const barTotal = round((barU + barL) * F);
+        const barNotes = equal ? `Bars ${round(barU)} × 2 + 15%` : `Bars ${round(barU)} + ${round(barL)} + 15%`;
+        beading.push(rec('TRIANGLE BEADING (EXT)', barTotal, barNotes));
         // 3. Georgian middle beading (internal) — same length, glued other side of glass
-        beading.push(rec('GEORGIAN MIDDLE BEADING', barTotal,
-            `Bars ${round(barPerSash)} × 2 + 15%`));
+        beading.push(rec('GEORGIAN MIDDLE BEADING', barTotal, barNotes));
     }
 
     // 4. Parting beading — 2× frame height + frame width
@@ -1706,10 +1795,10 @@ export function deriveWindowData(windowSpec, settings = {}) {
 
     const config = resolveConfiguration(gridMode, windowSpec.sash?.grid ?? {});
     const sashWidth = frameWidth - getWindowProfile().deductions.sashWidth;
-    const totalSashHeight = totalSashHeightFor(frameHeight);
-    const sashDiff = sashFaces().diff;
-    const topSashHeight = (totalSashHeight - sashDiff) / 2;
-    const bottomSashHeight = topSashHeight + sashDiff;
+    // Sash proportion (cottage, Piotr 09.10.2026): the split comes from the one helper
+    const sashProportion = windowSpec.sash?.proportion || 'standard';
+    const { total: totalSashHeight, top: topSashHeight, bottom: bottomSashHeight } = sashHeightsFor(frameHeight, sashProportion);
+    const meetingFraction = meetingFractionFor(frameHeight, sashProportion);
     const sashHeight = totalSashHeight;
 
     const sashComponents = isTripleSash
@@ -1717,11 +1806,15 @@ export function deriveWindowData(windowSpec, settings = {}) {
         : calculateSashComponentSet(windowSpec, settings, sashWidth, topSashHeight, bottomSashHeight);
     const boxComponents = calculateBoxComponentSet(windowSpec, frameWidth, frameHeight);
     const tripleSections = isTripleSash ? tripleSectionWidths(windowSpec, sashWidth) : null;
-    const glazingSummary = calculateGlazingSummaryForWindow(windowSpec, sashWidth, sashHeight, settings);
+    // standard: the one legacy row; cottage: one row per sash (the panes differ)
+    const glazingItems = sashProportion === 'standard'
+        ? [calculateGlazingSummaryForWindow(windowSpec, sashWidth, sashHeight, settings)]
+        : calculateGlazingSummaryPerSash(windowSpec, sashWidth, topSashHeight, bottomSashHeight, settings);
 
     const result = calculateWindow(frameWidth, frameHeight, config.key, {
         rows: config.rows,
         cols: config.cols,
+        sashProportion,
     });
 
     const barPositions = {
@@ -1729,14 +1822,15 @@ export function deriveWindowData(windowSpec, settings = {}) {
         horizontal: result.components.sash.glazingBars.horizontal.positions,
     };
 
+    const equalGlass = sashProportion === 'standard';
     const beadingComponents = calculateBeadingComponents(
-        windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight
+        windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight, equalGlass
     );
 
     // Triple sash: counterweights balance only the centre (opening) section
-    let weights = calculateWeights(windowSpec, tripleSections ? tripleSections.center : sashWidth, topSashHeight, bottomSashHeight);
+    let weights = calculateWeights(windowSpec, tripleSections ? tripleSections.center : sashWidth, topSashHeight, bottomSashHeight, equalGlass);
     let paint = calculatePaint(frameWidth, frameHeight);
-    let consumables = calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight);
+    let consumables = calculateConsumables(windowSpec, frameWidth, frameHeight, sashWidth, topSashHeight, bottomSashHeight, equalGlass);
 
     // ── Arched sash (ARCHED-WINDOWS-v3 Block 1 C): the box head and the upper
     //    sash's top rail become rings on the frame contour (arch.js, rule C);
@@ -1852,6 +1946,10 @@ export function deriveWindowData(windowSpec, settings = {}) {
         sashHeight,
         topSashHeight,
         bottomSashHeight,
+        // cottage (Piotr 09.10.2026): the proportion and where the meeting line sits
+        // in the opening (fraction from the bottom, the 3D draws it there)
+        sashProportion,
+        meetingFraction,
         config,
         // Profile numbers for drawing dimension labels (schematic geometry stays
         // fixed; only the printed numbers follow the active/snapshotted profile).
@@ -1874,7 +1972,7 @@ export function deriveWindowData(windowSpec, settings = {}) {
             };
         })(),
         components: { sash: sashComponents, box: boxComponents, beading: beadingComponents },
-        glazingItems: [glazingSummary],
+        glazingItems,
         barPositions,
         weights,
         paint,

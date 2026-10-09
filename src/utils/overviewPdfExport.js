@@ -60,6 +60,9 @@ export function exportOverviewPDF(info) {
     cells: isPP
       ? [w.projectNum || '—', w.name, w.type, w.width, w.height, w.bars, w.head, w.glass, w.opening]
       : [w.name, w.type, w.width, w.height, w.bars, w.head, w.glass, w.opening],
+    // cottage sash (Piotr 09.10.2026): the proportion under the type (the Type
+    // column is too narrow for both on one line); a standard row has none
+    ...(w.proportion ? { note: w.proportion, noteCol: 'Type' } : {}),
   }));
 
   drawReportTable(doc, PG, {

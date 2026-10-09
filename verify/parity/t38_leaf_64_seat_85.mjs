@@ -357,9 +357,16 @@ for (const id of ['arched-V1', 'circle-800']) {
 
 // ═════════════════════════════════════════════════════════════════════════════
 section('8 - sash and door: nothing moves');
+// 09.10.2026 (sash proportions, brief 2.4): a sash derived carries two new keys, sashProportion
+// and meetingFraction; every other key stays byte for byte and the two take their standard values
+// (meeting fraction by hand: bottom = (H - 92 + 33) / 2, f = (bottom - 43 / 2) / (H - 92 - 43)).
+const withoutProportionKeys = (d) => { const c = { ...d }; delete c.sashProportion; delete c.meetingFraction; return c; };
+const handFraction = (H) => (((H - 92 + 33) / 2) - 43 / 2) / (H - 92 - 43);
 for (const id of ['sash']) {
   for (const [M, X, name] of [[REF, F, 'REF'], [START, S, 'START']]) {
-    ok(JSON.stringify(L[id].derived) === JSON.stringify(X[id].derived), `${id}: derived deep-equal to ${name}`);
+    const Ld = L[id].derived;
+    ok(JSON.stringify(withoutProportionKeys(Ld)) === JSON.stringify(X[id].derived) && !('sashProportion' in X[id].derived) && Ld.sashProportion === 'standard' && near(Ld.meetingFraction, handFraction(Number(SASH.item.height)), 1e-12),
+      `${id}: derived deep-equal to ${name} but for the two new keys (sashProportion ${Ld.sashProportion}, meetingFraction ${Ld.meetingFraction})`);
     const ca = LIVE.lists.buildCutListForWindow(L[id].derived, L[id].spec), cb = M.lists.buildCutListForWindow(X[id].derived, X[id].spec);
     const ga = LIVE.lists.buildGlassListForWindow(L[id].derived, L[id].spec), gb = M.lists.buildGlassListForWindow(X[id].derived, X[id].spec);
     ok(JSON.stringify(ca) === JSON.stringify(cb) && JSON.stringify(ga) === JSON.stringify(gb), `${id}: cut list and glass schedule equal to ${name} (${ga.map((r) => `${r.width} x ${r.height}`).join(', ')})`);

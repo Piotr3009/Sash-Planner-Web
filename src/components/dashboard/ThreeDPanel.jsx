@@ -11,7 +11,7 @@ import Window3DCaptureRig from '../viewer/Window3DCaptureRig.jsx';
 import { exportThreeDPDF } from '../../utils/threeDPdfExport.js';
 import { useProjectStore } from '../../stores/projectStore.js';
 
-export default function ThreeDPanel({ item, windowSpec, batch, editUrl }) {
+export default function ThreeDPanel({ item, windowSpec, batch, editUrl, derived = null }) {
   const [capturing, setCapturing] = useState(false);
 
   const winW = item?.width || windowSpec?.frame?.width || '';
@@ -56,7 +56,7 @@ export default function ThreeDPanel({ item, windowSpec, batch, editUrl }) {
         </div>
       </div>
       <div className="aspect-[4/3] bg-gradient-to-br from-surface-600 to-surface-700 rounded-lg overflow-hidden">
-        <WindowPreview3D windowSpec={windowSpec} side="exterior" />
+        <WindowPreview3D windowSpec={windowSpec} side="exterior" derived={derived} />
       </div>
 
       {capturing && (
@@ -64,7 +64,7 @@ export default function ThreeDPanel({ item, windowSpec, batch, editUrl }) {
           <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
             <div className="card px-6 py-4 text-sm text-ink-100">Generating 3D PDF…</div>
           </div>
-          <Window3DCaptureRig windows={[{ id: item?.id || 'win', windowSpec }]} side="exterior" onComplete={handleComplete} />
+          <Window3DCaptureRig windows={[{ id: item?.id || 'win', windowSpec, derived }]} side="exterior" onComplete={handleComplete} />
         </>
       )}
     </div>

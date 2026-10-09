@@ -564,6 +564,7 @@ export const useProjectStore = create((set, get) => ({
       inputHeight: windowConfig.inputHeight || windowConfig.extHeight || 1500,
       sashType: windowConfig.sashType || 'double',
       splitRatio: windowConfig.splitRatio || '1/4-1/2-1/4',
+      sashProportion: windowConfig.sashProportion || 'standard',   // cottage (Piotr 09.10.2026), PSW contract
       headType: windowConfig.headType || 'flat',
       upperBars: windowConfig.upperBars || 'none',
       lowerBars: windowConfig.lowerBars || 'none',
@@ -736,6 +737,7 @@ export const useProjectStore = create((set, get) => ({
       inputHeight: windowConfig.inputHeight || windowConfig.extHeight || existing.height,
       sashType: windowConfig.sashType || 'double',
       splitRatio: windowConfig.splitRatio || '1/4-1/2-1/4',
+      sashProportion: windowConfig.sashProportion || 'standard',   // cottage (Piotr 09.10.2026), PSW contract
       headType: windowConfig.headType || 'flat',
       upperBars: windowConfig.upperBars || 'none',
       lowerBars: windowConfig.lowerBars || 'none',

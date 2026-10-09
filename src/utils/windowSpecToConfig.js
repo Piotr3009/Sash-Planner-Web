@@ -49,7 +49,7 @@ import { buildVentGrilles } from '../engine/lists.js';
 import { RAL_LOOKUP as RAL_COLORS } from '../config.js';
 import { fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from '../engine/casementLayouts.js';
 import { profileBoxDepth, getCasementProfile, getWindowProfile, getDoorProfile } from '../engine/profile.js';
-import { deriveWindowData } from '../engine/calculations.js';
+import { deriveWindowData, meetingFractionFor } from '../engine/calculations.js';
 
 function resolveColor(name, ral) {
   if (!name && !ral) return '#F4F4F2'; // default white
@@ -75,7 +75,7 @@ function resolveColor(name, ral) {
  * Convert a windowSpec object (from specification.js normaliseToWindowSpec)
  * into props that ParametricSashWindow accepts.
  */
-export function windowSpecToConfig(windowSpec) {
+export function windowSpecToConfig(windowSpec, derived = null) {
   if (!windowSpec) return {};
 
   // Casement windows route to CasementWindow via casementProps; width/height
@@ -271,6 +271,14 @@ export function windowSpecToConfig(windowSpec) {
     ironmongery,
     sashType: 'double',
     splitRatio: '1/4-1/2-1/4',
+    // cottage (Piotr 09.10.2026): the proportion and the meeting line fraction from
+    // the engine (every sash window, standard included: the 3D meeting line sits
+    // where production puts it). A page that derived the window (under the batch
+    // profile snapshot) passes its derived data, so the 3D uses that very number.
+    sashProportion: windowSpec.sash?.proportion || 'standard',
+    meetingFraction: derived?.category === 'sash' && Number.isFinite(derived.meetingFraction)
+      ? derived.meetingFraction
+      : meetingFractionFor(h, windowSpec.sash?.proportion || 'standard'),
     headType: 'flat',
     // arched sash (v3 Block 1 I): the PSW `sashType 'arched'` branch of the shared App with PC's shape + real rise
     ...(windowSpec.category === 'sash' && windowSpec.arch?.shape && windowSpec.sash?.type !== 'triple' ? {

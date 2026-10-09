@@ -6,6 +6,8 @@ import IronmongeryMatrixModal from '../components/IronmongeryMatrixModal.jsx';
 import { GLASS_TYPES, GLASS_FINISHES, FROSTED_LOCATIONS, SPACERS, SPACER_TYPES, SWATCHES, RAL_GROUPS, FB_GROUPS } from '../config.js';
 import { buildVentGrilles } from '../engine/lists.js';
 import { calculatePrice } from '../engine/pricing.js';
+import { SASH_PROPORTIONS, SASH_PROPORTION_OPTIONS, SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, effectiveSashProportion } from '../engine/specification.js';
+import { meetingFractionFor } from '../engine/calculations.js';
 
 // Reuse the SAME 3D viewer the production configurator uses (window.update3D bridge).
 const Viewer3D = lazy(() => import('../3d/App.jsx'));
@@ -95,6 +97,7 @@ export default function EstimateConfiguratorPage() {
   const [winName, setWinName] = useState('');
   const [sashType, setSashType] = useState('double');
   const [splitRatio, setSplitRatio] = useState('1/4-1/2-1/4');
+  const [sashProportion, setSashProportion] = useState('standard');   // cottage (Piotr 09.10.2026)
   const [headType, setHeadType] = useState('flat');
   const [inW, setInW] = useState(1000);
   const [inH, setInH] = useState(1500);
@@ -130,6 +133,7 @@ export default function EstimateConfiguratorPage() {
       setWinName(editingItem.windowName || '');
       setSashType(c.sashType || 'double');
       setSplitRatio(c.splitRatio || '1/4-1/2-1/4');
+      setSashProportion(c.sashProportion || 'standard');
       setHeadType(c.headType || 'flat');
       setInW(c.inputWidth || c.extWidth || 1000);
       setInH(c.inputHeight || c.extHeight || 1500);
@@ -161,6 +165,12 @@ export default function EstimateConfiguratorPage() {
   const dimConstraints = sashType === 'triple' ? TRIPLE_CONSTRAINTS : DOUBLE_CONSTRAINTS;
   const extW = Number(inW) || 400;
   const extH = Number(inH) || 400;
+  // Sash proportions (cottage, Piotr 09.10.2026): cottage from a 900 frame up; the
+  // effective value is what the 3D shows, the price counts and the save stores
+  const cottageAllowed = extH >= COTTAGE_MIN_FRAME_HEIGHT;
+  const sashProp = effectiveSashProportion(sashProportion, { frameHeight: extH });
+  // a stored value the engine does not know (e.g. a newer PSW one): said next to the control, not saved, no 3D line from it
+  const proportionError = SASH_PROPORTIONS.includes(sashProp) ? null : `Unknown sash proportion "${sashProp}": choose one of the three.`;
   const isSingle = colourMode === 'single';
   const effectiveLBars = sameBars ? uBars : lBars;
   const effectiveLCustom = sameBars ? uCustom : lCustom;
@@ -190,9 +200,11 @@ export default function EstimateConfiguratorPage() {
       upperGlass: gFin === 'frosted' && frostLoc === 'both' ? 'frosted' : 'clear',
       lowerGlass: gFin === 'frosted' ? 'frosted' : 'clear',
       spacerColor: spacer, sashType, splitRatio, headType, openingType: opening,
+      // the meeting line where production puts it (engine helper, every sash window)
+      sashProportion: sashProp, meetingFraction: proportionError ? undefined : meetingFractionFor(extH, sashProp),
       boxType: glassType === 'triple' ? 'standard' : frameType, boxDepth: frameDepth,
     });
-  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, effectiveLCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, ironBespoke, derivedFinish, gFin, frostLoc, spacer, sashType, splitRatio, headType, opening, glassType, frameType, frameDepth]);
+  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, effectiveLCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, ironBespoke, derivedFinish, gFin, frostLoc, spacer, sashType, splitRatio, sashProp, proportionError, headType, opening, glassType, frameType, frameDepth]);
   useEffect(() => { sync(); }, [sync]);
   useEffect(() => {
     const handler = () => sync();
@@ -223,10 +235,10 @@ export default function EstimateConfiguratorPage() {
     customBars: { upper: toCustomBars(uCustom), lower: toCustomBars(effectiveLCustom) },
     glassType, glassSpec, glassFinish: gFin,
     colorType: colourMode, colorSingle: isWhiteHex(woodColor) ? 'white' : 'custom',
-    openingType: opening, headType,
+    openingType: opening, headType, sashProportion: sashProp,
     frameType, sillExtension: 'none', pas24: pas24 ? 'yes' : 'no',
     ironmongery: ironmongeryForPrice,
-  }), [sashType, extW, extH, uBars, effectiveLBars, uCustom, effectiveLCustom, glassType, glassSpec, gFin, colourMode, woodColor, opening, headType, frameType, pas24, ironmongeryForPrice]);
+  }), [sashType, sashProp, extW, extH, uBars, effectiveLBars, uCustom, effectiveLCustom, glassType, glassSpec, gFin, colourMode, woodColor, opening, headType, frameType, pas24, ironmongeryForPrice]);
 
   const price = useMemo(() => calculatePrice(pricingConfig, pricingSettings), [pricingConfig, pricingSettings]);
 
@@ -245,13 +257,13 @@ export default function EstimateConfiguratorPage() {
     upperGlass: gFin === 'frosted' && frostLoc === 'both' ? 'frosted' : 'clear',
     lowerGlass: gFin === 'frosted' ? 'frosted' : 'clear',
     glassType, glassSpec, glassFinish: gFin, frostedLocation: frostLoc,
-    spacerColor: spacer, spacerType, sashType, splitRatio, headType, openingType: opening,
+    spacerColor: spacer, spacerType, sashType, splitRatio, sashProportion: sashProp, headType, openingType: opening,
     ventRoomType, ventSoleWindow,
     frameType: glassType === 'triple' ? 'standard' : frameType, frameDepth, pas24,
   });
 
   const handleSave = () => {
-    if (!winName.trim()) return;
+    if (!winName.trim() || proportionError) return;
     const item = {
       windowName: winName.trim(),
       config: buildSaveConfig(),
@@ -290,7 +302,7 @@ export default function EstimateConfiguratorPage() {
         <div className="flex items-center gap-3">
           <input type="text" placeholder="Window name (max 7)" maxLength={7} value={winName} onChange={(e) => setWinName(e.target.value)}
             className={`px-3 py-2 border-2 rounded-lg text-sm w-56 bg-surface-800 ${winName.trim() ? 'border-accent-500 text-ink-50' : 'border-status-danger/50 text-ink-200'}`} />
-          <button onClick={handleSave} className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'}`}>
+          <button onClick={handleSave} disabled={!!proportionError} title={proportionError || undefined} className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'} ${proportionError ? 'opacity-40 cursor-not-allowed' : ''}`}>
             {isEditMode ? '✓ Update window' : '✓ Add to estimate'}
           </button>
         </div>
@@ -302,6 +314,10 @@ export default function EstimateConfiguratorPage() {
           <Sec t="Sash Type">
             <HChips o={SASH_TYPES} v={sashType} c={setSashType} />
             {sashType === 'triple' && <select value={splitRatio} onChange={(e) => setSplitRatio(e.target.value)} className="w-full px-3 py-2 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs mb-2">{SPLIT_RATIOS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}</select>}
+            <Lbl>Sash proportions</Lbl>
+            <HChips o={SASH_PROPORTION_OPTIONS} v={sashProp} c={setSashProportion} disabled={(x) => x.value !== 'standard' && !cottageAllowed} />
+            {!cottageAllowed && <div className="text-[10px] text-ink-400 -mt-1 mb-2">Cottage needs a frame height of {COTTAGE_MIN_FRAME_HEIGHT} mm or more.</div>}
+            {proportionError && <div className="text-[11px] text-red-400 -mt-1 mb-2">{proportionError}</div>}
             <Lbl>Head</Lbl><HChips o={HEAD_TYPES} v={headType} c={setHeadType} />
           </Sec>
 
@@ -319,7 +335,7 @@ export default function EstimateConfiguratorPage() {
                 <Lbl>Height (mm)</Lbl>
                 <input type="number" min={dimConstraints.minH} max={dimConstraints.maxH} step={10} value={inH}
                   onChange={(e) => setInH(e.target.value === '' ? '' : Number(e.target.value))}
-                  onBlur={(e) => { const v = Number(e.target.value); setInH(isNaN(v) || v < dimConstraints.minH ? dimConstraints.minH : v > dimConstraints.maxH ? dimConstraints.maxH : v); }}
+                  onBlur={(e) => { const v = Number(e.target.value); const nv = isNaN(v) || v < dimConstraints.minH ? dimConstraints.minH : v > dimConstraints.maxH ? dimConstraints.maxH : v; setInH(nv); if (nv < COTTAGE_MIN_FRAME_HEIGHT) setSashProportion('standard'); }}
                   className="w-full px-3 py-2 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
               </div>
             </div>
@@ -400,7 +416,7 @@ export default function EstimateConfiguratorPage() {
         <div className="w-72 shrink-0 border-l border-surface-500 bg-surface-900 overflow-y-auto text-xs flex flex-col">
           <div className="px-4 py-2 bg-surface-700 border-b border-surface-500 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Specification</div>
           <SG t="Dimensions"><SR l="Frame" v={`${extW} × ${extH} mm`} /><SR l="Depth" v={`${frameDepth}mm`} /></SG>
-          <SG t="Product"><SR l="Sash" v={sashType} /><SR l="Head" v={headType} />{sashType === 'triple' && <SR l="Split" v={splitRatio} />}</SG>
+          <SG t="Product"><SR l="Sash" v={sashType} /><SR l="Proportions" v={SASH_PROPORTION_LABELS[sashProp] || sashProp} /><SR l="Head" v={headType} />{sashType === 'triple' && <SR l="Split" v={splitRatio} />}</SG>
           <SG t="Bars"><SR l="Upper" v={uBars} /><SR l="Lower" v={sameBars ? uBars : lBars} /></SG>
           <SG t="Ventilation"><SR l="Room" v={(ROOM_TYPES.find((r) => r.value === ventRoomType) || {}).label} /><SR l="Trickle vents" v={ventQty} /></SG>
           <SG t="Glass">
@@ -437,6 +453,7 @@ export default function EstimateConfiguratorPage() {
                 {Number(price.breakdown.barsPrice) > 0 && <PR l="Bars" v={fmt(price.breakdown.barsPrice)} />}
                 {Number(price.breakdown.fixBarsPrice) > 0 && <PR l="Fix bars" v={fmt(price.breakdown.fixBarsPrice)} />}
                 {Number(price.breakdown.additionalOptions) !== 0 && <PR l="Options / glass / iron" v={fmt(price.breakdown.additionalOptions)} />}
+                {Number(price.breakdown.cottageSurcharge) > 0 && <PR l="Cottage proportions" v={fmt(price.breakdown.cottageSurcharge)} />}
                 {ironBespoke && <div className="text-[10px] text-amber-400">+ bespoke ironmongery (added manually)</div>}
                 <div className="flex justify-between pt-1.5 border-t border-surface-500">
                   <span className="text-ink-300">This window (ex VAT)</span>
@@ -493,7 +510,7 @@ export default function EstimateConfiguratorPage() {
 // ─── UI Components ───
 function Sec({ t, children }) { return <div className="px-4 py-3 border-b border-surface-500"><div className="text-xs font-semibold text-ink-100 uppercase tracking-wider mb-2">{t}</div>{children}</div>; }
 function Lbl({ children }) { return <div className="text-xs text-ink-400 font-medium mb-1 mt-1.5">{children}</div>; }
-function HChips({ o, v, c }) { return <div className="flex flex-wrap gap-1.5 mb-2">{o.map((x) => <button key={String(x.value)} onClick={() => c(x.value)} className={`px-2.5 py-1 text-[11px] rounded-lg border transition-all ${v === x.value ? 'border-accent-500 bg-accent-500/15 text-accent-400 font-medium' : 'border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500'}`}>{x.label}</button>)}</div>; }
+function HChips({ o, v, c, disabled }) { return <div className="flex flex-wrap gap-1.5 mb-2">{o.map((x) => { const off = !!disabled?.(x); return <button key={String(x.value)} disabled={off} onClick={() => { if (!off) c(x.value); }} className={`px-2.5 py-1 text-[11px] rounded-lg border transition-all ${off ? 'border-surface-500 text-ink-500 bg-surface-700 opacity-50 cursor-not-allowed' : v === x.value ? 'border-accent-500 bg-accent-500/15 text-accent-400 font-medium' : 'border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500'}`}>{x.label}</button>; })}</div>; }
 function GChips({ o, v, c }) { return <div className="grid grid-cols-4 gap-1 mb-2">{o.map((x) => <button key={x.value} onClick={() => c(x.value)} className={`px-1.5 py-1 text-[11px] rounded border transition-all ${v === x.value ? 'border-accent-500 bg-accent-500/15 text-accent-400 font-medium' : 'border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500'}`}>{x.label}</button>)}</div>; }
 
 function ColorField({ label, value, onChange }) {
