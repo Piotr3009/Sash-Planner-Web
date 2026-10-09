@@ -571,6 +571,8 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
         h: Number(item?.doorHBars ?? fc.doorHBars) || 0,
         v: Number(item?.doorVBars ?? fc.doorVBars) || 0,
       },
+      // Side panel zones (doors v3, owner box item 6, flagged): each width runs from
+      // the outer frame edge to the mullion axis, INSIDE the frame width W.
       sidePanels: {
         mode: item?.sidePanels || fc.sidePanels || 'none',
         leftWidth: Number(item?.sideLeftWidth ?? fc.sideLeftWidth) || 500,
@@ -581,6 +583,8 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       },
       // Fanlight (coupled transom). The configurator offers it on a french
       // door only; the engine builds whatever transom.type says, on any door type.
+      // height = T, from the frame top to the transom AXIS, inside H (doors v3,
+      // owner box item 3, flagged).
       transom: {
         type: item?.transomType || fc.transomType || 'none',
         height: Number(item?.transomHeight ?? fc.transomHeight) || 450,

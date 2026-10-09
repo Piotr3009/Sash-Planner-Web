@@ -708,7 +708,8 @@ function overviewCells(wd) {
     return {
       type: d.type === 'french' ? 'french' : 'single',
       head: d.style || 'full-glass',
-      opening: `${d.openDirection || 'outward'} · ${lock} · ${threshold}`,
+      // doors v3 (CLAUDE.md 3.8): the handing as the configurator states it ("Hinge left · opens outward")
+      opening: `${wd?.derived?.door?.handing?.label || d.openDirection || 'outward'} · ${lock} · ${threshold}`,
       box: wd?.derived?.door?.frameDepth ?? wd?.windowSpec?.frame?.depth,
     };
   }

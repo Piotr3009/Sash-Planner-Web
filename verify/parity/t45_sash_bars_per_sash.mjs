@@ -36,8 +36,10 @@
  *      unknown bar pattern and an arch the engine refuses fail that window only
  *  10  pages in a browser (Playwright, like t39 / t43): the project page cards, the window
  *      detail page and the production pack with two windows in error and a PSW window
- *      with its bars only in fullConfig; Pricing Settings "Cottage sash surcharge"
- *      (owner box item 18) next to "Arched head", its 5 % fallback and its save
+ *      with its bars only in fullConfig; a door batch (the pack overview prints the
+ *      handing, a door whose frame leaves no leaf is excluded with its message); the
+ *      custom bar warning on the window detail page; Pricing Settings "Cottage sash
+ *      surcharge" (owner box item 18) next to "Arched head", its 5 % fallback and its save
  *
  * "6 over 1" is upper '6x6' (the PSW six-pane pattern: 2 rows x 3 columns) over lower
  * 'none'. The vocabulary has no '2x3' ('2x2' and '3x3' already mean 2 and 3 panes per
@@ -548,6 +550,41 @@ if (!chromium) {
   const barsCell = async (name) => ((await row(name).count()) ? (await row(name).first().locator('td').nth(5).innerText()).trim() : null);
   const bSix = await barsCell('SIX'), bPsw = await barsCell('PSW');
   ok(bSix === '6x6 / none' && bPsw === '6x6 / none', `pack overview bars: SIX "${bSix}", PSW "${bPsw}"`);
+
+  // ── doors v3 on the same pages: a door batch with a good door and one whose frame leaves no leaf
+  //    (a PSW-era 900 with side panels 500 + 500 outside W), and a sash with a custom bar outside its pane ──
+  const ids2 = await page.evaluate((x) => {
+    const st = window.__store.getState();
+    const db = st.createBatch(x.p, 'door');
+    const mkWin = (id, name, w, h, fc, extra = {}) => ({ id, name, width: w, height: h, specification: JSON.stringify({ fullConfig: fc }), ...extra });
+    window.__store.setState((s) => ({
+      projects: s.projects.map((pp) => (pp.id !== x.p ? pp : { ...pp, batches: pp.batches.map((bb) => {
+        if (bb.id === db.id) return { ...bb, windows: [
+          mkWin('door-ok', 'DOK', 900, 2100, { windowCategory: 'door', doorType: 'single-external', doorHinge: 'left' }),
+          mkWin('door-bad', 'DBAD', 900, 2100, { windowCategory: 'door', doorType: 'single-external', sidePanels: 'both', sideLeftWidth: 500, sideRightWidth: 500 }),
+        ] };
+        if (bb.id === x.b) return { ...bb, windows: [...bb.windows, mkWin('cust', 'CUST', 1000, 1400, {}, { upperBars: 'custom', lowerBars: 'none', upperCustomBars: [{ type: 'v', mm: 900 }] })] };
+        return bb;
+      }) })),
+    }));
+    window.__store.getState().setCurrentProject(window.__store.getState().projects.find((pp) => pp.id === x.p));
+    return { db: db.id, type: db.type };
+  }, ids);
+  await mount(`/projects/${ids.p}/batches/${ids2.db}/production-pack`);
+  await waitText('excluded from the lists');
+  t = await body();
+  const openingCell = async (name) => ((await row(name).count()) ? (await row(name).first().locator('td').nth(8).innerText()).trim() : null);
+  const oc = await openingCell('DOK');
+  ok(oc != null && oc.startsWith('Hinge left · opens outward · single kit'), `door pack overview: the opening cell prints the handing "${oc}" (CLAUDE.md 3.8)`);
+  ok(/1 window excluded from the lists and PDFs: DBAD/.test(t) && /Door "DBAD": the door field -100 mm/.test(t) && (await row('DBAD').count()) === 0,
+    'door pack: the door whose frame leaves no leaf is excluded with its DoorGeometryError message');
+  await mount(`/projects/${ids.p}/batches/${ids2.db}/windows/door-bad`);
+  await waitText('This window cannot be calculated');
+  ok(/the door field -100 mm \(frame 900 less side panels 500 \+ 500\)/.test(await body()), 'window detail DBAD: the message, not a blank page');
+  await mount(`/projects/${ids.p}/batches/${ids.b}/windows/cust`);
+  await waitText('Sashes & Bars');
+  const bw = await page.locator('[data-bar-warning]').allInnerTexts();
+  ok(bw.length === 1 && /custom vertical bar at 900 mm lies outside the upper sash glass \(708 wide\)/.test(bw[0]), `window detail CUST: the custom bar warning "${bw[0] || '-'}" (it still derives)`);
 
   // ── Pricing Settings: "Cottage sash surcharge" next to "Arched head" (owner box item 18) ──
   // a stored price list from before the field (no cottageSash) shows the 5 % default; a saved value is stored

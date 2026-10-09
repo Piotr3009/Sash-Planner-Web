@@ -4,6 +4,114 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-10-09 · TURA PC: DOORS v3, SASH BARS PER SASH, SETTINGS SAVE, items for Piotr (branch `claude/doors-v3`)
+
+**31.1 Owner checks: the assumptions (ZAŁOŻENIE) of the box, the number used and where it lives.**
+
+| | assumption | number used | where |
+|---|---|---|---|
+| a | W x H is the OVERALL frame; `sideLeftWidth` / `sideRightWidth` run from the outer frame edge to the mullion axis (box 6) | 2400 + sides 400 / 400: door field 1600 between the axes; 1000 + side 450 right: door field 550, leaf 482, side light 382 | `deriveDoorWindow` fields; `door.sidePanels.leftWidth / rightWidth` |
+| b | `transomHeight` T runs from the frame top to the transom AXIS (box 3) | T 450: fan leaves 385 high, the leaf under the transom starts 467 from the top | `door.transom.height`; `deductions.fanFromAxis 65`, `leafBelowAxis 17` |
+| c | fixed fanlight bottom rail 67 (as the casement fixed light, not 64) (box 7) | 64 / 64 / 67 | `fixedFan.bottom` |
+| d | panel edge: tongue 24, slope 40 from 24 to 54, flat 15 at the bead (box 8); the sheets and the 3D draw it symmetric about the leaf centre plane (the profile does not say on which face the bead sits) | 24 / 40 / 15 | `panel.edge` |
+| e | panel boards and core bought at the full panel outer size (box 8) | 644 x 806 x 2 Tricoya + 1 core for the 900 x 2100 half glazed | `deriveDoorWindow` panel BOM (comment "ASSUMPTION") |
+| f | an inward door ignores a stored or chosen aluminium / low-profile threshold (box 9); the configurators disable those chips when the direction is inward | timber inward cill 40 / 35; sheets and pages print "inward door: timber threshold" | `thresholdInfo.ignored`; `ConfiguratorPage` threshold chips |
+| g | french meeting stiles stay as drawn: rebated joint on the 12 lap, half the thickness each (box 13) | unchanged | sheets only |
+| h | the inward door leaf at 51 above the floor stands 51 - 40 = 11 over the inward cill inside and 51 - 35 = 16 outside (restates 29.9 b) | 11 / 16 | `leafAtFloor 51`, `cillInward` |
+| i | door batches frozen on schema 2 (`_profileSnapshot.door`) migrate when read, so a batch frozen before this tura re-derives with the v3 numbers (leaf 1998, not 2002) unless its stored values were hand edited | schema 2 default 98 -> 102, 57 -> 102 | `migrateDoorProfile`, `withProfiles` |
+
+**31.2 The casement helper numbers the door now prints** (`casementRules.js`, the same functions the casement engine
+calls):
+
+- Mullion (`fullMullionRun`): with a timber cill L = H - 77 (2100: 2023; 2400: 2323); without one (aluminium /
+  low-profile) L = H - (77 - 41) = H - 36 (2100: 2064; 2400: 2364). The 77 has no head / cill split in the profile:
+  the no-cill length takes the casement visible cill 41 out of it (`mullionLength(..., timberCill false)`).
+- Transom segments (`transomRun`): field leaf W + 8.5 (seat). 2400 x 2400 with sides 400 / 400: 340.5 / 1574.5 /
+  340.5; french 1600 x 2100 with a fanlight: one segment 1506.5.
+- Visible transom band: 21 (8 above + 13 below the axis); T 450: 442 to 463. Mullion visible land 26 (13 + 13).
+- Inward door with side panels (open): the mullion run ends at the outward cill line (H - 41, L = H - 77) while the
+  visible openings stop at the inward cill face (H - 35): 6 mm apart. The 3D fills the land down to the inward
+  cill; say if an inward mullion should be cut to the inward cill (H - 71).
+
+**31.3 Handing and the kit variant.** Every printout reads "Hinge left / Hinge right" + "opens outward / inward"
+(the configurator value; hinges seen from inside). The Winkhaus words (LH / RH, anti-clockwise / clockwise closing)
+are gone from every sheet, list, PDF and the pack. The engine keeps the kit handing internal (`hardware.kitHanding`,
+not printed): single hinge left outward RH, hinge right outward LH, hinge left inward LH, hinge right inward RH;
+french hinge left RH, hinge right LH (ThunderBolt for single and french one handle, FGTE for french two handles).
+The catalogue rows (`d_lock_single_kit`, `d_lock_double_kit`) carry no handed variant, so nothing is ordered by
+it; say if the order needs the handed kit. The configurator labels the same value "Open side" (hint "Seen from
+inside, the door opens towards your left / right"), the printouts "Hinge left / right": the label was not renamed
+(UI the owner uses); say if it should read "Hinge side". On a french door the passive leaf caption names its own
+inside-view side ("Hinge right · opens outward" when the door is "Hinge left").
+
+**31.4 Bars per sash (box 16).**
+
+a. "6 over 1" is upper '6x6' (the PSW six-pane pattern, 2 rows x 3 columns) over lower 'none'. The PC / PSW
+   vocabulary has no '2x3' ('2x2' and '3x3' already mean 2 and 3 panes per sash, so an 'R x C' reading would
+   contradict them): a '2x3' value raises `BarPatternError` for that window ("Unknown bar pattern "2x3" on the
+   upper sash of window ..."), shown on its card / page and left out of the pack (START threw a plain error deep in
+   the engine). Say if PSW can send 'R x C' values.
+b. A window record with `upperBars` and no `lowerBars` anywhere (record, specification, fullConfig) now reads the
+   lower sash as 'none' (brief 3.11); START put the upper pattern on both. PC and PSW write both fields (the
+   configurators write lower = upper with "same bars"), so no stored record should hit this.
+c. Not per sash, as at START: triple sash glass rows carry no bar pattern at all; an arched sash takes its lower
+   bars from the arch fields (`lowerHBars`), not from `lowerBars`; the PSW 3D fastener rule (a second fastener when
+   `upperBars` is not none, below 1200 wide) and the PC lock rule (2 locks when any sash has bars) disagree for "1
+   over 6". `MiniWindowSvg`, `WindowCard`, `HeroWindow` and `TechnicalDrawing2D` are imported by nothing (dead).
+d. Custom bars: each sash keeps its own list and is checked against its own glass; a bar at or beyond the edge of
+   its pane is a warning in `derived.bars.warnings` ("custom vertical bar at 900 mm lies outside the lower sash glass
+   (708 wide)"), printed on the window detail page; the window still derives.
+e. The canvas elevation (window and estimate PDFs) draws each pane's bars from `derived.bars` (the sheets' rule):
+   standard windows with horizontal bars now draw them inside their pane (START dropped or misplaced them; 30.4 e).
+
+**31.5 Settings save (box 20).** The save lays only the paths changed since the last cloud load ("profile.firstKey")
+over the current cloud copy. Remaining races: (1) the same path changed in two tabs: the later save wins, for the
+whole first key (two different bSuite targets added in two tabs: the later tab's `casement.bsuite` wins); (2) the
+`settings.constants` row is read, merged and written by the client, so two different constants keys saved at the
+same moment (window profiles and assignments, say) can still lose one. A server-side per-path write closes (2):
+`docs/handover/sql/2026-10-09_settings_constants_set_path.sql` (an RPC with `jsonb_set`, not deployed, nothing calls
+it yet). The client merge ships regardless. The Settings page save no longer writes the login-time window profiles
+and assignments back (found by the sweep).
+
+**31.6 Skipped, interpreted or outside the brief, with the reason.**
+
+a. **Door sizes against the PSW convention.** Pricing (`calculateDoor`) still prices W x H and ADDS each side panel
+   (PSW: side panels outside W), so with W the overall frame a quote double counts the side panels (pricing out of
+   scope). The configurator size hint (single 600 to 1100, french 1000 to 2000 wide) now reads against the door
+   field, W less the side zones (the 3.10 2400 door is a 1600 french field). A stored PSW-era door with side
+   panels (W = the door alone) re-derives with the sides inside W: a door field of zero or less is an explicit
+   per-window error ("door field ... leaves no door"), shown like the sash errors.
+b. **Side light without a timber cill** stands over an open 51 gap down to the floor (nothing is bought under it,
+   owner answer 15); the 3D draws nothing there. Worth a look.
+c. **3D render choices, not product data**: the aluminium strip fills the 51 under the leaf, the low-profile strip
+   half of it (25.5); the inward cill run, hinge barrel and handle backsets in `doorGeometryFromSpec` still read the
+   live profile (they are not echoed in `derived.door`).
+d. **Sheets**: on a crowded first chain row of the frame sheet a label is dropped or shortened (the 2400 case drops
+   the 332 side light widths there; they print on the elevation and the side sheets). The leaf sheets are wider
+   (one column per hinge dimension).
+e. **The excluded-window note** is on the pack screen (header count and a line per window); the pack PDFs leave the
+   window out without a note of their own. `EstimatePdfBuilder` still normalises outside a try (not one of the
+   three pages).
+f. **Single door with a fanlight**: the engine builds one, but the PC configurator saves `transomType 'none'` on a
+   single door (the Transom section is shown for french only), as before.
+g. **Hinges**: the count is now at least 3 per leaf whatever the profile says (box 12, "minimum 3"); the positions
+   cover 3 or 4 hinges, so a profile `perLeaf` above 4 buys more hinges than the sheets draw.
+h. **Render 08** (`samples/doors/08-...`) keeps its old inputs (1600 with 500 + 500): with W the overall frame that
+   now reads as two 289 leaves, the correct v3 reading; render 12 shows the realistic case.
+i. **Batch type 'door' vs 'doors'**: `createBatch`, the Batch Defaults page and the dashboard filter read one
+   mapping (`batchTypeKey`); the pack's Batch Specification still prints the raw type.
+j. **Not done (out of scope)**: bSuite for doors, the French centre clearance, counterweights, sheet titles.
+
+**31.7 Earlier items this tura answers or replaces.** 29.1 and 29.2 (coupling post, side panels 57 x 57: replaced by
+31.1 a and the casement fixed light), 29.3 (panel: 31.1 d, e), 29.4 (fan rule and transom band: 31.2), 29.5 a
+(handing: 31.3) and d (hinge load: none, minimum 3, 31.6 g), 29.7 (threshold seal: a BOM row, m, door opening), 29.8
+(vents on doors: counted by room type), 29.9 b (31.1 h), e (side panels without a timber cill: 31.6 b), g (snapshot:
+the 3D takes the page's derived), m (31.6 a), p (hinge dimensions: smaller, spread, collision test). 30.3 (glazing
+summary: deleted with `aggregateComponents`, no reader), 30.4 c (the Pricing Settings field exists), e (bars per
+sash: 31.4), g (the explicit error is per window now), k ("fullConfig bars not read": they are read).
+
+---
+
 ## 2026-10-09 · TURA PC: SASH PROPORTIONS (COTTAGE 40/60 AND 1/3-2/3), items for Piotr (branch `claude/sash-proportions`)
 
 **30.1 Places that assumed two equal sashes, and what they do now.**

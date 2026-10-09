@@ -141,6 +141,10 @@ export default function WindowDetailPage() {
             {item.window_type || 'sash'} · {item.width}×{item.height} mm
             {currentBatch && <span> · {currentBatch.label}</span>}
           </p>
+          {/* bars per sash (09.10.2026): a custom bar outside its own sash's glass still derives, but say so */}
+          {(derived?.bars?.warnings || []).map((w) => (
+            <p key={w} className="text-xs text-amber-400 mt-1" data-bar-warning>Bars: {w}</p>
+          ))}
           {/* cottage below the configurator's minimum frame height: it still derives (it is not wrong), but say so */}
           {(windowSpec?.category || 'sash') === 'sash' && isCottageProportion(windowSpec?.sash?.proportion) && Number(windowSpec?.frame?.height) < COTTAGE_MIN_FRAME_HEIGHT && (
             <p className="text-xs text-amber-400 mt-1">

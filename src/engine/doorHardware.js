@@ -37,8 +37,9 @@
 // (LH / RH, anti-clockwise / clockwise closing) are not printed any more; the
 // kit handing the engine would pick stays internal (doorHanding, kitHanding).
 //
-// Hinges are an owner product, not a ladder: no automatic size selection. The
-// leaf weight is reported for information only (BLOCKERS: hinge load limits).
+// Hinges are an owner product, not a ladder: no automatic size selection and
+// no load limit (owner box item 12, 09.10.2026), at least DOOR_MIN_HINGES a
+// leaf. The leaf weight is reported for information only.
 //
 // This module imports nothing: keep it cycle-free (stores import from here).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -82,12 +83,16 @@ export function doorHandingLabel(hingeSide, inward) {
   return `Hinge ${hingeSide === 'right' ? 'right' : 'left'} · opens ${inward ? 'inward' : 'outward'}`;
 }
 
+/** The fewest hinges a door leaf takes, whatever the profile says (owner box item 12). */
+export const DOOR_MIN_HINGES = 3;
+
 /** Hinges on one door leaf: perLeaf, or perLeafTall above tallAbove. */
 export function doorHingeCount(leafH, rule) {
   const r = rule || {};
-  return (Number(leafH) || 0) > (Number(r.tallAbove) || 2100)
+  // Owner box item 12 (09.10.2026): no load limit, but never fewer than 3 hinges a leaf
+  return Math.max(DOOR_MIN_HINGES, (Number(leafH) || 0) > (Number(r.tallAbove) || 2100)
     ? (Number(r.perLeafTall) || 4)
-    : (Number(r.perLeaf) || 3);
+    : (Number(r.perLeaf) || 3));
 }
 
 /**

@@ -34,6 +34,9 @@
  *   7  Assign Materials rows and the counterpart defaults
  *   8  door BOM part quantities of the reference set
  *   9  the shared casement rules and the visible openings
+ *  10  guards: a door frame that leaves no leaf or light raises DoorGeometryError (the
+ *      per-window error of the pages), at least 3 hinges a leaf (box 12), one batch
+ *      type mapping ('door' reads as 'doors', box 15)
  *
  * Run: node verify/parity/t44_doors_v3.mjs [start]
  */
@@ -64,6 +67,7 @@ function bundle(srcRoot, name) {
   writeFileSync(entry, [
     ...['specification', 'calculations', 'lists', 'bom', 'profile', 'partSymbols', 'partColours', 'partRegistry', 'doorHardware'].map((m) => `export * as ${m} from '${rel(`engine/${m}.js`)}';`),
     `export * as store from '${rel('stores/materialAssignmentStore.js')}';`,
+    ...(srcRoot === resolve(ROOT, 'src') ? [`export * as boundary from '${rel('utils/windowBoundary.js')}';`, `export { batchTypeKey, batchDefaultsFor } from '${rel('stores/projectStore.js')}';`] : []),
   ].join('\n'));
   const out = resolve(AUDIT, `${name}-bundle.mjs`);
   execFileSync('npx', ['-y', 'esbuild@0.25.0', entry, '--bundle', '--format=esm', '--platform=node',
@@ -73,7 +77,7 @@ function bundle(srcRoot, name) {
   return import(pathToFileURL(out).href + `?t=${Date.now()}`);
 }
 const warn = console.warn;
-console.warn = (...a) => { if (/zustand persist/i.test(String(a[0]))) return; warn(...a); };
+console.warn = (...a) => { if (/zustand persist|Calc failed/i.test(String(a[0]))) return; warn(...a); };
 
 const LIVE = await bundle(resolve(ROOT, 'src'), 't44-live');
 const START = await bundle(resolve(startTree.tree, 'src'), startTree.tag);
@@ -409,6 +413,37 @@ section('9 - the shared casement rules and the visible openings');
   const I = french(1600, 2100, { doorOpenDirection: 'inward' });
   const io = I.derived.door.zones.openings[0];
   ok(near(io.x, 68) && near(io.y, 68) && near(io.w, 1600 - 136) && near(io.y + io.h, 2100 - 35), 'inward door: the outside sees the full frame faces (68) and the inward cill outside face (35)');
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+section('10 - guards: no leaf, hinges, batch type');
+{
+  const errOf = (fn) => { try { fn(); return null; } catch (e) { return e; } };
+  // W x H is the overall frame (box 6): a PSW-era item (W = the door alone, sides outside) leaves no door
+  const e1 = errOf(() => mk(LIVE, 900, 2100, { windowCategory: 'door', doorType: 'single-external', sidePanels: 'both', sideLeftWidth: 500, sideRightWidth: 500 }, { name: 'D9' }));
+  ok(e1 instanceof calculations.DoorGeometryError && /Door "D9": the door field -100 mm \(frame 900 less side panels 500 \+ 500\)/.test(e1.message),
+    `900 single with side panels 500 + 500: DoorGeometryError "${e1?.message}"`);
+  const e2 = errOf(() => mk(LIVE, 1600, 2100, { windowCategory: 'door', doorType: 'french', sidePanels: 'right', sideRightWidth: 150 }, { name: 'D8' }));
+  ok(e2 instanceof calculations.DoorGeometryError && /the right side panel zone 150 mm leaves no side light/.test(e2.message), `a 150 side zone: "${e2?.message}"`);
+  const e3 = errOf(() => mk(LIVE, 900, 2100, { windowCategory: 'door', doorType: 'single-external', transomType: 'fixed', transomHeight: 2100 }, { name: 'D7' }));
+  ok(e3 instanceof calculations.DoorGeometryError, `a transom axis at the floor: DoorGeometryError (${e3?.message})`);
+  ok(!errOf(() => french(2400, 2400, BIG)) && !errOf(() => door(1000, 2100, { sidePanels: 'right', sideRightWidth: 450 })), 'the 3.10 doors derive without the error');
+  const B = LIVE.boundary;
+  const row = B.deriveWindowBounded({ id: 'd', name: 'D9', width: 900, height: 2100, windowCategory: 'door', doorType: 'single-external', sidePanels: 'both', sideLeftWidth: 500, sideRightWidth: 500 }, (ws) => calculations.deriveWindowData(ws, {}));
+  ok(row.error?.name === 'DoorGeometryError' && row.error.known === true && row.derived === null, 'the pages\' boundary catches it as a known window data error (shown on that window, left out of the pack)');
+  // hinges: at least 3 a leaf whatever the profile says (owner box 12)
+  const H = LIVE.doorHardware;
+  ok(H.DOOR_MIN_HINGES === 3 && H.doorHingeCount(1998, { perLeaf: 2, perLeafTall: 4, tallAbove: 2100 }) === 3 && H.doorHingeCount(2200, { perLeaf: 3, perLeafTall: 1, tallAbove: 2100 }) === 3
+    && H.doorHingeCount(1998, DP.hinges) === 3 && H.doorHingeCount(2146, DP.hinges) === 4 && H.doorHingeCount(1998, { perLeaf: 5 }) === 5,
+    'doorHingeCount: perLeaf 2 or perLeafTall 1 still buys 3; the defaults 3 / 4; 5 stays 5');
+  const snap = { ...DP, hinges: { ...DP.hinges, perLeaf: 2 } };
+  const nh = profile.withProfiles(null, null, snap, () => door(900, 2100).derived.door.leaves[0].hinges.length);
+  ok(nh === 3, `a door profile with perLeaf 2 draws and buys ${nh} hinges a leaf`);
+  // batch type: one mapping (box 15)
+  ok(LIVE.batchTypeKey('door') === 'doors' && LIVE.batchTypeKey('doors') === 'doors' && LIVE.batchTypeKey(undefined) === 'sash' && LIVE.batchTypeKey('casement') === 'casement'
+    && JSON.stringify(LIVE.batchDefaultsFor('door')) === JSON.stringify(LIVE.batchDefaultsFor('doors')), "batchTypeKey: 'door' and 'doors' read as 'doors'; batchDefaultsFor('door') = the doors defaults");
+  const dash = readFileSync(resolve(ROOT, 'src/pages/DashboardPage.jsx'), 'utf8');
+  ok(!/batch\??\.type \|\| 'sash'/.test(dash) && (dash.match(/batchTypeKey\(/g) || []).length >= 8, 'the dashboard reads every batch type through batchTypeKey (filter, colours, labels, pack chips)');
 }
 
 console.log(`\n${passes} passed, ${fails} failed`);

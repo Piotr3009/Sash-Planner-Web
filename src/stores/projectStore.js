@@ -122,8 +122,11 @@ const uid = () =>
 // createBatch and the Batch Defaults page read it. A copy, so a batch never
 // shares the defaults object.
 export function batchDefaultsFor(type) {
-  const key = type === 'door' ? 'doors' : type;
-  return { ...(BATCH_DEFAULTS[key] || BATCH_DEFAULTS.sash) };
+  return { ...(BATCH_DEFAULTS[batchTypeKey(type)] || BATCH_DEFAULTS.sash) };
+}
+/** The batch type as the defaults, the dashboard colours and filters know it ('door' reads as 'doors'; none as 'sash'). */
+export function batchTypeKey(type) {
+  return type === 'door' ? 'doors' : (type || 'sash');
 }
 
 export { BATCH_DEFAULTS, BATCH_STATUSES };

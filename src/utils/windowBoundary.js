@@ -10,7 +10,8 @@
 /**
  * windowBoundary.js: one window's derivation inside its own error boundary
  * (Piotr 09.10.2026, owner box item 19). An unknown sash proportion, an
- * unknown bar pattern or an arch the engine cannot build fails THAT window
+ * unknown bar pattern, an arch the engine cannot build or a door frame that
+ * leaves no leaf (DoorGeometryError) fails THAT window
  * only: the page shows the message on the window's card or row, leaves the
  * window out of the lists and PDFs with a visible note, and renders every
  * other window. ProjectDetailPage, ProductionPackPage and WindowDetailPage
@@ -19,11 +20,11 @@
 
 import { parseSpecification, normaliseToWindowSpec, SashProportionError, BarPatternError } from '../engine/specification.js';
 import { ArchError } from '../engine/arch.js';
-import { sashBarPattern } from '../engine/calculations.js';
+import { sashBarPattern, DoorGeometryError } from '../engine/calculations.js';
 
 /** The engine errors that describe the window's own data (the owner fixes the window, not the code). */
 export function isWindowDataError(e) {
-  return e instanceof SashProportionError || e instanceof BarPatternError || e instanceof ArchError;
+  return e instanceof SashProportionError || e instanceof BarPatternError || e instanceof ArchError || e instanceof DoorGeometryError;
 }
 
 /** The error a page prints for one window: the engine message, the error name for the log. */

@@ -1278,6 +1278,17 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
  * CONSUMABLES: the casement per-leaf rules on every door leaf, side light and
  * fan leaf; glazing bead on the door bead row.
  */
+/**
+ * Raised for a door whose frame leaves no leaf or light (doors v3, 09.10.2026):
+ * W x H is the overall frame, so a PSW-era item (W = the door alone, its side
+ * panels outside) or side zones wider than the frame give a door field of zero
+ * or less. One window's error (the pages show it on that window), never
+ * negative sizes on a cut list.
+ */
+export class DoorGeometryError extends Error {
+    constructor(message) { super(message); this.name = 'DoorGeometryError'; }
+}
+
 function deriveDoorWindow(windowSpec, frameWidth, frameHeight, settings = {}) {
     const p = getDoorProfile();
     const cp = getCasementProfile();
@@ -1441,6 +1452,9 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight, settings = {}) {
     // The right leaf's outer edge: the field's right bound less its edge
     // deduction (51 at a jamb, 17 at a mullion axis).
     const doorRightEdge = doorField.rightAxis - (doorField.rightIsJamb ? ded.leafAtJamb : ded.leafAtMullionAxis);
+    if (!(leafW > 0) || !(leafH > 0)) {
+        throw new DoorGeometryError(`Door "${windowSpec.name || '?'}": the door field ${R(doorField.w)} mm (frame ${frameWidth} less side panels ${leftW} + ${rightW})${T ? `, transom axis ${T}` : ''} on a ${frameHeight} frame leaves no door leaf (leaf ${leafW} x ${leafH})`);
+    }
     // Handing (owner box item 11, the PSW convention): doorHinge 'left' =
     // hinges on the LEFT seen from INSIDE, so on the right in the exterior
     // view. For a french door the ACTIVE leaf is the one hinged on that side
@@ -1499,6 +1513,9 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight, settings = {}) {
         const x = R(o.x), y = R(o.y);
         const w = R(fieldLeafW(f, b));
         const h = R(leafHeightInTier(b, frameHeight, tierDed).leafH);
+        if (!(w > 2 * spP.stile) || !(h > spP.top + spP.bottom)) {
+            throw new DoorGeometryError(`Door "${windowSpec.name || '?'}": the ${f.side} side panel zone ${R(f.w)} mm leaves no side light (light ${w} x ${h}, members ${spP.stile} / ${spP.top} / ${spP.bottom})`);
+        }
         const day = { x: R(x + spP.stile), y: R(y + spP.top), w: R(w - 2 * spP.stile), h: R(h - spP.top - spP.bottom) };
         const glass = { x: R(x + spP.stile - inset), y: R(y + spP.top - inset), w: R(w - spGlassDed.width), h: R(h - spGlassDed.height) };
         const timberKg = kgPerM(spP.stile, spP.depth) * (2 * h / 1000) + (kgPerM(spP.top, spP.depth) + kgPerM(spP.bottom, spP.depth)) * (w / 1000);

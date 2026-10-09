@@ -622,6 +622,12 @@ export default function ConfiguratorPage() {
   };
   const isFrench = isDoor && doorType === 'french';
   const doorLimits = DOOR_DIMS[doorType] || DOOR_DIMS['single-external'];
+  // Doors v3 (09.10.2026): W is the overall frame and the side panel zones sit
+  // inside it, so the PSW door width limits apply to the door field (W less
+  // the side zones); the height limits stay on H.
+  const doorSideW = (sidePanels === 'left' || sidePanels === 'both' ? Number(sideLeftW) || 0 : 0)
+    + (sidePanels === 'right' || sidePanels === 'both' ? Number(sideRightW) || 0 : 0);
+  const doorFieldW = extW - doorSideW;
 
   // Casement effective values — PSW clamps 1:1: fanlight 15–50% innerH step 10,
   // fan2 shares a 70% guard with fanlight, middle 300..(W-600) step 10.
@@ -1178,7 +1184,8 @@ export default function ConfiguratorPage() {
               <HChips o={DOOR_TYPES} v={doorType} c={applyDoorType} />
               <div className="text-[11px] text-ink-500 mt-1.5">
                 Width {doorLimits.wMin}–{doorLimits.wMax} · Height {doorLimits.hMin}–{doorLimits.hMax} mm
-                {(extW < doorLimits.wMin || extW > doorLimits.wMax || extH < doorLimits.hMin || extH > doorLimits.hMax) && (
+                {doorSideW > 0 && <span> · door width = W less the side panels = {doorFieldW} mm</span>}
+                {(doorFieldW < doorLimits.wMin || doorFieldW > doorLimits.wMax || extH < doorLimits.hMin || extH > doorLimits.hMax) && (
                   <span className="text-amber-400"> · current size is outside this range</span>
                 )}
               </div>
