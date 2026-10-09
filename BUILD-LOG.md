@@ -4,6 +4,109 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-10-09 · TURA PC: DOORS v3 (casement rules inside the door frame), SASH BARS PER SASH, SETTINGS SAVE (branch `claude/doors-v3`)
+
+Owner box (Piotr, 09.10.2026, answers 1 to 23; CLAUDE.md of this tura): the door frame is ONE casement frame (mullion
+68 x 93 through, transom 68 x 93 in segments, fan T - 65, leaf 17 under the axis), every leaf stands 51 above the
+floor (H - 102), side panel = casement fixed light 64 / 64 / 180, fixed fan = non-opening casement leaf 64 / 64 / 67,
+panel 17 deep in the rebate, threshold seal with aluminium / low-profile, inward always timber, vents on doors,
+handing in the PSW wording; sash bars per sash, the proportion error per window, a cottage price field, the window
+profile save that merges with the cloud; batch type door.
+
+### Stage 0: baseline and sweep (no code changes)
+
+Starting commit **150500e** (`main` on 09.10.2026: PR #14 merged, plus this tura's CLAUDE.md). Branch
+`claude/doors-v3` from it.
+
+**Suite on the starting commit: 30 harnesses, 3504 checks, 0 failures. `npm run build` OK (13.3 s).** Run as in
+the previous turas: `verify/arch/t*.mjs` minus the `*baseline*` generators, plus `verify/parity/*.mjs`, each with
+`node <file>`, after `npm ci` and `pip install ezdxf`; `docs/handover/samples/` restored with `git checkout` (and
+untracked files there cleaned) after every file. `verify/parity/psw-casement-layouts.mjs` needs a PSW clone (outside
+this session's repository scope): not run, not counted. Harnesses that print one PASS line per check (t34 to t37)
+are counted by their `PASS ` lines.
+
+| harness | checks | | harness | checks | | harness | checks |
+|---|---|---|---|---|---|---|---|
+| t16 | 369 | | t24_stage4 | 26 | | parity t34_glass_minus1 | 46 |
+| t17_edges | 70 | | t25 | 226 | | parity t35_locks | 51 |
+| t18 | 179 | | t26 | 38 | | parity t36_hinges | 110 |
+| t19 | 280 | | t27 | 97 | | parity t37_single_window_bom | 50 |
+| t20 | 117 | | t28 | 51 | | parity t38_leaf_64_seat_85 | 471 |
+| t20_bars | 31 | | t29 | 34 | | parity t39_settings_leaf_cards | 23 |
+| t21 | 120 | | t30_preview | 30 | | parity t40_bottom_rail_3d | 73 |
+| t22 | 118 | | t33_bar_grid | 43 | | parity t41_doors_production | 343 |
+| t23 | 81 | | parity t31_bars_8x8 | 18 | | parity t42_precut_colours_labels | 32 |
+| | | | parity t32_bsuite | 54 | | parity t43_sash_proportions | 233 |
+| | | | | | | parity t43_window_tag | 90 |
+
+**BEFORE table** (live engine on 150500e, `normaliseToWindowSpec` then `deriveWindowData`, default profiles; the same
+form inputs as the 3.10 / section 6 cases; the script is kept in the session scratchpad and re-run for the AFTER
+table). On the start commit the side panels sit OUTSIDE the frame W and the fan ABOVE the frame H (`totalWidth = W +
+left + right`, `totalHeight = H + T`), so the 2400 x 2400 rows describe a 3200 x 2850 assembly:
+
+| case | leaf W x H | glass W x H | panel | side light(s) (glass) | fan (glass) | frame members |
+|---|---|---|---|---|---|---|
+| single 900 x 2100, timber cill, outward | 798 x 2002 | 633 x 1751 | - | - | - | D-FRAME HEAD 68x93 L900 x1; D-FRAME JAMB (L) 68x93 L2100 x1; D-FRAME JAMB (R) 68x93 L2100 x1; D-FRAME CILL 68x93 L900 x1 |
+| single 900 x 2100, aluminium threshold | 798 x 2043 | 633 x 1792 | - | - | - | D-FRAME HEAD 68x93 L900 x1; D-FRAME JAMB (L) 68x93 L2100 x1; D-FRAME JAMB (R) 68x93 L2100 x1 |
+| single 900 x 2100, low-profile threshold | 798 x 2043 | 633 x 1792 | - | - | - | D-FRAME HEAD 68x93 L900 x1; D-FRAME JAMB (L) 68x93 L2100 x1; D-FRAME JAMB (R) 68x93 L2100 x1 |
+| single 900 x 2100, inward | 798 x 2002 | 633 x 1751 | - | - | - | D-FRAME HEAD 68x93 L900 x1; D-FRAME JAMB (L) 68x93 L2100 x1; D-FRAME JAMB (R) 68x93 L2100 x1; D-FRAME CILL (INWARD) 40x93 L900 x1 |
+| single 900 x 2100, inward + aluminium | 798 x 2043 | 633 x 1792 | - | - | - | D-FRAME HEAD 68x93 L900 x1; D-FRAME JAMB (L) 68x93 L2100 x1; D-FRAME JAMB (R) 68x93 L2100 x1 |
+| single 900 x 2100, half-glazed | 798 x 2002 | 633 x 883 | 633 x 797 (day 610 x 774) | - | - | D-FRAME HEAD 68x93 L900 x1; D-FRAME JAMB (L) 68x93 L2100 x1; D-FRAME JAMB (R) 68x93 L2100 x1; D-FRAME CILL 68x93 L900 x1 |
+| single 900 x 2100, three-quarter | 798 x 2002 | 633 x 1383.5 | 633 x 296.5 (day 610 x 273.5) | - | - | D-FRAME HEAD 68x93 L900 x1; D-FRAME JAMB (L) 68x93 L2100 x1; D-FRAME JAMB (R) 68x93 L2100 x1; D-FRAME CILL 68x93 L900 x1 |
+| french 1600 x 2100 | 755 x 2002, 755 x 2002 | 584 x 1751, 584 x 1751 | - | - | - | D-FRAME HEAD 68x93 L1600 x1; D-FRAME JAMB (L) 68x93 L2100 x1; D-FRAME JAMB (R) 68x93 L2100 x1; D-FRAME CILL 68x93 L1600 x1 |
+| french 2400 x 2400, sides 400 + 400, opening fan T 450 | 1155 x 2302, 1155 x 2302 | 984 x 2051, 984 x 2051 | - | left 298 x 2302 (207 x 2211), right 298 x 2302 (207 x 2211) | panel left 298 x 348 (193 x 240), door 2298 x 348 (2193 x 240), panel right 298 x 348 (193 x 240) | D-FRAME HEAD 68x93 L3200 x1; D-FRAME JAMB (L) 68x93 L2850 x1; D-FRAME JAMB (R) 68x93 L2850 x1; D-COUPLING POST 136x93 L2850 x2; D-FRAME CILL 68x93 L3200 x1; D-TRANSOM 68x93 L3064 x1 |
+| french 2400 x 2400, sides 400 + 400, fixed fan T 450 | 1155 x 2302, 1155 x 2302 | 984 x 2051, 984 x 2051 | - | left 298 x 2302 (207 x 2211), right 298 x 2302 (207 x 2211) | pane over panel left 287 x 337, pane over door 2287 x 337, pane over panel right 287 x 337 | D-FRAME HEAD 68x93 L3200 x1; D-FRAME JAMB (L) 68x93 L2850 x1; D-FRAME JAMB (R) 68x93 L2850 x1; D-COUPLING POST 136x93 L2850 x2; D-FRAME CILL 68x93 L3200 x1; D-TRANSOM 68x93 L3064 x1 |
+| french 1600 x 2100, fixed fan T 450 | 755 x 2002, 755 x 2002 | 584 x 1751, 584 x 1751 | - | - | pane over door 1487 x 337 | D-FRAME HEAD 68x93 L1600 x1; D-FRAME JAMB (L) 68x93 L2550 x1; D-FRAME JAMB (R) 68x93 L2550 x1; D-FRAME CILL 68x93 L1600 x1; D-TRANSOM 68x93 L1464 x1 |
+| single 1000 x 2100, side panel 450 right | 898 x 2002 | 733 x 1751 | - | right 348 x 2002 (257 x 1911) | - | D-FRAME HEAD 68x93 L1450 x1; D-FRAME JAMB (L) 68x93 L2100 x1; D-FRAME JAMB (R) 68x93 L2100 x1; D-COUPLING POST 136x93 L2100 x1; D-FRAME CILL 68x93 L1450 x1 |
+
+Handing on the start commit: single, open left, outward = "RH (clockwise closing)"; open right = "LH (anti-clockwise
+closing)"; open left, inward = "LH"; french, open left, two handles = "master on the active leaf RH (clockwise
+closing)". Sash 1000 x 1400 "6 over 1" (`upperBars 6x6`, `lowerBars none` on the window record):
+`windowSpec.sash.grid.mode` = 6x6 for BOTH sashes, glass rows upper 731 x 560.5 bars 6x6 and lower 731 x 560.5
+bars 6x6, triangle / Georgian beading "Bars 1783 x 2": the lower sash gets the upper pattern (box item 16).
+
+**Sweep** (seven read-only agents on disjoint areas, then a completeness critic; workflow `doors-v3-stage0-sweep`).
+The areas and what they found (file:line on 150500e):
+
+1. *Door profile keys* (`couplingPost`, `sidePanel.member`, `fanAtHead` / `fanAtRail`, door `leafFullHeight` /
+   `leafNoThreshold`, `transomDeduct`, `zones.transom.band`, `zones.posts` / `joints` / `frames`, totals):
+   `profile.js` 624-768 (default, single-step migration, shallow merges of `sidePanel` / `panel`), `calculations.js`
+   1304-1784 (`deriveDoorWindow`: `totalWidth = W + left + right` 1372, `totalHeight = H + T` 1365, `edge = 51` on
+   every side of every zone 1374, posts 1381-1397, leaf H 1428, side panel leaves 1476-1488 with one member,
+   opening fan 1523, fixed fan glazed into the frame 1535-1544, D-COUPLING POST 1555, one D-TRANSOM W - 136 1570,
+   members.side / post 1719, transom band 1753), `windowProfileStore.js` 30 (`DOOR_PATH_ROOTS` lacks `fixedFan`),
+   `WindowSettingsPage.jsx` 1327-1508 (Doors card: coupling post and side member fields, the four retired rules),
+   `materialAssignmentStore.js` 217 / 239-241, `bom.js` 129 / 137-139, `lists.js` 703 / 710-712,
+   `partSymbols.js` 133, `partColours.js` 34 / 60, `precutPdfExport.js` 481-489. Readers of the totals and
+   zones: `WindowDetailPage.jsx` 295, `ProductionPackPage.jsx` 2354, `windowSpecToConfig.js` 356-361. Harness pins:
+   t41 (profile, leaf 2002 / 2043, glass 1751 / 1792, styles, fan 1498 x 348, transom 1464, jambs 2550, coupling
+   posts, side 57, migration schema 2, Assign Materials list, no vents on doors), t40 section 6, t27 (couplingPost
+   136, transomDeduct 136, leaf rules 98 / 57, a source regex on `sidePanel.member` / `couplingPost.width`), t29
+   section 6 (post = 2 x frame face), t34 (door ref - 2 pinned through `leafFullHeight`), t38 (door migration DKEYS),
+   t43_sash_proportions (door controls equal to 719bfba), t43_window_tag (the 3.10 door as a fixture). The biggest
+   finding: the 3.10 table (2400 x 2400 with 400 + 400 giving a 1600 door zone and leaves 1882 = 2400 - 450 - 17 - 51)
+   only holds with W x H as the OVERALL frame, side panels and fan inside it.
+2. *Door drawings and 3D*: `doorDrawUtils.js` 25-39 (sheet plan per `panelLeaves` / `fanLeaves`),
+   `doorSheetParts.jsx` 71 / 129 / 170-176 (fan glass unit offset by the fixed panes) / 186-196 (threshold text by
+   string) / 383-458 (plan: posts, side stiles from `pn.member`) / 561-645 (coupling post detail),
+   `DoorFrameDetail2D.jsx` 28-268 (land rects 47 on every side, D-JC, one transom band, `fan tz.h` dims),
+   `DoorElevation2D.jsx` 59-70 (openings computed in the component), 139 (Winkhaus handing), 243-294 (fixed panes,
+   fan symbol, side panels), `DoorLeafDetail2D.jsx` 120-122 (panel in the 11.5 rebate), 199-252, 258-270 (H1..Hn
+   on one line at one x, `hinge right` in the exterior view), `DoorSidePanelDetail2D.jsx` 33-77 (guard on
+   `pn.member`), `DoorFanlightDetail2D.jsx` 31-86 (opening only), `DoorSection2D.jsx` 94-142 (members.side / post,
+   exterior-view hinge words). 3D: `windowSpecToConfig.js` 329-414 (`doorGeometryFromSpec` re-derives with the
+   live profile; `doorH = frame.height`, posts, `member`, fan panes), `DoorAssembly.jsx` 287-359 (frame land =
+   complement of the openings, one gap 4 on every edge), 404-409 (origin from `doorX` / `transomH` / `doorH`, the
+   same formula in `DoorWindow.jsx` 1234-1263, `Window3DCaptureRig.jsx` 47-53 and t40), 492 (threshold strip by
+   string), 537-580 (side leaves `member`, every fan leaf swings with a handle, fixed panes). Pins: t41 section 18,
+   t40 section 6. No generator script for `docs/handover/samples/doors/` exists (the 24 PNGs came from an ad hoc
+   Chromium run).
+
+3 to 7. *Door lists / BOM / materials, the sash bar trail, glazing summary / proportion errors / pricing field, the
+   settings save and batch defaults, the casement helpers*: still running when Stage 0 was committed; their lists
+   are added below this line in a later commit (SWEEP_REST).
+
+
 ## 2026-10-09 · TURA PC: SASH PROPORTIONS, COTTAGE 40/60 AND 1/3-2/3 (branch `claude/sash-proportions`)
 
 Owner box (Piotr, 09.10.2026): a new sash option `sashProportion` (`standard`, `cottage-40-60`, `cottage-1-3`, missing
