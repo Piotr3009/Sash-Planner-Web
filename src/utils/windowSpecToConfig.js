@@ -49,7 +49,7 @@ import { buildVentGrilles } from '../engine/lists.js';
 import { RAL_LOOKUP as RAL_COLORS } from '../config.js';
 import { fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from '../engine/casementLayouts.js';
 import { profileBoxDepth, getCasementProfile, getWindowProfile, getDoorProfile } from '../engine/profile.js';
-import { deriveWindowData } from '../engine/calculations.js';
+import { deriveWindowData, meetingFractionFor } from '../engine/calculations.js';
 
 function resolveColor(name, ral) {
   if (!name && !ral) return '#F4F4F2'; // default white
@@ -271,6 +271,11 @@ export function windowSpecToConfig(windowSpec) {
     ironmongery,
     sashType: 'double',
     splitRatio: '1/4-1/2-1/4',
+    // cottage (Piotr 09.10.2026): the proportion and the meeting line fraction from
+    // the engine helper (every sash window, standard included: the 3D meeting line
+    // sits where production puts it)
+    sashProportion: windowSpec.sash?.proportion || 'standard',
+    meetingFraction: meetingFractionFor(h, windowSpec.sash?.proportion || 'standard'),
     headType: 'flat',
     // arched sash (v3 Block 1 I): the PSW `sashType 'arched'` branch of the shared App with PC's shape + real rise
     ...(windowSpec.category === 'sash' && windowSpec.arch?.shape && windowSpec.sash?.type !== 'triple' ? {

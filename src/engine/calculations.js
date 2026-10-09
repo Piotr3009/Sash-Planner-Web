@@ -5,7 +5,7 @@ import { buildArchGeometry, buildSashArchGeometry, planArchSegments, buildGlassO
 import { buildTraceryForDerived } from './cnc/traceryExport.js';
 import { casementLeafBars, leafBarsToUnit, computeBarPositions, BAR_WIDTH } from './casementBarGrid.js';
 import { selectDoorHardware, doorHingePositions } from './doorHardware.js';
-import { isAcousticUnit } from './specification.js';
+import { isAcousticUnit, SASH_PROPORTIONS, SashProportionError } from './specification.js';
 
 /**
  * calculations.js - ETAP 3
@@ -113,6 +113,44 @@ function totalSashHeightFor(frameHeight) {
     const p = getWindowProfile();
     const mr = Number(p.elements?.meetingRail?.face) || CONSTANTS.MEETING_RAIL_WIDTH;
     return frameHeight - p.deductions.sashHeight + mr;
+}
+
+/**
+ * Top and bottom sash heights for a sash proportion (cottage, Piotr 09.10.2026;
+ * the same numbers as PSW). The ONE place the split is computed: every caller
+ * (deriveWindowData, calculateWindow, the 3D meeting line) goes through here.
+ * The total is the same for every proportion (frame H - profile sashHeight
+ * deduction + meeting rail face, default H - 92).
+ *   standard:       top = (total - diff) / 2, bottom = top + diff (diff = bottom
+ *                   rail - top rail, default 33: equal glass, today's rule)
+ *   cottage-40-60:  top = total x 0.4, bottom = total - top
+ *   cottage-1-3:    top = total / 3,   bottom = total - top
+ * No rounding here (displays keep their own). A missing value is standard; an
+ * unknown value throws (never a silent standard).
+ */
+export function sashHeightsFor(frameHeight, proportion = 'standard') {
+    const p = proportion || 'standard';
+    if (!SASH_PROPORTIONS.includes(p)) throw new SashProportionError(`Unknown sash proportion "${p}" (allowed: ${SASH_PROPORTIONS.join(', ')})`);
+    const total = totalSashHeightFor(frameHeight);
+    if (p === 'standard') {
+        const diff = sashFaces().diff;
+        const top = (total - diff) / 2;
+        return { total, top, bottom: top + diff };
+    }
+    const top = p === 'cottage-40-60' ? total * 0.4 : total / 3;
+    return { total, top, bottom: total - top };
+}
+
+/**
+ * Where the meeting line sits in the opening, as a fraction from the bottom
+ * (the 3D draws it there, brief 3.4): the lower sash shows bottom - meet / 2 of
+ * the total - meet the two sashes cover. Standard 1400 0.5130, cottage-40-60
+ * 0.6034, cottage-1-3 0.6723.
+ */
+export function meetingFractionFor(frameHeight, proportion = 'standard') {
+    const { total, bottom } = sashHeightsFor(frameHeight, proportion);
+    const meet = sashFaces().meet;
+    return (bottom - meet / 2) / (total - meet);
 }
 
 

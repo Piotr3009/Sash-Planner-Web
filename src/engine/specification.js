@@ -70,6 +70,39 @@ export const DOOR_GLASS_THICKNESS = { double: 24, double_slim: 16, triple: 28 };
 export const DOOR_LEAF_DEPTH = DEFAULT_DOOR_PROFILE.leafDepth;
 export const DOOR_FRAME_DEPTH = DEFAULT_DOOR_PROFILE.frameDepth;
 export const glassGas = (type) => (type === 'single' || type === 'passive') ? '' : 'argon';
+
+// Sash proportions (cottage, Piotr 09.10.2026). The field name and the three
+// values are the contract with PSW: `sashProportion`, saved in the estimate
+// fullConfig like `splitRatio`; a missing, null or empty value is 'standard'.
+// The split itself is computed in ONE place: calculations.js sashHeightsFor().
+export const SASH_PROPORTIONS = Object.freeze(['standard', 'cottage-40-60', 'cottage-1-3']);
+export const SASH_PROPORTION_LABELS = Object.freeze({
+  standard: 'Standard',
+  'cottage-40-60': 'Cottage 40/60',
+  'cottage-1-3': 'Cottage 1/3-2/3',
+});
+// The configurator offers cottage from this frame height up; a stored cottage
+// window below it still derives (the detail page shows a warning line).
+export const COTTAGE_MIN_FRAME_HEIGHT = 900;
+export const isCottageProportion = (value) => value === 'cottage-40-60' || value === 'cottage-1-3';
+/** The configurator chips (value + label), in the contract order. */
+export const SASH_PROPORTION_OPTIONS = Object.freeze(SASH_PROPORTIONS.map((value) => Object.freeze({ value, label: SASH_PROPORTION_LABELS[value] })));
+/**
+ * The proportion a configurator saves and shows: a cottage value falls back to
+ * standard on an arched sash and below COTTAGE_MIN_FRAME_HEIGHT (the cottage
+ * chips are disabled there). Any other value passes through unchanged, so an
+ * unknown one still reaches normaliseToWindowSpec and its explicit error.
+ */
+export function effectiveSashProportion(value, { frameHeight, arched = false } = {}) {
+  if (!value) return 'standard';
+  if (!isCottageProportion(value)) return value;
+  if (arched || !(Number(frameHeight) >= COTTAGE_MIN_FRAME_HEIGHT)) return 'standard';
+  return value;
+}
+/** Raised for an unknown sashProportion value, or a cottage value on an arched window (the ArchError way). */
+export class SashProportionError extends Error {
+  constructor(message) { super(message); this.name = 'SashProportionError'; }
+}
 import { FAN_AXIS_OFFSET_TOP, FAN_AXIS_OFFSET_BOTTOM } from './casementLayouts.js';
 import { profileBoxDepth, getDoorProfile, DEFAULT_DOOR_PROFILE } from './profile.js';
 import {
@@ -360,6 +393,25 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
     : fc.ventSoleWindow !== undefined ? !!fc.ventSoleWindow
     : true;
 
+  // Arched casement (arched-casement-v1): null unless casementType 'arched';
+  // arched sash (arched-windows-v3 Block 1): null unless sashType 'arched-group' / frameShape 'arched'
+  const arch = category === 'sash' ? sashArchFromSpec(item, fc, width, height) : archFromSpec(item, fc, width, height);
+
+  // Sash proportion (cottage, Piotr 09.10.2026): read like splitRatio. An unknown
+  // value, or a cottage value on an arched sash, is an explicit error for this
+  // window (never a silent standard). Only a sash reads it.
+  let sashProportion = 'standard';
+  if (category === 'sash') {
+    sashProportion = item?.sashProportion || fc.sashProportion || 'standard';
+    const name = item?.name || item?.window_number || '?';
+    if (!SASH_PROPORTIONS.includes(sashProportion)) {
+      throw new SashProportionError(`Unknown sash proportion "${sashProportion}" on window "${name}" (allowed: ${SASH_PROPORTIONS.join(', ')})`);
+    }
+    if (arch?.shape && sashProportion !== 'standard') {
+      throw new SashProportionError(`Sash proportion "${sashProportion}" is not available on the arched window "${name}": cottage needs a rectangular sash`);
+    }
+  }
+
   return {
     id: item?.id || `mock_${Math.random().toString(36).slice(2, 8)}`,
     name: item?.name || item?.window_number || spec.windowName || 'Window',
@@ -370,6 +422,7 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
     sash: {
       type: item?.sashType || fc.sashType || 'double',
       splitRatio: item?.splitRatio || fc.splitRatio || '1/4-1/2-1/4',
+      proportion: sashProportion,
       openingType,
       horns: hasHorns,
       hornType: hornsVal,
@@ -418,9 +471,8 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
         fan2V: Number(item?.casementFan2VBars ?? fc.casementFan2VBars) || 0,
       },
     },
-    // ── Arched casement (arched-casement-v1) — null unless casementType 'arched';
-    //    arched sash (arched-windows-v3 Block 1) — null unless sashType 'arched-group' / frameShape 'arched'
-    arch: category === 'sash' ? sashArchFromSpec(item, fc, width, height) : archFromSpec(item, fc, width, height),
+    // ── Arched casement / arched sash: computed above, before the proportion check
+    arch,
     // ── Doors (PSW parity, Piotr 04.08) ─────────────────────────────────
     // Field names and value vocabularies match the PSW door-controller 1:1 so
     // a future PSW→PC import maps straight across. Two known PSW bugs are NOT
