@@ -604,12 +604,22 @@ section('17 - controls: casement and sash equal to START');
   ];
   for (const [name, fc, w, h] of CTL) {
     const a = mk(LIVE, w, h, fc), b = mk(START, w, h, fc);
-    ok(JSON.stringify(a.derived) === JSON.stringify(b.derived), `${name}: derived deep-equal to START`);
+    // 09.10.2026 (sash proportions, brief 2.4): a sash derived carries two new keys and a sash
+    // windowSpec sash.proportion; every other key stays byte for byte, the new ones are standard
+    // (meeting fraction by hand: bottom = (H - 92 + 33) / 2, f = (bottom - 43 / 2) / (H - 92 - 43)).
+    // A casement derives and specifies exactly as START (no new key at all).
+    const isSash = fc.windowCategory === 'sash';
+    const handFraction = (((h - 92 + 33) / 2) - 43 / 2) / (h - 92 - 43);
+    const noNewKeys = (d) => { const c = { ...d }; if (isSash) { delete c.sashProportion; delete c.meetingFraction; } return c; };
+    ok(JSON.stringify(noNewKeys(a.derived)) === JSON.stringify(b.derived)
+      && (isSash ? a.derived.sashProportion === 'standard' && near(a.derived.meetingFraction, handFraction, 1e-12) : !('sashProportion' in a.derived) && !('meetingFraction' in a.derived)),
+      `${name}: derived deep-equal to START${isSash ? ` but for the two new keys (standard, meetingFraction ${a.derived.meetingFraction})` : ''}`);
     // every windowSpec carries the door defaults block; on a window only its informational
     // leafDepth moved (61 -> 57, the door profile), nothing reads it outside a door
-    const noDoor = (x) => { const c = clone(x); delete c.door; return c; };
-    ok(JSON.stringify(noDoor(a.spec)) === JSON.stringify(noDoor(b.spec)) && JSON.stringify({ ...a.spec.door, leafDepth: 0 }) === JSON.stringify({ ...b.spec.door, leafDepth: 0 }),
-      `${name}: windowSpec equal to START but for the door block's informational leafDepth (${b.spec.door.leafDepth} -> ${a.spec.door.leafDepth})`);
+    const noDoor = (x) => { const c = clone(x); delete c.door; if (isSash && c.sash) delete c.sash.proportion; return c; };
+    ok(JSON.stringify(noDoor(a.spec)) === JSON.stringify(noDoor(b.spec)) && JSON.stringify({ ...a.spec.door, leafDepth: 0 }) === JSON.stringify({ ...b.spec.door, leafDepth: 0 })
+      && !('proportion' in b.spec.sash) && (isSash ? a.spec.sash.proportion === 'standard' : !('proportion' in a.spec.sash)),
+      `${name}: windowSpec equal to START but for the door block's informational leafDepth (${b.spec.door.leafDepth} -> ${a.spec.door.leafDepth})${isSash ? ' and the new sash.proportion (standard)' : ''}`);
     // 08.10.2026: the pre-cut allowance is a setting, default 10 (START added a fixed 20).
     // With 20 asked for, the live pre-cut and the BOM metres equal START exactly; at the
     // default every straight piece is 10 shorter and nothing else moves.
