@@ -828,7 +828,7 @@ export default function MaterialAssignmentsPage() {
           return (
             <div className="max-w-5xl">
               <PartGroupSection defaultOpen title="🪵 Frame"
-                subtitle={`${DOOR_PARTS.frame.length} parts · head, jambs, cill (outward / inward), coupling post, transom rail · the casement frame section`}
+                subtitle={`${DOOR_PARTS.frame.length} parts · head, jambs, cill (outward / inward), mullion and transom (casement rules), coupling post (doors before v3) · the casement frame section`}
                 parts={DOOR_PARTS.frame} {...timber} />
               <PartGroupSection defaultOpen title="🪵 Leaf"
                 subtitle={`${DOOR_PARTS.leaf.length} parts · stiles, meeting stile (french), top, bottom and mid rail · full leaf dimensions`}
@@ -837,8 +837,11 @@ export default function MaterialAssignmentsPage() {
                 subtitle={`${DOOR_PARTS.panel.length} boards · half-glazed and three-quarter doors · m² from the engine`}
                 parts={DOOR_PARTS.panel} {...timber} />
               <PartGroupSection title="🪵 Side panel"
-                subtitle={`${DOOR_PARTS.sidePanel.length} parts · fixed side panel leaf members`}
+                subtitle={`${DOOR_PARTS.sidePanel.length} parts · the casement fixed light behind the mullion · unassigned rows take the casement leaf / door bottom rail material`}
                 parts={DOOR_PARTS.sidePanel} {...timber} />
+              <PartGroupSection title="🪵 Fixed fanlight"
+                subtitle={`${DOOR_PARTS.fixedFan.length} parts · the non-opening casement leaf of a fixed fanlight · unassigned rows take the casement leaf material`}
+                parts={DOOR_PARTS.fixedFan} {...timber} />
               <PartGroupSection title="🔩 Ironmongery"
                 subtitle={`${DOOR_PARTS.ironmongery.length} rows · counts from the engine (hint "?" = the rule) · a product set in the window's door slot wins for that window`}
                 parts={DOOR_PARTS.ironmongery}

@@ -478,10 +478,11 @@ const KEY_LEAF = [
   [40, 356, 120, 30, 'leaf_bottom_rail'],
 ];
 
-// Door key (08.10.2026): a door frame with a side panel (coupling post) and a
-// fanlight rail, and a french leaf (hinge stile, meeting stile, mid rail).
+// Door key (08.10.2026; v3 09.10.2026): a door frame with a side panel behind
+// a full-height mullion and a fanlight transom cut in segments either side of
+// it, and a french leaf (hinge stile, meeting stile, mid rail).
 const KEY_DOOR_FRAME = [
-  [126, 110, 176, 24, 'door_transom'],
+  [38, 110, 62, 24, 'door_transom'], [126, 110, 176, 24, 'door_transom'],
   [100, 32, 26, 322, 'door_post'],
   [12, 32, 26, 322, 'door_frame_jambs'], [302, 32, 26, 322, 'door_frame_jambs'],
   [12, 6, 316, 26, 'door_frame_head'],

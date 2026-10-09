@@ -19,6 +19,21 @@
 
 import { VARIANT_ORDER } from './profile.js';
 
+// Doors v3 (Piotr 09.10.2026, "defaults equal to the casement counterparts"):
+// the door rows below take the material of their counterpart while they have
+// none of their own (bom.effectiveAssignment). The mullion and the fixed fan
+// members follow the casement rows; the side panel light follows the casement
+// leaf for its stiles and top rail and the door bottom rail for its 180 rail.
+export const PART_DEFAULT_FROM = Object.freeze({
+  d_mullion: 'c_mullion',
+  d_side_stile: 'c_sash_stile',
+  d_side_top_rail: 'c_sash_top_rail',
+  d_side_bottom_rail: 'd_leaf_bottom_rail',
+  d_fan_fixed_stile: 'c_sash_stile',
+  d_fan_fixed_top_rail: 'c_sash_top_rail',
+  d_fan_fixed_bottom_rail: 'c_sash_bottom_rail',
+});
+
 const fmt = (a, b) => `${a}×${b}`;
 
 // variantAware: true → base assignment inherits to every variant, overrides allowed.

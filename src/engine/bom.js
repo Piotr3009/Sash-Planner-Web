@@ -21,7 +21,7 @@
  */
 
 import { buildPrecutForWindow, buildHardwareList } from './lists.js';
-import { assignmentFor, legacyToCanonical } from './partRegistry.js';
+import { assignmentFor, legacyToCanonical, PART_DEFAULT_FROM } from './partRegistry.js';
 import { lockPartId, hingeWedgeMm, childRestrictorCounts, CHILD_RESTRICTOR_PART } from './casementHardware.js';
 import { isAcousticUnit } from './specification.js';
 import { DOOR_ITEM_SLOT, DOOR_PART_SLOT } from './doorHardware.js';
@@ -38,11 +38,20 @@ export function materialSizeToRaw(size) {
  * inherits; falls back to the flat map when no schema-2 data is provided.
  */
 export function effectiveAssignment(part_id, frameType, assignmentsData, flatAssignments) {
+  let own;
   if (assignmentsData) {
     const { key, variantKey } = legacyToCanonical(part_id);
-    return assignmentFor(assignmentsData, key, variantKey || frameType || 'standard');
+    own = assignmentFor(assignmentsData, key, variantKey || frameType || 'standard');
+  } else {
+    own = flatAssignments?.[part_id] || null;
   }
-  return flatAssignments?.[part_id] || null;
+  // Doors v3 (09.10.2026): a door row with a counterpart (the mullion, the
+  // side panel light and fixed fan members) takes the counterpart's material
+  // while it has none of its own (materialAssignmentStore PART_DEFAULT_FROM).
+  const from = PART_DEFAULT_FROM[part_id];
+  if (own?.material_id || !from) return own;
+  const inherited = effectiveAssignment(from, frameType, assignmentsData, flatAssignments);
+  return inherited?.material_id ? { ...inherited, inheritedFrom: from } : own;
 }
 
 // Engine element name → materialAssignmentStore part id (timber + beading)
@@ -126,7 +135,8 @@ Object.assign(ELEMENT_TO_PART_ID, {
   'D-FRAME JAMB (R)': 'd_frame_jamb',
   'D-FRAME CILL': 'd_frame_cill',
   'D-FRAME CILL (INWARD)': 'd_frame_cill_inward',
-  'D-COUPLING POST': 'd_coupling_post',
+  'D-COUPLING POST': 'd_coupling_post',   // doors before v3 (09.10.2026)
+  'D-MULLION': 'd_mullion',
   'D-TRANSOM': 'd_transom_rail',
   'D-STILE (L)': 'd_leaf_stile',
   'D-STILE (R)': 'd_leaf_stile',
@@ -141,6 +151,11 @@ Object.assign(ELEMENT_TO_PART_ID, {
   'D-FAN STILE (R)': 'c_sash_stile',
   'D-FAN TOP RAIL': 'c_sash_top_rail',
   'D-FAN BOTTOM RAIL': 'c_sash_bottom_rail',
+  // Doors v3: the fixed fanlight leaf (non-opening) has its own door rows.
+  'D-FIX FAN STILE (L)': 'd_fan_fixed_stile',
+  'D-FIX FAN STILE (R)': 'd_fan_fixed_stile',
+  'D-FIX FAN TOP RAIL': 'd_fan_fixed_top_rail',
+  'D-FIX FAN BOTTOM RAIL': 'd_fan_fixed_bottom_rail',
   'D-GLAZING BEADING': 'd_glazing_beading',
 });
 // The standard door glass unit, double 6-12-6 (owner box item 8): its own row.
@@ -381,6 +396,8 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
   const dw = derived.door;
   if (derived.category === 'door' && dw) {
     Object.entries(dw.hardware?.summary || {}).forEach(([pid, n]) => setQty(pid, n, 'pcs'));
+    // Doors v3: the threshold seal with an aluminium / low-profile threshold, in metres.
+    Object.entries(dw.hardware?.metres || {}).forEach(([pid, m]) => setQty(pid, m, 'm'));
     const fan = dw.hardware?.fan;
     if (fan) {
       let fanWedgeMm = 0;

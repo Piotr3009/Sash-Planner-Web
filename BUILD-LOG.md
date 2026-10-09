@@ -166,6 +166,35 @@ Every row of 3.10 matches. The single 1000 x 2100 with a 450 side panel reads as
 550 between the jamb and the mullion axis, leaf 482): see BLOCKERS 31.1 a.
 
 
+### Stage 2: lists, BOM, Assign Materials, hardware
+
+- **Cut list / pre-cut / grouped cut list**: `D-MULLION` (symbol M, "Door Mullion"), `D-TRANSOM` one record per
+  segment (codes D-T1.. when there are several, symbol T), side light `D-SIDE STILE` / `TOP RAIL` 64x57 and
+  `D-SIDE BOTTOM RAIL` 180x57, fixed fan `D-FIX FAN STILE (L) / (R)` (pair FFS-L/R), `D-FIX FAN TOP RAIL` (FFTR),
+  `D-FIX FAN BOTTOM RAIL` (FFBR) 64 / 64 / 67. No C- / D- prefix in any symbol. Colours: the mullion takes the
+  door frame compartment that was the coupling post (id `door_post`, now named "Mullion", the casement mullion's
+  green); side light members `door_side_panel`, fixed fan members `door_fan`. The door colour key sheet draws the
+  transom in two segments either side of the mullion.
+- **Assign Materials (Doors)**: new rows `d_mullion` (68x93), `d_fan_fixed_stile` / `top_rail` / `bottom_rail`
+  (64 / 64 / 67 x 57), `d_threshold_seal` (m, the thresholds tab, no per-window slot so the window's threshold
+  product never replaces it); the side panel rows read 64x57, 64x57, 180x57. New rows are appended at the end of
+  `DOOR_ALL_PARTS` (index-based assignment sets keep every earlier row). "Defaults equal to the casement
+  counterparts": `partRegistry.PART_DEFAULT_FROM` (mullion -> c_mullion, side stile / top -> casement leaf
+  stile / top, side bottom -> the door bottom rail, fixed fan -> the casement leaf rows); `bom.effectiveAssignment`
+  returns the counterpart's assignment while the door row has none, so the BOM, the pre-cut raw section and the
+  pre-cut group header follow it, and the pre-cut merges by material as today.
+- **BOM**: the door block adds `hardware.metres` (the threshold seal, m) to the pieces; panel boards and core at the
+  outer panel size (the engine's area); nothing for the coupling post.
+- **Hardware list**: the handing as the configurator states it (Stage 1); the threshold seal line (enginePart, unit
+  m); a fixed fanlight adds no hinge, lock or handle; trickle vents on doors by the window rule (`buildVentGrilles`,
+  room type), a client line on the `trickleVents` slot, so the BOM buys them through `buildWindowHardware`.
+
+French 2400 x 2400, sides 400 + 400, fixed fan T 450, aluminium threshold (live): pre-cut groups 94x57 (stiles, top
+rails), 100x57 (meeting stiles), 180x57 (door bottom rails and the side bottom rails), 64x57 (side stiles / tops,
+fixed fan stiles / tops), 67x57 (fixed fan bottoms), 68x93 (head, jambs, 2 mullions L2364, 3 transom segments); part
+quantities include d_mullion 4748 mm, d_transom_rail 2287 mm, d_threshold_alu_double 1, d_threshold_seal 1.57 m.
+
+
 ## 2026-10-09 · TURA PC: SASH PROPORTIONS, COTTAGE 40/60 AND 1/3-2/3 (branch `claude/sash-proportions`)
 
 Owner box (Piotr, 09.10.2026): a new sash option `sashProportion` (`standard`, `cottage-40-60`, `cottage-1-3`, missing
