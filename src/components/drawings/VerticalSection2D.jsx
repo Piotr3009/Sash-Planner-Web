@@ -87,11 +87,11 @@ export default function VerticalSection2D({ windowSpec, derived }) {
           </g>
         ))}
 
-        <DimV x={-DIM_OFFSET} y1={0} y2={d.totalStackH} extFrom={0} label={`≈ ${d.totalStackH} mm`} vbw={totalW} />
+        <DimV x={-DIM_OFFSET} y1={0} y2={d.totalStackH} extFrom={0} label={`≈ ${Math.round(d.totalStackH * 10) / 10} mm`} vbw={totalW} />
         <DimH y={d.totalStackH + DIM_OFFSET} x1={0} x2={d.depth} extFrom={d.totalStackH} label={`Depth: ${d.depth} mm`} vbw={totalW} />
         <TitleBlock x={d.depth / 2} y={d.totalStackH + DIM_OFFSET * 2 + 20}
           title="VERTICAL SECTION"
-          subtitle={`Frame ${d.fw}×${d.fh}mm · Top sash ${Math.round(d.topH * 10) / 10}mm · Bottom sash ${d.botH}mm`} vbw={totalW} />
+          subtitle={`Frame ${d.fw}×${d.fh}mm · Top sash ${Math.round(d.topH * 10) / 10}mm · Bottom sash ${Math.round(d.botH * 10) / 10}mm`} vbw={totalW} />
       </svg>
     </div>
   );

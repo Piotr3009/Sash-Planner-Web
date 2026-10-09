@@ -6,7 +6,7 @@ import { useProjectStore } from '../stores/projectStore.js';
 import { useMaterialStore } from '../stores/materialStore.js';
 import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignmentStore.js';
 import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
-import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
+import { parseSpecification, normaliseToWindowSpec, SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, isCottageProportion } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
 import { withProfiles, getCasementProfile, bsuiteActiveTarget } from '../engine/profile.js';
 import { buildGlassListForWindow, buildVentGrilles } from '../engine/lists.js';
@@ -115,6 +115,12 @@ export default function WindowDetailPage() {
             {item.window_type || 'sash'} · {item.width}×{item.height} mm
             {currentBatch && <span> · {currentBatch.label}</span>}
           </p>
+          {/* cottage below the configurator's minimum frame height: it still derives (it is not wrong), but say so */}
+          {(windowSpec?.category || 'sash') === 'sash' && isCottageProportion(windowSpec?.sash?.proportion) && Number(windowSpec?.frame?.height) < COTTAGE_MIN_FRAME_HEIGHT && (
+            <p className="text-xs text-amber-400 mt-1">
+              {SASH_PROPORTION_LABELS[windowSpec.sash.proportion]} on a {windowSpec.frame.height} mm frame: below the {COTTAGE_MIN_FRAME_HEIGHT} mm minimum for cottage sashes. Check the proportions with the customer.
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {(windowSpec?.category || 'sash') === 'sash' && (
@@ -247,6 +253,7 @@ export default function WindowDetailPage() {
             </SpecSection>
           ) : (
           <SpecSection title="Sashes & Bars">
+            {(windowSpec?.category || 'sash') === 'sash' && <SpecRow label="Proportions" value={SASH_PROPORTION_LABELS[windowSpec?.sash?.proportion] || windowSpec?.sash?.proportion} />}
             <SpecRow label="Grid" value={windowSpec?.sash.grid.mode} />
             <SpecRow label="Upper" value={item.upperBars || 'none'} />
             {!item.sameBars && <SpecRow label="Lower" value={item.lowerBars || 'none'} />}
@@ -293,8 +300,8 @@ export default function WindowDetailPage() {
           ) : derived && (
             <SpecSection title="Calculated">
               <SpecRow label="Sash W" value={`${derived.sashWidth} mm`} />
-              <SpecRow label="Top H" value={`${derived.topSashHeight} mm`} />
-              <SpecRow label="Bot H" value={`${derived.bottomSashHeight} mm`} />
+              <SpecRow label="Top H" value={`${Math.round(derived.topSashHeight * 10) / 10} mm`} />
+              <SpecRow label="Bot H" value={`${Math.round(derived.bottomSashHeight * 10) / 10} mm`} />
             </SpecSection>
           )}
         </aside>
