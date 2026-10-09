@@ -817,10 +817,17 @@ if (!chromium) {
   await mount(`${cfgUrl}?edit=${oddId}`);
   await waitText('Sash proportions');
   const updateBtn = page.locator('button', { hasText: 'Update Window' });
-  ok((await page.locator('text=Unknown sash proportion "cottage-30-70": choose one of the three.').count()) === 1 && (await updateBtn.isDisabled()) && pageErrors.length === errsBefore,
-    'edit ODD (cottage-30-70): the configurator says "Unknown sash proportion ...", Update is disabled, no page error');
+  const oddRecord = () => page.evaluate(([x, w]) => window.__store.getState().projects.find((p) => p.id === x.p).batches.find((b) => b.id === x.b).windows.find((y) => y.id === w), [ids, oddId]);
+  const before = JSON.stringify(await oddRecord());
+  const looksOff = async () => /cursor-not-allowed/.test(await updateBtn.getAttribute('class'));
+  ok((await page.locator('text=Unknown sash proportion "cottage-30-70": choose one of the three.').count()) === 1 && (await looksOff()) && pageErrors.length === errsBefore,
+    'edit ODD (cottage-30-70): the configurator says "Unknown sash proportion ...", Update shows as blocked, no page error');
+  await updateBtn.click(); await page.waitForTimeout(300);
+  ok(JSON.stringify(await oddRecord()) === before && (await page.locator('text=Sash proportions').count()) === 1, 'clicking Update saves nothing and stays on the configurator');
   await pchip('Standard').click(); await page.waitForTimeout(200);
-  ok(!(await updateBtn.isDisabled()) && (await page.locator('text=Unknown sash proportion').count()) === 0, 'choosing Standard clears the error and allows the update');
+  ok(!(await looksOff()) && (await page.locator('text=Unknown sash proportion').count()) === 0, 'choosing Standard clears the error and allows the update');
+  await updateBtn.click(); await page.waitForTimeout(300);
+  ok((await oddRecord())?.sashProportion === 'standard', 'update ODD: sashProportion standard');
 
   // the 3D canvas (no GPU) and the refused network (fonts, maps) may complain; nothing else may
   const relevant = pageErrors.filter((e) => !/WebGL|context|three|Canvas|GL_|Failed to fetch|net::/i.test(e));

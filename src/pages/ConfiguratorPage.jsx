@@ -812,6 +812,7 @@ export default function ConfiguratorPage() {
 
   // ─── Save ───
   const save = () => {
+    if (isSash && proportionError) return;   // an unknown stored proportion: said next to the control, never saved
     const config = {
       windowName: winName, windowCategory: batch?.type || 'sash',
       extWidth: extW, extHeight: extH, inputWidth: inW, inputHeight: inH, measurementType: 'box-to-box',
@@ -966,7 +967,7 @@ export default function ConfiguratorPage() {
             className={`px-3 py-2 border-2 rounded-lg text-sm w-56 bg-surface-800 ${winName.trim() ? 'border-accent-500 text-ink-50' : 'border-status-danger/50 text-ink-200'}`} />
           <button
             onClick={save}
-            disabled={shapeBlocked || (isSash && !!proportionError)}
+            disabled={shapeBlocked}
             title={shapeBlocked ? `${isCircle ? 'Circle' : 'Arch'}: ${archError}` : (isSash && proportionError) || undefined}
             className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'} ${shapeBlocked || (isSash && proportionError) ? 'opacity-40 cursor-not-allowed' : ''}`}
           >
