@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { profileBoxDepth, getWindowProfile, getCasementProfile } from '../engine/profile.js';
+import { profileBoxDepth, getWindowProfile, getCasementProfile, getDoorProfile } from '../engine/profile.js';
 import * as cloud from '../services/cloudSync.js';
 
 // ─── Production settings (preserved from original — used by calculations engine) ───
@@ -13,6 +13,7 @@ const defaultSettings = {
   stockLengthSash: 5900,
   stockLengthBox: 3700,
   boxWidthAllowance: 20,
+  precutAllowance: 10,         // mm over the finished length on the Pre-Cut (Piotr 08.10.2026: 10, was a fixed 20)
   hornExtensionDefault: 70,
   glazingAllowanceWidth: 4,
   glazingAllowanceHeight: 4,
@@ -376,6 +377,7 @@ export const useProjectStore = create((set, get) => ({
                 takenAt: new Date().toISOString(),
                 sash: JSON.parse(JSON.stringify(getWindowProfile())),
                 casement: JSON.parse(JSON.stringify(getCasementProfile())),
+                door: JSON.parse(JSON.stringify(getDoorProfile())),
               },
             }
           : b.defaults;

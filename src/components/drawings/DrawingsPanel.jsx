@@ -10,9 +10,8 @@ import SectionsUpload from './SectionsUpload.jsx';
 import CasementSection2D from './CasementSection2D.jsx';
 import CasementElevation2D from './CasementElevation2D.jsx';
 import DoorElevation2D from './DoorElevation2D.jsx';
-import DoorFrameDetail2D from './DoorFrameDetail2D.jsx';
-import DoorLeafDetail2D from './DoorLeafDetail2D.jsx';
-import DoorSection2D from './DoorSection2D.jsx';
+import DoorSheet from './DoorSheet.jsx';
+import { doorSheetPlan } from './doorDrawUtils.js';
 import CasementFrameDetail2D from './CasementFrameDetail2D.jsx';
 import CasementLeafDetail2D from './CasementLeafDetail2D.jsx';
 import { groupCasementLeaves, paneTitle } from './casementDrawUtils.js';
@@ -38,12 +37,15 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
   // through to the sash drawing, which renders NaN on door data.
   const isDoor = ['door', 'doors'].includes(windowSpec?.category || 'sash');
   const leafGroups = isCasement ? groupCasementLeaves(derived) : [];
+  // Doors (08.10.2026): one tab per door sheet of the engine's door (frame,
+  // leaves, each side panel, each opening fan leaf, plan section), the same
+  // plan the PDF rig, the Elements PDF and the production pack use.
+  const doorSheets = isDoor ? doorSheetPlan(derived) : [];
+  const renderDoorSheet = (sh) => <DoorSheet sheet={sh} windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />;
   const visibleTabs = isDoor
     ? [
         { id: 'elevation', label: 'Front Elevation' },
-        { id: 'doorframe', label: 'Frame' },
-        { id: 'doorleaf', label: 'Leaf' },
-        { id: 'doorsection', label: 'Sections' },
+        ...doorSheets.map((sh) => ({ id: sh.key, label: sh.label })),
       ]
     : isCasement
     ? [
@@ -61,6 +63,7 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
   // Pack: querySelector('svg') → svgNodeToPng({ printMode }) → export util).
   const handleExportElevation = async () => {
     if (busy || !derived) return;
+    if (!refs.current['elevation']?.querySelector('svg')) return;
     setBusy(true);
     try {
       const svg = refs.current['elevation']?.querySelector('svg');
@@ -89,6 +92,7 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
       // Layout decisions (hero sheet / grid / cill page) live in elementsPlan —
       // the same plan Production Pack uses, so the two exports cannot drift.
       const plan = elementsPlan(windowSpec, derived);
+      if (!plan.supported) return;   // nothing drawn for this window type: no empty sheet
       const { hero, drawings, cill } = await buildElementsPayload(
         plan, (k) => refs.current[k]?.querySelector('svg'));
       const company = useProjectStore.getState().settings.company || {};
@@ -151,15 +155,13 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
             </button>
           </div>
           <div className="card p-4 min-h-[400px]">
-            {isDoor && subTab === 'doorframe' && (
-              <DoorFrameDetail2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
-            )}
-            {isDoor && subTab === 'doorleaf' && (
-              <DoorLeafDetail2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
-            )}
-            {isDoor && subTab === 'doorsection' && (
-              <DoorSection2D windowSpec={windowSpec} derived={derived} />
-            )}
+            {isDoor && doorSheets.map((sh) => subTab === sh.key && (
+              <div key={sh.key}>
+                {renderDoorSheet(sh)}
+                {/* uploaded sections stay available for doors (as on the sash / casement 2D Sections tab) */}
+                {sh.sheet === 'section' && <div className="mt-4"><SectionsUpload item={item} batch={batch} /></div>}
+              </div>
+            ))}
             {subTab === 'elevation' && (
               isDoor
                 ? <DoorElevation2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
@@ -192,10 +194,17 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
       {derived && (
         <div aria-hidden="true" style={{ position: 'absolute', left: '-99999px', top: 0, width: '1200px' }}>
           <div ref={(el) => { refs.current['elevation'] = el; }}>
-            {isCasement
+            {isDoor
+              ? <DoorElevation2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
+              : isCasement
               ? <CasementElevation2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
               : <FrontElevation2D windowSpec={windowSpec} derived={derived} />}
           </div>
+          {isDoor && doorSheets.map((sh) => (
+            <div key={sh.key} ref={(el) => { refs.current[sh.key] = el; }}>
+              {renderDoorSheet(sh)}
+            </div>
+          ))}
           {isCasement && (<>
           <div ref={(el) => { refs.current['vsection'] = el; }}>
             <CasementSection2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
@@ -209,7 +218,7 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
             </div>
           ))}
           </>)}
-          {!isCasement && (<>
+          {!isCasement && !isDoor && (<>
           <div ref={(el) => { refs.current['box'] = el; }}>
             <BoxDetail2D windowSpec={windowSpec} derived={derived} />
           </div>

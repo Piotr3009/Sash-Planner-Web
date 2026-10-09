@@ -231,14 +231,15 @@ for (const c of CASES) {
     check(`${tag}: elevation + frame carry every head radius (${outerLabels.join(', ')}), start ${A.geometry.start}, rise ${A.geometry.rise}`,
       outerLabels.every((l) => S.elevation.includes(`>${l}<`) && S.frame.includes(`>${l}<`)) && [S.elevation, S.frame].every((s) => s.includes(`start ${fmtHalf(A.geometry.start)}`) && s.includes(`rise ${fmtHalf(A.geometry.rise)}`)));
     const leafLabels = A.geometry.leafTop.outer.map((a) => `R ${fmtHalf(a.r)}`);
-    check(`${tag}: leaf sheet carries the leaf top radii (${leafLabels.join(', ')}), stile ${fmtHalf(A.geometry.leafStraightStile)}, C-ATR`,
-      leafLabels.every((l) => S.leaf[0].svg.includes(`>${l}<`)) && S.leaf[0].svg.includes(`stile ${fmtHalf(A.geometry.leafStraightStile)}`) && S.leaf[0].svg.includes('C-ATR'));
+    // member codes without the C- prefix on the sheets since 08.10.2026
+    check(`${tag}: leaf sheet carries the leaf top radii (${leafLabels.join(', ')}), stile ${fmtHalf(A.geometry.leafStraightStile)}, ATR`,
+      leafLabels.every((l) => S.leaf[0].svg.includes(`>${l}<`)) && S.leaf[0].svg.includes(`stile ${fmtHalf(A.geometry.leafStraightStile)}`) && / ATR \d/.test(S.leaf[0].svg) && !S.leaf[0].svg.includes('C-ATR'));
     const glassLabels = A.glassOutline.arcs.map((a) => `R ${fmtTenth(a.r)}`);
     check(`${tag}: glass sheet carries the glass radii (${glassLabels.join(', ')}), springing ${fmtTenth(A.glassOutline.springing)}, title "· arched"`,
       glassLabels.every((l) => S.glass[0].svg.includes(`>${l}<`)) && S.glass[0].svg.includes(`springing ${fmtTenth(A.glassOutline.springing)}`) && S.glass[0].svg.includes('mm · arched'));
-    check(`${tag}: frame sheet prints C-AH / C-J with the cut-list lengths`, (() => {
+    check(`${tag}: frame sheet prints AH / J with the cut-list lengths (no C- prefix)`, (() => {
       const head = derived.components.box.find((r) => r.elementName === 'C-ARCH HEAD'), jamb = derived.components.box.find((r) => r.elementName === 'C-FRAME JAMB (L)');
-      return S.frame.includes(`C-AH ${fmtHalf(head.length)}`) && S.frame.includes(`C-J/L ${fmtHalf(jamb.length)}`) && S.frame.includes(`C-J/R ${fmtHalf(jamb.length)}`);
+      return S.frame.includes(`>AH ${fmtHalf(head.length)}<`) && S.frame.includes(`>J/L ${fmtHalf(jamb.length)}<`) && S.frame.includes(`>J/R ${fmtHalf(jamb.length)}<`) && !/C-(AH|J|H|CILL)/.test(S.frame);
     })());
     if (variant === 'bars') {
       // E / v3 0.3: the glass sheet prints the glassBars.js bar-end rows — labels beside the bars (≤ 4 bars)

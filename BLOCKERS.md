@@ -4,6 +4,140 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-10-08 · TURA PC: DOORS TO PRODUCTION, SINGLE AND FRENCH, items for Piotr (branch `claude/doors-production`)
+
+**29.1 What happens at merge.** Every door is recalculated; no batch is frozen, so doors already quoted or in a
+production pack move (a reprint will not match a pack printed today). Pricing does not move: `engine/pricing.js`
+prices a door per m² from the configurator fields and does not read the engine (out of scope).
+
+| door | before (410cb5d) | after |
+|---|---|---|
+| single 900 x 2100 | leaf 806 x 2006 (W - 94, H - 94), 61 deep, glass 641 x 1755, 6x16x6 / 28 | leaf **798 x 2002** (W - 102, H - 98), **57** deep, glass **633 x 1751**, **6x12x6 / 24** |
+| single, aluminium / low-profile threshold | leaf 806 x 2047 | leaf 798 x **2043** (H - 57), no timber cill, threshold 1 pc |
+| french 1600 x 2100 | leaves 756 x 2006, four 94 stiles | half 749, leaves **755 x 2002**, hinge stile 94 + meeting stile **100**, glass **584 x 1751** |
+| half glazed / three quarter | drawn as full glass | mid rail 94 + panel (2 x 18 Tricoya + core); single half glazed: glass 633 x 883, panel 633 x 797 |
+| opening fanlight | frame glazed, "64 sash pending" | a casement top hung leaf 64 / 64 / 67 x 57 with casement hinges, lock and handle |
+| BOM | glass on the window double row, paint on the sash rows, nothing else | door timber, panel, door glass 6-12-6, door beading, casement consumables and seals, paint on the casement rows, hinges, lock kit, cylinders, handles, bolts, thresholds |
+
+No door profile was ever stored (Window Settings had no door card), so every tenant starts on the new defaults; a
+batch snapshot taken after the merge carries the door profile too (`_profileSnapshot.door`).
+
+**29.2 Side panels and the fixed fanlight.** Side panels stay fixed leaves with 57 x 57 members in the door frame
+(not in the box: unchanged); they now get glass bars, seals, beading and consumables like a leaf. The alternative is
+a casement-style fixed light (64 / 64 / 67 dummy sash). The fixed fanlight stays glazed into the frame (glass
+W_frame - 2 x (68 - 11.5) by transomH - 2 x (68 - 11.5)); the casement rule (a dummy sash) is the alternative.
+**Say if either should change.**
+
+**29.3 Panel.** The panel build is 2 x 18 Tricoya MDF + an MDF core, the core **assumed 18** (`panel.coreThickness`,
+Window Settings · Doors), so the panel is **54 thick** and sits in the same 11.5 rebate as the glass (panel width =
+glass width; single half glazed 633 x 797). Note: a 54 panel in a 57 leaf leaves no room for a glazing bead on the
+panel (the glass is 24); a thinner core or a rebated / fielded edge is the usual answer. **Confirm the core and how
+the panel is held.** The panel perimeter is counted as beaded (door bead row), like a pane. Panel weight uses an MDF
+density of 750 kg/m³ (information only, `panel.densityKgM3`).
+
+**29.4 Fan leaf rule and the transom band.** The opening fan leaf is `W_frame - 102` wide and `transomH - 102` high
+(51 at the head, 51 at the rail, box rule; `deductions.fanAtHead / fanAtRail`). The cut list keeps ONE transom rail
+68 x 93 (`totalWidth - 136`), placed `transomH - 68` to `transomH` from the top (transom 450: 382 to 450). The door
+leaf top is at `transomH + 51` (501), so there are **51 mm below the rail with no member** before the door leaf.
+Above the rail the opening fan leaf ends at `transomH - 51` (399). The visible frame band between the fan and the
+door leaf is therefore **94** (opening fan: 403 to 497) or **115** (fixed fan: 382 to 497), wider than the 68 rail.
+The engine publishes that band (`zones.transom.band`); the sheets and the 3D draw it as it is (the 3D shows about
+136 with the 21 stops). **Check on the drawing: is the rail wider, or should the fan / door leaf deduction at the
+rail change?** Related, same drawing: each coupling post (D-JC) is cut to the full assembly height while the
+transom rail (D-T) is cut `totalWidth - 136` straight across; with side panels and a fanlight both cannot be through
+members at the crossing. Say which one runs through.
+
+**29.5 Hardware defaults (all FLAGGED, Window Settings · Doors).**
+a) Handing: hinge side + opening direction to `LH` / `RH`, printed with the Winkhaus words "anti-clockwise closing"
+   (LH) / "clockwise closing" (RH). Mapping used: seen from the side the door opens to, hinges on the left = LH.
+   Note the configurator's hinge side is named as seen from INSIDE (as the engine has done since 09.08: "hinge
+   left" puts the hinges on the right seen from outside), so "hinge left, outward" prints **RH** and "hinge left,
+   inward" prints **LH**. Check it against the handing diagram PDF on the BJ Waller product page.
+b) ThunderBolt single door kit: door thickness variant 56 (leaf 57), backset 45 (45 or 55), faceplate radius, keeps
+   full length.
+c) FGTE double door kit: family "slave shootbolts only" (`fgteShootbolts 'slave'`, or 'both'), slave backset 45
+   (35 or 45), lock centre line 22 (12 or 22), shootbolt keep cill option "yes" when the door has a timber cill. The
+   height band comes from the LEAF height (leaf 2002: slave only 1965 to 2161).
+d) Hinges: 3 per leaf, 4 above leaf height 2100. The door hinge is an owner product (no size ladder): the leaf weight
+   is reported (single 900 x 2100: leaf 56.6 kg; french 1600 x 2100: 53.9 kg per leaf; in the hinge detail row) but **no load check is made: confirm the
+   chosen hinge carries it.**
+e) The opening fanlight takes the casement picks (hinges, lock) and, added in this tura, one casement handle.
+
+**29.6 French centre clearance** is 0 (owner decision: later, after tests). The profile key `frenchClearance` is
+documented in `DEFAULT_DOOR_PROFILE` and honoured by the engine when set (half = (W - 102 - clearance) / 2). There is
+no Window Settings field for it yet: say when you want one.
+
+**29.7 Threshold seal** (the bottom seal of an aluminium / low-profile threshold) is not counted. Say if a row is
+wanted.
+
+**29.8 Trickle vents on doors.** The configurator shows the vent slot for doors; the BOM does not count it. Say if it
+should.
+
+**29.9 Skipped, interpreted or outside the brief, with the reason.**
+
+a) **Interpretations made to finish the box** (say if any is wrong):
+   - `transom.bars 'match'`: the vertical bar lines of the door (and of a side panel) continue into the fanlight
+     above it at the same x (on a french door the centre line too); no horizontal fan bars.
+   - The opening fanlight is one fan leaf per frame zone (over the door, and over each side panel when there is
+     one), each `W_zone - 102` wide.
+   - The panel perimeter is beaded like a pane (door bead row), and the panel takes no glazing packers or clips.
+   - The threshold extension (door form, 0 to 100) is added to the cill length, as the old door engine did with
+     `cill.extension`; a sill extension BOARD row is bought only for the board sizes that exist (35 / 60 / 85, the
+     casement rows `c_sill_ext_*`); any other value gets the longer cill and no board.
+   - Door glass weight 30 kg/m² (two 6 mm panes), panel 750 kg/m³: information only (leaf weight).
+   - A side panel style other than full glass (`sideStyle`) is not built: side panels are always glazed (as before).
+b) **Inward door, cill gap.** With the box rule `leafFullHeight 98` in both directions, an inward leaf bottom sits
+   47 above the floor over the unrebated 40 / 35 cill: 7 seen inside, 12 seen outside. Drawn as it is; check it on
+   the drawing (a weather bar would normally close it; not in the engine or the BOM).
+c) **French meeting joint** is drawn (plan section, 3D) as a half lap over the 12 overlap: each 100 meeting stile
+   is 100 on one half of its depth and 88 on the other. No profile key carries the lap depth; confirm the joint.
+d) **Plan rebate depth.** The profile has no rebate depth for the leaf; the plan section draws the leaf flush with the
+   face it opens to (rebate as deep as the leaf) and the 3D adds a 5 seal (62). Cosmetic; say if you want a value.
+e) **Side panels without a timber cill** (aluminium / low-profile threshold): the side panel leaves follow the door
+   leaf rule (H - 57), so they stand 6 above the floor, and the threshold product is counted for the door only, so
+   nothing is under the side panels. Owner check.
+f) **3D, not drawn in the new engine-driven path:** the weather bar, the trickle vent, the passive leaf bolts, a
+   bead around the fixed fanlight, the R12 round on frame edges, a side panel style other than glass. The transom
+   reads about 136 wide in the 3D (the 94 band of 29.4 plus a 21 stop each side). Handle plates render dark under the
+   capture lights (pre-existing). Fixed in this tura: the pack 3D and the preview now frame the whole assembly (side
+   panels, fanlight), they framed the door frame only. The old PSW door path (no `doorGeo`) is untouched; a latent
+   bug there (`DoorPanel.jsx` top rail memo with empty dependencies) is left as it is.
+g) **Batch snapshot.** The pages derive with the batch `_profileSnapshot` (now with `door`), but the 3D preview and
+   the pack 3D derive the door geometry with the live door profile (as `frameDims` already did), and the door sheets
+   read a few note values from the live profile (cill visible and gap, inward cill faces, hinge barrel and the hinge
+   rule text, backset, panel boards). Equal until a batch is snapshotted and the door profile is edited afterwards;
+   copying those values into `derived.door` would close it.
+h) **Batch type `'door'` vs `'doors'`.** `moveToProduction` creates `'door'`, the project page creates `'doors'`;
+   `BATCH_DEFAULTS` knows `doors` only, so a `'door'` batch starts with SASH batch defaults, and the Batch Defaults
+   page filters door slots by the literal type. The engine treats both as doors. Not changed (batch creation is
+   outside the door engine); one line in `createBatch` would map `'door'` to the door defaults: say if wanted.
+i) **Ironmongery `unit` / `subcategory`** (the new `cylinders` category uses the same catalogue) are not saved to
+   the cloud (`cloudSync.js` 449-468); fixing it needs a DB column (migration), so it was not done.
+j) **Stale older entries** made obsolete by this tura: 19.x / 23.x door items (leaf 61, land 43, no stored door
+   profile, side panel and 3D not threaded), and "Window types other than sash" further down this file.
+k) **Pricing** (`engine/pricing.js`) is unchanged and does not read the engine: a door quote does not move with
+   this tura (out of scope).
+l) **Hardware names** of the casement catalogue (fan hinges and locks) carry long dashes in the stored product
+   names; the door sheets print them with hyphens, the BOM / lists print the catalogue text as it is.
+m) **Not guarded:** a very small fanlight or side panel is built without a warning (transom 150 gives a 48 mm fan
+   leaf); the default french 1600 opening fan (1498 x 348) is over the top hung hinge limit of the casement picks
+   and is flagged there as for any casement leaf. The engine ignores the panel style (`paneling` flat / raised /
+   beaded: the 3D draws it, the BOM counts the same boards) and the side panel style (29.9 a).
+n) **Text in hints.** The door Assign Materials and hardware hints spell the rules with numbers (2100, the 6 lip,
+   94, 41); they are help text, not used in any calculation, so a Window Settings change does not update them.
+o) **Old `frenchOverlap`.** A stored schema-1 copy is read with `frenchOverlap` as the lip. No door profile was ever
+   stored before this tura, so this only matters for a hand-made copy.
+p) **Cosmetic, sheets** (the numbers are right, the dimension rule passes): on the french elevation the "left panel
+   500" / "right panel 500" labels are wider than their spans; on the fan leaf sheet the D-FTR label is crossed by
+   the opening symbol apex; on the meeting detail "lip 6 + 6" is crossed by the centre line; on a one-handle french
+   leaf sheet the lower "BOLT" label touches the panel edge; on the frame sheet the short "21" / "27" labels sit
+   outside the chain; stacked hinge dimensions H1 / H2 / H3 read like a chain (an older style). Hinge barrels are
+   drawn on the exterior view of an inward door as a symbol.
+q) **PSW** was not read (no clone in the session); `docs/handover/DOORS-PRODUCTION.md` section 3 lists what PSW
+   would have to port.
+
+---
+
 ## 2026-10-07 · TURA PC: CASEMENT BOTTOM RAIL 67, items for Piotr (branch `claude/casement-bottom-rail-67`)
 
 **28.1 What happens at merge.** Every casement window is recalculated again. Your stored workshop profile (leaf

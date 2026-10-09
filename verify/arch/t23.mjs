@@ -211,7 +211,8 @@ const DC = derive(CIRCLE);
   check('circle without a pattern: no tracery record, bars empty, cut list = the two rings only', noPat.components.sash.length === 1 && noPat.arch.bars.length === 0 && noPat.arch.tracery === null);
   expectThrows('a circle that is not fixed → ArchError', () => derive(cas('CO', 800, 800, { casementKind: 'opening', archShape: 'circle' })), /fixed window/);
   const lists = M.lists.buildCutList ? null : null; void lists;
-  check('cut list order carries C-FRAME RING (C-FRR) and C-LEAF RING (C-LFR) rows', M.lists.CUT_LIST_ORDER.some((r) => r.match === 'C-FRAME RING' && r.symbol === 'C-FRR') && M.lists.CUT_LIST_ORDER.some((r) => r.match === 'C-LEAF RING' && r.symbol === 'C-LFR'));
+  // symbols without the C prefix since 08.10.2026 (the engine codes C-FRR / C-LFR-P1 above are unchanged)
+  check('cut list order carries C-FRAME RING (FRR) and C-LEAF RING (LFR) rows', M.lists.CUT_LIST_ORDER.some((r) => r.match === 'C-FRAME RING' && r.symbol === 'FRR') && M.lists.CUT_LIST_ORDER.some((r) => r.match === 'C-LEAF RING' && r.symbol === 'LFR'));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -336,7 +337,7 @@ section('8 — sheets: circle sheets concentric on the engine radii; fixed recta
     check(`${k}: circle sheet (Ø 800), no NaN, ${arcs.length} arcs all concentric on the sheet centre, radii ∈ engine set`, /Ø 800/.test(svg) && !/NaN/.test(svg) && !!c && arcs.length >= 6 && arcs.every((a) => near(a.cx, c[0], 0.01) && near(a.cy, c[1], 0.01) && engineR.some((r) => near(a.r, r, 0.01))), arcs.filter((a) => !engineR.some((r) => near(a.r, r, 0.01))).map((a) => a.r.toFixed(2)).join(' '));
   }
   const rGtext = new RegExp(`R ${f1(rG)}`);
-  check(`elevation / leaf carry the glass + bars (R ${f1(rG)}), frame sheet does not; texts name the rings (${tF} / ${tL} face)`, rGtext.test(S.elevation) && rGtext.test(S.leaf[0].svg) && !rGtext.test(S.frame) && new RegExp(`C-FRAME RING ${tF} face`).test(S.frame) && new RegExp(`C-LEAF RING ${tL} face`).test(S.leaf[0].svg));
+  check(`elevation / leaf carry the glass + bars (R ${f1(rG)}), frame sheet does not; texts name the rings (${tF} / ${tL} face)`, rGtext.test(S.elevation) && rGtext.test(S.leaf[0].svg) && !rGtext.test(S.frame) && new RegExp(`[^-]FRAME RING ${tF} face`).test(S.frame) && new RegExp(`[^-]LEAF RING ${tL} face`).test(S.leaf[0].svg)); // ring names without the C- prefix since 08.10.2026
   const gsvg = S.glass[0].svg;
   const go = dataAttr(gsvg, 'data-arch-origin');
   const garcs = svgArcs(gsvg);

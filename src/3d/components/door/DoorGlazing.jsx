@@ -33,10 +33,17 @@ export default function DoorGlazing({
   barMaterialInt,
   glassFinish = 'clear',
   position = [0, 0, 0],
+  // Doors to production (brief 5.1), optional: the sealed unit thickness from
+  // the glazing (24 standard, 16 slim, 28 triple) and the bar centre lines
+  // in mm from the glass centre (x right, y up) as the engine places them.
+  // Absent: the 24mm unit and the equal split, as before.
+  unitDepthMm = null,
+  barXs = null,
+  barYs = null,
 }) {
   const W = mm(width);
   const H = mm(height);
-  const D = mm(GLASS_UNIT_DEPTH);
+  const D = mm(Number(unitDepthMm) > 0 ? Number(unitDepthMm) : GLASS_UNIT_DEPTH);
   const glassHalf = D / 2;
   const spacerHex = spacerHexMap[spacerColor] || '#C8C8C8';
 
@@ -142,10 +149,15 @@ export default function DoorGlazing({
   // ─── Bar positions ───
   const barItems = useMemo(() => {
     const items = [];
+    if (Array.isArray(barXs) || Array.isArray(barYs)) {
+      (barXs || []).forEach((x) => items.push({ type: 'v', x: mm(x), y: 0 }));
+      (barYs || []).forEach((y) => items.push({ type: 'h', x: 0, y: mm(y) }));
+      return items;
+    }
     for (let i = 1; i <= (vBars||0); i++) items.push({ type:'v', x: -W/2 + (W/(vBars+1))*i, y: 0 });
     for (let i = 1; i <= (hBars||0); i++) items.push({ type:'h', x: 0, y: -H/2 + (H/(hBars+1))*i });
     return items;
-  }, [hBars, vBars, W, H]);
+  }, [hBars, vBars, W, H, barXs, barYs]);
 
   const glassMat = useMemo(() => {
     if (glassFinish === 'frosted' && frostedTexture) {

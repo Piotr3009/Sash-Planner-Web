@@ -87,9 +87,9 @@ export default function CircleFixedDrawing2D({ windowSpec, derived, projectNumbe
   const titleText = `${VIEW_TITLE[view] || 'Drawing'}${projNum ? ` — ${projNum}` : ''} — ${winName}`;
   const subtitleText = `Casement · fixed · circle Ø ${fmt(D)} mm · ${view === 'elevation' ? 'exterior view' : view === 'frame' ? 'frame ring' : 'leaf ring'}`;
   const line3 = view === 'frame'
-    ? `C-FRAME RING ${fmt(p.elements.frameHead.face)} face · R ${fmt(rFrame)} / ${fmt(rFrameIn)} · centre L ${geom.frameRec ? fmt(geom.frameRec.length) : '—'} · ${planText(geom.plans?.frameHead)}`
+    ? `FRAME RING ${fmt(p.elements.frameHead.face)} face · R ${fmt(rFrame)} / ${fmt(rFrameIn)} · centre L ${geom.frameRec ? fmt(geom.frameRec.length) : '—'} · ${planText(geom.plans?.frameHead)}`
     : view === 'leaf'
-      ? `C-LEAF RING ${fmt(p.elements.leafTop.face)} face · R ${fmt(rLeaf)} / ${fmt(rLeafIn)} · centre L ${geom.leafRec ? fmt(geom.leafRec.length) : '—'} · glass R ${fmt(rGlass)} · ${planText(geom.plans?.leafTop)}`
+      ? `LEAF RING ${fmt(p.elements.leafTop.face)} face · R ${fmt(rLeaf)} / ${fmt(rLeafIn)} · centre L ${geom.leafRec ? fmt(geom.leafRec.length) : '—'} · glass R ${fmt(rGlass)} · ${planText(geom.plans?.leafTop)}`
       : `Frame R ${fmt(rFrame)} / ${fmt(rFrameIn)} · leaf R ${fmt(rLeaf)} / ${fmt(rLeafIn)} · glass R ${fmt(rGlass)}${geom.bars.length ? ` · ${geom.bars.length} bars` : ''}`;
   const titleY = oy + D + DM + TITLE_AREA * 0.5;
   // radius labels: each ring labelled at its own angle on the upper half so they never stack

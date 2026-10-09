@@ -24,12 +24,23 @@ const DEFAULT_SETTINGS = {
   hornExtensionDefault: 70,
   glazingAllowanceWidth: 4,
   glazingAllowanceHeight: 4,
+  // Pre-cut allowance over the finished length, every window type (Piotr
+  // 08.10.2026: 10 mm, was a fixed 20; the CNC does not need more). A tenant
+  // setting (Settings > Production), read by the Pre-Cut, the BOM timber
+  // metres and the labels alike.
+  precutAllowance: 10,
   sectionMap: {
     '57x57': '63x63',
     '57x90': '63x95',
     '57x43': '63x63'
   }
 };
+
+/** The pre-cut allowance of a settings object (mm), the default when unset or invalid. */
+export function precutAllowanceOf(settings) {
+  const v = Number(settings?.precutAllowance);
+  return Number.isFinite(v) && v >= 0 ? v : DEFAULT_SETTINGS.precutAllowance;
+}
 
 function settingsWithDefaults(settings) {
   return {
@@ -211,7 +222,7 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg, resolveRa
   const settings = settingsWithDefaults(settingsArg);
   if (!derived) return { sashEngineering: [], boxSapele: [] };
 
-  const MACHINING_ALLOWANCE = 20; // mm added to finished length for pre-cut
+  const MACHINING_ALLOWANCE = precutAllowanceOf(settings); // mm over the finished length (Settings > Production, default 10)
 
   // Sash precut groups by section (mapped via settings.sectionMap to raw)
   const bySection = new Map();
@@ -225,9 +236,16 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg, resolveRa
     }
     return true;
   };
+  // Door timber (D-*, 08.10.2026): the assigned material, else the section
+  // map, else the finished section. Never profileRawForSection: it reads the
+  // second number as a sash face, so 94x57, 100x57 and 180x57 would all fall
+  // into the sash 63x63 stock.
+  const rawFor = (c) => (String(c.elementName || '').startsWith('D-')
+    ? (resolveRaw?.(c.elementName) || settings?.sectionMap?.[c.section] || c.section)
+    : (resolveRaw?.(c.elementName) || settings?.sectionMap?.[c.section] || profileRawForSection(c.section) || c.section));
   derived.components.sash.forEach((c) => {
     if (pushBlanks(c)) return;
-    const raw = resolveRaw?.(c.elementName) || settings?.sectionMap?.[c.section] || profileRawForSection(c.section) || c.section;
+    const raw = rawFor(c);
     if (!raw) return;
     if (!bySection.has(raw)) bySection.set(raw, []);
     bySection.get(raw).push({
@@ -254,8 +272,10 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg, resolveRa
     // Casement frame members (C-*): same raw-keyed list as the rest of the
     // casement timber, so one material assigned across frame + mullions +
     // leaves lands in ONE group and the optimizer cuts it from the same bars.
-    if (c.elementName?.startsWith('C-')) {
-      const raw = resolveRaw?.(c.elementName) || settings?.sectionMap?.[c.section] || profileRawForSection(c.section) || c.section;
+    // Door frame members (D-*, owner box item 17, 08.10.2026) the same way:
+    // they take their assigned material and merge with every door member of it.
+    if (c.elementName?.startsWith('C-') || c.elementName?.startsWith('D-')) {
+      const raw = rawFor(c);
       if (!bySection.has(raw)) bySection.set(raw, []);
       bySection.get(raw).push({
         elementName: c.elementName,
@@ -313,7 +333,8 @@ export function buildGlassListForWindow(derived, windowSpec) {
 
   // Non-double-hung sources (casement, triple sections) supply units directly
   if (Array.isArray(derived.customGlassUnits) && derived.customGlassUnits.length > 0) {
-    const barType = windowSpec?.casement?.barType === 'georgian' ? 'georgian' : 'astragal';
+    const barSrc = derived.category === 'door' ? windowSpec?.door : windowSpec?.casement;
+    const barType = barSrc?.barType === 'georgian' ? 'georgian' : 'astragal';
     return derived.customGlassUnits.map((u) => {
       // Casement frosted scope lives in ONE place: casementPaneFinish
       // ('bottom' = main lights only, 'both' = every pane). Screen drawings
@@ -328,7 +349,8 @@ export function buildGlassListForWindow(derived, windowSpec) {
       // Bars belong on the ROW (Piotr 02.08, PDF audit item 5): the screen used
       // to recompute them locally while the PDF printed nothing — one engine
       // field now feeds the panel text, the PDF column AND the PDF sketch.
-      if (derived.category === 'casement' && u.bars) {
+      // Doors (08.10.2026): the same per-unit bars from the door engine.
+      if ((derived.category === 'casement' || derived.category === 'door') && u.bars) {
         // the unit's OWN bars from the engine grid (casementBarGrid.js): a
         // light under a fan carries only the window lines that cross it
         const { v, h } = u.bars;
@@ -531,7 +553,33 @@ export function buildHardwareList(windowSpec, derived = null) {
     }
     return list;
   }
-  if (cat !== 'sash') return []; // door hardware comes later
+  if (cat === 'door') {
+    // Doors (08.10.2026, doors to production): the engine's door hardware
+    // (doorHardware.js). Every count is an Assign Materials row (d_*), so each
+    // line is `enginePart` (detail only: handing, kit variants, FGTE band, the
+    // leaf weight for the hinges); the window's slot product shows as the line
+    // name (HARDWARE_TO_SLOT_KEY). The opening fanlight adds the casement hinge
+    // and lock lines and a casement handle (a client product), as a casement
+    // opener does. No trickle vent line (not counted on doors, BLOCKERS).
+    const dh = derived?.door?.hardware;
+    if (!dh) return [];
+    const list = (dh.detail || []).map((l) => ({ item: l.item, detail: l.detail, quantity: l.quantity, enginePart: true, partId: l.partId }));
+    const fan = dh.fan;
+    if (fan) {
+      const slotName = (id) => CASEMENT_HINGE_SLOTS.find((x) => x.id === id)?.name || id;
+      Object.entries(fan.hingeSummary || {}).forEach(([slotId, e]) => {
+        list.push({ item: slotName(slotId), detail: `pairs · opening fanlight${e.overLimit ? ' · ! verify limits' : ''}`, quantity: e.pairs, enginePart: true });
+      });
+      Object.entries(fan.lockSummary || {}).forEach(([slotId, e]) => {
+        const nm = CASEMENT_LOCK_SLOTS.find((r) => r.id === slotId)?.name || slotId;
+        list.push({ item: nm, detail: `${e.unhanded} top (unhanded) · opening fanlight${e.overLimit ? ' · ! verify size' : ''}`, quantity: e.count, enginePart: true });
+      });
+      const fanOpeners = Object.values(fan.hingeSummary || {}).reduce((a, e) => a + e.pairs, 0);
+      if (fanOpeners > 0) list.push({ item: 'Casement handle', detail: 'per opening fanlight', quantity: fanOpeners });
+    }
+    return list;
+  }
+  if (cat !== 'sash') return [];
   const finish = windowSpec?.hardware?.finish || 'brass';
   const isPas24 = windowSpec?.hardware?.catches === 'PAS24';
   const openingType = windowSpec?.sash?.openingType || 'both';
@@ -588,12 +636,15 @@ export const MIRROR_PAIRS = {
   'STILES TOP (L)':           { right: 'STILES TOP (R)',           symbol: 'ST-L/R',  label: 'Stiles Top (pair)' },
   'STILES BOTTOM SASH (L)':   { right: 'STILES BOTTOM SASH (R)',   symbol: 'SBS-L/R', label: 'Stiles Bottom Sash (pair)' },
   // ── Casement (Piotr 02.08.2026, PDF audit item 0 — grouping never knew C-*) ──
-  'C-FRAME JAMB (L)':         { right: 'C-FRAME JAMB (R)',         symbol: 'C-J-L/R', label: 'Frame Jambs (pair)' },
-  'C-STILE (L)':              { right: 'C-STILE (R)',              symbol: 'C-ST-L/R', label: 'Leaf Stiles (pair)' },
+  // Symbols carry no C- / D- prefix (Piotr 08.10.2026): the pack is one window type, the prefix said nothing.
+  'C-FRAME JAMB (L)':         { right: 'C-FRAME JAMB (R)',         symbol: 'J-L/R',   label: 'Frame Jambs (pair)' },
+  'C-STILE (L)':              { right: 'C-STILE (R)',              symbol: 'ST-L/R',  label: 'Leaf Stiles (pair)' },
   // ── Doors (Piotr 09.08 — the D-* vocabulary never reached the grouping,
   //    exactly the casement gap repeated; parts fell into the '?' safety net) ──
-  'D-FRAME JAMB (L)':         { right: 'D-FRAME JAMB (R)',         symbol: 'D-J-L/R', label: 'Door Frame Jambs (pair)' },
-  'D-STILE (L)':              { right: 'D-STILE (R)',              symbol: 'D-ST-L/R', label: 'Door Leaf Stiles (pair)' },
+  'D-FRAME JAMB (L)':         { right: 'D-FRAME JAMB (R)',         symbol: 'J-L/R',   label: 'Door Frame Jambs (pair)' },
+  'D-STILE (L)':              { right: 'D-STILE (R)',              symbol: 'ST-L/R',  label: 'Door Leaf Stiles (pair)' },
+  // Opening fanlight leaf (08.10.2026): a casement leaf in the transom zone
+  'D-FAN STILE (L)':          { right: 'D-FAN STILE (R)',          symbol: 'FS-L/R',  label: 'Fan Leaf Stiles (pair)' },
 };
 
 /**
@@ -607,7 +658,7 @@ export const CUT_LIST_ORDER = [
   // ── BOX ──
   { match: 'HEAD',                      symbol: 'HEAD',    label: 'Head' },
   // Arched sash (arched-windows-v3 Block 1 D): curved box head, length = ring centre-line arc
-  { match: 'S-ARCH HEAD',               symbol: 'S-AH',    label: 'Arched Box Head' },
+  { match: 'S-ARCH HEAD',               symbol: 'AH',    label: 'Arched Box Head' },
   { match: 'JAMB LEFT',                 symbol: 'JB-L/R',  label: 'Jambs (pair)',                isPair: true },
   { match: 'INTERNAL JAMB LINER (L)',   symbol: 'IL-L/R',  label: 'Internal Jamb Liner (pair)',  isPair: true },
   { match: 'EXTERNAL JAMB LINER (L)',   symbol: 'EL-L/R',  label: 'External Jamb Liner (pair)',  isPair: true },
@@ -619,41 +670,47 @@ export const CUT_LIST_ORDER = [
   { match: 'STILES TOP (L)',            symbol: 'ST-L/R',  label: 'Stiles Top (pair)',           isPair: true },
   { match: 'STILES BOTTOM SASH (L)',    symbol: 'SBS-L/R', label: 'Stiles Bottom Sash (pair)',   isPair: true },
   { match: 'TOP RAIL',                  symbol: 'TR',      label: 'Top Rail' },
-  { match: 'S-ARCH TOP RAIL',           symbol: 'S-ATR',   label: 'Arched Top Rail' },
+  { match: 'S-ARCH TOP RAIL',           symbol: 'ATR',   label: 'Arched Top Rail' },
   { match: 'TOP MEET RAIL',             symbol: 'TMR',     label: 'Top Meet Rail' },
   { match: 'BOTTOM MEET RAIL',          symbol: 'BMR',     label: 'Bottom Meet Rail' },
   { match: 'BOTTOM RAIL',               symbol: 'BR',      label: 'Bottom Rail' },
   // ── CASEMENT (frame first, then dividers, then leaves) ──
-  { match: 'C-FRAME HEAD',              symbol: 'C-FH',    label: 'Frame Head' },
+  { match: 'C-FRAME HEAD',              symbol: 'FH',    label: 'Frame Head' },
   // Arched casement (arched-casement-v2): curved head / leaf top rail, length = arc length at the member centre line
-  { match: 'C-ARCH HEAD',               symbol: 'C-AH',    label: 'Arched Frame Head' },
+  { match: 'C-ARCH HEAD',               symbol: 'AH',    label: 'Arched Frame Head' },
   // v3 Block 3: circle fixed window — the frame and the leaf are full rings
-  { match: 'C-FRAME RING',              symbol: 'C-FRR',   label: 'Frame Ring (circle)' },
-  { match: 'C-FRAME JAMB (L)',          symbol: 'C-J-L/R', label: 'Frame Jambs (pair)',          isPair: true },
-  { match: 'C-FRAME CILL',              symbol: 'C-CILL',  label: 'Frame Cill' },
-  { match: 'C-MULLION',                 symbol: 'C-M',     label: 'Mullion' },
-  { match: 'C-TRANSOM',                 symbol: 'C-T',     label: 'Transom' },
-  { match: 'C-STILE (L)',               symbol: 'C-ST-L/R', label: 'Leaf Stiles (pair)',         isPair: true },
-  { match: 'C-TOP RAIL',                symbol: 'C-TR',    label: 'Leaf Top Rail' },
-  { match: 'C-ARCH TOP RAIL',           symbol: 'C-ATR',   label: 'Arched Leaf Top Rail' },
-  { match: 'C-LEAF RING',               symbol: 'C-LFR',   label: 'Leaf Ring (circle)' },
-  { match: 'C-BOTTOM RAIL',             symbol: 'C-BR',    label: 'Leaf Bottom Rail' },
+  { match: 'C-FRAME RING',              symbol: 'FRR',   label: 'Frame Ring (circle)' },
+  { match: 'C-FRAME JAMB (L)',          symbol: 'J-L/R', label: 'Frame Jambs (pair)',          isPair: true },
+  { match: 'C-FRAME CILL',              symbol: 'CILL',  label: 'Frame Cill' },
+  { match: 'C-MULLION',                 symbol: 'M',     label: 'Mullion' },
+  { match: 'C-TRANSOM',                 symbol: 'T',     label: 'Transom' },
+  { match: 'C-STILE (L)',               symbol: 'ST-L/R', label: 'Leaf Stiles (pair)',         isPair: true },
+  { match: 'C-TOP RAIL',                symbol: 'TR',    label: 'Leaf Top Rail' },
+  { match: 'C-ARCH TOP RAIL',           symbol: 'ATR',   label: 'Arched Leaf Top Rail' },
+  { match: 'C-LEAF RING',               symbol: 'LFR',   label: 'Leaf Ring (circle)' },
+  { match: 'C-BOTTOM RAIL',             symbol: 'BR',    label: 'Leaf Bottom Rail' },
   // v3 0.4: timber tracery board over the arched unit (one board, one side; section = thickness x blank W, length = blank H)
-  { match: 'C-TRACERY',                 symbol: 'C-TRY',   label: 'Tracery Board' },
+  { match: 'C-TRACERY',                 symbol: 'TRY',   label: 'Tracery Board' },
   // ── DOOR (frame first, then dividers, then leaves, then side panels).
   //    French leaves share the single-leaf element names: identical lengths
   //    consolidate into one row (qty summed), pairs merge per window. ──
-  { match: 'D-FRAME HEAD',              symbol: 'D-FH',    label: 'Door Frame Head' },
-  { match: 'D-FRAME JAMB (L)',          symbol: 'D-J-L/R', label: 'Door Frame Jambs (pair)',    isPair: true },
-  { match: 'D-FRAME CILL',              symbol: 'D-CILL',  label: 'Door Frame Cill' },
-  { match: 'D-COUPLING POST',           symbol: 'D-JC',    label: 'Door Coupling Post' },
-  { match: 'D-TRANSOM',                 symbol: 'D-T',     label: 'Door Transom Rail' },
-  { match: 'D-STILE (L)',               symbol: 'D-ST-L/R', label: 'Door Leaf Stiles (pair)',   isPair: true },
-  { match: 'D-TOP RAIL',                symbol: 'D-TR',    label: 'Door Leaf Top Rail' },
-  { match: 'D-BOTTOM RAIL',             symbol: 'D-BR',    label: 'Door Leaf Bottom Rail' },
-  { match: 'D-SIDE STILE',              symbol: 'D-SP-ST', label: 'Side Panel Stiles' },
-  { match: 'D-SIDE TOP RAIL',           symbol: 'D-SP-TR', label: 'Side Panel Top Rail' },
-  { match: 'D-SIDE BOTTOM RAIL',        symbol: 'D-SP-BR', label: 'Side Panel Bottom Rail' },
+  { match: 'D-FRAME HEAD',              symbol: 'FH',    label: 'Door Frame Head' },
+  { match: 'D-FRAME JAMB (L)',          symbol: 'J-L/R', label: 'Door Frame Jambs (pair)',    isPair: true },
+  { match: 'D-FRAME CILL',              symbol: 'CILL',  label: 'Door Frame Cill' },
+  { match: 'D-FRAME CILL (INWARD)',     symbol: 'CILL-IN', label: 'Door Frame Cill (inward)' },
+  { match: 'D-COUPLING POST',           symbol: 'CP',    label: 'Door Coupling Post' },
+  { match: 'D-TRANSOM',                 symbol: 'T',     label: 'Door Transom Rail' },
+  { match: 'D-STILE (L)',               symbol: 'ST-L/R', label: 'Door Leaf Stiles (pair)',   isPair: true },
+  { match: 'D-MEETING STILE',           symbol: 'MS',    label: 'Door Meeting Stile' },
+  { match: 'D-TOP RAIL',                symbol: 'TR',    label: 'Door Leaf Top Rail' },
+  { match: 'D-MID RAIL',                symbol: 'MR',    label: 'Door Leaf Mid Rail' },
+  { match: 'D-BOTTOM RAIL',             symbol: 'BR',    label: 'Door Leaf Bottom Rail' },
+  { match: 'D-SIDE STILE',              symbol: 'SP-ST', label: 'Side Panel Stiles' },
+  { match: 'D-SIDE TOP RAIL',           symbol: 'SP-TR', label: 'Side Panel Top Rail' },
+  { match: 'D-SIDE BOTTOM RAIL',        symbol: 'SP-BR', label: 'Side Panel Bottom Rail' },
+  { match: 'D-FAN STILE (L)',           symbol: 'FS-L/R', label: 'Fan Leaf Stiles (pair)',    isPair: true },
+  { match: 'D-FAN TOP RAIL',            symbol: 'FTR',   label: 'Fan Leaf Top Rail' },
+  { match: 'D-FAN BOTTOM RAIL',         symbol: 'FBR',   label: 'Fan Leaf Bottom Rail' },
 ];
 
 /**
@@ -679,27 +736,34 @@ export function buildGroupedCutList(rawCutList) {
   // Consolidate rows of the SAME length within a group into one row:
   // sum the quantities and collect the contributing window names.
   // Rows flagged mismatch are never merged (kept separate as error signals).
-  const consolidate = (rows) => {
+  // Door groups (D-*, 08.10.2026) keep the engine notes (hinge / meeting /
+  // active / passive, the mid rail axis): rows still merge by length, the
+  // distinct notes are appended. Other groups are unchanged (no notes key).
+  const consolidate = (rows, keepNotes = false) => {
     const byLen = new Map();
     const passthrough = [];
     rows.forEach((r) => {
       if (r.mismatch) { passthrough.push(r); return; }
       const k = r.length;
       if (!byLen.has(k)) {
-        byLen.set(k, { length: r.length, qty: 0, windows: [], projectNum: r.projectNum, section: r.section });
+        byLen.set(k, { length: r.length, qty: 0, windows: [], projectNum: r.projectNum, section: r.section, notes: [] });
       }
       const agg = byLen.get(k);
       agg.qty += r.qty;
       if (r.window && !agg.windows.includes(r.window)) agg.windows.push(r.window);
+      (r.notes || []).forEach((n) => { if (n && !agg.notes.includes(n)) agg.notes.push(n); });
     });
     const merged = Array.from(byLen.values()).map((a) => ({
       length: a.length, qty: a.qty,
       window: a.windows.join(', '),   // listed windows, e.g. "W2, r5, w4"
       windowCount: a.windows.length,
       projectNum: a.projectNum, section: a.section,
+      ...(keepNotes ? { notes: a.notes.join(' / ') } : {}),
     }));
-    return [...merged, ...passthrough];
+    return [...merged, ...(keepNotes ? passthrough.map((r) => ({ ...r, notes: (r.notes || []).filter(Boolean).join(' / ') })) : passthrough)];
   };
+  const isDoorGroup = (name) => String(name || '').startsWith('D-');
+  const notesOf = (...rs) => rs.map((r) => r?.notes).filter(Boolean);
 
   // Bucket rows by engine element name.
   const byElement = new Map();
@@ -729,12 +793,14 @@ export function buildGroupedCutList(rawCutList) {
           rows.push({
             window: win(L), projectNum: proj(L), length: L.length,
             qty: (L.quantity || 1) + (R.quantity || 1), section: L.section,
+            ...(isDoorGroup(def.match) ? { notes: notesOf(L, R) } : {}),
           });
         } else {
           // No equal-length partner in same window → keep L alone, flag mismatch.
           rows.push({
             window: win(L), projectNum: proj(L), length: L.length,
             qty: L.quantity || 1, section: L.section, mismatch: true,
+            ...(isDoorGroup(def.match) ? { notes: notesOf(L) } : {}),
           });
         }
       });
@@ -743,21 +809,23 @@ export function buildGroupedCutList(rawCutList) {
         rows.push({
           window: win(R), projectNum: proj(R), length: R.length,
           qty: R.quantity || 1, section: R.section, mismatch: true,
+          ...(isDoorGroup(def.match) ? { notes: notesOf(R) } : {}),
         });
       });
       if (rows.length) {
-        const consolidated = consolidate(rows);
+        const consolidated = consolidate(rows, isDoorGroup(def.match));
         consolidated.sort((a, b) => (b.length - a.length) || (a.window || '').localeCompare(b.window || ''));
-        groups.push({ symbol: def.symbol, label: def.label, mirror: true, section: consolidated[0].section || '', rows: consolidated });
+        groups.push({ symbol: def.symbol, label: def.label, element: def.match, mirror: true, section: consolidated[0].section || '', rows: consolidated });
       }
     } else {
       if (leftRows.length) {
         const rows = leftRows.map((r) => ({
           window: win(r), projectNum: proj(r), length: r.length, qty: r.quantity || 1, section: r.section,
+          ...(isDoorGroup(def.match) ? { notes: notesOf(r) } : {}),
         }));
-        const consolidated = consolidate(rows);
+        const consolidated = consolidate(rows, isDoorGroup(def.match));
         consolidated.sort((a, b) => (b.length - a.length) || (a.window || '').localeCompare(b.window || ''));
-        groups.push({ symbol: def.symbol, label: def.label, mirror: false, section: consolidated[0].section || '', rows: consolidated });
+        groups.push({ symbol: def.symbol, label: def.label, element: def.match, mirror: false, section: consolidated[0].section || '', rows: consolidated });
       }
     }
   });
@@ -771,7 +839,7 @@ export function buildGroupedCutList(rawCutList) {
     }));
     const consolidated = consolidate(rows);
     consolidated.sort((a, b) => (b.length - a.length) || (a.window || '').localeCompare(b.window || ''));
-    groups.push({ symbol: '?', label: name, mirror: false, section: consolidated[0].section || '', rows: consolidated });
+    groups.push({ symbol: '?', label: name, element: name, mirror: false, section: consolidated[0].section || '', rows: consolidated });
   });
 
   return groups;

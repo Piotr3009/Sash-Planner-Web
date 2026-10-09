@@ -687,9 +687,15 @@ function ProductionTab() {
     Number.isFinite(Number(settings?.weightMarginPct)) ? Number(settings.weightMarginPct) : 5
   );
   const [restrictor, setRestrictor] = useState(settings?.childRestrictorDefault ?? true);
+  // Pre-cut allowance (Piotr 08.10.2026): 10 mm over the finished length, every window type; was a fixed 20.
+  const [allowance, setAllowance] = useState(
+    Number.isFinite(Number(settings?.precutAllowance)) ? Number(settings.precutAllowance) : 10
+  );
+  const allowanceValue = () => { const v = Number(allowance); return Number.isFinite(v) && v >= 0 ? v : 10; };
   const save = () => updateSettings({
     weightMarginPct: Number.isFinite(Number(margin)) ? Number(margin) : 5,
     childRestrictorDefault: !!restrictor,
+    precutAllowance: allowanceValue(),
   });
   return (
     <div className="max-w-[560px]">
@@ -709,9 +715,23 @@ function ProductionTab() {
           </div>
         </div>
         <div className="border-t border-surface-500 pt-5">
+          <div className="text-[15px] font-semibold text-ink-50 mb-1">Pre-cut allowance</div>
+          <div className="text-xs text-ink-400 mb-2">
+            Millimetres added to the finished length of every pre-cut piece (sash, casement, doors).
+            Drives the Pre-Cut bars, the timber metres in the purchase list and the labels. Default 10.
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="number" min="0" max="50" step="1" value={allowance}
+              onChange={(e) => setAllowance(e.target.value)}
+              onBlur={save}
+              className="input w-[90px] text-[13px] text-center" />
+            <span className="text-sm text-ink-300">mm</span>
+          </div>
+        </div>
+        <div className="border-t border-surface-500 pt-5">
           <label className="flex items-start gap-3 cursor-pointer">
             <input type="checkbox" checked={restrictor}
-              onChange={(e) => { setRestrictor(e.target.checked); updateSettings({ childRestrictorDefault: e.target.checked, weightMarginPct: Number.isFinite(Number(margin)) ? Number(margin) : 5 }); }}
+              onChange={(e) => { setRestrictor(e.target.checked); updateSettings({ childRestrictorDefault: e.target.checked, weightMarginPct: Number.isFinite(Number(margin)) ? Number(margin) : 5, precutAllowance: allowanceValue() }); }}
               className="accent-accent-500 mt-0.5" />
             <span>
               <span className="text-[15px] font-semibold text-ink-50 block">Child restrictor by default</span>

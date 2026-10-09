@@ -1,225 +1,279 @@
 /**
  * DoorFrameDetail2D.jsx
  *
- * The door FRAME as one timber assembly — head, jambs, cill/threshold and the
- * side-panel mullions, because a side panel sits in the SAME frame and is cut
- * from the same stock (Piotr 05.08). Exterior view, mm coordinates.
+ * The door FRAME as one timber assembly: head, jambs, cill or threshold, the
+ * coupling posts of the side panels and the fanlight transom, because a side
+ * panel sits in the SAME frame and is cut from the same stock (Piotr 05.08).
+ * Exterior view, mm coordinates, the casement drawing system (overall width at
+ * the TOP, heights on the RIGHT, member chains along the bottom and on the
+ * left, Piotr 06.09).
  *
- * Carries the member dimensions the elevation deliberately no longer shows:
- * section faces, cut lengths and the D-* codes the cut list uses. The leaf is
- * drawn only as a dashed ghost so the joiner can see where it lands.
+ * Carries what the elevation does not: member faces and sections, cut lengths
+ * and the D-* codes of the cut list (derived.components.box), the layer chain
+ * from the frame edge to the leaf (land, gap), the rebate, the frame depth and
+ * the cill. Every number comes from derived.door (members, zones, leaves) or
+ * the door profile (cill visible, inward cill faces). The land line is the
+ * rebate step seen from outside; the dashed line one rebate further in is the
+ * member's inner edge (68 face). On an inward door the rebate is on the
+ * interior: the door frame shows its full face and the land line is dashed.
+ * The coupling post is ONE member (2 x the jamb face) with two rebates. The
+ * leaves are dashed ghosts so the joiner sees where they land.
  */
 import { useMemo } from 'react';
-import { getDoorProfile } from '../../engine/profile.js';
-import { DimH, DimV, DimChainH, TitleBlock, Label } from './drawingUtils.jsx';
-import { COLORS, STROKES } from './drawingTheme.js';
+import { DimH, DimV, DimChainH, DimChainV, TitleBlock, Label } from './drawingUtils.jsx';
+import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
+import { displayCode } from '../../engine/partSymbols.js';
+import { NS, num, fmt, safely, NoSheet, doorProfileParts, doorRecords, recordText, thresholdText } from './doorSheetParts.jsx';
 
-const NS = { vectorEffect: 'non-scaling-stroke' };
-
-function fmt(n) {
-  const r = Math.round(n * 2) / 2;
-  return Number.isInteger(r) ? r.toString() : r.toFixed(1);
+function buildFrame(windowSpec, derived) {
+  const dr = derived?.door;
+  const z = dr?.zones;
+  const m = dr?.members;
+  if (!windowSpec || !dr || !z || !m) return null;
+  const W = num(z.totalWidth);
+  const H = num(z.totalHeight);
+  if (!(W > 0 && H > 0)) return null;
+  const pp = doorProfileParts();
+  const inward = !!dr.inward;
+  const tz = z.transom && num(z.transom.h, 0) > 0 ? z.transom : null;
+  const frames = (z.frames || []).length ? z.frames : [{ x: 0, w: W, kind: 'door' }];
+  // the cill member face (68 outward, 40 inward) and the part of it seen from outside
+  const bottomFace = dr.hasTimberCill ? num(m.frameCill, 0) : 0;
+  const bottomVis = dr.hasTimberCill ? (inward ? pp.cillInward.faceExternal : pp.cillVisible) : 0;
+  // The land rect (the rebate step) and the face rect (the member's inner
+  // edge) of each frame opening. With a fanlight the openings split at the
+  // transom band, as the elevation draws them: the fan zone is rebated on the
+  // exterior in every frame (the fan leaf or pane), the door zone starts at
+  // the band and an inward door shows its frame face there too (the rail laps
+  // the leaf top like the head, by the jamb face less the land).
+  const zone = (f, inwardDoor, yLand, yFace, landBottom, faceBottom) => ({
+    f, inwardDoor,
+    land: { x: f.x + m.land, y: yLand, w: f.w - 2 * m.land, h: landBottom - yLand },
+    face: { x: f.x + m.frameJamb, y: yFace, w: f.w - 2 * m.frameJamb, h: faceBottom - yFace },
+  });
+  const rects = [];
+  frames.forEach((f) => {
+    const inwardDoor = inward && f.kind === 'door';
+    if (tz?.band) {
+      const bandBottom = tz.band.y + tz.band.h;
+      rects.push(zone(f, false, m.land, m.frameHead, tz.band.y, tz.band.y));
+      rects.push(zone(f, inwardDoor, bandBottom, bandBottom + (m.frameJamb - m.land), H - bottomVis, H - bottomFace));
+    } else {
+      rects.push(zone(f, inwardDoor, m.land, m.frameHead, H - bottomVis, H - bottomFace));
+    }
+  });
+  const recs = doorRecords(derived);
+  const by = (c) => recs.find((r) => r.code === c) || null;
+  const leaves = [...(dr.leaves || [])].sort((a, b) => a.x - b.x);
+  return {
+    dr, z, m, pp, W, H, inward, tz, frames, rects, bottomFace, bottomVis, leaves,
+    head: by('D-H'), jambL: by('D-J/L'), jambR: by('D-J/R'), cill: by('D-CILL'), post: by('D-JC'), transom: by('D-T'),
+  };
 }
 
 export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber }) {
-  const geom = useMemo(() => {
-    const dr = derived?.door;
-    if (!windowSpec || !dr) return null;
-    const fw = Number(windowSpec.frame?.width ?? 0);
-    const fh = Number(windowSpec.frame?.height ?? 0);
-    if (!fw || !fh) return null;
+  const geom = useMemo(() => safely(() => buildFrame(windowSpec, derived)), [windowSpec, derived]);
+  if (!geom) return <NoSheet />;
 
-    const p = getDoorProfile();
-    const g = p.geometry;
-    const els = p.elements;
-    const d = windowSpec.door || {};
-    const sp = d.sidePanels || {};
-    const mode = sp.mode || 'none';
+  const { dr, z, m, pp, W, H, inward, tz, rects, bottomFace, bottomVis, leaves } = geom;
 
-    const leftW = (mode === 'left' || mode === 'both') ? (Number(sp.leftWidth) || 0) : 0;
-    const rightW = (mode === 'right' || mode === 'both') ? (Number(sp.rightWidth) || 0) : 0;
-    const mullion = els.mullion.face;
-    const inward = !!dr.inward;
-
-    // Cut lengths straight from the engine parts, so the sheet can never
-    // disagree with the cut list.
-    const parts = [].concat(...Object.values(derived.components || {}).filter(Array.isArray));
-    const byCode = (c) => parts.find((x) => x.code === c);
-
-    const z = dr.zones || {};
-    const totalH = Number(z.totalHeight) || fh;
-    const totalWidth = Number(z.totalWidth) || fw;
-    return {
-      fw, fh, totalH, totalWidth, dy: totalH - fh, g, els, inward, mullion, leftW, rightW, mode,
-      zones: z, leaves: dr.leaves || [], panelLeaves: dr.panelLeaves || [],
-      frameFace: els.frameHead.face,
-      cillFace: inward ? p.cillInward.faceInternal : els.frameCill.face,
-      hasTimberCill: !!dr.hasTimberCill,
-      threshold: dr.threshold || 'standard',
-      frameDepth: p.frameDepth,
-      head: byCode('D-H'), jambL: byCode('D-J/L'), cill: byCode('D-CILL'),
-      couplingP: byCode('D-JC'), transomP: byCode('D-T'),
-      leafY: (totalH - fh) + g.land + g.gap,
-      leafH: dr.leafH,
-      overlap: inward ? els.frameHead.face - g.land - g.gap : 0,
-    };
-  }, [windowSpec, derived]);
-
-  if (!geom) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
-
-  const { fh, g, dy } = geom;
-  const fw = geom.totalWidth;                 // whole assembly: panels + door
-  const frameH = geom.totalH;                 // full frame incl. fan zone
-  const layoutSc = Math.max(fw, frameH) / 500;
-  const DM = 80 * layoutSc;
-  const M = 90 * layoutSc;
-  const TITLE_AREA = 55 * layoutSc;
-  const totalW = M + fw + DM * 2 + M;
-  const totalH = M + frameH + DM + TITLE_AREA;
-  const ox = M, oy = M;
+  // ── Layout ──
+  const layoutSc = Math.max(W, H) / 500;
+  const ML = 104 * layoutSc;
+  const MR = 90 * layoutSc;
+  const MT = 70 * layoutSc;
+  const svgW = ML + W + MR;
+  const ts = svgW / VIEWBOX_REF;
+  const ox = ML, oy = MT;
   const X = (x) => ox + x;
   const Y = (y) => oy + y;
-  const sw = (n) => n * layoutSc;
-
-  const bottomLand = geom.hasTimberCill ? g.cillVisible : 0;
-  const openTop = g.land;
-  const openBottom = frameH - bottomLand;
-
-  // Door opening x-range straight from the ENGINE zones — this sheet does
-  // no width math of its own (v1 recomputed it and could drift).
-  const doorX = geom.zones.doorX ?? 0;
-  const doorRight = doorX + (geom.zones.doorW ?? fw);
+  const dash = `${5 * ts},${3 * ts}`;
+  const ghostDash = `${8 * ts},${5 * ts}`;
+  const axisDash = `${8 * ts},${3 * ts},${2 * ts},${3 * ts}`;
+  const codeFs = SIZES.code * ts;
 
   const winName = windowSpec?.name || 'Door';
   const projNum = projectNumber || '';
-  // Kept short so it cannot overflow the viewBox (Piotr 09.08): codes only,
-  // no section / swing / view repetition — those live on the drawing.
   const codes = [
-    geom.head && `${geom.head.code} ${fmt(geom.head.length)}`,
-    geom.jambL && `${geom.jambL.code.replace('/L', '')} ×2 ${fmt(geom.jambL.length)}`,
-    geom.cill ? `${geom.cill.code} ${fmt(geom.cill.length)}` : `${geom.threshold} threshold`,
-    geom.couplingP && `${geom.couplingP.code} ×${geom.couplingP.quantity || 1} ${fmt(geom.couplingP.length)}`,
-    geom.transomP && `${geom.transomP.code} ${fmt(geom.transomP.length)}`,
+    geom.head && `${displayCode(geom.head.code)} ${fmt(geom.head.length)}`,
+    geom.jambL && `J ×2 ${fmt(geom.jambL.length)}`,
+    geom.cill ? `${displayCode(geom.cill.code)} ${fmt(geom.cill.length)}` : `${dr.threshold} threshold`,
+    geom.post && `${displayCode(geom.post.code)}${num(geom.post.quantity, 1) > 1 ? ` ×${geom.post.quantity}` : ''} ${fmt(geom.post.length)}`,
+    geom.transom && `${displayCode(geom.transom.code)} ${fmt(geom.transom.length)}`,
   ].filter(Boolean).join(' · ');
+  const notes = [
+    `Section: frame ${fmt(m.frameJamb)}×${fmt(dr.frameDepth)}, land ${fmt(m.land)} + rebate ${fmt(m.rebate)}; leaf ${fmt(dr.leafDepth)} deep in the rebate, gap ${fmt(m.gap)}`,
+    inward ? `Inward: rebate on the interior; from outside the frame face ${fmt(m.frameJamb)} laps ${fmt(m.frameJamb - m.land - m.gap)} over the leaf` : '',
+    `Threshold: ${thresholdText(dr, pp)}`,
+    tz ? `Transom rail ${fmt(tz.railH)}: band ${fmt(tz.band?.h)} seen between fanlight and door leaves (rail lap: drawing check)` : '',
+  ].filter(Boolean);
+
+  // ── Bottom annotation rows and the title ──
+  const rowY = (k) => oy + H + (24 + 26 * k) * ts;
+  const nRows = 2 + (geom.frames.length > 1 ? 1 : 0);
+  const bottomAnn = (24 + 26 * nRows) * ts;
+  const TITLE = (44 + 18 * notes.length) * ts;
+  const svgH = MT + H + bottomAnn + TITLE;
+  const titleY = oy + H + bottomAnn + 16 * ts;
+
+  // Layer chain at the door: frame edge · land · gap · leaves · gap · land · frame edge
+  const doorX = num(z.doorX, 0);
+  const doorR = doorX + num(z.doorW, W);
+  const lL = leaves[0];
+  const lR = leaves[leaves.length - 1];
+  // (the right gap and land share one segment so the short gap label never lands on the land label)
+  const layerCuts = lL && lR
+    ? [doorX, doorX + m.land, lL.x, lR.x + lR.w, doorR]
+    : [doorX, doorX + m.land, doorR - m.land, doorR];
+  const layerLabels = lL && lR
+    ? [fmt(m.land), fmt(lL.x - doorX - m.land), `${leaves.length > 1 ? 'leaves' : 'leaf'} ${fmt(lR.x + lR.w - lL.x)}`,
+      `${fmt(doorR - m.land - (lR.x + lR.w))} + ${fmt(m.land)}`]
+    : undefined;
+  // Member chain along the bottom: jamb face · (coupling posts) · jamb face
+  const memberCuts = [0, m.frameJamb];
+  (z.posts || []).forEach((p) => memberCuts.push(p.x, p.x + p.w));
+  memberCuts.push(W - m.frameJamb, W);
+  // Vertical member chain on the left: land · rebate · (transom band) · cill
+  const vCuts = [0, m.land, m.frameHead];
+  if (tz?.band) vCuts.push(tz.band.y, tz.band.y + tz.band.h);
+  if (dr.hasTimberCill) {
+    if (!inward && bottomFace > bottomVis) vCuts.push(H - bottomFace);
+    vCuts.push(H - bottomVis);
+  }
+  vCuts.push(H);
+  const vLabels = vCuts.slice(0, -1).map((c, i) => fmt(vCuts[i + 1] - c));
+
+  const rightX = (k) => ox + W + (22 + 26 * k) * ts;
+  const visRect = (r) => (r.inwardDoor ? r.face : r.land);
+  const hidRect = (r) => (r.inwardDoor ? r.land : r.face);
+  const ok = (r) => r.w > 0 && r.h > 0;
+  const midDoorY = num(lL?.y, 0) + num(lL?.h, H) / 2;
+
+  const cillLabel = dr.hasTimberCill
+    ? [recordText(geom.cill), inward
+      ? `${fmt(pp.cillInward.faceInternal)} → ${fmt(pp.cillInward.faceExternal)} fall, unrebated`
+      : `${fmt(bottomVis)} visible`].filter(Boolean).join(' · ')
+    : `${String(dr.threshold || '').toUpperCase().replace('-', ' ')} THRESHOLD · no timber member`;
 
   return (
-    <div className="w-full flex justify-center">
-      <svg viewBox={`0 0 ${totalW} ${totalH}`} xmlns="http://www.w3.org/2000/svg"
-        className="max-h-[72vh] w-auto max-w-full" style={{ background: COLORS.bg }}>
+    <div className="w-full">
+      <svg viewBox={`0 0 ${svgW} ${svgH}`} xmlns="http://www.w3.org/2000/svg"
+        className="w-full h-auto" style={{ background: COLORS.bg }}>
 
-        {/* ── FRAME body ── */}
+        {/* ── FRAME body: the assembly less the openings seen from outside ── */}
         <path
-          d={`M ${X(0)} ${Y(0)} H ${X(fw)} V ${Y(frameH)} H ${X(0)} Z
-              M ${X(g.land)} ${Y(openTop)} H ${X(fw - g.land)}
-              V ${Y(openBottom)} H ${X(g.land)} Z`}
+          d={[`M ${X(0)} ${Y(0)} H ${X(W)} V ${Y(H)} H ${X(0)} Z`,
+            ...rects.map(visRect).filter(ok).map((o) => `M ${X(o.x)} ${Y(o.y)} H ${X(o.x + o.w)} V ${Y(o.y + o.h)} H ${X(o.x)} Z`)].join(' ')}
           fillRule="evenodd" fill={COLORS.frameFill} stroke="none" />
-        <rect x={X(0)} y={Y(0)} width={fw} height={frameH}
+        <rect x={X(0)} y={Y(0)} width={W} height={H}
           fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frame} {...NS} />
-        <rect x={X(g.land)} y={Y(openTop)} width={fw - 2 * g.land} height={openBottom - openTop}
-          fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
-
-        {/* Rebate line — inward frames lap over the leaf */}
-        {geom.inward && (
-          <rect x={X(geom.frameFace)} y={Y(dy + geom.frameFace)}
-            width={fw - 2 * geom.frameFace} height={fh - geom.frameFace - bottomLand}
-            fill="none" stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS}
-            strokeDasharray={`${sw(5)},${sw(3)}`} />
-        )}
-
-        {/* ── COUPLING POST — ONE member 114 with two rebates. This is the
-             frame sheet, so the full member face is drawn (the elevation shows
-             only the band the leaves leave visible) ── */}
-        {(geom.zones.posts || []).map((po, i) => (
-          <g key={i}>
-            <rect x={X(po.x)} y={Y(g.land)}
-              width={po.w} height={frameH - g.land - bottomLand}
-              fill={COLORS.frameFill} stroke={COLORS.frame}
-              strokeWidth={STROKES.frameLight} {...NS} />
-            <Label x={X(po.axis)} y={Y(frameH * 0.28)}
-              text={`D-JC ${po.w}`} vbw={totalW} />
+        {rects.map((r, i) => (
+          <g key={`fr${i}`}>
+            {ok(visRect(r)) && (
+              <rect x={X(visRect(r).x)} y={Y(visRect(r).y)} width={visRect(r).w} height={visRect(r).h}
+                fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
+            )}
+            {ok(hidRect(r)) && (
+              <rect x={X(hidRect(r).x)} y={Y(hidRect(r).y)} width={hidRect(r).w} height={hidRect(r).h}
+                fill="none" stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={dash} />
+            )}
           </g>
         ))}
 
-        {/* ── TRANSOM RAIL — bottom flush with the door-opening top (3D) ── */}
-        {geom.zones.transom && <>
-          <rect x={X(g.land)} y={Y(dy - (geom.zones.transom.railH - geom.frameFace))}
-            width={fw - 2 * g.land}
-            height={(geom.zones.transom.railH - geom.frameFace) + g.land + g.gap}
-            fill={COLORS.frameFill} stroke={COLORS.frame}
-            strokeWidth={STROKES.frameLight} {...NS} />
-          <Label x={X(fw / 2)} y={Y(dy + (g.land + g.gap) / 2) + sw(3)}
-            text={`${geom.transomP ? `${geom.transomP.code} ${fmt(geom.transomP.length)}` : 'D-T'} · rail ${geom.zones.transom.railH} · fan cavity ${fmt(geom.zones.transom.cavity)}`}
-            vbw={totalW} />
-        </>}
+        {/* ── COUPLING POSTS: ONE member, two rebates; the axis ── */}
+        {(z.posts || []).map((p, i) => (
+          <g key={`po${i}`}>
+            <line x1={X(p.axis)} y1={Y(0) - 10 * ts} x2={X(p.axis)} y2={Y(H) + 10 * ts}
+              stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={axisDash} />
+            <text x={X(p.axis) + codeFs * 0.35} y={Y(midDoorY)} fill={COLORS.label} fontSize={codeFs}
+              fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
+              transform={`rotate(-90, ${X(p.axis) + codeFs * 0.35}, ${Y(midDoorY)})`}>
+              {geom.post ? `${displayCode(geom.post.code)} ${fmt(geom.post.length)} · ${fmt(p.w)}×${fmt(dr.frameDepth)}` : `JC ${fmt(p.w)}`}
+            </text>
+          </g>
+        ))}
 
-        {/* ── CILL / THRESHOLD ── */}
-        {geom.hasTimberCill ? (
-          <>
-            <rect x={X(0)} y={Y(frameH - g.cillVisible)} width={fw} height={g.cillVisible}
-              fill={COLORS.frameFill} stroke={COLORS.sillDetail}
-              strokeWidth={STROKES.sash} {...NS} />
-            <Label x={X(fw / 2)} y={Y(frameH - g.cillVisible / 2) + sw(3)}
-              text={geom.inward ? `CILL ${geom.cillFace} unrebated · 40→35 fall` : `CILL ${geom.cillFace}`}
-              vbw={totalW} />
-          </>
+        {/* ── TRANSOM: the visible band between the fanlight and the door leaves ── */}
+        {tz?.band && (
+          <g>
+            <rect x={X(m.land)} y={Y(tz.band.y)} width={W - 2 * m.land} height={tz.band.h}
+              fill={COLORS.bg} stroke="none" />
+            <rect x={X(m.land)} y={Y(tz.band.y)} width={W - 2 * m.land} height={tz.band.h}
+              fill={COLORS.frameFill} stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
+            <text x={X(W / 2)} y={Y(tz.band.y + tz.band.h / 2) + codeFs * 0.35} fill={COLORS.label} fontSize={codeFs}
+              fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>
+              {`${geom.transom ? recordText(geom.transom) : `T ${fmt(tz.railH)}`} · band ${fmt(tz.band.h)}`}
+            </text>
+          </g>
+        )}
+
+        {/* ── CILL (one piece across the assembly) or the threshold product ── */}
+        {dr.hasTimberCill ? (
+          <rect x={X(0)} y={Y(H - bottomVis)} width={W} height={bottomVis}
+            fill={COLORS.frameFill} stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} />
         ) : (
-          <Label x={X(fw / 2)} y={Y(frameH) - sw(6)}
-            text={`${geom.threshold.toUpperCase()} THRESHOLD — no timber member`} vbw={totalW} />
+          <line x1={X(num(z.doorX, 0))} y1={Y(H)} x2={X(num(z.doorX, 0) + num(z.doorW, W))} y2={Y(H)}
+            stroke={COLORS.sillDetail} strokeWidth={STROKES.boardIndicator} {...NS} />
         )}
 
-        {/* ── LEAF ghosts straight from the engine (french = two, plus fixed
-             panel leaves so the joiner sees what lands in each opening) ── */}
-        {[...geom.leaves, ...geom.panelLeaves].map((leaf, i) => (
-          <rect key={i} x={X(leaf.x)} y={Y(geom.leafY)} width={leaf.w} height={leaf.h}
-            fill="none" stroke={COLORS.sash} strokeWidth={STROKES.sashLight} {...NS}
-            strokeDasharray={`${sw(8)},${sw(5)}`} />
+        {/* ── LEAF ghosts straight from the engine: door, side panel and fan leaves, fixed fan units ── */}
+        {[...leaves, ...(dr.panelLeaves || []), ...(dr.fanLeaves || []), ...(tz?.fanPanes || [])].map((lf, i) => (
+          <rect key={`g${i}`} x={X(lf.x)} y={Y(lf.y)} width={lf.w} height={lf.h}
+            fill="none" stroke={COLORS.sash} strokeWidth={STROKES.sashLight} {...NS} strokeDasharray={ghostDash} />
         ))}
-        <Label x={X((doorX + doorRight) / 2)} y={Y(geom.leafY + geom.leafH / 2)}
-          text={geom.leaves.length === 2 ? 'LEAVES ×2 (ref)' : 'LEAF (ref)'} vbw={totalW} />
-
-        {/* ── MEMBER SECTIONS — head left, cill right, jamb on top, so no two
-             dimensions share a line (Piotr 05.08) ── */}
-        <DimV x={ox - DM * 0.4} y1={Y(0)} y2={Y(g.land)} extFrom={X(0)}
-          label={`head ${fmt(geom.frameFace)}`} small vbw={totalW} />
-        <DimH y={oy - DM * 0.35} x1={X(0)} x2={X(g.land)} extFrom={Y(0)}
-          label={`jamb ${fmt(geom.frameFace)}`} small vbw={totalW} />
-        {/* Cill height — was missing entirely (Piotr 05.08) */}
-        {geom.hasTimberCill && (
-          <DimV x={ox + fw + DM * 0.35} y1={Y(fh - g.cillVisible)} y2={Y(fh)}
-            extFrom={X(fw)} label={`cill ${fmt(g.cillVisible)}`} small vbw={totalW} />
-        )}
-        {geom.inward && (
-          <Label x={X(0)} y={oy - DM * 1.15}
-            text={`inward · lap ${fmt(geom.overlap)} over leaf (${fmt(geom.overlap)}+${g.gap}+${g.land})`}
-            anchor="start" vbw={totalW} />
+        {lL && (
+          <Label x={X((doorX + doorR) / 2)} y={Y(midDoorY)} text={leaves.length === 2 ? 'LEAVES ×2 (ref)' : 'LEAF (ref)'} vbw={svgW} />
         )}
 
-        {/* Layer chain: frame land · gap · leaf edge */}
-        <DimChainH y={oy - DM * 0.75}
-          cuts={[X(0), X(g.land), X(doorX)]} extFrom={Y(0)} vbw={totalW} fmt={fmt} />
+        {/* ── MEMBER CODES on the frame: head, jambs, cill ── */}
+        <text x={X(W / 2)} y={Y(m.frameHead) + codeFs * 1.2} fill={COLORS.label} fontSize={codeFs}
+          fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>
+          {geom.head ? recordText(geom.head) : `H ${fmt(W)}`}
+        </text>
+        {[[geom.jambL, m.frameJamb + codeFs * 0.9], [geom.jambR, W - m.frameJamb - codeFs * 0.4]].map(([rec, x], i) => (
+          <text key={`jl${i}`} x={X(x)} y={Y(midDoorY)} fill={COLORS.label} fontSize={codeFs}
+            fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
+            transform={`rotate(-90, ${X(x)}, ${Y(midDoorY)})`}>
+            {rec ? recordText(rec) : ''}
+          </text>
+        ))}
+        <text x={X(W / 2)} y={Y(H - Math.max(bottomFace, bottomVis)) - codeFs * 0.5} fill={COLORS.label} fontSize={codeFs}
+          fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>
+          {cillLabel}
+        </text>
 
-        {/* Frame widths — panels and door, straight from the engine */}
-        {(geom.zones.frames || []).length > 1 && (geom.zones.frames || []).map((f, i) => (
-          <DimH key={i} y={oy + frameH + DM * 0.35} x1={X(f.x)} x2={X(f.x + f.w)}
-            extFrom={Y(frameH)}
-            label={`${f.kind === 'door' ? 'door' : `${f.side} panel`} ${fmt(f.w)}`}
-            small vbw={totalW} />
+        {/* ── DIMENSIONS ── width at the TOP, heights on the RIGHT, chains bottom / left */}
+        <DimH y={oy - 30 * ts} x1={X(0)} x2={X(W)} extFrom={Y(0)} label={fmt(W)} vbw={svgW} />
+        {tz && (
+          <>
+            <DimV x={rightX(0)} y1={Y(0)} y2={Y(tz.h)} extFrom={X(W)} label={`fan ${fmt(tz.h)}`} small vbw={svgW} />
+            <DimV x={rightX(0)} y1={Y(tz.h)} y2={Y(H)} extFrom={X(W)} label={fmt(H - tz.h)} small vbw={svgW} />
+          </>
+        )}
+        <DimV x={rightX(tz ? 1 : 0)} y1={Y(0)} y2={Y(H)} extFrom={X(W)} label={fmt(H)} vbw={svgW} />
+
+        <DimChainV x={ox - 24 * ts} cuts={vCuts.map(Y)} extFrom={ox - 4 * ts} vbw={svgW} labels={vLabels} fmt={fmt} />
+        <DimV x={ox - 84 * ts} y1={Y(0)} y2={Y(m.frameHead)} extFrom={ox - 4 * ts}
+          label={`head ${fmt(m.frameHead)}`} small vbw={svgW} />
+        {dr.hasTimberCill && bottomFace > 0 && (
+          <DimV x={ox - 84 * ts} y1={Y(H - bottomFace)} y2={Y(H)} extFrom={ox - 4 * ts}
+            label={`cill ${fmt(bottomFace)}`} small vbw={svgW} />
+        )}
+
+        <DimChainH y={rowY(0)} cuts={layerCuts.map(X)} extFrom={oy + H + 4 * ts} vbw={svgW} labels={layerLabels} fmt={fmt} />
+        <DimChainH y={rowY(1)} cuts={memberCuts.map(X)} extFrom={oy + H + 4 * ts} vbw={svgW} fmt={fmt} />
+        {geom.frames.length > 1 && geom.frames.map((f, i) => (
+          <DimH key={`fw${i}`} y={rowY(2)} x1={X(f.x)} x2={X(f.x + f.w)} extFrom={Y(H)}
+            label={`${f.kind === 'door' ? 'door' : `${f.side} panel`} ${fmt(f.w)}`} small vbw={svgW} />
         ))}
 
-        {/* ── OVERALL ── */}
-        <DimH y={oy + frameH + DM * 0.75} x1={X(0)} x2={X(fw)} extFrom={Y(frameH)}
-          label={fmt(fw)} vbw={totalW} />
-        {geom.zones.transom && (
-          <DimV x={ox + fw + DM * 0.4} y1={Y(0)} y2={Y(dy)} extFrom={X(fw)}
-            label={`fan ${fmt(geom.zones.transom.h)}`} small vbw={totalW} />
-        )}
-        <DimV x={ox + fw + DM * 0.85} y1={Y(0)} y2={Y(frameH)} extFrom={X(fw)}
-          label={fmt(frameH)} vbw={totalW} />
-
-        <TitleBlock x={totalW / 2} y={oy + frameH + DM + TITLE_AREA * 0.5}
-          title={`Frame Detail${projNum ? ` — ${projNum}` : ''} — ${winName}`}
-          subtitle={codes}
-          vbw={totalW} />
+        {/* ── TITLE + notes ── */}
+        <TitleBlock x={svgW / 2} y={titleY} title={`Frame Detail${projNum ? ` · ${projNum}` : ''} · ${winName}`}
+          subtitle={codes} vbw={svgW} />
+        {notes.map((t, i) => (
+          <text key={`n${i}`} x={svgW / 2} y={titleY + (42 + 18 * i) * ts} fill={COLORS.subtitle} fontSize={codeFs}
+            fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>{t}</text>
+        ))}
       </svg>
     </div>
   );

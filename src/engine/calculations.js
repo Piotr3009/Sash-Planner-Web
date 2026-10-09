@@ -3,7 +3,8 @@ import { selectCasementHinges, summariseHinges, selectCasementLocks, summariseLo
 import { getWindowProfile, getCasementProfile, getDoorProfile, DEFAULT_DOOR_PROFILE, profileSashDepth, profileBoardWidth, boardWidthForDepth, profileBoxDepth, kgPerM, casementGlassDeductions } from './profile.js';
 import { buildArchGeometry, buildSashArchGeometry, planArchSegments, buildGlassOutline, buildArchBars, glassOutlinePoly, chainAreaAboveLine, ArchError, isCircleShape, buildCircleGeometry, buildCircleGlassOutline, buildCircleBars } from './arch.js';
 import { buildTraceryForDerived } from './cnc/traceryExport.js';
-import { casementLeafBars, leafBarsToUnit } from './casementBarGrid.js';
+import { casementLeafBars, leafBarsToUnit, computeBarPositions, BAR_WIDTH } from './casementBarGrid.js';
+import { selectDoorHardware, doorHingePositions } from './doorHardware.js';
 import { isAcousticUnit } from './specification.js';
 
 /**
@@ -399,6 +400,9 @@ const GLASS_KG_PER_SQM = {
     'single': 12,    // single heritage laminated
     'passive': 12,   // vacuum
 };
+// Door double unit 6x12x6 (owner box item 8): 12mm of glass at 2.5 kg/m2 per mm.
+// Slim, triple and Laminate / Acoustic door units take the window rates above.
+const DOOR_GLASS_KG_PER_SQM = { double: 30 };
 
 function calculateWeights(windowSpec, sashWidth, topSashHeight, bottomSashHeight) {
     const sw = sashWidth / 1000; // to meters
@@ -1165,58 +1169,86 @@ function deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings = {}
 }
 
 /**
- * DOOR ENGINE v3 (Piotr 09.08) — single + FRENCH, coupled side panels, transom.
+ * DOOR ENGINE v4 (Piotr 08.10.2026, doors to production): single and FRENCH,
+ * coupled side panels, fanlight. Every number from the door profile
+ * (getDoorProfile, DEFAULT_DOOR_PROFILE schema 2); the opening fanlight leaf
+ * from the casement profile. No bare constants in the formulas.
  *
- * ASSEMBLY (corrected 09.08 — v2 wrongly subtracted the panels from the door
- * width, which crushed a 1200 french into two 29mm leaves):
- *   windowSpec.frame.width  = the DOOR frame only.
- *   Side panels are COUPLED ON THE OUTSIDE, each with its own width field, so
- *   the assembly grows sideways exactly as the transom grows upwards:
- *       totalWidth = leftPanel + doorFrame + rightPanel
- *   Head and cill are ONE piece each across the whole assembly (Piotr 09.08).
- *   Between a panel and the door stand TWO 57 jambs side by side (the panel's
- *   own jamb + the door's), matching the 3D where DoorSidePanel is a complete
- *   DoorFrame butted against the door frame. NOTE: coupling could also be a
- *   single shared post — awaiting Piotr's confirmation; only D-JC qty changes.
+ * ASSEMBLY (09.08): windowSpec.frame.width = the DOOR frame only. Side panels
+ * are coupled OUTSIDE it, each with its own width, so the assembly grows
+ * sideways as the fanlight grows upwards:
+ *     totalWidth  = leftPanel + doorFrame + rightPanel
+ *     totalHeight = doorFrame height + transom height
+ * Head and cill are ONE piece each across the assembly. Between a panel and
+ * the door stands ONE coupling post (2 x jamb face = 136) with two rebates.
  *
- * Construction:
- *   frame   = casement frame, rebate 4mm deeper (leaf 61 instead of 57)
- *   leaf    = 94mm all round, bottom rail 180mm (stiffness, not decoration)
- *   FRENCH  = two leaves, NO centre mullion EVER: meeting stiles rebated 6mm
- *             with 3mm clearance. Only the 6mm overlap matters for sizing:
- *             each leaf = (door clear width + frenchOverlap) / 2, so a 1200
- *             door gives 2 x 563 (clear 1120, meeting band 94+94-6 = 182).
- *   panel   = FIXED leaf, all members 57 (as 3D). Between panel and door
- *             stands ONE coupling post 114 with two rebates (Piotr 09.08):
- *             72 shows from outside when the door opens outward, 93 when it
- *             opens inward (the door rebate flips to the interior).
- *   transom = frame grows TALLER by transomHeight; frame.height stays the DOOR
- *             zone height. Rail 68 runs the full assembly with its bottom edge
- *             flush with the door opening top; fan cavity = transomHeight - 68.
- *             The jambs run full height, so the fan is one pane PER FRAME.
- *   glass   = member face - glassInset per bounding member, per unit
- *   cill    = outward: casement cill · inward: 40->35 unrebated fall
- *             · aluminium / low-profile threshold: NO bottom timber member
+ * FRAME (owner box items 1 to 3): the casement frame, face 68, depth 93,
+ * rebate 21, land 47, gap 4; outward cill 68 x 93 with 41 visible; inward cill
+ * unrebated 40 -> 35; aluminium / low-profile threshold: no timber cill, the
+ * threshold is a product counted in pieces.
+ *
+ * LEAF (items 4 to 7): depth 57 (61 triple), stiles 94, top rail 94, bottom
+ * rail 180, mid rail 94, french meeting stile 100 (94 + the 6 lip). Every
+ * rail runs the full leaf width, every stile the full leaf height (the T&G
+ * convention of the cut list, lengths.*Deduct 0).
+ *   single  leafW = W - 2 x leafAtJamb (51)                     900 -> 798
+ *   french  half  = (W - 2 x leafAtJamb - frenchClearance) / 2,  1600 -> 749
+ *           leafW = half + frenchLip (6)                                755
+ *   leafH = H - leafFullHeight (98) with a timber cill, both directions;
+ *           H - leafNoThreshold (57) without                    2100 -> 2002
+ *   glass W = leafW - (stile L - inset) - (stile R - inset), the meeting
+ *           stile counting 100                          798 -> 633, 755 -> 584
+ *   glass H = leafH - (top - inset) - (bottom - inset)          2002 -> 1751
+ * STYLES (item 9): half-glazed = mid rail axis at leafH / 2, three-quarter =
+ * at 0.75 x leafH from the top; glass above it, a panel below it, both in the
+ * same 11.5 rebate (item 10):
+ *   glass H = (axis - mid / 2) - top + 2 x inset
+ *   panel H = (leafH - bottom) - (axis + mid / 2) + 2 x inset, panel W = glass W
+ * FANLIGHT (item 11): fixed = glazed into the frame as before; opening = a
+ * casement top hung leaf (64 / 64 / 67 x 57) W_frame - 2 x 51 by
+ * transomH - fanAtHead - fanAtRail, glass by the casement rule, hinge and lock
+ * from the casement picks.
+ * HARDWARE (items 12 to 15): doorHardware.js selectDoorHardware.
+ * CONSUMABLES (item 16): the casement per-leaf rules on every door leaf, side
+ * panel leaf and fan leaf; glazing bead on the door bead row.
  */
-function deriveDoorWindow(windowSpec, frameWidth, frameHeight) {
+function deriveDoorWindow(windowSpec, frameWidth, frameHeight, settings = {}) {
     const p = getDoorProfile();
+    const cp = getCasementProfile();
     const els = p.elements;
     const ded = p.deductions;
     const geo = p.geometry;
     const L = p.lengths;
     const d = windowSpec.door || {};
     const R = (v) => Math.round(v * 10) / 10;
+    const face = (k, fallback) => Number(els[k]?.face ?? fallback);
 
+    // ── Profile numbers ──
+    const glassType = windowSpec.glazing?.type || 'double';
     const fd = p.frameDepth;
-    const ld = p.leafDepth;                    // 61 for double AND triple
-    const secFrame = `${els.frameHead.face}x${fd}`;
-    const secLeafStile = `${els.leafStile.face}x${ld}`;
-    const secLeafBottom = `${els.leafBottom.face}x${ld}`;
-    const spMember = p.sidePanel?.member ?? DEFAULT_DOOR_PROFILE.sidePanel.member;
-    const postW = p.couplingPost?.width ?? DEFAULT_DOOR_PROFILE.couplingPost.width;
-    const secSide = `${spMember}x${p.sidePanel?.depth ?? DEFAULT_DOOR_PROFILE.sidePanel.depth}`;
-    const frameFace = els.frameHead.face;
-    const inset = geo.glassInset;
+    const ld = glassType === 'triple' ? (p.leafDepthTriple || p.leafDepth) : p.leafDepth;
+    const fHead = face('frameHead');
+    const fJamb = face('frameJamb', fHead);
+    const fCill = face('frameCill', fHead);
+    const railFace = face('transomRail', fHead);
+    const fStile = face('leafStile');
+    const fTop = face('leafTop', fStile);
+    const fBottom = face('leafBottom');
+    const fMid = face('leafMid', fStile);
+    const lip = Number(p.frenchLip ?? 6);
+    const fMeet = face('leafMeeting', fStile + lip);
+    const inset = Number(geo.glassInset);
+    const spMember = Number(p.sidePanel?.member ?? DEFAULT_DOOR_PROFILE.sidePanel.member);
+    const spDepth = Number(p.sidePanel?.depth ?? DEFAULT_DOOR_PROFILE.sidePanel.depth);
+    const postW = Number(p.couplingPost?.width ?? DEFAULT_DOOR_PROFILE.couplingPost.width);
+    const secHead = `${fHead}x${fd}`;
+    const secJamb = `${fJamb}x${fd}`;
+    const secStile = `${fStile}x${ld}`;
+    const secTop = `${fTop}x${ld}`;
+    const secBottom = `${fBottom}x${ld}`;
+    const secMid = `${fMid}x${ld}`;
+    const secMeet = `${fMeet}x${ld}`;
+    const secSide = `${spMember}x${spDepth}`;
 
     const mk = (group, name, section, length, qty, code, notes = '') => {
         const rec = createComponentRecord(windowSpec, group, name, section, length, qty, notes);
@@ -1225,17 +1257,22 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight) {
         return rec;
     };
 
-    const isFrench = (d.type || 'single-external') === 'french';
+    const type = d.type || 'single-external';
+    const isFrench = type === 'french';
     const threshold = d.threshold || 'standard';
     const inward = (d.openDirection || 'outward') === 'inward';
     const hasTimberCill = threshold === 'standard';
-    const cillWider = !!windowSpec.cill?.wider;
-    const cillExt = Number(windowSpec.cill?.extension) || 0;
+    // The door form's threshold extension replaces cill.extension for doors
+    // (brief 3.7); cill.wider is not a door field.
+    const thresholdExt = Number(d.thresholdExtension) || 0;
+    const style = d.style || 'full-glass';
+    const axisRatio = style === 'half-glazed' ? 0.5 : style === 'three-quarter' ? 0.75 : null;
+    const barType = d.barType || 'astragal';
 
-    // ── Transom: whole assembly grows upward, door zone height untouched ──
+    // ── Fanlight: the whole assembly grows upward, door zone height untouched ──
     const tr = d.transom || {};
-    const railH = p.transom?.rail ?? 68;
-    const transomH = (tr.type && tr.type !== 'none') ? (Number(tr.height) || 0) : 0;
+    const transomType = tr.type && tr.type !== 'none' ? tr.type : null;
+    const transomH = transomType ? (Number(tr.height) || 0) : 0;
     const totalHeight = frameHeight + transomH;
 
     // ── Horizontal assembly: panels coupled OUTSIDE the door frame ──
@@ -1245,26 +1282,23 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight) {
     const rightW = (mode === 'right' || mode === 'both') ? (Number(sp.rightWidth) || 0) : 0;
     const totalWidth = frameWidth + leftW + rightW;
     const doorX = leftW;
-    const edge = ded.leafAtJamb;                       // 47 = land 43 + gap 4
+    const edge = ded.leafAtJamb;                       // 51 = land 47 + gap 4
 
     const frames = [
         leftW ? { x: 0, w: leftW, kind: 'panel', side: 'left' } : null,
         { x: doorX, w: frameWidth, kind: 'door' },
         rightW ? { x: doorX + frameWidth, w: rightW, kind: 'panel', side: 'right' } : null,
     ].filter(Boolean);
-    // Coupling posts — ONE member per panel, 2 × jamb face wide (136 from v4
-    // Block F), two rebates. The band seen from OUTSIDE is not symmetric when
-    // the door opens inward: the panel side always shows its land, the door
-    // side shows the land outward but its full frame face inward (that rebate
-    // has flipped to the interior).
+    // Coupling posts: the band seen from OUTSIDE is not symmetric when the
+    // door opens inward (the door rebate flips to the interior, so the door
+    // side shows its full jamb face).
     const halfPost = postW / 2;
-    const doorFace = els.frameHead.face;
     const posts = [
         leftW ? { axis: R(leftW), doorSide: 'right' } : null,
         rightW ? { axis: R(doorX + frameWidth), doorSide: 'left' } : null,
     ].filter(Boolean).map((po) => {
-        const panelVis = geo.land;                       // land always
-        const doorVis = inward ? doorFace : geo.land;    // face inward · land outward
+        const panelVis = geo.land;
+        const doorVis = inward ? fJamb : geo.land;
         const visX = po.doorSide === 'right' ? po.axis - panelVis : po.axis - doorVis;
         return {
             axis: po.axis, doorSide: po.doorSide,
@@ -1274,68 +1308,210 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight) {
     });
     const joints = posts.map((po) => po.axis);
 
+    // ── Weights: timber from sections x density, glass by m2, + margin ──
+    const marginPct = Number.isFinite(Number(settings?.weightMarginPct))
+        ? Number(settings.weightMarginPct)
+        : CONSTANTS.WEIGHT_MARGIN_PCT;
+    const wMargin = 1 + (marginPct || 0) / 100;
+    const acoustic = isAcousticUnit(windowSpec.glazing);
+    const glassKgPerSqm = (!acoustic && glassType === 'double')
+        ? DOOR_GLASS_KG_PER_SQM.double
+        : (GLASS_KG_PER_SQM[glassType] || GLASS_KG_PER_SQM.double);
+    const panelThick = Number(p.panel?.boardThickness || 0) * Number(p.panel?.boards || 0) + Number(p.panel?.coreThickness || 0);
+    const panelKgPerSqm = (panelThick / 1000) * Number(p.panel?.densityKgM3 || 0);
+
+    // Bars of one glazed daylight (frame coordinates): the casement bar law
+    // (equal panes between 22 bars, casementBarGrid.computeBarPositions); the
+    // unit axes are measured from the unit's top-left corner, inset outside
+    // the daylight.
+    const barsFor = (day, v, h) => {
+        const counts = { v: Number(v) || 0, h: Number(h) || 0 };
+        const pos = computeBarPositions({ glassX: day.x, glassY: day.y, glassW: day.w, glassH: day.h, vCount: counts.v, hCount: counts.h, barW: BAR_WIDTH });
+        return {
+            counts,
+            frame: { vBars: pos.vBars, hBars: pos.hBars },
+            unit: { x: pos.vBars.map((b) => R(b.cx - (day.x - inset))), y: pos.hBars.map((b) => R(b.cy - (day.y - inset))) },
+        };
+    };
+    const unitOf = (day) => ({ x: R(day.x - inset), y: R(day.y - inset), w: R(day.w + 2 * inset), h: R(day.h + 2 * inset) });
+
     // ── Door leaves ──
     const leafH = R(frameHeight - (hasTimberCill ? ded.leafFullHeight : ded.leafNoThreshold));
+    const leafY = R(transomH + edge);           // the door zone top behaves as a head: leafAtJamb below it
     const clearW = frameWidth - 2 * edge;
-    const overlap = isFrench ? (p.frenchOverlap ?? 6) : 0;
-    const leafW = isFrench ? R((clearW + overlap) / 2) : R(clearW);
+    const clearance = isFrench ? (Number(p.frenchClearance) || 0) : 0;
+    const half = isFrench ? R((clearW - clearance) / 2) : null;
+    const leafW = isFrench ? R((clearW - clearance) / 2 + lip) : R(clearW);
+    const meetingX = isFrench ? R(doorX + frameWidth / 2) : null;
     // Open side is stated from INSIDE (open left = towards your left as you
-    // walk in), so from OUTSIDE the hinges sit on the opposite edge. For
-    // french the ACTIVE leaf is the hinged-on-that-side one; the other leaf
-    // is passive (bolts top + bottom by default).
+    // walk in), so from OUTSIDE the hinges sit on the opposite edge. For a
+    // french door the ACTIVE leaf is the one hinged on that side (it carries
+    // the lock); the other is passive.
     const hingeOnRight = (d.hingeSide || 'left') === 'left';
-    const leaves = isFrench
+    const leafBase = isFrench
         ? [
-            { x: R(doorX + edge), w: leafW, h: leafH, hinge: 'left', role: hingeOnRight ? 'passive' : 'active' },
-            { x: R(doorX + frameWidth - edge - leafW), w: leafW, h: leafH, hinge: 'right', role: hingeOnRight ? 'active' : 'passive' },
+            { x: R(doorX + edge), hinge: 'left', role: hingeOnRight ? 'passive' : 'active', meetingSide: 'R' },
+            { x: R(doorX + frameWidth - edge - leafW), hinge: 'right', role: hingeOnRight ? 'active' : 'passive', meetingSide: 'L' },
         ]
-        : [{ x: R(doorX + edge), w: leafW, h: leafH, hinge: hingeOnRight ? 'right' : 'left', role: 'single' }];
+        : [{ x: R(doorX + edge), hinge: hingeOnRight ? 'right' : 'left', role: 'single', meetingSide: null }];
+    const hingeRule = p.hinges || DEFAULT_DOOR_PROFILE.hinges;
+    const handleHeight = Number(p.hardware?.handleHeight ?? DEFAULT_DOOR_PROFILE.hardware.handleHeight);
+    const axis = axisRatio ? R(leafH * axisRatio) : null;      // mid rail axis, from the leaf top
+    const leaves = leafBase.map((b) => {
+        const stileL = b.meetingSide === 'L' ? fMeet : fStile;
+        const stileR = b.meetingSide === 'R' ? fMeet : fStile;
+        const dayX = R(b.x + stileL);
+        const dayW = R(leafW - stileL - stileR);
+        const glassDay = { x: dayX, y: R(leafY + fTop), w: dayW, h: R((axis != null ? axis - fMid / 2 : leafH - fBottom) - fTop) };
+        const glass = unitOf(glassDay);
+        const midRail = axis != null ? { axis, y: R(leafY + axis - fMid / 2), face: fMid } : null;
+        const panelDay = axis != null ? { x: dayX, y: R(leafY + axis + fMid / 2), w: dayW, h: R(leafH - fBottom - axis - fMid / 2) } : null;
+        const panel = panelDay ? { ...unitOf(panelDay), daylight: panelDay } : null;
+        const bars = barsFor(glassDay, d.bars?.v, d.bars?.h);
+        const timberKg = (kgPerM(stileL, ld) + kgPerM(stileR, ld)) * (leafH / 1000)
+            + (kgPerM(fTop, ld) + kgPerM(fBottom, ld) + (midRail ? kgPerM(fMid, ld) : 0)) * (leafW / 1000);
+        const glassKg = (glass.w * glass.h / 1e6) * glassKgPerSqm;
+        const panelKg = panel ? (panel.w * panel.h / 1e6) * panelKgPerSqm : 0;
+        return {
+            ...b, y: leafY, w: leafW, h: leafH,
+            stileL, stileR,
+            daylight: glassDay, glass, bars,
+            midRail, panel,
+            hinges: doorHingePositions(leafH, hingeRule).map((hy) => R(leafY + hy)),
+            hingeEdgeX: b.hinge === 'right' ? R(b.x + leafW) : b.x,
+            handleY: R(totalHeight - handleHeight),
+            weightKg: R((timberKg + glassKg + panelKg) * wMargin),
+        };
+    });
 
-    // ── Fixed panel leaves — same land/gap as the door, members 57 ──
-    const panelLeaves = frames
-        .filter((f) => f.kind === 'panel')
-        .map((f) => ({ x: R(f.x + edge), w: R(f.w - 2 * edge), h: leafH, side: f.side }));
+    // ── Fixed side panel leaves: same land / gap as the door, members 57 ──
+    const panelLeaves = frames.filter((f) => f.kind === 'panel').map((f) => {
+        const x = R(f.x + edge), w = R(f.w - 2 * edge);
+        const day = { x: R(x + spMember), y: R(leafY + spMember), w: R(w - 2 * spMember), h: R(leafH - 2 * spMember) };
+        const glass = unitOf(day);
+        const timberKg = kgPerM(spMember, spDepth) * ((2 * leafH + 2 * w) / 1000);
+        return {
+            x, y: leafY, w, h: leafH, side: f.side, member: spMember,
+            daylight: day, glass,
+            bars: barsFor(day, sp.barsV, sp.barsH),
+            weightKg: R((timberKg + (glass.w * glass.h / 1e6) * glassKgPerSqm) * wMargin),
+        };
+    });
 
-    // ── BOX: one head, one cill, jambs, transom rail ──
+    // ── Fanlight ──
+    // fixed:   one pane per frame, glazed into the frame (the jamb, head and
+    //          rail faces less the glass inset);
+    // opening: one casement top hung leaf per frame, every number from the
+    //          casement profile (owner box item 11).
+    const cEls = cp.elements;
+    const cld = glassType === 'triple' ? (cp.leafDepthTriple || cp.leafDepth) : cp.leafDepth;
+    const cGlass = casementGlassDeductions(cp);
+    const fanBarsV = (f) => {
+        // 'match': the vertical lines of the door (or of the side panel)
+        // continue into the fan above it: same x, horizontal bars none.
+        if (tr.bars !== 'match') return [];
+        if (f.kind === 'door') {
+            const xs = leaves.flatMap((l) => l.bars.frame.vBars.map((b) => b.cx));
+            if (isFrench && xs.length) xs.push(meetingX);
+            return xs.sort((a, b) => a - b);
+        }
+        const pn = panelLeaves.find((q) => q.side === f.side);
+        return pn ? pn.bars.frame.vBars.map((b) => b.cx) : [];
+    };
+    const fanBars = (day, xs) => {
+        const inside = xs.filter((cx) => cx - BAR_WIDTH / 2 > day.x && cx + BAR_WIDTH / 2 < day.x + day.w);
+        return {
+            counts: { v: inside.length, h: 0 },
+            frame: { vBars: inside.map((cx) => ({ cx, left: cx - BAR_WIDTH / 2, right: cx + BAR_WIDTH / 2 })), hBars: [] },
+            unit: { x: inside.map((cx) => R(cx - (day.x - inset))), y: [] },
+        };
+    };
+    const fanPanes = [];
+    const fanLeaves = [];
+    if (transomH) {
+        frames.forEach((f) => {
+            if (transomType === 'opening') {
+                const x = R(f.x + edge), y = R(ded.fanAtHead), w = R(f.w - 2 * edge), h = R(transomH - ded.fanAtHead - ded.fanAtRail);
+                if (!(w > 0 && h > 0)) return;
+                const cS = cEls.leafStile.face, cT = cEls.leafTop.face, cB = cEls.leafBottom.face;
+                const day = { x: R(x + cS), y: R(y + cT), w: R(w - 2 * cS), h: R(h - cT - cB) };
+                const glass = { x: R(x + (cS - inset)), y: R(y + (cT - inset)), w: R(w - cGlass.width), h: R(h - cGlass.height) };
+                const timberKg = kgPerM(cS, cld) * (2 * h / 1000) + (kgPerM(cT, cld) + kgPerM(cB, cld)) * (w / 1000);
+                fanLeaves.push({
+                    x, y, w, h, over: f.kind, side: f.side || null, hinge: 'top',
+                    members: { stile: cS, top: cT, bottom: cB, depth: cld },
+                    daylight: day, glass, bars: fanBars(day, fanBarsV(f)),
+                    weightKg: R((timberKg + (glass.w * glass.h / 1e6) * glassKgPerSqm) * wMargin),
+                });
+            } else {
+                const eat = fJamb - inset;
+                const gw = R(f.w - 2 * eat);
+                const gh = R(transomH - (fHead - inset) - (railFace - inset));
+                if (gw > 0 && gh > 0) {
+                    const pane = { x: R(f.x + eat), y: R(fHead - inset), w: gw, h: gh, over: f.kind, side: f.side || null };
+                    const day = { x: R(pane.x + inset), y: R(pane.y + inset), w: R(gw - 2 * inset), h: R(gh - 2 * inset) };
+                    fanPanes.push({ ...pane, bars: fanBars(day, fanBarsV(f)) });
+                }
+            }
+        });
+    }
+
+    // ── BOX: one head, one cill, jambs, posts, fanlight rail ──
     const box = [
-        mk('box', 'D-FRAME HEAD', secFrame, R(totalWidth - (L.headDeduct || 0)), 1, 'D-H',
+        mk('box', 'D-FRAME HEAD', secHead, R(totalWidth - (L.headDeduct || 0)), 1, 'D-H',
             panelLeaves.length ? 'full assembly' : ''),
-        mk('box', 'D-FRAME JAMB (L)', secFrame, R(totalHeight - (L.jambDeduct || 0)), 1, 'D-J/L'),
-        mk('box', 'D-FRAME JAMB (R)', secFrame, R(totalHeight - (L.jambDeduct || 0)), 1, 'D-J/R'),
+        mk('box', 'D-FRAME JAMB (L)', secJamb, R(totalHeight - (L.jambDeduct || 0)), 1, 'D-J/L'),
+        mk('box', 'D-FRAME JAMB (R)', secJamb, R(totalHeight - (L.jambDeduct || 0)), 1, 'D-J/R'),
     ];
     if (posts.length) {
         box.push(mk('box', 'D-COUPLING POST', `${postW}x${fd}`,
             R(totalHeight - (L.jambDeduct || 0)), posts.length, 'D-JC',
             'one member, two rebates (panel + door)'));
     }
+    const cillFace = inward ? p.cillInward.faceInternal : fCill;
+    const cillLength = R(totalWidth + thresholdExt - (L.cillDeduct || 0));
     if (hasTimberCill) {
-        // Inward-opening cill is a different section: unrebated, 40 -> 35mm fall.
-        const cillFace = inward ? p.cillInward.faceInternal : els.frameCill.face;
-        box.push(mk('box', 'D-FRAME CILL', `${cillFace}x${fd}`,
-            R(totalWidth + (cillWider ? 100 : 0) + cillExt - (L.cillDeduct || 0)), 1, 'D-CILL',
+        // Inward-opening cill is a different section: unrebated, 40 -> 35 fall.
+        // The inward cill is its own part (d_frame_cill_inward): its own name.
+        box.push(mk('box', inward ? 'D-FRAME CILL (INWARD)' : 'D-FRAME CILL', `${cillFace}x${fd}`, cillLength, 1, 'D-CILL',
             [panelLeaves.length ? 'full assembly' : '',
              inward ? `inward: ${p.cillInward.faceInternal}->${p.cillInward.faceExternal}mm fall` : '',
-             cillWider ? 'wider +50mm each side' : '',
-             cillExt ? `ext ${cillExt}mm` : ''].filter(Boolean).join(' · ')));
+             thresholdExt ? `ext ${thresholdExt}mm` : ''].filter(Boolean).join(' · ')));
     }
     if (transomH) {
-        box.push(mk('box', 'D-TRANSOM', `${railH}x${fd}`,
+        box.push(mk('box', 'D-TRANSOM', `${railFace}x${fd}`,
             R(totalWidth - (L.transomDeduct || 0)), 1, 'D-T',
-            `fan cavity ${R(transomH - railH)}`));
+            transomType === 'opening' ? 'rebated for the fan leaf' : `fan cavity ${R(transomH - railFace)}`));
     }
 
-    // ── SASH: door leaves + fixed panel leaves ──
+    // ── SASH: door leaves, fixed panel leaves, fan leaves ──
     const sash = [];
     leaves.forEach((leaf) => {
-        const noteL = leaf.hinge === 'left' ? 'hinge' : (isFrench ? 'meeting' : 'lock');
-        const noteR = leaf.hinge === 'right' ? 'hinge' : (isFrench ? 'meeting' : 'lock');
         const roleNote = isFrench ? ` (${leaf.role})` : '';
+        if (isFrench) {
+            // Each french leaf: the hinge stile 94 on its outer edge, the
+            // meeting stile 100 (94 + the 6 lip) on the centre line.
+            const side = leaf.hinge === 'left' ? 'L' : 'R';
+            sash.push(
+                mk('sash', `D-STILE (${side})`, secStile, R(leaf.h - (L.stileDeduct || 0)), 1, `D-ST/${side}`, `hinge${roleNote}`),
+                mk('sash', 'D-MEETING STILE', secMeet, R(leaf.h - (L.meetingStileDeduct || 0)), 1, 'D-MS', `meeting${roleNote} · lip ${lip}`),
+            );
+        } else {
+            const noteL = leaf.hinge === 'left' ? 'hinge' : 'lock';
+            const noteR = leaf.hinge === 'right' ? 'hinge' : 'lock';
+            sash.push(
+                mk('sash', 'D-STILE (L)', secStile, R(leaf.h - (L.stileDeduct || 0)), 1, 'D-ST/L', noteL),
+                mk('sash', 'D-STILE (R)', secStile, R(leaf.h - (L.stileDeduct || 0)), 1, 'D-ST/R', noteR),
+            );
+        }
         sash.push(
-            mk('sash', 'D-STILE (L)', secLeafStile, R(leaf.h - (L.stileDeduct || 0)), 1, 'D-ST/L', noteL + roleNote),
-            mk('sash', 'D-STILE (R)', secLeafStile, R(leaf.h - (L.stileDeduct || 0)), 1, 'D-ST/R', noteR + roleNote),
-            mk('sash', 'D-TOP RAIL', secLeafStile, R(leaf.w - (L.topRailDeduct || 0)), 1, 'D-TR', isFrench ? leaf.role : ''),
-            mk('sash', 'D-BOTTOM RAIL', secLeafBottom, R(leaf.w - (L.bottomRailDeduct || 0)), 1, 'D-BR', isFrench ? leaf.role : ''),
+            mk('sash', 'D-TOP RAIL', secTop, R(leaf.w - (L.topRailDeduct || 0)), 1, 'D-TR', isFrench ? leaf.role : ''),
+            mk('sash', 'D-BOTTOM RAIL', secBottom, R(leaf.w - (L.bottomRailDeduct || 0)), 1, 'D-BR', isFrench ? leaf.role : ''),
         );
+        if (leaf.midRail) {
+            sash.push(mk('sash', 'D-MID RAIL', secMid, R(leaf.w - (L.midRailDeduct || 0)), 1, 'D-MR',
+                [isFrench ? leaf.role : '', `${style} · axis ${leaf.midRail.axis} from the leaf top`].filter(Boolean).join(' · ')));
+        }
     });
     panelLeaves.forEach((pn) => {
         sash.push(
@@ -1344,82 +1520,175 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight) {
             mk('sash', 'D-SIDE BOTTOM RAIL', secSide, R(pn.w - (L.sideRailDeduct || 0)), 1, 'D-SP-BR', `panel ${pn.side}`),
         );
     });
+    // Fan leaves: casement leaf members (vertogen: full leaf dimensions, the
+    // casement cut deductions), mapped to the casement leaf part ids.
+    fanLeaves.forEach((fl) => {
+        const where = `fan over ${fl.over}${fl.side ? ` ${fl.side}` : ''} · top hung`;
+        const sS = `${fl.members.stile}x${cld}`, sT = `${fl.members.top}x${cld}`, sB = `${fl.members.bottom}x${cld}`;
+        const cl = cp.lengths || {};
+        sash.push(
+            mk('sash', 'D-FAN STILE (L)', sS, R(fl.h - (cl.stileDeduct || 0)), 1, 'D-FS/L', where),
+            mk('sash', 'D-FAN STILE (R)', sS, R(fl.h - (cl.stileDeduct || 0)), 1, 'D-FS/R', where),
+            mk('sash', 'D-FAN TOP RAIL', sT, R(fl.w - (cl.topRailDeduct || 0)), 1, 'D-FTR', `${where} · hinge`),
+            mk('sash', 'D-FAN BOTTOM RAIL', sB, R(fl.w - (cl.bottomRailDeduct || 0)), 1, 'D-FBR', `${where} · lock`),
+        );
+    });
 
-    // ── GLASS: per door leaf + per panel + one fan pane PER FRAME ──
-    const stileEat = els.leafStile.face - inset;
+    // ── GLASS: per door leaf + per side panel + per fan (pane or leaf) ──
+    const unitBars = (b) => ({ ...b.counts, x: b.unit.x, y: b.unit.y });
     const glassUnits = [];
     leaves.forEach((leaf, i) => {
-        const gw = R(leaf.w - 2 * stileEat);
-        const gh = R(leaf.h - (els.leafTop.face - inset) - (els.leafBottom.face - inset));
-        if (gw > 0 && gh > 0) glassUnits.push({
-            width: gw, height: gh, qty: 1, role: 'main',
-            location: isFrench
-                ? `french P${i + 1} ${leaf.role}`
-                : `${d.type || 'single-external'} P1 ${d.hingeSide || 'left'}`,
+        if (leaf.glass.w > 0 && leaf.glass.h > 0) glassUnits.push({
+            width: leaf.glass.w, height: leaf.glass.h, qty: 1, role: 'main',
+            location: isFrench ? `french P${i + 1} ${leaf.role}` : `${type} P1 ${d.hingeSide || 'left'}`,
+            bars: unitBars(leaf.bars),
         });
     });
-    const sideEat = spMember - inset;
     panelLeaves.forEach((pn) => {
-        const gw = R(pn.w - 2 * sideEat);
-        const gh = R(pn.h - 2 * sideEat);
-        if (gw > 0 && gh > 0) glassUnits.push({
-            width: gw, height: gh, qty: 1, role: 'side',
-            location: `side panel ${pn.side}`,
+        if (pn.glass.w > 0 && pn.glass.h > 0) glassUnits.push({
+            width: pn.glass.w, height: pn.glass.h, qty: 1, role: 'side',
+            location: `side panel ${pn.side}`, bars: unitBars(pn.bars),
         });
     });
-    const fanPanes = [];
-    if (transomH) {
-        const frameEat = frameFace - inset;
-        const fanH = R(transomH - frameEat - (railH - inset));
-        frames.forEach((f) => {
-            const gw = R(f.w - 2 * frameEat);
-            if (gw > 0 && fanH > 0) {
-                fanPanes.push({ x: R(f.x + frameEat), w: gw, h: fanH, over: f.kind });
-                glassUnits.push({
-                    width: gw, height: fanH, qty: 1, role: 'fanlight',
-                    location: `fanlight over ${f.kind}${f.side ? ` ${f.side}` : ''}${tr.type === 'opening' ? ' (opening — 64 sash pending)' : ' (fixed)'}`,
-                });
-            }
+    fanPanes.forEach((fp) => glassUnits.push({
+        width: fp.w, height: fp.h, qty: 1, role: 'fanlight',
+        location: `fanlight over ${fp.over}${fp.side ? ` ${fp.side}` : ''} (fixed)`, bars: unitBars(fp.bars),
+    }));
+    fanLeaves.forEach((fl) => {
+        if (fl.glass.w > 0 && fl.glass.h > 0) glassUnits.push({
+            width: fl.glass.w, height: fl.glass.h, qty: 1, role: 'fanlight',
+            location: `fanlight over ${fl.over}${fl.side ? ` ${fl.side}` : ''} (opening, top hung leaf)`, bars: unitBars(fl.bars),
         });
+    });
+
+    // ── Panels (half-glazed / three-quarter): two Tricoya boards + an MDF core ──
+    const panels = leaves.filter((l) => l.panel).map((l) => ({
+        leaf: l.role, x: l.panel.x, y: l.panel.y, w: l.panel.w, h: l.panel.h,
+        area: Math.round((l.panel.w * l.panel.h / 1e6) * 10000) / 10000,
+        thickness: panelThick, paneling: d.paneling || 'flat',
+        boards: { tricoya: Number(p.panel?.boards || 0), core: 1 },
+    }));
+
+    // ── Hardware ──
+    const doorHw = selectDoorHardware({
+        leaves, isFrench, lockType: d.lockType, inward, threshold, hasTimberCill,
+        hinges: hingeRule, hw: p.hardware || DEFAULT_DOOR_PROFILE.hardware, leafDepth: ld,
+    });
+    let fanHw = null;
+    if (fanLeaves.length) {
+        const fanPanels = fanLeaves.map(() => ({ hinge: 'top' }));
+        const fanSizes = fanLeaves.map((fl) => ({ leafW: fl.w, leafH: fl.h }));
+        const hingePicks = selectCasementHinges(fanPanels, fanSizes, fanLeaves.map((fl) => ({ weightKg: fl.weightKg })));
+        const lockPicks = selectCasementLocks(fanPanels, fanSizes);
+        fanHw = { hingePicks, hingeSummary: summariseHinges(hingePicks), lockPicks, lockSummary: summariseLocks(lockPicks) };
     }
+
+    // ── Beading, consumables, seals: the casement per-leaf rules ──
+    const BEAD_WASTE = 1.15;
+    const recBead = (name, mm, notes) =>
+        createComponentRecord(windowSpec, 'beading', name, 'profile', mm, 1, notes);
+    const glassPerimMm = glassUnits.reduce((a, g) => a + 2 * (g.width + g.height), 0);
+    const panelPerimMm = panels.reduce((a, pn) => a + 2 * (pn.w + pn.h), 0);
+    const barMm = barType !== 'astragal' ? 0
+        : glassUnits.reduce((a, g) => a + (g.bars?.h || 0) * g.width + (g.bars?.v || 0) * g.height, 0);
+    const beading = [recBead('D-GLAZING BEADING', Math.round((glassPerimMm + panelPerimMm) * BEAD_WASTE),
+        panels.length ? 'Pane and panel perimeters + 15%' : 'Pane perimeters + 15%')];
+    if (barMm > 0) {
+        beading.push(recBead('C-TRIANGLE BEADING (EXT)', Math.round(barMm * BEAD_WASTE), 'Astragal bars ext + 15% (door)'));
+        beading.push(recBead('C-GEORGIAN MIDDLE BEADING', Math.round(barMm * BEAD_WASTE), 'Astragal bars int + 15% (door)'));
+    }
+    const siliconeTubes = Math.round(0.1 * ((glassPerimMm + barMm) / 1000) * 10) / 10;
+    const beadTapeSideM = Math.round(((glassPerimMm + 2 * barMm) / 1000) * 100) / 100;
+    const SEAL_F = 1.10;
+    const sealLeaves = [...leaves, ...panelLeaves, ...fanLeaves];
+    const sealFrameM = Math.round((sealLeaves.reduce((a, l) => a + 2 * l.h + 2 * l.w, 0) * SEAL_F / 1000) * 100) / 100;
+    const sealHjM = Math.round((sealLeaves.reduce((a, l) => a + 2 * l.h + l.w, 0) * SEAL_F / 1000) * 100) / 100;
+    // The door form saves the seal colour with the casement field (spec casement.sealColour).
+    const sealColour = String(d.sealColour || windowSpec.casement?.sealColour || windowSpec.sealColour || 'black').toLowerCase();
+
+    // ── Weights (information; derived.weights the casement way) ──
+    const secKgPerM = (sec) => {
+        const [sf, sd2] = String(sec).split('x').map(Number);
+        return kgPerM(sf || 0, sd2 || 0);
+    };
+    const timberKg = [...box, ...sash].reduce(
+        (a, c) => a + secKgPerM(c.section) * ((Number(c.length) || 0) / 1000) * (Number(c.quantity) || 1), 0);
+    const glassSqm = glassUnits.reduce((s, u) => s + u.width * u.height * u.qty, 0) / 1e6;
+    const glassKg = glassSqm * glassKgPerSqm;
+    const panelKg = panels.reduce((a, pn) => a + pn.area * panelKgPerSqm, 0);
 
     return {
         category: 'door',
         door: {
-            type: d.type || 'single-external',
-            leafW, leafH,
-            threshold, inward,
-            hasTimberCill,
-            bottomRailFace: els.leafBottom.face,
-            overlap,
+            type, isFrench, style, paneling: d.paneling || 'flat', lockType: d.lockType || 'single',
+            leafW, leafH, half, lip, clearance,
+            leafDepth: ld, frameDepth: fd,
+            threshold, inward, hasTimberCill, thresholdExtension: thresholdExt,
+            bottomRailFace: fBottom,
+            overlap: isFrench ? R(2 * lip - clearance) : 0,
+            members: {
+                stile: fStile, top: fTop, bottom: fBottom, mid: fMid, meeting: fMeet, side: spMember,
+                frameHead: fHead, frameJamb: fJamb, frameCill: cillFace, transomRail: railFace, post: postW,
+                land: geo.land, rebate: geo.rebate, gap: geo.gap, inset,
+            },
             totalWidth, totalHeight,
-            leaves,
-            panelLeaves,
+            leaves, panelLeaves, fanLeaves, panels,
             sidePanelMember: spMember,
+            cill: hasTimberCill ? { length: cillLength, face: cillFace, extension: thresholdExt, inward } : null,
+            hardware: { ...doorHw, fan: fanHw },
             zones: {
                 totalWidth, totalHeight,
                 doorX: R(doorX), doorW: R(frameWidth),
+                leafY, meetingX, lip: isFrench ? lip : 0,
                 frames, joints, posts,
                 leftPanel: leftW ? { x: 0, w: leftW } : null,
                 rightPanel: rightW ? { x: R(doorX + frameWidth), w: rightW } : null,
+                midRailAxis: axis,
+                // French meeting: the ACTIVE leaf laps the passive one on the face it
+                // opens to (exterior outward, interior inward), so the passive leaf
+                // (bolted) closes first and the active leaf swings free.
+                meetingLap: isFrench ? { leaf: 'active', face: inward ? 'interior' : 'exterior' } : null,
                 transom: transomH ? {
-                    h: transomH, railH,
-                    cavity: R(transomH - railH),
-                    type: tr.type || 'fixed',
-                    fanPanes,
+                    h: transomH, railH: railFace,
+                    cavity: R(transomH - railFace),
+                    type: transomType,
+                    bars: tr.bars || 'none',
+                    fanPanes, fanLeaves,
+                    // The visible frame band between the fanlight and the door leaf top,
+                    // as the profile numbers place them: from the fan daylight bottom
+                    // (fixed pane: glass bottom less the inset; opening leaf: leaf bottom
+                    // + gap) to the door leaf top less the gap. With the owner's fan rule
+                    // (51 at the rail) and the door top (51 below the zone top) it is
+                    // wider than the one 68 rail of the cut list: the rail lap is the
+                    // owner's drawing check (BLOCKERS 5.4); sheets and 3D draw this band.
+                    band: (() => {
+                        const top = transomType === 'opening'
+                            ? R(transomH - ded.fanAtRail + geo.gap)
+                            : R(transomH - (railFace - inset) - inset);
+                        const bottom = R(leafY - geo.gap);
+                        return { y: top, h: R(bottom - top) };
+                    })(),
                 } : null,
             },
         },
-        components: { sash, box, beading: [] },
+        components: { sash, box, beading },
         customGlassUnits: glassUnits,
         glazingItems: [],
-        weights: { total: 0 },
+        weights: {
+            timber: R(timberKg),
+            glass: R(glassKg),
+            panel: R(panelKg),
+            total: R((timberKg + glassKg + panelKg) * wMargin),
+            leaves: leaves.map((l) => ({ role: l.role, weightKg: l.weightKg })),
+        },
         paint: calculatePaint(totalWidth, totalHeight),
         consumables: {
-            glass: {
-                type: windowSpec.glazing?.type || 'double',
-                sqm: Math.round(glassUnits.reduce((s, u) => s + u.width * u.height * u.qty, 0) / 1e6 * 100) / 100,
-            },
+            glass: { type: glassType, sqm: Math.round(glassSqm * 100) / 100 },
+            silicone: { tubes: siliconeTubes },
+            beadTapeSide: { meters: beadTapeSideM },
+            sealFrame: { meters: sealFrameM },
+            sealHeadJambs: { meters: sealHjM },
+            sealColour,
         },
         frame: { width: frameWidth, height: frameHeight },
     };
@@ -1430,7 +1699,7 @@ export function deriveWindowData(windowSpec, settings = {}) {
     const frameHeight = Number(windowSpec.frame?.height ?? 0);
     const category = windowSpec.category || 'sash';
     if (category === 'casement') return deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings);
-    if (category === 'door' || category === 'doors') return deriveDoorWindow(windowSpec, frameWidth, frameHeight);
+    if (category === 'door' || category === 'doors') return deriveDoorWindow(windowSpec, frameWidth, frameHeight, settings);
     if (category !== 'sash') return emptyDerived(category, frameWidth, frameHeight);
     const isTripleSash = windowSpec.sash?.type === 'triple';
     const gridMode = windowSpec.sash?.grid?.mode ?? 'none';

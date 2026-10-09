@@ -6,8 +6,8 @@
  * Page 2+: one section per page — BLO visualization + element table
  */
 import { jsPDF } from 'jspdf';
-import { getPartSymbol } from '../engine/partSymbols.js';
-import { PART_COLOUR_GROUPS, partColourForElement, hexToRgb, barLabelThatFits } from '../engine/partColours.js';
+import { getPartSymbol, displayElementName } from '../engine/partSymbols.js';
+import { PART_COLOUR_GROUPS, partColourForElement, hexToRgb, barLabelThatFits, windowColourForIndex, WINDOW_COLOURS } from '../engine/partColours.js';
 
 // ─── COLORS ───
 const C = {
@@ -210,7 +210,7 @@ function drawSummaryTable(doc, PG, groups, startY, beginPage) {
 }
 
 // ─── BLO VISUALIZATION (per section page) ───
-function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf, colourByPart = false) {
+function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf, colourByPart = false, windowColourOf = null) {
   const x = PG.bx + 4;
   const areaW = PG.w - 2 * PG.bx - 8;
   let y = startY;
@@ -251,7 +251,10 @@ function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf, colourBy
       // Colour by part: the piece takes its compartment colour (offcut bars
       // too, they keep their "(offcut N)" note); otherwise one colour as before.
       const partColour = colourByPart ? partColourForElement(elName) : null;
-      const color = partColour ? hexToRgb(partColour.hex) : (bar.isOffcut ? C.amber : C.teal);
+      // Per window (08.10.2026): the window's colour, the label is the part symbol and the dimension.
+      const winColour = !partColour && windowColourOf ? windowColourOf(detail) : null;
+      const pieceColour = partColour || winColour;
+      const color = pieceColour ? hexToRgb(pieceColour.hex) : (bar.isOffcut ? C.amber : C.teal);
       fc(doc, color);
       dc(doc, [30, 30, 35]);
       doc.setLineWidth(LW.barCut);
@@ -264,7 +267,8 @@ function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf, colourBy
       // project number, window and dimension only.
       const plainLabel = `${projNum ? projNum + '-' : ''}${winName ? winName + '-' : ''}${sym?.symbol || ''} ${cutLen}`.trim();
       const colouredLabel = `${[projNum, winName].filter(Boolean).join('-')} ${cutLen}`.trim();
-      const fullLabel = partColour ? colouredLabel : plainLabel;
+      const windowLabel = `${sym?.symbol || ''} ${cutLen}`.trim();
+      const fullLabel = partColour ? colouredLabel : winColour ? windowLabel : plainLabel;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.5);
       tc(doc, C.black);
@@ -298,6 +302,15 @@ function drawBLO(doc, PG, optGroup, stockLength, startY, endTrim, kerf, colourBy
   doc.setFontSize(10);
   tc(doc, C.gray);
   doc.text(`Bars: ${optGroup.summary.totalBars}  ·  Waste: ${optGroup.summary.wasteTotal} mm  ·  Utilization: ${(optGroup.summary.utilAvg * 100).toFixed(1)}%`, x, y);
+  // 08.10.2026: pieces longer than the stock bar (reported by optimizer.js, never dropped)
+  const over = optGroup.summary.overLength || [];
+  if (over.length) {
+    y += 6;
+    doc.setFont('helvetica', 'bold');
+    tc(doc, C.black);
+    doc.text(`Longer than the stock bar (${over[0].stockLength} mm): ${over.map((o) => `${o.windowName ? `${o.windowName} ` : ''}${o.elementName} ${o.length}`).join(', ')}`.slice(0, 160), x, y);
+    doc.setFont('helvetica', 'normal');
+  }
   y += 8;
 
   return y;
@@ -394,7 +407,7 @@ function drawElementTable(doc, PG, items, startY, isPPMode, sg, beginPage) {
     if (isPPMode) {
       doc.text(item._projectNumber || '—', x + 28, y);
       doc.text(item.windowName || '—', x + 60, y);
-      doc.text(item.elementName, x + 100, y);
+      doc.text(displayElementName(item.elementName), x + 100, y);
       doc.setFont('courier', 'normal');
       doc.text(String(item.length), x + 175, y);
       doc.text(String(item.finishedLength || item.length), x + 210, y);
@@ -404,7 +417,7 @@ function drawElementTable(doc, PG, items, startY, isPPMode, sg, beginPage) {
       doc.text(String(item.totalQty), x + 285, y);
     } else {
       doc.text(item.windowName || '—', x + 28, y);
-      doc.text(item.elementName, x + 68, y);
+      doc.text(displayElementName(item.elementName), x + 68, y);
       doc.setFont('courier', 'normal');
       doc.text(String(item.length), x + 160, y);
       doc.text(String(item.finishedLength || item.length), x + 198, y);
@@ -465,7 +478,30 @@ const KEY_LEAF = [
   [40, 356, 120, 30, 'leaf_bottom_rail'],
 ];
 
-function drawColourKeyPage(doc, PG, topY) {
+// Door key (08.10.2026): a door frame with a side panel (coupling post) and a
+// fanlight rail, and a french leaf (hinge stile, meeting stile, mid rail).
+const KEY_DOOR_FRAME = [
+  [126, 110, 176, 24, 'door_transom'],
+  [100, 32, 26, 322, 'door_post'],
+  [12, 32, 26, 322, 'door_frame_jambs'], [302, 32, 26, 322, 'door_frame_jambs'],
+  [12, 6, 316, 26, 'door_frame_head'],
+  [2, 354, 336, 32, 'door_frame_cill'],
+];
+const KEY_DOOR_LEAF = [
+  [40, 36, 120, 160, null],
+  [40, 220, 120, 110, null],
+  [10, 6, 30, 380, 'door_leaf_stiles'], [160, 6, 30, 380, 'door_meeting_stile'],
+  [40, 6, 120, 30, 'door_top_rail'],
+  [40, 196, 120, 24, 'door_mid_rail'],
+  [40, 330, 120, 56, 'door_bottom_rail'],
+];
+const KEY_SHEETS = {
+  casement: { title: 'COLOUR KEY · CASEMENT', frame: KEY_FRAME, leaf: KEY_LEAF, families: ['frame', 'leaf'] },
+  door: { title: 'COLOUR KEY · DOOR', frame: KEY_DOOR_FRAME, leaf: KEY_DOOR_LEAF, families: ['door_frame', 'door_leaf'] },
+};
+
+function drawColourKeyPage(doc, PG, topY, kind = 'casement') {
+  const K = KEY_SHEETS[kind] || KEY_SHEETS.casement;
   const k = PG.w / 297;      // A4 landscape = 1
   const u = 0.2646 * k;      // one grid unit in mm
   const byId = Object.fromEntries(PART_COLOUR_GROUPS.map((g) => [g.id, g]));
@@ -475,7 +511,7 @@ function drawColourKeyPage(doc, PG, topY) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18 * k);
   tc(doc, C.black);
-  doc.text('COLOUR KEY · CASEMENT', x0, y);
+  doc.text(K.title, x0, y);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10 * k);
   tc(doc, C.dark);
@@ -514,8 +550,76 @@ function drawColourKeyPage(doc, PG, topY) {
     });
   };
 
-  drawPart('FRAME', KEY_FRAME, 'frame', x0);
-  drawPart('LEAF', KEY_LEAF, 'leaf', x0 + 610 * u);
+  drawPart('FRAME', K.frame, K.families[0], x0);
+  drawPart('LEAF', K.leaf, K.families[1], x0 + 610 * u);
+}
+
+// ─── COLOUR BY WINDOW (08.10.2026) ───
+// Legend line of a section: the windows whose pieces are in it, in pack order.
+function windowsIn(items, windowList, windowIndexOf) {
+  const seen = new Set();
+  (items || []).forEach((it) => {
+    const i = windowIndexOf ? windowIndexOf({ windowId: it.windowId, windowName: it.windowName, projectNumber: it._projectNumber }) : null;
+    if (i != null) seen.add(i);
+  });
+  return (windowList || []).filter((w) => seen.has(w.index));
+}
+
+function drawWindowLegend(doc, x, y, windows, maxW) {
+  let cx = x; let cy = y;
+  windows.forEach((w) => {
+    const text = `${w.index + 1}. ${w.name}`;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    const wText = 11 + doc.getTextWidth(text) + 8;
+    if (cx + wText > x + maxW) { cx = x; cy += 6; }
+    fc(doc, hexToRgb(w.colour.hex));
+    dc(doc, C.black);
+    doc.setLineWidth(LW.barOutline);
+    doc.rect(cx, cy - 3.6, 9, 4.6, 'FD');
+    tc(doc, C.black);
+    doc.text(text, cx + 11, cy);
+    cx += wText;
+  });
+  return cy;
+}
+
+// The window colour sheet: every window of the pack with its colour, to hang by the saw.
+function drawWindowKeyPage(doc, PG, topY, windowList) {
+  const k = PG.w / 297;
+  const x0 = PG.bx + 8 * k;
+  let y = topY + 4;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18 * k);
+  tc(doc, C.black);
+  doc.text('COLOUR KEY · WINDOWS', x0, y);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10 * k);
+  tc(doc, C.dark);
+  doc.text(`One colour = one window · ${WINDOW_COLOURS.length} colours, then they repeat`, PG.w - PG.bx - 6, y, { align: 'right' });
+  y += 12 * k;
+  const perCol = 11;
+  const colW = (PG.w - 2 * PG.bx - 16 * k) / Math.max(1, Math.ceil(windowList.length / perCol));
+  windowList.forEach((w, i) => {
+    const col = Math.floor(i / perCol);
+    const row = i % perCol;
+    const lx = x0 + col * colW;
+    const ly = y + row * 12 * k;
+    fc(doc, hexToRgb(w.colour.hex));
+    dc(doc, C.black);
+    doc.setLineWidth(0.3);
+    doc.rect(lx, ly - 6 * k, 14 * k, 8 * k, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12 * k);
+    tc(doc, C.black);
+    doc.text(`${w.index + 1}.  ${w.projectNumber ? w.projectNumber + '  ' : ''}${w.name}`, lx + 18 * k, ly);
+    if (w.colour.repeatOf != null) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5 * k);
+      tc(doc, C.gray);
+      doc.text(`same colour as window ${w.colour.repeatOf + 1}`, lx + 18 * k, ly + 4.2 * k);
+    }
+  });
 }
 
 // ─── MAIN EXPORT ───
@@ -532,8 +636,14 @@ export function exportPreCutPDF({
   companySettings = {},
   returnDoc = false,
   colourByPart = false, // colour the pieces by part + legend + key sheet
+  colourMode = null,    // 'off' | 'part' | 'window' (08.10.2026); falls back to colourByPart
+  windowList = [],      // [{ index, id, name, projectNumber, colour }] in pack order (per window mode)
+  windowIndexOf = null, // (detail) => pack index of the piece's window
 }) {
   const PG = getPageDims(format);
+  const mode = colourMode || (colourByPart ? 'part' : 'off');
+  const byPart = mode === 'part';
+  const windowColourOf = mode === 'window' && windowIndexOf ? (detail) => windowColourForIndex(windowIndexOf(detail)) : null;
   const endTrim = settings?.endTrim || 10;
   const kerf = settings?.kerf || 3;
 
@@ -620,10 +730,18 @@ export function exportPreCutPDF({
     y += sg.materialInfo ? 18 : 12;
 
     // Colour by part: which colour is which part in this section.
-    const legendGroups = colourByPart && content !== 'list' ? colourGroupsIn(sg.items) : [];
+    const legendGroups = byPart && content !== 'list' ? colourGroupsIn(sg.items) : [];
     if (legendGroups.length) {
       drawColourLegend(doc, PG.bx + 4, y - 3, legendGroups);
       y += 6;
+    }
+    // Per window: which colour is which window in this section.
+    if (mode === 'window' && content !== 'list') {
+      const wins = windowsIn(sg.items, windowList, windowIndexOf);
+      if (wins.length) {
+        const endY = drawWindowLegend(doc, PG.bx + 4, y - 3, wins, PG.w - 2 * PG.bx - 8);
+        y = endY + 6;
+      }
     }
 
     // BLO (skipped when exporting the list only) — first page of the material only
@@ -634,7 +752,7 @@ export function exportPreCutPDF({
       doc.text('BAR LAYOUT OPTIMIZER', PG.bx + 4, y);
       y += 8;
 
-      y = drawBLO(doc, PG, sg.optGroup, sg.stockLength, y, endTrim, kerf, colourByPart);
+      y = drawBLO(doc, PG, sg.optGroup, sg.stockLength, y, endTrim, kerf, byPart, windowColourOf);
       y += 4;
     }
 
@@ -645,8 +763,15 @@ export function exportPreCutPDF({
   });
 
   // Colour by part: one key sheet at the end, to hang by the saw.
-  if (colourByPart && content !== 'list' && summaryGroups.some((sg) => colourGroupsIn(sg.items).length)) {
-    drawColourKeyPage(doc, PG, beginPage());
+  // Casement and door parts each have their own key sheet (08.10.2026).
+  if (byPart && content !== 'list') {
+    const fams = new Set(summaryGroups.flatMap((sg) => colourGroupsIn(sg.items).map((g) => g.family)));
+    if (fams.has('frame') || fams.has('leaf')) drawColourKeyPage(doc, PG, beginPage(), 'casement');
+    if (fams.has('door_frame') || fams.has('door_leaf')) drawColourKeyPage(doc, PG, beginPage(), 'door');
+  }
+  // Per window: the window colour sheet at the end.
+  if (mode === 'window' && content !== 'list' && windowList.length) {
+    drawWindowKeyPage(doc, PG, beginPage(), windowList);
   }
 
   // Resolve the {tot} placeholder to the real page count on every page.
@@ -656,4 +781,138 @@ export function exportPreCutPDF({
   if (returnDoc) return doc.output('arraybuffer');
   doc.save(filename);
   return filename;
+}
+
+// ─── LABELS: A4 sheet of 44 labels, 48.5 x 25.4 mm (Piotr 08.10.2026) ───
+// One label per pre-cut piece, in bar order (group by group, bar by bar, left
+// to right), so the sheet follows the saw. Colour strip of the active mode
+// (per part or per window; none when the colours are off). Window name, part
+// (no C- / D- prefix) and section, then PRE-CUT and CUT side by side, CUT a
+// tenth smaller (owner). No project number. Printed on a plain colour printer
+// at 100 % scale on a 44-up sheet (4 x 11, zero gaps, 8 / 8.8 mm margins).
+export const LABEL_SHEET = Object.freeze({ cols: 4, rows: 11, w: 48.5, h: 25.4, left: 8.0, top: 8.8, gapX: 0, gapY: 0, strip: 6 });
+
+/** The label of one bar piece: text fields and the colour of the active mode. */
+export function labelForPiece(detail, { groupSection = '', mode = 'off', windowIndexOf = null, barId = '' } = {}) {
+  const elName = detail?.elementName || '';
+  const sym = elName ? getPartSymbol(elName) : null;
+  const part = sym && sym.name && !/^[CDS]-/.test(sym.name) ? sym.name : displayElementName(elName);
+  const partColour = mode === 'part' ? partColourForElement(elName) : null;
+  const winColour = mode === 'window' && windowIndexOf ? windowColourForIndex(windowIndexOf(detail)) : null;
+  const precut = Number(detail?.length) || 0;
+  const finished = detail?.finishedLength != null ? Number(detail.finishedLength) : null;
+  return {
+    window: detail?.windowName || '',
+    part,
+    symbol: sym?.symbol || '',
+    section: detail?.section || groupSection || '',
+    precut,
+    cut: finished,
+    colour: partColour?.hex || winColour?.hex || null,
+    barId: barId || '',
+  };
+}
+
+/** All labels of a pack in bar order (the summary groups as the Pre-Cut PDF orders them). */
+export function buildLabelList(groups, optimization, { mode = 'off', windowIndexOf = null } = {}) {
+  const out = [];
+  (groups || []).forEach((g) => {
+    let optGroup = null;
+    if (g.type === 'sash' && optimization?.sashEngineering) optGroup = optimization.sashEngineering.find((o) => o.section === g.section);
+    else if (g.type === 'box' && optimization?.boxSapele) optGroup = optimization.boxSapele.find((o) => String(o.preCutWidth) === g.section);
+    (optGroup?.bars || []).forEach((bar) => {
+      const details = bar.cutDetails || bar.cuts.map((c) => ({ length: c, elementName: '' }));
+      details.forEach((d) => out.push(labelForPiece(d, { groupSection: g.section, mode, windowIndexOf, barId: bar.barId })));
+    });
+  });
+  return out;
+}
+
+/** Position of label n (0-based) on its sheet: { page, col, row, x, y } in mm. */
+export function labelSlot(n, L = LABEL_SHEET) {
+  const perPage = L.cols * L.rows;
+  const page = Math.floor(n / perPage);
+  const i = n % perPage;
+  const col = i % L.cols;
+  const row = Math.floor(i / L.cols);
+  return { page, col, row, x: L.left + col * (L.w + L.gapX), y: L.top + row * (L.h + L.gapY) };
+}
+
+function drawLabel(doc, x, y, lab, L = LABEL_SHEET) {
+  const strip = lab.colour ? L.strip : 0;
+  if (lab.colour) {
+    fc(doc, hexToRgb(lab.colour));
+    doc.rect(x + 0.6, y + 0.6, strip - 0.6, L.h - 1.2, 'F');
+    if (lab.colour.toUpperCase() === '#FFFFFF') {          // the white colour: visible by its outline only
+      dc(doc, C.black); doc.setLineWidth(0.3);
+      doc.rect(x + 0.6, y + 0.6, strip - 0.6, L.h - 1.2, 'D');
+    }
+  }
+  const tx = x + strip + 1.5;
+  const innerW = L.w - strip - 3;
+  // window name, then the part and section on the same line when they fit
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  tc(doc, C.black);
+  const win = String(lab.window || '').slice(0, 14);
+  doc.text(win, tx, y + 5.2);
+  const winW = doc.getTextWidth(win);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  tc(doc, C.dark);
+  const partText = [lab.part, lab.section].filter(Boolean).join(' · ');
+  if (winW + 2 + doc.getTextWidth(partText) <= innerW) doc.text(partText, tx + winW + 2, y + 5.2);
+  else {
+    let t = partText;
+    while (t.length > 4 && doc.getTextWidth(t) > innerW - winW - 2) t = t.slice(0, -2);
+    doc.text(t, tx + winW + 2, y + 5.2);
+  }
+  // PRE-CUT and CUT side by side, CUT a tenth smaller (owner 08.10.2026)
+  const colW = innerW / 2;
+  const cells = [['PRE-CUT', lab.precut, 18], ['CUT', lab.cut, 16.2]];
+  cells.forEach(([cap, val, basePt], i) => {
+    const cx = tx + i * colW;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(5.5);
+    tc(doc, C.gray);
+    doc.text(cap, cx, y + 10.2);
+    if (val == null) return;
+    const text = String(val);
+    let pt = basePt;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(pt);
+    while (doc.getTextWidth(text) > colW - 2.5 && pt > 8) { pt -= 0.5; doc.setFontSize(pt); }
+    tc(doc, C.black);
+    doc.text(text, cx, y + 19.4);
+  });
+  dc(doc, C.grayL); doc.setLineWidth(0.2);
+  doc.line(tx + colW - 1.2, y + 8.5, tx + colW - 1.2, y + L.h - 2);
+  // bar id, small, bottom right
+  if (lab.barId) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(5.5);
+    tc(doc, C.gray);
+    doc.text(String(lab.barId), x + L.w - 1.5, y + L.h - 1.8, { align: 'right' });
+  }
+}
+
+export function exportPreCutLabelsPDF({
+  groups, optimization, settings, batch, pp, isPPMode = false,
+  colourMode = 'off', windowList = [], windowIndexOf = null, returnDoc = false,
+}) {
+  void settings; void isPPMode; void windowList;
+  const labels = buildLabelList(groups, optimization, { mode: colourMode, windowIndexOf });
+  const L = LABEL_SHEET;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  labels.forEach((lab, n) => {
+    const slot = labelSlot(n, L);
+    if (slot.page > 0 && slot.col === 0 && slot.row === 0) doc.addPage();
+    drawLabel(doc, slot.x, slot.y, lab, L);
+  });
+  const name = batch?.name || batch?.label || pp?.name || 'pack';
+  const date = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
+  const filename = `PreCut_Labels_${String(name).replace(/[^a-zA-Z0-9-]/g, '_')}_${date}.pdf`;
+  if (returnDoc) return doc.output('arraybuffer');
+  doc.save(filename);
+  return { filename, labels: labels.length, sheets: Math.ceil(labels.length / (L.cols * L.rows)) };
 }

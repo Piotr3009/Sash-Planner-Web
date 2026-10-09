@@ -24,6 +24,11 @@
  *   woodColor, woodColorExt, woodColorInt, sameColor
  *   glassType, spacerColor
  *   upperBars, lowerBars, etc.
+ *   doorGeo       - optional (doors to production, Piotr 08.10.2026): the engine door
+ *                   geometry from utils/windowSpecToConfig.js doorGeometryFromSpec. When
+ *                   present the door is drawn by DoorAssembly.jsx from the engine numbers
+ *                   (leaves, members, glass, panel, frame, cill, fanlight, hinges,
+ *                   handles); when absent this file renders exactly as before (PSW).
  */
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
@@ -32,6 +37,7 @@ import DoorFrame, { resolveFrameDims, DEFAULT_FRAME_DIMS, FRAME_FACE, EXT_FACE, 
 import DoorPanel, { SASH_RAIL } from './DoorPanel';
 import DoorSidePanel from './DoorSidePanel';
 import TransomPanel from './TransomPanel';
+import DoorAssembly from './DoorAssembly';
 
 // ─── Layout definitions ───
 // Each layout = { panels: [...], mullions?: [...], transoms?: [...] }
@@ -473,6 +479,10 @@ export default function DoorWindow({
   transomHeight = 450,
   transomBars = 'none',
   frameDims = null,       // v4 Block F (PC): { frameFace, extFace } from the door profile; absent → PSW 57 / 36
+  // Doors to production (brief 5.1): the engine geometry (utils/windowSpecToConfig.js
+  // doorGeometryFromSpec). Present: the door is drawn from it by DoorAssembly, every
+  // size and position from the engine. Absent: the door renders exactly as before.
+  doorGeo = null,
 }) {
   const colorE = sameColor ? woodColor : woodColorExt;
   const colorI = sameColor ? woodColor : woodColorInt;
@@ -575,6 +585,17 @@ export default function DoorWindow({
 
   const W = mm(width);
   const H = mm(height);
+
+  if (doorGeo) {
+    return (
+      <group>
+        <DoorAssembly geo={doorGeo} extMaterial={extMaterial} intMaterial={intMaterial}
+          opening={opening} spacerColor={spacerColor} glassFinish={glassFinish}
+          sealColour={sealColour} ironmongery={ironmongery} />
+        {showGuides && <DoorGeoGuides geo={doorGeo} />}
+      </group>
+    );
+  }
 
   return (
     <group>
@@ -1204,6 +1225,40 @@ export default function DoorWindow({
           </group>
         );
       })()}
+    </group>
+  );
+}
+
+// ─── Guides of the engine-driven door (doorGeo): the assembly, the frames,
+//     the fanlight and the frame depth, every label from the engine ───
+function DoorGeoGuides({ geo }) {
+  const transomH = geo.transomH || 0;
+  const cx = geo.doorX + geo.doorW / 2;
+  const cy = transomH + geo.doorH / 2;
+  const X = (x) => mm(x - cx);
+  const Y = (y) => mm(cy - y);
+  const frames = geo.frames || [];
+  const hasPanels = frames.length > 1;
+  const top = Y(0);
+  const right = X(geo.totalWidth);
+  const left = X(0);
+  const halfD = mm(geo.frameDepth) / 2;
+  return (
+    <group>
+      <DimensionGuide from={[left, top + mm(hasPanels ? 140 : 80), 0]} to={[right, top + mm(hasPanels ? 140 : 80), 0]}
+        label={`${geo.totalWidth}mm`} offset={[0, 0.05, 0]} />
+      {hasPanels && frames.map((f, i) => (
+        <DimensionGuide key={`fw-${i}`} from={[X(f.x), top + mm(60), 0]} to={[X(f.x + f.w), top + mm(60), 0]}
+          label={`${f.w}`} offset={[0, 0.04, 0]} />
+      ))}
+      <DimensionGuide from={[right + mm(80), Y(geo.totalHeight), 0]} to={[right + mm(80), top, 0]}
+        label={`${geo.totalHeight}mm`} offset={[0.07, 0, 0]} />
+      {transomH > 0 && (
+        <DimensionGuide from={[right + mm(30), Y(transomH), 0]} to={[right + mm(30), top, 0]}
+          label={`${transomH}`} offset={[0.05, 0, 0]} />
+      )}
+      <DimensionGuide from={[left - mm(80), 0, -halfD]} to={[left - mm(80), 0, halfD]}
+        label={`${geo.frameDepth}mm`} offset={[-0.07, 0, 0]} />
     </group>
   );
 }

@@ -261,9 +261,16 @@ for (const [name, spec] of SHAPED_CASES) {
 // ═══════════════════════════════════════════════════════════════════════════
 section('6 — skips: only a window with no glass at all');
 {
-  const door = specification.normaliseToWindowSpec({ id: 'D1', name: 'D1', width: 1000, height: 2100 }, { fullConfig: { windowCategory: 'door', doorLayout: 'D01' } });
-  const r = glassDxf.glassDxfParamsForWindow(door, derive(door), 'D1');
-  check('a door is skipped with "not a casement or sash window"', r.skip === 'not a casement or sash window', String(r.skip));
+  // 08.10.2026 (doors to production): a door now exports its rectangular units (until then it was
+  // the skip example). The skip is shown on a fix frame window, which still has no engine.
+  const fix = specification.normaliseToWindowSpec({ id: 'X1', name: 'X1', width: 1000, height: 1200 }, { fullConfig: { windowCategory: 'fix-frame' } });
+  const r = glassDxf.glassDxfParamsForWindow(fix, derive(fix), 'X1');
+  check('a window type without an engine (fix frame) is skipped with "not a casement or sash window"', r.skip === 'not a casement or sash window', String(r.skip));
+  const door = specification.normaliseToWindowSpec({ id: 'D1', name: 'D1', width: 1000, height: 2100 }, { fullConfig: { windowCategory: 'door', doorLayout: 'D01', doorHBars: 1, doorVBars: 1 } });
+  const rd = glassDxf.glassDxfParamsForWindow(door, derive(door), 'D1');
+  const u0 = rd.params?.units?.[0];
+  check('a door exports its unit with the schedule size and its bars (1 H x 1 V)', rd.params?.units?.length === 1 && u0.rect && near(u0.rect.width, derive(door).customGlassUnits[0].width) && u0.rect.bars.length === 2,
+    JSON.stringify(rd.skip || u0?.rect));
   check('no windowSpec → "no data"', glassDxf.glassDxfParamsForWindow(null, null, '').skip === 'no data');
   check('derived missing → "window could not be calculated"', glassDxf.glassDxfParamsForWindow(RECT, null, 'R040').skip === 'window could not be calculated');
   check('a casement whose rows carry no glass → "no glass unit"', glassDxf.glassDxfParamsForWindow(RECT, { category: 'casement', customGlassUnits: [] }, 'R040').skip === 'no glass unit',

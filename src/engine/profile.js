@@ -607,71 +607,93 @@ export function casementGlassDeductions(profile = getCasementProfile()) {
   return { width, height: Math.round(((top - inset) + (bottom - inset)) * 10) / 10 };
 }
 
-// ─── DOOR PROFILE v1 ────────────────────────────────────────────────────────
-// Piotr 04.08: the door FRAME is the casement frame with a 4mm deeper rebate
-// (61 instead of 57). The LEAF is different: 94mm all round INCLUDING internal
-// members, except the bottom rail at 180mm — the height is what keeps a door
-// rigid. Threshold has three variants; with 'none' there is NO bottom frame
-// member at all, so it must never appear in the cut list.
+// ─── DOOR PROFILE v2 (Piotr 08.10.2026, doors to production) ────────────────
+// The door FRAME is the casement frame: face 68, depth 93, land 47, rebate 21,
+// gap 4, cill 68 x 93 with 41 visible (owner box item 1). Inward doors keep
+// the unrebated 40 -> 35 cill (item 2); aluminium and low-profile thresholds
+// have no timber cill at all (item 3). The LEAF is 57 deep (61 with a triple
+// unit, as casement): stiles 94, top rail 94, bottom rail 180, mid rail 94,
+// french meeting stile 100 = 94 + the 6 lip (item 4).
+//   single leaf W = W - 2 x leafAtJamb (51)                         (item 5)
+//   french half  = (W - 2 x leafAtJamb - frenchClearance) / 2, leaf = half + frenchLip
+//   leaf H       = H - leafFullHeight (98 = 47 + 4 + 6 + 41) with a timber cill,
+//                  in both opening directions; H - leafNoThreshold (57) without (item 6)
+// Schema 1 (04.08 to 07.10.2026) carried the 28mm-unit numbers: leaf 61,
+// rebate 25, land 43, leafAtJamb 47, leafFullHeight 94, leafNoThreshold 53 and
+// frenchOverlap 6. migrateDoorProfile moves a stored copy key by key.
 export const DEFAULT_DOOR_PROFILE = Object.freeze({
-  schema: 1,
+  schema: 2,
   frameDepth: 93,
-  leafDepth: 61,          // = casement 57 + 4mm deeper rebate
+  leafDepth: 57,          // as casement leafDepth (24mm unit)
+  leafDepthTriple: 61,    // as casement leafDepthTriple: the 28mm triple unit needs a deeper leaf rebate
   elements: {
-    frameHead:  { face: 68 },   // v4 Block F: 57 → 68, same section as the casement frame
-    frameJamb:  { face: 68 },
-    frameCill:  { face: 68 },   // outward-opening: same as casement cill
-    mullion:    { face: 68 },   // french centre mullion
-    leafStile:  { face: 94 },
-    leafTop:    { face: 94 },
-    leafBottom: { face: 180 },  // deliberately taller — door stiffness
-    leafMid:    { face: 94 },   // internal rail (half-glazed / three-quarter)
+    frameHead:   { face: 68 },   // as casement frameHead
+    frameJamb:   { face: 68 },   // as casement frameJamb
+    frameCill:   { face: 68 },   // outward: the casement cill, 68 x 93, 41 visible
+    mullion:     { face: 68 },   // kept for stored copies: a french door has no centre mullion
+    transomRail: { face: 68 },   // fanlight transom rail, cut totalWidth - 2 x 68
+    leafStile:   { face: 94 },
+    leafTop:     { face: 94 },
+    leafBottom:  { face: 180 },  // deliberately taller: door stiffness
+    leafMid:     { face: 94 },   // mid rail of the half-glazed and three-quarter styles
+    leafMeeting: { face: 100 },  // french meeting stile = 94 + frenchLip 6
   },
   // Inward-opening doors cannot have a rebated cill (the leaf must swing in):
-  // the internal face is 40mm and falls to 35mm across the leaf depth, so rain
-  // runs out. Outward-opening doors reuse the casement cill unchanged.
-  cillInward: { faceInternal: 40, faceExternal: 35, runDepth: 61 },
-  // French doors NEVER have a centre mullion (Piotr 09.08) — the leaves meet
-  // on a rebate: each meeting stile is rebated 6mm with a 3mm clearance. For
-  // sizing, only the 6mm overlap matters: combined meeting band seen from
-  // outside = 94 + 94 − 6 = 182, and each leaf = (door clear width + 6) / 2.
-  frenchOverlap: 6,
-  // Side panels are FIXED leaves in the same frame, all members 57mm — matches
-  // the 3D model (DoorSidePanel stileWidthMm=57), confirmed by Piotr 09.08.
+  // the internal face is 40mm and falls to 35mm across the leaf depth.
+  cillInward: { faceInternal: 40, faceExternal: 35, runDepth: 57 },
+  // French doors never have a centre mullion (Piotr 09.08): each leaf runs
+  // frenchLip past the centre line on its meeting stile (owner box item 5).
+  frenchLip: 6,
+  // frenchClearance: 0,   // centre clearance between the two halves: owner, later (after tests). Leave unset;
+  //                       // the engine honours it when a workshop sets it: half = (W - 102 - clearance) / 2.
+  // Side panels are FIXED leaves in the same frame, all members 57 (unchanged, BLOCKERS).
   sidePanel: { member: 57, depth: 57 },
-  // Coupling post between a side panel and the door: ONE member 2 × jamb face
-  // = 136 wide (v4 Block F; was 114) with TWO rebates — the panel leaf laps
-  // one side, the door leaf the other (Piotr 09.08; replaces the two abutting
-  // jambs the 3D instantiates). Outward: both rebates face the exterior, so
-  // land + land = 86 shows from outside. Inward: the door rebate flips to the
-  // interior (3D mirrors the door frame on Z, DoorWindow.jsx:615) so the door
-  // side shows its full 68 face — visible band becomes 43 + 68 = 111, offset
-  // towards the door (was 72 / 104 on the 36 land).
+  // Coupling post between a side panel and the door: ONE member 2 x jamb face
+  // = 136 wide with TWO rebates (Piotr 09.08).
   couplingPost: { width: 136 },
-  // Coupled transom (PSW/3D convention): the frame gets TALLER by the transom
-  // height — frame.height stays the DOOR zone height. Internal rail 68 (same
-  // stock as the mullion), its bottom edge flush with the door opening top;
-  // fan cavity above the rail = transomHeight − 68. Opening fanlights carry a
-  // 64mm sash (3D TRANSOM_SASH_STILE) — engine support for that sash pending.
-  transom: { rail: 68, fanStile: 64 },
-  // Night 7 stage 3 — OPTION B for doors, the rule the casement frame already
-  // follows: the REBATE is the invariant, the land is what the wider face buys.
-  // land = face − rebate = 68 − 25 = 43 (was 36 against the old 57 face, which
-  // left a 32mm rebate step on the 68 frame — BLOCKERS §19.1).
+  // Panel of the half-glazed and three-quarter styles (owner box item 10): two
+  // Tricoya MDF boards and an MDF core, in the same 11.5 rebate as the glass.
+  // coreThickness 18 and densityKgM3 (leaf weight, information only) are
+  // FLAGGED defaults (BLOCKERS).
+  panel: { boardThickness: 18, boards: 2, coreThickness: 18, densityKgM3: 750 },
   geometry: {
-    land: 43,             // = frameJamb face 68 − rebate 25
-    rebate: 25,           // casement 21 + 4mm deeper — unchanged, it is the invariant
-    gap: 4,
-    mullionLand: 26,
-    gapCill: 6,
-    cillVisible: 41,
-    glassInset: 11.5,     // glass enters the leaf rebate this deep, per side (02.10.2026: 12.5 → 11.5, as windows)
+    land: 47,             // as casement: frame land 68 - 21
+    rebate: 21,           // as casement
+    gap: 4,               // as casement: leaf fitting gap at jambs and head
+    mullionLand: 26,      // as casement (kept for stored copies)
+    gapCill: 6,           // as casement
+    cillVisible: 41,      // as casement: cill front seen from outside
+    glassInset: 11.5,     // as casement: glass (and panel) enters the leaf rebate this deep, per side
+    glazingRebate: 18,    // as casement: the leaf glazing rebate (11.5 glass + 6.5 clips)
   },
   deductions: {
-    leafAtJamb: 47,          // land 43 + gap 4 (was 40)
-    leafAtMullionAxis: 17,   // half-land 13 + gap 4 — the mullion land did not move
-    leafFullHeight: 94,      // leafAtJamb 47 + gapCill 6 + cillVisible 41 (was 87)
-    leafNoThreshold: 53,     // leafAtJamb 47 + gapCill 6 — threshold 'none' (was 46)
+    leafAtJamb: 51,          // land 47 + gap 4
+    leafAtMullionAxis: 17,   // as casement (kept for stored copies)
+    leafFullHeight: 98,      // leafAtJamb 51 + gapCill 6 + cillVisible 41, outward AND inward
+    leafNoThreshold: 57,     // leafAtJamb 51 + gapCill 6 (aluminium / low-profile threshold)
+    // Opening fanlight (owner box item 11): a casement leaf in the transom
+    // zone, W_frame - 2 x leafAtJamb wide, transomH - fanAtHead - fanAtRail
+    // high (51 at the head, 51 at the rail: the rail is rebated like the head).
+    // FLAGGED: the rail lap is the owner's drawing check (BLOCKERS).
+    fanAtHead: 51,
+    fanAtRail: 51,
+  },
+  // Hinges per door leaf (owner box item 12) and their centres from the leaf
+  // top (the sheets' rule since 05.08.2026): 200 below the top, 100 above the
+  // centre, 150 above the bottom; the 4th halfway between top and middle.
+  hinges: { perLeaf: 3, perLeafTall: 4, tallAbove: 2100, fromTop: 200, aboveCentre: 100, fromBottom: 150, barrel: 102 },
+  // Variant attributes the buyer selects on the BJ Waller page (owner links
+  // 08.10.2026). Every value is a FLAGGED default (BLOCKERS 5.5).
+  hardware: {
+    doorThickness: 56,          // ThunderBolt door thickness variant for the 57 leaf
+    backset: 45,                // ThunderBolt backset: 45 or 55
+    faceplate: 'radius',        // ThunderBolt faceplate: radius or square
+    keeps: 'full length',       // ThunderBolt keeps
+    fgteShootbolts: 'slave',    // FGTE family: 'slave' (slave shootbolts only) or 'both'
+    fgteSlaveBackset: 45,       // FGTE slave backset: 35 or 45
+    fgteCentreLine: 22,         // FGTE lock centre line: 12 or 22
+    cillKeep: 'yes',            // FGTE shootbolt keep cill option, when the door has a timber cill
+    handleHeight: 1000,         // handle centre above the floor (3D DoorPanel.jsx), drawings only
   },
   lengths: {
     headDeduct: 0,
@@ -681,9 +703,9 @@ export const DEFAULT_DOOR_PROFILE = Object.freeze({
     topRailDeduct: 0,
     bottomRailDeduct: 0,
     midRailDeduct: 0,
+    meetingStileDeduct: 0,
     mullion: 77,
-    // Transom rail runs between the jambs: default deduct = 2 × jamb face
-    // (v4 Block F: 2 × 68 = 136).
+    // Transom rail runs between the jambs: default deduct = 2 x jamb face (2 x 68 = 136).
     transomDeduct: 136,
     // Side-panel members follow the door-leaf convention: full outer lengths.
     sideStileDeduct: 0,
@@ -691,9 +713,65 @@ export const DEFAULT_DOOR_PROFILE = Object.freeze({
   },
 });
 
+// Old defaults of door schema 1 (the 28mm-unit door, 04.08 to 07.10.2026) and
+// the schema-2 keys they map to. A stored copy below schema 2 takes a new
+// value only while it still equals the old default; a hand edit is kept.
+const DOOR_SCHEMA_1 = {
+  top: { leafDepth: 61 },
+  geometry: { land: 43, rebate: 25 },
+  deductions: { leafAtJamb: 47, leafFullHeight: 94, leafNoThreshold: 53 },
+  cillInward: { runDepth: 61 },
+};
+
+/**
+ * Door profile schema migration (casement style). Stored copies (Window
+ * Settings, windowProfiles.door; batch _profileSnapshot.door) below schema 2
+ * move key by key: a value equal to the schema-1 default takes the schema-2
+ * default, a hand-edited one is kept. frenchOverlap (schema 1, the rebate of
+ * each meeting stile) is read as frenchLip when no frenchLip is stored;
+ * transom.rail as elements.transomRail. Missing keys come from the default.
+ */
+export function migrateDoorProfile(profile) {
+  if (!profile) return null;
+  const D = DEFAULT_DOOR_PROFILE;
+  const old = (Number(profile.schema) || 1) < D.schema;
+  const pick = (stored, oldDefault, def) => (old && stored === oldDefault ? def : stored ?? def);
+  const elements = Object.fromEntries(Object.keys(D.elements).map((k) => [k, { ...D.elements[k], ...(profile.elements?.[k] || {}) }]));
+  for (const k of Object.keys(profile.elements || {})) if (!elements[k]) elements[k] = { ...profile.elements[k] };
+  if (!profile.elements?.transomRail && profile.transom?.rail != null) elements.transomRail = { face: Number(profile.transom.rail) };
+  const geometry = { ...D.geometry, ...(profile.geometry || {}) };
+  for (const k of Object.keys(DOOR_SCHEMA_1.geometry)) geometry[k] = pick(profile.geometry?.[k], DOOR_SCHEMA_1.geometry[k], D.geometry[k]);
+  const deductions = { ...D.deductions, ...(profile.deductions || {}) };
+  for (const k of Object.keys(DOOR_SCHEMA_1.deductions)) deductions[k] = pick(profile.deductions?.[k], DOOR_SCHEMA_1.deductions[k], D.deductions[k]);
+  const cillInward = { ...D.cillInward, ...(profile.cillInward || {}) };
+  cillInward.runDepth = pick(profile.cillInward?.runDepth, DOOR_SCHEMA_1.cillInward.runDepth, D.cillInward.runDepth);
+  const frenchLip = profile.frenchLip ?? (profile.frenchOverlap != null ? Number(profile.frenchOverlap) : D.frenchLip);
+  const { frenchOverlap, transom, ...rest } = profile;
+  void frenchOverlap; void transom;
+  return {
+    ...D, ...rest,
+    schema: D.schema,
+    leafDepth: pick(profile.leafDepth, DOOR_SCHEMA_1.top.leafDepth, D.leafDepth),
+    leafDepthTriple: profile.leafDepthTriple ?? D.leafDepthTriple,
+    elements,
+    cillInward,
+    frenchLip,
+    sidePanel: { ...D.sidePanel, ...(profile.sidePanel || {}) },
+    couplingPost: { ...D.couplingPost, ...(profile.couplingPost || {}) },
+    panel: { ...D.panel, ...(profile.panel || {}) },
+    geometry,
+    deductions,
+    hinges: { ...D.hinges, ...(profile.hinges || {}) },
+    hardware: { ...D.hardware, ...(profile.hardware || {}) },
+    lengths: { ...D.lengths, ...(profile.lengths || {}) },
+  };
+}
+
 let activeDoorProfile = null;
+// Pushed in by windowProfileStore (hydrate, cloud load, every edit). A stored
+// copy below schema 2 is migrated key by key on the way in.
 export function setActiveDoorProfile(profile) {
-  activeDoorProfile = profile ? { ...DEFAULT_DOOR_PROFILE, ...profile } : null;
+  activeDoorProfile = profile ? migrateDoorProfile(profile) : null;
 }
 export function getDoorProfile() {
   return activeDoorProfile || DEFAULT_DOOR_PROFILE;
@@ -765,15 +843,24 @@ export function boardWidthForDepth(frameDepth) {
   return depth - (p.boardInset ?? 23);
 }
 
-/** Temporarily compute with frozen (batch snapshot) profiles. */
-export function withProfiles(sashProfile, casementProfile, fn) {
+/**
+ * Temporarily compute with frozen (batch snapshot) profiles.
+ * withProfiles(sash, casement, door, fn), or the older withProfiles(sash,
+ * casement, fn): a function in third place is the callback and the door
+ * profile stays the live one (a batch frozen before doors had a snapshot).
+ */
+export function withProfiles(sashProfile, casementProfile, doorProfile, fn) {
+  if (typeof doorProfile === 'function') { fn = doorProfile; doorProfile = null; }
   const prevSash = activeProfile;
   const prevCas = activeCasementProfile;
+  const prevDoor = activeDoorProfile;
   if (sashProfile) activeProfile = normalizeSashProfile(sashProfile);
   if (casementProfile) activeCasementProfile = migrateCasementProfile(casementProfile);
+  if (doorProfile) activeDoorProfile = migrateDoorProfile(doorProfile);
   try { return fn(); } finally {
     activeProfile = prevSash;
     activeCasementProfile = prevCas;
+    activeDoorProfile = prevDoor;
   }
 }
 

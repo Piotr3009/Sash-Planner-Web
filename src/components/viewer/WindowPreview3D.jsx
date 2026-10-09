@@ -12,8 +12,9 @@ function Scene({ config, side }) {
   // Exterior = front (+Z camera), Interior = back (-Z camera) achieved by rotating group
   const groupRotation = side === 'interior' ? [0, Math.PI, 0] : [0, 0, 0];
 
-  // Auto-fit camera distance based on window dimensions
-  const h = (config.height || 1800) / 1000;
+  // Auto-fit camera distance based on window dimensions (a door: the whole
+  // assembly with side panels and fanlight, from the engine totals)
+  const h = (config.doorGeo ? Math.max(config.doorGeo.totalHeight, config.doorGeo.totalWidth) : (config.height || 1800)) / 1000;
   const cameraZ = Math.max(h * 1.4, 1.8);
 
   return (
@@ -110,6 +111,8 @@ function Scene({ config, side }) {
             sillExtension={config.sillExtension || 0}
             sillWider={config.sillWider || false}
             sealColour={config.sealColour || 'black'}
+            ironmongery={config.ironmongery || 'brass'}
+            doorGeo={config.doorGeo || null}
             showGuides={false}
           />
         ) : (
@@ -148,8 +151,8 @@ export default function WindowPreview3D({ windowSpec, side }) {
   // Convert Planner windowSpec → ParametricSashWindow props
   const config = useMemo(() => windowSpecToConfig(windowSpec), [windowSpec]);
 
-  // Camera position based on window size
-  const h = (config.height || 1800) / 1000;
+  // Camera position based on window size (a door: the whole assembly)
+  const h = (config.doorGeo ? Math.max(config.doorGeo.totalHeight, config.doorGeo.totalWidth) : (config.height || 1800)) / 1000;
   const cameraZ = Math.max(h * 1.4, 1.8);
 
   return (

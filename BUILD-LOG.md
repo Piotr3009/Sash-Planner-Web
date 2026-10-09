@@ -4,6 +4,297 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-10-08 · TURA PC: DOORS TO PRODUCTION, SINGLE AND FRENCH (branch `claude/doors-production`)
+
+Owner box (Piotr, 08.10.2026): the door frame is the casement frame (68 face, 93 deep, rebate 21, land 47, gap 4,
+cill 68 x 93 with 41 visible; inward cill unrebated 40 to 35; aluminium / low-profile threshold without a timber
+cill, counted in pieces). Leaf 57 deep (61 triple): stiles 94, top rail 94, bottom rail 180, mid rail 94, french
+meeting stile 100 (94 + the 6 lip). Single leaf W - 102; french half (W - 102) / 2, each leaf half + 6. Height
+H - 98 with a timber cill (both directions), H - 57 without. Single 900 x 2100: leaf 798 x 2002, glass 633 x 1751.
+French 1600 x 2100: half 749, leaf 755 x 2002, glass 584 x 1751. Door glass double 6x12x6 (24). Half glazed and
+three quarter with a mid rail and a panel (2 x 18 Tricoya + MDF core). Opening fanlight = a casement leaf.
+Winkhaus hardware from BJ Waller: hinges 3 / 4 per leaf, ThunderBolt single kit or FGTE double kit, cylinders,
+handles, bolts, thresholds.
+
+### Verdict ✅ single and french doors to production; box numbers in the engine, BOM, sheets and 3D; suite green twice
+
+Single 900 x 2100: leaf 798 x 2002, glass 633 x 1751, 6x12x6 / 24, members 94 / 94 / 180 x 57. French 1600 x 2100:
+leaves 755 x 2002, meeting stile 100 x 57, glass 584 x 1751. Half glazed 633 x 883 + panel 633 x 797, three quarter
+633 x 1383.5 + 296.5. Hardware counts per box items 12 to 15 on the new door rows; consumables, seals and paint on the
+casement rows. **Final tree: 27 harnesses, 3145 checks, 0 failures, twice (identical); `npm run build` OK (14.2 s).**
+Independent review: PASS, its should-fix items done (Stage 8). Sash and casement unchanged (t41 controls deep-equal to
+410cb5d; reviewer: 171 windows, 0 differences; no fixture changed). Items for Piotr: BLOCKERS 29.
+
+### Stage 0: baseline and sweep (no code changes)
+
+Starting commit **410cb5d** (`main` on 08.10.2026: the merge of PR #12, 7a333d8, plus the new CLAUDE.md and
+`docs/handover/DOORS-AUDIT-2026-10-07.md`). `git diff 7a333d8 410cb5d` touches those two files only, so the audit
+(written on 7a333d8) applies to this commit unchanged.
+
+**Suite on the starting commit: 26 harnesses, 2748 checks, 0 failures. `npm run build` OK (16.0 s).** Run as
+before: `verify/arch/t*.mjs` minus the `*baseline*` generators, plus `verify/parity/*.mjs`, each with `node <file>`,
+after `npm ci` and `pip install ezdxf` (ezdxf 1.4.4; the first run failed t16 / t17_edges / t18 / t20 / t22 / t23 /
+t25 on the missing module, rerun after the install). `verify/parity/psw-casement-layouts.mjs` exits rc 2 (no PSW
+clone at `../psw`): not a failure, not counted. The files the suite rewrites in `docs/handover/samples/` were
+restored with `git checkout` after every run; the first run also ran the two `*baseline*` generators, which rewrote
+`verify/arch/fixtures/rect-casement-sheets.json` (commit stamp only): restored, and the runner now skips them.
+
+| harness | checks | | harness | checks | | harness | checks |
+|---|---|---|---|---|---|---|---|
+| t16 | 369 | | t23 | 81 | | t33_bar_grid | 43 |
+| t17_edges | 70 | | t24_stage4 | 26 | | parity t31_bars_8x8 | 18 |
+| t18 | 179 | | t25 | 226 | | parity t32_bsuite | 54 |
+| t19 | 280 | | t26 | 38 | | parity t34_glass_minus1 | 46 |
+| t20 | 117 | | t27 | 87 | | parity t35_locks | 51 |
+| t20_bars | 31 | | t28 | 50 | | parity t36_hinges | 110 |
+| t21 | 120 | | t29 | 34 | | parity t37_single_window_bom | 47 |
+| t22 | 118 | | t30_preview | 30 | | parity t38_leaf_64_seat_85 | 468 |
+| | | | | | | parity t39_settings_leaf_cards | 23 |
+| | | | | | | parity t40_bottom_rail_3d | 32 |
+
+**Reference set, BEFORE** (live engine on 410cb5d, `normaliseToWindowSpec` then `deriveWindowData`, default
+profiles; the script is kept in the session scratchpad and re-run for the AFTER table). Every door feeds four BOM
+rows only (glass on the WINDOW double row, paint on the SASH rows) and has no hardware line, no weight, no beading:
+
+| door | leaves | glass | makeup / mm | BOM rows | hardware lines |
+|---|---|---|---|---|---|
+| single 900 x 2100 outward | 806 x 2006 | 641 x 1755 | 6x16x6 / 28 | glass_double, paint_primer, paint_preserver, paint_white_9016 | 0 |
+| single inward | 806 x 2006 | 641 x 1755 | 6x16x6 / 28 | same 4 | 0 |
+| single aluminium threshold | 806 x 2047 | 641 x 1796 | 6x16x6 / 28 | same 4 | 0 |
+| single half-glazed | 806 x 2006 (no mid rail, no panel) | 641 x 1755 | 6x16x6 / 28 | same 4 | 0 |
+| single three-quarter | 806 x 2006 (no mid rail, no panel) | 641 x 1755 | 6x16x6 / 28 | same 4 | 0 |
+| french 1600 x 2100 lockType single | 756 x 2006, 756 x 2006 | 591 x 1755 x 2 | 6x16x6 / 28 | same 4 | 0 |
+| french lockType double | 756 x 2006 x 2 | 591 x 1755 x 2 | 6x16x6 / 28 | same 4 | 0 |
+| french + side panels 500 / 500 | 756 x 2006 x 2; panels 406 x 2006 (57 members) | 591 x 1755 x 2, 315 x 1915 x 2 | 6x16x6 / 28 | same 4 | 0 |
+| french + fanlight 450 fixed | 756 x 2006 x 2 | 591 x 1755 x 2, 1487 x 337 | 6x16x6 / 28 | same 4 | 0 |
+| french + fanlight 450 opening | 756 x 2006 x 2 (no fan leaf) | 591 x 1755 x 2, 1487 x 337 "(opening, 64 sash pending)" | 6x16x6 / 28 | same 4 | 0 |
+| single bars h 2 / v 1 | 806 x 2006 | 641 x 1755 (no bars) | 6x16x6 / 28 | same 4 | 0 |
+
+Members today: stiles 94x61 L2006, top rail 94x61 L806, bottom rail 180x61 L806 (french: four 94 stiles, no meeting
+stile, no mid rail); frame head / jambs / cill 68x93; inward cill 40x93; coupling post 136x93 x2; transom 68x93
+L1464. Pre-cut: leaf members group as raw `94x61` / `180x61`, side panel members as `63x63` (sash section map), frame
+members under `undefined` with no material. Controls: casement 040L 1000 x 1200 (leaf 898 x 1102, glass 793 x 994)
+and sash 1000 x 1600; their derived data is the "controls unchanged" reference of Stage 7.
+
+**Sweep** (seven read-only agents: engine, store / settings, materials / BOM, drawings, pages, 3D, harness; then a
+completeness critic). The claims of `DOORS-AUDIT-2026-10-07.md` sections 0 to 6 hold on 410cb5d, with line drift
+only: 3.15 (the screen block is 739-748, not 740-747), 4.8 (the fan block runs 638-702), the t34 door pin (line
+87), the inward cill (calc 1311-1320), `DOOR_FRAME_DEPTH` (spec 66); BLOCKERS 23.4 names `setDoorProfile()` for the
+real `setActiveDoorProfile`. Two audit statements are slightly wrong: the bSuite export is casement only (doors are
+excluded either way), and BLOCKERS 23.6 "pricing consumes the engine rows" (`pricing.js` prices a door per m² from
+the configurator fields, out of scope). Found beyond the audit: a batch of type `'door'` (from `moveToProduction`)
+gets SASH batch defaults (`BATCH_DEFAULTS` knows `doors` only), the ironmongery `unit` / `subcategory` fields are not
+saved to the cloud (needs a DB column), `WindowDoorHandle.jsx` is imported but never rendered. Cross-report
+conflicts settled before Stage 1: the t27 grep gate forbids a literal 57 in `specification.js` (the door constants
+read the profile); one shape for `derived.door.hardware` (`{ summary, detail: [{ item, detail, quantity, partId }],
+fan, ... }`); `ProjectDetailPage` also derives, so all three `withProfiles(` callers pass the door snapshot; the fan
+rail datum goes to BLOCKERS 29.4.
+
+### Stage 1: profile, settings, snapshot (4bae7ff)
+
+`DEFAULT_DOOR_PROFILE` schema 2 per brief 3 (frame 68 x 93, land 47, rebate 21, gap 4, gapCill 6, cillVisible 41,
+glassInset 11.5, glazingRebate 18, leafAtJamb 51, leafFullHeight 98, leafNoThreshold 57, leaf 57 / 61, faces
+94 / 94 / 180 / mid 94 / meeting 100, frenchLip 6 with `frenchClearance` documented and honoured when set, panel
+boards 2 x 18 + core 18, hinge rule 3 / 4 above 2100, hardware defaults, fan rule 51 / 51). Every "as casement"
+value commented with its source. `migrateDoorProfile`: a stored copy below schema 2 takes the new value only where
+it still equals the schema-1 default; `frenchOverlap` is read as `frenchLip`, `transom.rail` as `transomRail`.
+`windowProfileStore` carries `door` next to sash and casement through the existing save / load path, with
+`setActiveDoorProfile` on hydrate, cloud load and every edit; `withProfiles(sash, casement, door, fn)` keeps the
+two-argument shape, and all three callers (WindowDetailPage, ProjectDetailPage, ProductionPackPage) pass
+`_profileSnapshot.door`; a new batch snapshot carries the door profile. Window Settings · Doors card (depths,
+frame faces, leaf faces incl. meeting and mid rail, panel boards, lip, leaf size rules with their hints, fan rule,
+hinge rule, hardware defaults), in the casement card components; the sidebar "Doors, soon" is a link now. Glass:
+`DOOR_GLASS_MAKEUP.double '6x12x6'`, `DOOR_GLASS_THICKNESS { double 24, double_slim 16, triple 28 }`, slim / triple
+on the window makeups, Laminate / Acoustic 24.8 for doors too; door frame depth 93 from the door profile.
+
+### Stage 2: engine (cbfb319, 66d0fff)
+
+`deriveDoorWindow` v4: single `W - 102`; french `half = (W - 102 - clearance) / 2`, leaf `half + 6`; height
+`H - 98` with a timber cill in both directions, `H - 57` without; members D-ST/L, D-ST/R (single) or the hinge
+stile + D-MS 100 (french), D-TR 94, D-BR 180, D-MR 94 for the two styles; glass per leaf zone with the meeting
+stile counted at 100; mid rail axis leafH / 2 or 0.75 x leafH, glass and panel by the brief formulas, panel 54 in
+the 11.5 rebate. Bars on door leaves, side panel leaves and fanlights (casement bar law; transom `match`). Opening
+fanlight = a casement top hung leaf per frame zone (D-FAN members on the casement faces 64 / 64 / 67, casement glass
+rule, `selectCasementHinges` / `selectCasementLocks`, a casement handle). Weights the casement way (door glass
+30 kg/m²), seals, door glazing bead, astragal beads, silicone, bead tape, packers, clips. `doorHardware.js`: hinges
+3 / 4, ThunderBolt / FGTE kits, cylinders, handle sets, bolts, thresholds, handing LH / RH with the Winkhaus words,
+FGTE height bands, all in `derived.door.hardware { summary, detail, handing, kit, fgte, fan }`. `zones` carry
+meetingX, lip, meetingLap, mid rail axis, panel, fan leaves, the transom band, hinge positions (200 / centre - 100 /
+150, the 4th halfway), handleY. Threshold extension replaces `cill.extension` (cill length, sill extension board);
+the inward cill is its own element `D-FRAME CILL (INWARD)`. Stale comments (calc 1177-1192, profile 639-641) rewritten.
+Note: the Stage 2 commit alone still fed sash counterweights and sash silicone to doors through the generic BOM path
+(`bom.js` 248); Stage 3 closed it (doors never buy counterweights), so no commit after b04d721 carries it.
+
+### Stage 3: Assign Materials, BOM, pre-cut, cut list (b04d721)
+
+`DOOR_PARTS` (Frame, Leaf, Panel, Side panel, Glass 6-12-6 plus the window glass rows shown read-only as "shared
+with windows", Beading, Ironmongery with the counting rule of 3.5 in each hint), appended last to `ALL_PARTS`;
+casement consumable, seal, clip and paint hints say "also doors". The Doors page replaces "coming soon" with the
+`PartGroupSection` pattern, ironmongery filtered to the door categories plus the new `cylinders`; "Doors use the
+casement rows" under Consumables and Paint. `bom.js`: every D- name maps (incl. meeting stile, mid rail, inward
+cill, side panel and fan members, the door bead); door glass on `d_glass_double_6_12_6`, slim / triple / acoustic on
+the window rows; paint on `c_paint_*`; hardware counts per 3.5; fan picks on the casement hinge and lock rows; panel
+boards in m²; consumables on the casement rows; sill extension boards for 35 / 60 / 85. `lists.js`: door frame
+members take the assigned material and merge with other door timber of that material; unassigned door timber groups
+by the workshop section map, else its finished section (never the sash profile fallback 63x63; a 57x57 side panel member
+follows the section map 57x57 -> 63x63); door hardware lines; door glass rows carry bars (the glass
+order PDF draws them from `barAxes`); the cut list keeps the hinge / meeting / active / passive notes when rows merge.
+Part symbols DFH DFJ DFC DFCI DCP DTR DMS DMR DSS DST DSB DFS DFT DFB; the door colour family and a COLOUR KEY DOOR
+legend; `optimizer.js` reports a piece longer than the stock instead of dropping it.
+
+### Stage 4: sheets, PDFs, pack (5ba2faa)
+
+Built by one agent on the sheet files only, then reviewed by a second agent (4 defects fixed: an inward leaf's bottom
+edge drawn dashed; frame openings not split at the transom on an inward door; the glass drawing subtitle running off
+the sheet; land / gap not dimensioned on the plan when both sides have side panels). `DoorElevation2D` (side panel
+bars, handle 1000 to the floor, opening symbol apex at the hinge, mid rail / panel / glass zones, the 6 lips and the
+centre line, the opening fan leaf top hung, the transom band, the threshold named, hinges from derived, bolts on the
+passive leaf of a one-handle french door), `DoorFrameDetail2D` (layer chain 47 / 4, labels on the spans they draw,
+the cill on the full frame height, depth 93 and rebate 21, inward cill text from the profile), `DoorLeafDetail2D`
+(every leaf, active and passive, the meeting detail, schedule glass to 0.1 mm, handle and lock, D-MR, panel and its
+build, hinge set-out, codes and cut lengths from the records, leaf depth from the record), new `DoorSidePanelDetail2D`,
+`DoorFanlightDetail2D`, `DoorGlassDrawing2D`, `doorSheetParts.jsx`, and `DoorSection2D` as a real plan view (frame
+with the rebate, leaf in it with the 4 gap, the meeting stiles with their lips, swing arcs, active / passive, inside /
+outside, side panels and the 136 post). One sheet plan (`doorSheetPlan`) mounted through `DoorSheet.jsx` by the
+Drawings panel tabs, its Elevation and Elements PDF rig, the Elements PDF payload and the production pack; uploaded
+sections stay available for doors. Window page: a door spec panel and a door "Calculated" block instead of the sash
+one, the door hardware detail card, depth 93, door glass drawings. Pack: door elevations and element cards, door glass
+drawings, spraying rows per door leaf, side panel and fan leaf, Overview columns (single / french, style, opening ·
+lock · threshold, depth 93). Glass DXF accepts doors (t18 / t28 skip examples moved to a fix frame window, see below).
+
+### Stage 5: 3D (764be73)
+
+Built by one agent on the 3D files only, then reviewed (2 defects fixed: the handle drawn at backset + 40 instead of
+the profile backset; an aluminium strip drawn for threshold `none`; and the t40 door section made non-circular, 15
+mutations each caught). `doorGeometryFromSpec` builds a plain geometry object from `deriveWindowData`; `DoorWindow`
+draws it through the new `DoorAssembly.jsx` when the `doorGeo` prop is present and renders byte-identical to before
+without it (t40 section 4). Leaf sizes, 94 / 94 / 180 x 57 (61 triple), mid rail and 54 panel per style, meeting
+stiles 100 with the 6 lips (12 overlap, the active leaf laps on its face), one 136 coupling post (no rewrite of
+`DoorSidePanel` was needed: the new path does not use it), side panel members 57, hinges 3 / 4 from derived, the
+active leaf and the handles per the engine and `lockType`, glass at the daylight size and the unit thickness,
+timber cill vs threshold, the opening fan leaf 64 / 64 / 67, the fixed fan glazed in the frame, the transom band.
+Preview, capture rig and the configurator iframe pass `doorGeo`; the capture rig and the preview now frame the whole
+assembly (side panels and fanlight) from the engine totals (checked by rendering through `Window3DCaptureRig`).
+24 headless renders (Chromium from /opt/pw-browsers, SwiftShader) in `docs/handover/samples/doors/`.
+
+### Stage 6: configurator (2e37fb1)
+
+Door frame depth 93 from the door profile in the saved config and the summary (the TDZ trap at the old line 587 is
+avoided by testing the batch type directly); editing a door prefills `doorPaneling`; glass chips stay double / slim
+/ triple with the spec chips; `thresholdExtension` flows to the engine (3.7); the 3D sync sends `doorGeo` built
+through `normaliseToWindowSpec` from the same keys the save stores. No new fields.
+
+### Stage 7: tests (2d54461, 5598d46)
+
+New `verify/parity/t41_doors_production.mjs` (18 sections): the box literals typed in, the reference set, hardware,
+BOM, pre-cut, cut list, fanlight, side panels, bars, weights and consumables by hand, threshold extension, migration
+and `withProfiles`, the store, the Assign Materials rows, controls (casement and sash deep-equal to 410cb5d), and the
+door sheets rendered through `DoorSheet` / `doorSheetPlan` (svg, no NaN / undefined / long dash, the dimension rule,
+schedule glass, frame chain 47 / 4, plan section, hinges 3 / 4, meeting stile 100, D-MR and panel, triple depth 61,
+fan leaf sheet). t40 section 6: the door meshes against the engine. Changed pins, each because the door really
+changed:
+- **t37**: "doors have zero hardware" (`if door continue` in the reference list; "no hardware cards (door ironmongery
+  is not counted yet)") is replaced by the new truth: a door is walked like every window; it still shows no hardware
+  CARD because every door line is an engine pick (typed by name in the test and flagged by the engine), and its
+  counts sit on the door rows (single 3 hinges + kit + cylinder + handle set; french one handle 6 hinges + kit + 2
+  bolts + cylinder + handle set). Two assertions added, none removed; Stage 8 added a third and one allowed row
+  field (`notes`, the purchase list variant note, checked to sit only on the door lock rows and add up).
+- **t34**: "door units = ref - 2" is kept, derived on a door profile pinned at the reference tree's construction
+  (leaf 61, land 43, rebate 25, leafAtJamb 47, leafFullHeight 94), so it still proves the glass -1 mm per side and
+  nothing else; the new door numbers are t41's subject.
+- **t38**: the door profile no longer equals the two older trees; instead both trees' schema-1 door profile,
+  migrated, must equal the live default on every key the engine reads, and the casement leaf pinned at 67 or 70 all
+  round must not change the door at all. The Assign Materials comparison sets aside the door rows (appended after
+  every window row, checked) and the hints that now mention doors (each checked to mention doors).
+- **t27**: the door rebate is the casement 21 now (option B land 43 / rebate 25 became schema 2 land 47 / rebate 21);
+  the option-B section compares against the last schema-1 tree; the french rule is half + lip.
+- **t18 / t28**: the glass DXF "door is skipped" examples now use a fix frame window (still no engine); a door
+  exports its unit at the schedule size with its bars (new check).
+No assertion was deleted to get a pass; sash and casement fixtures are byte-identical (no fixture file changed).
+
+### Stage 8: independent review, fixes (3382474)
+
+One review agent that had not seen the work, on its own worktree at 5598d46: it re-derived every box number by hand
+(all match, see its table: single 798 x 2002 / 633 x 1751, aluminium 2043 / 633 x 1792, french half 749, leaves
+755 x 2002 at x 51 and 794, glass 584 x 1751 = 749 - 165, half glazed axis 1001, 633 x 883 + 633 x 797,
+three-quarter axis 1501.5, 633 x 1383.5 + 633 x 296.5, hardware counts, hinges 3 at leaf 2100 and 4 at 2101, FGTE
+band 1965-2161, opening fan 1498 x 348 with glass 1393 x 240, fixed fan glass 1487 x 337, the BOM rows, one pre-cut
+group per material); confirmed no assertion weakened or deleted (start 2748 checks on 26 files, 2805 on the same
+files, plus t41); found no fixture changed (the 31 samples the suite rewrites are byte-identical to a run on 410cb5d
+but for PDF dates: drift older than this tura; 171 casement and sash windows compared with the start: 0
+differences); ran the suite (3138 checks, 0 fail) and the build; opened the rendered sheets and three 3D renders.
+**Verdict: PASS, nothing blocking.** Its should-fix items, all done in 3382474: the FGTE detail used an arrow that
+jsPDF Helvetica prints as garbage (reworded); the purchase list carried no variant note (now the lock kit and FGTE
+cylinder rows list their variants with quantities, screen and PDF, keys unchanged; t37 allows and checks the new
+`notes` row field); the pack hardware tab listed nothing for doors (passes derived for doors only); the optimiser's
+over-length report was in the data only (now on the Pre-Cut panels and the pre-cut PDF); BLOCKERS 29.4 now states the
+rail / door leaf numbers. Also from its notes: the door tab names are back to Frame / Leaf / Sections (rule 6), the
+elements PDF empty-sheet line that changed every window type was reverted, t41's "never 63x63" label was imprecise
+(a 57x57 side panel member follows the workshop section map 57x57 -> 63x63, now pinned with a section map test).
+Its cosmetic sheet notes and the remaining notes are BLOCKERS 29.9 m to p.
+
+### AFTER (5598d46 + 3382474, same script as the BEFORE table)
+
+| door | leaves | glass | makeup / mm | BOM rows | hardware lines |
+|---|---|---|---|---|---|
+| single 900 x 2100 outward | 798 x 2002 | 633 x 1751 | 6x12x6 / 24 | 22 | 4 (hinges 3, single kit, cylinder, handle set) |
+| single inward | 798 x 2002 | 633 x 1751 | 6x12x6 / 24 | 22 (inward cill 40x93) | 4 |
+| single aluminium threshold | 798 x 2043 | 633 x 1792 | 6x12x6 / 24 | 22 | 5 (+ threshold) |
+| single half-glazed | 798 x 2002, mid rail 94, panel 633 x 797 | 633 x 883 | 6x12x6 / 24 | 25 (+ mid rail, 2 panel boards) | 4 |
+| single three-quarter | 798 x 2002, mid rail 94, panel 633 x 296.5 | 633 x 1383.5 | 6x12x6 / 24 | 25 | 4 |
+| french 1600 x 2100 lockType single | 755 x 2002 x 2 (94 + meeting 100) | 584 x 1751 x 2 | 6x12x6 / 24 | 24 | 5 (hinges 6, kit, cylinder, handle, bolts 2) |
+| french lockType double | 755 x 2002 x 2 | 584 x 1751 x 2 | 6x12x6 / 24 | 23 | 4 (hinges 6, FGTE kit, cylinders 2, handle sets 2) |
+| french + side panels 500 / 500 | 755 x 2002 x 2; panels 398 x 2002 (57) | 584 x 1751 x 2, 307 x 1911 x 2 | 6x12x6 / 24 | 28 | 5 |
+| french + fanlight 450 fixed | 755 x 2002 x 2 | 584 x 1751 x 2, 1487 x 337 | 6x12x6 / 24 | 25 | 5 |
+| french + fanlight 450 opening | 755 x 2002 x 2; fan leaf 1498 x 348 (64 / 64 / 67) | 584 x 1751 x 2, 1393 x 240 | 6x12x6 / 24 | 30 (+ casement leaf timber, hinge, lock) | 8 (+ fan hinges, lock, handle) |
+| single bars h 2 / v 1 | 798 x 2002 | 633 x 1751, bars 2H x 1V (axes on the glass order) | 6x12x6 / 24 | 24 (+ astragal rows) | 4 |
+
+Single 900 x 2100 BOM rows: d_leaf_stile, d_leaf_top_rail, d_leaf_bottom_rail, d_frame_head, d_frame_jamb,
+d_frame_cill, d_glazing_beading, d_glass_double_6_12_6, c_paint_primer / preserver / white_9016, d_hinges,
+d_lock_single_kit, d_cylinder, d_handle_set, c_glazing_packer, c_glass_clips_double, c_silicone, c_bead_tape_1mm /
+2mm, c_seal_frame_black, c_seal_hj_black. Pre-cut unassigned: `94x57` (stiles, top rail), `180x57` (bottom rail),
+`68x93` (frame); with one material on the door rows: one group. Controls: casement 040L and sash 1000 x 1600 equal to
+the BEFORE run (components, BOM rows, hardware, glass list), and t41 section 17 deep-equal to 410cb5d.
+
+### Suite on the final tree (twice), `npm run build`
+
+Both runs identical, every file rc 0 (`psw-casement-layouts.mjs` exits 2: no ../psw clone, as at the start; not
+counted). The files the suite rewrites in `docs/handover/samples/` were restored after each run (the reviewer showed
+that drift predates this tura). `npm run build`: built in 14.2 s (the usual chunk-size warning).
+
+| harness | start | final (x2) | fail |
+|---|---|---|---|
+| t16 | 369 | 369 | 0 |
+| t17_edges | 70 | 70 | 0 |
+| t18 | 179 | 179 | 0 |
+| t19 | 280 | 280 | 0 |
+| t20 | 117 | 117 | 0 |
+| t20_bars | 31 | 31 | 0 |
+| t21 | 120 | 120 | 0 |
+| t22 | 118 | 118 | 0 |
+| t23 | 81 | 81 | 0 |
+| t24_stage4 | 26 | 26 | 0 |
+| t25 | 226 | 226 | 0 |
+| t26 | 38 | 38 | 0 |
+| t27 | 87 | 97 | 0 |
+| t28 | 50 | 51 | 0 |
+| t29 | 34 | 34 | 0 |
+| t30_preview | 30 | 30 | 0 |
+| t33_bar_grid | 43 | 43 | 0 |
+| t31_bars_8x8 | 18 | 18 | 0 |
+| t32_bsuite | 54 | 54 | 0 |
+| t34_glass_minus1 | 46 | 46 | 0 |
+| t35_locks | 51 | 51 | 0 |
+| t36_hinges | 110 | 110 | 0 |
+| t37_single_window_bom | 47 | 50 | 0 |
+| t38_leaf_64_seat_85 | 468 | 471 | 0 |
+| t39_settings_leaf_cards | 23 | 23 | 0 |
+| t40_bottom_rail_3d | 32 | 73 | 0 |
+| t41_doors_production | new | 339 | 0 |
+| **total** | **2748 (26 files)** | **3145 (27 files)** | **0** |
+
+---
+
 ## 2026-10-07 · TURA PC: CASEMENT BOTTOM RAIL 67 (branch `claude/casement-bottom-rail-67`)
 
 Owner box (Piotr, 07.10.2026): every casement leaf (opening, fanlight, fixed) has **stiles 64, top rail 64, bottom

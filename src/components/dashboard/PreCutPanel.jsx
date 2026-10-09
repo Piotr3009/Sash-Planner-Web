@@ -7,7 +7,7 @@ import { useState, useMemo } from 'react';
 import { buildPrecutForWindow } from '../../engine/lists.js';
 import { effectiveAssignment, materialSizeToRaw, ELEMENT_TO_PART_ID, assignedMaterialForItems } from '../../engine/bom.js';
 import { optimisePrecut } from '../../engine/optimizer.js';
-import { getPartSymbol } from '../../engine/partSymbols.js';
+import { getPartSymbol, displayElementName } from '../../engine/partSymbols.js';
 import { useMaterialAssignmentStore } from '../../stores/materialAssignmentStore.js';
 import { useMaterialStore } from '../../stores/materialStore.js';
 import { exportPreCutPDF } from '../../utils/precutPdfExport.js';
@@ -281,6 +281,13 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
                         Bars: {optGroup.summary.totalBars} · Waste: {optGroup.summary.wasteTotal} mm · Util: {(optGroup.summary.utilAvg * 100).toFixed(1)}%
                       </div>
                     </div>
+                    {/* 08.10.2026: a piece longer than the stock bar is reported, never dropped
+                        (optimizer.js; a door jamb with a fanlight can exceed it) */}
+                    {optGroup.summary.overLength?.length > 0 && (
+                      <div className="text-[11px] text-amber-400 mb-2">
+                        Longer than the stock bar ({optGroup.summary.overLength[0].stockLength} mm): {optGroup.summary.overLength.map((o) => `${o.windowName ? `${o.windowName} ` : ''}${o.elementName} ${o.length}`).join(', ')}. Order longer stock or joint the piece.
+                      </div>
+                    )}
                     <div className="space-y-1">
                       {(() => {
                         const maxStock = Math.max(...optGroup.bars.map((b) => b.stockLength || stock));
@@ -442,7 +449,7 @@ function GroupedElementTable({ items }) {
             const sym = getPartSymbol(g.element);
             return (
               <tr key={i} className="border-b border-surface-500/30">
-                <td className="px-4 py-2 text-ink-100">{g.element} <span className="text-accent-400 font-mono text-[10px]">({sym.symbol})</span>{sym.mirror ? <span className="text-purple-400 text-[9px] ml-1">⟷</span> : ''}</td>
+                <td className="px-4 py-2 text-ink-100">{displayElementName(g.element)} <span className="text-accent-400 font-mono text-[10px]">({sym.symbol})</span>{sym.mirror ? <span className="text-purple-400 text-[9px] ml-1">⟷</span> : ''}</td>
                 <td className="px-4 py-2 text-right text-ink-100 font-mono">{g.length} mm</td>
                 <td className="px-4 py-2 text-right text-ink-300 font-mono">{g.finishedLength} mm</td>
                 <td className="px-4 py-2 text-ink-300">{g.section}</td>
