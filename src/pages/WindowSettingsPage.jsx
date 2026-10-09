@@ -1317,18 +1317,21 @@ function CasementSettings({ sampleW, sampleH, setSampleW, setSampleH }) {
   );
 }
 
-// ─── Doors (08.10.2026, doors to production) ────────────────────────────────
+// ─── Doors (08.10.2026, doors to production; v3 09.10.2026) ─────────────────
 // The door profile card, in the casement card's layout: depths, frame and leaf
-// faces with their cut deductions, the panel boards, the french lip, the leaf
-// size rules with their composition hints, lands and gaps, the hinge rule, the
-// hardware variant defaults and the opening fanlight rule. Every field writes
-// the door profile through setDoorPath; the sample door on the right is the
-// live engine.
+// faces with their cut rules, the side panel light and fixed fan members, the
+// panel boards and edge, the french lip, the leaf size rules with their
+// composition hints, lands and gaps, the hinge rule and the hardware variant
+// defaults. Every field writes the door profile through setDoorPath; the
+// sample door on the right is the live engine. Since v3 the frame is ONE
+// casement frame (W x H overall): mullions and the transom follow the
+// casement rules.
 const DOOR_FRAME_ROWS = [
-  { key: 'frameHead', name: 'Frame head', lenKey: 'headDeduct', base: 'total W' },
-  { key: 'frameJamb', name: 'Frame jamb', qty: '×2', lenKey: 'jambDeduct', base: 'total H' },
-  { key: 'frameCill', name: 'Frame cill', lenKey: 'cillDeduct', base: 'total W + ext' },
-  { key: 'transomRail', name: 'Transom rail', lenKey: 'transomDeduct', base: 'total W' },
+  { key: 'frameHead', name: 'Frame head', lenKey: 'headDeduct', base: 'frame W' },
+  { key: 'frameJamb', name: 'Frame jamb', qty: '×2', lenKey: 'jambDeduct', base: 'frame H' },
+  { key: 'frameCill', name: 'Frame cill', lenKey: 'cillDeduct', base: 'frame W + ext' },
+  { key: 'mullion', name: 'Mullion', lenKey: 'mullion', base: 'frame H', note: 'door / side panel, full height (no timber cill: H − (77 − cill visible))' },
+  { key: 'transomRail', name: 'Transom', lenKey: 'transomSeat', base: 'field leaf W', op: '+', note: 'one segment per field, between jambs and mullions' },
 ];
 const DOOR_LEAF_ROWS = [
   { key: 'leafStile', name: 'Stiles', qty: '×2', lenKey: 'stileDeduct', base: 'leaf H' },
@@ -1378,8 +1381,10 @@ function DoorSettings() {
 
   // Composition hints (geometry -> expected rule value)
   const hJ = g.land + g.gap;
-  const hFull = g.land + g.gap + g.gapCill + g.cillVisible;
-  const hNo = g.land + g.gap + g.gapCill;
+  const hMull = g.mullionLand / 2 + g.gap;
+  const hFan = g.land + g.gap + g.gapFanTransom + g.transomLandAbove;
+  const hBelow = g.transomLandBelow + g.gapBelowTransom;
+  const SPN = p.sidePanel || {}, FF = p.fixedFan || {}, PE = PN.edge || {};
 
   const FaceCard = ({ r, locked }) => {
     const face = p.elements?.[r.key]?.face;
@@ -1394,7 +1399,7 @@ function DoorSettings() {
           <span>Face</span>
           <NumInput value={face} onCommit={(v) => setPath(['elements', r.key, 'face'], v)} disabled={locked}
             className={`w-14 px-1 py-0.5 bg-surface-800 border border-surface-500 text-ink-50 rounded text-[11px] text-center ${locked ? 'opacity-50 cursor-not-allowed' : ''}`} />
-          <span className="font-mono">L = {r.base} −</span>
+          <span className="font-mono">L = {r.base} {r.op || '−'}</span>
           <NumInput value={dedV} onCommit={(v) => setPath(['lengths', r.lenKey], v)} disabled={locked}
             className={`w-12 px-1 py-0.5 bg-surface-800 border border-surface-500 text-ink-50 rounded text-[11px] text-center ${locked ? 'opacity-50 cursor-not-allowed' : ''}`} />
         </div>
@@ -1468,8 +1473,19 @@ function DoorSettings() {
           <fieldset disabled={frameLock} className={`flex flex-wrap gap-x-5 gap-y-3 items-end text-xs border-0 p-0 m-0 mb-4 min-w-0 ${frameLock ? 'opacity-60' : ''}`}>
             <PathField label="Inward cill, inside face" value={p.cillInward?.faceInternal} onCommit={(v) => setPath(['cillInward', 'faceInternal'], v)} hint="unrebated" />
             <PathField label="Inward cill, outside face" value={p.cillInward?.faceExternal} onCommit={(v) => setPath(['cillInward', 'faceExternal'], v)} hint="fall" />
-            <PathField label="Coupling post" value={p.couplingPost?.width} onCommit={(v) => setPath(['couplingPost', 'width'], v)} hint="2 × jamb" />
-            <PathField label="Side panel members" value={p.sidePanel?.member} onCommit={(v) => setPath(['sidePanel', 'member'], v)} hint={`× ${p.sidePanel?.depth}`} />
+          </fieldset>
+          <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Side panel: a casement fixed light behind the mullion (no hardware)</div>
+          <fieldset disabled={frameLock} className={`flex flex-wrap gap-x-5 gap-y-3 items-end text-xs border-0 p-0 m-0 mb-3 min-w-0 ${frameLock ? 'opacity-60' : ''}`}>
+            <PathField label="Stiles" value={SPN.stile} onCommit={(v) => setPath(['sidePanel', 'stile'], v)} hint="as casement leaf" />
+            <PathField label="Top rail" value={SPN.top} onCommit={(v) => setPath(['sidePanel', 'top'], v)} />
+            <PathField label="Bottom rail" value={SPN.bottom} onCommit={(v) => setPath(['sidePanel', 'bottom'], v)} hint="as the door bottom rail" />
+            <PathField label="Depth" value={SPN.depth} onCommit={(v) => setPath(['sidePanel', 'depth'], v)} />
+          </fieldset>
+          <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Fixed fanlight: a non-opening casement leaf (no hardware; the opening fan is the casement leaf)</div>
+          <fieldset disabled={frameLock} className={`flex flex-wrap gap-x-5 gap-y-3 items-end text-xs border-0 p-0 m-0 mb-4 min-w-0 ${frameLock ? 'opacity-60' : ''}`}>
+            <PathField label="Stiles" value={FF.stile} onCommit={(v) => setPath(['fixedFan', 'stile'], v)} />
+            <PathField label="Top rail" value={FF.top} onCommit={(v) => setPath(['fixedFan', 'top'], v)} />
+            <PathField label="Bottom rail" value={FF.bottom} onCommit={(v) => setPath(['fixedFan', 'bottom'], v)} hint="owner check" />
           </fieldset>
 
           <div className="flex items-center justify-between mb-2">
@@ -1484,6 +1500,10 @@ function DoorSettings() {
             <PathField label="Panel boards" value={PN.boards} onCommit={(v) => setPath(['panel', 'boards'], v)} hint="pcs" />
             <PathField label="Panel core" value={PN.coreThickness} onCommit={(v) => setPath(['panel', 'coreThickness'], v)} hint="MDF, to confirm" />
             <PathField label="Panel density" value={PN.densityKgM3} onCommit={(v) => setPath(['panel', 'densityKgM3'], v)} hint="kg/m³, weight only" />
+            <PathField label="Panel in rebate" value={PN.inset} onCommit={(v) => setPath(['panel', 'inset'], v)} hint="per side: panel = daylight + 2 ×" />
+            <PathField label="Edge tongue" value={PE.tongue} onCommit={(v) => setPath(['panel', 'edge', 'tongue'], v)} hint="thick" />
+            <PathField label="Edge slope" value={PE.slope} onCommit={(v) => setPath(['panel', 'edge', 'slope'], v)} hint="wide" />
+            <PathField label="Edge flat" value={PE.flat} onCommit={(v) => setPath(['panel', 'edge', 'flat'], v)} hint="next to the bead" />
           </fieldset>
 
           <div className={`card p-4 mb-4 ${rulesLock ? '' : 'ring-1 ring-amber-500/40'}`}>
@@ -1496,16 +1516,18 @@ function DoorSettings() {
             <fieldset disabled={rulesLock} className={`grid grid-cols-2 gap-x-6 gap-y-3 text-xs border-0 p-0 m-0 min-w-0 ${rulesLock ? 'opacity-60' : ''}`}>
               <RuleField label="Leaf W at jamb: −" value={d.leafAtJamb} onCommit={(v) => setPath(['deductions', 'leafAtJamb'], v)}
                 hint={`land ${g.land} + gap ${g.gap}`} hintVal={hJ} />
-              <RuleField label="Leaf H, timber cill: H −" value={d.leafFullHeight} onCommit={(v) => setPath(['deductions', 'leafFullHeight'], v)}
-                hint={`${g.land}+${g.gap} + ${g.gapCill}+${g.cillVisible}`} hintVal={hFull} sample={Hh - d.leafFullHeight} />
-              <RuleField label="Leaf H, no timber cill: H −" value={d.leafNoThreshold} onCommit={(v) => setPath(['deductions', 'leafNoThreshold'], v)}
-                hint={`${g.land}+${g.gap} + ${g.gapCill}`} hintVal={hNo} sample={Hh - d.leafNoThreshold} />
-              <RuleField label="Opening fan H: transom H − head −" value={d.fanAtHead} onCommit={(v) => setPath(['deductions', 'fanAtHead'], v)}
-                hint={`land ${g.land} + gap ${g.gap}`} hintVal={hJ} />
-              <RuleField label="Opening fan H: − rail" value={d.fanAtRail} onCommit={(v) => setPath(['deductions', 'fanAtRail'], v)}
-                hint={`land ${g.land} + gap ${g.gap}`} hintVal={hJ} />
+              <RuleField label="Leaf W at mullion axis: −" value={d.leafAtMullionAxis} onCommit={(v) => setPath(['deductions', 'leafAtMullionAxis'], v)}
+                hint={`${g.mullionLand} / 2 + gap ${g.gap}`} hintVal={hMull} />
+              <RuleField label="Leaf bottom above the floor: −" value={d.leafAtFloor} onCommit={(v) => setPath(['deductions', 'leafAtFloor'], v)}
+                sample={Hh - d.leafAtJamb - d.leafAtFloor} />
+              <RuleField label="Fan leaf H: T −" value={d.fanFromAxis} onCommit={(v) => setPath(['deductions', 'fanFromAxis'], v)}
+                hint={`${g.land}+${g.gap} + ${g.gapFanTransom}+${g.transomLandAbove}`} hintVal={hFan} />
+              <RuleField label="Leaf below the transom axis: −" value={d.leafBelowAxis} onCommit={(v) => setPath(['deductions', 'leafBelowAxis'], v)}
+                hint={`${g.transomLandBelow} + gap ${g.gapBelowTransom}`} hintVal={hBelow} />
               <div className="text-[10px] text-ink-500">
-                Opening fanlight = a casement leaf (Casement settings: leaf faces, glass rule, hinges and locks), W = frame W − 2 × {d.leafAtJamb}. Fixed fanlight: glass in the frame.
+                Every leaf stands {d.leafAtFloor} above the floor, any threshold, any direction: leaf H = H − {d.leafAtJamb} − {d.leafAtFloor} = H − {d.leafAtJamb + d.leafAtFloor} (sample {Hh - d.leafAtJamb - d.leafAtFloor});
+                under a transom at T: H − T − {d.leafBelowAxis} − {d.leafAtFloor}. Fan leaf (opening = the casement leaf, fixed = the fixed fan members): W = field − {d.leafAtJamb} at a jamb / − {d.leafAtMullionAxis} at a mullion, H = T − {d.fanFromAxis}.
+                T and the side panel widths are measured from the frame edge to the member axis. Inward doors always take the timber inward cill.
               </div>
             </fieldset>
           </div>
@@ -1520,6 +1542,8 @@ function DoorSettings() {
             <fieldset disabled={advLock} className={`flex flex-wrap gap-x-5 gap-y-3 items-end text-xs border-0 p-0 m-0 min-w-0 ${advLock ? 'opacity-60' : ''}`}>
               {[
                 ['land', 'Frame land'], ['rebate', 'Rebate'], ['gap', 'Leaf gap'],
+                ['mullionLand', 'Mullion land'], ['transomLandAbove', 'Transom land above'], ['transomLandBelow', 'Transom land below'],
+                ['gapFanTransom', 'Gap fan / transom'], ['gapBelowTransom', 'Gap below transom'],
                 ['gapCill', 'Gap at cill'], ['cillVisible', 'Cill visible'], ['glazingRebate', 'Glazing rebate'],
               ].map(([k, label]) => (
                 <div key={k}>
@@ -1599,7 +1623,7 @@ function DoorSettings() {
                 </div>
               </div>
               <div className="text-[10px] text-ink-500">
-                Defaults to confirm with the supplier (BLOCKERS). Handing is printed per door: LH anti-clockwise closing, RH clockwise closing.
+                Defaults to confirm with the supplier (BLOCKERS). Handing is printed as the configurator states it: Hinge left / right (seen from inside), opens outward / inward.
               </div>
             </fieldset>
           </div>

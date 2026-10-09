@@ -136,7 +136,7 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber , w
     [
       hingeCount ? `${hingeCount} hinges per leaf` : '',
       handleY != null ? `handle ${fmt(H - handleY)} above the floor` : '',
-      hw.handing ? `handing ${hw.handing}${hw.handingWords ? ` (${hw.handingWords})` : ''}` : '',
+      hw.handing || '',
     ].filter(Boolean).join(' · '),
     lockText,
   ].filter(Boolean);

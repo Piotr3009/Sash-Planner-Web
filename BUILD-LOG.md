@@ -107,6 +107,65 @@ The areas and what they found (file:line on 150500e):
    are added below this line in a later commit (SWEEP_REST).
 
 
+### Stage 1: door profile schema 3 and the engine
+
+**Shared casement rules** (`src/engine/casementRules.js`, new): `leafWidthInField`, `leafHeightInTier`, `leafOrigin`,
+`fieldLandX`, `mullionLength`, `fullMullionRun`, `transomSegmentLength`, `transomRun`: the formulas that were inline
+in `deriveCasementWindow` (leaf sizes, leaf corners, mullion runs, transom runs), moved verbatim (same operations,
+same order). The casement engine calls them, and so does the door engine with the door numbers composed into the
+same names (head to floor = 51 + 51, under a transom = 17 + 51). Proved byte-identical: 76 casement and sash
+controls (every layout code at its default size and at 1234.5 x 1677 with bars, fixed, triple glass, arched, sash
+double / triple with four bar patterns, cottage) derive, list, glass, hardware and BOM exactly as on 150500e.
+
+**Profile schema 3** (`DEFAULT_DOOR_PROFILE`): new keys `deductions.leafAtFloor 51`, `fanFromAxis 65`,
+`leafBelowAxis 17`; `geometry.transomLandAbove 8`, `transomLandBelow 13`, `gapFanTransom 6`, `gapBelowTransom 4`;
+`lengths.transomSeat 8.5`; `panel.inset 17`, `panel.edge {24, 40, 15}`; `sidePanel {64, 64, 180, 57}`; `fixedFan
+{64, 64, 67}`. `leafFullHeight` / `leafNoThreshold` stay in the object at the derived 102 / 102 (not read);
+`couplingPost` stays (not read). `migrateDoorProfile` walks schema by schema: a value equal to the old default of its
+schema moves (schema 1 94 -> 98 -> 102, schema 2 98 -> 102, 57 -> 102), a hand edit stays; schema-2 keys no longer
+read (`fanAtHead`, `fanAtRail`, `transomDeduct`, `sidePanel.member`) stay in a stored copy as stored. `DOOR_PATH_ROOTS`
+gains `fixedFan`. Window Settings · Doors: mullion and transom face cards (L = frame H - 77, L = field leaf W + 8.5),
+side panel light and fixed fan members, panel inset and edge, the rules leafAtJamb / leafAtMullionAxis /
+leafAtFloor / fanFromAxis / leafBelowAxis with their composition hints, the transom and mullion lands in
+Advanced; the coupling post, side member and the four retired rule fields are gone from the card.
+
+**Engine** (`deriveDoorWindow` v5): W x H is the overall frame (BLOCKERS 31.1 a); fields between the jambs and the
+mullion axes; mullions by `fullMullionRun`; the fan tier and the lower tier by `leafHeightInTier` / `leafOrigin`;
+side lights as casement fixed lights (glass by `casementGlassDeductions` on the light faces); fixed fans as
+non-opening leaves in `fanLeaves` (`fixed: true`, no hardware picks); transom segments by `transomRun`; panel outer
+= daylight + 2 x 17 with the edge profile; `thresholdInfo {type, effectiveType, ignored, timberCill, openingWidth,
+seal}`; `handing {hinge, opens, label}`. `derived.door` keeps `threshold` (the stored string), `leaves`, `panels`,
+`fanLeaves`, `zones`, and gains `sidePanels` (= `panelLeaves`, same array), `mullions`, `transom`, `thresholdInfo`,
+`handing`; `zones.posts`, `members.side` / `post`, `sidePanelMember` and `zones.transom.fanPanes` / `cavity` are gone.
+Handing (`doorHardware.js`): `doorHandingLabel` prints "Hinge left · opens outward"; `HANDING_WORDS` removed;
+`doorHanding` (LH / RH) is kept internal as `kitHanding`.
+
+**3.10 from the live engine** (default profile), row by row:
+
+| case | leaf / light W x H | glass W x H | notes (live engine) | 3.10 |
+|---|---|---|---|---|
+| single 900 x 2100, timber cill, outward | 798 x 1998 | 633 x 1747 | cill 68 L900 | 798 x 1998 / 633 x 1747 ✓ |
+| single 900 x 2100, aluminium threshold | 798 x 1998 | 633 x 1747 | no timber cill; seal 806 mm = 0.81 m | 798 x 1998 / 633 x 1747 ✓ |
+| single 900 x 2100, inward | 798 x 1998 | 633 x 1747 | inward cill 40 (40 / 35) | 798 x 1998 / 633 x 1747 ✓ |
+| single 900 x 2100, half-glazed | 798 x 1998 | 633 x 881 | mid rail axis 999; panel 644 x 806 (daylight 610 x 772 + 2 x 17) | 633 x 881, axis 999, panel 644 x 806 ✓ |
+| french 1600 x 2100 | 755 x 1998, 755 x 1998 | 584 x 1747, 584 x 1747 | half 749, lip 6, meeting stile 100 | 2 x 755 x 1998 / 584 x 1747 ✓ |
+| french 2400 x 2400, sides 400 + 400, opening fan T 450: door leaves | 789 x 1882, 789 x 1882 | 618 x 1631, 618 x 1631 | door zone 1600 (axes 400 / 2000), half 783 | 2 x 789 x 1882 / 618 x 1631 ✓ |
+| the same, side panel light | 332 x 1882, 332 x 1882 | 227 x 1661, 227 x 1661 | members 64 / 64 / 180 x 57 | 332 x 1882 / 227 x 1661 ✓ |
+| the same, fan leaves (opening) | panel left 332 x 385, door 1566 x 385, panel right 332 x 385 | 227 x 277, 1461 x 277, 227 x 277 | casement leaf 64 / 64 / 67, hinge and lock picks | door 1566 x 385, sides 332 x 385 ✓ |
+| the same, mullions and transom | D-M1 L2323, D-M2 L2323 | - | transom segments D-T1 L340.5, D-T2 L1574.5, D-T3 L340.5; band y 442 h 21 (axis 450 - 8 / + 13) | mullion H - 77; segment = field leaf W + 8.5 |
+| the same with a fixed fan | panel left 332 x 385 fixed, door 1566 x 385 fixed, panel right 332 x 385 fixed | 227 x 277, 1461 x 277, 227 x 277 | members 64 / 64 / 67, no hardware (fan picks none) | W - 105, H - 108 ✓ |
+| the same on an aluminium threshold (no timber cill) | 789 x 1882, 789 x 1882 | - | mullions L2364, L2364 (H - (77 - 41)), jambs 2400 | leaf heights unchanged |
+
+| section 6 case | leaf / light | glass | notes |
+|---|---|---|---|
+| single 900 x 2100 three-quarter | 798 x 1998 | 633 x 1380.5 | axis 1498.5; panel 644 x 306.5 (daylight 610 x 272.5) |
+| french 1600 x 2100, fixed fan T 450 | leaves 755 x 1582, 755 x 1582; fan 1498 x 385 fixed | leaves 584 x 1331, 584 x 1331; fan 1393 x 277 | transom L1506.5 |
+| single 1000 x 2100, side panel 450 right | leaf 482 x 1998; light 382 x 1998 | 317 x 1747; 277 x 1777 | mullion D-M axis 550 L2023 |
+
+Every row of 3.10 matches. The single 1000 x 2100 with a 450 side panel reads as a 1000 overall frame (door field
+550 between the jamb and the mullion axis, leaf 482): see BLOCKERS 31.1 a.
+
+
 ## 2026-10-09 · TURA PC: SASH PROPORTIONS, COTTAGE 40/60 AND 1/3-2/3 (branch `claude/sash-proportions`)
 
 Owner box (Piotr, 09.10.2026): a new sash option `sashProportion` (`standard`, `cottage-40-60`, `cottage-1-3`, missing

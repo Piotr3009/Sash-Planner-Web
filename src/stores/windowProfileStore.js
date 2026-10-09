@@ -27,7 +27,10 @@ const syncGlassDeduction = (casement) => {
 // the first path segment must be one of these, and the last one must already
 // exist in the profile, so a typo can never grow it. String-valued leaves are
 // the hardware variant names; every other leaf is a finite number.
-const DOOR_PATH_ROOTS = ['frameDepth', 'leafDepth', 'leafDepthTriple', 'frenchLip', 'elements', 'geometry', 'deductions', 'cillInward', 'sidePanel', 'couplingPost', 'panel', 'hinges', 'hardware', 'lengths'];
+// Schema 3 (doors v3): fixedFan joins; sidePanel and panel carry nested keys
+// (sidePanel.stile / top / bottom / depth, panel.inset, panel.edge.*).
+// couplingPost stays writable for stored copies (not read by the engine).
+const DOOR_PATH_ROOTS = ['frameDepth', 'leafDepth', 'leafDepthTriple', 'frenchLip', 'elements', 'geometry', 'deductions', 'cillInward', 'sidePanel', 'fixedFan', 'couplingPost', 'panel', 'hinges', 'hardware', 'lengths'];
 const DOOR_STRING_LEAVES = ['faceplate', 'keeps', 'fgteShootbolts', 'cillKeep'];
 
 /**

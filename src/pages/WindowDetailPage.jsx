@@ -294,7 +294,7 @@ export default function WindowDetailPage() {
               ))}
               <SpecRow label="Assembly" value={`${derived.door.totalWidth} × ${derived.door.totalHeight} mm`} />
               <SpecRow label="Leaf depth" value={`${derived.door.leafDepth} mm`} />
-              <SpecRow label="Handing" value={derived.door.hardware?.handing ? `${derived.door.hardware.handing} (${derived.door.hardware.handingWords})` : 'n/a'} />
+              <SpecRow label="Handing" value={derived.door.hardware?.handing || 'n/a'} />
               <SpecRow label="Weight" value={`${derived.weights?.total} kg`} />
             </SpecSection>
           ) : derived && (
