@@ -684,10 +684,14 @@ function overviewCells(wd) {
   const d = wd?.windowSpec?.door;
   if (wd?.windowSpec?.category === 'door' && d) {
     const lock = d.type === 'french' ? (d.lockType === 'double' ? '2 handles' : '1 handle') : 'single kit';
+    // doors v3: the threshold the engine builds; an inward door with a stored
+    // aluminium / low profile value takes the timber cill and says so
+    const ti = wd?.derived?.door?.thresholdInfo;
+    const threshold = ti ? (ti.ignored ? ti.note : ti.effectiveType) : (d.threshold || 'standard');
     return {
       type: d.type === 'french' ? 'french' : 'single',
       head: d.style || 'full-glass',
-      opening: `${d.openDirection || 'outward'} · ${lock} · ${d.threshold || 'standard'}`,
+      opening: `${d.openDirection || 'outward'} · ${lock} · ${threshold}`,
       box: wd?.derived?.door?.frameDepth ?? wd?.windowSpec?.frame?.depth,
     };
   }
@@ -2346,7 +2350,8 @@ function SprayingTab({ windowsData, batch, pp, registerExport }) {
       const tH = Math.round(derived.topSashHeight || 0);
       const bH = Math.round(derived.bottomSashHeight || 0);
       // Doors (08.10.2026): the frame of the whole assembly, every door leaf, each
-      // side panel leaf and each opening fan leaf, at the engine sizes.
+      // side panel light and each fan leaf (doors v3: a fixed fanlight is a
+      // non-opening leaf, labelled fixed), at the engine sizes.
       const R0 = (v) => Math.round(Number(v) || 0);
       const dr = derived.door;
       const elements = derived.category === 'door' && dr
@@ -2354,7 +2359,7 @@ function SprayingTab({ windowsData, batch, pp, registerExport }) {
             { element: 'Frame', size: `${R0(dr.totalWidth)} × ${R0(dr.totalHeight)}`, sort: 0 },
             ...(dr.leaves || []).map((lf, i) => ({ element: dr.isFrench ? `Leaf P${i + 1} ${lf.role}` : 'Leaf', size: `${R0(lf.w)} × ${R0(lf.h)}`, sort: 1 })),
             ...(dr.panelLeaves || []).map((pl) => ({ element: `Side panel ${pl.side}`, size: `${R0(pl.w)} × ${R0(pl.h)}`, sort: 2 })),
-            ...(dr.fanLeaves || []).map((fl, i) => ({ element: `Fan leaf${dr.fanLeaves.length > 1 ? ` ${i + 1}` : ''}`, size: `${R0(fl.w)} × ${R0(fl.h)}`, sort: 2 })),
+            ...(dr.fanLeaves || []).map((fl, i) => ({ element: `${fl.fixed ? 'Fixed fan leaf' : 'Fan leaf'}${dr.fanLeaves.length > 1 ? ` ${i + 1}` : ''}`, size: `${R0(fl.w)} × ${R0(fl.h)}`, sort: 2 })),
           ]
         // Casement (Piotr 21.09.2026): frame, then every leaf, then the fans; one row per pane, leaf size
         : derived.category === 'casement'

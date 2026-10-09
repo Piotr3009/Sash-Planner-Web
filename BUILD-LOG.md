@@ -229,6 +229,49 @@ quantities include d_mullion 4748 mm, d_transom_rail 2287 mm, d_threshold_alu_do
   471, 233).
 
 
+### Stage 4: door sheets and PDFs
+
+- One agent on the sheet files only (`src/components/drawings/Door*`, `doorSheetParts.jsx`, `doorDrawUtils.js`, an
+  opt-in prop in `drawingUtils.jsx`, the door texts of `WindowDetailPage` / `ProductionPackPage`); every number from
+  `derived.door` or the door profile.
+- **`DoorFrameDetail2D`** (rewritten): the visible openings from `zones.openings`, each mullion with its axis and
+  "M1 2323 · 68x93", each transom segment ("T1 340.5", "T2 1574.5"), "T 450" from the frame top, then H - T and H;
+  the layer chain breaks over each mullion ("4 + 26 + 4"); the threshold line spans only the door opening.
+- **`DoorElevation2D`**: openings from `zones.openings`, mullion and transom axes, no symbol on a fixed fan, the
+  handing label in the subtitle and notes. **`DoorSidePanelDetail2D`**: the side light as a casement fixed light
+  64 / 64 / 180 from `pn.members`, glass deductions from derived, "behind the mullion M1", no hardware.
+  **`DoorFanlightDetail2D`**: "Fixed Fanlight N" (no symbol, hinges or lock) and the opening fan with its picks
+  indexed among the opening fans. **`DoorSection2D`**: mullion axes, the inward note when `thresholdInfo.ignored`,
+  a PANEL EDGE detail (17 in the 18 rebate, tongue 24, flat 15, slope 40 up to 54).
+- **`DoorLeafDetail2D`** (CLAUDE.md 3.15): H1 to H4 at a smaller size (`DimV textSize` = `SIZES.code`, off by
+  default so casement and sash sheets are byte-identical: t20, t25, t28, t43_window_tag), one column per hinge on
+  the hinge side, margins solved so nothing overlaps; the panel notes print the outer size (644 x 806), "panel =
+  daylight + 2 x 17" and the edge profile; the captions print the handing label.
+- **`doorSheetParts.jsx`**: `thresholdText` and `handingText` read `thresholdInfo` / `handing`; the coupling post
+  detail became a "MULLION M1" detail (21 . 26 . 21 = 68, 4 + 13, 13 + 4); the plan draws mullions 68 x 93.
+- **Pages**: the window detail door block prints the handing label, the threshold the engine builds (timber cill /
+  aluminium / low profile, the threshold seal in metres, the inward note), "Side light <side> ... fixed" and "Fixed
+  fan leaf"; the pack overview prints the inward note for an ignored stored value, the spraying rows "Fixed fan
+  leaf N".
+- **New `verify/arch/lib/textCollision.mjs`**: each `<text>` as a box font size x 0.55 x characters wide and one font
+  size tall (0.8 above the baseline, 0.2 below), placed by `text-anchor`, rotate / translate applied to the corners;
+  `collisionFailures(sheets)` lists the overlapping pairs.
+- **t41 section 18**: the set gains the 3.10 cases (2400 x 2400 with side panels 400 / 400 and an opening or a fixed
+  fan 450, single 1000 + side 450 right), low-profile, inward + stored aluminium, hinge right, and every leaf height
+  1900 to 2400 with 3 and with 4 hinges (forced through the profile hinge rule), single and french double: 43 doors.
+  Every door sheet passes the collision check, the dimension rule and the "no NaN / long dash" check. The three
+  v2 literals moved with their reason (633 x 1751 to 633 x 1747, 584 x 1751 to 584 x 1747, 633 x 883 to 633 x 881);
+  new: panel 644 x 806, glass 618 x 1631, side light glass 227 x 1661, "M1 2323", "T1 340.5" / "T2 1574.5", "T 450"
+  on the frame sheet and the elevation, fixed fan sheets without hinge / lock lines, the inward note on three
+  sheets, no Winkhaus word or coupling post on any sheet. t41: 683 pass, 0 fail.
+- The agent's own scratch harness (not committed): 81 doors, 729 sheets, 6509 checks, 0 fail, zero collisions.
+- **Samples**: `docs/handover/samples/doors/sheets/` (38 SVGs: every sheet of 2400 x 2400 opening fan, 2400 x 2400
+  fixed fan, single 1000 + side 450, single 900 half-glazed).
+- Owner checks from this stage (BLOCKERS section 31): the panel edge drawn symmetric about the leaf centre plane
+  (the profile does not say on which face the bead sits); the passive leaf caption of a french door names its own
+  inside-view side; label drops on a crowded first chain row of the frame sheet (the 332 side light widths of the
+  2400 case print on the elevation and the side sheet instead).
+
 ### Stage 7: the window profile save merges with the cloud; batch type door
 
 - **`windowProfileStore.js`**: the store keeps `dirty` (plain data, persisted with the profiles) = the paths changed

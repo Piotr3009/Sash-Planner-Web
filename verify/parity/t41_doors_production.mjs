@@ -21,6 +21,13 @@
  *   three-quarter: glass 633 x 1383.5, panel 633 x 296.5
  *   hardware per 3.5, FGTE band 1965-2161 for leaf 2002, thresholds, fanlight
  *
+ * Doors v3 (Piotr 09.10.2026, CLAUDE.md doors v3 tura): every leaf stands 51 above the
+ * floor, so leaf H = H - 102 = 1998 at 2100 (whatever the threshold), glass 633 x 1747,
+ * french 584 x 1747, half-glazed 633 x 881 with a panel 644 x 806 (daylight + 2 x 17);
+ * casement mullions and transom inside the frame. Each changed assertion carries its
+ * reason; section 18 adds the 3.10 cases, the leaf heights 1900 to 2400 with 3 and 4
+ * hinges and the text collision check of 3.15.
+ *
  * Bundles the LIVE src and the START tree (git archive 410cb5d, the start of this
  * tura, needs the history) for the controls: a casement and a sash derive, list and
  * count exactly as they did.
@@ -65,6 +72,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { checkDimRule } from '../arch/lib/dimRule.mjs';
+import { collisionFailures, describeFailures } from '../arch/lib/textCollision.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const AUDIT = resolve(ROOT, '.audit');
@@ -495,7 +503,7 @@ section('10 - side panels and bars');
   const day = B.derived.door.leaves[0].daylight;
   const barRun = 2 * 633 + 1 * 1747;   // doors v3: glass H 1747
   ok(rec(B.derived, 'C-TRIANGLE BEADING (EXT)')?.length === Math.round(barRun * 1.15) && rec(B.derived, 'C-GEORGIAN MIDDLE BEADING')?.length === Math.round(barRun * 1.15),
-    `astragal beads ext / int = (2 x 633 + 1751) x 1.15 = ${Math.round(barRun * 1.15)} on the casement rows`);
+    `astragal beads ext / int = (2 x 633 + 1747) x 1.15 = ${Math.round(barRun * 1.15)} on the casement rows (doors v3: the message followed the glass H, was 1751)`);
   ok(!rec(door(900, 2100, { doorHBars: 2, doorVBars: 1, doorBarType: 'georgian' }).derived, 'C-TRIANGLE BEADING (EXT)'), 'internal georgian bars: no astragal bead');
   ok(day.w === 610 && day.h === 1724, 'daylight 610 x 1724 (unit less 2 x 11.5; doors v3)');
   const M = french(1600, 2100, { doorVBars: 1, transomType: 'fixed', transomHeight: 450, transomBars: 'match' });
@@ -743,6 +751,7 @@ section('18 - door sheets: the components the screen, the PDFs and the pack moun
     `export * as specification from '${rel('engine/specification.js')}';`,
     `export * as calculations from '${rel('engine/calculations.js')}';`,
     `export * as lists from '${rel('engine/lists.js')}';`,
+    `export * as profile from '${rel('engine/profile.js')}';`,
   ].join('\n'));
   const out = resolve(AUDIT, 't41-sheets-bundle.mjs');
   execFileSync('npx', ['-y', 'esbuild@0.25.0', entry, '--bundle', '--format=esm', '--platform=node',
@@ -766,19 +775,49 @@ section('18 - door sheets: the components the screen, the PDFs and the pack moun
     'single bars h2 v1': sk(900, 2100, { doorType: 'single-external', doorHBars: 2, doorVBars: 1 }),
     'single triple': sk(900, 2100, { doorType: 'single-external', glassType: 'triple' }),
     'single 900 x 2248 (4 hinges)': sk(900, 2248, { doorType: 'single-external' }),
+    // doors v3 (09.10.2026): the cases of CLAUDE.md 3.10 and section 6, and every threshold
+    'french 2400 x 2400 sides 400 / 400 opening fan 450': sk(2400, 2400, { doorType: 'french', sidePanels: 'both', sideLeftWidth: 400, sideRightWidth: 400, transomType: 'opening', transomHeight: 450 }),
+    'french 2400 x 2400 sides 400 / 400 fixed fan 450': sk(2400, 2400, { doorType: 'french', sidePanels: 'both', sideLeftWidth: 400, sideRightWidth: 400, transomType: 'fixed', transomHeight: 450 }),
+    'single 1000 x 2100 side 450 right': sk(1000, 2100, { doorType: 'single-external', sidePanels: 'right', sideRightWidth: 450 }),
+    'single low-profile threshold': sk(900, 2100, { doorType: 'single-external', thresholdType: 'low-profile' }),
+    'single inward aluminium (ignored)': sk(900, 2100, { doorType: 'single-external', doorOpenDirection: 'inward', thresholdType: 'aluminium' }),
+    'single hinge right': sk(900, 2100, { doorType: 'single-external', doorHinge: 'right' }),
   };
+  // CLAUDE.md 3.15: every leaf height from 1900 to 2400 with 3 and with 4 hinges (the hinge
+  // rule is a profile value: tallAbove 1 forces 4, a huge one forces 3), single and french
+  const FORCED = {};
+  for (const lh of [1900, 2000, 2100, 2200, 2300, 2400]) {
+    for (const n of [3, 4]) {
+      FORCED[`single leaf ${lh} ${n} hinges`] = { n, w: 900, h: lh + DP.deductions.leafAtJamb + DP.deductions.leafAtFloor, fc: { doorType: 'single-external' } };
+      FORCED[`french leaf ${lh} ${n} hinges`] = { n, w: 1600, h: lh + DP.deductions.leafAtJamb + DP.deductions.leafAtFloor, fc: { doorType: 'french', lockType: 'double' } };
+    }
+  }
   const fmt = (v) => String(Math.round(Number(v) * 10) / 10);
-  for (const [name, { spec, derived }] of Object.entries(SET)) {
-    const dr = derived.door;
+  const sheetsOf = (spec, derived) => {
     const plan = SH.ddu.doorSheetPlan(derived);
-    // the plan: frame, leaf, one per side panel, one per opening fan leaf, the plan section
-    const wantKeys = ['doorframe', 'doorleaf', ...(dr.panelLeaves || []).map((pl) => `doorside-${pl.side}`),
-      ...(dr.fanLeaves || []).map((_, i) => `doorfan-${i}`), 'doorsection'];
-    ok(JSON.stringify(plan.map((p) => p.key)) === JSON.stringify(wantKeys), `${name}: sheet plan ${plan.map((p) => p.key).join(', ')}`);
     const sheets = { elevation: render(SH.Elevation, { windowSpec: spec, derived, projectNumber: 'P-1' }) };
     for (const p of plan) sheets[p.key] = render(SH.DoorSheet, { sheet: p, windowSpec: spec, derived, projectNumber: 'P-1' });
     const groups = SH.ddu.groupDoorGlass(derived, spec);
     groups.forEach((g, i) => { sheets[`glass${i}`] = render(SH.Glass, { windowSpec: spec, derived, group: g }); });
+    return { plan, sheets, groups };
+  };
+  const forcedProfile = (n) => ({ ...DP, hinges: { ...DP.hinges, tallAbove: n === 4 ? 1 : 99999 } });
+  const RUNS = [
+    ...Object.entries(SET).map(([name, { spec, derived }]) => ({ name, spec, derived, ...sheetsOf(spec, derived) })),
+    ...Object.entries(FORCED).map(([name, f]) => SH.profile.withProfiles(null, null, forcedProfile(f.n), () => {
+      const { spec, derived } = sk(f.w, f.h, f.fc);
+      return { name, spec, derived, forced: f.n, ...sheetsOf(spec, derived) };
+    })),
+  ];
+  for (const { name, spec, derived, plan, sheets, groups, forced } of RUNS) {
+    const dr = derived.door;
+    // the plan: frame, leaf, one per side panel, one per fan leaf (opening or fixed, doors v3), the plan section
+    const wantKeys = ['doorframe', 'doorleaf', ...(dr.panelLeaves || []).map((pl) => `doorside-${pl.side}`),
+      ...(dr.fanLeaves || []).map((_, i) => `doorfan-${i}`), 'doorsection'];
+    ok(JSON.stringify(plan.map((p) => p.key)) === JSON.stringify(wantKeys), `${name}: sheet plan ${plan.map((p) => p.key).join(', ')}`);
+    // CLAUDE.md 3.15 (doors v3): no two texts overlap on any door sheet (font size x 0.55 x characters, rotation applied)
+    const col = collisionFailures(sheets);
+    ok(col.length === 0, `${name}: no overlapping texts on the ${Object.keys(sheets).length} sheets`, describeFailures(col));
     const bad = Object.entries(sheets).filter(([, m]) => !/^<svg|<svg/.test(m) || /NaN|undefined|[\u2013\u2014]/.test(m)).map(([k]) => k);
     ok(bad.length === 0, `${name}: ${Object.keys(sheets).length} sheets render as svg with no NaN / undefined / long dash`, bad.join(', '));
     const dimBad = Object.entries(sheets).map(([k, m]) => [k, checkDimRule(m)]).filter(([, r]) => !r.ok).map(([k, r]) => `${k}: ${r.why}`);
@@ -798,8 +837,8 @@ section('18 - door sheets: the components the screen, the PDFs and the pack moun
     ok(/<svg/.test(sheets.doorsection) && !/Not drawn yet/.test(sheets.doorsection), `${name}: the plan section is an svg drawing`);
     // the hinge rule from derived
     const nh = dr.leaves[0].hinges.length;
-    ok(sheets.doorleaf.includes(`${nh} hinges per leaf`) && nh === (dr.leafH > DP.hinges.tallAbove ? DP.hinges.perLeafTall : DP.hinges.perLeaf),
-      `${name}: leaf sheet prints ${nh} hinges per leaf (leaf ${dr.leafH})`);
+    ok(sheets.doorleaf.includes(`${nh} hinges per leaf`) && nh === (forced || (dr.leafH > DP.hinges.tallAbove ? DP.hinges.perLeafTall : DP.hinges.perLeaf)),
+      `${name}: leaf sheet prints ${nh} hinges per leaf (leaf ${dr.leafH}${forced ? `, forced ${forced}` : ''})`);
     if (dr.isFrench) {
       // member codes without the D- prefix on the sheets since 08.10.2026
       ok(/>MS \d/.test(sheets.doorleaf) && !sheets.doorleaf.includes('D-MS') && sheets.doorleaf.includes(`>${DP.elements.leafMeeting.face}<`) && sheets.doorsection.includes(`>${DP.elements.leafMeeting.face}<`),
@@ -816,9 +855,27 @@ section('18 - door sheets: the components the screen, the PDFs and the pack moun
   }
   // the four reference numbers of the box, read off the rendered leaf sheet
   const leafOf = (k) => render(SH.DoorSheet, { sheet: SH.ddu.doorSheetPlan(SET[k].derived)[1], windowSpec: SET[k].spec, derived: SET[k].derived, projectNumber: 'P-1' });
-  ok(leafOf('single 900 x 2100 outward').includes('633 × 1751'), 'box: single 900 x 2100 leaf sheet prints glass 633 × 1751');
-  ok(leafOf('french lockType double').includes('584 × 1751'), 'box: french 1600 x 2100 leaf sheet prints glass 584 × 1751');
-  ok(leafOf('single half-glazed').includes('633 × 883'), 'box: half-glazed single leaf sheet prints glass 633 × 883');
+  // doors v3 (09.10.2026, CLAUDE.md 3.10): every leaf 51 above the floor, glass H 1747 (was 1751), half-glazed 881 (was 883)
+  ok(leafOf('single 900 x 2100 outward').includes('633 × 1747'), 'box: single 900 x 2100 leaf sheet prints glass 633 × 1747 (doors v3, was 633 × 1751)');
+  ok(leafOf('french lockType double').includes('584 × 1747'), 'box: french 1600 x 2100 leaf sheet prints glass 584 × 1747 (doors v3, was 584 × 1751)');
+  ok(leafOf('single half-glazed').includes('633 × 881'), 'box: half-glazed single leaf sheet prints glass 633 × 881 (doors v3, was 633 × 883)');
+  // doors v3 additions: the panel outer size (daylight 610 x 772 + 2 x 17), the 2400 case of 3.10
+  ok(leafOf('single half-glazed').includes('panel 644 × 806'), 'box: half-glazed leaf sheet prints panel 644 × 806 (daylight + 2 x 17)');
+  ok(leafOf('french 2400 x 2400 sides 400 / 400 opening fan 450').includes('618 × 1631'), 'box: french 2400 x 2400 with side panels and a fan: leaf glass 618 × 1631');
+  {
+    const k = 'french 2400 x 2400 sides 400 / 400 opening fan 450';
+    const { sheets } = sheetsOf(SET[k].spec, SET[k].derived);
+    ok(sheets['doorside-left'].includes('227 × 1661') && sheets['doorside-right'].includes('227 × 1661'), `box: ${k}: side light sheets print glass 227 × 1661`);
+    ok(sheets.doorframe.includes('M1 2323') && sheets.doorframe.includes('T1 340.5') && sheets.doorframe.includes('T2 1574.5'), `box: ${k}: frame sheet prints the mullion M1 2323 and the transom segments T1 340.5 / T2 1574.5`);
+    ok(sheets.doorframe.includes('T 450') && sheets.elevation.includes('T 450'), `box: ${k}: the transom axis T 450 on the frame sheet and the elevation`);
+    const f = 'french 2400 x 2400 sides 400 / 400 fixed fan 450';
+    const fx = sheetsOf(SET[f].spec, SET[f].derived).sheets;
+    ok(Object.keys(fx).filter((x) => x.startsWith('doorfan-')).every((x) => /Fixed Fanlight/.test(fx[x]) && !/Hinges:|Lock:/.test(fx[x])), `box: ${f}: every fan sheet is a Fixed Fanlight with no hinge / lock line`);
+    const inw = sheetsOf(SET['single inward aluminium (ignored)'].spec, SET['single inward aluminium (ignored)'].derived).sheets;
+    ok(['doorframe', 'elevation', 'doorsection'].every((x) => inw[x].includes('inward door: timber threshold')), 'box: inward + stored aluminium: "inward door: timber threshold" on the frame sheet, the elevation and the section');
+    const all = RUNS.flatMap((r) => Object.values(r.sheets)).join('\n');
+    ok(!/anti-clockwise|clockwise closing|\bLH\b|\bRH\b|coupling post/i.test(all), 'no Winkhaus handing words and no coupling post on any door sheet (doors v3, CLAUDE.md 3.8)');
+  }
 }
 
 console.log(`\n${passes} pass, ${fails} fail`);

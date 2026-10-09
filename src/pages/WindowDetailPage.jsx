@@ -244,9 +244,15 @@ export default function WindowDetailPage() {
               <SpecRow label="Type" value={windowSpec.door?.type === 'french' ? 'French' : 'Single'} />
               <SpecRow label="Style" value={windowSpec.door?.style} />
               {windowSpec.door?.style !== 'full-glass' && <SpecRow label="Panel" value={windowSpec.door?.paneling} />}
-              <SpecRow label="Opening" value={`${windowSpec.door?.openDirection} · open ${windowSpec.door?.hingeSide}`} />
+              {/* doors v3: the handing as the configurator states it (Hinge left / right seen from inside, opens outward / inward) */}
+              <SpecRow label="Opening" value={derived?.door?.handing?.label || `Hinge ${windowSpec.door?.hingeSide} · opens ${windowSpec.door?.openDirection}`} />
               <SpecRow label="Lock" value={windowSpec.door?.type === 'french' ? (windowSpec.door?.lockType === 'double' ? 'two handles' : 'one handle') : 'single door kit'} />
-              <SpecRow label="Threshold" value={`${windowSpec.door?.threshold}${windowSpec.door?.thresholdExtension ? ` · ext ${windowSpec.door.thresholdExtension}` : ''}`} />
+              {/* doors v3: the threshold the engine builds (an inward door always takes the timber cill; aluminium / low profile + the threshold seal) */}
+              <SpecRow label="Threshold" value={`${derived?.door?.thresholdInfo
+                ? [{ standard: 'timber cill', aluminium: 'aluminium', 'low-profile': 'low profile' }[derived.door.thresholdInfo.effectiveType] || derived.door.thresholdInfo.effectiveType,
+                  derived.door.thresholdInfo.seal ? `threshold seal ${derived.door.thresholdInfo.seal.metres} m` : '',
+                  derived.door.thresholdInfo.ignored ? derived.door.thresholdInfo.note : ''].filter(Boolean).join(' · ')
+                : windowSpec.door?.threshold}${windowSpec.door?.thresholdExtension ? ` · ext ${windowSpec.door.thresholdExtension}` : ''}`} />
               <SpecRow label="Bars" value={`${windowSpec.door?.bars?.h || 0}H × ${windowSpec.door?.bars?.v || 0}V · ${windowSpec.door?.barType}`} />
               {windowSpec.door?.sidePanels?.mode !== 'none' && <SpecRow label="Side panels" value={windowSpec.door?.sidePanels?.mode} />}
               {windowSpec.door?.transom?.type !== 'none' && <SpecRow label="Fanlight" value={`${windowSpec.door?.transom?.type} · ${windowSpec.door?.transom?.height}`} />}
@@ -287,14 +293,14 @@ export default function WindowDetailPage() {
               ))}
               {derived.door.isFrench && <SpecRow label="Half + lip" value={`${derived.door.half} + ${derived.door.lip} mm`} />}
               {derived.door.panelLeaves.map((pl, i) => (
-                <SpecRow key={`p${i}`} label={`Side ${pl.side}`} value={`${pl.w} × ${pl.h} mm`} />
+                <SpecRow key={`p${i}`} label={`Side light ${pl.side}`} value={`${pl.w} × ${pl.h} mm · fixed`} />
               ))}
               {derived.door.fanLeaves.map((fl, i) => (
-                <SpecRow key={`f${i}`} label="Fan leaf" value={`${fl.w} × ${fl.h} mm`} />
+                <SpecRow key={`f${i}`} label={fl.fixed ? 'Fixed fan leaf' : 'Fan leaf'} value={`${fl.w} × ${fl.h} mm`} />
               ))}
               <SpecRow label="Assembly" value={`${derived.door.totalWidth} × ${derived.door.totalHeight} mm`} />
               <SpecRow label="Leaf depth" value={`${derived.door.leafDepth} mm`} />
-              <SpecRow label="Handing" value={derived.door.hardware?.handing || 'n/a'} />
+              <SpecRow label="Handing" value={derived.door.handing?.label || derived.door.hardware?.handing || 'n/a'} />
               <SpecRow label="Weight" value={`${derived.weights?.total} kg`} />
             </SpecSection>
           ) : derived && (

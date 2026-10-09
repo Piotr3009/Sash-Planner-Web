@@ -5,19 +5,20 @@
  * in the casement drawing system: mm coordinates, dark theme, non-scaling
  * strokes, the Dim helpers of drawingUtils, the overall width at the TOP and
  * the heights on the RIGHT (Piotr 06.09). Every position comes from
- * derived.door (deriveDoorWindow, doors to production 08.10.2026): the leaves
- * with their daylights, mid rails, panels, bars, hinges and handle height, the
- * fixed side panel leaves, the opening fan leaves or the fixed fan panes, the
- * coupling posts and the transom band. The sheet computes no widths itself,
- * so it cannot disagree with the cut list, the leaf sheet or the 3D.
+ * derived.door (deriveDoorWindow): the leaves with their daylights, mid rails,
+ * panels, bars, hinges and handle height, the side lights, the fan leaves
+ * (fixed and opening), the visible frame openings (zones.openings), the
+ * mullion axes and the transom axis. The sheet computes no widths itself, so
+ * it cannot disagree with the cut list, the leaf sheet or the 3D.
  *
- * ASSEMBLY (v4, Piotr 09.08): side panels are coupled OUTSIDE the door frame,
- * each with its own width; head and cill run across the whole assembly; ONE
- * coupling post (2 x the jamb face) stands between a panel and the door. From
- * outside only the band the leaves leave free is seen: the land on each side,
- * the full jamb face on the door side of an inward door (its rebate is on the
- * interior). The fanlight sits above the door zone; the band between the fan
- * and the door leaves is drawn as zones.transom.band.
+ * ASSEMBLY (doors v3, Piotr 09.10.2026: the casement rules inside the door
+ * frame): ONE frame, the side panels and the fanlight inside it; a casement
+ * MULLION (68, full height through the transom) between the door and each
+ * side panel, the side panel a casement FIXED light behind it; the fanlight a
+ * casement TRANSOM at the axis T from the frame top with one fan leaf per
+ * field, opening (top hung, the casement symbol) or fixed (no symbol). From
+ * outside only the land of the frame is seen (zones.openings), the full member
+ * faces on the door field of an inward door (its rebate is on the interior).
  *
  * FRENCH: two leaves, no centre mullion; each leaf runs the lip past the
  * centre line on its meeting stile, so the leaves overlap by twice the lip.
@@ -33,7 +34,7 @@ import { useMemo } from 'react';
 import { DimH, DimV, TitleBlock, Label, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
 import {
-  NS, num, fmt, safely, NoSheet, doorProfileParts, thresholdText,
+  NS, num, fmt, safely, NoSheet, doorProfileParts, thresholdText, handingText,
   OpeningSymbol, BarBands, HingeBarrels, HandleSymbol,
 } from './doorSheetParts.jsx';
 
@@ -47,35 +48,25 @@ function buildElevation(windowSpec, derived) {
   const W = num(z.totalWidth);
   const H = num(z.totalHeight);
   if (!(W > 0 && H > 0)) return null;
+  if (!Array.isArray(z.openings) || !z.openings.length) return null;
   const pp = doorProfileParts();
   const inward = !!dr.inward;
-  const tz = z.transom && num(z.transom.h, 0) > 0 ? z.transom : null;
-  const zoneTop = tz ? num(tz.h, 0) : 0;
-  const bottomVis = dr.hasTimberCill ? (inward ? pp.cillInward.faceExternal : pp.cillVisible) : 0;
+  const ti = dr.thresholdInfo || null;
+  const timber = ti ? !!ti.timberCill : !!dr.hasTimberCill;
+  const tr = dr.transom || null;
+  const T = tr ? num(tr.axisT, 0) : 0;
+  const bottomVis = num(z.bottomVisible, 0);
   const frames = (z.frames || []).length ? z.frames : [{ x: 0, w: W, kind: 'door' }];
-
-  // Openings of the frame as seen from outside, per frame (a coupling post
-  // shows the land, or the jamb face on the door side of an inward door).
-  const visOf = (f) => (f.kind === 'door' && inward ? m.frameJamb : m.land);
-  const openings = [];
-  frames.forEach((f) => {
-    const v = visOf(f);
-    if (tz) {
-      openings.push({ x: f.x + m.land, y: m.land, w: f.w - 2 * m.land, h: tz.band.y - m.land, fan: true });
-      const top = tz.band.y + tz.band.h + (v - m.land);
-      openings.push({ x: f.x + v, y: top, w: f.w - 2 * v, h: H - bottomVis - top });
-    } else {
-      openings.push({ x: f.x + v, y: v, w: f.w - 2 * v, h: H - bottomVis - v });
-    }
-  });
+  // The openings of the frame as seen from outside (the casement lands; the
+  // member faces on the door field of an inward door), straight from derived.
+  const openings = z.openings;
+  const doorOpening = openings.find((o) => o.kind === 'door') || null;
 
   const leaves = dr.leaves || [];
   const french = !!dr.isFrench && leaves.length === 2;
-  // The door frame opening across (what an inward door's jamb faces leave seen)
-  const doorFrame = frames.find((f) => f.kind === 'door') || null;
-  const doorVis = doorFrame ? visOf(doorFrame) : 0;
-  const doorOpen = doorFrame
-    ? { x0: doorFrame.x + doorVis, x1: doorFrame.x + doorFrame.w - doorVis }
+  // The door opening across (what an inward door's jamb faces leave seen)
+  const doorOpen = doorOpening
+    ? { x0: doorOpening.x, x1: doorOpening.x + doorOpening.w }
     : { x0: 0, x1: W };
   const lap = z.meetingLap || null;
   const otherRole = (r) => (r === 'active' ? 'passive' : 'active');
@@ -86,11 +77,11 @@ function buildElevation(windowSpec, derived) {
   const handleLeaf = leaves.find(hasHandle) || null;
 
   return {
-    dr, z, m, pp, W, H, inward, tz, zoneTop, bottomVis, frames, openings,
+    dr, z, m, pp, W, H, inward, ti, timber, tr, T, bottomVis, frames, openings, doorOpening,
     leaves, french, frontRole, kit, hasHandle, hasBolts, handleLeaf, doorOpen,
     fanLeaves: dr.fanLeaves || [],
-    fanPanes: tz?.fanPanes || [],
     panelLeaves: dr.panelLeaves || [],
+    mullions: dr.mullions || z.mullions || [],
   };
 }
 
@@ -98,7 +89,7 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber , w
   const geom = useMemo(() => safely(() => buildElevation(windowSpec, derived)), [windowSpec, derived]);
   if (!geom) return <NoSheet />;
 
-  const { dr, z, m, pp, W, H, inward, tz, zoneTop, bottomVis, openings, leaves, french, frontRole } = geom;
+  const { dr, z, m, pp, W, H, inward, tr, T, bottomVis, openings, leaves, french, frontRole } = geom;
 
   // ── Layout (mm = SVG units, the casement elevation convention) ──
   const layoutSc = Math.max(W, H) / 500;
@@ -116,10 +107,9 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber , w
   // ── Notes under the title: the threshold, the style, the meeting, the hardware ──
   const winName = windowSpec?.name || 'Door';
   const projNum = projectNumber || '';
-  const hingeSide = windowSpec?.door?.hingeSide || 'left';
+  const handing = handingText(dr) || dr.hardware?.handing || '';
   const hingeCount = (leaves[0]?.hinges || []).length;
   const handleY = num(geom.handleLeaf?.handleY);
-  const hw = dr.hardware || {};
   const lockText = !french
     ? 'Lock: multipoint lock, ThunderBolt single door kit'
     : geom.kit === 'fgte'
@@ -136,8 +126,14 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber , w
     [
       hingeCount ? `${hingeCount} hinges per leaf` : '',
       handleY != null ? `handle ${fmt(H - handleY)} above the floor` : '',
-      hw.handing || '',
+      handing,
     ].filter(Boolean).join(' · '),
+    tr
+      ? `Fanlight: casement transom, axis T ${fmt(T)} from the frame top; ${geom.fanLeaves.length} ${geom.fanLeaves.every((f) => f.fixed) ? 'fixed' : 'top hung'} fan ${geom.fanLeaves.length > 1 ? 'leaves' : 'leaf'}`
+      : '',
+    geom.panelLeaves.length
+      ? `Side panel${geom.panelLeaves.length > 1 ? 's' : ''}: casement fixed light${geom.panelLeaves.length > 1 ? 's' : ''} behind the mullion${geom.mullions.length > 1 ? 's' : ''} ${geom.mullions.map((mu) => mu.code.replace(/^D-/, '')).join(', ')}`
+      : '',
     lockText,
   ].filter(Boolean);
 
@@ -148,7 +144,7 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber , w
   const noteFs = SIZES.code * ts;
 
   const titleText = `Front Elevation${projNum ? ` · ${projNum}` : ''} · ${winName}`;
-  const subtitleText = `${french ? 'French door' : 'Single door'} · ${fmt(W)} × ${fmt(H)} mm · ${inward ? 'inward' : 'outward'} · open ${hingeSide} · exterior view`;
+  const subtitleText = `${french ? 'French door' : 'Single door'} · ${fmt(W)} × ${fmt(H)} · ${handing} · exterior view`;
 
   // ── One door leaf: outline (hidden edges dashed), glass, mid rail gap, panel, bars, symbol, furniture ──
   const renderDoorLeaf = (leaf, i) => {
@@ -224,7 +220,7 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber , w
     : leaves;
   const rightX = (k) => ox + W + (22 + 26 * k) * ts;
   const showHandleDim = handleY != null && handleY > 0 && handleY < H;
-  const rightSlots = (showHandleDim ? 1 : 0) + (tz ? 1 : 0);
+  const rightSlots = (showHandleDim ? 1 : 0) + (tr ? 1 : 0);
 
   return (
     <div className="w-full">
@@ -240,31 +236,28 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber , w
           fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frame} {...NS} />
         {openings.filter((o) => o.w > 0 && o.h > 0).map((o, i) => (
           <rect key={`op${i}`} x={X(o.x)} y={Y(o.y)} width={o.w} height={o.h}
-            fill={o.fan && geom.fanPanes.length ? COLORS.frameFill : 'none'}
-            stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
+            fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
         ))}
+        {/* Mullion and transom axes (casement members, the frame sheet carries their sizes) */}
+        {geom.mullions.map((mu, i) => (
+          <line key={`ma${i}`} x1={X(mu.axisX)} y1={Y(0) - 10 * ts} x2={X(mu.axisX)} y2={Y(H) + 10 * ts}
+            stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={axisDash} />
+        ))}
+        {tr && (
+          <line x1={X(0) - 10 * ts} y1={Y(T)} x2={X(W) + 10 * ts} y2={Y(T)}
+            stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={axisDash} />
+        )}
 
-        {/* ── CILL (timber, one piece across the assembly) or the threshold product under the door ── */}
-        {dr.hasTimberCill ? (
+        {/* ── CILL (timber, one piece across the assembly) or the threshold product under the door opening only ── */}
+        {geom.timber ? (
           <line x1={X(0)} y1={Y(H - bottomVis)} x2={X(W)} y2={Y(H - bottomVis)}
             stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} />
         ) : (
-          <rect x={X(z.doorX)} y={Y(H - pp.gapCill)} width={z.doorW} height={pp.gapCill}
+          <rect x={X(geom.doorOpen.x0)} y={Y(H - pp.gapCill)} width={geom.doorOpen.x1 - geom.doorOpen.x0} height={pp.gapCill}
             fill={COLORS.frameFill} stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} />
         )}
 
-        {/* ── FANLIGHT: fixed panes glazed into the frame, or opening top hung leaves ── */}
-        {geom.fanPanes.map((fp, i) => {
-          const day = { x: fp.x + m.inset, y: fp.y + m.inset, w: fp.w - 2 * m.inset, h: fp.h - 2 * m.inset };
-          return (
-            <g key={`fp${i}`}>
-              <rect x={X(day.x)} y={Y(day.y)} width={day.w} height={day.h}
-                fill={COLORS.glass} fillOpacity={COLORS.glassOpacity}
-                stroke={COLORS.glass} strokeWidth={STROKES.glassLight} {...NS} />
-              <BarBands day={day} bars={fp.bars} X={X} Y={Y} />
-            </g>
-          );
-        })}
+        {/* ── FANLIGHT: one casement leaf per field, opening (top hung symbol) or fixed (no symbol) ── */}
         {geom.fanLeaves.map((fl, i) => (
           <g key={`fl${i}`}>
             <rect x={X(fl.x)} y={Y(fl.y)} width={fl.w} height={fl.h}
@@ -275,11 +268,11 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber , w
                 stroke={COLORS.glass} strokeWidth={STROKES.glassLight} {...NS} />
             )}
             <BarBands day={fl.daylight} bars={fl.bars} X={X} Y={Y} />
-            <OpeningSymbol r={fl} hinge="top" X={X} Y={Y} dash={dash} />
+            {!fl.fixed && <OpeningSymbol r={fl} hinge="top" X={X} Y={Y} dash={dash} />}
           </g>
         ))}
 
-        {/* ── FIXED SIDE PANEL LEAVES (bars from the side panel spec) ── */}
+        {/* ── SIDE LIGHTS: casement fixed lights behind the mullions (bars from the side panel spec) ── */}
         {geom.panelLeaves.map((pn, i) => (
           <g key={`pn${i}`}>
             <rect x={X(pn.x)} y={Y(pn.y)} width={pn.w} height={pn.h}
@@ -312,12 +305,12 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber , w
           <DimV x={rightX(0)} y1={Y(handleY)} y2={Y(H)} extFrom={X(W)}
             label={`handle ${fmt(H - handleY)}`} small vbw={svgW} />
         )}
-        {tz && (
+        {tr && (
           <>
-            <DimV x={rightX(showHandleDim ? 1 : 0)} y1={Y(0)} y2={Y(zoneTop)} extFrom={X(W)}
-              label={`fan ${fmt(zoneTop)}`} small vbw={svgW} />
-            <DimV x={rightX(showHandleDim ? 1 : 0)} y1={Y(zoneTop)} y2={Y(H)} extFrom={X(W)}
-              label={fmt(H - zoneTop)} small vbw={svgW} />
+            <DimV x={rightX(showHandleDim ? 1 : 0)} y1={Y(0)} y2={Y(T)} extFrom={X(W)}
+              label={`T ${fmt(T)}`} small vbw={svgW} />
+            <DimV x={rightX(showHandleDim ? 1 : 0)} y1={Y(T)} y2={Y(H)} extFrom={X(W)}
+              label={fmt(H - T)} small vbw={svgW} />
           </>
         )}
         <DimV x={rightX(rightSlots)} y1={Y(0)} y2={Y(H)} extFrom={X(W)} label={fmt(H)} vbw={svgW} />
