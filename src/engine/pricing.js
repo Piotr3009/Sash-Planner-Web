@@ -14,6 +14,8 @@
 // here are the REAL Prime Sash Windows rates (sash double = £850/m², triple =
 // £950/m², etc.) so a new tenant starts from a sane, working price list.
 
+import { isCottageProportion } from './specification.js';
+
 // ─────────────────────────────────────────────────────────────
 // DEFAULT_PRICING — real PSW rates (frozen so callers can't mutate them).
 // ─────────────────────────────────────────────────────────────
@@ -55,6 +57,7 @@ export const DEFAULT_PRICING = Object.freeze({
   colorSingleNonWhite: 0.05, // single colour other than white: +5%
   colorDual: 0.15, // dual colour: +15%
   archedHead: 0.10, // arched glazing head: +10%
+  cottageSash: 0.05, // cottage sash proportion (40/60 or 1/3-2/3): +5%, after the arched head, before colour (Piotr 09.10.2026, as PSW)
 
   // Sill extension
   sillExtension: { none: 0, '35': 45, '60': 65, '85': 85 },
@@ -334,6 +337,13 @@ export function calculatePrice(config, pricingConfig) {
     subtotal += subtotal * pricing.archedHead;
   }
 
+  // Cottage sash proportion: after the arched head, before the colour surcharge
+  let cottageSurcharge = 0;
+  if (isCottageProportion(config.sashProportion)) {
+    cottageSurcharge = subtotal * pricing.cottageSash;
+    subtotal += cottageSurcharge;
+  }
+
   if (config.colorType === 'dual') {
     subtotal += subtotal * pricing.colorDual;
   } else if (config.colorType === 'single' && config.colorSingle && config.colorSingle !== 'white') {
@@ -357,6 +367,7 @@ export function calculatePrice(config, pricingConfig) {
       barsPrice, fixBarsPrice,
       sashType: config.sashType || 'double',
       additionalOptions: additionalPrice,
+      cottageSurcharge: cottageSurcharge.toFixed(2),
       subtotal: subtotal.toFixed(2),
       quantity,
       discount: (discount * 100) + '%',
