@@ -13,6 +13,10 @@ panel 17 deep in the rebate, threshold seal with aluminium / low-profile, inward
 handing in the PSW wording; sash bars per sash, the proportion error per window, a cottage price field, the window
 profile save that merges with the cloud; batch type door.
 
+### Verdict ✅ doors v3 (casement rules inside the door frame), sash bars per sash, per-window errors, settings save; every 3.10 / section 6 number from the live engine; suite green twice (33 harnesses, 4162 checks, 0 failures); build OK; independent review PASS WITH FINDINGS, all fixed or reported
+
+Branch `claude/doors-v3`, 12 commits on 150500e (Stage 0 ed567bf ... Stage 9 3275d45 and this log). Not merged.
+
 ### Stage 0: baseline and sweep (no code changes)
 
 Starting commit **150500e** (`main` on 09.10.2026: PR #14 merged, plus this tura's CLAUDE.md). Branch
@@ -543,6 +547,53 @@ Findings and what was done:
 8. (low) the window detail "Grid" row printed "6x6" on a 6 over 1: it prints the per-sash label now ("6x6 / none",
    the one pattern when both agree); the triple-section mismatch between `derived.bars` and the full-width beading
    run, and `derived.config` keeping the legacy pattern: reported, BLOCKERS 31.4 c.
+
+### Final suite (3275d45), twice on the final tree, then the build
+
+Run as in Stage 0 (every `verify/arch/t*.mjs` but the baseline generators, every `verify/parity/*.mjs` but
+`psw-casement-layouts.mjs`, which needs a PSW clone, and `render_door_samples.mjs`, the sample renderer; samples
+restored after each file). Pass / fail per file:
+
+| harness | start (150500e) | run 1 | run 2 |
+|---|---|---|---|
+| t16 | 369 | 369 / 0 | 369 / 0 |
+| t17_edges | 70 | 70 / 0 | 70 / 0 |
+| t18 | 179 | 179 / 0 | 179 / 0 |
+| t19 | 280 | 280 / 0 | 280 / 0 |
+| t20 | 117 | 117 / 0 | 117 / 0 |
+| t20_bars | 31 | 31 / 0 | 31 / 0 |
+| t21 | 120 | 120 / 0 | 120 / 0 |
+| t22 | 118 | 118 / 0 | 118 / 0 |
+| t23 | 81 | 81 / 0 | 81 / 0 |
+| t24_stage4 | 26 | 26 / 0 | 26 / 0 |
+| t25 | 226 | 226 / 0 | 226 / 0 |
+| t26 | 38 | 38 / 0 | 38 / 0 |
+| t27 | 97 | 97 / 0 | 97 / 0 |
+| t28 | 51 | 51 / 0 | 51 / 0 |
+| t29 | 34 | 34 / 0 | 34 / 0 |
+| t30_preview | 30 | 30 / 0 | 30 / 0 |
+| t33_bar_grid | 43 | 43 / 0 | 43 / 0 |
+| t31_bars_8x8 | 18 | 18 / 0 | 18 / 0 |
+| t32_bsuite | 54 | 54 / 0 | 54 / 0 |
+| t34_glass_minus1 | 46 | 46 / 0 | 46 / 0 |
+| t35_locks | 51 | 51 / 0 | 51 / 0 |
+| t36_hinges | 110 | 110 / 0 | 110 / 0 |
+| t37_single_window_bom | 50 | 50 / 0 | 50 / 0 |
+| t38_leaf_64_seat_85 | 471 | 472 / 0 | 472 / 0 |
+| t39_settings_leaf_cards | 23 | 23 / 0 | 23 / 0 |
+| t40_bottom_rail_3d | 73 | 95 / 0 | 95 / 0 |
+| t41_doors_production | 343 | 683 / 0 | 683 / 0 |
+| t42_precut_colours_labels | 32 | 32 / 0 | 32 / 0 |
+| t43_sash_proportions | 233 | 237 / 0 | 237 / 0 |
+| t43_window_tag | 90 | 90 / 0 | 90 / 0 |
+| t44_doors_v3 | new | 127 / 0 | 127 / 0 |
+| t45_sash_bars_per_sash | new | 124 / 0 | 124 / 0 |
+| t46_settings_save | new | 40 / 0 | 40 / 0 |
+| **total** | **3504** (30 harnesses) | **4162 / 0** | **4162 / 0** |
+
+`npm run build`: OK (17.5 s; the usual chunk size warning only). Changes against the start: t38 +1 (the fullConfig
+bars proof), t40 +22 (door meshes v3), t41 +340 (section 18 over 43 doors with the collision check), t43 +4 (the
+removal check, the canvas positions), new t44 (127), t45 (124), t46 (40).
 
 ## 2026-10-09 · TURA PC: SASH PROPORTIONS, COTTAGE 40/60 AND 1/3-2/3 (branch `claude/sash-proportions`)
 
