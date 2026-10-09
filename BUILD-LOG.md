@@ -272,6 +272,44 @@ quantities include d_mullion 4748 mm, d_transom_rail 2287 mm, d_threshold_alu_do
   inside-view side; label drops on a crowded first chain row of the frame sheet (the 332 side light widths of the
   2400 case print on the elevation and the side sheet instead).
 
+### Stage 5: door 3D
+
+- One agent on the 3D files only (`windowSpecToConfig.js` door code, `DoorAssembly.jsx`, the `doorGeo` branch of
+  `DoorWindow.jsx`, the capture rig and the preview framing, t40 section 6).
+- **`doorGeometryFromSpec(windowSpec, derived)`** takes the page's derived (computed under the batch profile
+  snapshot) and derives again only when none is given (the configurator). New `doorGeo` fields: `origin` (the centre
+  of the overall frame, the ONE origin the assembly, the guides, the capture rig and t40 read), `thresholdInfo`,
+  `mullions[]`, `transom` (axis, rail, band, segments), `openings[]` (= `zones.openings`), side lights and fan leaves
+  with their `members` and `fixed`, `leaf.panel` with outer size, daylight, inset, thickness and edge. Removed:
+  `doorH`, `transomH`, `posts`, `fanPanes`, `sidePanelDepth`, `cill.gap`.
+- **`DoorAssembly.jsx`**: the frame land is the complement of the derived openings; jambs and mullions continuous,
+  the transom band 21 drawn as the engine segments; side lights fixed 64 / 64 / 180 x 57 leaves; fixed fans 64 / 64
+  / 67 with no swing and no handle; the threshold strip follows `thresholdInfo.effectiveType` (an inward door never
+  gets one) and spans `thresholdInfo.openingWidth`; the bevelled panel from `panel.edge` (a 24 tongue slab across
+  the outer size on the leaf mid-plane, a 15 flat, a 40 slope up to the 54 field). The legacy PSW door path without
+  `doorGeo` is byte-identical (t40 section 4).
+- **t40 section 6** (73 to 95 checks), a reason at every changed pin: leaf 798 x 1998 (was 2002), daylight 610 x 1724,
+  hinges 251 / 950 / 1899, the 10 gap over the timber cill (51 - 41), aluminium leaf 1998 (was 2043) with the strip
+  806 wide, half-glazed / three-quarter mid rail axes 999 / 1498.5 and the panels 644 x 806 / 644 x 306.5, french
+  glass 561 x 1724, the fixed fan as a 1498 x 385 non-opening leaf (was a unit glazed into the frame), the 3.10 case
+  2400 x 2400 with side panels 400 + 400 and an opening fan (replaces the 1600 + 500 + 500 coupling post case):
+  leaves 2 x 789 x 1882, side lights 332 x 1882, fans 332 / 1566 / 332 x 385, mullions at 400 / 2000 from 47 to 2359
+  through the transom, band segments 47-387 / 413-1987 / 2013-2353. New: the frame land tiles the frame with the
+  openings (5 cases), low-profile strip, inward land and stops, inward + stored aluminium (no strip), the panel edge,
+  single 1000 + side 450 right on aluminium (mullion 2064 to the floor, strip under the door only), the derived
+  pass-through under a snapshot (leafAtFloor 61, stile 100 drawn 1988 high, 100 wide), the single origin.
+- **New `verify/parity/render_door_samples.mjs`** (reusable): renders the real `DoorWindow` from
+  `windowSpecToConfig` in Chromium with the capture rig lights. `docs/handover/samples/doors/`: the 24 renders
+  regenerated, 7 new (12 french 2400 x 2400 side panels 400 + 400 opening fan: front, angle, open; 13 the same with a
+  fixed fan: front, angle; 14 single 1000 + side 450 right: front, angle). Render 08 keeps its old inputs (1600 with
+  500 + 500): with W the overall frame that now reads as two 289 leaves, the correct v3 reading of those inputs.
+- t40 95 / 0, t30 30 / 0, t27 97 / 0, t29 34 / 0 on the tree after this stage.
+- Owner checks from this stage (BLOCKERS section 31): the strip heights (aluminium fills the 51 under the leaf,
+  low-profile half of it) are render choices, not product data; an inward door with side panels: the mullion run
+  ends at the outward cill line (H - 41, length H - 77) while the openings stop at the inward cill face (H - 35);
+  the side light without a timber cill stands over an open 51 gap; the inward cill run, hinge barrel and handle
+  backsets in `doorGeometryFromSpec` still read the live profile (not echoed in derived).
+
 ### Stage 7: the window profile save merges with the cloud; batch type door
 
 - **`windowProfileStore.js`**: the store keeps `dirty` (plain data, persisted with the profiles) = the paths changed

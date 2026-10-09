@@ -1229,16 +1229,17 @@ export default function DoorWindow({
   );
 }
 
-// ─── Guides of the engine-driven door (doorGeo): the assembly, the frames,
-//     the fanlight and the frame depth, every label from the engine ───
+// ─── Guides of the engine-driven door (doorGeo): the overall frame W x H, the
+//     fields (from the frame edge to a mullion axis), the transom axis T from
+//     the frame top and the frame depth, every label from the engine; the
+//     group origin is doorGeo.origin (the frame centre), as DoorAssembly ───
 function DoorGeoGuides({ geo }) {
-  const transomH = geo.transomH || 0;
-  const cx = geo.doorX + geo.doorW / 2;
-  const cy = transomH + geo.doorH / 2;
-  const X = (x) => mm(x - cx);
-  const Y = (y) => mm(cy - y);
+  const o = geo.origin || { x: geo.totalWidth / 2, y: geo.totalHeight / 2 };
+  const X = (x) => mm(x - o.x);
+  const Y = (y) => mm(o.y - y);
   const frames = geo.frames || [];
   const hasPanels = frames.length > 1;
+  const axisT = Number(geo.transom?.axisT) || 0;
   const top = Y(0);
   const right = X(geo.totalWidth);
   const left = X(0);
@@ -1253,9 +1254,9 @@ function DoorGeoGuides({ geo }) {
       ))}
       <DimensionGuide from={[right + mm(80), Y(geo.totalHeight), 0]} to={[right + mm(80), top, 0]}
         label={`${geo.totalHeight}mm`} offset={[0.07, 0, 0]} />
-      {transomH > 0 && (
-        <DimensionGuide from={[right + mm(30), Y(transomH), 0]} to={[right + mm(30), top, 0]}
-          label={`${transomH}`} offset={[0.05, 0, 0]} />
+      {axisT > 0 && (
+        <DimensionGuide from={[right + mm(30), Y(axisT), 0]} to={[right + mm(30), top, 0]}
+          label={`${axisT}`} offset={[0.05, 0, 0]} />
       )}
       <DimensionGuide from={[left - mm(80), 0, -halfD]} to={[left - mm(80), 0, halfD]}
         label={`${geo.frameDepth}mm`} offset={[-0.07, 0, 0]} />

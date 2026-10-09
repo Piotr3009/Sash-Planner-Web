@@ -40,15 +40,17 @@ function fitDistance(config, box = null) {
   return half / Math.tan(((FOV / 2) * Math.PI) / 180);
 }
 
-// Doors (08.10.2026): the door group's origin is the centre of the door frame,
-// while side panels and a fanlight make the assembly wider, taller and off
-// centre. Frame the whole assembly from the engine totals (doorGeo, in mm,
-// origin top-left, y down); the interior view mirrors x (group rotated by PI).
+// Doors (08.10.2026; doors v3 09.10.2026): frame the whole frame W x H from
+// the engine totals (doorGeo, in mm, origin top-left, y down). The door
+// group is centred on doorGeo.origin (the frame centre since doors v3), so
+// the box centre sits at (W / 2 - origin.x, origin.y - H / 2) = (0, 0); the
+// interior view mirrors x (group rotated by PI).
 function doorFraming(config, side) {
   const g = config.doorGeo;
-  if (!g || !(g.totalWidth > 0) || !(g.totalHeight > 0) || !(g.doorH > 0)) return null;
-  const cx = (g.totalWidth / 2 - (g.doorX + g.doorW / 2)) / 1000;
-  const cy = ((g.transomH || 0) + g.doorH / 2 - g.totalHeight / 2) / 1000;
+  if (!g || !(g.totalWidth > 0) || !(g.totalHeight > 0)) return null;
+  const o = g.origin || { x: g.totalWidth / 2, y: g.totalHeight / 2 };
+  const cx = (g.totalWidth / 2 - o.x) / 1000;
+  const cy = (o.y - g.totalHeight / 2) / 1000;
   return { x: side === 'interior' ? -cx : cx, y: cy, w: g.totalWidth / 1000, h: g.totalHeight / 1000 };
 }
 

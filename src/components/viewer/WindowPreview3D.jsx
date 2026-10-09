@@ -16,6 +16,9 @@ function Scene({ config, side }) {
   // assembly with side panels and fanlight, from the engine totals)
   const h = (config.doorGeo ? Math.max(config.doorGeo.totalHeight, config.doorGeo.totalWidth) : (config.height || 1800)) / 1000;
   const cameraZ = Math.max(h * 1.4, 1.8);
+  // the floor line under the model: a door group is centred on its frame
+  // (doorGeo.origin), so its floor is half the frame height down
+  const floorY = config.doorGeo ? -(config.doorGeo.totalHeight / 1000) / 2 : -h / 2;
 
   return (
     <>
@@ -121,7 +124,7 @@ function Scene({ config, side }) {
       </group>
 
       <ContactShadows
-        position={[0, -h / 2 - 0.05, 0]}
+        position={[0, floorY - 0.05, 0]}
         opacity={0.35}
         scale={3}
         blur={2.5}

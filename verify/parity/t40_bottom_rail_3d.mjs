@@ -29,21 +29,27 @@
  *   4  nothing else in the 3D moved: FixFrameWindow (rectangle and circle), DoorWindow,
  *      ParametricSashWindow are byte-identical to the start commit
  *   5  the constants: SASH_RAIL stays 64 (exported), SASH_BOTTOM_RAIL 67 (exported)
- *   6  doors to production (Piotr 08.10.2026, LIVE only): DoorWindow with the engine
- *      geometry (doorGeo): single 900 x 2100 leaf 798 x 2002, stiles 94, top 94, bottom
- *      180, glass daylight 610 x 1728, 3 hinges (4 on a 2150 leaf), timber cill 41 / 68,
- *      no cill 2043; mid rail 94 and the panel for half-glazed / three-quarter; french
- *      1600 leaves 755, hinge stiles 94, meeting stiles 100 lapping 12 at the centre,
- *      handles per lockType at the profile backset from the lock edge; the active leaf
- *      checked against deriveWindowData for both hinge sides; inward: the same leaf
- *      height on the interior face, the 40 / 35 cill; one 136 post; the opening
- *      fanlight a 64 / 64 / 67 casement leaf, the fixed one a unit glazed into the
- *      frame, both under the engine band; triple unit 28 in a 61 leaf
+ *   6  doors to production (Piotr 08.10.2026, LIVE only; doors v3 09.10.2026): DoorWindow
+ *      with the engine geometry (doorGeo, the group centred on the frame): single 900 x
+ *      2100 leaf 798 x 1998 (H - 51 - 51), stiles 94, top 94, bottom 180, glass daylight
+ *      610 x 1724, 3 hinges (4 on a 2146 leaf), timber cill 41 / 68 with a 10 gap under
+ *      the leaf, aluminium / low-profile 1998 on the product strip; mid rail 94 and the
+ *      panel at its outer size (daylight + 2 x 17) with the 24 / 15 / 40 edge for
+ *      half-glazed / three-quarter; french 1600 leaves 755, hinge stiles 94, meeting
+ *      stiles 100 lapping 12 at the centre, handles per lockType at the profile backset
+ *      from the lock edge; the active leaf checked against deriveWindowData for both
+ *      hinge sides; inward: the same leaf height on the interior face, the 40 / 35 cill,
+ *      a stored aluminium ignored; the frame land the exact complement of the engine
+ *      openings; casement mullions (land 26) through the transom band 21 cut in the
+ *      engine segments; side lights 64 / 64 / 180; the opening fanlight a 64 / 64 / 67
+ *      casement leaf, the fixed one a non-opening 64 / 64 / 67 leaf (no handle, no
+ *      swing); the page derived (batch profile snapshot) reaches the meshes; triple
+ *      unit 28 in a 61 leaf
  *
  * Run: node verify/parity/t40_bottom_rail_3d.mjs [git-ref]
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve, dirname, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -253,11 +259,16 @@ ok(LIVE.Panel.SASH_RAIL === 64 && LIVE.Panel.SASH_BOTTOM_RAIL === 67 && REF.Pane
   `CasementPanel exports SASH_RAIL ${LIVE.Panel.SASH_RAIL} (kept) and SASH_BOTTOM_RAIL ${LIVE.Panel.SASH_BOTTOM_RAIL} (new; START had none)`);
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 6 - doors to production (brief 5.1, Piotr 08.10.2026): DoorWindow with the engine
-// geometry (doorGeo from utils/windowSpecToConfig.js doorGeometryFromSpec), LIVE tree
-// only. The door is built the way the preview builds it (normaliseToWindowSpec ->
-// windowSpecToConfig -> DoorWindow) and measured on the meshes; the no-props
-// DoorWindow stays byte-identical to START (section 4).
+// 6 - doors to production (brief 5.1, Piotr 08.10.2026; doors v3, Piotr 09.10.2026):
+// DoorWindow with the engine geometry (doorGeo from utils/windowSpecToConfig.js
+// doorGeometryFromSpec), LIVE tree only. The door is built the way the preview builds
+// it (normaliseToWindowSpec -> windowSpecToConfig -> DoorWindow) and measured on the
+// meshes; the no-props DoorWindow stays byte-identical to START (section 4).
+// Doors v3: W x H is the OVERALL frame (side panels behind casement mullions, the
+// fanlight above a casement transom inside it), every leaf bottom stands 51 above the
+// floor line, the 3D group is centred on the frame (doorGeo.origin = W / 2, H / 2).
+// Every expected number below is worked out by hand from the owner box rules first,
+// then checked against the engine (deriveWindowData) and then against the meshes.
 section('6 - DoorWindow with doorGeo: the owner box numbers in the door 3D (LIVE)');
 {
   const entry = resolve(AUDIT, 't40-live-door-entry.mjs');
@@ -270,6 +281,8 @@ section('6 - DoorWindow with doorGeo: the owner box numbers in the door 3D (LIVE
     `export * as wsc from '${rel('utils/windowSpecToConfig.js')}';`,
     `export * as specification from '${rel('engine/specification.js')}';`,
     `export * as calculations from '${rel('engine/calculations.js')}';`,
+    // doors v3: the batch profile snapshot path (withProfiles) for the derived pass-through check
+    `export * as profile from '${rel('engine/profile.js')}';`,
   ].join('\n'));
   const out = resolve(AUDIT, 't40-live-door-bundle.mjs');
   execFileSync('npx', ['-y', 'esbuild@0.25.0', entry, '--bundle', '--format=esm', '--platform=node',
@@ -299,46 +312,79 @@ section('6 - DoorWindow with doorGeo: the owner box numbers in the door 3D (LIVE
     root.unmount();
     return res;
   }
-  const door = async (width, height, fc) => {
+  // doors v3: `derived` (optional) is handed to windowSpecToConfig the way the pages do
+  // (WindowPreview3D / Window3DCaptureRig), `opening` moves the leaves
+  const door = async (width, height, fc, { derived = null, opening = 0 } = {}) => {
     const spec = DM.specification.normaliseToWindowSpec({ id: 'D', name: 'D', width, height }, { fullConfig: { windowCategory: 'door', ...fc } });
-    const cfg = DM.wsc.windowSpecToConfig(spec);
-    const ms = await namedMeshes({ width: cfg.width, height: cfg.height, frameDims: cfg.frameDims, opening: 0, showGuides: false, doorGeo: cfg.doorGeo, ironmongery: cfg.ironmongery, glassFinish: 'clear' });
+    const cfg = DM.wsc.windowSpecToConfig(spec, derived);
+    const ms = await namedMeshes({ width: cfg.width, height: cfg.height, frameDims: cfg.frameDims, opening, showGuides: false, doorGeo: cfg.doorGeo, ironmongery: cfg.ironmongery, glassFinish: 'clear' });
     const geo = cfg.doorGeo;
-    // assembly mm (y down, top-left origin) -> the DoorWindow group (door zone centre, y up)
-    const cx = geo.doorX + geo.doorW / 2, cy = (geo.transomH || 0) + geo.doorH / 2;
+    // frame mm (y down, top-left origin) -> the DoorWindow group (doors v3: centred on
+    // doorGeo.origin, the frame centre W / 2, H / 2; was the door zone centre)
+    const cx = geo.origin.x, cy = geo.origin.y;
     return { spec, cfg, geo, ms, X: (x) => R2(x - cx), Y: (y) => R2(cy - y) };
   };
   const has = (m, n) => m.names.some((x) => x === n || x.startsWith(n));
   const inLeaf = (ms, role) => ms.filter((m) => has(m, `door-leaf-${role}`) && !has(m, 'door-handle'));
   const members = (ms) => ms.filter((m) => m.kind === 'ExtrudeGeometry');
-  const glassOf = (ms) => ms.filter((m) => m.kind === 'BoxGeometry').sort((a, b) => w(b) * h(b) - w(a) * h(a))[0];
+  const glassOf = (ms) => ms.filter((m) => m.kind === 'BoxGeometry' && !has(m, 'door-panel')).sort((a, b) => w(b) * h(b) - w(a) * h(a))[0];
   const d = (m) => R2(m.max[2] - m.min[2]);
   const bbox = (ms) => ({ min: [0, 1, 2].map((k) => Math.min(...ms.map((m) => m.min[k]))), max: [0, 1, 2].map((k) => Math.max(...ms.map((m) => m.max[k]))) });
   const noNaN = (ms) => ms.length > 0 && ms.every((m) => [...m.min, ...m.max].every(Number.isFinite));
+  const midX = (m) => R2((m.min[0] + m.max[0]) / 2), midYm = (m) => R2((m.min[1] + m.max[1]) / 2);
+  // doors v3: the frame land is the complement of the engine's visible openings. The EXT
+  // land meshes and zones.openings tile the frame W x H exactly (no overlap, no gap):
+  // the land is built from the derived openings, not from the leaves grown by the gap
+  // (that made the transom band 23 instead of the casement 21). Outward doors only (an
+  // inward door field is drawn at the full member faces, its rebate faces the room).
+  const tiling = (D) => {
+    const land = D.ms.filter((m) => has(m, 'frame-land-ext')).map((m) => ({ x0: m.min[0], x1: m.max[0], y0: m.min[1], y1: m.max[1] }));
+    const ops = D.geo.openings.map((o) => ({ x0: D.X(o.x), x1: D.X(o.x + o.w), y0: D.Y(o.y + o.h), y1: D.Y(o.y) }));
+    const area = (r) => (r.x1 - r.x0) * (r.y1 - r.y0);
+    const inter = (a, b) => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
+    const all = [...land, ...ops];
+    let overlap = 0;
+    for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) overlap += inter(all[i], all[j]);
+    return { land: land.length, overlap: R2(overlap), total: R2(all.reduce((s, r) => s + area(r), 0)), frame: D.geo.totalWidth * D.geo.totalHeight };
+  };
+  const tiles = (D, name) => {
+    const t = tiling(D);
+    ok(t.land > 0 && t.overlap === 0 && near(t.total, t.frame, 1),
+      `${name}: the frame land (${t.land} EXT meshes) + the engine openings (${D.geo.openings.length}) tile the frame ${D.geo.totalWidth} x ${D.geo.totalHeight} exactly (overlap ${t.overlap}, area ${t.total} = ${t.frame})`);
+  };
 
-  // ── single 900 x 2100, outward, timber cill: leaf 798 x 2002, stiles 94, top 94, bottom 180, glass 610 x 1728 ──
+  // ── single 900 x 2100, outward, timber cill: leaf 798 x 1998, stiles 94, top 94, bottom 180, glass 610 x 1724 ──
   {
     const D = await door(900, 2100, { doorType: 'single-external' });
     const L = D.geo.leaves[0];
-    ok(D.geo && L.w === 798 && L.h === 2002 && D.geo.leafDepth === 57 && D.geo.glassThickness === 24 && noNaN(D.ms),
-      `single 900 x 2100: windowSpecToConfig carries doorGeo (leaf ${L.w} x ${L.h}, depth ${D.geo.leafDepth}, unit ${D.geo.glassThickness}); ${D.ms.length} meshes, no NaN`);
+    // doors v3: leaf H = H - 51 - 51 = 1998, was H - 98 = 2002; the group origin is the frame centre (450, 1050)
+    ok(D.geo && L.w === 798 && L.h === 1998 && D.geo.leafDepth === 57 && D.geo.glassThickness === 24 && noNaN(D.ms)
+        && D.geo.origin.x === 450 && D.geo.origin.y === 1050,
+      `single 900 x 2100: windowSpecToConfig carries doorGeo (leaf ${L.w} x ${L.h}, depth ${D.geo.leafDepth}, unit ${D.geo.glassThickness}, origin ${D.geo.origin.x} / ${D.geo.origin.y}); ${D.ms.length} meshes, no NaN`);
     const lm = inLeaf(D.ms, 'single');
     const bb = bbox(members(lm));
-    ok(near(bb.max[0] - bb.min[0], 798, 0.02) && near(bb.max[1] - bb.min[1], 2002, 0.02) && near(bb.min[1], D.Y(L.y + L.h), 0.02) && near(bb.max[1], D.Y(L.y), 0.02) && near(bb.min[0], D.X(L.x), 0.02),
-      `single: the leaf in the 3D is ${R2(bb.max[0] - bb.min[0])} x ${R2(bb.max[1] - bb.min[1])} from y ${bb.min[1]} to ${bb.max[1]} (engine: x ${D.X(L.x)}, y ${D.Y(L.y + L.h)} to ${D.Y(L.y)}; W - 102, H - 98)`);
-    const stiles = members(lm).filter((m) => near(h(m), 2002, 0.02));
+    // doors v3: H - 102 (51 at the head, 51 above the floor), was H - 98
+    ok(near(bb.max[0] - bb.min[0], 798, 0.02) && near(bb.max[1] - bb.min[1], 1998, 0.02) && near(bb.min[1], D.Y(L.y + L.h), 0.02) && near(bb.max[1], D.Y(L.y), 0.02) && near(bb.min[0], D.X(L.x), 0.02)
+        && near(bb.min[1], D.Y(2100 - 51), 0.02),
+      `single: the leaf in the 3D is ${R2(bb.max[0] - bb.min[0])} x ${R2(bb.max[1] - bb.min[1])} from y ${bb.min[1]} to ${bb.max[1]} (engine: x ${D.X(L.x)}, y ${D.Y(L.y + L.h)} to ${D.Y(L.y)}; W - 102, H - 102, the bottom 51 above the floor)`);
+    // doors v3: the stiles run the leaf height 1998, was 2002
+    const stiles = members(lm).filter((m) => near(h(m), 1998, 0.02));
     const rails = members(lm).filter((m) => near(w(m), 798, 0.02) && h(m) < 400);
     ok(stiles.length === 4 && stiles.every((m) => near(w(m), 94, 0.02)),
-      `single: stiles EXT + INT x 2 = ${stiles.length} meshes, ${[...new Set(stiles.map(w))].join(' / ')} wide x 2002 high`);
+      `single: stiles EXT + INT x 2 = ${stiles.length} meshes, ${[...new Set(stiles.map(w))].join(' / ')} wide x 1998 high`);
     const top = rails.filter((m) => near(m.max[1], bb.max[1], 0.02)), bottom = rails.filter((m) => near(m.min[1], bb.min[1], 0.02));
     ok(top.length === 2 && top.every((m) => near(h(m), 94, 0.02)) && bottom.length === 2 && bottom.every((m) => near(h(m), 180, 0.02)) && rails.length === 4,
       `single: top rail ${top.map(h).join(' / ')} and bottom rail ${bottom.map(h).join(' / ')} high, 798 wide (EXT + INT), no mid rail on full glass`);
     const g = glassOf(lm);
-    ok(g && near(w(g), 610, 0.02) && near(h(g), 1728, 0.02) && near(d(g), 24, 0.02) && near(w(g), L.daylight.w, 0.02) && near(h(g), L.daylight.h, 0.02),
-      `single: glass at the daylight ${w(g)} x ${h(g)} (engine ${L.daylight.w} x ${L.daylight.h}; unit 633 x 1751 less 2 x 11.5), unit ${d(g)} thick`);
+    // doors v3: daylight 1998 - 94 - 180 = 1724, was 1728; the unit 633 x 1747 (was 1751)
+    ok(g && near(w(g), 610, 0.02) && near(h(g), 1724, 0.02) && near(d(g), 24, 0.02) && near(w(g), L.daylight.w, 0.02) && near(h(g), L.daylight.h, 0.02)
+        && L.glass.w === 633 && L.glass.h === 1747,
+      `single: glass at the daylight ${w(g)} x ${h(g)} (engine ${L.daylight.w} x ${L.daylight.h}; unit ${L.glass.w} x ${L.glass.h} less 2 x 11.5), unit ${d(g)} thick`);
     const hinges = D.ms.filter((m) => has(m, 'door-hinge'));
-    ok(hinges.length === 3 && hinges.every((m) => m.kind === 'CylinderGeometry' && near(h(m), D.geo.hingeBarrel, 0.02)) && L.hinges.every((hy) => hinges.some((m) => near((m.min[1] + m.max[1]) / 2, D.Y(hy), 0.02))),
-      `single: ${hinges.length} hinges (leaf 2002 is not above 2100) at the engine centres ${L.hinges.map(D.Y).join(', ')}, on the hinge edge x ${D.X(L.hingeEdgeX)}`);
+    // doors v3: the leaf 1998 is not above 2100: 3 hinges, 200 / 899 / 1848 below the leaf top
+    ok(hinges.length === 3 && hinges.every((m) => m.kind === 'CylinderGeometry' && near(h(m), D.geo.hingeBarrel, 0.02)) && L.hinges.every((hy) => hinges.some((m) => near((m.min[1] + m.max[1]) / 2, D.Y(hy), 0.02)))
+        && JSON.stringify(L.hinges) === JSON.stringify([51 + 200, 51 + 899, 51 + 1848]),
+      `single: ${hinges.length} hinges (leaf 1998 is not above 2100) at the engine centres ${L.hinges.map(D.Y).join(', ')}, on the hinge edge x ${D.X(L.hingeEdgeX)}`);
     const levers = D.ms.filter((m) => m.kind === 'TubeGeometry');
     ok(levers.length === 2 && levers.every((m) => near((m.min[1] + m.max[1]) / 2, D.Y(L.handleY), 1.0)),
       `single: one handle set (EXT + INT levers ${levers.length}) at the engine handle height y ${D.Y(L.handleY)} (1000 above the floor)`);
@@ -356,59 +402,116 @@ section('6 - DoorWindow with doorGeo: the owner box numbers in the door 3D (LIVE
       `single: the frame shows the land 47 at the head and both jambs, with a 21 rebate stop inside (face 68)`);
     const cillLand = D.ms.filter((m) => has(m, 'frame-land') && near(m.min[1], D.Y(D.geo.totalHeight), 0.02) && near(w(m), 900, 0.02));
     const cillStop = D.ms.filter((m) => has(m, 'frame-stop-bottom'));
-    ok(cillLand.length === 2 && cillLand.every((m) => near(h(m), 41, 0.02)) && cillStop.length === 1 && near(h(cillStop[0]), 68 - 41, 0.02) && near(bb.min[1] - cillLand[0].max[1], 6, 0.02),
-      `single: timber cill: ${cillLand.length} land meshes ${h(cillLand[0])} high (41 visible), stop to the cill face 68 (${h(cillStop[0])}), 6 gap under the leaf`);
+    // doors v3: the leaf bottom stands 51 above the floor, the cill shows 41: the leaf clears the cill land by 51 - 41 = 10 (was 6)
+    ok(cillLand.length === 2 && cillLand.every((m) => near(h(m), 41, 0.02)) && cillStop.length === 1 && near(h(cillStop[0]), 68 - 41, 0.02) && near(bb.min[1] - cillLand[0].max[1], 10, 0.02)
+        && D.geo.cill.visible === 41,
+      `single: timber cill: ${cillLand.length} land meshes ${h(cillLand[0])} high (41 visible), stop to the cill face 68 (${h(cillStop[0])}), ${R2(bb.min[1] - cillLand[0].max[1])} gap under the leaf (51 - 41)`);
+    tiles(D, 'single');
   }
 
-  // ── a leaf above 2100 (frame 2248: leaf 2150) carries 4 hinges ──
+  // ── a leaf above 2100 (frame 2248: leaf 2146) carries 4 hinges ──
   {
     const D = await door(900, 2248, { doorType: 'single-external' });
     const hinges = D.ms.filter((m) => has(m, 'door-hinge'));
-    ok(D.geo.leaves[0].h === 2150 && hinges.length === 4 && D.geo.leaves[0].hinges.every((hy) => hinges.some((m) => near((m.min[1] + m.max[1]) / 2, D.Y(hy), 0.02))),
+    // doors v3: leaf 2248 - 102 = 2146 (was 2150), still above 2100: 4 hinges
+    ok(D.geo.leaves[0].h === 2146 && hinges.length === 4 && D.geo.leaves[0].hinges.every((hy) => hinges.some((m) => near((m.min[1] + m.max[1]) / 2, D.Y(hy), 0.02))),
       `single 900 x 2248: leaf ${D.geo.leaves[0].h}, ${hinges.length} hinges at the engine centres`);
   }
 
-  // ── no timber cill (aluminium threshold): the leaf runs to H - 57 ──
+  // ── no timber cill (aluminium threshold): the leaf is 1998 as on the timber cill ──
   {
     const D = await door(900, 2100, { doorType: 'single-external', thresholdType: 'aluminium' });
     const bb = bbox(members(inLeaf(D.ms, 'single')));
     const thr = D.ms.filter((m) => has(m, 'threshold-aluminium'));
-    ok(near(bb.max[1] - bb.min[1], 2043, 0.02) && thr.length === 1 && near(bb.min[1], thr[0].max[1], 0.02) && !D.ms.some((m) => has(m, 'frame-stop-bottom')),
-      `aluminium threshold: leaf ${R2(bb.max[1] - bb.min[1])} high (2100 - 57), no timber cill, the threshold strip under the leaf`);
+    // doors v3: every leaf stands 51 above the floor whatever the threshold: 1998 (was 2043 = H - 57); the
+    // aluminium strip fills that 51 zone under the leaf (its top is the leaf bottom), the door opening wide
+    // (thresholdInfo.openingWidth 806 = 900 - 2 x 47, the threshold seal length), full frame depth
+    ok(near(bb.max[1] - bb.min[1], 1998, 0.02) && thr.length === 1 && near(bb.min[1], thr[0].max[1], 0.02) && !D.ms.some((m) => has(m, 'frame-stop-bottom'))
+        && near(h(thr[0]), 51, 0.02) && near(w(thr[0]), D.geo.thresholdInfo.openingWidth, 0.02) && D.geo.thresholdInfo.openingWidth === 806 && near(d(thr[0]), 93, 0.02)
+        && D.geo.thresholdInfo.effectiveType === 'aluminium' && D.geo.thresholdInfo.seal?.length === 806,
+      `aluminium threshold: leaf ${R2(bb.max[1] - bb.min[1])} high (2100 - 102, as on a timber cill), no timber cill, the threshold strip under the leaf (${w(thr[0])} x ${h(thr[0])} x ${d(thr[0])}: the door opening, the 51 zone, the frame depth)`);
+    // the jamb stops stand on the threshold, they do not run through it
+    const jambStops = D.ms.filter((m) => has(m, 'frame-stop-left') || has(m, 'frame-stop-right'));
+    ok(jambStops.length === 2 && jambStops.every((m) => near(m.min[1], thr[0].max[1], 0.02)),
+      `aluminium threshold: the jamb rebate stops end on the threshold (y ${jambStops.map((m) => m.min[1]).join(' / ')})`);
+    tiles(D, 'aluminium threshold');
+  }
+  {
+    // doors v3 (new): low-profile: the product strip is half the 51 zone and only the leaf deep
+    const D = await door(900, 2100, { doorType: 'single-external', thresholdType: 'low-profile' });
+    const thr = D.ms.filter((m) => has(m, 'threshold-low-profile'));
+    const bb = bbox(members(inLeaf(D.ms, 'single')));
+    ok(thr.length === 1 && near(h(thr[0]), 25.5, 0.02) && near(d(thr[0]), D.geo.leafDepth, 0.02) && near(bb.max[1] - bb.min[1], 1998, 0.02) && !D.ms.some((m) => has(m, 'threshold-aluminium')),
+      `low-profile threshold: leaf ${R2(bb.max[1] - bb.min[1])}, the strip ${w(thr[0])} x ${h(thr[0])} x ${d(thr[0])} (half the 51 zone, the leaf depth)`);
   }
 
-  // ── inward: the same leaf height (H - 98 in both directions, box item 6), the leaf flush with the
+  // ── inward: the same leaf height (H - 102 in both directions), the leaf flush with the
   //    INTERIOR face, the unrebated 40 -> 35 cill (no rebate stop on it), the hinges on the interior ──
   {
     const D = await door(900, 2100, { doorType: 'single-external', doorOpenDirection: 'inward' });
     const L = D.geo.leaves[0];
     const fd = D.geo.frameDepth;
     const bb = bbox(members(inLeaf(D.ms, 'single')));
-    ok(D.geo.inward && L.h === 2002 && near(bb.max[1] - bb.min[1], 2002, 0.02) && near(bb.min[1], D.Y(L.y + L.h), 0.02) && near(bb.min[2], -fd / 2, 0.02) && near(bb.max[2] - bb.min[2], D.geo.leafDepth, 0.02),
-      `inward: leaf ${R2(bb.max[1] - bb.min[1])} high (H - 98, as outward), flush with the interior face (z ${bb.min[2]} to ${bb.max[2]}, frame ${-fd / 2} to ${fd / 2})`);
+    // doors v3: 1998 (was 2002 = H - 98)
+    ok(D.geo.inward && L.h === 1998 && near(bb.max[1] - bb.min[1], 1998, 0.02) && near(bb.min[1], D.Y(L.y + L.h), 0.02) && near(bb.min[2], -fd / 2, 0.02) && near(bb.max[2] - bb.min[2], D.geo.leafDepth, 0.02),
+      `inward: leaf ${R2(bb.max[1] - bb.min[1])} high (H - 102, as outward), flush with the interior face (z ${bb.min[2]} to ${bb.max[2]}, frame ${-fd / 2} to ${fd / 2})`);
     const cill = D.ms.filter((m) => has(m, 'cill-inward'));
     const cb = cill.length ? bbox(cill) : null;
     const hinges = D.ms.filter((m) => has(m, 'door-hinge'));
     ok(D.geo.cill.inwardInternal === 40 && D.geo.cill.inwardExternal === 35 && cill.length === 2 && near(cb.max[1] - cb.min[1], 40, 0.02) && near(cb.min[1], D.Y(D.geo.totalHeight), 0.02)
         && !D.ms.some((m) => has(m, 'frame-stop-bottom')) && hinges.length === 3 && hinges.every((m) => near((m.min[2] + m.max[2]) / 2, -fd / 2, 0.02)),
       `inward: the unrebated cill ${D.geo.cill.inwardInternal} -> ${D.geo.cill.inwardExternal} (${cb ? R2(cb.max[1] - cb.min[1]) : '?'} high, no rebate stop), ${hinges.length} hinges on the interior face`);
+    // doors v3 (new): the engine draws the inward door field at the full member faces (68); the 3D land is
+    // still 47 (the full-depth part) with the 21 stop on the EXTERIOR, so from outside 47 + 21 = 68 shows
+    const jambLand = D.ms.filter((m) => has(m, 'frame-land-ext-jamb'));
+    const jambStops = D.ms.filter((m) => has(m, 'frame-stop-left') || has(m, 'frame-stop-right'));
+    const o = D.geo.openings.find((x) => x.kind === 'door');
+    ok(o.x === 68 && o.w === 900 - 2 * 68 && jambLand.length === 2 && jambLand.every((m) => near(w(m), 47, 0.02)) && jambStops.length === 2 && jambStops.every((m) => near(w(m), 21, 0.02) && near(m.max[2], fd / 2, 0.02)),
+      `inward: the engine opening at the member faces (x ${o.x}, ${o.w} wide); the 3D land 47 and a 21 stop on the exterior face (47 + 21 = 68)`);
+  }
+  {
+    // doors v3 (new, owner box item 9): an inward door is ALWAYS on its timber inward cill; a stored
+    // aluminium threshold is ignored (thresholdInfo.ignored), no aluminium strip is drawn
+    const D = await door(900, 2100, { doorType: 'single-external', doorOpenDirection: 'inward', thresholdType: 'aluminium' });
+    const bb = bbox(members(inLeaf(D.ms, 'single')));
+    ok(D.geo.threshold === 'aluminium' && D.geo.thresholdInfo.effectiveType === 'standard' && D.geo.thresholdInfo.ignored && D.geo.hasTimberCill
+        && D.ms.filter((m) => has(m, 'cill-inward')).length === 2 && !D.ms.some((m) => has(m, 'threshold-aluminium') || has(m, 'threshold-low-profile')) && near(bb.max[1] - bb.min[1], 1998, 0.02),
+      `inward + stored aluminium: the timber inward cill (effectiveType ${D.geo.thresholdInfo.effectiveType}, ignored ${D.geo.thresholdInfo.ignored}), no aluminium strip, leaf ${R2(bb.max[1] - bb.min[1])}`);
   }
 
   // ── half-glazed and three-quarter: the mid rail 94 at the engine axis, glass above, the panel below ──
-  for (const [style, glassH, panelH, axis] of [['half-glazed', 860, 774, 1001], ['three-quarter', 1360.5, 273.5, 1501.5]]) {
+  //    doors v3: axis = 0.5 / 0.75 x 1998 = 999 / 1498.5 (was 1001 / 1501.5); glass daylight 999 - 47 - 94 = 858
+  //    and 1498.5 - 47 - 94 = 1357.5 (was 860 / 1360.5); panel daylight 1998 - 180 - axis - 47 = 772 / 272.5;
+  //    the panel is drawn at its OUTER size, daylight + 2 x 17 = 644 x 806 / 644 x 306.5 (was the daylight)
+  for (const [style, glassH, panelDayH, axis] of [['half-glazed', 858, 772, 999], ['three-quarter', 1357.5, 272.5, 1498.5]]) {
     const D = await door(900, 2100, { doorType: 'single-external', doorStyle: style });
     const L = D.geo.leaves[0];
     const lm = inLeaf(D.ms, 'single');
     const mid = members(lm).filter((m) => near(w(m), 798, 0.02) && near(h(m), 94, 0.02) && near((m.min[1] + m.max[1]) / 2, D.Y(L.y + axis), 0.02));
     const g = glassOf(lm.filter((m) => near(d(m), 24, 0.02)));
-    const panel = lm.filter((m) => m.kind === 'BoxGeometry' && near(w(m), 610, 0.02) && near(h(m), panelH, 0.02));
-    const panelT = panel.length ? R2(Math.max(...panel.map((m) => m.max[2])) - Math.min(...panel.map((m) => m.min[2]))) : null;
+    const pm = lm.filter((m) => has(m, 'door-panel'));
+    const pb = pm.length ? bbox(pm) : null;
+    const panelT = pb ? R2(pb.max[2] - pb.min[2]) : null;
+    const outerW = 610 + 2 * 17, outerH = panelDayH + 2 * 17;
     ok(L.midRail?.axis === axis && mid.length === 2,
       `${style}: D-MID RAIL 94 x 798 (EXT + INT ${mid.length}) centred on the engine axis ${axis} below the leaf top`);
     ok(g && near(w(g), 610, 0.02) && near(h(g), glassH, 0.02) && near(g.max[1], D.Y(L.y) - 94, 0.02),
       `${style}: glass daylight ${g ? `${w(g)} x ${h(g)}` : '?'} (engine ${L.daylight.w} x ${L.daylight.h}) from the top rail down to the mid rail`);
-    ok(panel.length === 2 && near(panelT, D.geo.panels[0].thickness, 0.02) && near(panel[0].min[1], D.Y(L.y + L.h) + 180, 0.02),
-      `${style}: the panel ${panel.length ? `${w(panel[0])} x ${h(panel[0])}` : '?'} (engine daylight ${L.panel.daylight.w} x ${L.panel.daylight.h}), ${panelT} thick (2 x 18 Tricoya + 18 core), above the 180 bottom rail`);
+    ok(pb && L.panel.daylight.w === 610 && L.panel.daylight.h === panelDayH && L.panel.w === outerW && L.panel.h === outerH && L.panel.inset === 17
+        && near(pb.max[0] - pb.min[0], outerW, 0.02) && near(pb.max[1] - pb.min[1], outerH, 0.02) && near(panelT, D.geo.panels[0].thickness, 0.02) && D.geo.panels[0].thickness === 54
+        && near(pb.min[1], D.Y(L.y + L.h) + 180 - 17, 0.02),
+      `${style}: the panel ${pb ? `${R2(pb.max[0] - pb.min[0])} x ${R2(pb.max[1] - pb.min[1])}` : '?'} = daylight ${L.panel.daylight.w} x ${L.panel.daylight.h} + 2 x 17, ${panelT} thick (2 x 18 Tricoya + 18 core), its edge 17 into the 180 bottom rail`);
+    // doors v3 (new): the edge profile (profile panel.edge): the tongue slab 24 across the outer size, the
+    // field at the full 54 from inset 17 + flat 15 + slope 40 = 72 in from the outer edge
+    const e = L.panel.edge;
+    const slab = pm.filter((m) => m.kind === 'BoxGeometry' && near(w(m), outerW, 0.02) && near(h(m), outerH, 0.02));
+    const fieldW = outerW - 2 * (17 + e.flat + e.slope), fieldH = outerH - 2 * (17 + e.flat + e.slope);
+    const field = pm.filter((m) => m.kind === 'BoxGeometry' && near(w(m), fieldW, 0.02) && near(h(m), fieldH, 0.02));
+    const slopes = pm.filter((m) => m.kind === 'BufferGeometry');
+    ok(e.tongue === 24 && e.flat === 15 && e.slope === 40 && slab.length === 2 && near(bbox(slab).max[2] - bbox(slab).min[2], 24, 0.02)
+        && field.length === 2 && near(bbox(field).max[2] - bbox(field).min[2], 54, 0.02)
+        && slopes.length === 2 && slopes.every((m) => near(w(m), outerW - 2 * (17 + e.flat), 0.02)),
+      `${style}: the panel edge: a tongue slab ${outerW} x ${outerH} x 24, a ${e.flat} flat and a ${e.slope} slope to the field ${fieldW} x ${fieldH} at the full 54`);
   }
 
   // ── french 1600 x 2100: leaves 755, hinge stiles 94, meeting stiles 100 with the 6 lip, overlap 12 ──
@@ -425,7 +528,8 @@ section('6 - DoorWindow with doorGeo: the owner box numbers in the door 3D (LIVE
       const pLeft = pb.max[0] <= ab.max[0];       // the passive leaf is the left one when the active one is hinged right
       ok(near(pLeft ? pb.max[0] - ab.min[0] : ab.max[0] - pb.min[0], 12, 0.02) && near(pLeft ? pb.max[0] : ab.max[0], mx + 6, 0.02) && near(pLeft ? ab.min[0] : pb.min[0], mx - 6, 0.02),
         `french: the leaves overlap ${R2(pLeft ? pb.max[0] - ab.min[0] : ab.max[0] - pb.min[0])} at the centre line (each runs the 6 lip past x ${mx})`);
-      const stiles = (ms) => ms.filter((m) => near(h(m), 2002, 0.02));
+      // doors v3: the stiles run the leaf height 1998, was 2002
+      const stiles = (ms) => ms.filter((m) => near(h(m), 1998, 0.02));
       const hingeSt = (ms, l) => stiles(ms).filter((m) => near(l.hinge === 'left' ? m.min[0] : m.max[0], D.X(l.hingeEdgeX), 0.02));
       const meetSt = (ms, l) => stiles(ms).filter((m) => !hingeSt(ms, l).includes(m));
       ok([[am, act], [pm, pas]].every(([ms, l]) => hingeSt(ms, l).length === 2 && hingeSt(ms, l).every((m) => near(w(m), 94, 0.02))),
@@ -441,8 +545,9 @@ section('6 - DoorWindow with doorGeo: the owner box numbers in the door 3D (LIVE
       const clash = zone(am).some((a) => zone(pm).some((p) => a.min[2] < p.max[2] - 0.01 && p.min[2] < a.max[2] - 0.01));
       ok(!clash && zone(am).length > 0 && zone(pm).length > 0, 'french: in the 12 overlap the two leaves never occupy the same depth (rebated meeting stiles, no clash)');
       const ga = glassOf(inLeaf(D.ms, 'active')), gp = glassOf(inLeaf(D.ms, 'passive'));
-      ok([ga, gp].every((g) => near(w(g), 561, 0.02) && near(h(g), 1728, 0.02)),
-        `french: glass daylight ${w(ga)} x ${h(ga)} per leaf (755 - 94 - 100; unit 584 x 1751)`);
+      // doors v3: daylight 755 - 94 - 100 = 561 x (1998 - 94 - 180 = 1724), was 561 x 1728; unit 584 x 1747
+      ok([ga, gp].every((g) => near(w(g), 561, 0.02) && near(h(g), 1724, 0.02)) && act.glass.w === 584 && act.glass.h === 1747,
+        `french: glass daylight ${w(ga)} x ${h(ga)} per leaf (755 - 94 - 100; unit ${act.glass.w} x ${act.glass.h})`);
       const hingeX = D.ms.filter((m) => has(m, 'door-hinge')).map((m) => R2((m.min[0] + m.max[0]) / 2));
       ok(hingeX.length === 6 && [act, pas].every((l) => hingeX.filter((x) => near(x, D.X(l.hingeEdgeX), 0.02)).length === 3),
         `french: 3 hinges on each leaf's hinge edge (x ${D.X(pas.hingeEdgeX)} / ${D.X(act.hingeEdgeX)})`);
@@ -466,6 +571,7 @@ section('6 - DoorWindow with doorGeo: the owner box numbers in the door 3D (LIVE
     const D = await door(1600, 2100, { doorType: 'french', lockType: 'single', doorHinge });
     const eng = DM.calculations.deriveWindowData(D.spec, {}).door;
     const keys = ['x', 'y', 'w', 'h', 'role', 'hinge', 'meetingSide', 'stileL', 'stileR', 'hingeEdgeX', 'handleY'];
+    // doors v3: doorGeo.members deep-copies the side panel / fixed fan member objects (same values)
     const same = eng.leaves.length === D.geo.leaves.length
       && eng.leaves.every((l, i) => keys.every((k) => l[k] === D.geo.leaves[i][k]) && JSON.stringify(l.hinges) === JSON.stringify(D.geo.leaves[i].hinges))
       && JSON.stringify(eng.members) === JSON.stringify(D.geo.members) && eng.zones.meetingX === D.geo.meetingX;
@@ -479,44 +585,161 @@ section('6 - DoorWindow with doorGeo: the owner box numbers in the door 3D (LIVE
       `french hinge side ${doorHinge}: doorGeo = the engine leaves; the 3D active leaf is the engine's (x ${D.X(ea.x)} to ${D.X(ea.x + ea.w)}, ${rightSeenOutside ? 'right' : 'left'} seen from outside) and carries the one handle set`);
   }
 
-  // ── fixed fanlight 450: no fan leaf, the sealed unit glazed into the frame (W - 2 x (68 - 11.5) by
-  //    450 - 2 x (68 - 11.5)), drawn at its daylight; the rail band as the engine places it ──
+  // ── fixed fanlight, T 450 (the transom AXIS 450 below the frame top): doors v3 (owner box items 2, 7):
+  //    a non-opening casement leaf (fixedFan 64 / 64 / 67), the size the opening fan leaf would be:
+  //    W 1600 - 2 x 51 = 1498, H 450 - 65 = 385 (was a unit glazed into the frame, 1487 x 337); glass
+  //    by the casement rule 1498 - 105 = 1393 by 385 - 108 = 277, daylight 1370 x 254; no hardware ──
   {
     const D = await door(1600, 2100, { doorType: 'french', transomType: 'fixed', transomHeight: 450 });
-    const fp = D.geo.fanPanes[0];
-    const inset = D.geo.members.inset;
-    const pane = D.ms.filter((m) => m.kind === 'BoxGeometry' && !m.names.some((n) => n.startsWith('door-leaf')) && near(w(m), fp.w - 2 * inset, 0.02) && near(h(m), fp.h - 2 * inset, 0.02));
-    ok(D.geo.fanLeaves.length === 0 && D.geo.fanPanes.length === 1 && fp.w === 1487 && fp.h === 337 && pane.length === 1
-        && near((pane[0].min[0] + pane[0].max[0]) / 2, D.X(fp.x + fp.w / 2), 0.02) && near((pane[0].min[1] + pane[0].max[1]) / 2, D.Y(fp.y + fp.h / 2), 0.02)
-        && !D.ms.some((m) => m.names.some((n) => n.startsWith('fan-leaf'))),
-      `fixed fanlight: no fan leaf; the unit ${fp.w} x ${fp.h} glazed into the frame, its daylight ${pane.length ? `${w(pane[0])} x ${h(pane[0])}` : '?'} where the engine puts it`);
+    const F = D.geo.fanLeaves[0];
+    const fm = D.ms.filter((m) => has(m, 'fixed-fan-leaf-door') && m.kind === 'ExtrudeGeometry');
+    const fb = fm.length ? bbox(fm) : null;
+    const fanSt = fm.filter((m) => near(h(m), 385, 0.02)), fanTop = fm.filter((m) => near(w(m), 1498, 0.02) && fb && near(m.max[1], fb.max[1], 0.02)), fanBot = fm.filter((m) => near(w(m), 1498, 0.02) && fb && near(m.min[1], fb.min[1], 0.02));
+    ok(D.geo.fanLeaves.length === 1 && F.fixed && F.hinge === 'fixed' && F.w === 1498 && F.h === 385 && F.x === 51 && F.y === 51
+        && F.members.stile === 64 && F.members.top === 64 && F.members.bottom === 67
+        && fanSt.length === 4 && fanSt.every((m) => near(w(m), 64, 0.02)) && fanTop.length === 2 && fanTop.every((m) => near(h(m), 64, 0.02)) && fanBot.length === 2 && fanBot.every((m) => near(h(m), 67, 0.02))
+        && near(fb.max[0] - fb.min[0], 1498, 0.02) && near(fb.max[1] - fb.min[1], 385, 0.02) && near(fb.max[1], D.Y(51), 0.02),
+      `fixed fanlight: a non-opening leaf ${F.w} x ${F.h} (1600 - 102, 450 - 65) at (${F.x}, ${F.y}): stiles 64, top rail 64, bottom rail 67 in the 3D`);
+    const gf = glassOf(D.ms.filter((m) => has(m, 'fixed-fan-leaf-door')));
+    ok(F.glass.w === 1393 && F.glass.h === 277 && gf && near(w(gf), 1370, 0.02) && near(h(gf), 254, 0.02),
+      `fixed fanlight: glass unit ${F.glass.w} x ${F.glass.h} (W - 105, H - 108), drawn at the daylight ${gf ? `${w(gf)} x ${h(gf)}` : '?'}`);
+    // no hardware: no fan handle; no swing: the fixed leaf does not move with the opening slider
+    const D1 = await door(1600, 2100, { doorType: 'french', transomType: 'fixed', transomHeight: 450 }, { opening: 1 });
+    const keyOf = (ms) => ms.filter((m) => has(m, 'fixed-fan-leaf')).map(key).join(';');
+    ok(!D.ms.some((m) => has(m, 'fan-handle')) && !D.ms.some((m) => m.names.some((n) => n.startsWith('fan-leaf'))) && keyOf(D.ms).length > 0 && keyOf(D.ms) === keyOf(D1.ms)
+        && D.geo.leaves.every((l) => l.h === 1582 && l.y === 467),
+      'fixed fanlight: no handle, no swing (its meshes are the same at opening 1); the door leaves under it 2100 - 450 - 17 - 51 = 1582 high from y 467');
+    // doors v3: the transom is the casement transom: the visible band 8 above + 13 below the axis = 21 (was the
+    // engine band 94 / 115), cut between the jambs (one segment, the jambs run through)
     const band = D.geo.transom.band;
-    const bandLand = D.ms.filter((m) => has(m, 'frame-land-ext') && near(m.max[1], D.Y(band.y), 0.02) && near(m.min[1], D.Y(band.y + band.h), 0.02) && near(w(m), D.geo.totalWidth, 0.02));
-    ok(bandLand.length === 1, `fixed fanlight: the transom rail drawn as the engine band (y ${band.y}, ${band.h} high) across the assembly`);
+    const seg = D.geo.transom.segments[0];
+    const bandLand = D.ms.filter((m) => has(m, 'frame-land-ext-transom'));
+    ok(D.geo.transom.axisT === 450 && band.y === 442 && band.h === 21 && D.geo.transom.segments.length === 1 && seg.x1 === 47 && seg.x2 === 1553
+        && bandLand.length === 1 && near(bandLand[0].max[1], D.Y(442), 0.02) && near(bandLand[0].min[1], D.Y(463), 0.02) && near(bandLand[0].min[0], D.X(47), 0.02) && near(w(bandLand[0]), 1506, 0.02),
+      `fixed fanlight: the transom band ${band.h} high (y ${band.y} to ${band.y + band.h}, axis 450) between the jambs (x ${seg.x1} to ${seg.x2})`);
+    tiles(D, 'fixed fanlight');
   }
 
-  // ── side panels 500 / 500 and an opening fanlight 450: ONE post, panel members 57, the fan a casement leaf ──
+  // ── side panels and an opening fanlight: the 3.10 reference french 2400 x 2400, side panels 400 + 400,
+  //    opening fan T 450 (doors v3: W x H is the overall frame, side panels inside it behind casement
+  //    mullions; replaces the french 1600 + 500 + 500 assembly with its ONE coupling post 136) ──
   {
-    const D = await door(1600, 2100, { doorType: 'french', sidePanels: 'both', sideLeftWidth: 500, sideRightWidth: 500, transomType: 'opening', transomHeight: 450 });
-    const post = D.geo.posts[0];
-    const landPost = D.ms.filter((m) => has(m, 'frame-land-ext') && near(m.min[0], D.X(post.visX), 0.02) && near(w(m), post.visW, 0.02));
-    const stopsAt = D.ms.filter((m) => has(m, 'frame-stop-left') || has(m, 'frame-stop-right')).filter((m) => m.min[0] >= D.X(post.x) - 0.01 && m.max[0] <= D.X(post.x + post.w) + 0.01);
-    const span = stopsAt.length ? R2(Math.max(...stopsAt.map((m) => m.max[0]), ...landPost.map((m) => m.max[0])) - Math.min(...stopsAt.map((m) => m.min[0]), ...landPost.map((m) => m.min[0]))) : 0;
-    ok(landPost.length >= 1 && near(span, post.w, 0.02),
-      `side panels: ONE coupling post: the land ${post.visW} seen outside + a 21 rebate stop each side = ${span} (engine post ${post.w})`);
+    const D = await door(2400, 2400, { doorType: 'french', sidePanels: 'both', sideLeftWidth: 400, sideRightWidth: 400, transomType: 'opening', transomHeight: 450 });
+    // by hand: door field 400..2000 = 1600 between the mullion axes: half (1600 - 2 x 17) / 2 = 783, leaf 789;
+    // leaf H 2400 - 450 - 17 - 51 = 1882; side light 400 - 51 - 17 = 332 x 1882; fan 1600 - 34 = 1566 / 400 - 68 = 332 by 450 - 65 = 385
+    const [A, B] = D.geo.leaves;
+    ok(A.w === 789 && B.w === 789 && A.h === 1882 && B.h === 1882 && D.geo.panelLeaves.every((pl) => pl.w === 332 && pl.h === 1882)
+        && D.geo.fanLeaves.map((f) => `${f.w}x${f.h}`).join(',') === '332x385,1566x385,332x385',
+      `side panels: door leaves 2 x ${A.w} x ${A.h}, side lights ${D.geo.panelLeaves.map((pl) => `${pl.w} x ${pl.h}`).join(' / ')}, fan leaves ${D.geo.fanLeaves.map((f) => `${f.w} x ${f.h}`).join(' / ')} (3.10)`);
+    // the mullions: casement 68 x 93, the land 26 seen outside (axis +- 13), full height from the head land to
+    // the cill top THROUGH the transom (one land mesh per half), a 21 stop each side: 21 + 26 + 21 = 68
+    const mus = D.geo.mullions;
+    const landM = D.ms.filter((m) => has(m, 'frame-land-ext-mullion'));
+    const muOk = mus.length === 2 && mus.every((mu) => {
+      const lm = landM.filter((m) => near(midX(m), D.X(mu.axisX), 0.02));
+      const st = D.ms.filter((m) => (has(m, 'frame-stop-left') || has(m, 'frame-stop-right')) && m.min[0] >= D.X(mu.axisX - 34) - 0.01 && m.max[0] <= D.X(mu.axisX + 34) + 0.01);
+      const lo = Math.min(...st.map((m) => m.min[0]), ...lm.map((m) => m.min[0])), hi = Math.max(...st.map((m) => m.max[0]), ...lm.map((m) => m.max[0]));
+      return lm.length === 1 && near(w(lm[0]), 26, 0.02) && near(lm[0].max[1], D.Y(47), 0.02) && near(lm[0].min[1], D.Y(2400 - 41), 0.02)
+        && st.length > 0 && st.every((m) => near(w(m), 21, 0.02)) && near(hi - lo, 68, 0.02);
+    });
+    ok(muOk && mus.map((mu) => mu.axisX).join(',') === '400,2000' && mus.every((mu) => mu.x2 - mu.x1 === 26 && mu.yTop === 47 && mu.yBottom === 2359) && !D.ms.some((m) => has(m, 'frame-land-ext-post')),
+      `side panels: two casement mullions (axes ${mus.map((mu) => mu.axisX).join(' / ')}): the land 26 seen outside, one mesh from the head land to the cill top through the transom, a 21 stop each side (26 + 2 x 21 = 68), no coupling post`);
+    // the side light: a casement fixed light 64 / 64 / 180 x 57, no hinge, no handle
     const P = D.geo.panelLeaves.find((x) => x.side === 'left');
-    const pl = D.ms.filter((m) => has(m, 'side-panel-leaf-left') && m.kind === 'ExtrudeGeometry' && (near(h(m), P.h, 0.02) || near(w(m), P.w, 0.02)));
-    ok(pl.length === 8 && pl.every((m) => near(w(m), 57, 0.02) || near(h(m), 57, 0.02)) && near(bbox(pl).max[0] - bbox(pl).min[0], P.w, 0.02),
-      `side panel leaf: stiles and rails 57 (not 93 / 185), leaf ${P.w} x ${P.h}`);
+    const pl = D.ms.filter((m) => has(m, 'side-panel-leaf-left') && m.kind === 'ExtrudeGeometry');
+    const pbb = bbox(pl);
+    const plSt = pl.filter((m) => near(h(m), 1882, 0.02)), plTop = pl.filter((m) => near(w(m), 332, 0.02) && near(m.max[1], pbb.max[1], 0.02)), plBot = pl.filter((m) => near(w(m), 332, 0.02) && near(m.min[1], pbb.min[1], 0.02));
+    ok(P.members.stile === 64 && P.members.top === 64 && P.members.bottom === 180 && P.members.depth === 57 && pl.length === 8
+        && plSt.length === 4 && plSt.every((m) => near(w(m), 64, 0.02)) && plTop.length === 2 && plTop.every((m) => near(h(m), 64, 0.02)) && plBot.length === 2 && plBot.every((m) => near(h(m), 180, 0.02))
+        && near(pbb.max[0] - pbb.min[0], 332, 0.02) && near(pbb.max[2] - pbb.min[2], 57, 0.02) && near(pbb.min[1], D.Y(2400 - 51), 0.02)
+        && !D.ms.some((m) => has(m, 'side-panel-leaf') && (has(m, 'door-handle') || m.kind === 'TubeGeometry')),
+      `side light: a fixed leaf ${P.w} x ${P.h}: stiles 64, top rail 64, bottom rail 180 (the door's, its line meets the door bottom rail), 57 deep, standing 51 above the floor; no hardware`);
+    ok(D.geo.leaves.every((l) => near(bbox(members(inLeaf(D.ms, l.role))).min[1], plBot[0].min[1], 0.02) && near(bbox(members(inLeaf(D.ms, l.role))).min[1] + 180, plBot[0].max[1], 0.02)),
+      'side light: its bottom rail lines up with the door bottom rails (same bottom, same 180)');
+    // the opening fan leaves: casement top hung leaves with a handle, 64 / 64 / 67
     const F = D.geo.fanLeaves.find((x) => x.over === 'door');
-    const fm = D.ms.filter((m) => has(m, 'fan-leaf-door') && m.kind === 'ExtrudeGeometry' && (near(h(m), F.h, 0.02) || near(w(m), F.w, 0.02)));
+    const fm = D.ms.filter((m) => has(m, 'fan-leaf-door') && m.kind === 'ExtrudeGeometry' && !has(m, 'fan-handle') && (near(h(m), F.h, 0.02) || near(w(m), F.w, 0.02)));
     const fb = bbox(fm);
     const fanSt = fm.filter((m) => near(h(m), F.h, 0.02)), fanTop = fm.filter((m) => near(w(m), F.w, 0.02) && near(m.max[1], fb.max[1], 0.02)), fanBot = fm.filter((m) => near(w(m), F.w, 0.02) && near(m.min[1], fb.min[1], 0.02));
-    ok(fanSt.length === 4 && fanSt.every((m) => near(w(m), 64, 0.02)) && fanTop.length === 2 && fanTop.every((m) => near(h(m), 64, 0.02)) && fanBot.length === 2 && fanBot.every((m) => near(h(m), 67, 0.02)) && near(fb.max[0] - fb.min[0], F.w, 0.02) && near(fb.max[1] - fb.min[1], F.h, 0.02),
-      `opening fanlight: a casement top hung leaf ${F.w} x ${F.h}, stiles 64, top rail 64, bottom rail 67`);
-    const band = D.geo.transom.band;
-    const bandLand = D.ms.filter((m) => has(m, 'frame-land-ext') && near(m.max[1], D.Y(band.y), 0.02) && near(m.min[1], D.Y(band.y + band.h), 0.02) && near(w(m), D.geo.totalWidth, 0.02));
-    ok(bandLand.length === 1, `fanlight: the transom rail drawn as the engine band (y ${band.y}, ${band.h} high) across the assembly`);
+    const fanHandles = new Set(D.ms.filter((m) => has(m, 'fan-handle')).map((m) => m.names.find((n) => n.startsWith('fan-leaf'))));
+    ok(!F.fixed && F.hinge === 'top' && fanSt.length === 4 && fanSt.every((m) => near(w(m), 64, 0.02)) && fanTop.length === 2 && fanTop.every((m) => near(h(m), 64, 0.02)) && fanBot.length === 2 && fanBot.every((m) => near(h(m), 67, 0.02)) && near(fb.max[0] - fb.min[0], F.w, 0.02) && near(fb.max[1] - fb.min[1], F.h, 0.02)
+        && fanHandles.size === 3,
+      `opening fanlight: a casement top hung leaf ${F.w} x ${F.h}, stiles 64, top rail 64, bottom rail 67; a handle on each of the ${fanHandles.size} fan leaves`);
+    // doors v3: the transom band 21 (8 above + 13 below the axis 450), cut in the engine's three segments
+    // between the jambs and the mullions (the mullions run through it)
+    const segs = D.geo.transom.segments;
+    const bandLand = D.ms.filter((m) => has(m, 'frame-land-ext-transom')).sort((a, b) => a.min[0] - b.min[0]);
+    ok(D.geo.transom.band.h === 21 && segs.map((s) => `${s.x1}-${s.x2}`).join(',') === '47-387,413-1987,2013-2353' && bandLand.length === 3
+        && bandLand.every((m, i) => near(m.min[0], D.X(segs[i].x1), 0.02) && near(m.max[0], D.X(segs[i].x2), 0.02) && near(m.max[1], D.Y(442), 0.02) && near(h(m), 21, 0.02)),
+      `fanlight: the transom band 21 split by the mullions into the engine segments (${segs.map((s) => `${s.x1} to ${s.x2}`).join(', ')}), y 442 to 463`);
+    // the fan's rebate stop over the transom: 34 - 8 = 26; under it (the lower openings) 34 - 13 = 21
+    const fanStops = D.ms.filter((m) => has(m, 'stops-fan') && has(m, 'frame-stop-bottom'));
+    const lowStops = D.ms.filter((m) => (has(m, 'stops-door') || has(m, 'stops-panel')) && has(m, 'frame-stop-top'));
+    ok(fanStops.length === 3 && fanStops.every((m) => near(h(m), 26, 0.02) && near(m.min[1], D.Y(442), 0.02)) && lowStops.length === 3 && lowStops.every((m) => near(h(m), 21, 0.02) && near(m.max[1], D.Y(463), 0.02)),
+      'fanlight: the rebate stop over the transom 26 (34 - 8) under each fan, 21 (34 - 13) over each lower opening');
+    // the opening slider moves the opening fans (top hung) and leaves the side lights where they are
+    const D1 = await door(2400, 2400, { doorType: 'french', sidePanels: 'both', sideLeftWidth: 400, sideRightWidth: 400, transomType: 'opening', transomHeight: 450 }, { opening: 1 });
+    const keyOf = (ms, n) => ms.filter((m) => has(m, n)).map(key).join(';');
+    ok(keyOf(D.ms, 'fan-leaf-door') !== keyOf(D1.ms, 'fan-leaf-door') && keyOf(D.ms, 'side-panel-leaf') === keyOf(D1.ms, 'side-panel-leaf'),
+      'opening 1: the opening fan leaves swing, the side lights stay fixed');
+    tiles(D, 'side panels + fanlight');
+  }
+
+  // ── a single 1000 x 2100 with one side panel 450 on the right, on an aluminium threshold (6 of CLAUDE.md):
+  //    by hand: the door field 0..550, leaf 550 - 51 - 17 = 482 x 1998; the side light 450 - 51 - 17 = 382 x 1998;
+  //    no timber cill: the mullion runs to the floor line (length 2100 - (77 - 41) = 2064) ──
+  {
+    const D = await door(1000, 2100, { doorType: 'single-external', sidePanels: 'right', sideRightWidth: 450, thresholdType: 'aluminium' });
+    const L = D.geo.leaves[0], P = D.geo.panelLeaves[0], mu = D.geo.mullions[0];
+    const landM = D.ms.filter((m) => has(m, 'frame-land-ext-mullion'));
+    const thr = D.ms.filter((m) => has(m, 'threshold-aluminium'));
+    ok(L.w === 482 && L.h === 1998 && P.w === 382 && P.h === 1998 && mu.axisX === 550 && mu.yBottom === 2100 && mu.length === 2064 && !mu.timberCill
+        && landM.length === 1 && near(landM[0].min[1], D.Y(2100), 0.02) && near(w(landM[0]), 26, 0.02),
+      `single + side panel 450 right, aluminium: leaf ${L.w} x ${L.h}, side light ${P.w} x ${P.h}, the mullion (axis ${mu.axisX}, ${mu.length} long) runs to the floor line`);
+    ok(thr.length === 1 && near(thr[0].min[0], D.X(47), 0.02) && near(thr[0].max[0], D.X(537), 0.02) && D.geo.thresholdInfo.openingWidth === 490
+        && !D.ms.some((m) => has(m, 'frame-stop-bottom')),
+      `single + side panel: the threshold strip only under the door (x 47 to 537, ${D.geo.thresholdInfo.openingWidth} = the threshold seal), nothing bought under the side light`);
+    tiles(D, 'single + side panel');
+  }
+
+  // ── doors v3: the page's derived reaches the meshes. A door derived under a modified door profile
+  //    (the batch snapshot path: withProfiles) and handed to windowSpecToConfig is drawn from THAT
+  //    derived: leafAtFloor 61 and a stile 100 give a leaf 2100 - 51 - 61 = 1988 with 100 stiles;
+  //    without the derived the live profile draws 1998 / 94 ──
+  {
+    const prof = DM.profile;
+    const base = prof.getDoorProfile();
+    const mod = { ...base, elements: { ...base.elements, leafStile: { face: 100 } }, deductions: { ...base.deductions, leafAtFloor: 61 } };
+    const spec = DM.specification.normaliseToWindowSpec({ id: 'D', name: 'D', width: 900, height: 2100 }, { fullConfig: { windowCategory: 'door', doorType: 'single-external' } });
+    const derived = prof.withProfiles(null, null, mod, () => DM.calculations.deriveWindowData(spec, {}));
+    const D = await door(900, 2100, { doorType: 'single-external' }, { derived });
+    const Dlive = await door(900, 2100, { doorType: 'single-external' });
+    const bb = bbox(members(inLeaf(D.ms, 'single')));
+    const stiles = members(inLeaf(D.ms, 'single')).filter((m) => near(h(m), 1988, 0.02));
+    const bbL = bbox(members(inLeaf(Dlive.ms, 'single')));
+    ok(derived.door.leaves[0].h === 1988 && D.geo.leaves[0].h === 1988 && near(bb.max[1] - bb.min[1], 1988, 0.02) && near(bb.min[1], D.Y(2100 - 61), 0.02)
+        && stiles.length === 4 && stiles.every((m) => near(w(m), 100, 0.02))
+        && Dlive.geo.leaves[0].h === 1998 && near(bbL.max[1] - bbL.min[1], 1998, 0.02) && prof.getDoorProfile().deductions.leafAtFloor === 51,
+      `derived pass-through: the snapshot door (leafAtFloor 61, stile 100) is drawn ${R2(bb.max[1] - bb.min[1])} high with ${stiles.length} stile meshes ${[...new Set(stiles.map(w))].join(' / ')} wide; without the derived the live profile draws ${R2(bbL.max[1] - bbL.min[1])}`);
+    // the two page components hand their derived to windowSpecToConfig (the preview and the pack capture rig)
+    const src = (p) => readFileSync(resolve(ROOT, 'src', p), 'utf8');
+    ok(/windowSpecToConfig\(windowSpec, derived\)/.test(src('components/viewer/WindowPreview3D.jsx')) && /windowSpecToConfig\(list\[idx\]\.windowSpec, list\[idx\]\.derived \|\| null\)/.test(src('components/viewer/Window3DCaptureRig.jsx'))
+        && /doorGeometryFromSpec\(windowSpec, derived\)/.test(src('utils/windowSpecToConfig.js')),
+      'derived pass-through: WindowPreview3D and Window3DCaptureRig hand the page derived to windowSpecToConfig, which hands it to doorGeometryFromSpec');
+  }
+
+  // ── doors v3: ONE origin. DoorAssembly, the guides (DoorGeoGuides), the capture rig framing and this
+  //    harness all centre on doorGeo.origin; none reads the old door-zone origin (doorH / transomH) ──
+  {
+    const src = (p) => readFileSync(resolve(ROOT, 'src', p), 'utf8');
+    const asm = src('3d/components/door/DoorAssembly.jsx'), win = src('3d/components/door/DoorWindow.jsx'), rig = src('components/viewer/Window3DCaptureRig.jsx');
+    const guides = win.slice(win.indexOf('function DoorGeoGuides'), win.indexOf('function DimensionGuide'));
+    const rigFraming = rig.slice(rig.indexOf('function doorFraming'), rig.indexOf('function CaptureScene'));
+    const geoW = src('utils/windowSpecToConfig.js');
+    const fromSpec = geoW.slice(geoW.indexOf('export function doorGeometryFromSpec'), geoW.indexOf('// ─── Casement: windowSpec'));
+    ok(/g\.origin/.test(asm) && /geo\.origin/.test(guides) && /g\.origin/.test(rigFraming) && /origin: \{ x: d\.totalWidth \/ 2, y: d\.totalHeight \/ 2 \}/.test(fromSpec)
+        && ![asm, guides, rigFraming, fromSpec].some((s) => /\b(doorH|transomH)\b/.test(s)),
+      'one origin: doorGeo.origin (W / 2, H / 2) is read by DoorAssembly, DoorGeoGuides and the capture rig framing; nothing reads doorH / transomH');
   }
 
   // ── triple glazing: the unit 28 thick and the leaf 61 deep ──
