@@ -20,32 +20,44 @@
  * ovolo, seal strip, hinge barrel radius, opening angles, panel moulding),
  * not workshop numbers.
  *
- * Coordinates: doorGeo is in assembly mm, origin at the assembly top-left
- * seen from OUTSIDE, y DOWN. This group's origin is the centre of the DOOR
- * zone (the origin DoorWindow always had):
- *     x3 = xA - (doorX + doorW / 2),   y3 = (transomH + doorH / 2) - yA   (to m)
- * and +z is the exterior face.
+ * Coordinates: doorGeo is in frame mm, origin at the frame top-left seen
+ * from OUTSIDE, y DOWN. W x H is the OVERALL frame (doors v3). This group's
+ * origin is doorGeo.origin, the frame centre (W / 2, H / 2):
+ *     x3 = x - origin.x,   y3 = origin.y - y   (to m)
+ * and +z is the exterior face. The guides (DoorWindow DoorGeoGuides), the
+ * pack capture rig and the harness read the same field.
  *
- * What is drawn (owner box of 08.10.2026):
- *   frame    one land band (the part of the frame that is full depth) around
- *            every opening, built from the openings themselves: the head and
- *            the cill run the full assembly, ONE coupling post 136 between a
- *            side panel and the door (two rebates), the fanlight rail is the
- *            engine's transom band (zones.transom.band, owner drawing check);
- *            a rebate stop (21) with a seal strip inside every leaf opening,
+ * What is drawn (owner box of 09.10.2026, doors v3: casement rules inside
+ * the door frame):
+ *   frame    the land (the part of the frame that is full depth) is the
+ *            complement of the engine's visible openings (zones.openings: 47
+ *            at a jamb and the head, 13 each side of a mullion axis, 8 above
+ *            and 13 below the transom axis, down to the cill top or the floor
+ *            line). The jambs and the casement MULLIONS (68 x 93, land 26)
+ *            run through; the TRANSOM band (21) is cut in the engine's
+ *            segments between them; the head and the cill run the full
+ *            width. Inside every opening a rebate stop (the member face beyond
+ *            the land: 21 at a jamb, the head and a mullion, 21 under and 26
+ *            over the transom axis, 27 at the outward cill) with a seal strip,
  *            on the interior for outward leaves and on the exterior for an
  *            inward door; the outward cill is the casement cill (68, 41
- *            visible, 27 stop), the inward cill is unrebated (40 falling to
- *            35), an aluminium / low-profile threshold is a strip under the
- *            leaf (no timber cill).
- *   leaves   stiles 94, top 94, bottom 180, mid rail 94 and the panel per
- *            style, french meeting stiles 100 with the 6 lip each side: the
- *            ACTIVE leaf laps the passive one on the face it opens to
- *            (zones.meetingLap), so the two leaves overlap 12 at the centre
- *            line; glass at the daylight, the sealed unit as thick as the
- *            glazing; side panel leaves 57 all round (fixed); the opening
- *            fanlight is a casement top hung leaf (64 / 64 / 67), the fixed
- *            fanlight is glass in the frame.
+ *            visible), the inward cill is unrebated (40 falling to 35), an
+ *            aluminium / low-profile threshold is a strip under the door leaf
+ *            (no timber cill; an inward door never has one).
+ *   leaves   every leaf bottom stands 51 above the floor line (the engine's
+ *            leaf heights), so a leaf over the timber cill clears its land by
+ *            51 - 41 = 10. Door leaves: stiles 94, top 94, bottom 180, mid
+ *            rail 94 and the panel per style, french meeting stiles 100 with
+ *            the 6 lip each side: the ACTIVE leaf laps the passive one on the
+ *            face it opens to (zones.meetingLap), so the two leaves overlap 12
+ *            at the centre line; glass at the daylight, the sealed unit as
+ *            thick as the glazing; the panel (54) at its outer size (daylight
+ *            + 2 x 17) with the engine's edge profile (a 24 tongue in the
+ *            rebate, a 15 flat, a 40 slope to the field). Side panels:
+ *            casement fixed lights 64 / 64 / 180 (no hardware, no swing).
+ *            Fanlight: one leaf per field, the opening one a casement top hung
+ *            leaf (64 / 64 / 67, handle), the fixed one a non-opening leaf
+ *            (fixedFan 64 / 64 / 67, no handle, no swing).
  *   ironmongery  hinges at the engine's hinge centres (3, or 4 above 2100),
  *            handles on the active leaf (lockType single) or on both leaves
  *            (lockType double), the spindle at the engine's handle height and
@@ -70,7 +82,9 @@ const GASKET_T = 5;     //   and its thickness: the leaf sits on it
 const HINGE_R = 5;      // hinge barrel radius
 const MAX_ANGLE = 70;   // leaf opening at slider 1, degrees (DoorPanel.jsx)
 const FAN_ANGLE = 30;   // top hung fanlight tilt at slider 1, degrees (DoorWindow.jsx)
-const MOULD = { bevelOut: 50, bevelIn: 30, recess: 8 };   // raised and fielded panel (DoorPanel.jsx look)
+// 'panel' paneling: the PSW recessed moulding inside the panel field (DoorPanel.jsx:
+// bevel 30 down 8, a 20 flat step, bevel 30 up to 3 below the field face)
+const RECESS = { bevel1: 30, step: 20, bevel2: 30, depth: 8, drop: 3 };
 const BEAD = { w: 20, h: 15 };                            // panel beading moulding (DoorPanel.jsx)
 const FINISH = {
   brass: '#d4af37', chrome: '#e8eaec', stainless: '#c8c8c8',
@@ -134,7 +148,8 @@ function railProfile(kind, half, F, D) {
  *   top, bottom       rail faces; mid { y, face } (top edge from the leaf top)
  *   glass             daylight rect; unit (thickness); barXs / barYs (mm from
  *                     the glass centre, x right, y up)
- *   panel             daylight rect; panelThick; paneling
+ *   panel             OUTER rect (daylight + 2 x inset) with its inset and
+ *                     edge profile; panelThick; paneling
  */
 function LeafBody({ L, mat, matInt, spacerColor, glassFinish }) {
   const key = JSON.stringify(L);
@@ -183,79 +198,125 @@ function LeafBody({ L, mat, matInt, spacerColor, glassFinish }) {
           spacerColor={spacerColor} glassFinish={glassFinish} position={at(L.glass)} />
       )}
       {L.panel && L.panel.w > 0 && L.panel.h > 0 && (
-        <PanelInfill rect={L.panel} thick={L.panelThick} paneling={L.paneling} pos={at(L.panel)}
+        <PanelInfill rect={L.panel} inset={L.panel.inset} edge={L.panel.edge} thick={L.panelThick} paneling={L.paneling} pos={at(L.panel)}
           mat={panelMat} matInt={panelMatInt} />
       )}
     </group>
   );
 }
 
+/**
+ * The face profile of the panel, one face (mm, from the panel's OUTER edge
+ * inward): [inset from the outer edge, height of the face above the panel's
+ * mid plane] pairs. Doors v3 (owner box item 8, profile panel.edge): the
+ * edge is machined down to the tongue (24 thick, on the leaf mid plane like
+ * the glass unit) that sits `inset` 17 deep in the glazing rebate; from the
+ * daylight edge a flat (15, the bead sits on it) at the tongue face, then the
+ * slope (40) up to the full thickness (54): the field. 'panel' paneling adds
+ * the PSW recessed moulding inside the field (RECESS). Returns null when the
+ * profile is missing or the panel is too small for it (the board is then
+ * flat at its full thickness).
+ */
+export function panelFaceProfile(w, h, thick, inset, edge, paneling) {
+  const T = Number(thick), tongue = Number(edge?.tongue), flat = Number(edge?.flat), slope = Number(edge?.slope), ins = Number(inset);
+  if (!(T > 0 && tongue > 0 && tongue < T && flat >= 0 && slope > 0 && ins >= 0)) return null;
+  const e1 = ins + flat;        // the end of the flat: the slope starts at the tongue face
+  const e2 = e1 + slope;        // the field edge: full thickness
+  if (!(w > 2 * e2 && h > 2 * e2)) return null;
+  const steps = [[0, tongue / 2], [e1, tongue / 2], [e2, T / 2]];
+  const r = RECESS;
+  const inner = e2 + r.bevel1 + r.step + r.bevel2;
+  // the raised centre at least a flat step wide each way, or the field stays plain
+  if (paneling === 'panel' && w - 2 * inner >= 2 * r.step && h - 2 * inner >= 2 * r.step && T / 2 - r.depth > tongue / 2) {
+    steps.push([e2 + r.bevel1, T / 2 - r.depth], [e2 + r.bevel1 + r.step, T / 2 - r.depth], [inner, T / 2 - r.drop]);
+  }
+  return steps;
+}
+
 // The half-glazed / three-quarter panel (two Tricoya boards and an MDF core,
-// doorGeo.panels thickness) at its daylight, in the glass rebate. 'panel'
-// adds a raised field on both faces, 'beading' a moulding round the daylight.
-function PanelInfill({ rect, thick, paneling, pos, mat, matInt }) {
+// `thick` 54) at its OUTER size (the daylight + 2 x inset 17: its edge runs 17
+// into the leaf's glazing rebate, inside the stiles and rails), with the edge
+// profile above: a tongue slab across the whole panel, the slopes and steps
+// as one surface per face, the centre field as a box. 'beading' adds a
+// moulding round the field on both faces.
+function PanelInfill({ rect, inset, edge, thick, paneling, pos, mat, matInt }) {
   const w = rect.w, h = rect.h;
   const T = Number(thick) > 0 ? thick : 0;
-  const raised = paneling === 'panel' && w > 2 * (MOULD.bevelOut + MOULD.bevelIn) && h > 2 * (MOULD.bevelOut + MOULD.bevelIn) && T > 2 * MOULD.recess;
-  const quads = useMemo(() => {
-    if (!raised) return null;
+  const steps = useMemo(() => panelFaceProfile(w, h, T, inset, edge, paneling), [w, h, T, inset, edge?.tongue, edge?.flat, edge?.slope, paneling]);
+  const surfaces = useMemo(() => {
+    if (!steps) return null;
     const make = (sign) => {
-      const zo = sign * (T / 2 - MOULD.recess), zi = sign * (T / 2);
-      const o = { l: -w / 2 + MOULD.bevelOut, r: w / 2 - MOULD.bevelOut, b: -h / 2 + MOULD.bevelOut, t: h / 2 - MOULD.bevelOut };
-      const i = { l: o.l + MOULD.bevelIn, r: o.r - MOULD.bevelIn, b: o.b + MOULD.bevelIn, t: o.t - MOULD.bevelIn };
-      const q = (A, B, C, Dp) => {
-        const g = new THREE.BufferGeometry();
-        g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([...A, ...B, ...C, ...Dp].map(mm)), 3));
-        g.setIndex([0, 1, 2, 0, 2, 3]);
-        g.computeVertexNormals();
-        return g;
+      const pts = [];
+      const idx = [];
+      const quad = (A, B, C, Dp) => {
+        const n = pts.length / 3;
+        pts.push(...A, ...B, ...C, ...Dp);
+        idx.push(n, n + 1, n + 2, n, n + 2, n + 3);
       };
-      return [
-        q([o.l, o.t, zo], [o.r, o.t, zo], [i.r, i.t, zi], [i.l, i.t, zi]),
-        q([o.r, o.b, zo], [o.l, o.b, zo], [i.l, i.b, zi], [i.r, i.b, zi]),
-        q([o.l, o.b, zo], [o.l, o.t, zo], [i.l, i.t, zi], [i.l, i.b, zi]),
-        q([o.r, o.t, zo], [o.r, o.b, zo], [i.r, i.b, zi], [i.r, i.t, zi]),
-      ];
+      for (let k = 1; k < steps.length - 1; k++) {
+        const [d0, z0] = steps[k], [d1, z1] = steps[k + 1];
+        const zo = sign * z0, zi = sign * z1;
+        const o = { l: -w / 2 + d0, r: w / 2 - d0, b: -h / 2 + d0, t: h / 2 - d0 };
+        const i = { l: -w / 2 + d1, r: w / 2 - d1, b: -h / 2 + d1, t: h / 2 - d1 };
+        quad([o.l, o.t, zo], [o.r, o.t, zo], [i.r, i.t, zi], [i.l, i.t, zi]);
+        quad([o.r, o.b, zo], [o.l, o.b, zo], [i.l, i.b, zi], [i.r, i.b, zi]);
+        quad([o.l, o.b, zo], [o.l, o.t, zo], [i.l, i.t, zi], [i.l, i.b, zi]);
+        quad([o.r, o.t, zo], [o.r, o.b, zo], [i.r, i.b, zi], [i.r, i.t, zi]);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pts.map(mm)), 3));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      return g;
     };
     return { ext: make(1), int: make(-1) };
-  }, [raised, w, h, T]);
+  }, [steps, w, h]);
   if (!(T > 0)) return null;
-  const inner = { w: w - 2 * (MOULD.bevelOut + MOULD.bevelIn), h: h - 2 * (MOULD.bevelOut + MOULD.bevelIn) };
+  // the slab: the tongue thickness across the panel (the full thickness when flat)
+  const slabHalf = steps ? steps[0][1] : T / 2;
+  // the centre field: from the slab face to the last step
+  const last = steps ? steps[steps.length - 1] : null;
+  const field = last ? { w: w - 2 * last[0], h: h - 2 * last[0], z: last[1] } : null;
+  const fieldEdge = steps ? steps[2][0] : 0;
   return (
-    <group position={pos}>
-      {/* the board (thinner at the moulding when raised and fielded), split EXT / INT for the colours */}
-      <mesh castShadow receiveShadow position={[0, 0, mm((raised ? T / 2 - MOULD.recess : T / 2) / 2)]} material={mat}>
-        <boxGeometry args={[mm(w), mm(h), mm(raised ? T / 2 - MOULD.recess : T / 2)]} />
+    <group position={pos} name="door-panel">
+      {/* the slab, split EXT / INT for the colours */}
+      <mesh castShadow receiveShadow position={[0, 0, mm(slabHalf / 2)]} material={mat}>
+        <boxGeometry args={[mm(w), mm(h), mm(slabHalf)]} />
       </mesh>
-      <mesh castShadow receiveShadow position={[0, 0, -mm((raised ? T / 2 - MOULD.recess : T / 2) / 2)]} material={matInt}>
-        <boxGeometry args={[mm(w), mm(h), mm(raised ? T / 2 - MOULD.recess : T / 2)]} />
+      <mesh castShadow receiveShadow position={[0, 0, -mm(slabHalf / 2)]} material={matInt}>
+        <boxGeometry args={[mm(w), mm(h), mm(slabHalf)]} />
       </mesh>
-      {raised && quads && (
+      {field && field.z > slabHalf && [1, -1].map((sign) => (
+        <mesh key={`field${sign}`} castShadow receiveShadow position={[0, 0, sign * mm((slabHalf + field.z) / 2)]} material={sign > 0 ? mat : matInt}>
+          <boxGeometry args={[mm(field.w), mm(field.h), mm(field.z - slabHalf)]} />
+        </mesh>
+      ))}
+      {surfaces && (
         <group>
-          <mesh castShadow receiveShadow position={[0, 0, mm(T / 4)]} material={mat}>
-            <boxGeometry args={[mm(inner.w), mm(inner.h), mm(T / 2)]} />
-          </mesh>
-          <mesh castShadow receiveShadow position={[0, 0, -mm(T / 4)]} material={matInt}>
-            <boxGeometry args={[mm(inner.w), mm(inner.h), mm(T / 2)]} />
-          </mesh>
-          {quads.ext.map((g, i) => <mesh key={`qe${i}`} geometry={g} material={mat} castShadow receiveShadow />)}
-          {quads.int.map((g, i) => <mesh key={`qi${i}`} geometry={g} material={matInt} castShadow receiveShadow />)}
+          <mesh geometry={surfaces.ext} material={mat} castShadow receiveShadow />
+          <mesh geometry={surfaces.int} material={matInt} castShadow receiveShadow />
         </group>
       )}
-      {paneling === 'beading' && [1, -1].map((sign) => (
-        <group key={`bead${sign}`}>
-          {[
-            [0, h / 2 - BEAD.w / 2, w, BEAD.w],
-            [0, -h / 2 + BEAD.w / 2, w, BEAD.w],
-            [-w / 2 + BEAD.w / 2, 0, BEAD.w, h - 2 * BEAD.w],
-            [w / 2 - BEAD.w / 2, 0, BEAD.w, h - 2 * BEAD.w],
-          ].map(([x, y, bw, bh], i) => (
-            <mesh key={i} castShadow receiveShadow position={[mm(x), mm(y), sign * mm(T / 2 + BEAD.h / 2)]} material={sign > 0 ? mat : matInt}>
-              <boxGeometry args={[mm(bw), mm(bh), mm(BEAD.h)]} />
-            </mesh>
-          ))}
-        </group>
-      ))}
+      {paneling === 'beading' && [1, -1].map((sign) => {
+        // round the field (the daylight edge on a flat board), on its face
+        const bw = w - 2 * fieldEdge, bh = h - 2 * fieldEdge;
+        if (!(bw > 2 * BEAD.w && bh > 2 * BEAD.w)) return null;
+        return (
+          <group key={`bead${sign}`}>
+            {[
+              [0, bh / 2 - BEAD.w / 2, bw, BEAD.w],
+              [0, -bh / 2 + BEAD.w / 2, bw, BEAD.w],
+              [-bw / 2 + BEAD.w / 2, 0, BEAD.w, bh - 2 * BEAD.w],
+              [bw / 2 - BEAD.w / 2, 0, BEAD.w, bh - 2 * BEAD.w],
+            ].map(([x, y, rw, rh], i) => (
+              <mesh key={i} castShadow receiveShadow position={[mm(x), mm(y), sign * mm(T / 2 + BEAD.h / 2)]} material={sign > 0 ? mat : matInt}>
+                <boxGeometry args={[mm(rw), mm(rh), mm(BEAD.h)]} />
+              </mesh>
+            ))}
+          </group>
+        );
+      })}
     </group>
   );
 }
@@ -283,13 +344,17 @@ function Swing({ hinge, angle, W, H, children }) {
 
 // The frame's land band: every grid cell (cut at the openings' edges) that no
 // opening covers, merged into the fewest boxes (rows first, then equal runs
-// down the rows). Rects in assembly mm.
-export function frameLandRects(totalWidth, totalHeight, openings) {
+// down the rows). Rects in frame mm. `members` (optional, doors v3): the land
+// of the members that run through (the jambs, the mullions) and of the
+// transom segments, drawn as they are (each keeps its `member` name); the
+// rest of the complement (the head, the cill) is merged around them.
+export function frameLandRects(totalWidth, totalHeight, openings, members = []) {
   const uniq = (a) => [...new Set(a.map(R2))].sort((p, q) => p - q);
-  const xs = uniq([0, totalWidth, ...openings.flatMap((o) => [o.x0, o.x1])]).filter((v) => v >= 0 && v <= totalWidth);
-  const ys = uniq([0, totalHeight, ...openings.flatMap((o) => [o.y0, o.y1])]).filter((v) => v >= 0 && v <= totalHeight);
-  const covered = (cx, cy) => openings.some((o) => cx > o.x0 && cx < o.x1 && cy > o.y0 && cy < o.y1);
-  const done = [];
+  const all = [...openings, ...members];
+  const xs = uniq([0, totalWidth, ...all.flatMap((o) => [o.x0, o.x1])]).filter((v) => v >= 0 && v <= totalWidth);
+  const ys = uniq([0, totalHeight, ...all.flatMap((o) => [o.y0, o.y1])]).filter((v) => v >= 0 && v <= totalHeight);
+  const covered = (cx, cy) => all.some((o) => cx > o.x0 && cx < o.x1 && cy > o.y0 && cy < o.y1);
+  const done = members.map((r) => ({ x0: R2(r.x0), x1: R2(r.x1), y0: R2(r.y0), y1: R2(r.y1), member: r.member || null }));
   let open = [];
   for (let j = 0; j < ys.length - 1; j++) {
     const y0 = ys[j], y1 = ys[j + 1];
@@ -313,51 +378,103 @@ export function frameLandRects(totalWidth, totalHeight, openings) {
   return done;
 }
 
-// The openings of the assembly (assembly mm): every leaf opening is the leaf
-// grown by the fitting gap (the land's inner edge), with the rebate stop ring
-// inside it; a fixed fanlight pane is glazed into the frame, so its opening is
-// its daylight and it has no stop.
+// The frame openings (frame mm, y down), one per field and tier, from the
+// engine (doorGeo.openings = zones.openings: the casement lands, 47 at a jamb
+// and the head, 13 at a mullion axis, 8 above and 13 below the transom axis,
+// down to the cill top or the floor line). Each one is the HOLE through the
+// full frame depth (the land's inner edge) with the rebate stop ring inside
+// it: on each edge the member face beyond the land (jamb and head 68 - 47 =
+// 21, mullion (68 - 26) / 2 = 21, transom 34 - 13 = 21 under it and 34 - 8 =
+// 26 over it, the outward cill 68 - 41 = 27; none on the floor line nor on
+// the unrebated inward cill). The engine draws an inward door field at the
+// full member faces (its rebate faces the room): its hole is that opening
+// grown by the stop on the jamb, mullion, head and transom edges, and the
+// stop sits on the exterior. With the inward cill (its own mesh, InwardCill)
+// the lower holes run to the floor line. A door without a timber cill gets
+// the threshold product strip under its leaves (the leafAtFloor zone, 51:
+// the full zone for aluminium, half of it for low-profile); the jamb stops
+// stand on it.
 export function doorOpenings(geo) {
   const m = geo.members || {};
-  const gap = Number(m.gap) || 0;
-  const reb = Number(m.rebate) || 0;
-  const inset = Number(m.inset) || 0;
-  const H = geo.totalHeight;
-  const cill = geo.cill || {};
+  const W = geo.totalWidth, H = geo.totalHeight;
+  const tr = geo.transom || null;
+  const railHalf = tr ? (Number(tr.railH) || 0) / 2 : 0;
   const outwardCill = geo.hasTimberCill && !geo.inward;
-  const leafBottom = outwardCill ? R2(H - cill.visible) : H;      // land top of the outward cill, else the floor
-  const bottomStop = outwardCill ? { y0: R2(H - cill.face), y1: leafBottom } : null;
-  const ring = (o, withBottom) => {
-    const strips = [{ edge: 'top', x0: o.x0, x1: o.x1, y0: o.y0, y1: R2(o.y0 + reb) }];
-    let yb = o.y1;
-    if (withBottom === 'rail') { strips.push({ edge: 'bottom', x0: o.x0, x1: o.x1, y0: R2(o.y1 - reb), y1: o.y1 }); yb = R2(o.y1 - reb); }
-    if (withBottom && withBottom.y0 != null) { strips.push({ edge: 'bottom', x0: o.x0, x1: o.x1, y0: withBottom.y0, y1: withBottom.y1 }); yb = withBottom.y0; }
-    strips.push({ edge: 'left', x0: o.x0, x1: R2(o.x0 + reb), y0: R2(o.y0 + reb), y1: yb });
-    strips.push({ edge: 'right', x0: R2(o.x1 - reb), x1: o.x1, y0: R2(o.y0 + reb), y1: yb });
+  const inwardCill = geo.hasTimberCill && geo.inward;
+  const pos = (v) => (Number.isFinite(v) && v > 0 ? R2(v) : 0);
+  const stop = {
+    jamb: pos(m.frameJamb - m.land),
+    head: pos(m.frameHead - m.land),
+    mullion: pos((m.mullion - m.mullionLand) / 2),
+    underTransom: pos(railHalf - m.transomLandBelow),
+    overTransom: pos(railHalf - m.transomLandAbove),
+    cill: outwardCill ? pos(m.frameCill - geo.cill?.visible) : 0,
+  };
+  const effective = geo.thresholdInfo?.effectiveType || geo.threshold;
+  const product = !geo.hasTimberCill && (effective === 'aluminium' || effective === 'low-profile') ? effective : null;
+  const leafBottom = geo.leaves?.length ? Math.max(...geo.leaves.map((l) => l.y + l.h)) : H;
+  const zone = R2(H - leafBottom);                 // the leafAtFloor zone under the door leaves (51)
+  const frames = geo.frames || [];
+  const fieldOf = (o) => frames.find((f) => f.kind === (o.kind === 'fan' ? o.over : o.kind) && (f.side || null) === (o.side || null)) || null;
+  const depthOf = (o) => {
+    if (o.kind === 'door') return geo.leafDepth;
+    if (o.kind === 'panel') return (geo.panelLeaves || []).find((pl) => pl.side === o.side)?.members?.depth || geo.leafDepth;
+    return (geo.fanLeaves || []).find((fl) => fl.over === o.over && (fl.side || null) === (o.side || null))?.members?.depth || geo.leafDepth;
+  };
+  const ring = (o, e, sideBottom) => {
+    const strips = [];
+    const yt = e.top > 0 ? R2(o.y0 + e.top) : o.y0;
+    const yb = e.bottom > 0 ? R2(o.y1 - e.bottom) : sideBottom;
+    if (e.top > 0) strips.push({ edge: 'top', x0: o.x0, x1: o.x1, y0: o.y0, y1: yt });
+    if (e.bottom > 0) strips.push({ edge: 'bottom', x0: o.x0, x1: o.x1, y0: yb, y1: o.y1 });
+    if (e.left > 0) strips.push({ edge: 'left', x0: o.x0, x1: R2(o.x0 + e.left), y0: yt, y1: yb });
+    if (e.right > 0) strips.push({ edge: 'right', x0: R2(o.x1 - e.right), x1: o.x1, y0: yt, y1: yb });
     return strips;
   };
+  return (geo.openings || []).map((op) => {
+    const f = fieldOf(op);
+    const fan = op.kind === 'fan';
+    const e = {
+      left: f && R2(f.x) > 0 ? stop.mullion : stop.jamb,
+      right: f && R2(f.x + f.w) < R2(W) ? stop.mullion : stop.jamb,
+      top: fan || !tr ? stop.head : stop.underTransom,
+      bottom: fan ? stop.overTransom : stop.cill,
+    };
+    const inwardDoor = geo.inward && op.kind === 'door';
+    const o = {
+      kind: op.kind, over: op.over || null, side: op.side || null,
+      x0: R2(op.x - (inwardDoor ? e.left : 0)),
+      x1: R2(op.x + op.w + (inwardDoor ? e.right : 0)),
+      y0: R2(op.y - (inwardDoor ? e.top : 0)),
+      y1: !fan && inwardCill ? H : R2(op.y + op.h),
+      face: inwardDoor ? 'int' : 'ext',
+      depth: depthOf(op),
+      edges: e,
+    };
+    o.threshold = op.kind === 'door' && product && zone > 0
+      ? { type: product, x0: o.x0, x1: o.x1, y0: R2(H - (product === 'low-profile' ? zone / 2 : zone)), y1: H }
+      : null;
+    o.stops = ring(o, e, o.threshold ? o.threshold.y0 : o.y1);
+    return o;
+  });
+}
+
+// The land that runs through, from the holes and the engine: the jambs (from
+// the frame edge to the first / last hole, over the holes' height), the
+// mullions (doorGeo.mullions x1..x2, yTop..yBottom) and the transom segments
+// (doorGeo.transom.segments x1..x2, bandTop..bandBottom).
+export function doorFrameMembers(geo, holes) {
+  const W = geo.totalWidth;
   const out = [];
-  if (geo.leaves?.length) {
-    const x0 = Math.min(...geo.leaves.map((l) => l.x)) - gap;
-    const x1 = Math.max(...geo.leaves.map((l) => l.x + l.w)) + gap;
-    const o = { kind: 'door', x0: R2(x0), x1: R2(x1), y0: R2(geo.leaves[0].y - gap), y1: leafBottom, side: geo.inward ? 'int' : 'ext', depth: geo.leafDepth };
-    o.stops = ring(o, bottomStop);
-    out.push(o);
+  if (holes.length) {
+    const y0 = Math.min(...holes.map((o) => o.y0)), y1 = Math.max(...holes.map((o) => o.y1));
+    const xl = Math.min(...holes.map((o) => o.x0)), xr = Math.max(...holes.map((o) => o.x1));
+    if (xl > 0) out.push({ member: 'jamb', x0: 0, x1: xl, y0, y1 });
+    if (xr < W) out.push({ member: 'jamb', x0: xr, x1: W, y0, y1 });
   }
-  (geo.panelLeaves || []).forEach((pl) => {
-    const o = { kind: 'panel', x0: R2(pl.x - gap), x1: R2(pl.x + pl.w + gap), y0: R2(pl.y - gap), y1: leafBottom, side: 'ext', depth: geo.sidePanelDepth || geo.leafDepth };
-    o.stops = ring(o, bottomStop);
-    out.push(o);
-  });
-  (geo.fanLeaves || []).forEach((fl) => {
-    const o = { kind: 'fan', x0: R2(fl.x - gap), x1: R2(fl.x + fl.w + gap), y0: R2(fl.y - gap), y1: R2(fl.y + fl.h + gap), side: 'ext', depth: fl.members?.depth || geo.leafDepth };
-    o.stops = ring(o, 'rail');
-    out.push(o);
-  });
-  (geo.fanPanes || []).forEach((fp) => {
-    out.push({ kind: 'pane', x0: R2(fp.x + inset), x1: R2(fp.x + fp.w - inset), y0: R2(fp.y + inset), y1: R2(fp.y + fp.h - inset), side: null, stops: [] });
-  });
-  return out;
+  (geo.mullions || []).forEach((mu) => out.push({ member: 'mullion', x0: mu.x1, x1: mu.x2, y0: mu.yTop, y1: mu.yBottom }));
+  (geo.transom?.segments || []).forEach((s) => out.push({ member: 'transom', x0: s.x1, x1: s.x2, y0: s.bandTop, y1: s.bandBottom }));
+  return out.filter((r) => r.x1 - r.x0 > 0 && r.y1 - r.y0 > 0);
 }
 
 // A leaf of doorGeo in the LeafBody shape (leaf-local mm from its top-left).
@@ -384,8 +501,12 @@ function leafSpec(l, { depth, top, bottom, unit, paneling, panelThick, meeting }
     unit,
     barXs: (l.bars?.v || []).map((cx) => R2(cx - gcx)),
     barYs: (l.bars?.h || []).map((cy) => R2(gcy - cy)),
-    panel: l.panel?.daylight ? { x: lx(l.panel.daylight.x), y: ly(l.panel.daylight.y), w: l.panel.daylight.w, h: l.panel.daylight.h } : null,
-    panelThick, paneling,
+    // the panel at its outer size (the engine's leaf.panel: daylight + 2 x inset)
+    panel: l.panel && Number(l.panel.w) > 0 && Number(l.panel.h) > 0 ? {
+      x: lx(l.panel.x), y: ly(l.panel.y), w: l.panel.w, h: l.panel.h,
+      inset: l.panel.inset, edge: l.panel.edge || null,
+    } : null,
+    panelThick: l.panel?.thickness ?? panelThick, paneling,
   };
 }
 
@@ -404,11 +525,10 @@ export default function DoorAssembly({
   const g = geo;
   const m = g.members || {};
   const fd = g.frameDepth;
-  const transomH = g.transomH || 0;
-  const cx = g.doorX + g.doorW / 2;
-  const cy = transomH + g.doorH / 2;
-  const X = (x) => mm(x - cx);
-  const Y = (y) => mm(cy - y);
+  // the group origin: the frame centre (doorGeo.origin)
+  const origin = g.origin || { x: g.totalWidth / 2, y: g.totalHeight / 2 };
+  const X = (x) => mm(x - origin.x);
+  const Y = (y) => mm(origin.y - y);
   const metal = FINISH[ironmongery] || FINISH.brass;
 
   const gasketMat = useMemo(() => new THREE.MeshStandardMaterial({ color: sealColour === 'white' ? '#E8E8E8' : '#1a1a1a', roughness: 0.9 }), [sealColour]);
@@ -416,7 +536,7 @@ export default function DoorAssembly({
   const aluMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#a8aaac', roughness: 0.3, metalness: 0.7 }), []);
 
   const openings = useMemo(() => doorOpenings(g), [g]);
-  const land = useMemo(() => frameLandRects(g.totalWidth, g.totalHeight, openings), [g, openings]);
+  const land = useMemo(() => frameLandRects(g.totalWidth, g.totalHeight, openings, doorFrameMembers(g, openings)), [g, openings]);
 
   // Depth: the leaf sits on the seal on the rebate stop, flush with the face
   // it opens to; the stop takes the rest of the frame depth.
@@ -451,18 +571,19 @@ export default function DoorAssembly({
 
   return (
     <group name="door-assembly">
-      {/* ═══ Frame: the land band (full depth), EXT and INT halves for the colours ═══ */}
+      {/* ═══ Frame: the land (full depth), EXT and INT halves for the colours;
+             the jambs, mullions and transom segments carry their member name ═══ */}
       {land.map((r, i) => (
         <group key={`land-${i}`}>
-          {boxMesh({ name: 'frame-land-ext', r, z0: zSplit, z1: fd / 2, mat: extMaterial })}
-          {boxMesh({ name: 'frame-land-int', r, z0: -fd / 2, z1: zSplit, mat: intMaterial })}
+          {boxMesh({ name: `frame-land-ext${r.member ? `-${r.member}` : ''}`, r, z0: zSplit, z1: fd / 2, mat: extMaterial })}
+          {boxMesh({ name: `frame-land-int${r.member ? `-${r.member}` : ''}`, r, z0: -fd / 2, z1: zSplit, mat: intMaterial })}
         </group>
       ))}
 
-      {/* ═══ Rebate stops and seals inside every leaf opening ═══ */}
+      {/* ═══ Rebate stops and seals inside every frame opening ═══ */}
       {openings.filter((o) => o.stops.length).map((o, oi) => {
         const sd = stopDepth(o.depth);
-        const ext = o.side === 'int';           // inward door: the stop is on the exterior
+        const ext = o.face === 'int';           // inward door: the stop is on the exterior
         const z0 = ext ? fd / 2 - sd : -fd / 2;
         const z1 = ext ? fd / 2 : -fd / 2 + sd;
         const gz0 = ext ? z0 - GASKET_T : z1;
@@ -488,13 +609,12 @@ export default function DoorAssembly({
       {g.hasTimberCill && g.inward && (
         <InwardCill geo={g} X={X} Y={Y} extMaterial={extMaterial} intMaterial={intMaterial} />
       )}
-      {/* the threshold PRODUCT strip only for the two threshold products the engine counts */}
-      {!g.hasTimberCill && (g.threshold === 'aluminium' || g.threshold === 'low-profile') && openings.filter((o) => o.kind === 'door').map((o, i) => {
-        const gapC = Number(g.cill?.gap) || 0;
-        const low = g.threshold === 'low-profile';
-        const r = { x0: o.x0, x1: o.x1, y0: R2(g.totalHeight - (low ? gapC / 2 : gapC)), y1: g.totalHeight };
-        const zc = leafZ(o.side, g.leafDepth);
-        return low
+      {/* the threshold PRODUCT strip only for the two products the engine buys
+          (thresholdInfo.effectiveType: an inward door is always on its timber cill) */}
+      {openings.filter((o) => o.threshold).map((o, i) => {
+        const r = o.threshold;
+        const zc = leafZ(o.face, g.leafDepth);
+        return r.type === 'low-profile'
           ? boxMesh({ k: `thr${i}`, name: 'threshold-low-profile', r, z0: zc - g.leafDepth / 2, z1: zc + g.leafDepth / 2, mat: aluMat })
           : boxMesh({ k: `thr${i}`, name: 'threshold-aluminium', r, z0: -fd / 2, z1: fd / 2, mat: aluMat });
       })}
@@ -534,10 +654,12 @@ export default function DoorAssembly({
         </mesh>
       )))}
 
-      {/* ═══ Side panel leaves: fixed, members 57 all round ═══ */}
+      {/* ═══ Side panels: casement fixed lights behind the mullion, the engine's
+             members (stiles 64, top rail 64, bottom rail 180, depth 57); no swing ═══ */}
       {(g.panelLeaves || []).filter(positive).map((pl, i) => {
-        const depth = g.sidePanelDepth || g.leafDepth;
-        const L = leafSpec({ ...pl, stileL: pl.member, stileR: pl.member }, { depth, top: pl.member, bottom: pl.member, unit, paneling: 'flat', panelThick, meeting: null });
+        const mb = pl.members || {};
+        const depth = mb.depth || g.leafDepth;
+        const L = leafSpec({ ...pl, stileL: mb.stile, stileR: mb.stile }, { depth, top: mb.top, bottom: mb.bottom, unit, paneling: 'flat', panelThick, meeting: null });
         return (
           <group key={`panel-${i}`} name={`side-panel-leaf-${pl.side}`} position={[X(pl.x + pl.w / 2), Y(pl.y + pl.h / 2), mm(leafZ('ext', depth))]}>
             <LeafBody L={L} mat={extMaterial} matInt={intMaterial} spacerColor={spacerColor} glassFinish={glassFinish} />
@@ -545,37 +667,34 @@ export default function DoorAssembly({
         );
       })}
 
-      {/* ═══ Opening fanlight: a casement top hung leaf ═══ */}
+      {/* ═══ Fanlight: one leaf per field. Opening: a casement top hung leaf with
+             its handle; fixed: a non-opening leaf (fixedFan), no handle, no swing ═══ */}
       {(g.fanLeaves || []).filter(positive).map((fl, i) => {
         const mb = fl.members || {};
         const depth = mb.depth || g.leafDepth;
         const L = leafSpec({ ...fl, stileL: mb.stile, stileR: mb.stile }, { depth, top: mb.top, bottom: mb.bottom, unit, paneling: 'flat', panelThick, meeting: null });
+        const where = `${fl.over}${fl.side ? `-${fl.side}` : ''}`;
+        const at = [X(fl.x + fl.w / 2), Y(fl.y + fl.h / 2), mm(leafZ('ext', depth))];
+        if (fl.fixed) {
+          return (
+            <group key={`fan-${i}`} name={`fixed-fan-leaf-${where}`} position={at}>
+              <LeafBody L={L} mat={extMaterial} matInt={intMaterial} spacerColor={spacerColor} glassFinish={glassFinish} />
+            </group>
+          );
+        }
         const W3 = mm(fl.w), H3 = mm(fl.h);
         const angle = THREE.MathUtils.degToRad(clamped * FAN_ANGLE);
         const reb = Number(m.rebate) || 0;
         const handleY = -H3 / 2 + mm(reb + (mb.bottom - reb) / 2);   // the bottom rail's visible centre (CasementPanel.jsx rule)
         return (
-          <group key={`fan-${i}`} name={`fan-leaf-${fl.over}`} position={[X(fl.x + fl.w / 2), Y(fl.y + fl.h / 2), mm(leafZ('ext', depth))]}>
+          <group key={`fan-${i}`} name={`fan-leaf-${where}`} position={at}>
             <Swing hinge="top" angle={angle} W={W3} H={H3}>
               <LeafBody L={L} mat={extMaterial} matInt={intMaterial} spacerColor={spacerColor} glassFinish={glassFinish} />
-              <group position={[0, handleY, -mm(depth) / 2 - mm(1)]} rotation={[Math.PI / 2, 0, Math.PI / 2]} scale={[0.001, 0.001, 0.001]}>
+              <group name="fan-handle" position={[0, handleY, -mm(depth) / 2 - mm(1)]} rotation={[Math.PI / 2, 0, Math.PI / 2]} scale={[0.001, 0.001, 0.001]}>
                 <WindowCasementHandle rotationDeg={clamped * FAN_ANGLE} metalColor={metal} />
               </group>
             </Swing>
           </group>
-        );
-      })}
-
-      {/* ═══ Fixed fanlight: the sealed unit glazed into the frame ═══ */}
-      {(g.fanPanes || []).filter(positive).map((fp, i) => {
-        const inset = Number(m.inset) || 0;
-        const day = { x: fp.x + inset, y: fp.y + inset, w: fp.w - 2 * inset, h: fp.h - 2 * inset };
-        const gcx = day.x + day.w / 2, gcy = day.y + day.h / 2;
-        return (
-          <DoorGlazing key={`pane-${i}`} width={day.w} height={day.h} unitDepthMm={unit}
-            barXs={(fp.bars?.v || []).map((v) => R2(v - gcx))} barYs={(fp.bars?.h || []).map((v) => R2(gcy - v))}
-            barMaterial={extMaterial} barMaterialInt={intMaterial} spacerColor={spacerColor} glassFinish={glassFinish}
-            position={[X(gcx), Y(gcy), mm(leafZ('ext', g.leafDepth))]} />
         );
       })}
     </group>

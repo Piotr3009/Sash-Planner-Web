@@ -19,7 +19,9 @@ import { casementPaneFinish } from './casementDrawUtils.js';
 /**
  * The detail sheets of one door, in tab and PDF order (the front elevation is
  * its own tab): the frame, the leaf sheet (both leaves of a french door), one
- * sheet per side panel, one per opening fan leaf, and the plan section.
+ * sheet per side panel, one per fan leaf (doors v3: fixed fanlights are
+ * non-opening casement leaves with their own sheet, labelled fixed; the keys
+ * stay doorfan-<i> over derived.door.fanLeaves), and the plan section.
  * Each entry: { key, label, sheet: 'frame' | 'leaf' | 'side' | 'fan' | 'section', props }.
  */
 export function doorSheetPlan(derived) {
@@ -35,7 +37,8 @@ export function doorSheetPlan(derived) {
   });
   const fans = dr.fanLeaves || [];
   fans.forEach((fl, i) => {
-    plan.push({ key: `doorfan-${i}`, label: fans.length > 1 ? `Fanlight ${i + 1} (${fl.over}${fl.side ? ` ${fl.side}` : ''})` : 'Fanlight Leaf', sheet: 'fan', props: { index: i } });
+    const name = fl.fixed ? 'Fixed Fanlight' : 'Fanlight Leaf';
+    plan.push({ key: `doorfan-${i}`, label: fans.length > 1 ? `${name} ${i + 1} (${fl.over}${fl.side ? ` ${fl.side}` : ''})` : name, sheet: 'fan', props: { index: i } });
   });
   plan.push({ key: 'doorsection', label: 'Sections', sheet: 'section', props: {} });
   return plan;

@@ -1,29 +1,36 @@
 /**
  * DoorFrameDetail2D.jsx
  *
- * The door FRAME as one timber assembly: head, jambs, cill or threshold, the
- * coupling posts of the side panels and the fanlight transom, because a side
- * panel sits in the SAME frame and is cut from the same stock (Piotr 05.08).
- * Exterior view, mm coordinates, the casement drawing system (overall width at
- * the TOP, heights on the RIGHT, member chains along the bottom and on the
- * left, Piotr 06.09).
+ * The door FRAME as one timber assembly (doors v3, Piotr 09.10.2026: the
+ * casement rules inside the door frame): head, jambs, the cill or the
+ * threshold, the casement MULLIONS between the door and its side panels (full
+ * height, through the transom) and the casement TRANSOM of the fanlight, cut
+ * in segments between the jambs and the mullions. Exterior view, mm
+ * coordinates, the casement drawing system (overall width at the TOP, heights
+ * on the RIGHT, member chains along the bottom and on the left, Piotr 06.09).
  *
  * Carries what the elevation does not: member faces and sections, cut lengths
- * and the D-* codes of the cut list (derived.components.box), the layer chain
- * from the frame edge to the leaf (land, gap), the rebate, the frame depth and
- * the cill. Every number comes from derived.door (members, zones, leaves) or
- * the door profile (cill visible, inward cill faces). The land line is the
- * rebate step seen from outside; the dashed line one rebate further in is the
- * member's inner edge (68 face). On an inward door the rebate is on the
- * interior: the door frame shows its full face and the land line is dashed.
- * The coupling post is ONE member (2 x the jamb face) with two rebates. The
+ * and the D-* codes of the cut list (derived.components.box, printed without
+ * the D- prefix), the layer chain from the frame edge to the leaves (land,
+ * gap; at a mullion gap + land + gap), the rebate, the frame depth and the
+ * cill. Every number comes from derived.door: the visible frame openings
+ * (zones.openings, the casement lands: 47 at a jamb and the head, 13 each side
+ * of a mullion axis, 8 above and 13 below the transom axis), the mullions
+ * (axis, land band, cut length), the transom (axis T from the frame top,
+ * segments with their bands and cut lengths), the leaves, the threshold
+ * (thresholdInfo) and the door profile (cill visible, inward cill faces, the
+ * transom seat). The dashed lines are the hidden member edges: one rebate in
+ * from the land seen from outside; on an inward door field the rebate faces
+ * the room, so the member face is seen and the land line is dashed. The
  * leaves are dashed ghosts so the joiner sees where they land.
  */
 import { useMemo } from 'react';
 import { DimH, DimV, DimChainH, DimChainV, TitleBlock, Label, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
 import { displayCode } from '../../engine/partSymbols.js';
-import { NS, num, fmt, safely, NoSheet, doorProfileParts, doorRecords, recordText, thresholdText } from './doorSheetParts.jsx';
+import { NS, num, fmt, safely, NoSheet, doorProfileParts, doorRecords, recordText, thresholdText, sectionText } from './doorSheetParts.jsx';
+
+const near = (a, b) => Math.abs(Number(a) - Number(b)) < 0.01;
 
 function buildFrame(windowSpec, derived) {
   const dr = derived?.door;
@@ -33,49 +40,70 @@ function buildFrame(windowSpec, derived) {
   const W = num(z.totalWidth);
   const H = num(z.totalHeight);
   if (!(W > 0 && H > 0)) return null;
+  if (!Array.isArray(z.openings) || !z.openings.length) return null;
   const pp = doorProfileParts();
   const inward = !!dr.inward;
-  const tz = z.transom && num(z.transom.h, 0) > 0 ? z.transom : null;
+  const ti = dr.thresholdInfo || null;
+  const timber = ti ? !!ti.timberCill : !!dr.hasTimberCill;
+  const tr = dr.transom || null;
+  const T = tr ? num(tr.axisT, 0) : 0;
+  const segs = tr?.segments || [];
+  const mullions = dr.mullions || z.mullions || [];
   const frames = (z.frames || []).length ? z.frames : [{ x: 0, w: W, kind: 'door' }];
   // the cill member face (68 outward, 40 inward) and the part of it seen from outside
-  const bottomFace = dr.hasTimberCill ? num(m.frameCill, 0) : 0;
-  const bottomVis = dr.hasTimberCill ? (inward ? pp.cillInward.faceExternal : pp.cillVisible) : 0;
-  // The land rect (the rebate step) and the face rect (the member's inner
-  // edge) of each frame opening. With a fanlight the openings split at the
-  // transom band, as the elevation draws them: the fan zone is rebated on the
-  // exterior in every frame (the fan leaf or pane), the door zone starts at
-  // the band and an inward door shows its frame face there too (the rail laps
-  // the leaf top like the head, by the jamb face less the land).
-  const zone = (f, inwardDoor, yLand, yFace, landBottom, faceBottom) => ({
-    f, inwardDoor,
-    land: { x: f.x + m.land, y: yLand, w: f.w - 2 * m.land, h: landBottom - yLand },
-    face: { x: f.x + m.frameJamb, y: yFace, w: f.w - 2 * m.frameJamb, h: faceBottom - yFace },
-  });
-  const rects = [];
-  frames.forEach((f) => {
-    const inwardDoor = inward && f.kind === 'door';
-    if (tz?.band) {
-      const bandBottom = tz.band.y + tz.band.h;
-      rects.push(zone(f, false, m.land, m.frameHead, tz.band.y, tz.band.y));
-      rects.push(zone(f, inwardDoor, bandBottom, bandBottom + (m.frameJamb - m.land), H - bottomVis, H - bottomFace));
+  const bottomFace = timber ? num(m.frameCill, 0) : 0;
+  const bottomVis = num(z.bottomVisible, 0);
+  const fM = num(m.mullion, m.frameJamb);
+  const railH = num(tr?.railH, num(m.transomRail, 0));
+
+  // Each visible opening (zones.openings) with its field and the hidden line
+  // one rebate further in (outward fields: the member faces; the inward door
+  // field: the land, read off the mullion bands and the transom segments).
+  const fieldOf = (o) => frames.find((f) => f.kind === (o.kind === 'fan' ? o.over : o.kind) && (f.side || null) === (o.side || null)) || null;
+  const mullAt = (x) => mullions.find((mu) => near(mu.axisX, x)) || null;
+  const rects = z.openings.map((o) => {
+    const f = fieldOf(o);
+    if (!f) return { vis: o, hid: null, o };
+    const lJamb = near(f.x, 0), rJamb = near(f.x + f.w, W);
+    const fan = o.kind === 'fan';
+    const lowerUnderTransom = !fan && T > 0;
+    const inwardDoor = inward && o.kind === 'door';
+    let hid;
+    if (inwardDoor) {
+      const seg = segs.find((sg) => sg.over === 'door') || segs[0] || null;
+      const ml = mullAt(f.x), mr = mullAt(f.x + f.w);
+      hid = {
+        x1: lJamb ? m.land : num(ml?.x2, o.x),
+        x2: rJamb ? W - m.land : num(mr?.x1, o.x + o.w),
+        y1: lowerUnderTransom ? num(seg?.bandBottom, o.y) : m.land,
+        y2: o.y + o.h,
+      };
     } else {
-      rects.push(zone(f, inwardDoor, m.land, m.frameHead, H - bottomVis, H - bottomFace));
+      hid = {
+        x1: lJamb ? m.frameJamb : f.x + fM / 2,
+        x2: rJamb ? W - m.frameJamb : f.x + f.w - fM / 2,
+        y1: lowerUnderTransom ? T + railH / 2 : m.frameHead,
+        y2: fan ? T - railH / 2 : H - bottomFace,
+      };
     }
+    return { vis: o, hid: { x: hid.x1, y: hid.y1, w: hid.x2 - hid.x1, h: hid.y2 - hid.y1 }, o, f };
   });
   const recs = doorRecords(derived);
   const by = (c) => recs.find((r) => r.code === c) || null;
   const leaves = [...(dr.leaves || [])].sort((a, b) => a.x - b.x);
   return {
-    dr, z, m, pp, W, H, inward, tz, frames, rects, bottomFace, bottomVis, leaves,
-    head: by('D-H'), jambL: by('D-J/L'), jambR: by('D-J/R'), cill: by('D-CILL'), post: by('D-JC'), transom: by('D-T'),
+    dr, z, m, pp, W, H, inward, ti, timber, tr, T, segs, mullions, frames, rects, bottomFace, bottomVis, leaves,
+    head: by('D-H'), jambL: by('D-J/L'), jambR: by('D-J/R'), cill: by('D-CILL'),
+    mullionRec: (code) => by(code),
+    doorOpening: z.openings.find((o) => o.kind === 'door') || null,
   };
 }
 
-export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber , windowTag }) {
+export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber, windowTag }) {
   const geom = useMemo(() => safely(() => buildFrame(windowSpec, derived)), [windowSpec, derived]);
   if (!geom) return <NoSheet />;
 
-  const { dr, z, m, pp, W, H, inward, tz, rects, bottomFace, bottomVis, leaves } = geom;
+  const { dr, z, m, pp, W, H, inward, timber, tr, T, segs, mullions, rects, bottomFace, bottomVis, leaves } = geom;
 
   // ── Layout ──
   const layoutSc = Math.max(W, H) / 500;
@@ -94,49 +122,99 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber ,
 
   const winName = windowSpec?.name || 'Door';
   const projNum = projectNumber || '';
+  const mullionSec = mullions.length ? sectionText(geom.mullionRec(mullions[0].code)?.section) : '';
+  // the subtitle: head, jambs, mullions (one length: a frame has one height), cill or threshold
+  const mLens = [...new Set(mullions.map((mu) => fmt(mu.length)))];
   const codes = [
     geom.head && `${displayCode(geom.head.code)} ${fmt(geom.head.length)}`,
     geom.jambL && `J ×2 ${fmt(geom.jambL.length)}`,
-    geom.cill ? `${displayCode(geom.cill.code)} ${fmt(geom.cill.length)}` : `${dr.threshold} threshold`,
-    geom.post && `${displayCode(geom.post.code)}${num(geom.post.quantity, 1) > 1 ? ` ×${geom.post.quantity}` : ''} ${fmt(geom.post.length)}`,
-    geom.transom && `${displayCode(geom.transom.code)} ${fmt(geom.transom.length)}`,
+    mullions.length ? `M${mullions.length > 1 ? ` ×${mullions.length}` : ''} ${mLens.join(' / ')}` : '',
+    geom.cill ? `${displayCode(geom.cill.code)} ${fmt(geom.cill.length)}` : `${geom.ti?.effectiveType || dr.threshold} threshold`,
   ].filter(Boolean).join(' · ');
+  const mullionLand = num(m.mullionLand, 0);
   const notes = [
     `Section: frame ${fmt(m.frameJamb)}×${fmt(dr.frameDepth)}, land ${fmt(m.land)} + rebate ${fmt(m.rebate)}; leaf ${fmt(dr.leafDepth)} deep in the rebate, gap ${fmt(m.gap)}`,
+    mullions.length
+      ? `Mullion ${mullions.map((mu) => displayCode(mu.code)).join(', ')}${mullionSec ? ` ${mullionSec}` : ''}: full height, cut ${mLens.join(' / ')}${mullions[0].timberCill === false ? ' to the floor' : ''}; land ${fmt(mullionLand / 2)} + gap ${fmt(m.gap)} to the leaf each side`
+      : '',
+    tr
+      ? `Transom (casement): axis T ${fmt(T)} from the frame top, land ${fmt(m.transomLandAbove)} above / ${fmt(m.transomLandBelow)} below the axis`
+      : '',
+    tr && segs.length
+      ? `Transom ${segs.length > 1 ? 'segments' : 'segment'} ${segs.map((sg) => `${displayCode(sg.code)} ${fmt(sg.length)}`).join(', ')}: field leaf width + seat ${fmt(pp.transomSeat)}`
+      : '',
     inward ? `Inward: rebate on the interior; from outside the frame face ${fmt(m.frameJamb)} laps ${fmt(m.frameJamb - m.land - m.gap)} over the leaf` : '',
     `Threshold: ${thresholdText(dr, pp)}`,
-    tz ? `Transom rail ${fmt(tz.railH)}: band ${fmt(tz.band?.h)} seen between fanlight and door leaves (rail lap: drawing check)` : '',
   ].filter(Boolean);
 
   // ── Bottom annotation rows and the title ──
+  //   row 0  the layer chain across the frame: jamb land · gap · leaf / light ·
+  //          ... · gap + land (a french pair as one block: the leaves overlap)
+  //   row 1  across each mullion: gap + mullion land + gap (one label each)
+  //   row 2  the member chain: jamb face · mullion faces · jamb face
+  //   row 3  the fields, to the mullion axes
+  const lights = [...(dr.panelLeaves || [])].map((pn) => ({ x0: pn.x, x1: pn.x + pn.w, name: '' }));
+  const lL = leaves[0];
+  const lR = leaves[leaves.length - 1];
+  const items = [...lights, ...(lL && lR ? [{ x0: lL.x, x1: lR.x + lR.w, name: leaves.length > 1 ? 'leaves' : 'leaf' }] : [])]
+    .sort((a, b) => a.x0 - b.x0);
+  const crossings = [];
+  items.slice(0, -1).forEach((it, k) => {
+    const nx = items[k + 1];
+    const mu = mullions.find((q) => q.axisX > it.x1 && q.axisX < nx.x0) || null;
+    if (mu) crossings.push({ x0: it.x1, x1: nx.x0, label: `${fmt(mu.x1 - it.x1)} + ${fmt(mu.x2 - mu.x1)} + ${fmt(nx.x0 - mu.x2)}` });
+  });
+  const rowCount = 2 + (crossings.length ? 1 : 0) + (geom.frames.length > 1 ? 1 : 0);
+  const rowOf = { layer: 0, cross: crossings.length ? 1 : null, member: crossings.length ? 2 : 1, field: crossings.length ? 3 : 2 };
   const rowY = (k) => oy + H + (24 + 26 * k) * ts;
-  const nRows = 2 + (geom.frames.length > 1 ? 1 : 0);
-  const bottomAnn = (24 + 26 * nRows) * ts;
+  const bottomAnn = (24 + 26 * rowCount) * ts;
   const TITLE = (44 + 18 * notes.length) * ts;
   const svgH = MT + H + bottomAnn + TITLE;
   const titleY = oy + H + bottomAnn + 16 * ts;
-
-  // Layer chain at the door: frame edge · land · gap · leaves · gap · land · frame edge
-  const doorX = num(z.doorX, 0);
-  const doorR = doorX + num(z.doorW, W);
-  const lL = leaves[0];
-  const lR = leaves[leaves.length - 1];
-  // (the right gap and land share one segment so the short gap label never lands on the land label)
-  const layerCuts = lL && lR
-    ? [doorX, doorX + m.land, lL.x, lR.x + lR.w, doorR]
-    : [doorX, doorX + m.land, doorR - m.land, doorR];
-  const layerLabels = lL && lR
-    ? [fmt(m.land), fmt(lL.x - doorX - m.land), `${leaves.length > 1 ? 'leaves' : 'leaf'} ${fmt(lR.x + lR.w - lL.x)}`,
-      `${fmt(doorR - m.land - (lR.x + lR.w))} + ${fmt(m.land)}`]
-    : undefined;
-  // Member chain along the bottom: jamb face · (coupling posts) · jamb face
+  const dimFs = SIZES.dimSmall * ts;
+  const textW = (t) => String(t).length * 0.55 * dimFs;   // the width a dim label takes (the harness collision rule)
+  // The layer chain runs in pieces: it breaks over each mullion (row 1 carries that span).
+  const chains = [{ cuts: [0], labels: [] }];
+  const cur = () => chains[chains.length - 1];
+  if (items.length) {
+    cur().cuts.push(m.land, items[0].x0);
+    cur().labels.push(fmt(m.land), fmt(items[0].x0 - m.land));
+    // the gap label is a leader text right of its segment: an item label never reaches into it
+    const gapEnd = m.land + (items[0].x0 - m.land) / 2 + 15 * ts + textW(fmt(items[0].x0 - m.land));
+    // and the gap + land label at the right end is centred on its segment
+    const lastX1 = items[items.length - 1].x1;
+    const endStart = (lastX1 + W) / 2 - textW(`${fmt(W - m.land - lastX1)} + ${fmt(m.land)}`) / 2;
+    items.forEach((it, k) => {
+      cur().cuts.push(it.x1);
+      const w = it.x1 - it.x0, c = (it.x0 + it.x1) / 2;
+      const fits = (t) => textW(t) <= w - 8 * ts && (k > 0 || c - textW(t) / 2 > gapEnd)
+        && (k < items.length - 1 || c + textW(t) / 2 < endStart);
+      const full = it.name ? `${it.name} ${fmt(w)}` : fmt(w);
+      cur().labels.push(fits(full) ? full : (fits(fmt(w)) ? fmt(w) : ''));
+      const nx = items[k + 1];
+      if (!nx) return;
+      if (crossings.some((cr) => near(cr.x0, it.x1))) {
+        chains.push({ cuts: [nx.x0], labels: [] });
+      } else {
+        cur().cuts.push(nx.x0);
+        cur().labels.push(fmt(nx.x0 - it.x1));
+      }
+    });
+    // (the right gap and land share one segment so the short gap label never lands on the land label)
+    cur().cuts.push(W);
+    cur().labels.push(`${fmt(W - m.land - items[items.length - 1].x1)} + ${fmt(m.land)}`);
+  } else {
+    cur().cuts.push(m.land, W - m.land, W);
+    cur().labels = undefined;
+  }
+  // Member chain along the bottom: jamb face · mullion faces · jamb face
   const memberCuts = [0, m.frameJamb];
-  (z.posts || []).forEach((p) => memberCuts.push(p.x, p.x + p.w));
+  mullions.forEach((mu) => memberCuts.push(mu.axisX - num(m.mullion, m.frameJamb) / 2, mu.axisX + num(m.mullion, m.frameJamb) / 2));
   memberCuts.push(W - m.frameJamb, W);
-  // Vertical member chain on the left: land · rebate · (transom band) · cill
+  // Vertical member chain on the left: land · rebate · (transom land band) · cill
   const vCuts = [0, m.land, m.frameHead];
-  if (tz?.band) vCuts.push(tz.band.y, tz.band.y + tz.band.h);
-  if (dr.hasTimberCill) {
+  if (tr?.band) vCuts.push(tr.band.y, tr.band.y + tr.band.h);
+  if (timber) {
     if (!inward && bottomFace > bottomVis) vCuts.push(H - bottomFace);
     vCuts.push(H - bottomVis);
   }
@@ -144,16 +222,19 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber ,
   const vLabels = vCuts.slice(0, -1).map((c, i) => fmt(vCuts[i + 1] - c));
 
   const rightX = (k) => ox + W + (22 + 26 * k) * ts;
-  const visRect = (r) => (r.inwardDoor ? r.face : r.land);
-  const hidRect = (r) => (r.inwardDoor ? r.land : r.face);
-  const ok = (r) => r.w > 0 && r.h > 0;
+  const ok = (r) => r && r.w > 0 && r.h > 0;
   const midDoorY = num(lL?.y, 0) + num(lL?.h, H) / 2;
+  const doorX = num(z.doorX, 0);
+  const doorR = doorX + num(z.doorW, W);
+  const dOpen = geom.doorOpening;
+  const thrX0 = dOpen ? dOpen.x : doorX;
+  const thrX1 = dOpen ? dOpen.x + dOpen.w : doorR;
 
-  const cillLabel = dr.hasTimberCill
+  const cillLabel = timber
     ? [recordText(geom.cill), inward
       ? `${fmt(pp.cillInward.faceInternal)} → ${fmt(pp.cillInward.faceExternal)} fall, unrebated`
       : `${fmt(bottomVis)} visible`].filter(Boolean).join(' · ')
-    : `${String(dr.threshold || '').toUpperCase().replace('-', ' ')} THRESHOLD · no timber member`;
+    : `${String(geom.ti?.effectiveType || dr.threshold || '').toUpperCase().replace('-', ' ')} THRESHOLD${geom.ti?.seal ? ` + SEAL ${fmt(geom.ti.seal.length)}` : ''} · no timber member`;
 
   return (
     <div className="w-full">
@@ -163,61 +244,64 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber ,
         {/* ── FRAME body: the assembly less the openings seen from outside ── */}
         <path
           d={[`M ${X(0)} ${Y(0)} H ${X(W)} V ${Y(H)} H ${X(0)} Z`,
-            ...rects.map(visRect).filter(ok).map((o) => `M ${X(o.x)} ${Y(o.y)} H ${X(o.x + o.w)} V ${Y(o.y + o.h)} H ${X(o.x)} Z`)].join(' ')}
+            ...rects.map((r) => r.vis).filter(ok).map((o) => `M ${X(o.x)} ${Y(o.y)} H ${X(o.x + o.w)} V ${Y(o.y + o.h)} H ${X(o.x)} Z`)].join(' ')}
           fillRule="evenodd" fill={COLORS.frameFill} stroke="none" />
         <rect x={X(0)} y={Y(0)} width={W} height={H}
           fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frame} {...NS} />
         {rects.map((r, i) => (
           <g key={`fr${i}`}>
-            {ok(visRect(r)) && (
-              <rect x={X(visRect(r).x)} y={Y(visRect(r).y)} width={visRect(r).w} height={visRect(r).h}
+            {ok(r.vis) && (
+              <rect x={X(r.vis.x)} y={Y(r.vis.y)} width={r.vis.w} height={r.vis.h}
                 fill="none" stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
             )}
-            {ok(hidRect(r)) && (
-              <rect x={X(hidRect(r).x)} y={Y(hidRect(r).y)} width={hidRect(r).w} height={hidRect(r).h}
+            {ok(r.hid) && (
+              <rect x={X(r.hid.x)} y={Y(r.hid.y)} width={r.hid.w} height={r.hid.h}
                 fill="none" stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={dash} />
             )}
           </g>
         ))}
 
-        {/* ── COUPLING POSTS: ONE member, two rebates; the axis ── */}
-        {(z.posts || []).map((p, i) => (
-          <g key={`po${i}`}>
-            <line x1={X(p.axis)} y1={Y(0) - 10 * ts} x2={X(p.axis)} y2={Y(H) + 10 * ts}
-              stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={axisDash} />
-            <text x={X(p.axis) + codeFs * 0.35} y={Y(midDoorY)} fill={COLORS.label} fontSize={codeFs}
-              fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
-              transform={`rotate(-90, ${X(p.axis) + codeFs * 0.35}, ${Y(midDoorY)})`}>
-              {geom.post ? `${displayCode(geom.post.code)} ${fmt(geom.post.length)} · ${fmt(p.w)}×${fmt(dr.frameDepth)}` : `JC ${fmt(p.w)}`}
-            </text>
-          </g>
-        ))}
+        {/* ── MULLIONS (casement, full height through the transom): the axis and the code ── */}
+        {mullions.map((mu, i) => {
+          const lx = X(mu.axisX) + codeFs * 0.35;
+          return (
+            <g key={`mu${i}`}>
+              <line x1={X(mu.axisX)} y1={Y(0) - 10 * ts} x2={X(mu.axisX)} y2={Y(H) + 10 * ts}
+                stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={axisDash} />
+              <text x={lx} y={Y(midDoorY)} fill={COLORS.label} fontSize={codeFs}
+                fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
+                transform={`rotate(-90, ${lx}, ${Y(midDoorY)})`}>
+                {`${displayCode(mu.code)} ${fmt(mu.length)}${mullionSec ? ` · ${mullionSec}` : ''}`}
+              </text>
+            </g>
+          );
+        })}
 
-        {/* ── TRANSOM: the visible band between the fanlight and the door leaves ── */}
-        {tz?.band && (
+        {/* ── TRANSOM (casement): the axis and one code per segment above its band ── */}
+        {tr && (
           <g>
-            <rect x={X(m.land)} y={Y(tz.band.y)} width={W - 2 * m.land} height={tz.band.h}
-              fill={COLORS.bg} stroke="none" />
-            <rect x={X(m.land)} y={Y(tz.band.y)} width={W - 2 * m.land} height={tz.band.h}
-              fill={COLORS.frameFill} stroke={COLORS.frame} strokeWidth={STROKES.frameLight} {...NS} />
-            <text x={X(W / 2)} y={Y(tz.band.y + tz.band.h / 2) + codeFs * 0.35} fill={COLORS.label} fontSize={codeFs}
-              fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>
-              {`${geom.transom ? recordText(geom.transom) : `T ${fmt(tz.railH)}`} · band ${fmt(tz.band.h)}`}
-            </text>
+            <line x1={X(0) - 10 * ts} y1={Y(T)} x2={X(W) + 10 * ts} y2={Y(T)}
+              stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={axisDash} />
+            {segs.map((sg, i) => (
+              <text key={`ts${i}`} x={X((sg.x1 + sg.x2) / 2)} y={Y(sg.bandTop) - codeFs * 0.6} fill={COLORS.label} fontSize={codeFs}
+                fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>
+                {`${displayCode(sg.code)} ${fmt(sg.length)}`}
+              </text>
+            ))}
           </g>
         )}
 
-        {/* ── CILL (one piece across the assembly) or the threshold product ── */}
-        {dr.hasTimberCill ? (
+        {/* ── CILL (one piece across the assembly) or the threshold product under the door opening ── */}
+        {timber ? (
           <rect x={X(0)} y={Y(H - bottomVis)} width={W} height={bottomVis}
             fill={COLORS.frameFill} stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} />
         ) : (
-          <line x1={X(num(z.doorX, 0))} y1={Y(H)} x2={X(num(z.doorX, 0) + num(z.doorW, W))} y2={Y(H)}
+          <line x1={X(thrX0)} y1={Y(H)} x2={X(thrX1)} y2={Y(H)}
             stroke={COLORS.sillDetail} strokeWidth={STROKES.boardIndicator} {...NS} />
         )}
 
-        {/* ── LEAF ghosts straight from the engine: door, side panel and fan leaves, fixed fan units ── */}
-        {[...leaves, ...(dr.panelLeaves || []), ...(dr.fanLeaves || []), ...(tz?.fanPanes || [])].map((lf, i) => (
+        {/* ── LEAF ghosts straight from the engine: door leaves, side lights, fan leaves ── */}
+        {[...leaves, ...(dr.panelLeaves || []), ...(dr.fanLeaves || [])].map((lf, i) => (
           <rect key={`g${i}`} x={X(lf.x)} y={Y(lf.y)} width={lf.w} height={lf.h}
             fill="none" stroke={COLORS.sash} strokeWidth={STROKES.sashLight} {...NS} strokeDasharray={ghostDash} />
         ))}
@@ -244,26 +328,32 @@ export default function DoorFrameDetail2D({ windowSpec, derived, projectNumber ,
 
         {/* ── DIMENSIONS ── width at the TOP, heights on the RIGHT, chains bottom / left */}
         <DimH y={oy - 30 * ts} x1={X(0)} x2={X(W)} extFrom={Y(0)} label={fmt(W)} vbw={svgW} />
-        {tz && (
+        {tr && (
           <>
-            <DimV x={rightX(0)} y1={Y(0)} y2={Y(tz.h)} extFrom={X(W)} label={`fan ${fmt(tz.h)}`} small vbw={svgW} />
-            <DimV x={rightX(0)} y1={Y(tz.h)} y2={Y(H)} extFrom={X(W)} label={fmt(H - tz.h)} small vbw={svgW} />
+            <DimV x={rightX(0)} y1={Y(0)} y2={Y(T)} extFrom={X(W)} label={`T ${fmt(T)}`} small vbw={svgW} />
+            <DimV x={rightX(0)} y1={Y(T)} y2={Y(H)} extFrom={X(W)} label={fmt(H - T)} small vbw={svgW} />
           </>
         )}
-        <DimV x={rightX(tz ? 1 : 0)} y1={Y(0)} y2={Y(H)} extFrom={X(W)} label={fmt(H)} vbw={svgW} />
+        <DimV x={rightX(tr ? 1 : 0)} y1={Y(0)} y2={Y(H)} extFrom={X(W)} label={fmt(H)} vbw={svgW} />
 
         <DimChainV x={ox - 24 * ts} cuts={vCuts.map(Y)} extFrom={ox - 4 * ts} vbw={svgW} labels={vLabels} fmt={fmt} />
         <DimV x={ox - 84 * ts} y1={Y(0)} y2={Y(m.frameHead)} extFrom={ox - 4 * ts}
           label={`head ${fmt(m.frameHead)}`} small vbw={svgW} />
-        {dr.hasTimberCill && bottomFace > 0 && (
+        {timber && bottomFace > 0 && (
           <DimV x={ox - 84 * ts} y1={Y(H - bottomFace)} y2={Y(H)} extFrom={ox - 4 * ts}
             label={`cill ${fmt(bottomFace)}`} small vbw={svgW} />
         )}
 
-        <DimChainH y={rowY(0)} cuts={layerCuts.map(X)} extFrom={oy + H + 4 * ts} vbw={svgW} labels={layerLabels} fmt={fmt} />
-        <DimChainH y={rowY(1)} cuts={memberCuts.map(X)} extFrom={oy + H + 4 * ts} vbw={svgW} fmt={fmt} />
+        {chains.map((ch, i) => (
+          <DimChainH key={`lc${i}`} y={rowY(rowOf.layer)} cuts={ch.cuts.map(X)} extFrom={oy + H + 4 * ts} vbw={svgW} labels={ch.labels} fmt={fmt} />
+        ))}
+        {crossings.map((cr, i) => (
+          <DimH key={`cr${i}`} y={rowY(rowOf.cross)} x1={X(cr.x0)} x2={X(cr.x1)} extFrom={oy + H + 4 * ts}
+            label={cr.label} small vbw={svgW} />
+        ))}
+        <DimChainH y={rowY(rowOf.member)} cuts={memberCuts.map(X)} extFrom={oy + H + 4 * ts} vbw={svgW} fmt={fmt} />
         {geom.frames.length > 1 && geom.frames.map((f, i) => (
-          <DimH key={`fw${i}`} y={rowY(2)} x1={X(f.x)} x2={X(f.x + f.w)} extFrom={Y(H)}
+          <DimH key={`fw${i}`} y={rowY(rowOf.field)} x1={X(f.x)} x2={X(f.x + f.w)} extFrom={Y(H)}
             label={`${f.kind === 'door' ? 'door' : `${f.side} panel`} ${fmt(f.w)}`} small vbw={svgW} />
         ))}
 

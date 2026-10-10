@@ -493,6 +493,9 @@ function PricingTab() {
           <PctF label="Single non-white" value={p.colorSingleNonWhite} onChange={(v) => set('colorSingleNonWhite', v)} />
           <PctF label="Dual colour" value={p.colorDual} onChange={(v) => set('colorDual', v)} />
           <PctF label="Arched head" value={p.archedHead} onChange={(v) => set('archedHead', v)} />
+          {/* Cottage sash 40/60 and 1/3-2/3 (Piotr 09.10.2026): the surcharge after the
+              arched head and before colour; default 5 %, a stored price list without it falls back */}
+          <PctF label="Cottage sash surcharge" value={p.cottageSash} onChange={(v) => set('cottageSash', v)} />
         </div>
       </Section>
 

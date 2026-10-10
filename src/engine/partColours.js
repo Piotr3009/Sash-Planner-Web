@@ -31,15 +31,17 @@ export const PART_COLOUR_GROUPS = [
   { id: 'door_frame_head', family: 'door_frame', name: 'Door Frame Head', note: 'top of the frame', hex: '#F5E050' },
   { id: 'door_frame_jambs', family: 'door_frame', name: 'Door Frame Jambs', note: 'left and right together', hex: '#7CC4F5' },
   { id: 'door_frame_cill', family: 'door_frame', name: 'Door Frame Cill', note: 'outward or inward cill', hex: '#F2A03D' },
-  { id: 'door_post', family: 'door_frame', name: 'Coupling Post', note: 'between door and side panel', hex: '#5CCBA9' },
+  // Doors v3 (09.10.2026): a casement mullion stands where the coupling post
+  // stood; the compartment keeps its id and colour (the casement mullion's).
+  { id: 'door_post', family: 'door_frame', name: 'Mullion', note: 'between door and side panel', hex: '#5CCBA9' },
   { id: 'door_transom', family: 'door_frame', name: 'Transom Rail', note: 'under the fanlight', hex: '#D99AC5' },
   { id: 'door_leaf_stiles', family: 'door_leaf', name: 'Door Leaf Stiles', note: 'hinge and lock stiles', hex: '#FFFFFF' },
   { id: 'door_meeting_stile', family: 'door_leaf', name: 'Meeting Stile', note: 'french, with the lip', hex: '#C9D4DE' },
   { id: 'door_top_rail', family: 'door_leaf', name: 'Door Top Rail', note: 'top of the leaf', hex: '#A98BE8' },
   { id: 'door_mid_rail', family: 'door_leaf', name: 'Door Mid Rail', note: 'between glass and panel', hex: '#8FB3E8' },
   { id: 'door_bottom_rail', family: 'door_leaf', name: 'Door Bottom Rail', note: 'bottom of the leaf', hex: '#E04A2A' },
-  { id: 'door_side_panel', family: 'door_leaf', name: 'Side Panel', note: 'fixed side panel members', hex: '#B5D99C' },
-  { id: 'door_fan', family: 'door_leaf', name: 'Fan Leaf', note: 'opening fanlight members', hex: '#E8C38F' },
+  { id: 'door_side_panel', family: 'door_leaf', name: 'Side Panel', note: 'side panel fixed light members', hex: '#B5D99C' },
+  { id: 'door_fan', family: 'door_leaf', name: 'Fan Leaf', note: 'fanlight leaf members, opening or fixed', hex: '#E8C38F' },
 ];
 
 const BY_ID = Object.fromEntries(PART_COLOUR_GROUPS.map((g) => [g.id, g]));
@@ -57,7 +59,7 @@ const ELEMENT_TO_GROUP = {
   'D-FRAME HEAD': 'door_frame_head',
   'D-FRAME JAMB (L)': 'door_frame_jambs', 'D-FRAME JAMB (R)': 'door_frame_jambs',
   'D-FRAME CILL': 'door_frame_cill', 'D-FRAME CILL (INWARD)': 'door_frame_cill',
-  'D-COUPLING POST': 'door_post',
+  'D-COUPLING POST': 'door_post', 'D-MULLION': 'door_post',
   'D-TRANSOM': 'door_transom',
   'D-STILE (L)': 'door_leaf_stiles', 'D-STILE (R)': 'door_leaf_stiles',
   'D-MEETING STILE': 'door_meeting_stile',
@@ -66,6 +68,7 @@ const ELEMENT_TO_GROUP = {
   'D-BOTTOM RAIL': 'door_bottom_rail',
   'D-SIDE STILE': 'door_side_panel', 'D-SIDE TOP RAIL': 'door_side_panel', 'D-SIDE BOTTOM RAIL': 'door_side_panel',
   'D-FAN STILE (L)': 'door_fan', 'D-FAN STILE (R)': 'door_fan', 'D-FAN TOP RAIL': 'door_fan', 'D-FAN BOTTOM RAIL': 'door_fan',
+  'D-FIX FAN STILE (L)': 'door_fan', 'D-FIX FAN STILE (R)': 'door_fan', 'D-FIX FAN TOP RAIL': 'door_fan', 'D-FIX FAN BOTTOM RAIL': 'door_fan',
 };
 
 // Cut List group symbol (lists.js CUT_LIST_ORDER) to the same colour group.
@@ -89,6 +92,7 @@ const CUT_SYMBOL_TO_GROUP = {
   'MR': 'door_mid_rail',
   'SP-ST': 'door_side_panel', 'SP-TR': 'door_side_panel', 'SP-BR': 'door_side_panel',
   'FS-L/R': 'door_fan', 'FTR': 'door_fan', 'FBR': 'door_fan',
+  'FFS-L/R': 'door_fan', 'FFTR': 'door_fan', 'FFBR': 'door_fan',
   // the pre-08.10 symbols, for anything saved with them
   'C-FH': 'frame_head', 'C-AH': 'frame_head', 'C-FRR': 'frame_head', 'C-J-L/R': 'frame_jambs', 'C-CILL': 'frame_cill',
   'C-M': 'mullion', 'C-T': 'transom', 'C-ST-L/R': 'leaf_stiles', 'C-TR': 'leaf_top_rail', 'C-ATR': 'leaf_top_rail',

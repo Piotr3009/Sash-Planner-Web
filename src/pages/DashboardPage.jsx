@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, Fragment } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useProjectStore, BATCH_STATUSES } from '../stores/projectStore.js';
+import { useProjectStore, BATCH_STATUSES, batchTypeKey } from '../stores/projectStore.js';
 import { useClientStore } from '../stores/clientStore.js';
 import ClientPicker from '../components/clients/ClientPicker.jsx';
 
@@ -242,7 +242,7 @@ function BatchAssignDropdown({ batchId, projectId, productionPacks, currentPPId,
             Unassign
           </button>
           {productionPacks.map((pp) => {
-            const tc = typeColor(pp.type);
+            const tc = typeColor(batchTypeKey(pp.type));
             return (
               <button
                 key={pp.id}
@@ -305,7 +305,7 @@ function ConnectionLines({ containerRef, projects, productionPacks, onlyType, ho
       const projBox = box(projEl);
       (project.batches || []).forEach((batch) => {
         const batchEl = batchEls.get(batch.id);
-        const type = batch.type || 'sash';
+        const type = batchTypeKey(batch.type);   // 'door' (moveToProduction) reads as 'doors'
         if (!batchEl || !inCategory(type)) return;
         link(`p-${project.id}-${batch.id}`, projBox, box(batchEl), type, LINE_OPACITY.projectToBatch, project.id, packOfBatch.get(batch.id) || null);
       });
@@ -324,7 +324,7 @@ function ConnectionLines({ containerRef, projects, productionPacks, onlyType, ho
         const batch = projects
           .find((p) => p.id === projectId)
           ?.batches?.find((b) => b.id === batchId);
-        const type = batch?.type || 'sash';
+        const type = batchTypeKey(batch?.type);
         if (!inCategory(type)) return;
         link(`b-${batchId}-${pp.id}`, box(batchEl), ppBox, type, LINE_OPACITY.batchToPack, projectId, pp.id);
         if (!typesByProject.has(projectId)) typesByProject.set(projectId, new Set());
@@ -336,7 +336,7 @@ function ConnectionLines({ containerRef, projects, productionPacks, onlyType, ho
       typesByProject.forEach((types, projectId) => {
         const completeEl = completeEls.get(projectId);
         if (!completeEl) return;
-        const type = types.size === 1 ? [...types][0] : (pp.type || 'sash');
+        const type = types.size === 1 ? [...types][0] : batchTypeKey(pp.type);
         link(`d-${pp.id}-${projectId}`, ppBox, box(completeEl), type, LINE_OPACITY.packToComplete, projectId, pp.id);
       });
     });
@@ -516,7 +516,7 @@ export default function DashboardPage() {
           pp.assignments.some((a) => a.projectId === project.id && a.batchId === batch.id)
         );
         if (assignedPP?.status === 'complete') completedBatches++;
-        const t = batch.type || 'sash';
+        const t = batchTypeKey(batch.type);
         summary[t] = (summary[t] || 0) + winCount;
       });
 
@@ -535,7 +535,7 @@ export default function DashboardPage() {
   // other category found among its batches) and one chip per project and category.
   const packCards = useMemo(() => productionPacks.map((pp) => {
     const assignments = pp.assignments || [];
-    const categories = [pp.type || 'sash'];
+    const categories = [batchTypeKey(pp.type)];
     const chips = [];
     let totalWindows = 0;
 
@@ -545,7 +545,7 @@ export default function DashboardPage() {
       const count = batch?.windows?.length || 0;
       totalWindows += count;
       if (!project) return;
-      const type = batch?.type || pp.type || 'sash';
+      const type = batchTypeKey(batch?.type || pp.type);
       if (!categories.includes(type)) categories.push(type);
       const chip = chips.find((c) => c.projectId === projectId && c.type === type);
       if (chip) chip.count += count;
@@ -914,11 +914,11 @@ export default function DashboardPage() {
                         style={{ flex: `${SHARE_BATCHES} 1 0%`, minWidth: 0, gap: BATCH_GAP }}
                       >
                         {batches.map((batch) => {
-                          const tc = typeColor(batch.type);
+                          const tc = typeColor(batchTypeKey(batch.type));
                           const assignedPP = getPackForBatch(project.id, batch.id);
                           const winCount = batch.windows?.length || 0;
-                          const batchLabel = `${typeLabel(batch.type)} ×${winCount}`;
-                          const dimmed = !!onlyType && (batch.type || 'sash') !== onlyType;
+                          const batchLabel = `${typeLabel(batchTypeKey(batch.type))} ×${winCount}`;
+                          const dimmed = !!onlyType && batchTypeKey(batch.type) !== onlyType;
 
                           return (
                             <div

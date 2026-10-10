@@ -382,11 +382,35 @@ export async function deletePackCloud(id) {
   bg(supabase.from('production_packs').delete().eq('id', id), 'deletePack');
 }
 
+/**
+ * The constants a Settings save writes (Piotr 09.10.2026, owner box item 20):
+ * the settings keys of this tab, but the window profiles and the material
+ * assignments as the CLOUD holds them now. projectStore.settings carries the
+ * copies loaded at login, and writing them back undid every later profile or
+ * assignment save (the bSuite target lost on 07.10.2026); those two keys have
+ * their own merging saves (saveWindowProfiles, saveAssignments). Pure.
+ */
+export function settingsConstantsForSave(settings, currentConstants) {
+  const { company, windowProfiles, assignments, ...constants } = settings || {};
+  void company; void windowProfiles; void assignments;
+  const cur = currentConstants || {};
+  return {
+    ...constants,
+    ...(cur.windowProfiles !== undefined ? { windowProfiles: cur.windowProfiles } : {}),
+    ...(cur.assignments !== undefined ? { assignments: cur.assignments } : {}),
+  };
+}
+
 export async function saveSettings(settings) {
   if (!enabled()) return;
   const tenantId = await currentTenantId();
   if (!tenantId) return;
-  const { company, ...constants } = settings || {};
+  const { company } = settings || {};
+  const { data, error } = await supabase.from('settings').select('constants').eq('tenant_id', tenantId).maybeSingle();
+  // A failed read must not write: without the current constants the upsert
+  // would replace the window profiles and assignments with nothing.
+  if (error) { console.error('cloudSync saveSettings: read failed, nothing written', error); return; }
+  const constants = settingsConstantsForSave(settings, data?.constants);
   bg(supabase.from('settings').upsert({
     tenant_id: tenantId, company: company || {}, constants,
   }, { onConflict: 'tenant_id' }), 'saveSettings');
@@ -503,8 +527,10 @@ export async function saveAssignments(assignments) {
   if (!enabled()) return;
   const tenantId = await currentTenantId();
   if (!tenantId) return;
-  // Merge into existing constants so we don't clobber other settings.
-  const { data } = await supabase.from('settings').select('company, constants').eq('tenant_id', tenantId).maybeSingle();
+  // Merge into existing constants so we don't clobber other settings. A
+  // failed read writes nothing: the merge would drop every other key.
+  const { data, error: readError } = await supabase.from('settings').select('company, constants').eq('tenant_id', tenantId).maybeSingle();
+  if (readError) { console.error('cloudSync saveAssignments: read failed, nothing written', readError); return; }
   const constants = { ...(data?.constants || {}), assignments: assignments || {} };
   bg(supabase.from('settings').upsert({
     tenant_id: tenantId, company: data?.company || {}, constants,
@@ -520,20 +546,36 @@ export async function loadWindowProfiles() {
   const tenantId = await currentTenantId();
   if (!tenantId) return null;
   const { data, error } = await supabase.from('settings').select('constants').eq('tenant_id', tenantId).maybeSingle();
-  if (error) { console.error('loadWindowProfiles', error); return null; }
+  // A failed read throws (09.10.2026): the profile store then keeps its changes
+  // dirty instead of merging them over an "empty" cloud and writing every kind
+  // whole. null means the tenant has no profiles in the cloud yet.
+  if (error) { console.error('loadWindowProfiles', error); throw new Error(`loadWindowProfiles: ${error.message || error}`); }
   return data?.constants?.windowProfiles || null;
 }
 
+// The window profile store (windowProfileStore.saveToCloud) hands in the cloud
+// copy with only its changed paths laid over it (09.10.2026); this write keeps
+// merging into the other constants keys. Awaited: true when written, false on
+// an error (the store keeps its changes dirty and tries again), undefined when
+// the cloud is not configured.
 export async function saveWindowProfiles(profiles) {
   if (!enabled()) return;
   const tenantId = await currentTenantId();
   if (!tenantId) return;
   // Merge into existing constants so we don't clobber other settings.
-  const { data } = await supabase.from('settings').select('company, constants').eq('tenant_id', tenantId).maybeSingle();
+  const { data, error: readError } = await supabase.from('settings').select('company, constants').eq('tenant_id', tenantId).maybeSingle();
+  if (readError) { console.error('cloudSync saveWindowProfiles', readError); return false; }
   const constants = { ...(data?.constants || {}), windowProfiles: profiles || {} };
-  bg(supabase.from('settings').upsert({
-    tenant_id: tenantId, company: data?.company || {}, constants,
-  }, { onConflict: 'tenant_id' }), 'saveWindowProfiles');
+  try {
+    const { error } = await supabase.from('settings').upsert({
+      tenant_id: tenantId, company: data?.company || {}, constants,
+    }, { onConflict: 'tenant_id' });
+    if (error) { console.error('cloudSync saveWindowProfiles', error); return false; }
+    return true;
+  } catch (e) {
+    console.error('cloudSync saveWindowProfiles', e);
+    return false;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────

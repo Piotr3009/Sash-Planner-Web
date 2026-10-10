@@ -145,7 +145,11 @@ const SET = [
   arched('circle-800', 800, 800, { archShape: 'circle', archBarPattern: 'sunburst', casementKind: 'fixed' }),
 ];
 const byId = (id) => SET.find((w) => w.id === id);
-const SASH = { id: 'sash', item: { id: 's', name: 'S', width: 1000, height: 1500 }, fc: { windowCategory: 'sash', frameType: 'standard', upperBars: '2x2', lowerBars: '2x2', horns: 'none' } };
+// doors v3 tura (09.10.2026, box item 16): bars that a PSW item carries only in the fullConfig are read now,
+// so this control (whose 2x2 sat in the fullConfig and reached neither tree) carries its 2x2 on the window
+// record, where every tree reads it; SASH_FC keeps the fullConfig-only input to prove the new reading.
+const SASH = { id: 'sash', item: { id: 's', name: 'S', width: 1000, height: 1500, upperBars: '2x2', lowerBars: '2x2' }, fc: { windowCategory: 'sash', frameType: 'standard', horns: 'none' } };
+const SASH_FC = { id: 'sash-fc', item: { id: 's', name: 'S', width: 1000, height: 1500 }, fc: { windowCategory: 'sash', frameType: 'standard', upperBars: '2x2', lowerBars: '2x2', horns: 'none' } };
 const DOOR = { id: 'door', item: { id: 'd', name: 'D', width: 1000, height: 2100 }, fc: { windowCategory: 'door', doorType: 'single-external' } };
 
 const derive = (M, w) => {
@@ -182,8 +186,12 @@ section('0 - profile numbers');
   // door schema 1; the casement change of THIS harness never touched it: migrated, each tree's door
   // profile equals the live default on every number the engine reads.
   const DKEYS = ['frameDepth', 'leafDepth', 'geometry', 'deductions', 'elements', 'frenchLip', 'cillInward', 'sidePanel', 'couplingPost', 'lengths'];
-  ok([REF, START].every((M) => { const m = LIVE.profile.migrateDoorProfile(clone(M.profile.DEFAULT_DOOR_PROFILE)); return M.profile.DEFAULT_DOOR_PROFILE.schema === 1 && DKEYS.every((k) => same(m[k], LIVE.profile.DEFAULT_DOOR_PROFILE[k])); }),
-    'door default profile: schema 1 in both trees; migrated (doors tura, schema 2) it equals the live default on every key the engine reads');
+  // doors v3 (09.10.2026, schema 3): a migrated copy keeps the keys the engine no longer reads as
+  // they were stored (sidePanel.member, fanAtHead / fanAtRail, transomDeduct); the comparison is
+  // on every key of the live default (the keys the engine reads), in the default's order
+  const onLiveKeys = (v, d) => (d && typeof d === 'object' && !Array.isArray(d) ? Object.fromEntries(Object.keys(d).map((k) => [k, onLiveKeys(v?.[k], d[k])])) : v);
+  ok([REF, START].every((M) => { const m = LIVE.profile.migrateDoorProfile(clone(M.profile.DEFAULT_DOOR_PROFILE)); return M.profile.DEFAULT_DOOR_PROFILE.schema === 1 && DKEYS.every((k) => same(onLiveKeys(m[k], LIVE.profile.DEFAULT_DOOR_PROFILE[k]), LIVE.profile.DEFAULT_DOOR_PROFILE[k])); }),
+    'door default profile: schema 1 in both trees; migrated (schema 3 since doors v3) it equals the live default on every key the engine reads');
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -360,17 +368,28 @@ section('8 - sash and door: nothing moves');
 // 09.10.2026 (sash proportions, brief 2.4): a sash derived carries two new keys, sashProportion
 // and meetingFraction; every other key stays byte for byte and the two take their standard values
 // (meeting fraction by hand: bottom = (H - 92 + 33) / 2, f = (bottom - 43 / 2) / (H - 92 - 43)).
-const withoutProportionKeys = (d) => { const c = { ...d }; delete c.sashProportion; delete c.meetingFraction; return c; };
+const withoutProportionKeys = (d) => { const c = { ...d }; delete c.sashProportion; delete c.meetingFraction; delete c.bars; return c; };
+// doors v3 tura (09.10.2026): derived.bars is new on a sash (box item 16), derived.glazingItems is gone from
+// every derive (box item 17, dead code); the old trees still carry it
+const withoutGlazingItems = (d) => { const c = { ...d }; delete c.glazingItems; return c; };
 const handFraction = (H) => (((H - 92 + 33) / 2) - 43 / 2) / (H - 92 - 43);
 for (const id of ['sash']) {
   for (const [M, X, name] of [[REF, F, 'REF'], [START, S, 'START']]) {
     const Ld = L[id].derived;
-    ok(JSON.stringify(withoutProportionKeys(Ld)) === JSON.stringify(X[id].derived) && !('sashProportion' in X[id].derived) && Ld.sashProportion === 'standard' && near(Ld.meetingFraction, handFraction(Number(SASH.item.height)), 1e-12),
+    ok(JSON.stringify(withoutProportionKeys(Ld)) === JSON.stringify(withoutGlazingItems(X[id].derived)) && !('sashProportion' in X[id].derived) && Ld.sashProportion === 'standard' && near(Ld.meetingFraction, handFraction(Number(SASH.item.height)), 1e-12),
       `${id}: derived deep-equal to ${name} but for the two new keys (sashProportion ${Ld.sashProportion}, meetingFraction ${Ld.meetingFraction})`);
     const ca = LIVE.lists.buildCutListForWindow(L[id].derived, L[id].spec), cb = M.lists.buildCutListForWindow(X[id].derived, X[id].spec);
     const ga = LIVE.lists.buildGlassListForWindow(L[id].derived, L[id].spec), gb = M.lists.buildGlassListForWindow(X[id].derived, X[id].spec);
     ok(JSON.stringify(ca) === JSON.stringify(cb) && JSON.stringify(ga) === JSON.stringify(gb), `${id}: cut list and glass schedule equal to ${name} (${ga.map((r) => `${r.width} x ${r.height}`).join(', ')})`);
   }
+}
+
+{
+  // doors v3 tura (09.10.2026, box item 16): a PSW item with its bars only in the fullConfig now derives
+  // with them, exactly as the same bars on the window record do
+  const fcOnly = derive(LIVE, SASH_FC), onItem = derive(LIVE, SASH);
+  ok(fcOnly.spec.sash.grid.upper.mode === '2x2' && fcOnly.spec.sash.grid.lower.mode === '2x2' && JSON.stringify(fcOnly.derived) === JSON.stringify(onItem.derived),
+    'sash: 2x2 only in the fullConfig derives exactly as 2x2 on the window record (box item 16)');
 }
 
 // 08.10.2026: the door itself moved in the doors tura (door schema 2, t41), so it no longer equals
@@ -727,7 +746,7 @@ section('12 - nothing else moved: the live tree with the old numbers pinned');
     LIVE.profile.setActiveCasementProfile(pin);
     for (const w of SET) {
       const a = derive(LIVE, w), b = X[w.id];
-      ok(JSON.stringify(a.derived) === JSON.stringify(b.derived), `${name} pinned, ${w.id}: derived byte-identical to ${name}`);
+      ok(JSON.stringify(a.derived) === JSON.stringify(withoutGlazingItems(b.derived)), `${name} pinned, ${w.id}: derived byte-identical to ${name} (the dead glazingItems aside, box item 17)`);
       const sa = sheetsOf(LIVE, a.spec, a.derived), sb = sheetsOf(M, b.spec, b.derived);
       // one intended difference: the leaf sheet's subtitle glass is the schedule size (0.1 mm), where the old
       // trees printed it on the 0.5 grid (021 fan 251.2 -> "251"); everything else byte for byte

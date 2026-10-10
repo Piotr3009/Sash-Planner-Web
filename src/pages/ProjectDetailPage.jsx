@@ -4,12 +4,12 @@ import { useProjectStore } from '../stores/projectStore.js';
 import { useMaterialStore } from '../stores/materialStore.js';
 import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignmentStore.js';
 import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
-import { parseSpecification, normaliseToWindowSpec } from '../engine/specification.js';
 import { deriveWindowData } from '../engine/calculations.js';
 import { withProfiles } from '../engine/profile.js';
 import { mergeWindowMaterials, formatQty } from '../engine/bom.js';
 import { exportBomPDF } from '../utils/bomPdfExport.js';
 import { summarizeWindows } from '../utils/batchSummary.js';
+import { deriveWindowBounded, splitBounded, excludedWindowsNote, sashBarsLabel } from '../utils/windowBoundary.js';
 import ImageLightbox from '../components/ImageLightbox.jsx';
 
 
@@ -57,21 +57,28 @@ export default function ProjectDetailPage() {
   const ironmongeryItems = useIronmongeryStore((s) => s.items);
   const settings = useProjectStore((s) => s.settings);
 
-  const projectMaterials = useMemo(() => {
-    const windows = [];
+  // Every window derived once, each inside its own boundary (owner box item 19):
+  // a window the engine refuses (unknown sash proportion or bar pattern, an arch
+  // it cannot build) shows its message on its card and stays out of the
+  // project materials; every other window counts.
+  const boundedWindows = useMemo(() => {
+    const rows = [];
     batches.forEach((b) => {
       (b.windows || []).forEach((win) => {
-        const spec = parseSpecification(win.specification);
-        const windowSpec = normaliseToWindowSpec(win, spec);
-        let derived = null;
-        try { derived = withProfiles(b?.defaults?._profileSnapshot?.sash, b?.defaults?._profileSnapshot?.casement, b?.defaults?._profileSnapshot?.door, () => deriveWindowData(windowSpec, settings)); }
-        catch (e) { console.warn(`Calc failed for ${win.name}:`, e); }
-        if (derived) windows.push({ derived, windowSpec, batch: b });
+        const row = deriveWindowBounded(win, (windowSpec) => withProfiles(b?.defaults?._profileSnapshot?.sash, b?.defaults?._profileSnapshot?.casement, b?.defaults?._profileSnapshot?.door, () => deriveWindowData(windowSpec, settings)));
+        rows.push({ ...row, batch: b });
       });
     });
+    return rows;
+  }, [batches, settings]);
+  const boundedById = useMemo(() => new Map(boundedWindows.map((r) => [r.win.id, r])), [boundedWindows]);
+  const excludedWindows = useMemo(() => splitBounded(boundedWindows).excluded, [boundedWindows]);
+
+  const projectMaterials = useMemo(() => {
+    const windows = splitBounded(boundedWindows).ok.map(({ derived, windowSpec, batch: b }) => ({ derived, windowSpec, batch: b }));
     if (windows.length === 0) return [];
     return mergeWindowMaterials(windows, { assignments, assignmentsData, materials, ALL_PARTS, ironmongeryItems, settings });
-  }, [batches, assignments, assignmentsData, materials, ironmongeryItems, settings]);
+  }, [boundedWindows, assignments, assignmentsData, materials, ironmongeryItems, settings]);
 
   if (!currentProject) return <div className="p-8 text-sm text-ink-400">Project not found.</div>;
 
@@ -244,15 +251,25 @@ export default function ProjectDetailPage() {
               {/* Windows */}
               {winCount > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                  {batch.windows.map((win) => (
+                  {batch.windows.map((win) => {
+                    const bounded = boundedById.get(win.id);
+                    const sashBars = bounded?.windowSpec?.category === 'sash' ? sashBarsLabel(bounded.windowSpec) : null;
+                    return (
                     <div key={win.id} className="p-3 bg-surface-600 border border-surface-500 rounded-lg hover:border-accent-500/40 hover:shadow-glow transition-all relative group">
                       <Link to={`/projects/${projectId}/batches/${batch.id}/windows/${win.id}`} className="block">
                         <div className="font-semibold text-sm text-ink-50">{win.name}</div>
                         <div className="text-xs text-ink-400 mt-0.5">{win.width} × {win.height} mm</div>
                         <div className="text-[10px] text-ink-400 mt-1">
-                          {win.upperBars && win.upperBars !== 'none' ? `Bars: ${win.upperBars}` : 'No bars'}
+                          {sashBars != null
+                            ? (sashBars !== 'none' ? `Bars: ${sashBars}` : 'No bars')
+                            : (win.upperBars && win.upperBars !== 'none' ? `Bars: ${win.upperBars}` : 'No bars')}
                           {win.glassFinish === 'frosted' ? ' · Frosted' : ''}
                         </div>
+                        {bounded?.error && (
+                          <div className="text-[10px] text-red-400 mt-1" data-window-error={win.id}>
+                            {bounded.error.message}
+                          </div>
+                        )}
                       </Link>
                       <button
                         onClick={(e) => {
@@ -267,7 +284,8 @@ export default function ProjectDetailPage() {
                         Delete
                       </button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-xs text-ink-400 italic">No windows in this batch.</div>
@@ -298,6 +316,9 @@ export default function ProjectDetailPage() {
                 <p className="text-[10px] text-ink-400 mt-0.5">
                   {batches.length} batch{batches.length !== 1 ? 'es' : ''} · {batches.reduce((s, b) => s + (b.windows?.length || 0), 0)} windows
                 </p>
+                {excludedWindows.length > 0 && (
+                  <p className="text-[10px] text-red-400 mt-0.5" data-excluded-note>{excludedWindowsNote(excludedWindows)}</p>
+                )}
               </div>
               <button onClick={() => setShowMaterials(false)} className="w-7 h-7 rounded-full bg-surface-600 text-ink-400 hover:text-ink-200 flex items-center justify-center text-sm">×</button>
             </div>

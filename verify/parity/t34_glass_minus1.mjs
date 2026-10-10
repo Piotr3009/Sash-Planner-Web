@@ -65,6 +65,9 @@ const DOOR1 = JSON.parse(JSON.stringify(LIVE.profile.DEFAULT_DOOR_PROFILE));
 Object.assign(DOOR1, { leafDepth: 61 });
 Object.assign(DOOR1.geometry, { land: 43, rebate: 25 });
 Object.assign(DOOR1.deductions, { leafAtJamb: 47, leafFullHeight: 94, leafNoThreshold: 53 });
+// doors v3 (09.10.2026): the leaf height reads leafAtJamb + leafAtFloor (not leafFullHeight), so the
+// reference tree's 94 = 47 at the head + 47 at the cill side is pinned through leafAtFloor 47
+Object.assign(DOOR1.deductions, { leafAtFloor: 47 });
 const withDoor1 = (fn) => LIVE.profile.withProfiles(null, null, DOOR1, fn);
 const near = (a, b, tol = 0.051) => Math.abs(a - b) <= tol;
 

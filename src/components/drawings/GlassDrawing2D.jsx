@@ -9,7 +9,7 @@
  * (CONSTANTS.GLASS_REBATE each side of the clear light).
  */
 import { useMemo } from 'react';
-import { CONSTANTS } from '../../engine/calculations.js';
+import { CONSTANTS, sashBarPattern } from '../../engine/calculations.js';
 import { buildGlassListForWindow } from '../../engine/lists.js';
 import { getCasementProfile } from '../../engine/profile.js';
 import { readGlassProfile } from '../../engine/glassBars.js';
@@ -62,7 +62,9 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' , w
     // Edge seal (perimeter spacer line) per glass type from the casement profile glazier block
     const EDGE_SEAL = readGlassProfile(getCasementProfile(), windowSpec?.glazing?.type || 'double').edgeCover;
 
-    const gridMode = windowSpec.sash?.grid?.mode || 'none';
+    // bars per sash (Piotr 09.10.2026, owner box item 16): the pattern of THIS unit's
+    // row (the glass schedule, PDF and DXF read the same row.bars)
+    const gridMode = gRow?.bars || sashBarPattern(windowSpec, isUpper ? 'upper' : 'lower');
     const BAR_PATTERNS = {
       'none': { h: 0, v: 0 }, '2x2': { h: 0, v: 1 }, '3x3': { h: 0, v: 2 },
       '4x4': { h: 1, v: 1 }, '6x6': { h: 1, v: 2 }, '8x8': { h: 1, v: 3 }, '9x9': { h: 2, v: 2 },

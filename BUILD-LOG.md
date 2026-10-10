@@ -4,6 +4,597 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-10-09 · TURA PC: DOORS v3 (casement rules inside the door frame), SASH BARS PER SASH, SETTINGS SAVE (branch `claude/doors-v3`)
+
+Owner box (Piotr, 09.10.2026, answers 1 to 23; CLAUDE.md of this tura): the door frame is ONE casement frame (mullion
+68 x 93 through, transom 68 x 93 in segments, fan T - 65, leaf 17 under the axis), every leaf stands 51 above the
+floor (H - 102), side panel = casement fixed light 64 / 64 / 180, fixed fan = non-opening casement leaf 64 / 64 / 67,
+panel 17 deep in the rebate, threshold seal with aluminium / low-profile, inward always timber, vents on doors,
+handing in the PSW wording; sash bars per sash, the proportion error per window, a cottage price field, the window
+profile save that merges with the cloud; batch type door.
+
+### Verdict ✅ doors v3 (casement rules inside the door frame), sash bars per sash, per-window errors, settings save; every 3.10 / section 6 number from the live engine; suite green twice (33 harnesses, 4162 checks, 0 failures); build OK; independent review PASS WITH FINDINGS, all fixed or reported
+
+Branch `claude/doors-v3`, 12 commits on 150500e (Stage 0 ed567bf ... Stage 9 3275d45 and this log). Not merged.
+
+### Stage 0: baseline and sweep (no code changes)
+
+Starting commit **150500e** (`main` on 09.10.2026: PR #14 merged, plus this tura's CLAUDE.md). Branch
+`claude/doors-v3` from it.
+
+**Suite on the starting commit: 30 harnesses, 3504 checks, 0 failures. `npm run build` OK (13.3 s).** Run as in
+the previous turas: `verify/arch/t*.mjs` minus the `*baseline*` generators, plus `verify/parity/*.mjs`, each with
+`node <file>`, after `npm ci` and `pip install ezdxf`; `docs/handover/samples/` restored with `git checkout` (and
+untracked files there cleaned) after every file. `verify/parity/psw-casement-layouts.mjs` needs a PSW clone (outside
+this session's repository scope): not run, not counted. Harnesses that print one PASS line per check (t34 to t37)
+are counted by their `PASS ` lines.
+
+| harness | checks | | harness | checks | | harness | checks |
+|---|---|---|---|---|---|---|---|
+| t16 | 369 | | t24_stage4 | 26 | | parity t34_glass_minus1 | 46 |
+| t17_edges | 70 | | t25 | 226 | | parity t35_locks | 51 |
+| t18 | 179 | | t26 | 38 | | parity t36_hinges | 110 |
+| t19 | 280 | | t27 | 97 | | parity t37_single_window_bom | 50 |
+| t20 | 117 | | t28 | 51 | | parity t38_leaf_64_seat_85 | 471 |
+| t20_bars | 31 | | t29 | 34 | | parity t39_settings_leaf_cards | 23 |
+| t21 | 120 | | t30_preview | 30 | | parity t40_bottom_rail_3d | 73 |
+| t22 | 118 | | t33_bar_grid | 43 | | parity t41_doors_production | 343 |
+| t23 | 81 | | parity t31_bars_8x8 | 18 | | parity t42_precut_colours_labels | 32 |
+| | | | parity t32_bsuite | 54 | | parity t43_sash_proportions | 233 |
+| | | | | | | parity t43_window_tag | 90 |
+
+**BEFORE table** (live engine on 150500e, `normaliseToWindowSpec` then `deriveWindowData`, default profiles; the same
+form inputs as the 3.10 / section 6 cases; the script is kept in the session scratchpad and re-run for the AFTER
+table). On the start commit the side panels sit OUTSIDE the frame W and the fan ABOVE the frame H (`totalWidth = W +
+left + right`, `totalHeight = H + T`), so the 2400 x 2400 rows describe a 3200 x 2850 assembly:
+
+| case | leaf W x H | glass W x H | panel | side light(s) (glass) | fan (glass) | frame members |
+|---|---|---|---|---|---|---|
+| single 900 x 2100, timber cill, outward | 798 x 2002 | 633 x 1751 | - | - | - | D-FRAME HEAD 68x93 L900 x1; D-FRAME JAMB (L) 68x93 L2100 x1; D-FRAME JAMB (R) 68x93 L2100 x1; D-FRAME CILL 68x93 L900 x1 |
+| single 900 x 2100, aluminium threshold | 798 x 2043 | 633 x 1792 | - | - | - | D-FRAME HEAD 68x93 L900 x1; D-FRAME JAMB (L) 68x93 L2100 x1; D-FRAME JAMB (R) 68x93 L2100 x1 |
+| single 900 x 2100, low-profile threshold | 798 x 2043 | 633 x 1792 | - | - | - | D-FRAME HEAD 68x93 L900 x1; D-FRAME JAMB (L) 68x93 L2100 x1; D-FRAME JAMB (R) 68x93 L2100 x1 |
+| single 900 x 2100, inward | 798 x 2002 | 633 x 1751 | - | - | - | D-FRAME HEAD 68x93 L900 x1; D-FRAME JAMB (L) 68x93 L2100 x1; D-FRAME JAMB (R) 68x93 L2100 x1; D-FRAME CILL (INWARD) 40x93 L900 x1 |
+| single 900 x 2100, inward + aluminium | 798 x 2043 | 633 x 1792 | - | - | - | D-FRAME HEAD 68x93 L900 x1; D-FRAME JAMB (L) 68x93 L2100 x1; D-FRAME JAMB (R) 68x93 L2100 x1 |
+| single 900 x 2100, half-glazed | 798 x 2002 | 633 x 883 | 633 x 797 (day 610 x 774) | - | - | D-FRAME HEAD 68x93 L900 x1; D-FRAME JAMB (L) 68x93 L2100 x1; D-FRAME JAMB (R) 68x93 L2100 x1; D-FRAME CILL 68x93 L900 x1 |
+| single 900 x 2100, three-quarter | 798 x 2002 | 633 x 1383.5 | 633 x 296.5 (day 610 x 273.5) | - | - | D-FRAME HEAD 68x93 L900 x1; D-FRAME JAMB (L) 68x93 L2100 x1; D-FRAME JAMB (R) 68x93 L2100 x1; D-FRAME CILL 68x93 L900 x1 |
+| french 1600 x 2100 | 755 x 2002, 755 x 2002 | 584 x 1751, 584 x 1751 | - | - | - | D-FRAME HEAD 68x93 L1600 x1; D-FRAME JAMB (L) 68x93 L2100 x1; D-FRAME JAMB (R) 68x93 L2100 x1; D-FRAME CILL 68x93 L1600 x1 |
+| french 2400 x 2400, sides 400 + 400, opening fan T 450 | 1155 x 2302, 1155 x 2302 | 984 x 2051, 984 x 2051 | - | left 298 x 2302 (207 x 2211), right 298 x 2302 (207 x 2211) | panel left 298 x 348 (193 x 240), door 2298 x 348 (2193 x 240), panel right 298 x 348 (193 x 240) | D-FRAME HEAD 68x93 L3200 x1; D-FRAME JAMB (L) 68x93 L2850 x1; D-FRAME JAMB (R) 68x93 L2850 x1; D-COUPLING POST 136x93 L2850 x2; D-FRAME CILL 68x93 L3200 x1; D-TRANSOM 68x93 L3064 x1 |
+| french 2400 x 2400, sides 400 + 400, fixed fan T 450 | 1155 x 2302, 1155 x 2302 | 984 x 2051, 984 x 2051 | - | left 298 x 2302 (207 x 2211), right 298 x 2302 (207 x 2211) | pane over panel left 287 x 337, pane over door 2287 x 337, pane over panel right 287 x 337 | D-FRAME HEAD 68x93 L3200 x1; D-FRAME JAMB (L) 68x93 L2850 x1; D-FRAME JAMB (R) 68x93 L2850 x1; D-COUPLING POST 136x93 L2850 x2; D-FRAME CILL 68x93 L3200 x1; D-TRANSOM 68x93 L3064 x1 |
+| french 1600 x 2100, fixed fan T 450 | 755 x 2002, 755 x 2002 | 584 x 1751, 584 x 1751 | - | - | pane over door 1487 x 337 | D-FRAME HEAD 68x93 L1600 x1; D-FRAME JAMB (L) 68x93 L2550 x1; D-FRAME JAMB (R) 68x93 L2550 x1; D-FRAME CILL 68x93 L1600 x1; D-TRANSOM 68x93 L1464 x1 |
+| single 1000 x 2100, side panel 450 right | 898 x 2002 | 733 x 1751 | - | right 348 x 2002 (257 x 1911) | - | D-FRAME HEAD 68x93 L1450 x1; D-FRAME JAMB (L) 68x93 L2100 x1; D-FRAME JAMB (R) 68x93 L2100 x1; D-COUPLING POST 136x93 L2100 x1; D-FRAME CILL 68x93 L1450 x1 |
+
+Handing on the start commit: single, open left, outward = "RH (clockwise closing)"; open right = "LH (anti-clockwise
+closing)"; open left, inward = "LH"; french, open left, two handles = "master on the active leaf RH (clockwise
+closing)". Sash 1000 x 1400 "6 over 1" (`upperBars 6x6`, `lowerBars none` on the window record):
+`windowSpec.sash.grid.mode` = 6x6 for BOTH sashes, glass rows upper 731 x 560.5 bars 6x6 and lower 731 x 560.5
+bars 6x6, triangle / Georgian beading "Bars 1783 x 2": the lower sash gets the upper pattern (box item 16).
+
+**Sweep** (seven read-only agents on disjoint areas, then a completeness critic; workflow `doors-v3-stage0-sweep`).
+The areas and what they found (file:line on 150500e):
+
+1. *Door profile keys* (`couplingPost`, `sidePanel.member`, `fanAtHead` / `fanAtRail`, door `leafFullHeight` /
+   `leafNoThreshold`, `transomDeduct`, `zones.transom.band`, `zones.posts` / `joints` / `frames`, totals):
+   `profile.js` 624-768 (default, single-step migration, shallow merges of `sidePanel` / `panel`), `calculations.js`
+   1304-1784 (`deriveDoorWindow`: `totalWidth = W + left + right` 1372, `totalHeight = H + T` 1365, `edge = 51` on
+   every side of every zone 1374, posts 1381-1397, leaf H 1428, side panel leaves 1476-1488 with one member,
+   opening fan 1523, fixed fan glazed into the frame 1535-1544, D-COUPLING POST 1555, one D-TRANSOM W - 136 1570,
+   members.side / post 1719, transom band 1753), `windowProfileStore.js` 30 (`DOOR_PATH_ROOTS` lacks `fixedFan`),
+   `WindowSettingsPage.jsx` 1327-1508 (Doors card: coupling post and side member fields, the four retired rules),
+   `materialAssignmentStore.js` 217 / 239-241, `bom.js` 129 / 137-139, `lists.js` 703 / 710-712,
+   `partSymbols.js` 133, `partColours.js` 34 / 60, `precutPdfExport.js` 481-489. Readers of the totals and
+   zones: `WindowDetailPage.jsx` 295, `ProductionPackPage.jsx` 2354, `windowSpecToConfig.js` 356-361. Harness pins:
+   t41 (profile, leaf 2002 / 2043, glass 1751 / 1792, styles, fan 1498 x 348, transom 1464, jambs 2550, coupling
+   posts, side 57, migration schema 2, Assign Materials list, no vents on doors), t40 section 6, t27 (couplingPost
+   136, transomDeduct 136, leaf rules 98 / 57, a source regex on `sidePanel.member` / `couplingPost.width`), t29
+   section 6 (post = 2 x frame face), t34 (door ref - 2 pinned through `leafFullHeight`), t38 (door migration DKEYS),
+   t43_sash_proportions (door controls equal to 719bfba), t43_window_tag (the 3.10 door as a fixture). The biggest
+   finding: the 3.10 table (2400 x 2400 with 400 + 400 giving a 1600 door zone and leaves 1882 = 2400 - 450 - 17 - 51)
+   only holds with W x H as the OVERALL frame, side panels and fan inside it.
+2. *Door drawings and 3D*: `doorDrawUtils.js` 25-39 (sheet plan per `panelLeaves` / `fanLeaves`),
+   `doorSheetParts.jsx` 71 / 129 / 170-176 (fan glass unit offset by the fixed panes) / 186-196 (threshold text by
+   string) / 383-458 (plan: posts, side stiles from `pn.member`) / 561-645 (coupling post detail),
+   `DoorFrameDetail2D.jsx` 28-268 (land rects 47 on every side, D-JC, one transom band, `fan tz.h` dims),
+   `DoorElevation2D.jsx` 59-70 (openings computed in the component), 139 (Winkhaus handing), 243-294 (fixed panes,
+   fan symbol, side panels), `DoorLeafDetail2D.jsx` 120-122 (panel in the 11.5 rebate), 199-252, 258-270 (H1..Hn
+   on one line at one x, `hinge right` in the exterior view), `DoorSidePanelDetail2D.jsx` 33-77 (guard on
+   `pn.member`), `DoorFanlightDetail2D.jsx` 31-86 (opening only), `DoorSection2D.jsx` 94-142 (members.side / post,
+   exterior-view hinge words). 3D: `windowSpecToConfig.js` 329-414 (`doorGeometryFromSpec` re-derives with the
+   live profile; `doorH = frame.height`, posts, `member`, fan panes), `DoorAssembly.jsx` 287-359 (frame land =
+   complement of the openings, one gap 4 on every edge), 404-409 (origin from `doorX` / `transomH` / `doorH`, the
+   same formula in `DoorWindow.jsx` 1234-1263, `Window3DCaptureRig.jsx` 47-53 and t40), 492 (threshold strip by
+   string), 537-580 (side leaves `member`, every fan leaf swings with a handle, fixed panes). Pins: t41 section 18,
+   t40 section 6. No generator script for `docs/handover/samples/doors/` exists (the 24 PNGs came from an ad hoc
+   Chromium run).
+
+3. *Door lists, BOM, Assign Materials, hardware*: `bom.js` 123-145 (`ELEMENT_TO_PART_ID`, no row for the v3 names
+   D-MULLION / D-FIX FAN *: their timber would have been dropped silently), 381-429 (door hardware into the BOM, the
+   threshold product 1 pc), 191-205 / 451 / 527-561 (slots, door slot products, variant notes), 730
+   (`windowHardwareDetailRows`, no unit); `doorHardware.js` 60-66 (`HANDING_WORDS`), 226-233 (threshold product);
+   `lists.js` 487 (`buildVentGrilles`), 558-583 (door hardware list, no vents), 634 / 659 (mirror pairs, cut list
+   order and symbols); `partSymbols.js` 123-147, `partColours.js` 31-101, `precutPdfExport.js` 483-497;
+   `materialAssignmentStore.js` 207-257 (`DOOR_PARTS` reading `sidePanel.member` at import); `MaterialAssignmentsPage`
+   821-865; `ProductionPackPage.jsx` 682-693 (overview threshold printed raw), 2547 (BOM notes carry the handing
+   words); `WindowDetailPage.jsx` 247-249; `bomPdfExport.js` 59 / 80; pins in t41, t37 134, t27 193-223.
+4. *Sash bar trail*: `specification.js` 21 (`detectGridMode`: one pattern, the lower wins, fullConfig never read),
+   113 (`customBarsFromSpec`: the upper list wins), 339 / 433 (`grid` the only bars data); `calculations.js` 157
+   (CONFIGURATIONS: 'NxN' = N panes per sash, no '2x3'), 2055 (`resolveConfiguration`: '2x3' throws a plain error),
+   1814 (`barPositions`: one list, horizontal over the whole sash: 580.5 in a 537.5 pane), 544 / 625 (consumables and
+   beading: one pattern on both sashes, note "× 2" keyed on equal glass), 390 (the glazing summary); `lists.js` 439
+   (glass rows `bars: gridMode` on both), 384 (triple rows: no bars), 591 (lock rule: any grid); `canvas-renderer.js`
+   199; `SashDetail2D` 76, `FrontElevation2D` 76, `GlassDrawing2D` 65 (one mode); `glassPdfExport` / `glassDxfExport`
+   (per row: they follow the rows); `windowSpecToConfig.js` 199-258 (one value to both sashes); already per sash:
+   `ParametricSashWindow`, `App.jsx`, the configurators and the store; `WindowDetailPage` 320 (glass table read a
+   field the spec never has: a dash on every sash row), `ProductionPackPage` 668 and `ProjectDetailPage` 253 (upper
+   only); dead: `MiniWindowSvg`, `WindowCard`. Probe on 150500e, 1000 x 1400 upper 6x6 / lower none: 6x6 on both
+   glass rows, beading "Bars 1783 × 2"; bars only in fullConfig: no bars at all. Fixture risk: five of the six
+   rect-sash fixtures carry their bars only in fullConfig (t21 / t22 / t27 re-baseline by design).
+5. *Glazing summary, proportion errors, pricing field*: `calculateGlazingSummaryForWindow` 391 /
+   `calculateGlazingSummaryPerSash` 426 / the `glazingItems` keys 684, 1169, 1826, 2036; the only reader
+   `aggregateComponents` 2046 is never called; a repo-wide grep (src, verify, docs, js, public, the package scripts)
+   finds no other reader but a test (t43 267-270); `buildShoppingList`'s local `glazingItems` 2434 is unrelated.
+   `SashProportionError` thrown in `normaliseToWindowSpec` 408 / 411 and `sashHeightsFor`; `ArchError` in the arch
+   normalisers; all three pages call `normaliseToWindowSpec` outside their try (`ProjectDetailPage` 65,
+   `ProductionPackPage` 243, `WindowDetailPage` 81), so one bad window blanks the page; `EstimatePdfBuilder` 21
+   likewise. Pricing: `SettingsPage` 495 (Arched head), save path `savePricingSettings` (estimateStore 126 ->
+   cloudSync 612), `DEFAULT_PRICING.cottageSash 0.05` read at pricing.js 343, `resolvePricing` 166 falls back.
+6. *Settings save and batch defaults*: the race exactly as 07.10.2026: one cloud load at start, the whole `{ sash,
+   casement, door }` blob written on every edit (`scheduleCloudSave` -> `saveWindowProfiles` replaces
+   `constants.windowProfiles`); a second writer: `saveSettings` wrote `projectStore.settings`, which carries the
+   login-time `windowProfiles` and `assignments`; `normalizeSashProfile` mutates its argument (merge on clones);
+   dirty granularity "profile.firstKey"; harness strategy: an injectable cloud adapter and a pure merge. Batch:
+   `createBatch` indexed `BATCH_DEFAULTS[type]` ('door' missing), `moveToProduction` calls `createBatch`.
+7. *Casement helpers*: the eight pure helpers already in `casementRules.js` on the branch, byte-identical for the
+   casement (76 controls); the 3.10 table re-derived on the Stage 1 tree matches every row (mullions 2323 / 2364,
+   segments 340.5 / 1574.5 / 340.5, band 442 / 21).
+
+**Completeness critic** (one agent, read-only, after the seven): sites the sweep missed. The W convention: pricing
+`calculateDoor` adds the side panels to W (out of scope, reported), the configurator `DOOR_DIMS` width limits
+judged W (now the door field), nothing guarded a door field of zero or less (now `DoorGeometryError`); the side
+width / transom clamps are not checked against W / H; `doorHingeCount` had no minimum (box 12: now at least 3);
+the dashboard filter and colours knew only 'doors' (now `batchTypeKey`); the pack overview opening cell printed no
+handing (now the label); the configurator "Open side" label vs the printed "Hinge left" (reported); a single door is
+saved without a transom (reported); source-text gates in t24, t26, t22, t32, t38, t27, t30, t43_window_tag and
+t44 section 6 (all kept green); BLOCKERS 29.x / 30.x items the box answers (closed in 31.7).
+
+
+### Stage 1: door profile schema 3 and the engine
+
+**Shared casement rules** (`src/engine/casementRules.js`, new): `leafWidthInField`, `leafHeightInTier`, `leafOrigin`,
+`fieldLandX`, `mullionLength`, `fullMullionRun`, `transomSegmentLength`, `transomRun`: the formulas that were inline
+in `deriveCasementWindow` (leaf sizes, leaf corners, mullion runs, transom runs), moved verbatim (same operations,
+same order). The casement engine calls them, and so does the door engine with the door numbers composed into the
+same names (head to floor = 51 + 51, under a transom = 17 + 51). Proved byte-identical: 76 casement and sash
+controls (every layout code at its default size and at 1234.5 x 1677 with bars, fixed, triple glass, arched, sash
+double / triple with four bar patterns, cottage) derive, list, glass, hardware and BOM exactly as on 150500e.
+
+**Profile schema 3** (`DEFAULT_DOOR_PROFILE`): new keys `deductions.leafAtFloor 51`, `fanFromAxis 65`,
+`leafBelowAxis 17`; `geometry.transomLandAbove 8`, `transomLandBelow 13`, `gapFanTransom 6`, `gapBelowTransom 4`;
+`lengths.transomSeat 8.5`; `panel.inset 17`, `panel.edge {24, 40, 15}`; `sidePanel {64, 64, 180, 57}`; `fixedFan
+{64, 64, 67}`. `leafFullHeight` / `leafNoThreshold` stay in the object at the derived 102 / 102 (not read);
+`couplingPost` stays (not read). `migrateDoorProfile` walks schema by schema: a value equal to the old default of its
+schema moves (schema 1 94 -> 98 -> 102, schema 2 98 -> 102, 57 -> 102), a hand edit stays; schema-2 keys no longer
+read (`fanAtHead`, `fanAtRail`, `transomDeduct`, `sidePanel.member`) stay in a stored copy as stored. `DOOR_PATH_ROOTS`
+gains `fixedFan`. Window Settings · Doors: mullion and transom face cards (L = frame H - 77, L = field leaf W + 8.5),
+side panel light and fixed fan members, panel inset and edge, the rules leafAtJamb / leafAtMullionAxis /
+leafAtFloor / fanFromAxis / leafBelowAxis with their composition hints, the transom and mullion lands in
+Advanced; the coupling post, side member and the four retired rule fields are gone from the card.
+
+**Engine** (`deriveDoorWindow` v5): W x H is the overall frame (BLOCKERS 31.1 a); fields between the jambs and the
+mullion axes; mullions by `fullMullionRun`; the fan tier and the lower tier by `leafHeightInTier` / `leafOrigin`;
+side lights as casement fixed lights (glass by `casementGlassDeductions` on the light faces); fixed fans as
+non-opening leaves in `fanLeaves` (`fixed: true`, no hardware picks); transom segments by `transomRun`; panel outer
+= daylight + 2 x 17 with the edge profile; `thresholdInfo {type, effectiveType, ignored, timberCill, openingWidth,
+seal}`; `handing {hinge, opens, label}`. `derived.door` keeps `threshold` (the stored string), `leaves`, `panels`,
+`fanLeaves`, `zones`, and gains `sidePanels` (= `panelLeaves`, same array), `mullions`, `transom`, `thresholdInfo`,
+`handing`; `zones.posts`, `members.side` / `post`, `sidePanelMember` and `zones.transom.fanPanes` / `cavity` are gone.
+Handing (`doorHardware.js`): `doorHandingLabel` prints "Hinge left · opens outward"; `HANDING_WORDS` removed;
+`doorHanding` (LH / RH) is kept internal as `kitHanding`.
+
+**3.10 from the live engine** (default profile), row by row:
+
+| case | leaf / light W x H | glass W x H | notes (live engine) | 3.10 |
+|---|---|---|---|---|
+| single 900 x 2100, timber cill, outward | 798 x 1998 | 633 x 1747 | cill 68 L900 | 798 x 1998 / 633 x 1747 ✓ |
+| single 900 x 2100, aluminium threshold | 798 x 1998 | 633 x 1747 | no timber cill; seal 806 mm = 0.81 m | 798 x 1998 / 633 x 1747 ✓ |
+| single 900 x 2100, inward | 798 x 1998 | 633 x 1747 | inward cill 40 (40 / 35) | 798 x 1998 / 633 x 1747 ✓ |
+| single 900 x 2100, half-glazed | 798 x 1998 | 633 x 881 | mid rail axis 999; panel 644 x 806 (daylight 610 x 772 + 2 x 17) | 633 x 881, axis 999, panel 644 x 806 ✓ |
+| french 1600 x 2100 | 755 x 1998, 755 x 1998 | 584 x 1747, 584 x 1747 | half 749, lip 6, meeting stile 100 | 2 x 755 x 1998 / 584 x 1747 ✓ |
+| french 2400 x 2400, sides 400 + 400, opening fan T 450: door leaves | 789 x 1882, 789 x 1882 | 618 x 1631, 618 x 1631 | door zone 1600 (axes 400 / 2000), half 783 | 2 x 789 x 1882 / 618 x 1631 ✓ |
+| the same, side panel light | 332 x 1882, 332 x 1882 | 227 x 1661, 227 x 1661 | members 64 / 64 / 180 x 57 | 332 x 1882 / 227 x 1661 ✓ |
+| the same, fan leaves (opening) | panel left 332 x 385, door 1566 x 385, panel right 332 x 385 | 227 x 277, 1461 x 277, 227 x 277 | casement leaf 64 / 64 / 67, hinge and lock picks | door 1566 x 385, sides 332 x 385 ✓ |
+| the same, mullions and transom | D-M1 L2323, D-M2 L2323 | - | transom segments D-T1 L340.5, D-T2 L1574.5, D-T3 L340.5; band y 442 h 21 (axis 450 - 8 / + 13) | mullion H - 77; segment = field leaf W + 8.5 |
+| the same with a fixed fan | panel left 332 x 385 fixed, door 1566 x 385 fixed, panel right 332 x 385 fixed | 227 x 277, 1461 x 277, 227 x 277 | members 64 / 64 / 67, no hardware (fan picks none) | W - 105, H - 108 ✓ |
+| the same on an aluminium threshold (no timber cill) | 789 x 1882, 789 x 1882 | - | mullions L2364, L2364 (H - (77 - 41)), jambs 2400 | leaf heights unchanged |
+
+| section 6 case | leaf / light | glass | notes |
+|---|---|---|---|
+| single 900 x 2100 three-quarter | 798 x 1998 | 633 x 1380.5 | axis 1498.5; panel 644 x 306.5 (daylight 610 x 272.5) |
+| french 1600 x 2100, fixed fan T 450 | leaves 755 x 1582, 755 x 1582; fan 1498 x 385 fixed | leaves 584 x 1331, 584 x 1331; fan 1393 x 277 | transom L1506.5 |
+| single 1000 x 2100, side panel 450 right | leaf 482 x 1998; light 382 x 1998 | 317 x 1747; 277 x 1777 | mullion D-M axis 550 L2023 |
+
+Every row of 3.10 matches. The single 1000 x 2100 with a 450 side panel reads as a 1000 overall frame (door field
+550 between the jamb and the mullion axis, leaf 482): see BLOCKERS 31.1 a.
+
+
+### Stage 2: lists, BOM, Assign Materials, hardware
+
+- **Cut list / pre-cut / grouped cut list**: `D-MULLION` (symbol M, "Door Mullion"), `D-TRANSOM` one record per
+  segment (codes D-T1.. when there are several, symbol T), side light `D-SIDE STILE` / `TOP RAIL` 64x57 and
+  `D-SIDE BOTTOM RAIL` 180x57, fixed fan `D-FIX FAN STILE (L) / (R)` (pair FFS-L/R), `D-FIX FAN TOP RAIL` (FFTR),
+  `D-FIX FAN BOTTOM RAIL` (FFBR) 64 / 64 / 67. No C- / D- prefix in any symbol. Colours: the mullion takes the
+  door frame compartment that was the coupling post (id `door_post`, now named "Mullion", the casement mullion's
+  green); side light members `door_side_panel`, fixed fan members `door_fan`. The door colour key sheet draws the
+  transom in two segments either side of the mullion.
+- **Assign Materials (Doors)**: new rows `d_mullion` (68x93), `d_fan_fixed_stile` / `top_rail` / `bottom_rail`
+  (64 / 64 / 67 x 57), `d_threshold_seal` (m, the thresholds tab, no per-window slot so the window's threshold
+  product never replaces it); the side panel rows read 64x57, 64x57, 180x57. New rows are appended at the end of
+  `DOOR_ALL_PARTS` (index-based assignment sets keep every earlier row). "Defaults equal to the casement
+  counterparts": `partRegistry.PART_DEFAULT_FROM` (mullion -> c_mullion, side stile / top -> casement leaf
+  stile / top, side bottom -> the door bottom rail, fixed fan -> the casement leaf rows); `bom.effectiveAssignment`
+  returns the counterpart's assignment while the door row has none, so the BOM, the pre-cut raw section and the
+  pre-cut group header follow it, and the pre-cut merges by material as today.
+- **BOM**: the door block adds `hardware.metres` (the threshold seal, m) to the pieces; panel boards and core at the
+  outer panel size (the engine's area); nothing for the coupling post.
+- **Hardware list**: the handing as the configurator states it (Stage 1); the threshold seal line (enginePart, unit
+  m); a fixed fanlight adds no hinge, lock or handle; trickle vents on doors by the window rule (`buildVentGrilles`,
+  room type), a client line on the `trickleVents` slot, so the BOM buys them through `buildWindowHardware`.
+
+French 2400 x 2400, sides 400 + 400, fixed fan T 450, aluminium threshold (live): pre-cut groups 94x57 (stiles, top
+rails), 100x57 (meeting stiles), 180x57 (door bottom rails and the side bottom rails), 64x57 (side stiles / tops,
+fixed fan stiles / tops), 67x57 (fixed fan bottoms), 68x93 (head, jambs, 2 mullions L2364, 3 transom segments); part
+quantities include d_mullion 4748 mm, d_transom_rail 2287 mm, d_threshold_alu_double 1, d_threshold_seal 1.57 m.
+
+
+### Stage 3: tests for Stages 1 and 2
+
+- **New `verify/parity/t44_doors_v3.mjs`** (118 checks): bundles the live src and the start tree (git archive
+  150500e). Sections: the profile schema 3 and every row of 3.10 to 0.01 (leaf, glass, panel and its daylight, fan
+  leaves opening and fixed, side lights, mullion lengths, transom segments and band); thresholds (standard,
+  aluminium, low-profile, each outward and inward: leaf H 1998, effective type, the threshold product and the seal
+  only for an outward aluminium / low-profile door, the seal line on the hardware list, the timber cill on the cut
+  list; the seal across the door opening between mullion lands; the mullions to the floor without a timber cill);
+  trickle vents by room type on the hardware list and through the trickleVents slot in the BOM; the handing strings
+  (six cases, the internal kit handing, no Winkhaus word anywhere, the hints); the schema 2 to 3 migration (the
+  start tree's default as the stored copy: defaults move, hand edits stay, retired keys stay as stored,
+  idempotent, a schema-2 batch snapshot derives with v3); controls (every casement layout code, fixed, triple
+  glass, a decimal frame, sash none / 2x2 / 6x6 at two sizes, cottage: windowSpec, derived, cut list, glass list,
+  pre-cut, hardware list and BOM byte-identical to the start); Assign Materials rows (order, the five v3 rows
+  appended, the seal row, `PART_DEFAULT_FROM` against the rows, the counterpart resolution: own wins, unassigned
+  takes the counterpart with its yield, the pre-cut merges on the counterpart material, the BOM lines); the door BOM
+  part quantities of the reference set (read once, then checked by hand in the comment: 2400 x 2400 opening fan,
+  the same with a fixed fan on aluminium, the half-glazed panel boards); the shared helpers (both engines call
+  them, the door engine reads no retired key, the helpers by hand) and the visible openings.
+- **t41** sections 1 to 17 moved to the v3 rules, a "doors v3" reason at every changed assertion (leaf 1998, glass
+  1747, half-glazed 999 / 881 / 644 x 806, three-quarter 1498.5 / 1380.5 / 644 x 306.5, hinge centres 200 / 899
+  / 1848, frame H = leaf + 102 for the hinge cases, the handing strings and kit handing, vents on doors, the
+  threshold seal, the inward + aluminium case, BOM timber + 10 at 1998, the mullion in the pre-cut group, the side
+  light 64x57 / 180x57 groups, the symbols M / FF*, the fixed fan as a leaf, the transom segment 1506.5, jambs at
+  the overall H, side panels on a 2600 frame (door field 1600, leaves 789 between the mullions), the migration to
+  schema 3, the 33 door rows, the variant notes). The panel board check now rounds the panel area to 0.0001 first,
+  as the engine does (633 x 797 happened to round alike). Section 18 (sheets) follows Stage 4.
+- **t27** (door identities, section 5 door with a side panel, section 5b schema rows, the source gate), **t29**
+  section 6 (the engine mullion), **t34** (the reference door pinned through `leafAtFloor 47`), **t38** (the door
+  migration control compares the keys of the live default), **t43_sash_proportions** (the door controls: windowSpec
+  equal, derive 4 mm lower): each changed assertion carries its reason; assertion counts unchanged (97, 34, 46,
+  471, 233).
+
+
+### Stage 4: door sheets and PDFs
+
+- One agent on the sheet files only (`src/components/drawings/Door*`, `doorSheetParts.jsx`, `doorDrawUtils.js`, an
+  opt-in prop in `drawingUtils.jsx`, the door texts of `WindowDetailPage` / `ProductionPackPage`); every number from
+  `derived.door` or the door profile.
+- **`DoorFrameDetail2D`** (rewritten): the visible openings from `zones.openings`, each mullion with its axis and
+  "M1 2323 · 68x93", each transom segment ("T1 340.5", "T2 1574.5"), "T 450" from the frame top, then H - T and H;
+  the layer chain breaks over each mullion ("4 + 26 + 4"); the threshold line spans only the door opening.
+- **`DoorElevation2D`**: openings from `zones.openings`, mullion and transom axes, no symbol on a fixed fan, the
+  handing label in the subtitle and notes. **`DoorSidePanelDetail2D`**: the side light as a casement fixed light
+  64 / 64 / 180 from `pn.members`, glass deductions from derived, "behind the mullion M1", no hardware.
+  **`DoorFanlightDetail2D`**: "Fixed Fanlight N" (no symbol, hinges or lock) and the opening fan with its picks
+  indexed among the opening fans. **`DoorSection2D`**: mullion axes, the inward note when `thresholdInfo.ignored`,
+  a PANEL EDGE detail (17 in the 18 rebate, tongue 24, flat 15, slope 40 up to 54).
+- **`DoorLeafDetail2D`** (CLAUDE.md 3.15): H1 to H4 at a smaller size (`DimV textSize` = `SIZES.code`, off by
+  default so casement and sash sheets are byte-identical: t20, t25, t28, t43_window_tag), one column per hinge on
+  the hinge side, margins solved so nothing overlaps; the panel notes print the outer size (644 x 806), "panel =
+  daylight + 2 x 17" and the edge profile; the captions print the handing label.
+- **`doorSheetParts.jsx`**: `thresholdText` and `handingText` read `thresholdInfo` / `handing`; the coupling post
+  detail became a "MULLION M1" detail (21 . 26 . 21 = 68, 4 + 13, 13 + 4); the plan draws mullions 68 x 93.
+- **Pages**: the window detail door block prints the handing label, the threshold the engine builds (timber cill /
+  aluminium / low profile, the threshold seal in metres, the inward note), "Side light <side> ... fixed" and "Fixed
+  fan leaf"; the pack overview prints the inward note for an ignored stored value, the spraying rows "Fixed fan
+  leaf N".
+- **New `verify/arch/lib/textCollision.mjs`**: each `<text>` as a box font size x 0.55 x characters wide and one font
+  size tall (0.8 above the baseline, 0.2 below), placed by `text-anchor`, rotate / translate applied to the corners;
+  `collisionFailures(sheets)` lists the overlapping pairs.
+- **t41 section 18**: the set gains the 3.10 cases (2400 x 2400 with side panels 400 / 400 and an opening or a fixed
+  fan 450, single 1000 + side 450 right), low-profile, inward + stored aluminium, hinge right, and every leaf height
+  1900 to 2400 with 3 and with 4 hinges (forced through the profile hinge rule), single and french double: 43 doors.
+  Every door sheet passes the collision check, the dimension rule and the "no NaN / long dash" check. The three
+  v2 literals moved with their reason (633 x 1751 to 633 x 1747, 584 x 1751 to 584 x 1747, 633 x 883 to 633 x 881);
+  new: panel 644 x 806, glass 618 x 1631, side light glass 227 x 1661, "M1 2323", "T1 340.5" / "T2 1574.5", "T 450"
+  on the frame sheet and the elevation, fixed fan sheets without hinge / lock lines, the inward note on three
+  sheets, no Winkhaus word or coupling post on any sheet. t41: 683 pass, 0 fail.
+- The agent's own scratch harness (not committed): 81 doors, 729 sheets, 6509 checks, 0 fail, zero collisions.
+- **Samples**: `docs/handover/samples/doors/sheets/` (38 SVGs: every sheet of 2400 x 2400 opening fan, 2400 x 2400
+  fixed fan, single 1000 + side 450, single 900 half-glazed).
+- Owner checks from this stage (BLOCKERS section 31): the panel edge drawn symmetric about the leaf centre plane
+  (the profile does not say on which face the bead sits); the passive leaf caption of a french door names its own
+  inside-view side; label drops on a crowded first chain row of the frame sheet (the 332 side light widths of the
+  2400 case print on the elevation and the side sheet instead).
+
+### Stage 5: door 3D
+
+- One agent on the 3D files only (`windowSpecToConfig.js` door code, `DoorAssembly.jsx`, the `doorGeo` branch of
+  `DoorWindow.jsx`, the capture rig and the preview framing, t40 section 6).
+- **`doorGeometryFromSpec(windowSpec, derived)`** takes the page's derived (computed under the batch profile
+  snapshot) and derives again only when none is given (the configurator). New `doorGeo` fields: `origin` (the centre
+  of the overall frame, the ONE origin the assembly, the guides, the capture rig and t40 read), `thresholdInfo`,
+  `mullions[]`, `transom` (axis, rail, band, segments), `openings[]` (= `zones.openings`), side lights and fan leaves
+  with their `members` and `fixed`, `leaf.panel` with outer size, daylight, inset, thickness and edge. Removed:
+  `doorH`, `transomH`, `posts`, `fanPanes`, `sidePanelDepth`, `cill.gap`.
+- **`DoorAssembly.jsx`**: the frame land is the complement of the derived openings; jambs and mullions continuous,
+  the transom band 21 drawn as the engine segments; side lights fixed 64 / 64 / 180 x 57 leaves; fixed fans 64 / 64
+  / 67 with no swing and no handle; the threshold strip follows `thresholdInfo.effectiveType` (an inward door never
+  gets one) and spans `thresholdInfo.openingWidth`; the bevelled panel from `panel.edge` (a 24 tongue slab across
+  the outer size on the leaf mid-plane, a 15 flat, a 40 slope up to the 54 field). The legacy PSW door path without
+  `doorGeo` is byte-identical (t40 section 4).
+- **t40 section 6** (73 to 95 checks), a reason at every changed pin: leaf 798 x 1998 (was 2002), daylight 610 x 1724,
+  hinges 251 / 950 / 1899, the 10 gap over the timber cill (51 - 41), aluminium leaf 1998 (was 2043) with the strip
+  806 wide, half-glazed / three-quarter mid rail axes 999 / 1498.5 and the panels 644 x 806 / 644 x 306.5, french
+  glass 561 x 1724, the fixed fan as a 1498 x 385 non-opening leaf (was a unit glazed into the frame), the 3.10 case
+  2400 x 2400 with side panels 400 + 400 and an opening fan (replaces the 1600 + 500 + 500 coupling post case):
+  leaves 2 x 789 x 1882, side lights 332 x 1882, fans 332 / 1566 / 332 x 385, mullions at 400 / 2000 from 47 to 2359
+  through the transom, band segments 47-387 / 413-1987 / 2013-2353. New: the frame land tiles the frame with the
+  openings (5 cases), low-profile strip, inward land and stops, inward + stored aluminium (no strip), the panel edge,
+  single 1000 + side 450 right on aluminium (mullion 2064 to the floor, strip under the door only), the derived
+  pass-through under a snapshot (leafAtFloor 61, stile 100 drawn 1988 high, 100 wide), the single origin.
+- **New `verify/parity/render_door_samples.mjs`** (reusable): renders the real `DoorWindow` from
+  `windowSpecToConfig` in Chromium with the capture rig lights. `docs/handover/samples/doors/`: the 24 renders
+  regenerated, 7 new (12 french 2400 x 2400 side panels 400 + 400 opening fan: front, angle, open; 13 the same with a
+  fixed fan: front, angle; 14 single 1000 + side 450 right: front, angle). Render 08 keeps its old inputs (1600 with
+  500 + 500): with W the overall frame that now reads as two 289 leaves, the correct v3 reading of those inputs.
+- t40 95 / 0, t30 30 / 0, t27 97 / 0, t29 34 / 0 on the tree after this stage.
+- Owner checks from this stage (BLOCKERS section 31): the strip heights (aluminium fills the 51 under the leaf,
+  low-profile half of it) are render choices, not product data; an inward door with side panels: the mullion run
+  ends at the outward cill line (H - 41, length H - 77) while the openings stop at the inward cill face (H - 35);
+  the side light without a timber cill stands over an open 51 gap; the inward cill run, hinge barrel and handle
+  backsets in `doorGeometryFromSpec` still read the live profile (not echoed in derived).
+
+### Stage 6: sash bars per sash, the per-window error, the pricing field, the dead glazing summary
+
+- **Import (`specification.js`)**: `readSashBars` reads each sash on its own: the window record (`upperBars` /
+  `lowerBars`, `upper_bars` / `lower_bars`), then the specification top level, then the estimate `fullConfig` (PSW
+  sometimes sends the bars only there), then 'none'. `windowSpec.sash.grid` gains `upper: { mode, customBars }` and
+  `lower: { mode, customBars }`; `grid.mode` / `rows` / `cols` / `customBars` stay (the lower wins unless it has
+  none, as before) for a window whose sashes agree. Custom lists per sash (`customBarsPerSash`): the record's list,
+  else the fullConfig list; a lower sash without its own list takes the upper one (the configurators' "same bars").
+  An 'N x M' the engine has no table for raises `BarPatternError` naming the window and the sash (START threw a
+  plain "Configuration "2x3" is not supported." deep in the engine). "6 over 1" is upper '6x6' (the PSW six-pane
+  pattern) over 'none': the vocabulary has no '2x3' ('2x2' / '3x3' already mean 2 / 3 panes per sash), so '2x3'
+  is that explicit error (BLOCKERS 31).
+- **Engine (`calculations.js`)**: `sashBarPattern(windowSpec, which)` (falls back to `grid.mode` for a windowSpec made
+  without the per-sash keys); consumables (bead tape, silicone) and beading (triangle and Georgian) take each sash's
+  run, the note prints "Bars U x 2" only when the glass AND the pattern agree, else "Bars U + L";
+  `derived.bars = { upper, lower, same, warnings }`, each `{ pattern, v, h, pane, positions, custom, warnings }`
+  with the bar centres over THAT sash's pane by the sheets' rule (equal panes between 22 bars), custom lists checked
+  against that sash's glass (a bar outside is a warning string, not a crash). `derived.barPositions` (the legacy
+  single list) is unchanged.
+- **Every surface**: glass rows (`bars` per unit), so the glass PDF table / sketch and the glass DXF follow;
+  `SashDetail2D` and `GlassDrawing2D` (each its own sash, the glass sheet from its row), `FrontElevation2D` (each
+  pane its own pattern); the canvas elevation (each pane from `derived.bars`: horizontal bars now INSIDE their pane;
+  START spaced them over the whole sash height, so a 4x4 standard window drew its horizontal bar in the meeting
+  rail); `windowSpecToConfig` sends `upperBars` / `lowerBars` and each sash's custom list to `ParametricSashWindow`
+  (already per sash); the project card ("Bars: 6x6 / none"), the window detail rows (Upper / Lower from the
+  normalised spec) and its glass table (it read `windowSpec.upperBars`, a field that never exists, and printed a
+  dash on every sash row), the pack overview and its PDF (`winBarsLabel` printed `win.upperBars` only). The cut list
+  and pre-cut have no sash bar rows by the existing rule (lists.js: astragal bars are bought as triangle /
+  Georgian beading). Triple sash glass rows carry no bar pattern, as at START.
+- **Per-window error (`src/utils/windowBoundary.js`, new)**: `deriveWindowBounded(win, derive)` normalises and
+  derives one window in a try (`SashProportionError`, `BarPatternError`, `ArchError` are "known" window data
+  errors; any other error is caught the same way, as the pages caught derive errors before); `splitBounded`,
+  `excludedWindowsNote`, `sashBarsLabel`. ProjectDetailPage: the failing window's card prints its message, the
+  project materials leave it out and the materials header says so. WindowDetailPage: the page renders with the
+  window name, Edit Configuration and the message instead of a blank page. ProductionPackPage: the header counts
+  the excluded windows ("N excluded"), a note under it names each with its message, and every tab, list, sheet and
+  PDF of the pack receives only the windows that derived. Before, `normaliseToWindowSpec` ran outside the try on
+  all three pages, so one bad window blanked the page.
+- **Pricing Settings**: "Cottage sash surcharge" right after "Arched head", bound to `pricing.cottageSash` (default
+  0.05 in `DEFAULT_PRICING`; `resolvePricing` gives a stored list without it the default), saved with the same
+  `savePricingSettings` as the arched head.
+- **Dead glazing summary (box item 17)**: the sweep (area 5) found no reader of `derived.glazingItems` in src,
+  verify, docs or the package scripts besides `aggregateComponents`, itself never called; the only consumer was a
+  test (t43 section 4). Deleted: `calculateGlazingSummaryForWindow`, `calculateGlazingSummaryPerSash`,
+  `aggregateComponents` and the `glazingItems` key of the sash, casement, door and empty derived. The local
+  `glazingItems` of `buildShoppingList` (calculateWindow's shopping list) is a different thing and stays.
+- **Keys this stage adds or removes** (everything else of a same-pattern window is byte-identical to START, t45
+  section 8): `windowSpec.sash.grid.upper` / `.lower` (new), `derived.bars` (new), `derived.glazingItems` (removed).
+- **Fixtures re-baselined after reading the diff**: `rect-sash-base.json` (202 values by the baseline script's count,
+  142 leaf values by a plain JSON diff): the five barred fixtures
+  carry their bars only in fullConfig and were baselined with no bars; they now derive WITH them (std_2x2 25
+  values, triple_6x6 26, heritage_4x4 28, tg_9x9_cill 28, arch_head_flat_frame 25: `config` key / rows / cols /
+  bars, `barPositions`, the triangle and Georgian beading rows (5 to 7 rows), bead tape and silicone, the glass row
+  `bars`; plus `derived.bars` added and `glazingItems` removed); slim_none_horns only `bars` added and
+  `glazingItems` removed. `rect-casement-base.json`: `glazingItems: []` removed from the 4 windows, nothing else.
+  `rect-sash-sheets.json`: the elevation, both sash sheets and both glass sheets of the five barred windows now
+  draw their bars; the box and vertical sections and slim_none_horns are unchanged.
+- **Harnesses** (each changed assertion with its reason): t43 (the glazing summary assertions replaced by the
+  removal check, the controls strip the new / removed keys, the canvas pins per pane), t38 (the sash control bars
+  on the item plus a check that fullConfig bars are now read), t37 (doors show one hardware card, the trickle
+  vents of box item 10; the relational S-bars checks needed no change), t41 section 17 and t44 section 6 (controls strip `bars`, `grid.upper` / `grid.lower`, `glazingItems`).
+- **New `verify/parity/t45_sash_bars_per_sash.mjs`** (120 checks): import rules (record, top level, fullConfig,
+  'none', case, '2x3' error vs START); `derived.bars` for 6 over 1 and 1 over 2x2 at 1000 x 1400 by hand, cottage
+  panes, custom lists with the out-of-pane warnings; glass rows, beading lengths and notes, bead tape; the glass DXF
+  units and entities equal the START units of a window with that pattern on both sashes; the canvas bar rects per
+  pane; the sash and glass sheets of each sash equal the START sheet of a window with that pattern on both sashes,
+  the elevation's bar count; the 3D config per sash and the ParametricSashWindow meshes (changing one sash's
+  pattern changes meshes in that sash only); controls: none / 2x2 / 4x4 / 6x6 / 9x9 / cottage / custom on both
+  sashes byte-identical to START (windowSpec, derived, glass, cut list, sheets, DXF, 3D config); the boundary
+  helpers; in Chromium: the project page cards (messages, "Bars: 6x6 / none" also for a PSW window with fullConfig
+  bars), the window detail page of each bad window and of the good ones, the pack (the excluded note and count, the
+  messages, the overview without the bad windows, the bars cells), Pricing Settings (the field after Arched head,
+  the 5 % fallback of a stored list, the save).
+
+### Stage 7: the window profile save merges with the cloud; batch type door
+
+- **`windowProfileStore.js`**: the store keeps `dirty` (plain data, persisted with the profiles) = the paths changed
+  since the last cloud load, at "profile.firstKey" (`casement.bsuite`, `door.deductions`, ...) or the whole kind
+  after a reset. Every setter goes through `_edit(paths, updater)`, which marks a path only when its value really
+  changed (a refused or same-value edit marks nothing, so a stale branch is never laid over the cloud). The save
+  (`saveToCloud`, 800 ms after the last edit, one save at a time) loads the cloud copy, lays ONLY the dirty paths
+  of memory over it (`mergeWindowProfiles`, pure: the cloud copy migrated on a clone first, a kind the cloud lacks
+  taken whole, the casement glass width deduction recomputed on the result), writes it, takes the merged object as
+  the local copy and clears the paths saved; an edit made while the save ran stays local and dirty; a failed load
+  or write keeps every path dirty. `loadFromCloud` keeps the unsaved paths on top. Loads: app start (as today; the
+  paths a reload restored from localStorage are saved right after), entering Window Settings (`useEffect` in
+  `WindowSettingsPage`), the tab coming back (`visibilitychange`, browser only). The cloud is an adapter
+  (`setWindowProfileCloud`) so a harness runs two tabs over one fake cloud.
+- **`cloudSync.js`**: `saveWindowProfiles` still merges into the other constants keys, now awaited (true / false).
+  Found by the sweep: `saveSettings` wrote the whole `projectStore.settings` as constants, and those carry the
+  window profiles and assignments loaded at login, so every Settings or glass reference save put the login-time
+  profiles back (BLOCKERS 27.7a). It now reads the current constants and writes the settings keys with the cloud's
+  `windowProfiles` / `assignments` (`settingsConstantsForSave`, pure). No DB change.
+- **Batch type door**: `projectStore.batchDefaultsFor(type)` maps 'door' to the doors defaults (the one place that
+  indexes `BATCH_DEFAULTS`); `createBatch` and the Batch Defaults page read it, and the page shows the door
+  ironmongery slots for both spellings. `moveToProduction` builds no defaults itself (it calls `createBatch`).
+- **New `verify/parity/t46_settings_save.mjs`** (37 checks): two store instances (one bundle imported under two
+  query strings) over one fake cloud: tab A adds a bSuite target, tab B (loaded earlier) changes a casement face,
+  both save, the cloud holds both and both tabs end clean with the merged copy; the same path in two tabs (the
+  later save wins, also for two sub-keys of one first key); refused / same-value edits, resets, a load with unsaved
+  paths, a failed save, an edit during a save, the pure merge; `settingsConstantsForSave`; `createBatch` 'door' /
+  'doors' / 'sash'. t39 (the Window Settings page in Chromium), t38, t24, t25 and t41 section 14 still pass.
+
+
+### Stage 8: the critic's follow-ups, docs, full suite
+
+- **Follow-ups from the Stage 0 completeness critic** (each with a check): `doorHingeCount` never returns fewer than
+  `DOOR_MIN_HINGES` 3 (box 12; a profile `perLeaf` 2 buys and draws 3); `deriveDoorWindow` raises
+  `DoorGeometryError` when the door field or a side zone leaves no leaf / light (a PSW-era 900 single with side
+  panels 500 + 500: "the door field -100 mm (frame 900 less side panels 500 + 500) ..."), caught by the pages'
+  boundary as a window data error; the configurator's PSW width limits read the door field (W less the side zones,
+  printed next to the limits); `batchTypeKey` is the one 'door' / 'doors' mapping (`batchDefaultsFor`, the
+  dashboard filter, colours, labels and pack chips); the pack overview opening cell prints the handing label
+  ("Hinge left · opens outward · single kit · standard", CLAUDE.md 3.8); the window detail page prints the custom bar
+  warnings of `derived.bars`; the side zone and T meaning documented at the normaliser. t44 section 10 (9 checks), t45
+  section 10 (4 more checks: the door pack, the door error page, the bar warning).
+- **Docs**: `docs/handover/DOORS-PRODUCTION.md` rewritten for v3 (the model in one page, where it lives, what PSW
+  would port); `BLOCKERS.md` section 31; `docs/handover/sql/2026-10-09_settings_constants_set_path.sql` (the per-path
+  constants write that would close the remaining cross-key race, not deployed).
+
+**Comparison table for the owner (CLAUDE.md section 6)**, every number from the live engine (default profiles),
+BEFORE = 150500e (side panels outside W, the fan above H there):
+
+| case | before (150500e) | after (this branch) |
+|---|---|---|
+| single 900 x 2100, timber cill, outward | leaf 798 x 2002, glass 633 x 1751 | leaf 798 x 1998, glass 633 x 1747 |
+| single 900 x 2100, aluminium threshold | leaf 798 x 2043, glass 633 x 1792; threshold 1 pc | leaf 798 x 1998, glass 633 x 1747; threshold 1 pc + threshold seal 0.81 m (806 door opening) |
+| single 900 x 2100, low-profile | leaf 798 x 2043, glass 633 x 1792 | leaf 798 x 1998, glass 633 x 1747; threshold + seal |
+| single 900 x 2100, inward | leaf 798 x 2002, glass 633 x 1751 | leaf 798 x 1998, glass 633 x 1747; inward cill 40 / 35 |
+| single 900 x 2100, inward + stored aluminium | leaf 798 x 2043, glass 633 x 1792 | leaf 798 x 1998, glass 633 x 1747; timber inward cill, "inward door: timber threshold" |
+| single 900 x 2100, half-glazed | glass 633 x 883, panel 633 x 797 | glass 633 x 881, mid rail axis 999, panel 644 x 806 (daylight 610 x 772 + 2 x 17) |
+| single 900 x 2100, three-quarter | glass 633 x 1383.5, panel 633 x 296.5 | glass 633 x 1380.5, axis 1498.5, panel 644 x 306.5 (daylight 610 x 272.5) |
+| french 1600 x 2100 | leaves 755 x 2002, glass 584 x 1751 | leaves 755 x 1998, glass 584 x 1747 (half 749, lip 6, meeting stile 100) |
+| french 2400 x 2400, sides 400 + 400, opening fan T 450: door leaves | (a 3200 x 2850 assembly) 1155 x 2302, glass 984 x 2051 | 789 x 1882, glass 618 x 1631 (door field 1600, half 783) |
+| the same: side lights | 298 x 2302 (glass 207 x 2211), 57 x 57 members | 332 x 1882 (glass 227 x 1661), members 64 / 64 / 180 |
+| the same: fan leaves | 298 / 2298 / 298 x 348 (glass 193 / 2193 / 193 x 240) | 332 / 1566 / 332 x 385 (glass 227 / 1461 / 227 x 277) |
+| the same: frame members | coupling posts 136 x 93 L2850 x 2, one transom L3064 | mullions D-M1 / D-M2 68 x 93 L2323 (L2364 without a timber cill); transom D-T1 / D-T2 / D-T3 L340.5 / 1574.5 / 340.5; band 442 to 463 |
+| the same with a fixed fan | panes glazed into the frame 287 / 2287 / 287 x 337 | non-opening leaves 332 / 1566 / 332 x 385, 64 / 64 / 67, no hardware, glass 227 / 1461 / 227 x 277 |
+| french 1600 x 2100, fixed fan T 450 | leaves 755 x 2002 under a 1487 x 337 pane (assembly 1600 x 2550) | leaves 755 x 1582 (glass 584 x 1331); fan leaf 1498 x 385 fixed (glass 1393 x 277); transom L1506.5 |
+| single 1000 x 2100, side panel 450 right | (assembly 1450 wide) leaf 898 x 2002 (733 x 1751); side 348 x 2002 (257 x 1911) | leaf 482 x 1998 (317 x 1747); light 382 x 1998 (277 x 1777); mullion D-M axis 550 L2023 |
+| sash 1000 x 1400 "6 over 1" (upper 6x6, lower none) | 6x6 on BOTH sashes: glass rows 731 x 560.5 bars 6x6 / 6x6; triangle and Georgian beading 4100.9 "Bars 1783 × 2"; bars in fullConfig only: none at all | upper 6x6: 2V 1H, v 232.33 / 475.67, h 268.75 over the 708 x 537.5 pane; lower none; glass rows bars 6x6 / none; triangle and Georgian 2050.45 "Bars 1783 + 0 + 15%"; bead tape 17.1 m; the same from fullConfig |
+| sash 1000 x 1400 upper none / lower 2x2 | 2x2 on both | upper none; lower 2x2: 1V at 354; glass rows none / 2x2; triangle and Georgian 618.13 "Bars 0 + 537.5" |
+| sash 1000 x 1400 2x2 on both | glass rows 2x2 / 2x2, beading "Bars 537.5 × 2" | unchanged (byte-identical but for `derived.bars`) |
+
+### Stage 9: independent review
+
+One review agent that had not seen the work (CLAUDE.md rule 10), read-only, on 150500e..201ae40. **Verdict: PASS
+WITH FINDINGS.**
+
+- **Box numbers re-derived by hand** against the live engine: every 3.10 and section 6 row matches (single 900 x 2100
+  on every threshold and direction 798 x 1998 / 633 x 1747; half-glazed axis 999, glass 881, panel daylight 610 x 772,
+  panel 644 x 806; three-quarter 1498.5 / 1380.5 / 644 x 306.5; french 1600 755 x 1998 / 584 x 1747; 2400 x 2400:
+  leaves (1600 - 34) / 2 + 6 = 789 by 2400 - 450 - 17 - 51 = 1882, glass 618 x 1631, side lights 332 x 1882 / 227 x
+  1661, fans 332 / 1566 / 332 x 385, mullions 2323 (2364), segments 340.5 / 1574.5 / 340.5, band 442 to 463, the
+  lower leaf at 467; french 1600 fixed fan 755 x 1582, fan 1498 x 385, transom 1506.5; single 1000 + 450: leaf 482,
+  light 382 x 1998, mullion 2023 (2064); seal 0.81 m and 1.57 m; vents 2; the opening 2400 BOM by hand; the sash 6
+  over 1 by hand: 232.33 / 475.67 / 268.75 on the upper pane, beading 1783 x 1.15 = 2050.45, the same from fullConfig).
+- **Assertions**: per file removed / added `ok(` lines t27 13 / 13, t29 1 / 1, t37 2 / 2, t38 3 / 4, t40 16 / 33,
+  t41 74 / 85, t43 6 / 9; every changed one carries its reason and moves to the new rule; none weakened while the
+  old check still held.
+- **Fixtures**: START derived with the bars on the record (minus `glazingItems`) equals the new `rect-sash-base`
+  (minus `bars`) for all 6 windows, glass / cut / pre-cut equal; all 42 sheets equal START rendered with the bars on
+  the record; `rect-casement-base` only lost `glazingItems: []`.
+- **Sheets** (rendered with cairosvg): frame M1 / M2 2323, T1 / T2 / T3, T 450, the 4 + 26 + 4 chain; half-glazed
+  leaf panel 644 x 806 with H1 149 / H2 848 / H3 1797 in separate columns; fixed fans without hinge or lock; side
+  light 64 / 180 with glass 227 x 1661; the panel edge detail; the 3D open render.
+- **Housekeeping**: CLAUDE.md, package.json and the lock file unchanged; every new file carries the Skylon header
+  (the generated PNG / SVG samples excepted); the only removed export is `HANDING_WORDS` (3.8), the glazing summary
+  functions were internal.
+
+Findings and what was done:
+
+1. (medium) `saveSettings` ignored a failed read of `settings.constants` and would then have written constants
+   without `windowProfiles` / `assignments`: it now writes nothing on a failed read. The same was true of
+   `saveAssignments` (pre-existing, same class): fixed the same way.
+2. (medium) `loadWindowProfiles` returned null on a read error, so a save merged over an "empty" cloud and wrote every
+   kind whole: it now throws; the store keeps its paths dirty and writes nothing; a load keeps the local copy. t46
+   gains the failed-read case and a check that the three saves stop before their upsert (37 to 40 checks).
+3. (low) t43 computed the expected canvas bar positions and never checked them: it now asserts them (354; 232.33 /
+   475.67 from the pane edge), 235 to 237 checks.
+4. (low) this log said t37 changed for the S-bars window: corrected (the door vents card).
+5. (low) an em dash on a modified t27 section title: now a hyphen.
+6. (low) the final suite counts and this verdict: below.
+7. (low, informational) the frame sheet's vertical chain mixes conventions (from 08.10.2026): reported, BLOCKERS 31.6 d.
+8. (low) the window detail "Grid" row printed "6x6" on a 6 over 1: it prints the per-sash label now ("6x6 / none",
+   the one pattern when both agree); the triple-section mismatch between `derived.bars` and the full-width beading
+   run, and `derived.config` keeping the legacy pattern: reported, BLOCKERS 31.4 c.
+
+### Final suite (3275d45), twice on the final tree, then the build
+
+Run as in Stage 0 (every `verify/arch/t*.mjs` but the baseline generators, every `verify/parity/*.mjs` but
+`psw-casement-layouts.mjs`, which needs a PSW clone, and `render_door_samples.mjs`, the sample renderer; samples
+restored after each file). Pass / fail per file:
+
+| harness | start (150500e) | run 1 | run 2 |
+|---|---|---|---|
+| t16 | 369 | 369 / 0 | 369 / 0 |
+| t17_edges | 70 | 70 / 0 | 70 / 0 |
+| t18 | 179 | 179 / 0 | 179 / 0 |
+| t19 | 280 | 280 / 0 | 280 / 0 |
+| t20 | 117 | 117 / 0 | 117 / 0 |
+| t20_bars | 31 | 31 / 0 | 31 / 0 |
+| t21 | 120 | 120 / 0 | 120 / 0 |
+| t22 | 118 | 118 / 0 | 118 / 0 |
+| t23 | 81 | 81 / 0 | 81 / 0 |
+| t24_stage4 | 26 | 26 / 0 | 26 / 0 |
+| t25 | 226 | 226 / 0 | 226 / 0 |
+| t26 | 38 | 38 / 0 | 38 / 0 |
+| t27 | 97 | 97 / 0 | 97 / 0 |
+| t28 | 51 | 51 / 0 | 51 / 0 |
+| t29 | 34 | 34 / 0 | 34 / 0 |
+| t30_preview | 30 | 30 / 0 | 30 / 0 |
+| t33_bar_grid | 43 | 43 / 0 | 43 / 0 |
+| t31_bars_8x8 | 18 | 18 / 0 | 18 / 0 |
+| t32_bsuite | 54 | 54 / 0 | 54 / 0 |
+| t34_glass_minus1 | 46 | 46 / 0 | 46 / 0 |
+| t35_locks | 51 | 51 / 0 | 51 / 0 |
+| t36_hinges | 110 | 110 / 0 | 110 / 0 |
+| t37_single_window_bom | 50 | 50 / 0 | 50 / 0 |
+| t38_leaf_64_seat_85 | 471 | 472 / 0 | 472 / 0 |
+| t39_settings_leaf_cards | 23 | 23 / 0 | 23 / 0 |
+| t40_bottom_rail_3d | 73 | 95 / 0 | 95 / 0 |
+| t41_doors_production | 343 | 683 / 0 | 683 / 0 |
+| t42_precut_colours_labels | 32 | 32 / 0 | 32 / 0 |
+| t43_sash_proportions | 233 | 237 / 0 | 237 / 0 |
+| t43_window_tag | 90 | 90 / 0 | 90 / 0 |
+| t44_doors_v3 | new | 127 / 0 | 127 / 0 |
+| t45_sash_bars_per_sash | new | 124 / 0 | 124 / 0 |
+| t46_settings_save | new | 40 / 0 | 40 / 0 |
+| **total** | **3504** (30 harnesses) | **4162 / 0** | **4162 / 0** |
+
+`npm run build`: OK (17.5 s; the usual chunk size warning only). Changes against the start: t38 +1 (the fullConfig
+bars proof), t40 +22 (door meshes v3), t41 +340 (section 18 over 43 doors with the collision check), t43 +4 (the
+removal check, the canvas positions), new t44 (127), t45 (124), t46 (40).
+
 ## 2026-10-09 · TURA PC: SASH PROPORTIONS, COTTAGE 40/60 AND 1/3-2/3 (branch `claude/sash-proportions`)
 
 Owner box (Piotr, 09.10.2026): a new sash option `sashProportion` (`standard`, `cottage-40-60`, `cottage-1-3`, missing

@@ -87,10 +87,12 @@ export function DimH({ y, x1, x2, label, small, vbw, extFrom }) {
 }
 
 // ─── Vertical dimension line ───
-export function DimV({ x, y1, y2, label, small, vbw, extFrom }) {
+// textSize (optional, screen px like SIZES.*): a smaller label for a stack of
+// dims in one band (the door leaf hinge dims, doors v3); unset = small / large.
+export function DimV({ x, y1, y2, label, small, vbw, extFrom, textSize }) {
   const ts = vbw / VIEWBOX_REF;
   const mid = (y1 + y2) / 2;
-  const fs = (small ? SIZES.dimSmall : SIZES.dimLarge) * ts;
+  const fs = (textSize ?? (small ? SIZES.dimSmall : SIZES.dimLarge)) * ts;
   const tick = DIMS.tickHalf * ts;
   const offset = 14 * ts;
   const overshoot = DIMS.extOvershoot * ts;

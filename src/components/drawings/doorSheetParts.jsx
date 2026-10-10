@@ -9,11 +9,12 @@
 
 /**
  * doorSheetParts.jsx: the pieces every door 2D sheet shares (08.10.2026,
- * doors to production): number formatting, the cut list records of one leaf,
- * the glass schedule unit of one leaf, the threshold wording, the opening
- * symbol, glazing bars (elevation bands and detail lines), hinge barrels and
- * the PLAN geometry (horizontal section) of the frame, posts, leaves and side
- * panels that the plan sheet and the leaf sheet's meeting detail draw.
+ * doors to production; doors v3 09.10.2026): number formatting, the cut list
+ * records of one leaf, the glass schedule unit of one leaf, the threshold and
+ * handing wording, the opening symbol, glazing bars (elevation bands and
+ * detail lines), hinge barrels and the PLAN geometry (horizontal section) of
+ * the frame, the casement mullions, the leaves and the side lights that the
+ * plan sheet and the leaf sheet's meeting detail draw.
  *
  * Every number comes from derived.door (deriveDoorWindow) or the door profile
  * (getDoorProfile, with the DEFAULT_DOOR_PROFILE fallback for a stored copy
@@ -87,6 +88,13 @@ export function doorProfileParts() {
       coreThickness: num(p.panel?.coreThickness, D.panel.coreThickness),
     },
     sidePanelDepth: num(p.sidePanel?.depth, D.sidePanel.depth),
+    // the leaf glazing rebate the glass (geometry.glassInset) and the panel
+    // tongue (panel.inset) sit in
+    glazingRebate: num(p.geometry?.glazingRebate, D.geometry.glazingRebate),
+    // the casement transom seat: a transom segment = its field leaf width + this
+    transomSeat: num(p.lengths?.transomSeat, D.lengths.transomSeat),
+    // the leaf foot: every leaf bottom stands this far above the floor line
+    leafAtFloor: num(p.deductions?.leafAtFloor, D.deductions.leafAtFloor),
   };
 }
 
@@ -118,6 +126,8 @@ export function recordText(rec, extra = '') {
   return parts.join(' · ');
 }
 
+// Door leaf codes only: exact matches, so the side light (D-SP-*) and the fan
+// leaf records (D-FS / D-FFS / D-FTR / D-FFTR ...) are never read as a leaf.
 const LEAF_CODES = ['D-ST/L', 'D-ST/R', 'D-MS', 'D-TR', 'D-BR', 'D-MR'];
 
 /**
@@ -167,11 +177,12 @@ export function sidePanelGlassUnit(derived, i) {
   return scheduleUnit(derived, 'side', ps.slice(0, i).filter(hasGlass).length, ps[i].glass);
 }
 
+// The fan units follow the fanLeaves order (fixed and opening fan leaves alike,
+// doors v3) among the role 'fanlight' units.
 export function fanLeafGlassUnit(derived, i) {
   const fl = derived?.door?.fanLeaves || [];
   if (!hasGlass(fl[i])) return null;
-  const fixedPanes = (derived?.door?.zones?.transom?.fanPanes || []).length;
-  return scheduleUnit(derived, 'fanlight', fixedPanes + fl.slice(0, i).filter(hasGlass).length, fl[i].glass);
+  return scheduleUnit(derived, 'fanlight', fl.slice(0, i).filter(hasGlass).length, fl[i].glass);
 }
 
 /** The glass unit thickness and makeup printed on the sheets. */
@@ -182,19 +193,45 @@ export function glassSpecText(windowSpec) {
   return [t != null ? `${fmt(t)}mm` : '', makeup].filter(Boolean).join(' ');
 }
 
-/** The threshold of the door in words (timber cill, inward cill, aluminium, low profile). */
+/**
+ * The threshold of the door in words (doors v3, owner box item 9), from
+ * derived.door.thresholdInfo: the timber cill (outward), the timber inward
+ * cill (an inward door ALWAYS: a stored aluminium / low-profile value is
+ * ignored and the note says so), or the aluminium / low-profile threshold
+ * product with its threshold seal (one length per door opening).
+ */
 export function thresholdText(dr, pp) {
-  if (dr?.hasTimberCill) {
+  const ti = dr?.thresholdInfo || null;
+  const timber = ti ? !!ti.timberCill : !!dr?.hasTimberCill;
+  if (timber) {
     const m = dr.members || {};
     const ext = num(dr.thresholdExtension, 0);
     const base = dr.inward
       ? `inward timber cill ${fmt(m.frameCill)}×${fmt(dr.frameDepth)}, ${fmt(pp.cillInward.faceInternal)} → ${fmt(pp.cillInward.faceExternal)} fall, unrebated`
       : `timber cill ${fmt(m.frameCill)}×${fmt(dr.frameDepth)}, ${fmt(pp.cillVisible)} visible`;
-    return ext ? `${base} · threshold extension ${fmt(ext)}` : base;
+    return [base, ext ? `threshold extension ${fmt(ext)}` : '', ti?.ignored && ti.note ? ti.note : ''].filter(Boolean).join(' · ');
   }
-  if (dr?.threshold === 'aluminium') return 'aluminium threshold (no timber cill)';
-  if (dr?.threshold === 'low-profile') return 'low profile threshold (no timber cill)';
-  return 'no threshold (no timber cill)';
+  const type = ti ? ti.effectiveType : dr?.threshold;
+  const name = type === 'aluminium' ? 'aluminium threshold' : type === 'low-profile' ? 'low profile threshold' : 'no threshold';
+  const seal = ti?.seal && num(ti.seal.length) != null ? ` + threshold seal ${fmt(ti.seal.length)}` : '';
+  return `${name}${seal} (no timber cill)`;
+}
+
+/**
+ * The handing as printed (doors v3, owner box item 11, the PSW convention):
+ * derived.door.handing.label ('Hinge left · opens outward', hinges seen from
+ * INSIDE) for the door, the single leaf and the active leaf; the passive leaf
+ * of a french door is hinged on the other side, so its own line names that
+ * side in the same wording. Never the exterior view side (leaf.hinge).
+ */
+export function handingText(dr, leaf = null) {
+  const h = dr?.handing;
+  if (!h) return '';
+  if (leaf?.role === 'passive') {
+    const other = h.hinge === 'left' ? 'right' : 'left';
+    return `Hinge ${other} · opens ${h.opens}`;
+  }
+  return h.label || `Hinge ${h.hinge} · opens ${h.opens}`;
 }
 
 /** The name of a leaf role on a sheet. */
@@ -369,16 +406,18 @@ const cornerOf = (side, face) => (side === 'L'
   : (face === 'exterior' ? 'c1' : 'c2'));
 
 /**
- * The plan of the whole door assembly from derived.door:
- *   frame jambs and coupling posts (face x frameDepth) with the leaf rebate
- *   (members.rebate wide) on the face each frame's leaf closes to: the door
- *   frame on the interior when the door opens inward, every other frame on the
- *   exterior; the rebate is drawn as deep as the leaf (leaf flush with that
- *   face: the profile carries no rebate depth);
+ * The plan of the whole door assembly from derived.door (doors v3):
+ *   frame jambs and the casement MULLIONS (face x frameDepth) with the leaf
+ *   rebate on the face each field's leaf closes to: the door field on the
+ *   interior when the door opens inward, every other field on the exterior.
+ *   A jamb rebate is members.rebate wide; a mullion has one rebate each side,
+ *   (mullion face - mullion land) / 2 wide (68 - 26 = 2 x 21). The rebate is
+ *   drawn as deep as the leaf (leaf flush with that face: the profile carries
+ *   no rebate depth);
  *   door leaves (leafDepth) with their stiles, the french meeting stiles half
  *   lapped over the strip where the two leaves overlap (the active leaf on
  *   zones.meetingLap.face), the glass unit centred in the leaf depth;
- *   fixed side panel leaves (member x side panel depth).
+ *   side lights: casement fixed lights (side panel members: stile x depth).
  */
 export function doorPlan(windowSpec, derived) {
   const dr = derived?.door;
@@ -392,8 +431,12 @@ export function doorPlan(windowSpec, derived) {
   const reb = num(m.rebate);
   if (!(W > 0 && fd > 0 && ld > 0 && fJ > 0 && reb > 0)) return null;
   const pp = doorProfileParts();
-  const spRec = doorRecords(derived).find((r) => r.code === 'D-SP-ST');
-  const spDepth = sectionParts(spRec?.section).depth ?? pp.sidePanelDepth;
+  const sp = m.sidePanel || {};
+  const spDepth = num(sp.depth, pp.sidePanelDepth);
+  const spStile = num(sp.stile);
+  const fM = num(m.mullion, fJ);
+  const mLand = num(m.mullionLand, 0);
+  const mReb = (fM - mLand) / 2;
   const inward = !!dr.inward;
   const glassT = num(windowSpec?.glazing?.thickness);
   const frames = (z.frames || []).length ? z.frames : [{ x: 0, w: W, kind: 'door' }];
@@ -408,13 +451,16 @@ export function doorPlan(windowSpec, derived) {
     pts: notchedRect(0, fJ, 0, fd, [{ corner: cornerOf('R', faceOf(f0)), w: reb, d: depthOf(f0) }]) });
   members.push({ kind: 'jamb', side: 'right', x0: W - fJ, x1: W, face: faceOf(fN),
     pts: notchedRect(W - fJ, W, 0, fd, [{ corner: cornerOf('L', faceOf(fN)), w: reb, d: depthOf(fN) }]) });
-  (z.posts || []).forEach((p) => {
-    const fl = frames.find((f) => near(f.x + f.w, p.axis));
-    const fr = frames.find((f) => near(f.x, p.axis));
-    members.push({ kind: 'post', axis: p.axis, x0: p.x, x1: p.x + p.w,
-      pts: notchedRect(p.x, p.x + p.w, 0, fd, [
-        { corner: cornerOf('L', faceOf(fl)), w: reb, d: depthOf(fl) },
-        { corner: cornerOf('R', faceOf(fr)), w: reb, d: depthOf(fr) },
+  (dr.mullions || z.mullions || []).forEach((mu) => {
+    const axis = num(mu.axisX);
+    if (axis == null || !(mReb > 0)) return;
+    const fl = frames.find((f) => near(f.x + f.w, axis));
+    const fr = frames.find((f) => near(f.x, axis));
+    const x0 = axis - fM / 2, x1 = axis + fM / 2;
+    members.push({ kind: 'mullion', axis, x0, x1, reb: mReb, code: mu.code || '', length: num(mu.length),
+      pts: notchedRect(x0, x1, 0, fd, [
+        { corner: cornerOf('L', faceOf(fl)), w: mReb, d: depthOf(fl) },
+        { corner: cornerOf('R', faceOf(fr)), w: mReb, d: depthOf(fr) },
       ]) });
   });
 
@@ -450,15 +496,20 @@ export function doorPlan(windowSpec, derived) {
     };
   });
 
-  // Fixed side panel leaves (exterior rebate)
-  const panels = (dr.panelLeaves || []).map((pn) => ({
-    pn, x0: pn.x, x1: pn.x + pn.w, z0: 0, z1: spDepth,
-    stiles: [notchedRect(pn.x, pn.x + pn.member, 0, spDepth), notchedRect(pn.x + pn.w - pn.member, pn.x + pn.w, 0, spDepth)],
-    glass: num(pn.glass?.w, 0) > 0 ? { x0: pn.glass.x, x1: pn.glass.x + pn.glass.w, z: glassZ(0, spDepth) } : null,
-  }));
+  // Side lights: casement fixed lights in the exterior rebate (their own members)
+  const panels = (dr.panelLeaves || []).map((pn) => {
+    const st = num(pn.members?.stile, spStile);
+    const dp = num(pn.members?.depth, spDepth);
+    if (!(st > 0 && dp > 0)) throw new Error('side light without members');
+    return {
+      pn, stile: st, x0: pn.x, x1: pn.x + pn.w, z0: 0, z1: dp,
+      stiles: [notchedRect(pn.x, pn.x + st, 0, dp), notchedRect(pn.x + pn.w - st, pn.x + pn.w, 0, dp)],
+      glass: num(pn.glass?.w, 0) > 0 ? { x0: pn.glass.x, x1: pn.glass.x + pn.glass.w, z: glassZ(0, dp) } : null,
+    };
+  });
 
   return {
-    W, fd, ld, fJ, reb, spDepth, inward, glassT, frames, members, leaves, panels,
+    W, fd, ld, fJ, reb, fM, mLand, mReb, spDepth, inward, glassT, frames, members, leaves, panels,
     meeting: french ? {
       x: num(z.meetingX, (strip[0] + strip[1]) / 2), strip,
       lapFace: lap?.face || 'exterior',
@@ -522,7 +573,8 @@ export function idOf(windowSpec, tag) {
  *   jamb     an outer jamb of the door frame (the hinge side of a single door
  *            when it is an outer jamb) with the leaf stile in its rebate;
  *   meeting  the french meeting stiles with the lap;
- *   post     the first coupling post with its two rebates.
+ *   mullion  the first casement mullion (doors v3) with its two rebates, the
+ *            leaf or side light either side.
  * The window margins are drawing layout (a fraction of the depth / stile).
  */
 export function planDetailWindows(plan) {
@@ -558,24 +610,23 @@ export function planDetailWindows(plan) {
     out.push({ kind: 'meeting', title: 'MEETING STILES', left, right,
       x0: left.x + left.w - left.stileR - left.stileR * 0.5, x1: right.x + right.stileL + right.stileL * 0.5, z0, z1 });
   }
-  const post = plan.members.find((mb) => mb.kind === 'post');
-  if (post) {
+  const mull = plan.members.find((mb) => mb.kind === 'mullion');
+  if (mull) {
     const items = [...plan.leaves.map((l) => ({ x0: l.x0, x1: l.x1, sL: l.leaf.stileL, sR: l.leaf.stileR })),
-      ...plan.panels.map((p) => ({ x0: p.x0, x1: p.x1, sL: p.pn.member, sR: p.pn.member }))];
-    const nbL = items.filter((it) => it.x1 <= post.axis + 0.01).sort((a, b) => b.x1 - a.x1)[0];
-    const nbR = items.filter((it) => it.x0 >= post.axis - 0.01).sort((a, b) => a.x0 - b.x0)[0];
-    out.push({ kind: 'post', title: 'COUPLING POST', post,
-      // the leaf edges either side: the gap and land chain (a door with side
-      // panels both sides has no outer door jamb to show them on)
+      ...plan.panels.map((p) => ({ x0: p.x0, x1: p.x1, sL: p.stile, sR: p.stile }))];
+    const nbL = items.filter((it) => it.x1 <= mull.axis + 0.01).sort((a, b) => b.x1 - a.x1)[0];
+    const nbR = items.filter((it) => it.x0 >= mull.axis - 0.01).sort((a, b) => a.x0 - b.x0)[0];
+    out.push({ kind: 'mullion', title: `MULLION ${displayCode(mull.code) || ''}`.trim(), mullion: mull,
+      // the leaf / light edges either side: the gap and half land chain
       leafL: nbL ? nbL.x1 : null, leafR: nbR ? nbR.x0 : null,
-      x0: (nbL ? nbL.x1 - nbL.sR * 1.5 : post.x0 - pad), x1: (nbR ? nbR.x0 + nbR.sL * 1.5 : post.x1 + pad), z0, z1 });
+      x0: (nbL ? nbL.x1 - nbL.sR * 1.5 : mull.x0 - pad), x1: (nbR ? nbR.x0 + nbR.sL * 1.5 : mull.x1 + pad), z0, z1 });
   }
   return out;
 }
 
 /** Sheet size of one plan detail at scale s (sheet units per mm), ts = text scale. */
 export function planDetailSize(win, s, ts) {
-  const rows = win.kind === 'meeting' || win.kind === 'post' ? 3 : 2;
+  const rows = win.kind === 'meeting' || win.kind === 'mullion' ? 3 : 2;
   return { w: (win.x1 - win.x0) * s, h: 22 * ts + (win.z1 - win.z0) * s + (14 + 26 * rows) * ts };
 }
 
@@ -630,18 +681,22 @@ export function PlanDetail({ plan, dr, win, left, top, s, ts, vbw, clipId }) {
       label={`${fmt(R.stileL)}`} small vbw={vbw} />);
     const lz0 = plan.leaves[0].z0, lz1 = plan.leaves[0].z1;
     depthDim(winRight + 14 * ts, lz0, lz1, `leaf ${fmt(plan.ld)}`, 'm5');
-  } else if (win.kind === 'post') {
-    const p = win.post;
-    // leaf edge · gap · land | axis | land · gap · leaf edge
-    const lCuts = [win.leafL, p.x0 + plan.reb, p.axis, p.x1 - plan.reb, win.leafR];
-    if (lCuts.every((c) => num(c) != null)) {
-      dims.push(<DimChainH key="p0" y={row(0)} cuts={lCuts.map(PX)} extFrom={ext} vbw={vbw}
-        minSegment={0} labels={lCuts.slice(0, -1).map((c, i) => fmt(lCuts[i + 1] - c))} />);
+  } else if (win.kind === 'mullion') {
+    const mu = win.mullion;
+    // the mullion: rebate · land · rebate and its face in one label over the
+    // land (21 · 26 · 21 = 68), then the leaf / light either side: gap + half
+    // land to the axis, one row per side so the short labels never meet
+    dims.push(<DimChainH key="p0" y={row(0)} cuts={[mu.x0, mu.x0 + mu.reb, mu.x1 - mu.reb, mu.x1].map(PX)} extFrom={ext} vbw={vbw}
+      minSegment={0} labels={['', `${fmt(mu.reb)} · ${fmt(mu.x1 - mu.x0 - 2 * mu.reb)} · ${fmt(mu.reb)} = ${fmt(mu.x1 - mu.x0)}`, '']} />);
+    if (num(win.leafL) != null) {
+      dims.push(<DimH key="p1" y={row(1)} x1={PX(win.leafL)} x2={PX(mu.axis)} extFrom={ext}
+        label={`${fmt(mu.x0 + mu.reb - win.leafL)} + ${fmt(mu.axis - (mu.x0 + mu.reb))}`} small vbw={vbw} />);
     }
-    dims.push(<DimChainH key="p1" y={row(1)} cuts={[p.x0, p.x0 + plan.reb, p.x1 - plan.reb, p.x1].map(PX)} extFrom={ext} vbw={vbw}
-      minSegment={0} labels={[fmt(plan.reb), fmt(p.x1 - p.x0 - 2 * plan.reb), fmt(plan.reb)]} />);
-    dims.push(<DimH key="p2" y={row(2)} x1={PX(p.x0)} x2={PX(p.x1)} extFrom={ext} label={fmt(p.x1 - p.x0)} small vbw={vbw} />);
-    depthDim(winRight + 14 * ts, 0, plan.fd, fmt(plan.fd), 'p3');
+    if (num(win.leafR) != null) {
+      dims.push(<DimH key="p2" y={row(2)} x1={PX(mu.axis)} x2={PX(win.leafR)} extFrom={ext}
+        label={`${fmt(mu.x1 - mu.reb - mu.axis)} + ${fmt(win.leafR - (mu.x1 - mu.reb))}`} small vbw={vbw} />);
+    }
+    depthDim(winRight + 14 * ts, 0, plan.fd, fmt(plan.fd), 'p4');
   }
   return (
     <g>
@@ -650,6 +705,10 @@ export function PlanDetail({ plan, dr, win, left, top, s, ts, vbw, clipId }) {
         {win.title}
       </text>
       <PlanBody plan={plan} T={T} clip={win} clipId={clipId} />
+      {win.kind === 'mullion' && (
+        <line x1={PX(win.mullion.axis)} y1={winTop} x2={PX(win.mullion.axis)} y2={winBottom}
+          stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={`${8 * ts},${3 * ts},${2 * ts},${3 * ts}`} />
+      )}
       {win.kind === 'meeting' && (
         <>
           <line x1={PX(plan.meeting.x)} y1={winTop} x2={PX(plan.meeting.x)} y2={winBottom}

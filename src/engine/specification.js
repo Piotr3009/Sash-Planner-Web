@@ -18,14 +18,43 @@ export function parseSpecification(raw) {
   }
 }
 
-function detectGridMode(spec, item) {
-  const upper = (item?.upperBars || item?.upper_bars || spec?.upperBars || '').toLowerCase();
-  const lower = (item?.lowerBars || item?.lower_bars || spec?.lowerBars || '').toLowerCase();
-  const candidate = lower && lower !== 'none' ? lower : upper;
-  if (!candidate || candidate === 'none') return 'none';
-  if (/^\d+x\d+$/.test(candidate)) return candidate;
-  if (candidate === 'custom') return 'custom';
-  return 'none';
+// Sash glazing bar patterns ('N x N' = N panes PER SASH, "N over N"; PSW and the
+// configurators share this vocabulary). "6 over 1" = upper '6x6', lower 'none'.
+export const SASH_BAR_PATTERNS = Object.freeze(['none', '2x2', '3x3', '4x4', '6x6', '8x8', '9x9', 'custom']);
+/** Raised for a bar pattern the engine does not know ('2x3', '6x1'): per window, never a blank page. */
+export class BarPatternError extends Error {
+  constructor(message) { super(message); this.name = 'BarPatternError'; }
+}
+
+/**
+ * The bar pattern of each sash (Piotr 09.10.2026, owner box item 16): the
+ * window record (upperBars / lowerBars), then the specification's top level,
+ * then the estimate fullConfig (PSW sometimes sends the bars only there), then
+ * 'none'. A value that is no pattern at all (empty, a pricing word) is 'none'
+ * as it always was; an 'N x M' the engine has no table for raises
+ * BarPatternError (it threw a plain error deep in the engine before).
+ */
+function readSashBars(spec, item, windowName) {
+  const fc = spec?.fullConfig || {};
+  const read = (which) => {
+    const raw = String(item?.[`${which}Bars`] || item?.[`${which}_bars`] || spec?.[`${which}Bars`] || fc[`${which}Bars`] || '').toLowerCase();
+    if (!raw || raw === 'none') return 'none';
+    if (raw === 'custom') return 'custom';
+    if (/^\d+x\d+$/.test(raw)) {
+      if (!SASH_BAR_PATTERNS.includes(raw)) throw new BarPatternError(`Unknown bar pattern "${raw}" on the ${which} sash of window "${windowName || '?'}" (allowed: ${SASH_BAR_PATTERNS.join(', ')})`);
+      return raw;
+    }
+    return 'none';
+  };
+  return { upper: read('upper'), lower: read('lower') };
+}
+
+// The one pattern of the legacy grid (grid.mode): the lower sash wins unless it
+// has none. Every reader moved to the per-sash patterns (grid.upper / grid.lower)
+// on 09.10.2026; this value stays for a window whose sashes agree.
+function detectGridMode(spec, item, windowName) {
+  const { upper, lower } = readSashBars(spec, item, windowName);
+  return lower !== 'none' ? lower : upper;
 }
 
 // Sealed unit makeup/thickness per glass type — single source of truth.
@@ -109,6 +138,33 @@ import {
   PSW_ARCH_SHAPE, PSW_ARCH_RISE_RATIO, PSW_SASH_RADIO_SHAPE, LEGACY_ARCH_SHAPES, ARCH_RISE_RATIO, GOTHIC_PROFILE_RATIO,
   ARCH_BAR_PATTERNS, isArchShape, isRoundShape, resolveRoundShape, ArchError, CIRCLE_SHAPE, patternsForShape,
 } from './arch.js';
+
+// Custom bar lists per sash (09.10.2026): the window record's upper / lower list,
+// else the fullConfig's; a lower sash without its own list takes the upper one
+// (what the configurators save with "same bars", and what the single list did).
+function customBarsPerSash(spec, item) {
+  const fc = spec?.fullConfig || spec || {};
+  const fromList = (list) => {
+    if (Array.isArray(list)) {
+      const positions = (type) => list.filter((b) => b && b.type === type).map((b) => Number(b.mm ?? b.position)).filter((n) => Number.isFinite(n) && n > 0);
+      return { vertical: positions('v'), horizontal: positions('h') };
+    }
+    if (list && typeof list === 'object') {
+      const collect = (l) => (Array.isArray(l) ? l.map(Number).filter(Number.isFinite) : []);
+      return { vertical: collect(list.vertical), horizontal: collect(list.horizontal) };
+    }
+    return { vertical: [], horizontal: [] };
+  };
+  const has = (l) => l.vertical.length + l.horizontal.length > 0;
+  const own = (which) => {
+    const onItem = item?.[`${which}CustomBars`];
+    if (Array.isArray(onItem) && onItem.length) return fromList(onItem);
+    return fromList(fc[`${which}CustomBars`] || fc[`${which}CustomBarsArray`]);
+  };
+  const upper = own('upper');
+  const lowerOwn = own('lower');
+  return { upper, lower: has(lowerOwn) ? lowerOwn : upper };
+}
 
 function customBarsFromSpec(spec, item) {
   // New format: item stores custom bars directly as arrays of {type, mm}
@@ -336,7 +392,10 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
   const width = Number(item?.width ?? spec.width ?? fc.width ?? 1000);
   const height = Number(item?.height ?? spec.height ?? fc.height ?? 1500);
 
-  const gridMode = detectGridMode(spec, item);
+  const windowName = item?.name || item?.window_number || '?';
+  const sashBars = readSashBars(spec, item, windowName);
+  const gridMode = detectGridMode(spec, item, windowName);
+  const customPerSash = customBarsPerSash(spec, item);
   const [rowsStr, colsStr] = gridMode !== 'custom' ? gridMode.split('x') : ['2', '2'];
   const rows = Math.max(1, Number(rowsStr) || 2);
   const cols = Math.max(1, Number(colsStr) || 2);
@@ -434,7 +493,12 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
         mode: gridMode,
         rows,
         cols,
-        customBars: customBarsFromSpec(spec, item)
+        customBars: customBarsFromSpec(spec, item),
+        // Bars per sash (Piotr 09.10.2026, owner box item 16): each sash keeps
+        // its own pattern end to end; the four keys above stay for a window
+        // whose sashes agree (legacy readers).
+        upper: { mode: sashBars.upper, customBars: customPerSash.upper },
+        lower: { mode: sashBars.lower, customBars: customPerSash.lower },
       }
     },
     casement: {
@@ -507,6 +571,8 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
         h: Number(item?.doorHBars ?? fc.doorHBars) || 0,
         v: Number(item?.doorVBars ?? fc.doorVBars) || 0,
       },
+      // Side panel zones (doors v3, owner box item 6, flagged): each width runs from
+      // the outer frame edge to the mullion axis, INSIDE the frame width W.
       sidePanels: {
         mode: item?.sidePanels || fc.sidePanels || 'none',
         leftWidth: Number(item?.sideLeftWidth ?? fc.sideLeftWidth) || 500,
@@ -517,6 +583,8 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       },
       // Fanlight (coupled transom). The configurator offers it on a french
       // door only; the engine builds whatever transom.type says, on any door type.
+      // height = T, from the frame top to the transom AXIS, inside H (doors v3,
+      // owner box item 3, flagged).
       transom: {
         type: item?.transomType || fc.transomType || 'none',
         height: Number(item?.transomHeight ?? fc.transomHeight) || 450,

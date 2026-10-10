@@ -12,15 +12,24 @@
  * the bottom and on the left (Piotr 06.09).
  *
  * Every number comes from derived.door (deriveDoorWindow, doors to production
- * 08.10.2026): stile faces per side (94, the meeting stile 100 with its lip),
- * the mid rail and the panel of the half-glazed and three-quarter styles, the
- * hinge centres (dimensioned to the top of the barrel, the line the joiner
- * marks), the handle height, the bolts of the passive leaf (lockType single);
- * member codes, sections and cut lengths from the cut list records of that
- * leaf; the leaf depth from the record section (61 on a triple door). Rails
- * run the full leaf width and stiles the full leaf height (the cut list), so
- * the members are read from the gap between the outline and the glass, as on
- * the casement leaf sheet.
+ * 08.10.2026, doors v3 09.10.2026): stile faces per side (94, the meeting
+ * stile 100 with its lip), the mid rail and the panel of the half-glazed and
+ * three-quarter styles (the panel OUTER size: daylight + 2 x the panel inset,
+ * its edge profile), the hinge centres (dimensioned to the top of the barrel,
+ * the line the joiner marks), the handle height, the bolts of the passive
+ * leaf (lockType single), the handing (derived.door.handing: Hinge left /
+ * right seen from inside, opens outward / inward); member codes, sections and
+ * cut lengths from the cut list records of that leaf; the leaf depth from the
+ * record section (61 on a triple door). Rails run the full leaf width and
+ * stiles the full leaf height (the cut list), so the members are read from the
+ * gap between the outline and the glass, as on the casement leaf sheet.
+ *
+ * HINGE DIMENSIONS (owner box item 14): H1 to H4 in a smaller text, each in
+ * its own column beside the hinge edge (the hinge side of the leaf), so no two
+ * labels can meet on any leaf height; the handle dimension takes the first
+ * column on the lock side. The margins and the gap between the leaves grow
+ * with the columns and the captions (in sheet text units), so nothing runs off
+ * the sheet or into the next leaf.
  */
 import { useMemo } from 'react';
 import { DimChainH, DimChainV, DimH, DimV, TitleBlock, WindowTag } from './drawingUtils.jsx';
@@ -29,9 +38,17 @@ import {
   NS, num, fmt, fmtGlass, safely, NoSheet, doorProfileParts, leafMemberRecords, recordText,
   sectionParts, leafGlassUnit, glassSpecText, roleName, OpeningSymbol, BarDetail, barCuts,
   HingeBarrels, HandleSymbol, doorPlan, planDetailWindows, planDetailSize, PlanDetail, idOf,
+  handingText,
 } from './doorSheetParts.jsx';
 
 const C = { outer: COLORS.sash, rebate: COLORS.glass, bgFill: 'rgba(148,163,184,0.03)' };
+
+// Drawing layout in sheet text units (x ts), not dimensions of the door:
+const HINGE_TEXT = SIZES.code;   // the hinge dimension labels: smaller than the dims (box item 14)
+const COL = 20;                  // pitch of the dimension columns beside a leaf edge
+const LEFT0 = 66;                // first column left of a leaf (clear of the member chain and its leader labels)
+const RIGHT0 = 40;               // first column right of a leaf
+const CHAR = 0.55;               // text width per character, x the font size (the collision rule of the harness)
 
 function buildLeaves(windowSpec, derived) {
   const dr = derived?.door;
@@ -62,7 +79,18 @@ function buildLeaves(windowSpec, derived) {
   return { dr, pp, french, kit, items, depth, plan, meetWin };
 }
 
-export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber , windowTag }) {
+/** The caption lines under one leaf: role, handing, hardware. */
+function captionLines(dr, l, kit) {
+  const role = `${roleName(l.role).toUpperCase()}${l.role === 'single' ? '' : ' LEAF'}`;
+  const hw = l.role === 'single'
+    ? 'handle · multipoint lock (ThunderBolt)'
+    : kit === 'fgte'
+      ? (l.role === 'active' ? 'handle · FGTE master' : 'handle · FGTE slave, shootbolts in the kit')
+      : (l.role === 'active' ? 'handle · ThunderBolt kit' : 'bolts top and bottom');
+  return [role, handingText(dr, l), hw].filter(Boolean);
+}
+
+export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber, windowTag }) {
   const geom = useMemo(() => safely(() => buildLeaves(windowSpec, derived)), [windowSpec, derived]);
   if (!geom) return <NoSheet />;
 
@@ -70,29 +98,56 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber , 
   const m = dr.members || {};
   const leafH = items[0].l.h;
   const sumW = items.reduce((a, it) => a + it.l.w, 0);
+  const codeW = CHAR * SIZES.code;     // one character of a code-size text, in text units
 
-  // ── Layout: leaves side by side, annotations beside each ──
+  // ── Columns beside each leaf: the hinges on the hinge side, the handle on the lock side ──
+  const sides = items.map((it) => {
+    const hingeRight = it.l.hinge === 'right';
+    const nHinge = (it.l.hinges || []).length;
+    const nHandle = it.handle && num(it.l.handleY) != null ? 1 : 0;
+    const left = hingeRight ? nHandle : nHinge;
+    const right = hingeRight ? nHinge : nHandle;
+    const caption = Math.max(...captionLines(dr, it.l, kit).map((t) => t.length)) * codeW;
+    return { left, right, caption };
+  });
+  const lastIdx = items.length - 1;
+  // sheet text units a leaf needs beside it (the member chain on the left
+  // with its leader labels; the dimension columns; their label width)
+  const leftExt = (k) => (sides[k].left ? LEFT0 + COL * (sides[k].left - 1) + 10 : 52);
+  const rightCols = (k) => (sides[k].right ? RIGHT0 + COL * (sides[k].right - 1) + 20 : 0);
+  const overallOff = sides[lastIdx].right ? RIGHT0 + COL * sides[lastIdx].right + 8 : 80;
+  const rightExt = (k) => (k === lastIdx ? overallOff + 26 : rightCols(k));
+  // Margins: each the larger of the layout default (layoutSc) and what the
+  // columns and the captions need at the sheet's text scale (solved by
+  // iteration: the text scale follows the sheet width).
   const layoutSc = Math.max(sumW * 1.3, leafH) / 500;
-  const ML = 110 * layoutSc;
-  const GAP = 150 * layoutSc;
-  const MR = 130 * layoutSc;
-  const MT = 70 * layoutSc;
-  const svgW = ML + sumW + GAP * (items.length - 1) + MR;
+  const needs = [
+    { old: 110 * layoutSc, req: [[leftExt(0) + 10, 0], [sides[0].caption / 2 + 12, items[0].l.w / 2]] },
+    ...items.slice(0, -1).map((it, k) => ({
+      old: 150 * layoutSc,
+      req: [[rightExt(k) + leftExt(k + 1) + 12, 0], [(sides[k].caption + sides[k + 1].caption) / 2 + 16, (it.l.w + items[k + 1].l.w) / 2]],
+    })),
+    { old: 130 * layoutSc, req: [[rightExt(lastIdx) + 10, 0], [sides[lastIdx].caption / 2 + 12, items[lastIdx].l.w / 2]] },
+  ];
+  const marginsAt = (t) => needs.map((n) => Math.max(n.old, ...n.req.map(([a, b]) => a * t - b)));
+  let svgW = sumW + marginsAt(0).reduce((a, v) => a + v, 0);
+  for (let k = 0; k < 30; k += 1) {
+    const next = sumW + marginsAt(svgW / VIEWBOX_REF).reduce((a, v) => a + v, 0);
+    if (Math.abs(next - svgW) < 1e-6) break;
+    svgW = next;
+  }
   const ts = svgW / VIEWBOX_REF;
-  const oy = MT;
+  const margins = marginsAt(ts);
+  const ML = margins[0];
+  const MT0 = Math.max(70 * layoutSc, 64 * ts);
   const codeFs = SIZES.code * ts;
   const dash = `${6 * ts},${4 * ts}`;
   const unitDash = `${4 * ts},${3 * ts}`;
-  let cursor = ML;
-  const placed = items.map((it) => {
-    const ox = cursor;
-    cursor += it.l.w + GAP;
-    return { ...it, ox, X: (x) => ox + (x - it.l.x), Y: (y) => oy + (y - it.l.y) };
-  });
 
-  // Meeting detail (plan) under the leaves of a french door
+  // Meeting detail (plan) under the leaves of a french door, scaled on the
+  // leaves and the layout gap (not on the dimension columns)
   const meet = geom.meetWin;
-  const sd = meet ? (0.6 * (svgW - ML - MR)) / (meet.x1 - meet.x0) : 0;
+  const sd = meet ? (0.6 * (sumW + 150 * layoutSc * lastIdx)) / (meet.x1 - meet.x0) : 0;
   const meetSize = meet ? planDetailSize(meet, sd, ts) : { w: 0, h: 0 };
 
   // ── Title, subtitle, notes ──
@@ -110,15 +165,20 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber , 
   const leafBottomY = items[0].l.y + leafH;
   const handleY = num(items.find((it) => it.handle)?.l.handleY);
   const panel = items.find((it) => it.panel)?.panel || null;
+  const edge = panel?.edge || null;
   const notes = [
     [`Glass ${glassSpecText(windowSpec)}`, hingeCount ? `${hingeCount} hinges per leaf` : '', `barrel ${fmt(pp.barrel)}, set out to its top`]
       .filter(Boolean).join(' · '),
     `Hinge rule: ${num(rule.perLeaf, 0)} per leaf, ${num(rule.perLeafTall, 0)} on a leaf over ${fmt(rule.tallAbove)}`,
+    `Handing: ${handingText(dr)} (seen from inside)`,
     handleY != null
       ? `Handle ${fmt(leafBottomY - handleY)} above the leaf bottom (${fmt(num(dr.zones?.totalHeight, leafBottomY) - handleY)} above the floor), backset ${fmt(pp.backset)}`
       : '',
     panel
-      ? `Panel ${fmt(panel.thickness)}: ${fmt(num(panel.boards?.tricoya, pp.panel.boards))} × ${fmt(pp.panel.boardThickness)} Tricoya MDF + ${fmt(pp.panel.coreThickness)} MDF core, ${panel.paneling}, in the ${fmt(m.inset)} rebate`
+      ? `Panel ${fmt(panel.thickness)}: ${fmt(num(panel.boards?.tricoya, pp.panel.boards))} × ${fmt(pp.panel.boardThickness)} Tricoya MDF + ${fmt(pp.panel.coreThickness)} MDF core, ${panel.paneling}; panel = daylight + 2 × ${fmt(panel.inset)}`
+      : '',
+    panel && edge
+      ? `Panel edge: tongue ${fmt(edge.tongue)}, ${fmt(panel.inset)} deep in the ${fmt(pp.glazingRebate)} glazing rebate; slope ${fmt(edge.slope)} up to ${fmt(panel.thickness)}, flat ${fmt(edge.flat)} at the bead`
       : '',
     french
       ? `Meeting stile ${fmt(m.meeting)} (${fmt(m.stile)} + lip ${fmt(dr.lip)}), half lapped; active leaf laps on the ${dr.zones?.meetingLap?.face || 'exterior'}`
@@ -131,14 +191,39 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber , 
     'Rails run the full leaf width, stiles the full leaf height (cut list lengths)',
   ].filter(Boolean);
 
+  // Under the leaves: the captions, the meeting detail, the title and the
+  // notes. The dimension rule reads the bottom chain in the lower half of the
+  // sheet, so when that block is the taller one the top margin grows.
+  const nCap = Math.max(...items.map((it) => captionLines(dr, it.l, kit).length));
+  const below = 50 * ts + (meet ? (18 * nCap + 10) * ts + meetSize.h : (18 * nCap - 6) * ts) + 24 * ts + (44 + 18 * notes.length) * ts;
+  // (the chain labels sit 18 text units under the leaf: they must lie below
+  // half the sheet height, with 20 units to spare)
+  const MT = Math.max(MT0, below - leafH - 36 * ts + 20 * ts);
+  const oy = MT;
   const capY0 = oy + leafH + 50 * ts;          // leaf captions under the bottom chain
-  const meetTop = capY0 + 46 * ts;
-  const blockBottom = meet ? meetTop + meetSize.h : capY0 + 30 * ts;
+  const meetTop = capY0 + (18 * nCap + 10) * ts;
+  const blockBottom = meet ? meetTop + meetSize.h : capY0 + (18 * nCap - 6) * ts;
   const titleY = blockBottom + 24 * ts;
   const svgH = titleY + (44 + 18 * notes.length) * ts;
+  let cursor = ML;
+  const placed = items.map((it, k) => {
+    const ox = cursor;
+    cursor += it.l.w + (k < lastIdx ? margins[k + 1] : 0);
+    return { ...it, k, ox, X: (x) => ox + (x - it.l.x), Y: (y) => oy + (y - it.l.y) };
+  });
+
+  // A size text in a daylight: across when it fits the width, else along the height.
+  const sizeText = (key, text, day, yAcross) => {
+    const w = text.length * CHAR * codeFs;
+    const cx = day.x + day.w / 2;
+    if (w <= 0.9 * day.w || w > 0.9 * day.h) {
+      return { key, text, cx, y: yAcross, rot: false };
+    }
+    return { key, text, cx, y: day.y + day.h / 2, rot: true };
+  };
 
   const renderLeaf = (it, idx) => {
-    const { l, recs, unit, X, Y, ox } = it;
+    const { l, recs, unit, X, Y, ox, k } = it;
     const day = l.daylight;
     const pnl = l.panel;
     const hingeRight = l.hinge === 'right';
@@ -146,7 +231,8 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber , 
     const lockEdgeX = lockRight ? l.x + l.w : l.x;
     const inDir = lockRight ? -1 : 1;
     const backset = l.role === 'passive' && kit === 'fgte' ? num(dr.hardware?.fgte?.slaveBackset, pp.backset) : pp.backset;
-    const sideX = (right, k) => (right ? X(l.x + l.w) + (40 + 36 * k) * ts : ox - (56 + 36 * k) * ts);
+    // column c on one side of this leaf
+    const colX = (right, c) => (right ? X(l.x + l.w) + (RIGHT0 + COL * c) * ts : ox - (LEFT0 + COL * c) * ts);
     // chains: stile · bars · stile along the bottom; rails · bars · mid rail · panel on the left
     const bc = barCuts(l.bars);
     const hCuts = [l.x, l.x + l.stileL, ...bc.v.flat(), l.x + l.w - l.stileR, l.x + l.w];
@@ -165,24 +251,51 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber , 
       if (l.meetingSide === side) return 'meeting';
       return (side === 'L') === (l.hinge === 'left') ? 'hinge' : 'lock';
     };
-    const stileLabel = (rec, cx, side) => (
-      <text x={cx + codeFs * 0.35} y={Y(l.y + l.h * 0.27)} fill={COLORS.label} fontSize={codeFs}
-        fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
-        transform={`rotate(-90, ${cx + codeFs * 0.35}, ${Y(l.y + l.h * 0.27)})`}>
-        {rec ? recordText(rec, stileNote(side)) : ''}
-      </text>
-    );
+    // Stile labels along the stile, centred on the longest glass / panel zone
+    // between the rails (clear of the rail labels); a label longer than that
+    // zone drops its section, then its note.
+    const zones = l.midRail
+      ? [[l.y + m.top, l.midRail.y], [l.midRail.y + l.midRail.face, l.y + l.h - m.bottom]]
+      : [[l.y + m.top, l.y + l.h - m.bottom]];
+    const zone = zones.reduce((a, z) => (z[1] - z[0] > a[1] - a[0] ? z : a), zones[0]);
+    // keep clear of the handle symbol: the part of the zone above it, else below it, else the zone
+    const hY = it.handle ? num(l.handleY) : null;
+    const clear = 14 * ts;
+    const spans = (hY != null ? [[zone[0], Math.min(zone[1], hY - clear)], [Math.max(zone[0], hY + clear), zone[1]]] : [])
+      .concat([zone]).filter(([a, b]) => b > a);
+    const stilePlace = (rec, note) => {
+      if (!rec) return { text: '', y: Y((zone[0] + zone[1]) / 2) };
+      const variants = [recordText(rec, note), recordText({ ...rec, section: '' }, note), recordText({ ...rec, section: '' })];
+      for (const t of variants) {
+        const span = spans.find(([a, b]) => t.length * CHAR * codeFs <= 0.95 * (b - a));
+        if (span) return { text: t, y: Y((span[0] + span[1]) / 2) };
+      }
+      return { text: variants[variants.length - 1], y: Y((zone[0] + zone[1]) / 2) };
+    };
+    const stileLabel = (rec, cx, side) => {
+      const { text, y } = stilePlace(rec, stileNote(side));
+      return (
+        <text x={cx + codeFs * 0.35} y={y} fill={COLORS.label} fontSize={codeFs}
+          fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
+          transform={`rotate(-90, ${cx + codeFs * 0.35}, ${y})`}>
+          {text}
+        </text>
+      );
+    };
     const railLabel = (rec, yc) => (
       <text x={X(l.x + l.w / 2)} y={Y(yc) + codeFs * 0.35} fill={COLORS.label} fontSize={codeFs}
         fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>
         {rec ? recordText(rec) : ''}
       </text>
     );
-    const hwText = l.role === 'single'
-      ? 'handle · multipoint lock (ThunderBolt)'
-      : kit === 'fgte'
-        ? (l.role === 'active' ? 'handle · FGTE master' : 'handle · FGTE slave, shootbolts in the kit')
-        : (l.role === 'active' ? 'handle · ThunderBolt kit' : 'bolts top and bottom');
+    const sizes = [
+      unit && day ? sizeText('g', `glass ${fmtGlass(unit.w)} × ${fmtGlass(unit.h)}`, day, day.y + day.h * 0.3) : null,
+      pnl?.daylight ? sizeText('p', `panel ${fmtGlass(pnl.w)} × ${fmtGlass(pnl.h)}`, pnl.daylight, pnl.daylight.y + pnl.daylight.h / 2) : null,
+    ].filter(Boolean);
+    // BOLT labels just inside the rails, at the meeting stile
+    const boltTextX = X(l.meetingSide === 'R' ? l.x + l.w - l.stileR : l.x + l.stileL) + (l.meetingSide === 'R' ? -4 : 4) * ts;
+    const boltTextY = [Y(l.y + m.top) + codeFs * 1.3, Y(l.y + l.h - m.bottom) - codeFs * 0.5];
+    const captions = captionLines(dr, l, kit);
     return (
       <g key={`leaf${idx}`}>
         {/* Outer leaf, sealed unit edge (dashed), daylight */}
@@ -195,7 +308,7 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber , 
           <rect x={X(day.x)} y={Y(day.y)} width={day.w} height={day.h} fill={COLORS.glass} fillOpacity={0.06}
             stroke={C.outer} strokeWidth={STROKES.outer} {...NS} />
         )}
-        {/* Panel below the mid rail, in the same rebate as the glass */}
+        {/* Panel below the mid rail: its outer edge (dashed) sits panel.inset deep in the glazing rebate */}
         {pnl && pnl.w > 0 && (
           <>
             <rect x={X(pnl.x)} y={Y(pnl.y)} width={pnl.w} height={pnl.h} fill="none"
@@ -217,12 +330,11 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber , 
         )}
         {it.bolts && boltX != null && (
           <g>
-            {[[Y(l.y), 1], [Y(l.y + l.h), -1]].map(([yy, dir], k) => (
-              <g key={`bo${k}`}>
+            {[[Y(l.y), 1], [Y(l.y + l.h), -1]].map(([yy, dir], kk) => (
+              <g key={`bo${kk}`}>
                 <rect x={X(boltX) - 1.5 * ts} y={dir > 0 ? yy : yy - 28 * ts} width={3 * ts} height={28 * ts}
                   fill="none" stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} />
-                <text x={X(l.meetingSide === 'R' ? l.x + l.w - l.stileR : l.x + l.stileL) + (l.meetingSide === 'R' ? -4 : 4) * ts}
-                  y={dir > 0 ? yy + 40 * ts : yy - 34 * ts}
+                <text x={boltTextX} y={boltTextY[kk]}
                   fill={COLORS.label} fontSize={codeFs} fontFamily={FONT_FAMILY}
                   textAnchor={l.meetingSide === 'R' ? 'end' : 'start'} fontWeight={WEIGHTS.label}>BOLT</text>
               </g>
@@ -237,57 +349,50 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber , 
         {railLabel(recs.bottom, l.y + l.h - m.bottom / 2)}
         {l.midRail && railLabel(recs.mid, l.midRail.y + l.midRail.face / 2)}
 
-        {/* Glass (the schedule unit) and panel sizes */}
-        {unit && day && (
-          <text x={X(day.x + day.w / 2)} y={Y(day.y + day.h * 0.3)} fill={COLORS.label} fontSize={codeFs}
-            fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>
-            {`glass ${fmtGlass(unit.w)} × ${fmtGlass(unit.h)}`}
-          </text>
-        )}
-        {pnl?.daylight && (
-          <text x={X(pnl.daylight.x + pnl.daylight.w / 2)} y={Y(pnl.daylight.y + pnl.daylight.h / 2) + codeFs * 0.35}
-            fill={COLORS.label} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>
-            {`panel ${fmtGlass(pnl.w)} × ${fmtGlass(pnl.h)}`}
-          </text>
-        )}
+        {/* Glass (the schedule unit) and panel (outer) sizes */}
+        {sizes.map((t) => (t.rot ? (
+          <text key={t.key} x={X(t.cx) + codeFs * 0.35} y={Y(t.y)} fill={COLORS.label} fontSize={codeFs}
+            fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
+            transform={`rotate(-90, ${X(t.cx) + codeFs * 0.35}, ${Y(t.y)})`}>{t.text}</text>
+        ) : (
+          <text key={t.key} x={X(t.cx)} y={Y(t.y) + (t.key === 'p' ? codeFs * 0.35 : 0)} fill={COLORS.label} fontSize={codeFs}
+            fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>{t.text}</text>
+        )))}
 
         {/* ── DIMENSIONS ── */}
         <DimH y={oy - 30 * ts} x1={X(l.x)} x2={X(l.x + l.w)} extFrom={Y(l.y)} label={fmt(l.w)} vbw={svgW} />
         <DimChainH y={oy + l.h + 24 * ts} cuts={hCuts.map(X)} extFrom={oy + l.h + 4 * ts} vbw={svgW} labels={hLabels} fmt={fmt} />
         <DimChainV x={ox - 24 * ts} cuts={vCuts.map(Y)} extFrom={ox - 4 * ts} vbw={svgW} labels={vLabels} fmt={fmt} />
-        {(l.hinges || []).map((hy, k) => (
-          <DimV key={`hd${k}`} x={sideX(hingeRight, 0)} y1={Y(l.y)} y2={Y(hy - pp.barrel / 2)}
-            extFrom={X(l.hingeEdgeX)} label={`H${k + 1} ${fmt(hy - pp.barrel / 2 - l.y)}`} small vbw={svgW} />
+        {/* hinge dims: one column each on the hinge side, the smaller text (box item 14) */}
+        {(l.hinges || []).map((hy, c) => (
+          <DimV key={`hd${c}`} x={colX(hingeRight, c)} y1={Y(l.y)} y2={Y(hy - pp.barrel / 2)}
+            extFrom={X(l.hingeEdgeX)} label={`H${c + 1} ${fmt(hy - pp.barrel / 2 - l.y)}`} textSize={HINGE_TEXT} vbw={svgW} />
         ))}
         {it.handle && num(l.handleY) != null && (
-          <DimV x={sideX(lockRight, 0)} y1={Y(l.handleY)} y2={Y(l.y + l.h)} extFrom={X(lockEdgeX)}
+          <DimV x={colX(lockRight, 0)} y1={Y(l.handleY)} y2={Y(l.y + l.h)} extFrom={X(lockEdgeX)}
             label={`handle ${fmt(l.y + l.h - l.handleY)}`} small vbw={svgW} />
         )}
+        {k === lastIdx && (
+          <DimV x={X(l.x + l.w) + overallOff * ts} y1={oy} y2={oy + leafH} extFrom={X(l.x + l.w)}
+            label={fmt(leafH)} vbw={svgW} />
+        )}
 
-        {/* Caption */}
-        <text x={X(l.x + l.w / 2)} y={capY0} fill={COLORS.subtitle} fontSize={codeFs}
-          fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>
-          {`${roleName(l.role).toUpperCase()}${l.role === 'single' ? '' : ' LEAF'} · hinge ${l.hinge}`}
-        </text>
-        <text x={X(l.x + l.w / 2)} y={capY0 + 18 * ts} fill={COLORS.subtitle} fontSize={codeFs}
-          fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>
-          {hwText}
-        </text>
+        {/* Caption: role, handing (seen from inside), hardware */}
+        {captions.map((t, c) => (
+          <text key={`cap${c}`} x={X(l.x + l.w / 2)} y={capY0 + 18 * c * ts} fill={COLORS.subtitle} fontSize={codeFs}
+            fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={c === 0 ? WEIGHTS.label : WEIGHTS.subtitle}>
+            {t}
+          </text>
+        ))}
       </g>
     );
   };
-
-  const last = placed[placed.length - 1];
 
   return (
     <div className="w-full">
       <svg viewBox={`0 0 ${svgW} ${svgH}`} xmlns="http://www.w3.org/2000/svg"
         className="w-full h-auto" style={{ background: COLORS.bg }}>
         {placed.map(renderLeaf)}
-
-        {/* Overall height on the right of the last leaf */}
-        <DimV x={last.X(last.l.x + last.l.w) + 80 * ts} y1={oy} y2={oy + leafH} extFrom={last.X(last.l.x + last.l.w)}
-          label={fmt(leafH)} vbw={svgW} />
 
         {meet && geom.plan && (
           <PlanDetail plan={geom.plan} dr={dr} win={meet} left={(svgW - meetSize.w) / 2} top={meetTop}

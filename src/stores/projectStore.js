@@ -116,6 +116,19 @@ const uid = () =>
         return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
       });
 
+// Batch type to its defaults (Piotr 09.10.2026, owner box item 15): batches
+// exist as 'doors' (the project page, the packs) and as 'door' (an estimate
+// moved to production, PSW): both take the doors defaults. The ONE mapping;
+// createBatch and the Batch Defaults page read it. A copy, so a batch never
+// shares the defaults object.
+export function batchDefaultsFor(type) {
+  return { ...(BATCH_DEFAULTS[batchTypeKey(type)] || BATCH_DEFAULTS.sash) };
+}
+/** The batch type as the defaults, the dashboard colours and filters know it ('door' reads as 'doors'; none as 'sash'). */
+export function batchTypeKey(type) {
+  return type === 'door' ? 'doors' : (type || 'sash');
+}
+
 export { BATCH_DEFAULTS, BATCH_STATUSES };
 
 export const useProjectStore = create((set, get) => ({
@@ -294,7 +307,7 @@ export const useProjectStore = create((set, get) => ({
       type: windowType,
       label: `Batch ${batchNum} — ${typeLabel}`,
       status: 'preparation',
-      defaults: { ...(BATCH_DEFAULTS[windowType] || BATCH_DEFAULTS.sash) },
+      defaults: batchDefaultsFor(windowType),
       windows: [],
       created_at: new Date().toISOString(),
     };

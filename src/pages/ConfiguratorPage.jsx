@@ -622,6 +622,12 @@ export default function ConfiguratorPage() {
   };
   const isFrench = isDoor && doorType === 'french';
   const doorLimits = DOOR_DIMS[doorType] || DOOR_DIMS['single-external'];
+  // Doors v3 (09.10.2026): W is the overall frame and the side panel zones sit
+  // inside it, so the PSW door width limits apply to the door field (W less
+  // the side zones); the height limits stay on H.
+  const doorSideW = (sidePanels === 'left' || sidePanels === 'both' ? Number(sideLeftW) || 0 : 0)
+    + (sidePanels === 'right' || sidePanels === 'both' ? Number(sideRightW) || 0 : 0);
+  const doorFieldW = extW - doorSideW;
 
   // Casement effective values — PSW clamps 1:1: fanlight 15–50% innerH step 10,
   // fan2 shares a 70% guard with fanlight, middle 300..(W-600) step 10.
@@ -1178,7 +1184,8 @@ export default function ConfiguratorPage() {
               <HChips o={DOOR_TYPES} v={doorType} c={applyDoorType} />
               <div className="text-[11px] text-ink-500 mt-1.5">
                 Width {doorLimits.wMin}–{doorLimits.wMax} · Height {doorLimits.hMin}–{doorLimits.hMax} mm
-                {(extW < doorLimits.wMin || extW > doorLimits.wMax || extH < doorLimits.hMin || extH > doorLimits.hMax) && (
+                {doorSideW > 0 && <span> · door width = W less the side panels = {doorFieldW} mm</span>}
+                {(doorFieldW < doorLimits.wMin || doorFieldW > doorLimits.wMax || extH < doorLimits.hMin || extH > doorLimits.hMax) && (
                   <span className="text-amber-400"> · current size is outside this range</span>
                 )}
               </div>
@@ -1198,6 +1205,7 @@ export default function ConfiguratorPage() {
             <Sec t="Side Panels">
               <HChips o={SIDE_PANEL_MODES} v={sidePanels} c={setSidePanels} />
               {sidePanels !== 'none' && <>
+                <div className="text-[11px] text-ink-500 mb-2">Inside the frame W: each width runs from the outer frame edge to the mullion axis (68 casement mullion between the panel and the door).</div>
                 {(sidePanels === 'left' || sidePanels === 'both') && <>
                   <Lbl>Left width (mm)</Lbl>
                   <NumInput value={sideLeftW} onCommit={(v) => setSideLeftW(Math.min(800, Math.max(200, Number(v) || 500)))}
@@ -1218,6 +1226,7 @@ export default function ConfiguratorPage() {
               <HChips o={TRANSOM_TYPES} v={transomType} c={setTransomType} />
               {transomType !== 'none' && <>
                 <Lbl>Transom height (mm)</Lbl>
+                <div className="text-[11px] text-ink-500 mb-1">Inside the frame H: from the frame top to the transom axis.</div>
                 <NumInput value={transomHeight} onCommit={(v) => setTransomHeight(Math.min(750, Math.max(250, Number(v) || 450)))}
                   className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm mb-2" />
                 <Lbl>Transom bars</Lbl><HChips o={TRANSOM_BARS} v={transomBars} c={setTransomBars} />
@@ -1229,7 +1238,10 @@ export default function ConfiguratorPage() {
               <div className="text-[11px] text-ink-500 mb-2">Seen from inside — the door opens towards your left / right{isFrench ? '; the active leaf sits on that side' : ''}.</div>
               <Lbl>Opening direction</Lbl><HChips o={OPEN_DIRECTIONS} v={openDirection} c={setOpenDirection} />
               <Lbl>Lock</Lbl><HChips o={LOCK_TYPES} v={lockType} c={setLockType} />
-              <Lbl>Threshold</Lbl><HChips o={THRESHOLDS} v={threshold} c={setThreshold} />
+              <Lbl>Threshold</Lbl><HChips o={THRESHOLDS} v={threshold} c={setThreshold} disabled={(x) => openDirection === 'inward' && x.value !== 'standard'} />
+              {openDirection === 'inward' && (
+                <div className="text-[11px] text-ink-500 mb-2">Inward door: timber threshold (the inward cill). Aluminium and low profile are for outward doors{threshold !== 'standard' ? '; the saved choice is ignored' : ''}.</div>
+              )}
               <Lbl>Threshold extension (mm)</Lbl>
               <NumInput value={thresholdExt} onCommit={(v) => setThresholdExt(Math.min(100, Math.max(0, Number(v) || 0)))}
                 className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />

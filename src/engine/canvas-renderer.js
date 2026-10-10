@@ -214,16 +214,24 @@ export function drawTechnicalElevation(canvas, windowSpec, settings = {}) {
         hCount: derived.config?.horizontalBars || 0, barW: C.GLAZING_BAR_WIDTH }).hBars.map((b) => b.cy)
     : null;
 
-  const drawBars = (baseY, glassH) => {
+  // Bars per sash (Piotr 09.10.2026, owner box item 16): each pane draws ITS
+  // sash's bars from derived.bars (the centres over that pane by the sheets' rule,
+  // or that sash's custom list), so "6 over 1" draws six panes above and one
+  // below, and every horizontal bar lands inside its own pane. A derived made
+  // before (no derived.bars) keeps the legacy single list above.
+  const perSash = derived.bars?.upper && derived.bars?.lower ? derived.bars : null;
+
+  const drawBars = (baseY, glassH, which) => {
     if (glassH <= 0) return;
-    if (bars?.vertical) {
-      bars.vertical.forEach((pos) => {
+    const own = perSash ? perSash[which].positions : bars;
+    if (own?.vertical) {
+      own.vertical.forEach((pos) => {
         const bx = glassX + pos * finalScale - BAR_W / 2;
         ctx.fillRect(bx, baseY, BAR_W, glassH);
         ctx.strokeRect(bx, baseY, BAR_W, glassH);
       });
     }
-    const horizontal = paneHBars ? paneHBars(glassH) : bars?.horizontal;
+    const horizontal = perSash ? own.horizontal : (paneHBars ? paneHBars(glassH) : bars?.horizontal);
     if (horizontal) {
       horizontal.forEach((pos) => {
         const by = baseY + pos * finalScale - BAR_W / 2;
@@ -234,8 +242,8 @@ export function drawTechnicalElevation(canvas, windowSpec, settings = {}) {
       });
     }
   };
-  drawBars(glassTopY, glassTopH);
-  drawBars(glassBotY, glassBotH);
+  drawBars(glassTopY, glassTopH, 'upper');
+  drawBars(glassBotY, glassBotH, 'lower');
 
   // 4. Horns (decorative extensions on stiles, when enabled)
   if (windowSpec.sash?.horns) {

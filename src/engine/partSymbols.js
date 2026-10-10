@@ -131,6 +131,13 @@ const ENGINE_NAME_MAP = {
   'd-frame cill':                { partId: 'd_frame_cill', symbol: 'CILL', name: 'Door Frame Cill', group: 'door', mirror: false },
   'd-frame cill (inward)':       { partId: 'd_frame_cill_inward', symbol: 'CILL-IN', name: 'Door Frame Cill (inward)', group: 'door', mirror: false },
   'd-coupling post':             { partId: 'd_coupling_post', symbol: 'CP', name: 'Door Coupling Post', group: 'door', mirror: false },
+  // Doors v3 (09.10.2026): the casement mullion between the door and a side
+  // panel (the casement symbol M), and the fixed fanlight leaf.
+  'd-mullion':                   { partId: 'd_mullion', symbol: 'M', name: 'Door Mullion', group: 'door', mirror: false },
+  'd-fix fan stile (l)':         { partId: 'd_fan_fixed_stile', symbol: 'FFS-L', name: 'Fixed Fan Stile Left', group: 'door', mirror: true },
+  'd-fix fan stile (r)':         { partId: 'd_fan_fixed_stile', symbol: 'FFS-R', name: 'Fixed Fan Stile Right', group: 'door', mirror: true },
+  'd-fix fan top rail':          { partId: 'd_fan_fixed_top_rail', symbol: 'FFTR', name: 'Fixed Fan Top Rail', group: 'door', mirror: false },
+  'd-fix fan bottom rail':       { partId: 'd_fan_fixed_bottom_rail', symbol: 'FFBR', name: 'Fixed Fan Bottom Rail', group: 'door', mirror: false },
   'd-transom':                   { partId: 'd_transom_rail', symbol: 'T', name: 'Door Transom Rail', group: 'door', mirror: false },
   'd-stile (l)':                 { partId: 'd_leaf_stile', symbol: 'ST-L', name: 'Door Leaf Stile Left', group: 'door', mirror: true },
   'd-stile (r)':                 { partId: 'd_leaf_stile', symbol: 'ST-R', name: 'Door Leaf Stile Right', group: 'door', mirror: true },

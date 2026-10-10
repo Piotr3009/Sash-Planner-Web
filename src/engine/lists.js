@@ -6,7 +6,7 @@
  * `bom.js` (`mergeWindowMaterials`) merges many windows into one list.
  */
 
-import { CONSTANTS, deriveWindowData } from './calculations.js';
+import { CONSTANTS, deriveWindowData, sashBarPattern } from './calculations.js';
 import { CASEMENT_HINGE_SLOTS, CASEMENT_LOCK_SLOTS, hingeWedgeMm, childRestrictorCounts } from './casementHardware.js';
 import { GLASS_MAKEUP, glassGas, glassMakeupFor } from './specification.js';
 import { profileRawForSection, getWindowProfile, getCasementProfile } from './profile.js';
@@ -435,8 +435,10 @@ export function buildGlassListForWindow(derived, windowSpec) {
     upperFinish = frostedLoc === 'both' ? 'frosted' : 'clear';
   }
 
-  // Bar pattern info for reference
-  const gridMode = windowSpec?.sash?.grid?.mode || 'none';
+  // Bar pattern of EACH sash (Piotr 09.10.2026, owner box item 16): the glass
+  // PDF table, its sketch and the glass DXF read row.bars, so they follow.
+  const barsUpper = sashBarPattern(windowSpec, 'upper');
+  const barsLower = sashBarPattern(windowSpec, 'lower');
 
   return [
     {
@@ -453,7 +455,7 @@ export function buildGlassListForWindow(derived, windowSpec) {
       makeup,
       coating,
       gas,
-      bars: gridMode,
+      bars: barsUpper,
     },
     {
       label: 'Lower Glass',
@@ -469,7 +471,7 @@ export function buildGlassListForWindow(derived, windowSpec) {
       makeup,
       coating,
       gas,
-      bars: gridMode,
+      bars: barsLower,
     },
   ];
 }
@@ -562,10 +564,11 @@ export function buildHardwareList(windowSpec, derived = null) {
     // leaf weight for the hinges); the window's slot product shows as the line
     // name (HARDWARE_TO_SLOT_KEY). The opening fanlight adds the casement hinge
     // and lock lines and a casement handle (a client product), as a casement
-    // opener does. No trickle vent line (not counted on doors, BLOCKERS).
+    // opener does; a fixed fanlight adds nothing. Trickle vents (doors v3,
+    // 09.10.2026): the window rule by room type, the trickleVents slot.
     const dh = derived?.door?.hardware;
     if (!dh) return [];
-    const list = (dh.detail || []).map((l) => ({ item: l.item, detail: l.detail, quantity: l.quantity, enginePart: true, partId: l.partId }));
+    const list = (dh.detail || []).map((l) => ({ item: l.item, detail: l.detail, quantity: l.quantity, enginePart: true, partId: l.partId, ...(l.unit ? { unit: l.unit } : {}) }));
     const fan = dh.fan;
     if (fan) {
       const slotName = (id) => CASEMENT_HINGE_SLOTS.find((x) => x.id === id)?.name || id;
@@ -578,6 +581,10 @@ export function buildHardwareList(windowSpec, derived = null) {
       });
       const fanOpeners = Object.values(fan.hingeSummary || {}).reduce((a, e) => a + e.pairs, 0);
       if (fanOpeners > 0) list.push({ item: 'Casement handle', detail: 'per opening fanlight', quantity: fanOpeners });
+    }
+    const doorVents = buildVentGrilles(windowSpec);
+    if (doorVents > 0) {
+      list.push({ item: 'Trickle vents', detail: 'from Ventilation section', quantity: doorVents });
     }
     return list;
   }
@@ -647,6 +654,8 @@ export const MIRROR_PAIRS = {
   'D-STILE (L)':              { right: 'D-STILE (R)',              symbol: 'ST-L/R',  label: 'Door Leaf Stiles (pair)' },
   // Opening fanlight leaf (08.10.2026): a casement leaf in the transom zone
   'D-FAN STILE (L)':          { right: 'D-FAN STILE (R)',          symbol: 'FS-L/R',  label: 'Fan Leaf Stiles (pair)' },
+  // Fixed fanlight leaf (doors v3, 09.10.2026): a non-opening casement leaf
+  'D-FIX FAN STILE (L)':      { right: 'D-FIX FAN STILE (R)',      symbol: 'FFS-L/R', label: 'Fixed Fan Stiles (pair)' },
 };
 
 /**
@@ -701,6 +710,9 @@ export const CUT_LIST_ORDER = [
   { match: 'D-FRAME CILL',              symbol: 'CILL',  label: 'Door Frame Cill' },
   { match: 'D-FRAME CILL (INWARD)',     symbol: 'CILL-IN', label: 'Door Frame Cill (inward)' },
   { match: 'D-COUPLING POST',           symbol: 'CP',    label: 'Door Coupling Post' },
+  // Doors v3 (09.10.2026): the casement mullion between the door and a side
+  // panel (full height) and the transom cut in segments between them.
+  { match: 'D-MULLION',                 symbol: 'M',     label: 'Door Mullion' },
   { match: 'D-TRANSOM',                 symbol: 'T',     label: 'Door Transom Rail' },
   { match: 'D-STILE (L)',               symbol: 'ST-L/R', label: 'Door Leaf Stiles (pair)',   isPair: true },
   { match: 'D-MEETING STILE',           symbol: 'MS',    label: 'Door Meeting Stile' },
@@ -713,6 +725,9 @@ export const CUT_LIST_ORDER = [
   { match: 'D-FAN STILE (L)',           symbol: 'FS-L/R', label: 'Fan Leaf Stiles (pair)',    isPair: true },
   { match: 'D-FAN TOP RAIL',            symbol: 'FTR',   label: 'Fan Leaf Top Rail' },
   { match: 'D-FAN BOTTOM RAIL',         symbol: 'FBR',   label: 'Fan Leaf Bottom Rail' },
+  { match: 'D-FIX FAN STILE (L)',       symbol: 'FFS-L/R', label: 'Fixed Fan Stiles (pair)',  isPair: true },
+  { match: 'D-FIX FAN TOP RAIL',        symbol: 'FFTR',  label: 'Fixed Fan Top Rail' },
+  { match: 'D-FIX FAN BOTTOM RAIL',     symbol: 'FFBR',  label: 'Fixed Fan Bottom Rail' },
 ];
 
 /**

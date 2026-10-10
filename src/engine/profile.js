@@ -607,22 +607,37 @@ export function casementGlassDeductions(profile = getCasementProfile()) {
   return { width, height: Math.round(((top - inset) + (bottom - inset)) * 10) / 10 };
 }
 
-// ─── DOOR PROFILE v2 (Piotr 08.10.2026, doors to production) ────────────────
+// ─── DOOR PROFILE v3 (Piotr 09.10.2026, doors v3: casement rules inside the door frame) ──
 // The door FRAME is the casement frame: face 68, depth 93, land 47, rebate 21,
-// gap 4, cill 68 x 93 with 41 visible (owner box item 1). Inward doors keep
-// the unrebated 40 -> 35 cill (item 2); aluminium and low-profile thresholds
-// have no timber cill at all (item 3). The LEAF is 57 deep (61 with a triple
-// unit, as casement): stiles 94, top rail 94, bottom rail 180, mid rail 94,
-// french meeting stile 100 = 94 + the 6 lip (item 4).
-//   single leaf W = W - 2 x leafAtJamb (51)                         (item 5)
-//   french half  = (W - 2 x leafAtJamb - frenchClearance) / 2, leaf = half + frenchLip
-//   leaf H       = H - leafFullHeight (98 = 47 + 4 + 6 + 41) with a timber cill,
-//                  in both opening directions; H - leafNoThreshold (57) without (item 6)
-// Schema 1 (04.08 to 07.10.2026) carried the 28mm-unit numbers: leaf 61,
-// rebate 25, land 43, leafAtJamb 47, leafFullHeight 94, leafNoThreshold 53 and
-// frenchOverlap 6. migrateDoorProfile moves a stored copy key by key.
+// gap 4, cill 68 x 93 with 41 visible. Since schema 3 it is ONE frame with the
+// casement rules inside it (owner box items 1 to 7, 09.10.2026):
+//   - frame W x H = the OVERALL frame (side panels and fanlight inside it);
+//   - between the door and a side panel stands a casement MULLION 68 x 93,
+//     full height through the transom, the leaf 17 from its axis (13 + 4);
+//     side panel zone = sideLeftWidth / sideRightWidth from the outer frame
+//     edge to the mullion axis (ASSUMPTION, owner check);
+//   - the fanlight TRANSOM is the casement transom: axis at transom.height T
+//     from the frame top (ASSUMPTION, owner check), land 8 above / 13 below,
+//     fan leaf T - 65 (51 + 6 + 8), leaf below it 17 from the axis (13 + 4),
+//     the rail cut in segments between the jambs and mullions (seat 8.5);
+//   - every leaf stands leafAtFloor 51 above the floor line, whatever the
+//     threshold and the direction: leaf H = H - 51 - 51, under a transom
+//     H - T - 17 - 51;
+//   - side panel = a casement fixed light (non-opening leaf) 64 / 64 / 180 x 57,
+//     glass by the casement rule; fixed fanlight = a non-opening casement leaf
+//     64 / 64 / 67 (bottom 67 ASSUMPTION, owner check);
+//   - panel edge sits 17 deep in the 18 glazing rebate (panel = daylight + 2 x 17).
+// The LEAF is 57 deep (61 with a triple unit, as casement): stiles 94, top rail
+// 94, bottom rail 180, mid rail 94, french meeting stile 100 = 94 + the 6 lip.
+//   single leaf W = zone - edge L - edge R (51 at a jamb, 17 at a mullion axis)
+//   french half  = (zone - edges - frenchClearance) / 2, leaf = half + frenchLip
+// The casement formulas themselves are in casementRules.js (shared).
+// Schema 2 (08.10.2026): coupling post 136, side panel members 57, fanlight
+// 51 at the head and the rail, leaf H - 98 / H - 57; schema 1 (04.08 to
+// 07.10.2026) the 28mm-unit numbers. migrateDoorProfile moves a stored copy
+// key by key.
 export const DEFAULT_DOOR_PROFILE = Object.freeze({
-  schema: 2,
+  schema: 3,
   frameDepth: 93,
   leafDepth: 57,          // as casement leafDepth (24mm unit)
   leafDepthTriple: 61,    // as casement leafDepthTriple: the 28mm triple unit needs a deeper leaf rebate
@@ -630,8 +645,8 @@ export const DEFAULT_DOOR_PROFILE = Object.freeze({
     frameHead:   { face: 68 },   // as casement frameHead
     frameJamb:   { face: 68 },   // as casement frameJamb
     frameCill:   { face: 68 },   // outward: the casement cill, 68 x 93, 41 visible
-    mullion:     { face: 68 },   // kept for stored copies: a french door has no centre mullion
-    transomRail: { face: 68 },   // fanlight transom rail, cut totalWidth - 2 x 68
+    mullion:     { face: 68 },   // as casement: between the door and a side panel, full height (a french door has no centre mullion)
+    transomRail: { face: 68 },   // as casement transom: the fanlight rail, cut in segments between jambs and mullions
     leafStile:   { face: 94 },
     leafTop:     { face: 94 },
     leafBottom:  { face: 180 },  // deliberately taller: door stiffness
@@ -639,48 +654,63 @@ export const DEFAULT_DOOR_PROFILE = Object.freeze({
     leafMeeting: { face: 100 },  // french meeting stile = 94 + frenchLip 6
   },
   // Inward-opening doors cannot have a rebated cill (the leaf must swing in):
-  // the internal face is 40mm and falls to 35mm across the leaf depth.
+  // the internal face is 40mm and falls to 35mm across the leaf depth. An
+  // inward door ALWAYS takes this timber cill: a stored aluminium or
+  // low-profile threshold is ignored on it (ASSUMPTION, owner check).
   cillInward: { faceInternal: 40, faceExternal: 35, runDepth: 57 },
   // French doors never have a centre mullion (Piotr 09.08): each leaf runs
-  // frenchLip past the centre line on its meeting stile (owner box item 5).
+  // frenchLip past the centre line on its meeting stile.
   frenchLip: 6,
   // frenchClearance: 0,   // centre clearance between the two halves: owner, later (after tests). Leave unset;
-  //                       // the engine honours it when a workshop sets it: half = (W - 102 - clearance) / 2.
-  // Side panels are FIXED leaves in the same frame, all members 57 (unchanged, BLOCKERS).
-  sidePanel: { member: 57, depth: 57 },
-  // Coupling post between a side panel and the door: ONE member 2 x jamb face
-  // = 136 wide with TWO rebates (Piotr 09.08).
+  //                       // the engine honours it when a workshop sets it: half = (zone - edges - clearance) / 2.
+  // Side panel (schema 3): a casement FIXED light behind the mullion, a
+  // non-opening leaf with stiles and top rail 64 and the bottom rail of the
+  // door (180), so its line meets the door bottom rail; depth 57.
+  sidePanel: { stile: 64, top: 64, bottom: 180, depth: 57 },
+  // Fixed fanlight (schema 3): a non-opening casement leaf of the same size as
+  // the opening fan leaf would be; bottom rail 67 as the casement fixed light
+  // (ASSUMPTION, owner check).
+  fixedFan: { stile: 64, top: 64, bottom: 67 },
+  // Schema 2 coupling post (2 x jamb face, two rebates): kept for stored
+  // copies only, NOT read by the engine since schema 3 (the mullion replaced it).
   couplingPost: { width: 136 },
-  // Panel of the half-glazed and three-quarter styles (owner box item 10): two
-  // Tricoya MDF boards and an MDF core, in the same 11.5 rebate as the glass.
-  // coreThickness 18 and densityKgM3 (leaf weight, information only) are
-  // FLAGGED defaults (BLOCKERS).
-  panel: { boardThickness: 18, boards: 2, coreThickness: 18, densityKgM3: 750 },
+  // Panel of the half-glazed and three-quarter styles: two Tricoya MDF boards
+  // and an MDF core (54). The edge is machined down to a tongue that sits in
+  // the leaf glazing rebate (18 deep) `inset` 17 in: panel = daylight + 2 x 17
+  // (the glass sits 11.5 in). edge = the drawing profile: a tongue 24 thick, a
+  // slope 40 wide up to the full 54, a flat 15 next to the bead (ASSUMPTION,
+  // owner check). coreThickness 18 and densityKgM3 (leaf weight, information
+  // only) are FLAGGED defaults. BOM: both boards and the core at the full
+  // panel outer size (ASSUMPTION, owner check).
+  panel: { boardThickness: 18, boards: 2, coreThickness: 18, densityKgM3: 750, inset: 17, edge: { tongue: 24, slope: 40, flat: 15 } },
   geometry: {
     land: 47,             // as casement: frame land 68 - 21
     rebate: 21,           // as casement
-    gap: 4,               // as casement: leaf fitting gap at jambs and head
-    mullionLand: 26,      // as casement (kept for stored copies)
-    gapCill: 6,           // as casement
+    gap: 4,               // as casement: leaf fitting gap at jambs, mullions and head
+    mullionLand: 26,      // as casement: mullion visible land (13 + 13)
+    transomLandAbove: 8,  // as casement: transom land above the axis
+    transomLandBelow: 13, // as casement: transom land below the axis
+    gapFanTransom: 6,     // as casement: fan bottom rail to the transom land
+    gapBelowTransom: 4,   // as casement: transom land to the leaf below
+    gapCill: 6,           // as casement (window cill; a door leaf stands leafAtFloor above the floor)
     cillVisible: 41,      // as casement: cill front seen from outside
-    glassInset: 11.5,     // as casement: glass (and panel) enters the leaf rebate this deep, per side
-    glazingRebate: 18,    // as casement: the leaf glazing rebate (11.5 glass + 6.5 clips)
+    glassInset: 11.5,     // as casement: glass enters the leaf rebate this deep, per side
+    glazingRebate: 18,    // as casement: the leaf glazing rebate (11.5 glass + 6.5 clips; the panel tongue 17)
   },
   deductions: {
     leafAtJamb: 51,          // land 47 + gap 4
-    leafAtMullionAxis: 17,   // as casement (kept for stored copies)
-    leafFullHeight: 98,      // leafAtJamb 51 + gapCill 6 + cillVisible 41, outward AND inward
-    leafNoThreshold: 57,     // leafAtJamb 51 + gapCill 6 (aluminium / low-profile threshold)
-    // Opening fanlight (owner box item 11): a casement leaf in the transom
-    // zone, W_frame - 2 x leafAtJamb wide, transomH - fanAtHead - fanAtRail
-    // high (51 at the head, 51 at the rail: the rail is rebated like the head).
-    // FLAGGED: the rail lap is the owner's drawing check (BLOCKERS).
-    fanAtHead: 51,
-    fanAtRail: 51,
+    leafAtMullionAxis: 17,   // as casement: half mullion land 13 + gap 4
+    leafAtFloor: 51,         // every leaf bottom stands 51 above the floor line (threshold and accessories), any threshold, any direction
+    fanFromAxis: 65,         // as casement: fan leaf H = T - 65 (51 + 6 + 8)
+    leafBelowAxis: 17,       // as casement: the leaf below the transom starts 17 below the axis (13 + 4)
+    // Not read by the engine since schema 3 (kept for stored copies, shown
+    // read-only): the derived values leafAtJamb + leafAtFloor.
+    leafFullHeight: 102,
+    leafNoThreshold: 102,
   },
-  // Hinges per door leaf (owner box item 12) and their centres from the leaf
-  // top (the sheets' rule since 05.08.2026): 200 below the top, 100 above the
-  // centre, 150 above the bottom; the 4th halfway between top and middle.
+  // Hinges per door leaf and their centres from the leaf top (the sheets' rule
+  // since 05.08.2026): 200 below the top, 100 above the centre, 150 above the
+  // bottom; the 4th halfway between top and middle.
   hinges: { perLeaf: 3, perLeafTall: 4, tallAbove: 2100, fromTop: 200, aboveCentre: 100, fromBottom: 150, barrel: 102 },
   // Variant attributes the buyer selects on the BJ Waller page (owner links
   // 08.10.2026). Every value is a FLAGGED default (BLOCKERS 5.5).
@@ -704,10 +734,9 @@ export const DEFAULT_DOOR_PROFILE = Object.freeze({
     bottomRailDeduct: 0,
     midRailDeduct: 0,
     meetingStileDeduct: 0,
-    mullion: 77,
-    // Transom rail runs between the jambs: default deduct = 2 x jamb face (2 x 68 = 136).
-    transomDeduct: 136,
-    // Side-panel members follow the door-leaf convention: full outer lengths.
+    mullion: 77,          // as casement: D-M = H - 77 with a timber cill; without one the mullion runs to the floor: H - (77 - cillVisible 41)
+    transomSeat: 8.5,     // as casement: a transom segment = the leaf width of its field + 8.5
+    // Side panel light and fixed fan members: full outer lengths (the leaf convention).
     sideStileDeduct: 0,
     sideRailDeduct: 0,
   },
@@ -722,32 +751,60 @@ const DOOR_SCHEMA_1 = {
   deductions: { leafAtJamb: 47, leafFullHeight: 94, leafNoThreshold: 53 },
   cillInward: { runDepth: 61 },
 };
+// Old defaults of door schema 2 (08.10.2026) that schema 3 moves: the leaf
+// height deductions become the derived 102 (51 at the head + 51 at the floor,
+// not read by the engine any more). The new schema-3 keys (leafAtFloor,
+// fanFromAxis, leafBelowAxis, the transom geometry, transomSeat, panel.inset /
+// edge, sidePanel stile / top / bottom, fixedFan) do not exist in a schema-2
+// copy and take the defaults. Keys no longer read (couplingPost, fanAtHead,
+// fanAtRail, transomDeduct, sidePanel.member) stay in the object as stored.
+const DOOR_SCHEMA_2 = {
+  deductions: { leafFullHeight: 98, leafNoThreshold: 57 },
+};
 
 /**
  * Door profile schema migration (casement style). Stored copies (Window
- * Settings, windowProfiles.door; batch _profileSnapshot.door) below schema 2
- * move key by key: a value equal to the schema-1 default takes the schema-2
- * default, a hand-edited one is kept. frenchOverlap (schema 1, the rebate of
- * each meeting stile) is read as frenchLip when no frenchLip is stored;
- * transom.rail as elements.transomRail. Missing keys come from the default.
+ * Settings, windowProfiles.door; batch _profileSnapshot.door) move schema by
+ * schema, key by key: a value equal to the old schema's default takes the new
+ * default, a hand-edited one is kept. Schema 1 to 2: frenchOverlap (the rebate
+ * of each meeting stile) is read as frenchLip when no frenchLip is stored;
+ * transom.rail as elements.transomRail. Schema 2 to 3: see DOOR_SCHEMA_2.
+ * Missing keys come from the default.
  */
 export function migrateDoorProfile(profile) {
   if (!profile) return null;
   const D = DEFAULT_DOOR_PROFILE;
-  const old = (Number(profile.schema) || 1) < D.schema;
-  const pick = (stored, oldDefault, def) => (old && stored === oldDefault ? def : stored ?? def);
+  const schema = Number(profile.schema) || 1;
+  const below2 = schema < 2;
+  const below3 = schema < 3;
+  // A key moved by more than one schema step: the stored value is compared
+  // with each old default in turn (1 -> 2 -> 3), so a schema-1 default walks
+  // all the way, a value hand-edited on any schema stays.
+  const walk = (stored, olds, def) => {
+    let v = stored;
+    for (const [isOld, oldDefault, next] of olds) if (isOld && v === oldDefault) v = next;
+    return v ?? def;
+  };
+  const pick = (stored, oldDefault, def) => walk(stored, [[below2, oldDefault, def]], def);
   const elements = Object.fromEntries(Object.keys(D.elements).map((k) => [k, { ...D.elements[k], ...(profile.elements?.[k] || {}) }]));
   for (const k of Object.keys(profile.elements || {})) if (!elements[k]) elements[k] = { ...profile.elements[k] };
   if (!profile.elements?.transomRail && profile.transom?.rail != null) elements.transomRail = { face: Number(profile.transom.rail) };
   const geometry = { ...D.geometry, ...(profile.geometry || {}) };
   for (const k of Object.keys(DOOR_SCHEMA_1.geometry)) geometry[k] = pick(profile.geometry?.[k], DOOR_SCHEMA_1.geometry[k], D.geometry[k]);
   const deductions = { ...D.deductions, ...(profile.deductions || {}) };
-  for (const k of Object.keys(DOOR_SCHEMA_1.deductions)) deductions[k] = pick(profile.deductions?.[k], DOOR_SCHEMA_1.deductions[k], D.deductions[k]);
+  deductions.leafAtJamb = pick(profile.deductions?.leafAtJamb, DOOR_SCHEMA_1.deductions.leafAtJamb, D.deductions.leafAtJamb);
+  for (const k of Object.keys(DOOR_SCHEMA_2.deductions)) {
+    deductions[k] = walk(profile.deductions?.[k], [
+      [below2, DOOR_SCHEMA_1.deductions[k], DOOR_SCHEMA_2.deductions[k]],
+      [below3, DOOR_SCHEMA_2.deductions[k], D.deductions[k]],
+    ], D.deductions[k]);
+  }
   const cillInward = { ...D.cillInward, ...(profile.cillInward || {}) };
   cillInward.runDepth = pick(profile.cillInward?.runDepth, DOOR_SCHEMA_1.cillInward.runDepth, D.cillInward.runDepth);
   const frenchLip = profile.frenchLip ?? (profile.frenchOverlap != null ? Number(profile.frenchOverlap) : D.frenchLip);
   const { frenchOverlap, transom, ...rest } = profile;
   void frenchOverlap; void transom;
+  const storedPanel = profile.panel || {};
   return {
     ...D, ...rest,
     schema: D.schema,
@@ -757,8 +814,9 @@ export function migrateDoorProfile(profile) {
     cillInward,
     frenchLip,
     sidePanel: { ...D.sidePanel, ...(profile.sidePanel || {}) },
+    fixedFan: { ...D.fixedFan, ...(profile.fixedFan || {}) },
     couplingPost: { ...D.couplingPost, ...(profile.couplingPost || {}) },
-    panel: { ...D.panel, ...(profile.panel || {}) },
+    panel: { ...D.panel, ...storedPanel, edge: { ...D.panel.edge, ...(storedPanel.edge || {}) } },
     geometry,
     deductions,
     hinges: { ...D.hinges, ...(profile.hinges || {}) },

@@ -16,7 +16,8 @@ import { useMaterialStore } from '../stores/materialStore.js';
 import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
 import { mergeWindowMaterials, formatQty, makeRawResolver, assignedMaterialForItems } from '../engine/bom.js';
 import { summarizeWindows } from '../utils/batchSummary.js';
-import { parseSpecification, normaliseToWindowSpec, SASH_PROPORTION_LABELS, isCottageProportion } from '../engine/specification.js';
+import { SASH_PROPORTION_LABELS, isCottageProportion } from '../engine/specification.js';
+import { deriveWindowBounded, splitBounded, excludedWindowsNote, sashBarsLabel } from '../utils/windowBoundary.js';
 import { deriveWindowData } from '../engine/calculations.js';
 import { withProfiles, getCasementProfile, bsuiteActiveTarget } from '../engine/profile.js';
 import {
@@ -235,21 +236,20 @@ export default function ProductionPackPage() {
     return [];
   }, [pp, batch, projects, projectId, batchId, project]);
 
-  // Compute per-window data
-  const windowsData = useMemo(() => {
-    if (!sourceWindows.length) return [];
-    return sourceWindows.map((win) => {
-      const spec = parseSpecification(win.specification);
-      const windowSpec = normaliseToWindowSpec(win, spec);
+  // Compute per-window data, each window inside its own boundary (owner box
+  // item 19): a window the engine refuses (unknown sash proportion or bar
+  // pattern, an arch it cannot build) is left out of every list, sheet and PDF
+  // of the pack, the header counts it and the note under it names it with its
+  // message; every other window renders.
+  const { windowsData, excludedWindows } = useMemo(() => {
+    if (!sourceWindows.length) return { windowsData: [], excludedWindows: [] };
+    const rows = sourceWindows.map((win) => {
       const b = win._batch || batch;
-      let derived = null;
-      try {
-        derived = withProfiles(b?.defaults?._profileSnapshot?.sash, b?.defaults?._profileSnapshot?.casement, b?.defaults?._profileSnapshot?.door, () => deriveWindowData(windowSpec, settings));
-      } catch (e) {
-        console.warn(`Calc failed for ${win.name}:`, e);
-      }
-      return { win, spec, windowSpec, derived };
+      const { spec, windowSpec, derived, error } = deriveWindowBounded(win, (ws) => withProfiles(b?.defaults?._profileSnapshot?.sash, b?.defaults?._profileSnapshot?.casement, b?.defaults?._profileSnapshot?.door, () => deriveWindowData(ws, settings)));
+      return { win, spec, windowSpec, derived, error };
     });
+    const { ok, excluded } = splitBounded(rows);
+    return { windowsData: ok.map(({ win, spec, windowSpec, derived }) => ({ win, spec, windowSpec, derived })), excludedWindows: excluded };
   }, [sourceWindows, settings]);
 
   // Merged lists
@@ -435,6 +435,9 @@ export default function ProductionPackPage() {
               <div className="flex items-center gap-3 mt-0.5">
                 <p className="text-xs text-ink-400">
                   {headerSub}
+                  {excludedWindows.length > 0 && (
+                    <span className="text-red-400" data-excluded-count={excludedWindows.length}> · {excludedWindows.length} excluded</span>
+                  )}
                 </p>
                 {isPPMode && (
                   <select
@@ -627,6 +630,18 @@ export default function ProductionPackPage() {
         </div>
       )}
 
+      {/* Windows the engine refused (owner box item 19): named with their message, left out of the pack */}
+      {excludedWindows.length > 0 && (
+        <div className="border-b border-red-500/30 bg-red-500/10 px-6 py-2">
+          <div className="max-w-[1400px] mx-auto text-xs">
+            <div className="font-semibold text-red-400" data-excluded-note>{excludedWindowsNote(excludedWindows)}</div>
+            {excludedWindows.map(({ win, error }) => (
+              <div key={win.id} className="text-ink-300 mt-0.5" data-window-error={win.id}>{win.name || '?'}: {error.message}</div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <nav className="border-b border-surface-500 bg-surface-900/80 px-6 overflow-x-auto">
         <div className="max-w-[1400px] mx-auto flex gap-0.5">
@@ -671,7 +686,9 @@ function winBarsLabel(wd) {
     const uniq = [...new Set(rows.map((r) => r.bars).filter(Boolean))];
     return uniq.length ? uniq.join(' / ') : 'none';
   }
-  return wd?.win?.upperBars || 'none';
+  // sash (09.10.2026, owner box item 16): the pattern of each sash ("6x6 / none"
+  // for 6 over 1, one pattern when both agree), fullConfig bars included
+  return wd?.windowSpec ? sashBarsLabel(wd.windowSpec) : (wd?.win?.upperBars || 'none');
 }
 
 // Overview cells of one window (Type, Head, Opening, Box), ONE helper for the
@@ -684,10 +701,15 @@ function overviewCells(wd) {
   const d = wd?.windowSpec?.door;
   if (wd?.windowSpec?.category === 'door' && d) {
     const lock = d.type === 'french' ? (d.lockType === 'double' ? '2 handles' : '1 handle') : 'single kit';
+    // doors v3: the threshold the engine builds; an inward door with a stored
+    // aluminium / low profile value takes the timber cill and says so
+    const ti = wd?.derived?.door?.thresholdInfo;
+    const threshold = ti ? (ti.ignored ? ti.note : ti.effectiveType) : (d.threshold || 'standard');
     return {
       type: d.type === 'french' ? 'french' : 'single',
       head: d.style || 'full-glass',
-      opening: `${d.openDirection || 'outward'} · ${lock} · ${d.threshold || 'standard'}`,
+      // doors v3 (CLAUDE.md 3.8): the handing as the configurator states it ("Hinge left · opens outward")
+      opening: `${wd?.derived?.door?.handing?.label || d.openDirection || 'outward'} · ${lock} · ${threshold}`,
       box: wd?.derived?.door?.frameDepth ?? wd?.windowSpec?.frame?.depth,
     };
   }
@@ -2346,7 +2368,8 @@ function SprayingTab({ windowsData, batch, pp, registerExport }) {
       const tH = Math.round(derived.topSashHeight || 0);
       const bH = Math.round(derived.bottomSashHeight || 0);
       // Doors (08.10.2026): the frame of the whole assembly, every door leaf, each
-      // side panel leaf and each opening fan leaf, at the engine sizes.
+      // side panel light and each fan leaf (doors v3: a fixed fanlight is a
+      // non-opening leaf, labelled fixed), at the engine sizes.
       const R0 = (v) => Math.round(Number(v) || 0);
       const dr = derived.door;
       const elements = derived.category === 'door' && dr
@@ -2354,7 +2377,7 @@ function SprayingTab({ windowsData, batch, pp, registerExport }) {
             { element: 'Frame', size: `${R0(dr.totalWidth)} × ${R0(dr.totalHeight)}`, sort: 0 },
             ...(dr.leaves || []).map((lf, i) => ({ element: dr.isFrench ? `Leaf P${i + 1} ${lf.role}` : 'Leaf', size: `${R0(lf.w)} × ${R0(lf.h)}`, sort: 1 })),
             ...(dr.panelLeaves || []).map((pl) => ({ element: `Side panel ${pl.side}`, size: `${R0(pl.w)} × ${R0(pl.h)}`, sort: 2 })),
-            ...(dr.fanLeaves || []).map((fl, i) => ({ element: `Fan leaf${dr.fanLeaves.length > 1 ? ` ${i + 1}` : ''}`, size: `${R0(fl.w)} × ${R0(fl.h)}`, sort: 2 })),
+            ...(dr.fanLeaves || []).map((fl, i) => ({ element: `${fl.fixed ? 'Fixed fan leaf' : 'Fan leaf'}${dr.fanLeaves.length > 1 ? ` ${i + 1}` : ''}`, size: `${R0(fl.w)} × ${R0(fl.h)}`, sort: 2 })),
           ]
         // Casement (Piotr 21.09.2026): frame, then every leaf, then the fans; one row per pane, leaf size
         : derived.category === 'casement'

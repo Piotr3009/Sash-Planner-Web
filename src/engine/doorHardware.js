@@ -27,9 +27,19 @@
 //                                 d_handle_set 1
 //   aluminium threshold           d_threshold_alu_single / _double 1 pc
 //   low-profile threshold         d_threshold_low_single / _double 1 pc
+//   either of the two             d_threshold_seal, one length per door
+//                                 opening, in metres (doors v3, 09.10.2026)
+//   inward door                   always the timber inward cill: no product
 //
-// Hinges are an owner product, not a ladder: no automatic size selection. The
-// leaf weight is reported for information only (BLOCKERS: hinge load limits).
+// Handing (doors v3, owner box item 11): the printouts say exactly what the
+// configurator says, the PSW convention: "Hinge left" = hinges on the left
+// seen from INSIDE, plus "opens outward" / "opens inward". The Winkhaus words
+// (LH / RH, anti-clockwise / clockwise closing) are not printed any more; the
+// kit handing the engine would pick stays internal (doorHanding, kitHanding).
+//
+// Hinges are an owner product, not a ladder: no automatic size selection and
+// no load limit (owner box item 12, 09.10.2026), at least DOOR_MIN_HINGES a
+// leaf. The leaf weight is reported for information only.
 //
 // This module imports nothing: keep it cycle-free (stores import from here).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -50,12 +60,12 @@ export function fgteBand(leafH, family = 'slave') {
 }
 
 /**
- * Handing of a door leaf, Winkhaus wording: LH = anti-clockwise closing,
- * RH = clockwise closing. Read from the side the leaf swings TOWARDS (the
- * outside for an outward door, the inside for an inward one): hinges on the
- * left there = LH. `hingeFromOutside` is the leaf hinge as drawn in the
- * exterior view ('left' | 'right'). FLAGGED for the owner (BLOCKERS): confirm
- * against the handing diagram on the product page.
+ * The kit handing of a door leaf (INTERNAL, never printed since doors v3):
+ * LH / RH read from the side the leaf swings TOWARDS (the outside for an
+ * outward door, the inside for an inward one), hinges on the left there = LH.
+ * `hingeFromOutside` is the leaf hinge as drawn in the exterior view
+ * ('left' | 'right'). Kept so the order can name a handed kit variant if the
+ * supplier needs one (BLOCKERS 31).
  */
 export function doorHanding(hingeFromOutside, inward) {
   const seen = inward
@@ -63,14 +73,26 @@ export function doorHanding(hingeFromOutside, inward) {
     : hingeFromOutside;
   return seen === 'left' ? 'LH' : 'RH';
 }
-export const HANDING_WORDS = { LH: 'anti-clockwise closing', RH: 'clockwise closing' };
+
+/**
+ * The handing as printed (doors v3, owner box item 11, the PSW convention):
+ * the configurator value, "Hinge left" = hinges on the left seen from inside,
+ * and the opening direction. "Hinge left · opens outward".
+ */
+export function doorHandingLabel(hingeSide, inward) {
+  return `Hinge ${hingeSide === 'right' ? 'right' : 'left'} · opens ${inward ? 'inward' : 'outward'}`;
+}
+
+/** The fewest hinges a door leaf takes, whatever the profile says (owner box item 12). */
+export const DOOR_MIN_HINGES = 3;
 
 /** Hinges on one door leaf: perLeaf, or perLeafTall above tallAbove. */
 export function doorHingeCount(leafH, rule) {
   const r = rule || {};
-  return (Number(leafH) || 0) > (Number(r.tallAbove) || 2100)
+  // Owner box item 12 (09.10.2026): no load limit, but never fewer than 3 hinges a leaf
+  return Math.max(DOOR_MIN_HINGES, (Number(leafH) || 0) > (Number(r.tallAbove) || 2100)
     ? (Number(r.perLeafTall) || 4)
-    : (Number(r.perLeaf) || 3);
+    : (Number(r.perLeaf) || 3));
 }
 
 /**
@@ -95,7 +117,7 @@ export const DOOR_HARDWARE_PARTS = [
   { id: 'd_hinges', name: 'Door Hinges', slot: 'doorHinges',
     hint: 'Counted per door leaf: 3 hinges, 4 when the leaf is taller than 2100mm (Window Settings, Doors). Pieces. Side panel leaves are fixed and get none. The leaf weight is printed on the hardware detail for information: no automatic size selection, assign a hinge rated for your heaviest leaf.' },
   { id: 'd_lock_single_kit', name: 'Multipoint Lock: Single Door Kit (ThunderBolt)', slot: 'multipointLocks',
-    hint: 'Winkhaus ThunderBolt 5-point single door kit. 1 per single door; 1 per french door with ONE handle (lockType single, on the active leaf). The detail prints the handing (LH anti-clockwise / RH clockwise closing), door thickness, backset, faceplate and keeps to select on the BJ Waller page.' },
+    hint: 'Winkhaus ThunderBolt 5-point single door kit. 1 per single door; 1 per french door with ONE handle (lockType single, on the active leaf). The detail prints the handing as the configurator states it (Hinge left / right, seen from inside; opens outward / inward), door thickness, backset, faceplate and keeps to select on the BJ Waller page.' },
   { id: 'd_lock_double_kit', name: 'Multipoint Lock: Double Door Kit (FGTE)', slot: 'multipointLocks',
     hint: 'Winkhaus FGTE double door kit (master, slave, shootbolts). 1 per french door with TWO handles (lockType double). The height band comes from the leaf height; the detail prints the band, the shootbolt family, the slave backset, the lock centre line and the cill keep option.' },
   { id: 'd_cylinder', name: 'Door Cylinder', slot: 'cylinders',
@@ -112,8 +134,13 @@ export const DOOR_HARDWARE_PARTS = [
     hint: '1 piece per single door with the low-profile threshold (no timber cill).' },
   { id: 'd_threshold_low_double', name: 'Low Profile Threshold: French Door', slot: 'thresholds',
     hint: '1 piece per french door with the low-profile threshold (no timber cill).' },
+  // Doors v3 (owner box item 9): the seal bought with every aluminium or
+  // low-profile threshold. Metres; no per-window slot (the window's threshold
+  // product must not replace it), the row opens on the thresholds tab.
+  { id: 'd_threshold_seal', name: 'Threshold Seal', slot: null, category: 'thresholds', unit: 'm',
+    hint: 'With an aluminium or low-profile threshold: one length per door opening (the clear width between the frame lands of the door), in metres. A timber cill (and every inward door) buys none.' },
 ];
-export const DOOR_PART_SLOT = Object.fromEntries(DOOR_HARDWARE_PARTS.map((p) => [p.id, p.slot]));
+export const DOOR_PART_SLOT = Object.fromEntries(DOOR_HARDWARE_PARTS.filter((p) => p.slot).map((p) => [p.id, p.slot]));
 
 // Hardware list item names (lists.buildHardwareList) and the ironmongery slot
 // each one shows the product of (bom.HARDWARE_TO_SLOT_KEY).
@@ -125,6 +152,7 @@ export const DOOR_HARDWARE_ITEMS = {
   handle: 'Door handle set',
   bolts: 'Door bolts',
   threshold: 'Door threshold',
+  thresholdSeal: 'Threshold seal',
 };
 export const DOOR_ITEM_SLOT = {
   [DOOR_HARDWARE_ITEMS.hinges]: 'doorHinges',
@@ -139,14 +167,18 @@ export const DOOR_ITEM_SLOT = {
 /**
  * The hardware of ONE door.
  *   leaves:  derived door leaves [{ h, hinge, role, weightKg }]
- *   isFrench, lockType ('single' | 'double'), inward, threshold, hasTimberCill
+ *   isFrench, lockType ('single' | 'double'), inward, hingeSide (the
+ *   configurator value), threshold (the EFFECTIVE type: an inward door is
+ *   always 'standard'), hasTimberCill, thresholdSeal ({ length, metres } or null)
  *   hinges:  profile hinge rule; hw: profile hardware defaults
- * Returns { summary: { partId: qty }, detail: [{ item, detail, quantity, partId }],
- *           handing, kit, fgte }.
+ * Returns { summary: { partId: qty } (pieces), metres: { partId: m },
+ *           detail: [{ item, detail, quantity, partId, unit? }],
+ *           handing (the printed label), kitHanding (internal LH / RH), kit, fgte }.
  */
-export function selectDoorHardware({ leaves, isFrench, lockType, inward, threshold, hasTimberCill, hinges, hw, leafDepth }) {
+export function selectDoorHardware({ leaves, isFrench, lockType, inward, hingeSide, threshold, hasTimberCill, thresholdSeal, hinges, hw, leafDepth }) {
   const H = hw || {};
   const summary = {};
+  const metres = {};
   const detail = [];
   const add = (partId, qty) => { if (qty > 0) summary[partId] = (summary[partId] || 0) + qty; };
   const ls = leaves || [];
@@ -161,10 +193,12 @@ export function selectDoorHardware({ leaves, isFrench, lockType, inward, thresho
       detail: `${perLeaf} · weight for information, no automatic size selection` });
   }
 
-  // Lock: the active leaf (single door: the leaf) carries the handing
+  // Lock: the active leaf (single door: the leaf) carries the handing. The
+  // printed handing is the configurator's (Hinge left / right seen from
+  // inside, opens outward / inward); the kit handing stays internal.
   const active = ls.find((l) => l.role === 'active' || l.role === 'single') || ls[0] || null;
-  const handing = active ? doorHanding(active.hinge, inward) : null;
-  const handWords = handing ? `${handing} (${HANDING_WORDS[handing]})` : 'handing n/a';
+  const kitHanding = active ? doorHanding(active.hinge, inward) : null;
+  const handWords = doorHandingLabel(hingeSide, inward);
   const twoHandles = isFrench && lockType === 'double';
   let fgte = null;
   if (twoHandles) {
@@ -186,7 +220,7 @@ export function selectDoorHardware({ leaves, isFrench, lockType, inward, thresho
       ].join(' · '),
       // the attributes the buyer selects on the supplier page (purchase list note)
       variant: [
-        handing ? `${handing} ${HANDING_WORDS[handing]}` : null,
+        handWords,
         family === 'both' ? 'master and slave shootbolts' : 'slave shootbolts only',
         band ? `height band ${band.lo}-${band.hi}` : 'no height band',
         `slave backset ${H.fgteSlaveBackset}`,
@@ -209,7 +243,7 @@ export function selectDoorHardware({ leaves, isFrench, lockType, inward, thresho
       ].join(' · '),
       // the attributes the buyer selects on the supplier page (purchase list note)
       variant: [
-        handing ? `${handing} ${HANDING_WORDS[handing]}` : null,
+        handWords,
         `door thickness ${H.doorThickness}`,
         `backset ${H.backset}`,
         `faceplate ${H.faceplate}`,
@@ -230,7 +264,12 @@ export function selectDoorHardware({ leaves, isFrench, lockType, inward, thresho
     add(pid, 1);
     detail.push({ item: DOOR_HARDWARE_ITEMS.threshold, partId: pid, quantity: 1,
       detail: `${kind === 'alu' ? 'aluminium' : 'low profile'} · ${isFrench ? 'french (double)' : 'single'} door` });
+    if (thresholdSeal && thresholdSeal.metres > 0) {
+      metres.d_threshold_seal = (metres.d_threshold_seal || 0) + thresholdSeal.metres;
+      detail.push({ item: DOOR_HARDWARE_ITEMS.thresholdSeal, partId: 'd_threshold_seal', quantity: thresholdSeal.metres, unit: 'm',
+        detail: `one length per door opening · ${thresholdSeal.length} mm` });
+    }
   }
 
-  return { summary, detail, handing, handingWords: handing ? HANDING_WORDS[handing] : null, kit: twoHandles ? 'fgte' : 'thunderbolt', fgte };
+  return { summary, metres, detail, handing: handWords, kitHanding, kit: twoHandles ? 'fgte' : 'thunderbolt', fgte };
 }

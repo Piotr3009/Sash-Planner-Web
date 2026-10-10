@@ -6,8 +6,9 @@ import { useProjectStore } from '../stores/projectStore.js';
 import { useMaterialStore } from '../stores/materialStore.js';
 import { useMaterialAssignmentStore, ALL_PARTS } from '../stores/materialAssignmentStore.js';
 import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
-import { parseSpecification, normaliseToWindowSpec, SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, isCottageProportion } from '../engine/specification.js';
-import { deriveWindowData } from '../engine/calculations.js';
+import { SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, isCottageProportion } from '../engine/specification.js';
+import { deriveWindowData, sashBarPattern } from '../engine/calculations.js';
+import { deriveWindowBounded, sashBarsLabel } from '../utils/windowBoundary.js';
 import { withProfiles, getCasementProfile, bsuiteActiveTarget } from '../engine/profile.js';
 import { buildGlassListForWindow, buildVentGrilles } from '../engine/lists.js';
 import { formatQty, buildWindowMaterialLines, windowBomCards, windowHardwareDetailRows } from '../engine/bom.js';
@@ -77,13 +78,15 @@ export default function WindowDetailPage() {
     ? `${projectEntity.project_number || ''}${projectEntity.name ? ` (${projectEntity.name})` : ''}`.trim()
     : '';
 
-  const spec = useMemo(() => (item ? parseSpecification(item.specification) : null), [item]);
-  const windowSpec = useMemo(() => (item ? normaliseToWindowSpec(item, spec) : null), [item, spec]);
-  const derived = useMemo(() => {
-    if (!windowSpec) return null;
-    try { return withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, () => deriveWindowData(windowSpec, settings)); }
-    catch (e) { console.warn('Calculation failed:', e); return null; }
-  }, [windowSpec, settings]);
+  // The window normalised and derived inside its own boundary (owner box item 19):
+  // an unknown sash proportion or bar pattern, or an arch the engine refuses,
+  // shows its message on this page instead of a blank one.
+  const bounded = useMemo(() => (item
+    ? deriveWindowBounded(item, (ws) => withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, () => deriveWindowData(ws, settings)))
+    : null), [item, settings, currentBatch]);
+  const windowSpec = bounded?.windowSpec || null;
+  const derived = bounded?.derived || null;
+  const windowError = bounded?.error || null;
   // Arched casement CNC export — planned under the batch's profile snapshot,
   // exactly like `derived` above; `skip` doubles as the button tooltip.
   const archExport = useMemo(() => {
@@ -105,6 +108,29 @@ export default function WindowDetailPage() {
     );
   }
 
+  if (windowError) {
+    return (
+      <div className="p-8 max-w-4xl mx-auto">
+        <Link to={backUrl} className="text-xs text-ink-400 hover:text-accent-400 transition-colors">← Back to project</Link>
+        <div className="flex items-end justify-between mt-2 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-ink-50">{item.name || `Window`}</h1>
+            <p className="text-sm text-ink-400">
+              {item.window_type || 'sash'} · {item.width}×{item.height} mm
+              {currentBatch && <span> · {currentBatch.label}</span>}
+            </p>
+          </div>
+          <Link to={editUrl} className="btn btn-primary text-sm">✏️ Edit Configuration</Link>
+        </div>
+        <div className="card p-6 border border-red-500/40" data-window-error={item.id}>
+          <div className="text-sm font-semibold text-red-400">This window cannot be calculated</div>
+          <p className="text-sm text-ink-100 mt-2">{windowError.message}</p>
+          <p className="text-xs text-ink-400 mt-2">Correct it in the configurator (Edit Configuration). The production pack and the project materials leave this window out until then; every other window is unaffected.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <Link to={backUrl} className="text-xs text-ink-400 hover:text-accent-400 transition-colors">← Back to project</Link>
@@ -115,6 +141,10 @@ export default function WindowDetailPage() {
             {item.window_type || 'sash'} · {item.width}×{item.height} mm
             {currentBatch && <span> · {currentBatch.label}</span>}
           </p>
+          {/* bars per sash (09.10.2026): a custom bar outside its own sash's glass still derives, but say so */}
+          {(derived?.bars?.warnings || []).map((w) => (
+            <p key={w} className="text-xs text-amber-400 mt-1" data-bar-warning>Bars: {w}</p>
+          ))}
           {/* cottage below the configurator's minimum frame height: it still derives (it is not wrong), but say so */}
           {(windowSpec?.category || 'sash') === 'sash' && isCottageProportion(windowSpec?.sash?.proportion) && Number(windowSpec?.frame?.height) < COTTAGE_MIN_FRAME_HEIGHT && (
             <p className="text-xs text-amber-400 mt-1">
@@ -244,9 +274,15 @@ export default function WindowDetailPage() {
               <SpecRow label="Type" value={windowSpec.door?.type === 'french' ? 'French' : 'Single'} />
               <SpecRow label="Style" value={windowSpec.door?.style} />
               {windowSpec.door?.style !== 'full-glass' && <SpecRow label="Panel" value={windowSpec.door?.paneling} />}
-              <SpecRow label="Opening" value={`${windowSpec.door?.openDirection} · open ${windowSpec.door?.hingeSide}`} />
+              {/* doors v3: the handing as the configurator states it (Hinge left / right seen from inside, opens outward / inward) */}
+              <SpecRow label="Opening" value={derived?.door?.handing?.label || `Hinge ${windowSpec.door?.hingeSide} · opens ${windowSpec.door?.openDirection}`} />
               <SpecRow label="Lock" value={windowSpec.door?.type === 'french' ? (windowSpec.door?.lockType === 'double' ? 'two handles' : 'one handle') : 'single door kit'} />
-              <SpecRow label="Threshold" value={`${windowSpec.door?.threshold}${windowSpec.door?.thresholdExtension ? ` · ext ${windowSpec.door.thresholdExtension}` : ''}`} />
+              {/* doors v3: the threshold the engine builds (an inward door always takes the timber cill; aluminium / low profile + the threshold seal) */}
+              <SpecRow label="Threshold" value={`${derived?.door?.thresholdInfo
+                ? [{ standard: 'timber cill', aluminium: 'aluminium', 'low-profile': 'low profile' }[derived.door.thresholdInfo.effectiveType] || derived.door.thresholdInfo.effectiveType,
+                  derived.door.thresholdInfo.seal ? `threshold seal ${derived.door.thresholdInfo.seal.metres} m` : '',
+                  derived.door.thresholdInfo.ignored ? derived.door.thresholdInfo.note : ''].filter(Boolean).join(' · ')
+                : windowSpec.door?.threshold}${windowSpec.door?.thresholdExtension ? ` · ext ${windowSpec.door.thresholdExtension}` : ''}`} />
               <SpecRow label="Bars" value={`${windowSpec.door?.bars?.h || 0}H × ${windowSpec.door?.bars?.v || 0}V · ${windowSpec.door?.barType}`} />
               {windowSpec.door?.sidePanels?.mode !== 'none' && <SpecRow label="Side panels" value={windowSpec.door?.sidePanels?.mode} />}
               {windowSpec.door?.transom?.type !== 'none' && <SpecRow label="Fanlight" value={`${windowSpec.door?.transom?.type} · ${windowSpec.door?.transom?.height}`} />}
@@ -254,9 +290,11 @@ export default function WindowDetailPage() {
           ) : (
           <SpecSection title="Sashes & Bars">
             {(windowSpec?.category || 'sash') === 'sash' && <SpecRow label="Proportions" value={SASH_PROPORTION_LABELS[windowSpec?.sash?.proportion] || windowSpec?.sash?.proportion} />}
-            <SpecRow label="Grid" value={windowSpec?.sash.grid.mode} />
-            <SpecRow label="Upper" value={item.upperBars || 'none'} />
-            {!item.sameBars && <SpecRow label="Lower" value={item.lowerBars || 'none'} />}
+            {/* the one pattern when both sashes agree, else "upper / lower" (6 over 1 printed "6x6" here) */}
+            <SpecRow label="Grid" value={sashBarsLabel(windowSpec)} />
+            {/* bars per sash (Piotr 09.10.2026, owner box item 16): the pattern each sash is built with */}
+            <SpecRow label="Upper" value={sashBarPattern(windowSpec, 'upper')} />
+            {(!item.sameBars || sashBarPattern(windowSpec, 'upper') !== sashBarPattern(windowSpec, 'lower')) && <SpecRow label="Lower" value={sashBarPattern(windowSpec, 'lower')} />}
             <SpecRow label="Horns" value={windowSpec?.sash.hornType || 'none'} />
           </SpecSection>
           )}
@@ -287,14 +325,14 @@ export default function WindowDetailPage() {
               ))}
               {derived.door.isFrench && <SpecRow label="Half + lip" value={`${derived.door.half} + ${derived.door.lip} mm`} />}
               {derived.door.panelLeaves.map((pl, i) => (
-                <SpecRow key={`p${i}`} label={`Side ${pl.side}`} value={`${pl.w} × ${pl.h} mm`} />
+                <SpecRow key={`p${i}`} label={`Side light ${pl.side}`} value={`${pl.w} × ${pl.h} mm · fixed`} />
               ))}
               {derived.door.fanLeaves.map((fl, i) => (
-                <SpecRow key={`f${i}`} label="Fan leaf" value={`${fl.w} × ${fl.h} mm`} />
+                <SpecRow key={`f${i}`} label={fl.fixed ? 'Fixed fan leaf' : 'Fan leaf'} value={`${fl.w} × ${fl.h} mm`} />
               ))}
               <SpecRow label="Assembly" value={`${derived.door.totalWidth} × ${derived.door.totalHeight} mm`} />
               <SpecRow label="Leaf depth" value={`${derived.door.leafDepth} mm`} />
-              <SpecRow label="Handing" value={derived.door.hardware?.handing ? `${derived.door.hardware.handing} (${derived.door.hardware.handingWords})` : 'n/a'} />
+              <SpecRow label="Handing" value={derived.door.handing?.label || derived.door.hardware?.handing || 'n/a'} />
               <SpecRow label="Weight" value={`${derived.weights?.total} kg`} />
             </SpecSection>
           ) : derived && (
@@ -317,8 +355,9 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
       // Single source: the engine row carries the label (barsV/barsH + type); doors too (08.10.2026).
       return g.bars || '—';
     }
-    const pat = g.sash === 'upper' ? (spec?.upperBars || spec?.bars?.upper)
-      : g.sash === 'lower' ? (spec?.lowerBars || spec?.bars?.lower) : null;
+    // sash rows carry their own sash's pattern (lists.js, 09.10.2026); this read
+    // spec.upperBars, a field the normalised spec never has, so it printed a dash
+    const pat = g.sash === 'upper' || g.sash === 'lower' ? g.bars : null;
     return pat && pat !== 'none' ? String(pat) : '—';
   };
   const rowArea = (g) =>

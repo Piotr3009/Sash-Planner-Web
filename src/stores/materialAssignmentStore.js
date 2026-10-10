@@ -215,9 +215,11 @@ export const DOOR_PARTS = {
     { id: 'd_frame_cill_inward', name: 'Frame Cill (Inward)', section: dSec(DP.cillInward.faceInternal, DP.frameDepth), pcs: 1, materialType: 'hardwood',
       hint: 'Inward opening door: unrebated cill, the inside face falling to the outside face across the depth (Window Settings, Doors).' },
     { id: 'd_coupling_post', name: 'Coupling Post', section: dSec(DP.couplingPost.width, DP.frameDepth), pcs: 1, materialType: 'hardwood',
-      hint: 'One member between a side panel and the door, two rebates. One per side panel, full height.' },
+      hint: 'Doors before v3 (09.10.2026) only: the coupling post between a side panel and the door. Since v3 a casement mullion stands there (the Mullion row); nothing counts on this row any more.' },
     { id: 'd_transom_rail', name: 'Transom Rail', section: dSec(DP.elements.transomRail.face, DP.frameDepth), pcs: 1, materialType: 'hardwood',
-      hint: 'Fanlight rail across the assembly, between the jambs.' },
+      hint: 'Fanlight transom, the casement rule: one segment per field between the jambs and the mullions (field leaf width + 8.5 seat); the mullions run through.' },
+    { id: 'd_mullion', name: 'Mullion', section: dSec(DP.elements.mullion.face, DP.frameDepth), pcs: 1, materialType: 'hardwood', defaultFrom: 'c_mullion',
+      hint: 'Casement mullion between the door and a side panel, full height through the transom (frame H - 77; to the floor without a timber cill). Unassigned: the casement Mullion material.' },
   ],
   leaf: [
     { id: 'd_leaf_stile', name: 'Leaf Stiles', section: DOOR_LEAF_SEC('leafStile'), pcs: 2, materialType: 'hardwood', mirror: true,
@@ -235,10 +237,27 @@ export const DOOR_PARTS = {
     { id: 'd_panel_mdf_core', name: 'Panel Core, MDF', section: `${DP.panel.coreThickness}mm`, pcs: 1, materialType: 'board', unit: 'm²',
       hint: 'The MDF core between the two Tricoya boards: panel area × 1 per panel. Core thickness to confirm (Window Settings, Doors).' },
   ],
+  // Doors v3 (09.10.2026): the side panel is a casement fixed light behind the
+  // mullion: stiles and top rail as the casement leaf (64 x 57), the bottom
+  // rail as the door bottom rail (180 x 57). Unassigned, each row takes the
+  // material of its counterpart (defaultFrom).
   sidePanel: [
-    { id: 'd_side_stile', name: 'Side Panel Stiles', section: dSec(DP.sidePanel.member, DP.sidePanel.depth), pcs: 2, materialType: 'hardwood', mirror: true },
-    { id: 'd_side_top_rail', name: 'Side Panel Top Rail', section: dSec(DP.sidePanel.member, DP.sidePanel.depth), pcs: 1, materialType: 'hardwood' },
-    { id: 'd_side_bottom_rail', name: 'Side Panel Bottom Rail', section: dSec(DP.sidePanel.member, DP.sidePanel.depth), pcs: 1, materialType: 'hardwood' },
+    { id: 'd_side_stile', name: 'Side Panel Stiles', section: dSec(DP.sidePanel.stile, DP.sidePanel.depth), pcs: 2, materialType: 'hardwood', mirror: true, defaultFrom: 'c_sash_stile',
+      hint: 'Side panel fixed light stiles. Unassigned: the casement Leaf Stiles material.' },
+    { id: 'd_side_top_rail', name: 'Side Panel Top Rail', section: dSec(DP.sidePanel.top, DP.sidePanel.depth), pcs: 1, materialType: 'hardwood', defaultFrom: 'c_sash_top_rail',
+      hint: 'Side panel fixed light top rail. Unassigned: the casement Leaf Top Rail material.' },
+    { id: 'd_side_bottom_rail', name: 'Side Panel Bottom Rail', section: dSec(DP.sidePanel.bottom, DP.sidePanel.depth), pcs: 1, materialType: 'hardwood', defaultFrom: 'd_leaf_bottom_rail',
+      hint: 'Side panel fixed light bottom rail, the door bottom rail section so its line meets the door. Unassigned: the door Leaf Bottom Rail material.' },
+  ],
+  // Doors v3: the fixed fanlight is a non-opening casement leaf (the opening
+  // fan buys the casement leaf rows directly).
+  fixedFan: [
+    { id: 'd_fan_fixed_stile', name: 'Fixed Fan Stiles', section: dSec(DP.fixedFan.stile, DP.leafDepth), pcs: 2, materialType: 'hardwood', mirror: true, defaultFrom: 'c_sash_stile',
+      hint: 'Fixed fanlight leaf stiles (no hardware). Unassigned: the casement Leaf Stiles material.' },
+    { id: 'd_fan_fixed_top_rail', name: 'Fixed Fan Top Rail', section: dSec(DP.fixedFan.top, DP.leafDepth), pcs: 1, materialType: 'hardwood', defaultFrom: 'c_sash_top_rail',
+      hint: 'Fixed fanlight leaf top rail. Unassigned: the casement Leaf Top Rail material.' },
+    { id: 'd_fan_fixed_bottom_rail', name: 'Fixed Fan Bottom Rail', section: dSec(DP.fixedFan.bottom, DP.leafDepth), pcs: 1, materialType: 'hardwood', defaultFrom: 'c_sash_bottom_rail',
+      hint: 'Fixed fanlight leaf bottom rail. Unassigned: the casement Leaf Bottom Rail material.' },
   ],
   glass: [
     { id: 'd_glass_double_6_12_6', name: 'Door Glass 6-12-6', section: '6-12-6', pcs: 1, materialType: 'glass', unit: 'm²',
@@ -251,14 +270,21 @@ export const DOOR_PARTS = {
   // Hardware rows from the engine catalogue (doorHardware.js): the counting
   // rule is the hint. defaultCategory = the ironmongery tab the row opens on.
   ironmongery: DOOR_HARDWARE_PARTS.map((h) => ({
-    id: h.id, name: h.name, hint: h.hint, defaultCategory: h.slot,
-    section: '-', pcs: 1, materialType: 'ironmongery', unit: 'pcs',
+    id: h.id, name: h.name, hint: h.hint, defaultCategory: h.slot || h.category,
+    section: '-', pcs: 1, materialType: 'ironmongery', unit: h.unit || 'pcs',
   })),
 };
+// Rows added by doors v3 (09.10.2026) are appended at the END (index-based
+// assignment sets keep every earlier row, t37 / t41); the threshold seal is
+// the last ironmongery row, so it already sits after the older ones.
+const DOOR_V3_IDS = ['d_mullion', 'd_fan_fixed_stile', 'd_fan_fixed_top_rail', 'd_fan_fixed_bottom_rail'];
 export const DOOR_ALL_PARTS = [
-  ...DOOR_PARTS.frame, ...DOOR_PARTS.leaf, ...DOOR_PARTS.panel, ...DOOR_PARTS.sidePanel,
-  ...DOOR_PARTS.glass, ...DOOR_PARTS.beading, ...DOOR_PARTS.ironmongery,
+  ...[...DOOR_PARTS.frame, ...DOOR_PARTS.leaf, ...DOOR_PARTS.panel, ...DOOR_PARTS.sidePanel,
+    ...DOOR_PARTS.glass, ...DOOR_PARTS.beading, ...DOOR_PARTS.ironmongery].filter((p) => !DOOR_V3_IDS.includes(p.id)),
+  ...DOOR_V3_IDS.map((id) => [...DOOR_PARTS.frame, ...DOOR_PARTS.fixedFan].find((p) => p.id === id)),
 ];
+// `defaultFrom` on a row mirrors partRegistry PART_DEFAULT_FROM (the map the
+// BOM resolves with); t44 checks the two agree.
 // The window glass rows a door may count on (slim, triple, Laminate /
 // Acoustic): shown read-only on the Doors page, "shared with windows".
 export const DOOR_SHARED_GLASS_IDS = ['glass_double_slim', 'glass_triple', 'glass_acoustic'];

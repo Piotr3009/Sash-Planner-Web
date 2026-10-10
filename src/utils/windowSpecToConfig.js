@@ -49,7 +49,7 @@ import { buildVentGrilles } from '../engine/lists.js';
 import { RAL_LOOKUP as RAL_COLORS } from '../config.js';
 import { fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from '../engine/casementLayouts.js';
 import { profileBoxDepth, getCasementProfile, getWindowProfile, getDoorProfile } from '../engine/profile.js';
-import { deriveWindowData, meetingFractionFor } from '../engine/calculations.js';
+import { deriveWindowData, meetingFractionFor, sashBarPattern } from '../engine/calculations.js';
 
 function resolveColor(name, ral) {
   if (!name && !ral) return '#F4F4F2'; // default white
@@ -187,18 +187,22 @@ export function windowSpecToConfig(windowSpec, derived = null) {
       woodColorExt: col.outside || col.single || '#F6F6F6',
       woodColorInt: col.inside || col.single || '#F6F6F6',
       // Doors to production (brief 5.1): the hinge / handle finish and the
-      // engine geometry the 3D draws from (DoorWindow doorGeo prop).
+      // engine geometry the 3D draws from (DoorWindow doorGeo prop). Doors v3:
+      // the page's derived data (computed under the batch profile snapshot)
+      // is the geometry; the door is derived again only when none is given.
       ironmongery: windowSpec.hardware?.finish || 'brass',
-      doorGeo: doorGeometryFromSpec(windowSpec),
+      doorGeo: doorGeometryFromSpec(windowSpec, derived),
     };
   }
 
   const w = windowSpec.frame?.width || 1200;
   const h = windowSpec.frame?.height || 1800;
 
-  // Bars — windowSpec stores grid mode like '6x6', '3x3', 'none', 'custom'
-  const gridMode = windowSpec.sash?.grid?.mode || 'none';
-  const barsValue = gridMode === 'custom' ? 'custom' : gridMode;
+  // Bars per sash (Piotr 09.10.2026, owner box item 16): each sash its own
+  // pattern ('6x6', 'none', 'custom', ...), so "6 over 1" reaches the 3D; a
+  // windowSpec without the per-sash keys falls back to grid.mode for both.
+  const upperBarsValue = sashBarPattern(windowSpec, 'upper');
+  const lowerBarsValue = sashBarPattern(windowSpec, 'lower');
 
   // Custom bars — ParametricSashWindow expects per-sash arrays of {type:'v'|'h', mm}.
   // Primary source: rawSpec.fullConfig, which stores the exact per-sash bars the
@@ -211,15 +215,23 @@ export function windowSpecToConfig(windowSpec, derived = null) {
   let upperCustom = cleanBars(rawFc.upperCustomBars);
   let lowerCustom = cleanBars(rawFc.lowerCustomBars);
   if (upperCustom.length === 0 && lowerCustom.length === 0) {
-    // Legacy fallback: windowSpec grid keeps direction-keyed positions
-    // (vertical/horizontal) without the upper/lower split — apply to both sashes.
-    const cb = windowSpec.sash?.grid?.customBars || {};
-    const legacy = [
-      ...(Array.isArray(cb.vertical) ? cb.vertical : []).map(Number).filter(Number.isFinite).map((mm) => ({ type: 'v', mm })),
-      ...(Array.isArray(cb.horizontal) ? cb.horizontal : []).map(Number).filter(Number.isFinite).map((mm) => ({ type: 'h', mm })),
+    // windowSpec grid keeps direction-keyed positions (vertical/horizontal): per
+    // sash since 09.10.2026 (grid.upper / grid.lower, a lower sash without its own
+    // list takes the upper one); a windowSpec without them applies the single
+    // legacy list to both sashes.
+    const toList = (cb) => [
+      ...(Array.isArray(cb?.vertical) ? cb.vertical : []).map(Number).filter(Number.isFinite).map((mm) => ({ type: 'v', mm })),
+      ...(Array.isArray(cb?.horizontal) ? cb.horizontal : []).map(Number).filter(Number.isFinite).map((mm) => ({ type: 'h', mm })),
     ];
-    upperCustom = legacy;
-    lowerCustom = legacy;
+    const g = windowSpec.sash?.grid || {};
+    if (g.upper?.customBars || g.lower?.customBars) {
+      upperCustom = toList(g.upper?.customBars);
+      lowerCustom = toList(g.lower?.customBars);
+    } else {
+      const legacy = toList(g.customBars || {});
+      upperCustom = legacy;
+      lowerCustom = legacy;
+    }
   }
 
   // Horns
@@ -254,8 +266,8 @@ export function windowSpecToConfig(windowSpec, derived = null) {
   return {
     width: w,
     height: h,
-    upperBars: barsValue,
-    lowerBars: barsValue,
+    upperBars: upperBarsValue,
+    lowerBars: lowerBarsValue,
     upperCustomBars: upperCustom,
     lowerCustomBars: lowerCustom,
     showHorns: hasHorns,
@@ -313,34 +325,43 @@ export function doorFrameDims() {
   return { frameFace: p.elements.frameHead.face, extFace: p.geometry.land };
 }
 
-// ─── Door geometry for the 3D (doors to production, brief 5.1) ───
+// ─── Door geometry for the 3D (doors to production, brief 5.1; doors v3) ───
 // The door 3D draws every frame member, leaf, glass, panel, hinge and handle
-// from the engine (deriveWindowData(windowSpec).door), so it cannot disagree
-// with the cut list, the glass schedule and the sheets. Coordinates are the
-// engine's: assembly mm, origin at the assembly top-left seen from OUTSIDE,
-// y DOWN. The few profile numbers the engine does not echo (the cill's
-// visible face and gap, the inward cill fall, the hinge barrel, the handle
-// backset) are read from the door profile HERE, so the 3D components never
-// import the profile (PSW port rule): DoorWindow takes this object as its
-// optional `doorGeo` prop and, without it, renders as it always did.
-// Returns null for anything that is not a door (or a door the engine cannot
-// derive). The configurator builds the same object from its form state:
+// from the engine (derived.door), so it cannot disagree with the cut list, the
+// glass schedule and the sheets. Coordinates are the engine's: frame mm,
+// origin at the frame top-left seen from OUTSIDE, y DOWN. Since doors v3 W x H
+// is the OVERALL frame: the side panels stand inside it behind casement
+// mullions, the fanlight above a casement transom (axis T from the frame top).
+//
+// `derived` is the page's own deriveWindowData result (the batch profile
+// snapshot is applied there, withProfiles); the door is derived again here,
+// with the active profile, only when the caller has none (the configurator).
+// The few profile numbers the engine does not echo (the inward cill's fall
+// run, the hinge barrel, the handle backset) are read from the active door
+// profile HERE, so the 3D components never import the profile (PSW port
+// rule): DoorWindow takes this object as its optional `doorGeo` prop and,
+// without it, renders as it always did. Returns null for anything that is not
+// a door (or a door the engine cannot derive). The configurator builds the
+// same object from its form state:
 // doorGeometryFromSpec(normaliseToWindowSpec(item, { fullConfig })).
-export function doorGeometryFromSpec(windowSpec) {
+export function doorGeometryFromSpec(windowSpec, derivedIn = null) {
   if (!windowSpec || !['door', 'doors'].includes(windowSpec.category || 'sash')) return null;
-  let derived = null;
-  try { derived = deriveWindowData(windowSpec, {}); } catch { return null; }
+  let derived = derivedIn?.category === 'door' && derivedIn.door ? derivedIn : null;
+  if (!derived) {
+    try { derived = deriveWindowData(windowSpec, {}); } catch { return null; }
+  }
   const d = derived?.door;
   if (!d || !Array.isArray(d.leaves) || d.leaves.length === 0) return null;
   const p = getDoorProfile();
-  const g = p.geometry || {};
   const z = d.zones || {};
-  const tr = z.transom || null;
+  const tr = d.transom || null;
+  const ti = d.thresholdInfo || {};
   const rect = (r) => (r ? { x: r.x, y: r.y, w: r.w, h: r.h } : null);
   const bars = (b) => ({
     v: (b?.frame?.vBars || []).map((v) => v.cx),
     h: (b?.frame?.hBars || []).map((h) => h.cy),
   });
+  const leafMembers = (m) => (m ? { stile: m.stile, top: m.top, bottom: m.bottom, depth: m.depth } : null);
   const glassThickness = Number(windowSpec.glazing?.thickness);
   return {
     type: d.type,
@@ -352,13 +373,25 @@ export function doorGeometryFromSpec(windowSpec) {
     threshold: d.threshold,
     hasTimberCill: !!d.hasTimberCill,
     thresholdExtension: Number(d.thresholdExtension) || 0,
-    // the assembly: the door frame (W x H), side panels outside it, the fanlight above it
+    // the threshold the engine builds: an inward door always takes the timber
+    // inward cill (effectiveType 'standard'), whatever the stored value
+    thresholdInfo: {
+      type: ti.type ?? d.threshold,
+      effectiveType: ti.effectiveType ?? d.threshold,
+      ignored: !!ti.ignored,
+      timberCill: ti.timberCill ?? !!d.hasTimberCill,
+      openingWidth: ti.openingWidth ?? null,
+      seal: ti.seal ? { length: ti.seal.length, metres: ti.seal.metres } : null,
+    },
+    // the overall frame W x H, and the point the 3D group is centred on (the
+    // frame centre): the assembly, the guides, the capture rig and the
+    // harnesses all read this one field
     totalWidth: d.totalWidth,
     totalHeight: d.totalHeight,
+    origin: { x: d.totalWidth / 2, y: d.totalHeight / 2 },
+    // the door field (from the jamb or the mullion axis to the other bound)
     doorX: z.doorX,
     doorW: z.doorW,
-    doorH: derived.frame?.height,
-    transomH: tr ? tr.h : 0,
     frameDepth: d.frameDepth,
     leafDepth: d.leafDepth,
     glassThickness: glassThickness > 0 ? glassThickness : null,
@@ -366,52 +399,78 @@ export function doorGeometryFromSpec(windowSpec) {
     overlap: d.overlap,
     meetingX: z.meetingX,
     meetingLap: z.meetingLap ? { leaf: z.meetingLap.leaf, face: z.meetingLap.face } : null,
-    members: { ...d.members },
-    // cill / threshold: the face actually used comes from the engine (68
-    // outward, 40 inward); the visible front, the fitting gap and the fall
-    // of the unrebated inward cill from the profile
+    members: {
+      ...d.members,
+      sidePanel: d.members?.sidePanel ? { ...d.members.sidePanel } : null,
+      fixedFan: d.members?.fixedFan ? { ...d.members.fixedFan } : null,
+    },
+    // cill: the face (68 outward, 40 inward) and the visible front seen from
+    // outside (zones.bottomVisible: 41 outward, the inward cill's outside
+    // face 35, 0 without a timber cill) from the engine; the inward cill's
+    // fall run from the profile
     cill: {
       face: d.members?.frameCill,
-      visible: g.cillVisible,
-      gap: g.gapCill,
-      inwardInternal: p.cillInward?.faceInternal,
-      inwardExternal: p.cillInward?.faceExternal,
+      visible: Number(z.bottomVisible) || 0,
+      inwardInternal: d.inward ? d.members?.frameCill : p.cillInward?.faceInternal,
+      inwardExternal: d.inward ? z.bottomVisible : p.cillInward?.faceExternal,
       inwardRun: p.cillInward?.runDepth,
       length: d.cill?.length ?? null,
     },
-    sidePanelDepth: p.sidePanel?.depth,
     hingeBarrel: p.hinges?.barrel,
     handle: {
       backset: p.hardware?.backset,
       slaveBackset: d.hardware?.fgte?.slaveBackset ?? p.hardware?.fgteSlaveBackset,
     },
+    // fields: from the outer frame edge or a mullion axis to the next bound
     frames: (z.frames || []).map((f) => ({ x: f.x, w: f.w, kind: f.kind, side: f.side || null })),
-    posts: (z.posts || []).map((po) => ({ axis: po.axis, x: po.x, w: po.w, visX: po.visX, visW: po.visW, doorSide: po.doorSide })),
+    // casement mullions 68 x 93, full height through the transom: the visible
+    // land x1..x2 (axis +- 13) from yTop to yBottom
+    mullions: (d.mullions || []).map((m) => ({
+      axisX: m.axisX, x1: m.x1, x2: m.x2, yTop: m.yTop, yBottom: m.yBottom,
+      code: m.code, length: m.length, timberCill: !!m.timberCill,
+    })),
+    // the casement transom: axis T from the frame top, the rail face, the
+    // visible band (8 above, 13 below the axis) and one segment per field
+    transom: tr ? {
+      axisT: tr.axisT, type: tr.type, bars: tr.bars, railH: tr.railH,
+      band: tr.band ? { y: tr.band.y, h: tr.band.h } : null,
+      segments: (tr.segments || []).map((s) => ({
+        x1: s.x1, x2: s.x2, bandTop: s.bandTop, bandBottom: s.bandBottom,
+        code: s.code, length: s.length, over: s.over, side: s.side || null,
+      })),
+    } : null,
+    // the visible frame openings (exterior view), one per field and tier
+    openings: (z.openings || []).map((o) => ({ kind: o.kind, over: o.over || null, side: o.side || null, x: o.x, y: o.y, w: o.w, h: o.h })),
     leaves: d.leaves.map((l) => ({
       x: l.x, y: l.y, w: l.w, h: l.h,
       hinge: l.hinge, role: l.role, meetingSide: l.meetingSide,
       stileL: l.stileL, stileR: l.stileR,
       daylight: rect(l.daylight), glass: rect(l.glass), bars: bars(l.bars),
       midRail: l.midRail ? { axis: l.midRail.axis, y: l.midRail.y, face: l.midRail.face } : null,
-      panel: l.panel ? { ...rect(l.panel), daylight: rect(l.panel.daylight) } : null,
+      // the panel at its OUTER size (daylight + 2 x inset 17) with its edge profile
+      panel: l.panel ? {
+        ...rect(l.panel), daylight: rect(l.panel.daylight),
+        inset: l.panel.inset, thickness: l.panel.thickness,
+        edge: l.panel.edge ? { tongue: l.panel.edge.tongue, slope: l.panel.edge.slope, flat: l.panel.edge.flat } : null,
+      } : null,
       hinges: [...(l.hinges || [])],
       hingeEdgeX: l.hingeEdgeX,
       handleY: l.handleY,
     })),
     panels: (d.panels || []).map((pn) => ({ leaf: pn.leaf, thickness: pn.thickness, paneling: pn.paneling })),
-    panelLeaves: (d.panelLeaves || []).map((pl) => ({
-      x: pl.x, y: pl.y, w: pl.w, h: pl.h, side: pl.side, member: pl.member,
+    // side panels: casement fixed lights behind the mullion (64 / 64 / 180 x 57)
+    panelLeaves: (d.panelLeaves || d.sidePanels || []).map((pl) => ({
+      x: pl.x, y: pl.y, w: pl.w, h: pl.h, side: pl.side, fixed: true,
+      members: leafMembers(pl.members),
       daylight: rect(pl.daylight), glass: rect(pl.glass), bars: bars(pl.bars),
     })),
+    // fan leaves: opening (casement top hung) or fixed (non-opening 64 / 64 / 67)
     fanLeaves: (d.fanLeaves || []).map((fl) => ({
-      x: fl.x, y: fl.y, w: fl.w, h: fl.h, over: fl.over, side: fl.side || null, hinge: fl.hinge,
-      members: { ...fl.members },
+      x: fl.x, y: fl.y, w: fl.w, h: fl.h, over: fl.over, side: fl.side || null,
+      hinge: fl.hinge, fixed: !!fl.fixed,
+      members: leafMembers(fl.members),
       daylight: rect(fl.daylight), glass: rect(fl.glass), bars: bars(fl.bars),
     })),
-    fanPanes: (tr?.fanPanes || []).map((fp) => ({
-      x: fp.x, y: fp.y, w: fp.w, h: fp.h, over: fp.over, side: fp.side || null, bars: bars(fp.bars),
-    })),
-    transom: tr ? { h: tr.h, railH: tr.railH, type: tr.type, band: tr.band ? { y: tr.band.y, h: tr.band.h } : null } : null,
   };
 }
 
