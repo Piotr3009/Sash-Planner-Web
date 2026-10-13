@@ -40,8 +40,10 @@ export const DEFAULT_SASH_PROFILE = {
     intJambLiner: { w: 17, h: 86,  deduction: 0 },
     cill:         { w: 69, h: 46 },   // legacy field names: w = vertical HEIGHT (69), h = WIDTH/depth (46); UI + drawings map accordingly — do not swap the data (stored profiles, "69×46" section convention)
     cillNose:     { w: 64, h: 128 },
-    // Triple sash mullion post (matches the 3D viewer's 50mm) — FLAGGED default
-    mullion:      { face: 50, raw: '63x63' },
+    // Triple sash mullion post 50 (confirmed by Piotr 13.10.2026: "50 stays, everything is designed around it").
+    // extFace: the external mullion board seen from outside, 50 + 20 + 20 = 90, 17 thick like the box liners,
+    // with the drainage curves at its foot (3D MullionPost extBoard; Piotr 13.10.2026).
+    mullion:      { face: 50, extFace: 90, raw: '63x63' },
   },
   // Length rules (mm subtracted from the window dimension). "Advanced" —
   // geometrically coupled values; changing them reshapes the whole window.
@@ -852,6 +854,11 @@ export function normalizeSashProfile(p) {
   // v3: arched-sash block for stored profiles (no UI edits it yet)
   if (!p.sashArch) {
     p.sashArch = { ...DEFAULT_SASH_PROFILE.sashArch, limits: { ...DEFAULT_SASH_PROFILE.sashArch.limits } };
+  }
+  // 13.10.2026: the external mullion board width for stored copies that predate the key
+  if (p.elements) {
+    if (!p.elements.mullion) p.elements.mullion = { ...DEFAULT_SASH_PROFILE.elements.mullion };
+    if (p.elements.mullion.extFace == null) p.elements.mullion.extFace = DEFAULT_SASH_PROFILE.elements.mullion.extFace;
   }
   if (p.dedSchema !== 2) {
     const mr = Number(p.elements?.meetingRail?.face) || DEFAULT_SASH_PROFILE.elements.meetingRail.face;

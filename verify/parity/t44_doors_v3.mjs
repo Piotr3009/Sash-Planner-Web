@@ -293,8 +293,11 @@ section('6 - controls: casement and sash equal to the start of this tura');
     if (A === Bs) same += 1; else diffs.push(name);
   }
   ok(same === CTL.length, `${same} / ${CTL.length} casement and sash windows: windowSpec, derived, cut list, glass list, pre-cut, hardware list and BOM part quantities byte-identical to the start`, diffs.join(', '));
-  ok(JSON.stringify(profile.DEFAULT_CASEMENT_PROFILE) === JSON.stringify(START.profile.DEFAULT_CASEMENT_PROFILE) && JSON.stringify(profile.DEFAULT_SASH_PROFILE) === JSON.stringify(START.profile.DEFAULT_SASH_PROFILE),
-    'casement and sash default profiles equal to the start');
+  // 13.10.2026 (Piotr): the sash profile gained elements.mullion.extFace 90 (the external mullion board of a
+  // triple sash); the casement profile and every other sash key must still equal the start
+  const sashSansExtFace = (() => { const c = JSON.parse(JSON.stringify(profile.DEFAULT_SASH_PROFILE)); delete c.elements.mullion.extFace; return c; })();
+  ok(JSON.stringify(profile.DEFAULT_CASEMENT_PROFILE) === JSON.stringify(START.profile.DEFAULT_CASEMENT_PROFILE) && JSON.stringify(sashSansExtFace) === JSON.stringify(START.profile.DEFAULT_SASH_PROFILE),
+    'casement and sash default profiles equal to the start (but for the sash elements.mullion.extFace 90 of 13.10.2026)');
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

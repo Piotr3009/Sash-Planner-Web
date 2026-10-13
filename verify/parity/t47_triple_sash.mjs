@@ -44,7 +44,7 @@
  * Run: node verify/parity/t47_triple_sash.mjs [git-ref]
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import React from 'react';
@@ -66,7 +66,7 @@ function bundleTree(srcRoot, name, live) {
   const entry = resolve(AUDIT, `${name}-entry.mjs`);
   const rel = (p) => './' + relative(AUDIT, resolve(srcRoot, p)).replace(/\\/g, '/');
   writeFileSync(entry, [
-    ...['specification', 'calculations', 'lists'].map((m) => `export * as ${m} from '${rel(`engine/${m}.js`)}';`),
+    ...['specification', 'calculations', 'lists', 'profile'].map((m) => `export * as ${m} from '${rel(`engine/${m}.js`)}';`),
     `export * as wsc from '${rel('utils/windowSpecToConfig.js')}';`,
     `export * as elementsPayload from '${rel('utils/elementsPayload.js')}';`,
     ...(live ? [`export * as tdu from '${rel('components/drawings/tripleDrawUtils.js')}';`] : []),
@@ -138,6 +138,8 @@ section('1 - the engine (unchanged): sections, cut list rows, glass rows');
   ok(ts && ts.left === 426 && ts.center === 858 && ts.right === 426 && ts.mullionFace === 50 && ts.gap === 6 && ts.clear === 1828
     && ts.openings.left === 432 && ts.openings.center === 864 && ts.openings.right === 432,
     `2000 x 1500 at 1/4-1/2-1/4: ${JSON.stringify(ts)} (clear 1828 less two mullions 50 = 1728, openings by the ratio, every sash less the gap 6)`);
+  ok(ts.mullionExtFace === 90 && LIVE.profile.DEFAULT_SASH_PROFILE.elements.mullion.extFace === 90 && LIVE.profile.normalizeSashProfile({ deductions: {}, elements: { mullion: { face: 50 } }, dedSchema: 2 }).elements.mullion.extFace === 90,
+    `the external mullion board 50 + 20 + 20 = ${ts.mullionExtFace} (profile elements.mullion.extFace; a stored profile without the key takes 90)`);
   ok(ts.openings.left + ts.openings.center + ts.openings.right + 2 * ts.mullionFace === ts.clear && ts.left + ts.center + ts.right + 3 * ts.gap + 2 * ts.mullionFace === ts.clear,
     'the openings and the posts add up to the clear width; the sashes, three gaps and the posts too');
   const tS = T1S.derived.tripleSections;
@@ -154,6 +156,18 @@ section('1 - the engine (unchanged): sections, cut list rows, glass rows');
   ok(glass.length === 6 && glass.map((g) => g.location).join(',') === 'fix L upper,fix L lower,centre upper,centre lower,fix R upper,fix R lower',
     `six glass rows: ${glass.map((g) => `${g.location} ${g.width}x${g.height}`).join(', ')}`);
   ok(glass[0].width === 335 && glass[2].width === 767 && glass[4].width === 335 && glass.every((g) => near(g.height, 610.5)), 'glass widths 335 / 767 / 335 (sash less 91), heights 610.5');
+  // the opening (Piotr 13.10.2026): a triple opens its middle section, bottom only, whatever was stored
+  const tBoth = mk(LIVE, { ...TRIPLE, openingType: 'both' }), tFixed = mk(LIVE, { ...TRIPLE, openingType: 'fixed' });
+  ok(tBoth.spec.sash.openingType === 'bottom' && tFixed.spec.sash.openingType === 'bottom' && T1S.spec.sash.openingType === 'both',
+    `triple openingType: stored 'both' -> ${tBoth.spec.sash.openingType}, stored 'fixed' -> ${tFixed.spec.sash.openingType} (START kept '${T1S.spec.sash.openingType}')`);
+  ok(LIVE.specification.sashOpeningLabel(tBoth.spec) === 'middle section only, bottom only' && LIVE.specification.sashOpeningLabel(mk(LIVE, { openingType: 'both' }).spec) === 'both' && LIVE.specification.sashOpeningLabel(mk(LIVE, { openingType: 'fixed' }).spec) === 'fixed',
+    'sashOpeningLabel: the triple label; a double-hung keeps its stored type');
+  const hw = LIVE.lists.buildHardwareList(tBoth.spec, tBoth.derived), hwS = START.lists.buildHardwareList(T1S.spec, T1S.derived);
+  const pulleys = (l) => l.find((r) => r.item === 'Pulley wheels')?.quantity;
+  ok(pulleys(hw) === 2 && pulleys(hwS) === 4 && JSON.stringify(hw.filter((r) => r.item !== 'Pulley wheels')) === JSON.stringify(hwS.filter((r) => r.item !== 'Pulley wheels')),
+    `triple hardware: pulley wheels ${pulleys(hw)} (one sliding sash; START ${pulleys(hwS)}), every other row equal START`);
+  const dblBoth = mk(LIVE, { openingType: 'both' }), dblBothS = mk(START, { openingType: 'both' });
+  ok(JSON.stringify(LIVE.lists.buildHardwareList(dblBoth.spec, dblBoth.derived)) === JSON.stringify(START.lists.buildHardwareList(dblBothS.spec, dblBothS.derived)) && dblBoth.spec.sash.openingType === 'both', 'double-hung both: hardware and the opening type equal START');
   const d3 = mk(LIVE, { sashType: 'triple', splitRatio: '1/3-1/3-1/3' }).derived;
   ok(d3.tripleSections.left === 570 && d3.tripleSections.center === 570 && d3.tripleSections.right === 570 && d3.tripleSections.openings.left === 576, `1/3-1/3-1/3: ${JSON.stringify(d3.tripleSections)}`);
   const d5 = mk(LIVE, { sashType: 'triple', splitRatio: '1/5-3/5-1/5' }).derived.tripleSections;
@@ -173,6 +187,9 @@ section('2 - tripleDrawUtils: one layout law');
   const T = U.tripleSections(T1.derived);
   ok(T && T.sections.map((s) => `${s.key}:${s.label}:${s.width}/${s.opening}@${s.x}${s.fixed ? ':fixed' : ''}`).join(' ') === 'L:FIX L:426/432@3:fixed C:C:858/864@485 R:FIX R:426/432@1399:fixed',
     `sections ${T.sections.map((s) => `${s.label} ${s.width} in the opening ${s.opening} at x ${s.x}`).join(', ')} (x from the clear opening edge, gap / 2 in)`);
+  ok(T.mullions.map((m) => `${m.extX}+${m.extWidth}`).join(' ') === '412+90 1326+90' && T.mullionExtFace === 90, `the external boards 90 centred on the posts: ${T.mullions.map((m) => `${m.extX} + ${m.extWidth}`).join(', ')}`);
+  const bd = LIVE.tdu.mullionExtBoardD(T.mullions[0], 100, 0, 1000);
+  ok(/^M 512 0 L 602 0 L 602 920 A 20 20 0 0 0 582 940 L 582 1000 L 532 1000 L 532 940 A 20 20 0 0 0 512 920 Z$/.test(bd), `the board path: 90 wide, the foot 50 wide over the bottom 60 with radius 20 curves to 80 (${bd})`);
   ok(T.mullions.map((m) => `${m.label}@${m.x}+${m.width}`).join(' ') === 'MULLION (L)@432+50 MULLION (R)@1346+50' && T.totalWidth === 1828 && T.clear === 1828 && T.gap === 6,
     `mullions at ${T.mullions.map((m) => m.x).join(' and ')}, total ${T.totalWidth} = the clear width, gap ${T.gap}`);
   ok(T.sections.map((s) => s.listLocation).join(',') === 'fix L,centre,fix R', 'the glass-list locations of the sections');
@@ -253,6 +270,10 @@ section('4 - sheets: elevation, box, sash and glass per section');
   const barRects = R.filter((r) => r.w === 22 && r.fill === 'none');
   const centreX = [clearX + 485, clearX + 485 + 858];
   ok(barRects.length === 2 && barRects.every((r) => r.x > centreX[0] && r.x < centreX[1]), `elevation 2x2: ${barRects.length} bar rects, all inside the centre section (the 3D rule: no bars on the fixed sashes)`);
+  const boards = (svg) => (svg.match(/<path d="M [\d.]+ [\d.]+ L [\d.]+ [\d.]+ L [\d.]+ [\d.]+ A 20 20 0 0 0 /g) || []).length;
+  ok(boards(el) === 2, `elevation: ${boards(el)} external mullion boards (90, drainage curves at the foot) over the two posts`);
+  const bL = /<path d="M ([\d.]+) [\d.]+ L ([\d.]+) /.exec(el.slice(el.indexOf('A 20 20 0 0 0') - 400));
+  ok(bL && near(Number(bL[2]) - Number(bL[1]), 90) && near(Number(bL[1]), clearX + 412), `elevation: the left board runs ${bL ? Number(bL[1]) - clearX : '?'} to ${bL ? Number(bL[2]) - clearX : '?'} from the clear edge (412 to 502: the post 432..482 plus 20 a side)`);
   const tx = texts(el);
   ok(['432', '50', '864'].every((s) => tx.includes(s)) && tx.filter((s) => s === '50').length === 2 && tx.filter((s) => s === '432').length === 2, `elevation chain labels (the openings and the posts): ${tx.join(' ')}`);
   ok(/sashes 426 \/ 858 \/ 426 \(gap 6\)/.test(textsOf(el)), 'elevation subtitle: the sash widths and the gap');
@@ -267,7 +288,11 @@ section('4 - sheets: elevation, box, sash and glass per section');
   const DMb = 60 * layoutSc, Mb = 80 * layoutSc, oxb = Mb + DMb * 2;
   const bposts = RB.filter((r) => r.w === 50 && r.h > 1000);
   ok(bposts.length === 2 && near(bposts[0].x, oxb + 86 + 432) && near(bposts[1].x, oxb + 86 + 1346), `box sheet: two posts at frame x ${bposts.map((r) => r.x - oxb).join(' and ')} (liner 86 + 432, 86 + 1346)`);
-  ok(texts(box).includes('MULLION (L) 50 x 1392') && texts(box).includes('MULLION (R) 50 x 1392'), 'box sheet labels: MULLION (L) 50 x 1392, MULLION (R) 50 x 1392 (the cut list record)');
+  ok(texts(box).includes('MULLION (L) 50 x 1392 · EXT 90') && texts(box).includes('MULLION (R) 50 x 1392 · EXT 90'), 'box sheet (external) labels: MULLION (L) 50 x 1392 · EXT 90, the same on the right (the cut list record + the board)');
+  ok(boards(box) === 2, `box sheet external view: ${boards(box)} external mullion boards drawn`);
+  const boxInt = render(LIVE.BoxDetail, { windowSpec: T1.spec, derived: T1.derived, view: 'internal' });
+  ok(boards(boxInt) === 0 && texts(boxInt).includes('MULLION (L) 50 x 1392') && !texts(boxInt).some((t) => /EXT 90/.test(t)) && rectsOf(boxInt).filter((r) => r.w === 50 && r.h > 1000).length === 2,
+    'box sheet internal view: the two posts 50, no external board (as the 3D: nothing on the inside)');
   ok(['432', '864'].every((s) => texts(box).includes(s)) && /openings 432 \/ 864 \/ 432, sashes 426 \/ 858 \/ 426 \(gap 6\)/.test(textsOf(box)), 'box sheet chain 432 / 50 / 864 / 50 / 432 and the subtitle with the openings, the sashes and the gap');
 
   for (const s of T.sections) {
@@ -384,7 +409,7 @@ if (!chromium) {
   await page.locator('button', { hasText: /^Box Detail$/ }).first().click();
   await page.waitForTimeout(300);
   st = await svgTexts();
-  ok(st.filter((t) => /^MULLION \((L|R)\) 50 x 1392$/.test(t)).length === 4, 'Box Detail tab: the two mullion posts labelled (on the tab and in the hidden rig)');
+  ok(st.filter((t) => /^MULLION \((L|R)\) 50 x 1392 · EXT 90$/.test(t)).length === 4, 'Box Detail tab: the two mullion posts labelled with the external board (on the tab and in the hidden rig)');
   await page.locator('button', { hasText: /Glass/ }).first().click();
   await waitText('FIX L Upper Glass');
   const b2 = await body();
@@ -411,6 +436,13 @@ if (!chromium) {
   // ── production pack: seven Elements cards, six glass cards for the triple ──
   await mount(`/projects/${ids.p}/batches/${ids.b}/production-pack`);
   await waitText('TRI');
+  {
+    const row = (name) => page.locator('tr', { has: page.locator('td', { hasText: new RegExp(`^${name}$`) }) });
+    const cells = async (name) => ((await row(name).count()) ? (await row(name).first().locator('td').allInnerTexts()).map((t) => t.trim()) : []);
+    const cTri = await cells('TRI'), cDbl = await cells('DBL');
+    ok(cTri.includes('middle section only, bottom only') && cDbl.includes('both') && !cTri.includes('both'),
+      `pack overview: TRI opening "${cTri.find((t) => /middle/.test(t)) || '-'}", DBL opening "${cDbl.includes('both') ? 'both' : '-'}" (the stored 'both' of the triple never prints)`);
+  }
   await page.locator('button', { hasText: /2D Elements/ }).first().click();
   await waitText('Upper Sash FIX L');
   const b4 = await body();
@@ -428,6 +460,17 @@ if (!chromium) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+section('5b - the printouts name the triple opening (source evidence)');
+{
+  const src = (p) => readFileSync(resolve(ROOT, 'src', p), 'utf8');
+  ok(/c\.sashType === 'triple' \? TRIPLE_OPENING_LABEL/.test(src('utils/estimatePdfExport.js')), 'estimate PDF: the Opening row prints the triple label');
+  ok(/sashOpeningLabel\(wd\.windowSpec\)/.test(src('pages/ProductionPackPage.jsx')), 'pack overview (screen + PDF): the Opening cell comes from sashOpeningLabel');
+  ok(/sashType === 'triple'\s*\?\s*<div[^>]*>Triple sash: \{TRIPLE_OPENING_LABEL\}/.test(src('pages/ConfiguratorPage.jsx')) && /sashType === 'triple' \? TRIPLE_OPENING_LABEL : opening/.test(src('pages/ConfiguratorPage.jsx')),
+    'configurator: a triple shows the fixed opening text instead of the chips, the summary too');
+  ok(/sashType === 'triple'\s*\?\s*<div[^>]*>Triple sash: \{TRIPLE_OPENING_LABEL\}/.test(src('pages/EstimateConfiguratorPage.jsx')), 'estimate configurator: the same');
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 section('6 - controls: double-hung windows equal START');
 {
   const CASES = [
@@ -438,7 +481,7 @@ section('6 - controls: double-hung windows equal START');
     .concat(render(M.FrontElevation, { windowSpec: x.spec, derived: x.derived }), render(M.BoxDetail, { windowSpec: x.spec, derived: x.derived }), render(M.VerticalSection, { windowSpec: x.spec, derived: x.derived }));
   for (const [label, extra] of CASES) {
     const a = mk(LIVE, { width: 1000, height: 1400, ...extra }), b = mk(START, { width: 1000, height: 1400, ...extra });
-    ok(JSON.stringify(a.derived) === JSON.stringify(b.derived), `${label}: derived equal START`);
+    ok(JSON.stringify(a.derived) === JSON.stringify(b.derived) && JSON.stringify(a.spec) === JSON.stringify(b.spec), `${label}: derived and windowSpec equal START`);
     ok(JSON.stringify(sheets(LIVE, a)) === JSON.stringify(sheets(START, b)), `${label}: the two sash sheets, two glass sheets, elevation, box and section byte-identical to START`);
     ok(JSON.stringify(LIVE.elementsPayload.elementsPlan(a.spec, a.derived)) === JSON.stringify(START.elementsPayload.elementsPlan(b.spec, b.derived)), `${label}: the Elements plan equal START`);
     ok(JSON.stringify(LIVE.wsc.windowSpecToConfig(a.spec, a.derived)) === JSON.stringify(START.wsc.windowSpecToConfig(b.spec, b.derived)), `${label}: the 3D config equal START`);

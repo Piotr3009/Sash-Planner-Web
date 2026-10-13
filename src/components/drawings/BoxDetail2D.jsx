@@ -8,7 +8,7 @@ import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './dra
 import { archToSheet, ringBandD, arcLabelPoint, radiiText } from './archDrawUtils.js';
 // Triple sash (Piotr 13.10.2026): the two mullion posts are the engine's (derived.tripleSections, the
 // cut list MULLION rows), laid out by tripleDrawUtils inside the sash area; a double-hung box is unchanged.
-import { tripleSections, tripleMullionRecord } from './tripleDrawUtils.js';
+import { tripleSections, tripleMullionRecord, mullionExtBoardD } from './tripleDrawUtils.js';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
 
@@ -206,11 +206,16 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
                 <g key={`mullion-${m.key}`}>
                   <rect x={X(sashX0 + m.x)} y={Y(fh - BOX.headH)} width={m.width} height={Y(BOX.sillTop) - Y(fh - BOX.headH)}
                     fill={COL.frameFill} stroke={COL.frame} strokeWidth={STROKES.frame} {...NS} />
+                  {/* external view: the external mullion board (50 + 20 + 20) over the post, drainage curves at its foot */}
+                  {!isInternal && (
+                    <path d={mullionExtBoardD(m, X(sashX0), Y(fh - BOX.headH), Y(BOX.sillTop))}
+                      fill={COL.frameFill} stroke={COL.frame} strokeWidth={STROKES.frame} {...NS} />
+                  )}
                   <text x={X(sashX0 + m.x + m.width / 2)} y={Y(fh / 2)} fill={COL.label}
                     fontSize={tfs(SIZES.label, totalW)} fontWeight={WEIGHTS.label}
                     fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}
                     transform={`rotate(-90, ${X(sashX0 + m.x + m.width / 2)}, ${Y(fh / 2)})`}>
-                    {m.label}{mullionLen ? ` ${Math.round(m.width)} x ${mullionLen}` : ''}
+                    {m.label}{mullionLen ? ` ${Math.round(m.width)} x ${mullionLen}` : ''}{!isInternal ? ` · EXT ${Math.round(m.extWidth)}` : ''}
                   </text>
                 </g>
               ))}
@@ -293,7 +298,7 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
           <text x={totalW / 2} y={totalH + 14 * totalW / VIEWBOX_REF} fill={COL.title}
             fontSize={tfs(SIZES.subtitle, totalW)}
             fontFamily={FONT.family} textAnchor="middle">
-            {fw} × {fh} mm{A ? ` · ${A.geometry.label} · ${radiiText(A.geometry.arcs)}` : ''}{T ? ` · triple sash ${windowSpec.sash?.splitRatio || ''} · openings ${T.sections.map((s) => s.opening).join(' / ')}, sashes ${T.sections.map((s) => s.width).join(' / ')} (gap ${T.gap})` : ''}
+            {fw} × {fh} mm{A ? ` · ${A.geometry.label} · ${radiiText(A.geometry.arcs)}` : ''}{T ? ` · triple sash ${windowSpec.sash?.splitRatio || ''} · openings ${T.sections.map((s) => s.opening).join(' / ')}, sashes ${T.sections.map((s) => s.width).join(' / ')} (gap ${T.gap}), mullion ${T.mullionFace}${!isInternal ? ` / ext board ${T.mullionExtFace}` : ''}` : ''}
           </text>
           {windowTag ? <WindowTag tag={windowTag} vbw={totalW} /> : null}
         </svg>

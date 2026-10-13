@@ -6,7 +6,7 @@ import IronmongeryMatrixModal from '../components/IronmongeryMatrixModal.jsx';
 import { GLASS_TYPES, GLASS_FINISHES, FROSTED_LOCATIONS, SPACERS, SPACER_TYPES, SWATCHES, RAL_GROUPS, FB_GROUPS } from '../config.js';
 import { buildVentGrilles } from '../engine/lists.js';
 import { calculatePrice } from '../engine/pricing.js';
-import { SASH_PROPORTIONS, SASH_PROPORTION_OPTIONS, SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, effectiveSashProportion } from '../engine/specification.js';
+import { SASH_PROPORTIONS, SASH_PROPORTION_OPTIONS, SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, effectiveSashProportion, TRIPLE_OPENING_LABEL } from '../engine/specification.js';
 import { meetingFractionFor } from '../engine/calculations.js';
 
 // Reuse the SAME 3D viewer the production configurator uses (window.update3D bridge).
@@ -348,7 +348,11 @@ export default function EstimateConfiguratorPage() {
             {!sameBars && <><Lbl>Lower</Lbl><GChips o={BAR_OPTIONS} v={lBars} c={setLBars} />{lBars === 'custom' && <CBarEd bars={lCustom} maxVal={extW} onAdd={(type) => addBar(setLCustom, lCustom, type)} onChange={(i, v) => updateBarMm(setLCustom, lCustom, i, v)} onFinalize={(i) => finalizeBarMm(setLCustom, lCustom, i)} onRemove={(i) => removeBar(setLCustom, lCustom, i)} />}</>}
           </Sec>
 
-          <Sec t="Opening"><HChips o={OPENINGS} v={opening} c={setOpening} /></Sec>
+          <Sec t="Opening">
+            {sashType === 'triple'
+              ? <div className="text-[11px] text-ink-300 bg-surface-700/50 border border-surface-500 rounded-lg px-3 py-2">Triple sash: {TRIPLE_OPENING_LABEL} (the fixed sections and the middle upper sash never move).</div>
+              : <HChips o={OPENINGS} v={opening} c={setOpening} />}
+          </Sec>
 
           <Sec t="Ventilation">
             <Lbl>Room type</Lbl>
@@ -429,7 +433,7 @@ export default function EstimateConfiguratorPage() {
             <SR l={isSingle ? 'Colour' : 'Exterior'} v={hexToName(isSingle ? woodColor : woodColorExt)} />
             {!isSingle && <SR l="Interior" v={hexToName(woodColorInt)} />}
           </SG>
-          <SG t="Opening"><SR l="Type" v={opening} /></SG>
+          <SG t="Opening"><SR l="Type" v={sashType === 'triple' ? TRIPLE_OPENING_LABEL : opening} /></SG>
           <SG t="Frame"><SR l="Type" v={frameType} /><SR l="Depth" v={`${frameDepth}mm`} /></SG>
           <SG t="Hardware">
             <SR l="Finish" v={ironBespoke ? 'Bespoke' : finishLabel(derivedFinish)} />

@@ -27,10 +27,28 @@ remainder), each sash = its opening less the gap. 2000: openings 432 / 864 / 432
 1828, so the 3D sections differ from the sheets by a few mm (the same approximation the double-hung 3D has had since
 PSW). The sheets carry the engine numbers; the 3D is the configurator's picture.
 
-**32.5 Estimate PDF.** `canvas-renderer.js` (the technical elevation of the estimate PDF) still draws a triple as a
+**32.5 The external mullion board as a part (OPEN, Piotr 13.10.2026 "50 + 20 + 20 outside").** The sheets now draw
+it (profile `elements.mullion.extFace 90`, 17 thick like the box liners, the 3D shape). The cut list still has only
+MULLION (L) / (R) 50x141 x 1392: say whether the board is a separate part to list (EXTERNAL MULLION LINER (L) / (R)
+17 x 90, like EXTERNAL JAMB LINER 17x102) and its length: the mullion length (the 3D draws the board as tall as the
+post, 1392 at H 1500) or the full frame height as the external jamb liners (1500). Then it gets its registry entry,
+BOM mapping, Assign Materials row, pre-cut raw section and colour. Inside: nothing (the 3D), unless you say otherwise.
+
+**32.6 Triple beading and hardware (OPEN).** The engine counts the triple's beading as ONE double-hung frame: staff
+beading one perimeter (the 3D draws three staff-bead frames), parting beading the two jambs + the head (the 3D has a
+parting bead on the CENTRE side of each mullion only; the fixed sections have none). Say the rule and the rows follow.
+The sash lock rule "2 locks over 1200 wide" reads the FRAME width (2000: 2 locks) while a triple's lock sits on the
+858 centre meeting rail: 1 or 2?
+
+**32.7 The triple opening: DECIDED 13.10.2026.** A triple opens its middle section, bottom sash only; the stored
+'both' never prints again (pack overview, estimate PDF, configurators) and the hardware counts the one sliding sash
+(2 pulley wheels). The counterweights of a triple are still computed for both centre sashes (as every bottom-only
+double-hung: pre-existing, say if the fixed upper sash should carry none).
+
+**32.8 Estimate PDF.** `canvas-renderer.js` (the technical elevation of the estimate PDF) still draws a triple as a
 double-hung sash; not touched here (out of the window page scope).
 
-**32.6 PSW.** The same gizmo gating (`showGuides`) applies to PSW's ParametricSashWindow triple branch if PSW ever
+**32.9 PSW.** The same gizmo gating (`showGuides`) applies to PSW's ParametricSashWindow triple branch if PSW ever
 renders the triple with guides off; today PSW only shows it in the configurator, nothing to port.
 
 ---

@@ -105,6 +105,17 @@ export const glassGas = (type) => (type === 'single' || type === 'passive') ? ''
 // fullConfig like `splitRatio`; a missing, null or empty value is 'standard'.
 // The split itself is computed in ONE place: calculations.js sashHeightsFor().
 export const SASH_PROPORTIONS = Object.freeze(['standard', 'cottage-40-60', 'cottage-1-3']);
+
+// Triple sash opening (Piotr 13.10.2026): the middle section opens, bottom sash only; the
+// fixed sections and the middle upper sash never move. The normaliser forces the type,
+// the printouts (pack overview, estimate PDF, the configurators) print the label.
+export const TRIPLE_OPENING_TYPE = 'bottom';
+export const TRIPLE_OPENING_LABEL = 'middle section only, bottom only';
+/** The opening a printout names for a sash window: the triple label, else the stored type. */
+export function sashOpeningLabel(windowSpec) {
+  if (windowSpec?.sash?.type === 'triple') return TRIPLE_OPENING_LABEL;
+  return windowSpec?.sash?.openingType || 'both';
+}
 export const SASH_PROPORTION_LABELS = Object.freeze({
   standard: 'Standard',
   'cottage-40-60': 'Cottage 40/60',
@@ -442,7 +453,11 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
     : (item?.frameDepth || profileBoxDepth(glassType === 'triple' ? 'triple' : frameType));
 
   // Opening type — new: item.openingType
-  const openingType = item?.openingType || item?.opening_type || fc.openingType || 'both';
+  // Triple sash (Piotr 13.10.2026): only the middle section opens, bottom sash only, whatever
+  // was stored ('both' was printed on the PDFs); the hardware list counts the one sliding sash.
+  const storedOpeningType = item?.openingType || item?.opening_type || fc.openingType || 'both';
+  const sashTypeOf = item?.sashType || fc.sashType || 'double';
+  const openingType = sashTypeOf === 'triple' ? TRIPLE_OPENING_TYPE : storedOpeningType;
 
   // Trickle vent — room type drives grille count (Approved Document F, Vol 1).
   // Defaults are deliberately the safest (most ventilation): habitable + sole window.

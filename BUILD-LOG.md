@@ -8,7 +8,7 @@ Verdicts per phase, in execution order.
 
 Piotr, 13.10.2026: "triple window does not work at all: no drawings, no 3D, although the configurator shows it".
 
-### Verdict ✅ the window page, the pack and the PDFs show the triple sash; the engine gives every sash its own running gap (the double-hung rule, Piotr 13.10.2026); the 3D takes the configurator's branch; doubles byte-identical; suite green (34 harnesses, 4265 checks, 0 failures); build OK
+### Verdict ✅ the window page, the pack and the PDFs show the triple sash; the engine gives every sash its own running gap (the double-hung rule, Piotr 13.10.2026); the external mullion board 50 + 20 + 20 on the outside views; the triple opens its middle section, bottom only, on every printout; the 3D takes the configurator's branch; doubles byte-identical; suite green (34 harnesses, 4283 checks, 0 failures); build OK
 
 **Diagnosis (reproduced with the harness lib on main 94ba0a6, 2000 x 1500 at 1/4-1/2-1/4).** The engine derived the
 triple all along: `tripleSections` 431 / 861 / 430 between two mullions of 50 (sash width 1822 less 100), the cut list
@@ -35,9 +35,30 @@ takes the remainder: 432 / 864 / 432), every sash = its opening less `gap` = `de
 `openings`, `gap`, `clear`. Heights, the box rows, the mullion rows and the twelve stile lengths equal START
 (t47 section 1).
 
+**The external mullion board (Piotr 13.10.2026, "the mullion is 50 but outside it is 50 + 20 + 20").** The 3D
+MullionPost draws the post 50 and, on the outside, a board 90 wide and 17 thick with two drainage curves at its foot
+(radius 20, the narrow foot 60 high, full width from 80 up); nothing on the inside but the parting bead on the
+centre side and the staff beads of the three frames. New profile key `elements.mullion.extFace 90`
+(`normalizeSashProfile` fills it on stored copies), `derived.tripleSections.mullionExtFace`, and the elevation and
+the EXTERNAL box view draw the board over the post (`tripleDrawUtils.mullionExtBoardD`, the 3D shape); the internal
+view keeps the post 50. The openings and the sashes do not move (the board lies on the face, 20 over each stile like
+the box liners over the jambs). No cut list row for the board yet: BLOCKERS 32.5.
+
+**The opening (Piotr 13.10.2026, "the PDF says opening both; a triple can only be bottom only, middle section").**
+`normaliseToWindowSpec` forces `sash.openingType 'bottom'` on a triple whatever was stored (so the hardware list
+counts the one sliding sash: 2 pulley wheels, every other row as before); `sashOpeningLabel(windowSpec)` prints
+"middle section only, bottom only" on the pack overview (screen and PDF), the estimate PDF's Opening row, and both
+configurators show that text instead of the opening chips (the summary too). A double-hung window keeps its stored
+type and its hardware (t47 section 1 and 6 controls).
+
 **Change.**
 
-- `calculations.js` `tripleSectionWidths`: the rule above (one function, the only reader of the ratio).
+- `calculations.js` `tripleSectionWidths`: the rule above (one function, the only reader of the ratio);
+  `mullionExtFace` from the profile.
+- `specification.js`: `TRIPLE_OPENING_TYPE`, `TRIPLE_OPENING_LABEL`, `sashOpeningLabel`, the forced opening type
+  of a triple; `profile.js`: `elements.mullion.extFace 90` + the stored-copy fill.
+- `ProductionPackPage.jsx` overview cells, `estimatePdfExport.js`, `ConfiguratorPage.jsx`,
+  `EstimateConfiguratorPage.jsx`: the opening label / text for a triple.
 - `windowSpecToConfig.js`: `sashType` and `splitRatio` from the windowSpec (2 lines). Window page, pack 3D tab and the
   3D PDF now render the configurator's triple (the 3D keeps its own section proportions, as the configurator).
 - `ParametricSashWindow.jsx` (triple branch): the debug axes gizmo (X / Y / Z text) is gated by `showGuides`, like the
@@ -51,8 +72,9 @@ takes the remainder: 432 / 864 / 432), every sash = its opening less `gap` = `de
   line and the lower sash edge per sash, horns on every upper sash (as the cut list and the 3D: six), bars on the
   centre sash only (the 3D rule), the opening chain 432 / 50 / 864 / 50 / 432 under the window, the split, the sash
   widths and the gap in the subtitle.
-- `BoxDetail2D`: the two posts labelled "MULLION (L) 50 x 1392" (the cut list record), the same chain, the openings
-  / sashes / gap in the subtitle.
+- `BoxDetail2D`: the two posts labelled "MULLION (L) 50 x 1392 · EXT 90" on the external view (the cut list record +
+  the board), "MULLION (L) 50 x 1392" on the internal view, the same chain, the openings / sashes / gap / mullion in
+  the subtitle.
 - `SashDetail2D`, `GlassDrawing2D`: a `section` prop; the sheet draws that section's sash / unit (engine width, the
   glass row of its location, title "US (FIX L)", "C UPPER GLASS"); a fixed section carries no bars. Without the prop:
   the double-hung sheet, byte-identical.
@@ -61,7 +83,8 @@ takes the remainder: 432 / 864 / 432), every sash = its opening less `gap` = `de
   hidden rig mounts them by key; `WindowDetailPage` glass panel and `ProductionPackPage` (Elements cards, Glass cards,
   the expand modal): six glass drawings and seven element cards for a triple. Double-hung paths untouched.
 - Fixture `verify/arch/fixtures/rect-sash-sheets.json`, case `triple_6x6` (1800 x 2000, sashes 376 / 758 / 376 in
-  the openings 382 / 764 / 382): four sheets re-blessed after reading the diff. `elevation`: 8 -> 14 rects (6 panes
+  the openings 382 / 764 / 382): four sheets re-blessed after reading the diff (then the elevation and the box once
+  more for the external board: two path elements each and the " · EXT 90" label suffix, nothing else). `elevation`: 8 -> 14 rects (6 panes
   + 2 posts + 6 bars on the centre only), the chain 382 / 50 / 764 / 50 / 382, the subtitle; `box`: 2 post rects, 2
   labels "MULLION (L/R) 50 x 1892", the chain, the subtitle; `glassUpper` / `glassLower` (the harness lib renders
   them WITHOUT a section, a call the app no longer makes for a triple): the fix L row 290 -> 285 mm and its
@@ -71,27 +94,34 @@ takes the remainder: 432 / 864 / 432), every sash = its opening less `gap` = `de
   re-blessed after reading the diff: `tripleSections` 381 / 761 / 380 -> 376 / 758 / 376 plus the new keys (gap 6,
   clear 1628, openings 382 / 764 / 382), the twelve rail rows of the three sashes (the stiles, the box and the
   mullion rows identical), `bars` pane 647 -> 644 with its two vertical centres, the weights (timber 13.73 -> 13.7,
-  glass 22.76 -> 22.65), the six glass rows 290 / 670 / 289 -> 285 / 667 / 285, the pre-cut lengths. Every other
-  case identical.
+  glass 22.76 -> 22.65), the six glass rows 290 / 670 / 289 -> 285 / 667 / 285, the pre-cut lengths; then once more
+  for the one new key `tripleSections.mullionExtFace 90` (cut, glass, precut identical). Every other case identical.
 - `verify/parity/t43_sash_proportions.mjs`: its triple controls (section 7: the 1800 x 1400 and 1800 x 2000 6x6
   windows, the 60 windows under decimal-face profiles) demand byte-identity to its START 719bfba; the archived START
-  now carries the live `tripleSectionWidths` (the one function, copied over the archived one before bundling, a
-  rename or move fails loudly), so those controls keep their full strength and the rule itself is t47's business.
-  237 / 237 as before.
+  now carries the live `tripleSectionWidths` and the profile key it reads (copied over the archived text before
+  bundling, a rename or move fails loudly), so those controls keep their full strength and the rule itself is t47's
+  business; the triple opening type (bottom, 2 pulley wheels) is stated in the two triple checks. 239 / 239.
+- `t38`, `t41` and `t44` default-profile controls: the sash profile equals their START trees but for
+  `elements.mullion.extFace` (stated in each check).
 
-**Proof.** New `verify/parity/t47_triple_sash.mjs` (101 checks): the engine rule (openings, sashes, the gap, the
-three ratios, START's 431 / 861 / 430, heights / box / mullions / stiles equal START); the layout law; the 3D config
+**Proof.** New `verify/parity/t47_triple_sash.mjs` (117 checks): the engine rule (openings, sashes, the gap, the
+three ratios, START's 431 / 861 / 430, heights / box / mullions / stiles equal START, the profile key, the opening
+type and the hardware of a triple against START, the board path); the layout law; the 3D config
 (START sent 'double' for the triple; the page config renders the configurator's meshes, 258 vs the double's 216, tall
 meshes in three x bands); every sheet with the engine numbers (posts at 432 / 1346 from the clear edge, six panes 312
 / 744 / 312 starting gap 3 + stile 57 into each opening, bars in the centre only, six horns, MULLION labels, the
-chain and the subtitle, per-section sash and glass sheets without a bar alarm); the Elements plan; the window detail
-page and the production pack in a browser (three sheets per sash tab, six glass drawings 767 / 335 mm, seven Elements
-cards, six glass cards, the double-hung window unchanged); controls: five double-hung windows and the arched sash
-byte-identical to START (derived, sheets, plan, 3D config). Full suite on the final tree: 34 harnesses, 4265 checks,
-0 failures (`verify/arch/t16`..`t33`, `verify/parity/t31`..`t47`; t22 118 after the fixture re-bless); `npm run
-build` OK. `docs/handover/samples/` restored after the run (t22 rewrites them).
+chain and the subtitle, the two external boards on the elevation and the external box view and none on the internal
+view, per-section sash and glass sheets without a bar alarm); the Elements plan; the printouts' source; the window
+detail page and the production pack in a browser (three sheets per sash tab, six glass drawings 767 / 335 mm, seven
+Elements cards, six glass cards, the overview Opening cell "middle section only, bottom only" for the triple and
+"both" for the double, the double-hung window unchanged); controls: five double-hung windows and the arched sash
+byte-identical to START (derived, windowSpec, sheets, plan, 3D config). Full suite on the final tree: 34 harnesses,
+4283 checks, 0 failures (`verify/arch/t16`..`t33`, `verify/parity/t31`..`t47`; t22 118 after the fixture re-bless);
+`npm run build` OK. `docs/handover/samples/` restored after the run (t22 rewrites them).
 
-**Not changed (BLOCKERS 13.10).** Bars on a triple in the lists / glass PDF / DXF / beading; the estimate PDF canvas
+**Not changed (BLOCKERS 13.10).** Bars on a triple in the lists / glass PDF / DXF / beading; the triple beading
+(staff beads of three frames, parting beads on the centre side of the mullions) and the sash lock count by the
+frame width; the external mullion board as a cut list part (its length and material: owner); the estimate PDF canvas
 elevation (`canvas-renderer.js`) still draws a triple as a double; the 3D's own proportions (its inner width).
 
 ---

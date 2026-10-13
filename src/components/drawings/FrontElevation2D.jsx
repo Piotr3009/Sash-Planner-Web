@@ -12,7 +12,7 @@ import { CONSTANTS, sashBarPattern } from '../../engine/calculations.js';
 import { computeBarPositions, DimH, DimV, DimChainH, TitleBlock, tfs, HORN_DEF, HORN_W, buildHornPath, WindowTag } from './drawingUtils.jsx';
 // Triple sash (Piotr 13.10.2026): the three sections and the two mullion posts are the engine's
 // (derived.tripleSections), laid out by tripleDrawUtils; a double-hung sash takes the path below unchanged.
-import { tripleSections } from './tripleDrawUtils.js';
+import { tripleSections, mullionExtBoardD } from './tripleDrawUtils.js';
 import { COLORS, FONT_FAMILY, SIZES, STROKES, VIEWBOX_REF, WEIGHTS } from './drawingTheme.js';
 // Arched sash (ARCHED-WINDOWS-v3 Block 1 H): every arc is the engine's ArcChain (derived.arch) serialised
 // by archDrawUtils — box head ring, upper sash top rail ring, upper glass outline, bars — never re-derived here.
@@ -374,9 +374,14 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber , 
         {T && (
           <g>
             {T.mullions.map((m) => (
-              <rect key={`mullion-${m.key}`} x={clearX + m.x} y={SY(fh - BOX.headH)}
-                width={m.width} height={SY(BOX.sillTop) - SY(fh - BOX.headH)}
-                fill={COL.frameFill} stroke={COL.frame} strokeWidth={STROKES.frame} {...NS} />
+              <g key={`mullion-${m.key}`}>
+                <rect x={clearX + m.x} y={SY(fh - BOX.headH)}
+                  width={m.width} height={SY(BOX.sillTop) - SY(fh - BOX.headH)}
+                  fill={COL.frameFill} stroke={COL.frame} strokeWidth={STROKES.frame} {...NS} />
+                {/* the external mullion board (50 + 20 + 20) over the post, seen from outside; drainage curves at its foot */}
+                <path d={mullionExtBoardD(m, clearX, SY(fh - BOX.headH), SY(BOX.sillTop))}
+                  fill={COL.frameFill} stroke={COL.frame} strokeWidth={STROKES.frame} {...NS} />
+              </g>
             ))}
             <DimChainH y={oy + fh + DM * 0.55} extFrom={oy + fh}
               cuts={[clearX, ...T.mullions.flatMap((m) => [clearX + m.x, clearX + m.x + m.width]), clearX + T.clear]}

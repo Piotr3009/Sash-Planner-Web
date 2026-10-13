@@ -16,7 +16,7 @@ import { useMaterialStore } from '../stores/materialStore.js';
 import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
 import { mergeWindowMaterials, formatQty, makeRawResolver, assignedMaterialForItems } from '../engine/bom.js';
 import { summarizeWindows } from '../utils/batchSummary.js';
-import { SASH_PROPORTION_LABELS, isCottageProportion } from '../engine/specification.js';
+import { SASH_PROPORTION_LABELS, isCottageProportion, sashOpeningLabel } from '../engine/specification.js';
 import { deriveWindowBounded, splitBounded, excludedWindowsNote, sashBarsLabel } from '../utils/windowBoundary.js';
 import { deriveWindowData } from '../engine/calculations.js';
 import { withProfiles, getCasementProfile, bsuiteActiveTarget } from '../engine/profile.js';
@@ -722,7 +722,8 @@ function overviewCells(wd) {
     proportion: wd?.windowSpec?.category === 'sash' && isCottageProportion(wd?.windowSpec?.sash?.proportion)
       ? SASH_PROPORTION_LABELS[wd.windowSpec.sash.proportion] : '',
     head: win.headType || 'flat',
-    opening: win.openingType || 'both',
+    // triple sash (Piotr 13.10.2026): "middle section only, bottom only", never the stored 'both'
+    opening: wd?.windowSpec?.category === 'sash' && wd.windowSpec.sash?.type === 'triple' ? sashOpeningLabel(wd.windowSpec) : (win.openingType || 'both'),
     box: win.frameDepth || (win.glassType === 'triple' ? 172 : win.frameType === 'slim' ? 144 : 164),
   };
 }

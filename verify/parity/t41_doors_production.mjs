@@ -737,8 +737,11 @@ section('17 - controls: casement and sash equal to START');
     ok(JSON.stringify(sansElement(ga)) === JSON.stringify(sansPrefix(gb)) && ga.every((x) => typeof x.element === 'string' && x.element.length > 0),
       `${name}: grouped cut list equal to START but for the dropped C prefix; every group carries its element`);
   }
-  ok(JSON.stringify(profile.DEFAULT_CASEMENT_PROFILE) === JSON.stringify(START.profile.DEFAULT_CASEMENT_PROFILE) && JSON.stringify(profile.DEFAULT_SASH_PROFILE) === JSON.stringify(START.profile.DEFAULT_SASH_PROFILE),
-    'casement and sash default profiles equal to START');
+  // 13.10.2026 (Piotr): the sash profile gained elements.mullion.extFace 90 (the external mullion board of a
+  // triple sash); the casement profile and every other sash key must still equal START
+  const sashSansExtFace = (() => { const c = JSON.parse(JSON.stringify(profile.DEFAULT_SASH_PROFILE)); delete c.elements.mullion.extFace; return c; })();
+  ok(JSON.stringify(profile.DEFAULT_CASEMENT_PROFILE) === JSON.stringify(START.profile.DEFAULT_CASEMENT_PROFILE) && JSON.stringify(sashSansExtFace) === JSON.stringify(START.profile.DEFAULT_SASH_PROFILE),
+    'casement and sash default profiles equal to START (but for the sash elements.mullion.extFace 90 of 13.10.2026)');
 }
 
 section('18 - door sheets: the components the screen, the PDFs and the pack mount');

@@ -13,7 +13,7 @@ import {
 } from '../engine/arch.js';
 import { DEFAULT_DOOR_PROFILE, getCasementProfile, getDoorProfile, getWindowProfile } from '../engine/profile.js';
 import { casementFrameDims, doorFrameDims, doorGeometryFromSpec } from '../utils/windowSpecToConfig.js';
-import { normaliseToWindowSpec, SASH_PROPORTIONS, SASH_PROPORTION_OPTIONS, SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, effectiveSashProportion } from '../engine/specification.js';
+import { normaliseToWindowSpec, SASH_PROPORTIONS, SASH_PROPORTION_OPTIONS, SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, effectiveSashProportion, TRIPLE_OPENING_LABEL } from '../engine/specification.js';
 import { CONSTANTS, meetingFractionFor } from '../engine/calculations.js';
 import CasementLayoutPicker from '../components/configurator/CasementLayoutPicker.jsx';
 import NumInput from '../components/NumInput.jsx';
@@ -1175,7 +1175,11 @@ export default function ConfiguratorPage() {
             {!sameBars && <><Lbl>Lower</Lbl><GChips o={BAR_OPTIONS} v={lBars} c={setLBars} />{lBars === 'custom' && <CBarEd bars={lCustom} maxVal={extW} onAdd={type => addBar(setLCustom, lCustom, type)} onChange={(i, v) => updateBarMm(setLCustom, lCustom, i, v)} onFinalize={i => finalizeBarMm(setLCustom, lCustom, i)} onRemove={i => removeBar(setLCustom, lCustom, i)} />}</>}
           </Sec>}
 
-          {isSash && <Sec t="Opening"><HChips o={OPENINGS} v={opening} c={setOpening} /></Sec>}
+          {isSash && <Sec t="Opening">
+            {sashType === 'triple'
+              ? <div className="text-[11px] text-ink-300 bg-surface-700/50 border border-surface-500 rounded-lg px-3 py-2">Triple sash: {TRIPLE_OPENING_LABEL} (the fixed sections and the middle upper sash never move).</div>
+              : <HChips o={OPENINGS} v={opening} c={setOpening} />}
+          </Sec>}
 
           {/* ── Doors — every PSW choice, one shared set for single and french.
                Transom is french-only; PSW hides it the same way. ── */}
@@ -1425,7 +1429,7 @@ export default function ConfiguratorPage() {
             <SR l="Wider" v={sillWider ? '+50mm each side' : 'No'} />
             <SR l="Seal" v={sealColour === 'black' ? 'Black' : 'White'} />
           </SG>}
-          {isSash && <SG t="Opening"><SR l="Type" v={opening} /></SG>}
+          {isSash && <SG t="Opening"><SR l="Type" v={sashType === 'triple' ? TRIPLE_OPENING_LABEL : opening} /></SG>}
           <SG t="Hardware">
             <SR l="PAS24" v={pas24 ? 'Yes' : 'No'} />
             <SR l="Ironmongery" v={iron} />

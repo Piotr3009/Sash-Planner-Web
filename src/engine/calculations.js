@@ -336,10 +336,13 @@ function calculateSashComponentSet(windowSpec, settings, sashWidth, topSashHeigh
 // 13.10.2026 the split ran on the double sash width (one gap for the whole window),
 // so each sash came out 4 to 5 mm too wide; the 3D (sideGap 3 a side) was right.
 // `left` / `center` / `right` stay the SASH widths (the cut list, the glass rows, the
-// sheets); `openings` are the section openings the mullion posts bound.
+// sheets); `openings` are the section openings the mullion posts bound;
+// `mullionExtFace` is the external mullion board seen from outside (50 + 20 + 20 = 90,
+// Piotr 13.10.2026), drawn by the elevation and the external box sheet, no part row yet.
 function tripleSectionWidths(windowSpec, sashWidth) {
     const prof = getWindowProfile();
     const mullionFace = prof.elements.mullion?.face || 50;
+    const mullionExtFace = Number(prof.elements.mullion?.extFace) || mullionFace;
     const split = windowSpec.sash?.splitRatio || '1/4-1/2-1/4';
     let leftR = 0.25, centerR = 0.5;
     if (split === '1/3-1/3-1/3') { leftR = 1 / 3; centerR = 1 / 3; }
@@ -355,7 +358,7 @@ function tripleSectionWidths(windowSpec, sashWidth) {
     const centerOpen = half(avail - leftOpen - rightOpen);
     return {
         left: leftOpen - gap, center: centerOpen - gap, right: rightOpen - gap,
-        mullionFace, gap, clear,
+        mullionFace, mullionExtFace, gap, clear,
         openings: { left: leftOpen, center: centerOpen, right: rightOpen },
     };
 }

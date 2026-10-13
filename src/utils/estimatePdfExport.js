@@ -9,7 +9,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { drawTechnicalElevation } from '../engine/canvas-renderer.js';
-import { normaliseToWindowSpec, SASH_PROPORTION_LABELS, isCottageProportion } from '../engine/specification.js';
+import { normaliseToWindowSpec, SASH_PROPORTION_LABELS, isCottageProportion, TRIPLE_OPENING_LABEL } from '../engine/specification.js';
 
 const A4 = { w: 210, h: 297 };
 const MARGIN = 15;
@@ -143,7 +143,7 @@ export function exportEstimatePdf(estimate, opts = {}) {
       ['Bars', `${c.upperBars || 'none'}${c.sameBars ? '' : ` / ${c.lowerBars || 'none'}`}`],
       ['Glass', `${c.glassType || 'double'} · ${c.glassFinish || 'clear'}`],
       ['Colour', colourTxt],
-      ['Opening', c.openingType || 'both'],
+      ['Opening', c.sashType === 'triple' ? TRIPLE_OPENING_LABEL : (c.openingType || 'both')],   // triple: the middle section, bottom only (13.10.2026)
       ['Ironmongery', isBespoke ? 'Bespoke (priced separately)' : (c.ironmongery || 'brass')],
       ['PAS24', c.pas24 ? 'Yes' : 'No'],
     ];

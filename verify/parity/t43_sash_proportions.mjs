@@ -11,9 +11,10 @@
  * t43_sash_proportions: cottage sash proportions (Piotr 09.10.2026), measured on the
  * derived data and on the components that reach the screen, against the start of
  * this tura (default 719bfba, `git archive`; pass another ref as the first argument).
- * Since 13.10.2026 the archived START carries the live `tripleSectionWidths` (the triple
- * section rule moved on purpose, Piotr 13.10.2026; the rule itself is t47's business), so
- * the triple controls here still demand byte-identity.
+ * Since 13.10.2026 the archived START carries the live `tripleSectionWidths` and the profile
+ * key it reads (elements.mullion.extFace 90): the triple section rule moved on purpose
+ * (Piotr 13.10.2026; the rule itself is t47's business), so the triple controls here still
+ * demand byte-identity; the triple opening type (bottom only) is accounted for in section 7.
  *
  *   1  the owner box table (CLAUDE.md 3.3): every row of a double 1000 wide, total /
  *      top / bottom to 0.001, the upper and lower glass units to 0.01, the stiles and
@@ -78,6 +79,13 @@ execFileSync('sh', ['-c', `git archive ${startHash} src | tar -x -C "${startTree
   const liveFn = fnOf(liveCalc), startFn = fnOf(startCalc);
   if (!liveFn || !startFn) throw new Error('tripleSectionWidths not found in the live or the START calculations.js');
   writeFileSync(startCalcPath, startCalc.replace(startFn, liveFn));
+  // and the one profile key that function reads since 13.10.2026: elements.mullion.extFace 90 (the external
+  // mullion board); the archived default profile gets it, so the triple derived data stays byte-comparable
+  const startProfilePath = resolve(startTree, 'src', 'engine', 'profile.js');
+  const startProfile = readFileSync(startProfilePath, 'utf8');
+  const mullionLine = /mullion:\s*\{ face: 50, raw: '63x63' \},/.exec(startProfile);
+  if (!mullionLine) throw new Error('elements.mullion not found in the START profile.js');
+  writeFileSync(startProfilePath, startProfile.replace(mullionLine[0], "mullion: { face: 50, extFace: 90, raw: '63x63' },"));
 }
 
 const ESBUILD = ['-y', 'esbuild@0.25.0'];
@@ -501,12 +509,18 @@ for (const [name, w, h, fc, extra = {}] of STD_REF) {
   ok(JSON.stringify(L.buildCutListForWindow(a.derived, a.spec)) === JSON.stringify(S.buildCutListForWindow(b.derived, b.spec))
     && JSON.stringify(L.buildGlassListForWindow(a.derived, a.spec)) === JSON.stringify(S.buildGlassListForWindow(b.derived, b.spec))
     && JSON.stringify(L.buildPrecutForWindow(a.derived, a.spec, {}, null)) === JSON.stringify(S.buildPrecutForWindow(b.derived, b.spec, {}, null))
-    && JSON.stringify(L.buildHardwareList(a.spec, a.derived)) === JSON.stringify(S.buildHardwareList(b.spec, b.derived))
+    && JSON.stringify(L.buildHardwareList(a.spec, a.derived)) === JSON.stringify(fc.sashType === 'triple'
+      // 13.10.2026: the triple's one sliding sash takes 2 pulley wheels (START counted 4 for the stored 'both')
+      ? S.buildHardwareList(b.spec, b.derived).map((r) => (r.item === 'Pulley wheels' ? { ...r, quantity: 2 } : r))
+      : S.buildHardwareList(b.spec, b.derived))
     && JSON.stringify(LIVE.bom.buildWindowPartQtys(a.derived, a.spec, {})) === JSON.stringify(START.bom.buildWindowPartQtys(b.derived, b.spec, {})),
-    `${name}: cut list, glass list, pre-cut, hardware and BOM part quantities equal to START`);
+    `${name}: cut list, glass list, pre-cut, hardware and BOM part quantities equal to START${fc.sashType === 'triple' ? ' (triple: 2 pulley wheels, the 13.10.2026 opening rule)' : ''}`);
   // 09.10.2026 (box item 16): the windowSpec also carries grid.upper / grid.lower; on these windows both
   // sashes have the same pattern, equal to the legacy grid.mode
   const sa = specWithoutPerSash(a.spec), sb = clone(b.spec); delete sa.sash.proportion;
+  // 13.10.2026 (Piotr): a triple sash opens its middle section, bottom only: the normaliser forces
+  // openingType 'bottom' (START kept the stored 'both'); nothing else moves on the triple spec
+  if (fc.sashType === 'triple') { ok(sa.sash.openingType === 'bottom' && sb.sash.openingType === 'both', `${name}: openingType bottom (13.10.2026 rule; START both)`); sb.sash.openingType = 'bottom'; }
   ok(JSON.stringify(sa) === JSON.stringify(sb) && a.spec.sash.proportion === 'standard' && a.spec.sash.grid.upper.mode === a.spec.sash.grid.mode && a.spec.sash.grid.lower.mode === a.spec.sash.grid.mode,
     `${name}: windowSpec equal to START but for sash.proportion 'standard' and the per-sash grid (both ${a.spec.sash.grid.mode})${extra.upperBars ? ` (grid ${a.spec.sash.grid.mode})` : ''}`);
 }

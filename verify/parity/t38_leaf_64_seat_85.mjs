@@ -181,7 +181,11 @@ section('0 - profile numbers');
   ok(same(stripRef(P), stripRef(Q)), 'against REF every other key of the casement profile is unchanged (frame 68 x 93, leaf depth 57, deductions.leaf*, every other length)');
   const stripStart = (p) => { const c = clone(p); delete c.leafSchema; delete c.elements.leafBottom; return c; };
   ok(same(stripStart(P), stripStart(T)), 'against START only leafBottom.face and leafSchema moved (stiles, top rail, glass 105, seat 8.5, frame, every deduction and length equal)');
-  ok([REF, START].every((M) => same(LIVE.profile.DEFAULT_SASH_PROFILE, M.profile.DEFAULT_SASH_PROFILE)), 'sash default profile unchanged against both trees');
+  // 13.10.2026 (Piotr): elements.mullion.extFace 90 (the external mullion board of a triple sash, 50 + 20 + 20)
+  // is the ONE key added to the sash default profile since; everything else must still equal both trees
+  const sansExtFace = (p) => { const c = clone(p); if (c.elements?.mullion) delete c.elements.mullion.extFace; return c; };
+  ok([REF, START].every((M) => same(sansExtFace(LIVE.profile.DEFAULT_SASH_PROFILE), M.profile.DEFAULT_SASH_PROFILE)) && LIVE.profile.DEFAULT_SASH_PROFILE.elements.mullion.extFace === 90,
+    'sash default profile unchanged against both trees but for elements.mullion.extFace 90 (13.10.2026)');
   // 08.10.2026: the doors tura moved the door profile to schema 2 (owner box; t41). Both trees carry
   // door schema 1; the casement change of THIS harness never touched it: migrated, each tree's door
   // profile equals the live default on every number the engine reads.

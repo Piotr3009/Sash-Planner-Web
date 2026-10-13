@@ -36,12 +36,14 @@ const LIST_LOCATION = { L: 'fix L', C: 'centre', R: 'fix R' };
  * clear opening between the internal jamb liners (frame x = (frameWidth - clear) / 2),
  * or null for a double-hung.
  * { sections: [{ key, label, index, width, opening, fixed, x, listLocation }],
- *   mullions: [{ key, label, x, width }], mullionFace, gap, clear, totalWidth }
+ *   mullions: [{ key, label, x, width, extX, extWidth }], mullionFace, mullionExtFace, gap, clear, totalWidth }
+ * A mullion's `extX` / `extWidth` is the external board (50 + 20 + 20) centred on the post.
  */
 export function tripleSections(derived) {
   const t = derived?.tripleSections;
   if (!t) return null;
   const mullionFace = Number(t.mullionFace) || 0;
+  const mullionExtFace = Number(t.mullionExtFace) || mullionFace;   // the external board, centred on the post
   const gap = Number(t.gap) || 0;
   const op = t.openings || {};
   const defs = [
@@ -56,12 +58,13 @@ export function tripleSections(derived) {
     sections.push({ ...s, index, x: x + gap / 2, listLocation: LIST_LOCATION[s.key] });
     x += s.opening;
     if (index < 2) {
-      mullions.push({ key: index === 0 ? 'L' : 'R', label: `MULLION (${index === 0 ? 'L' : 'R'})`, x, width: mullionFace });
+      mullions.push({ key: index === 0 ? 'L' : 'R', label: `MULLION (${index === 0 ? 'L' : 'R'})`, x, width: mullionFace,
+        extWidth: mullionExtFace, extX: x - (mullionExtFace - mullionFace) / 2 });
       x += mullionFace;
     }
   });
   const clear = Number(t.clear) || x;
-  return { sections, mullions, mullionFace, gap, clear, totalWidth: x };
+  return { sections, mullions, mullionFace, mullionExtFace, gap, clear, totalWidth: x };
 }
 
 /** The sheet / rig key of one section's sash sheet: 'upperL', 'lowerC', ... */
@@ -78,4 +81,28 @@ export function tripleSheetLabel(type, section) {
 export function tripleMullionRecord(derived, key = 'L') {
   const rows = derived?.components?.sash || [];
   return rows.find((c) => c.elementName === `MULLION (${key})`) || null;
+}
+
+/**
+ * The external mullion board seen from outside (3D MullionPost extBoard): the board
+ * `m.extWidth` wide (50 + 20 + 20) runs from `yTop` to `yBottom` (SVG, y down) and
+ * narrows to the post at its foot through two drainage curves: radius 20, the
+ * narrow foot 60 high, full width from 80 up (the 3D shape, schematic like BOX.bulge).
+ * Returns the SVG path in sheet units, x from `x0` (the clear opening's left edge).
+ */
+export const EXT_BOARD_FOOT = Object.freeze({ r: 20, step: 60, top: 80 });
+export function mullionExtBoardD(m, x0, yTop, yBottom) {
+  const { r, step, top } = EXT_BOARD_FOOT;
+  const xl = x0 + m.extX, xr = x0 + m.extX + m.extWidth;
+  const inset = Math.min(r, (m.extWidth - m.width) / 2);
+  if (yBottom - yTop <= top || inset <= 0) {
+    return `M ${xl} ${yTop} L ${xr} ${yTop} L ${xr} ${yBottom} L ${xl} ${yBottom} Z`;
+  }
+  return [
+    `M ${xl} ${yTop}`, `L ${xr} ${yTop}`, `L ${xr} ${yBottom - top}`,
+    `A ${inset} ${inset} 0 0 0 ${xr - inset} ${yBottom - step}`,
+    `L ${xr - inset} ${yBottom}`, `L ${xl + inset} ${yBottom}`, `L ${xl + inset} ${yBottom - step}`,
+    `A ${inset} ${inset} 0 0 0 ${xl} ${yBottom - top}`,
+    'Z',
+  ].join(' ');
 }
