@@ -2784,8 +2784,8 @@ export default function ParametricSashWindow({
           </group>
         )}
 
-        {/* ═══ AXES GIZMO ═══ */}
-        <AxesGizmo origin={[w / 2 + mm(200), -h / 2, 0]} size={120} />
+        {/* ═══ AXES GIZMO (a guide: the configurator shows it, the window page / pack / PDF pass showGuides false; 13.10.2026) ═══ */}
+        {showGuides && <AxesGizmo origin={[w / 2 + mm(200), -h / 2, 0]} size={120} />}
 
       </group>
     );

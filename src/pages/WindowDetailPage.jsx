@@ -21,6 +21,8 @@ import CasementGlassDrawing2D from '../components/drawings/CasementGlassDrawing2
 import { groupCasementGlass } from '../components/drawings/casementDrawUtils.js';
 import DoorGlassDrawing2D from '../components/drawings/DoorGlassDrawing2D.jsx';
 import { groupDoorGlass } from '../components/drawings/doorDrawUtils.js';
+// Triple sash (Piotr 13.10.2026): one glass drawing per section and sash (FIX L / C / FIX R)
+import { tripleSections } from '../components/drawings/tripleDrawUtils.js';
 import CutListPanel from '../components/dashboard/CutListPanel.jsx';
 import PreCutPanel from '../components/dashboard/PreCutPanel.jsx';
 import ThreeDPanel from '../components/dashboard/ThreeDPanel.jsx';
@@ -540,6 +542,15 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
             </div>
           ))}
           </div>
+        </div>
+      ) : tripleSections(derived) ? (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          {['upper', 'lower'].flatMap((type) => tripleSections(derived).sections.map((sec) => (
+            <div key={`${type}${sec.key}`} className="card p-4">
+              <div className="text-xs font-semibold text-ink-200 mb-2">{sec.label} {type === 'upper' ? 'Upper' : 'Lower'} Glass</div>
+              <GlassDrawing2D windowSpec={windowSpec} derived={derived} type={type} section={sec} />
+            </div>
+          )))}
         </div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">

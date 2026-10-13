@@ -40,7 +40,10 @@ function segmentsBetween(from, to, cutPairs) {
   return segs;
 }
 
-export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' , windowTag }) {
+// `section` (triple sash, Piotr 13.10.2026): one of tripleDrawUtils.tripleSections(derived).sections.
+// The sheet then draws THAT section's unit: the glass-list row of its location ('fix L upper', 'centre
+// lower', ...), the section's engine width for the bar check; a fixed section carries no bars (the 3D rule).
+export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' , windowTag, section = null }) {
   // Arched sash (v3 Block 1 H): the upper unit is the engine's arched outline — the same sheet the
   // arched casement uses (outline, edge cover, spacer bands, bar-end dimensioning). Lower sash: rectangular below.
   const archedUpper = type === 'upper' && !!derived?.arch?.glassOutline && !derived?.casement;
@@ -48,7 +51,7 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' , w
     if (archedUpper) return null;
     if (!windowSpec || !derived) return null;
     const isUpper = type === 'upper';
-    const sashW = derived.sashWidth;
+    const sashW = section ? section.width : derived.sashWidth;
     const topH = derived.topSashHeight;
     const botH = derived.bottomSashHeight;
 
@@ -56,7 +59,9 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' , w
     // Schedule table (live profile faces). No local deduction math — the old
     // baked 100/133 constants lied the moment rails were edited (642.5 bug).
     const gRows = buildGlassListForWindow(derived, windowSpec) || [];
-    const gRow = gRows[isUpper ? 0 : 1];
+    const gRow = section
+      ? gRows.find((r) => r.location === `${section.listLocation} ${isUpper ? 'upper' : 'lower'}`)
+      : gRows[isUpper ? 0 : 1];
     const glassW = gRow ? gRow.width : sashW - 114 + 2 * REBATE;
     const glassH = gRow ? gRow.height : (isUpper ? topH - 100 : botH - 133) + 2 * REBATE;
     // Edge seal (perimeter spacer line) per glass type from the casement profile glazier block
@@ -64,7 +69,7 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' , w
 
     // bars per sash (Piotr 09.10.2026, owner box item 16): the pattern of THIS unit's
     // row (the glass schedule, PDF and DXF read the same row.bars)
-    const gridMode = gRow?.bars || sashBarPattern(windowSpec, isUpper ? 'upper' : 'lower');
+    const gridMode = section?.fixed ? 'none' : (gRow?.bars || sashBarPattern(windowSpec, isUpper ? 'upper' : 'lower'));
     const BAR_PATTERNS = {
       'none': { h: 0, v: 0 }, '2x2': { h: 0, v: 1 }, '3x3': { h: 0, v: 2 },
       '4x4': { h: 1, v: 1 }, '6x6': { h: 1, v: 2 }, '8x8': { h: 1, v: 3 }, '9x9': { h: 2, v: 2 },
@@ -140,7 +145,7 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' , w
     return { glassW, glassH, vBars: bars.vBars, hBars: bars.hBars,
       vCount, hCount, hCuts, vCuts, checkOk, errs, edgeSeal: EDGE_SEAL,
       glassType, glassFinish, spacerColour, spacerType, isFrosted, isUpper };
-  }, [windowSpec, derived, type]);
+  }, [windowSpec, derived, type, section]);
 
   if (archedUpper) {
     const finish = (windowSpec?.glazing?.finish === 'frosted' && (windowSpec?.glazing?.frostedLocation || 'bottom') === 'both') ? 'frosted' : 'clear';
@@ -165,7 +170,7 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' , w
 
         {/* Frosted hatch pattern — fine diagonal lines, subtle */}
         <defs>
-          <pattern id={`frost-${d.isUpper ? 'u' : 'l'}`} width={14 * layoutSc} height={14 * layoutSc}
+          <pattern id={`frost-${d.isUpper ? 'u' : 'l'}${section ? `-${section.key}` : ''}`} width={14 * layoutSc} height={14 * layoutSc}
             patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <line x1="0" y1="0" x2="0" y2={14 * layoutSc}
               stroke={COLORS.glass} strokeWidth={0.5} {...NS} strokeOpacity={0.45} />
@@ -186,7 +191,7 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' , w
         {d.isFrosted && (
           <rect x={ox + d.edgeSeal} y={oy + d.edgeSeal}
             width={d.glassW - 2 * d.edgeSeal} height={d.glassH - 2 * d.edgeSeal}
-            fill={`url(#frost-${d.isUpper ? 'u' : 'l'})`} stroke="none" />
+            fill={`url(#frost-${d.isUpper ? 'u' : 'l'}${section ? `-${section.key}` : ''})`} stroke="none" />
         )}
 
         {/* Vertical spacer bars — two parallel lines, broken at h-bar intersections */}
@@ -262,7 +267,7 @@ export default function GlassDrawing2D({ windowSpec, derived, type = 'upper' , w
         <text x={totalW / 2} y={totalH - 13.8 * ts}
           fill={COLORS.title} fontSize={tfs(SIZES.title, totalW)} fontFamily={FONT.family}
           textAnchor="middle" fontWeight={WEIGHTS.title}>
-          {d.isUpper ? 'UPPER' : 'LOWER'} GLASS
+          {section ? `${section.label} ` : ''}{d.isUpper ? 'UPPER' : 'LOWER'} GLASS
         </text>
         <text x={totalW / 2} y={totalH - 4 * ts}
           fill={STROKE.glass} fontSize={tfs(SIZES.subtitle * 1.25, totalW)} fontFamily={FONT.family}

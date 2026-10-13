@@ -23,6 +23,7 @@
  */
 import { groupCasementLeaves, paneTitle } from '../components/drawings/casementDrawUtils.js';
 import { doorSheetPlan } from '../components/drawings/doorDrawUtils.js';
+import { tripleSections, tripleSheetKey, tripleSheetLabel } from '../components/drawings/tripleDrawUtils.js';
 import { svgNodeToPng } from './svgRaster.js';
 
 /**
@@ -56,12 +57,23 @@ export function elementsPlan(windowSpec, derived) {
   }
 
   if (category === 'sash') {
-    const drawings = [
-      { key: 'box', label: 'Box Detail' },
-      { key: 'upper', label: 'Upper Sash' },
-      { key: 'lower', label: 'Lower Sash' },
-    ];
-    return { category, supported: true, leafGroups: [], rig: drawings.map((d) => d.key), hero: null, drawings, cill: null };
+    // Triple sash (Piotr 13.10.2026): the box, then one sash sheet per section
+    // (FIX L, C, FIX R) for the upper and the lower sash, the keys the Drawings
+    // panel rig and the production pack mount (tripleDrawUtils, one law).
+    const T = tripleSections(derived);
+    const drawings = T
+      ? [
+          { key: 'box', label: 'Box Detail' },
+          ...['upper', 'lower'].flatMap((type) => T.sections.map((section) => ({
+            key: tripleSheetKey(type, section), label: tripleSheetLabel(type, section), type, section,
+          }))),
+        ]
+      : [
+          { key: 'box', label: 'Box Detail' },
+          { key: 'upper', label: 'Upper Sash' },
+          { key: 'lower', label: 'Lower Sash' },
+        ];
+    return { category, supported: true, leafGroups: [], rig: drawings.map((d) => d.key), hero: null, drawings, cill: null, ...(T ? { sashSections: T.sections } : {}) };
   }
 
   // Doors (08.10.2026, doors to production): the frame detail is the hero

@@ -55,6 +55,8 @@ import DoorSheet from '../components/drawings/DoorSheet.jsx';
 import DoorGlassDrawing2D from '../components/drawings/DoorGlassDrawing2D.jsx';
 import { groupDoorGlass } from '../components/drawings/doorDrawUtils.js';
 import { elementsPlan, buildElementsPayload, buildCillInset } from '../utils/elementsPayload.js';
+// Triple sash (Piotr 13.10.2026): one sash sheet and one glass sheet per section (FIX L, C, FIX R)
+import { tripleSections } from '../components/drawings/tripleDrawUtils.js';
 import GlassDrawing2D from '../components/drawings/GlassDrawing2D.jsx';
 import CasementGlassDrawing2D from '../components/drawings/CasementGlassDrawing2D.jsx';
 import { groupCasementGlass } from '../components/drawings/casementDrawUtils.js';
@@ -1222,6 +1224,23 @@ function ElementsTab({ windowsData, pp, batch, isPPMode, registerExport }) {
                 </div>
               </div>
             </>
+          ) : plan.sashSections ? (
+            /* Triple sash (13.10.2026): the box, then one sash sheet per section of the
+               engine (upper FIX L / C / FIX R, lower FIX L / C / FIX R), refs by plan key. */
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+              {plan.drawings.map((d) => (
+                <div key={d.key} className="card p-4">
+                  <div className="text-xs font-semibold text-ink-200 mb-2">{d.label}</div>
+                  <div ref={(el) => { refs.current[`${win.id}-${d.key}`] = el; }}>
+                    {d.key === 'box'
+                      ? <BoxDetail2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} windowTag={windowTag}
+                          onExpand={() => setExpandedDrawing({ windowSpec, derived, type: 'box', title: `${win.name} — Box Detail`, projectNumber: win._projectNumber, windowTag })} />
+                      : <SashDetail2D windowSpec={windowSpec} derived={derived} type={d.type} section={d.section} projectNumber={win._projectNumber} windowTag={windowTag}
+                          onExpand={() => setExpandedDrawing({ windowSpec, derived, type: d.type, section: d.section, title: `${win.name} — ${d.label}`, projectNumber: win._projectNumber, windowTag })} />}
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
             <div className="card p-4">
@@ -1284,10 +1303,10 @@ function ElementsTab({ windowsData, pp, batch, isPPMode, registerExport }) {
                 <BoxDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} projectNumber={expandedDrawing.projectNumber} windowTag={expandedDrawing.windowTag} />
               )}
               {expandedDrawing.type === 'upper' && (
-                <SashDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} type="upper" projectNumber={expandedDrawing.projectNumber} windowTag={expandedDrawing.windowTag} />
+                <SashDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} type="upper" section={expandedDrawing.section || null} projectNumber={expandedDrawing.projectNumber} windowTag={expandedDrawing.windowTag} />
               )}
               {expandedDrawing.type === 'lower' && (
-                <SashDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} type="lower" projectNumber={expandedDrawing.projectNumber} windowTag={expandedDrawing.windowTag} />
+                <SashDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} type="lower" section={expandedDrawing.section || null} projectNumber={expandedDrawing.projectNumber} windowTag={expandedDrawing.windowTag} />
               )}
               {expandedDrawing.type === 'frame' && (
                 <CasementFrameDetail2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} projectNumber={expandedDrawing.projectNumber} windowTag={expandedDrawing.windowTag} />
@@ -1511,6 +1530,16 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport, ex
               <CasementGlassDrawing2D windowSpec={windowSpec} derived={derived} group={gp} windowTag={tagOf(win)} />
             </div>
           ))
+          : tripleSections(derived)
+          /* Triple sash (13.10.2026): one glass sheet per section and sash (FIX L / C / FIX R, upper and lower) */
+          ? ['upper', 'lower'].flatMap((type) => tripleSections(derived).sections.map((sec) => (
+            <div key={`${win.id}-${type}${sec.key}`} className="card p-4">
+              <div className="text-xs font-semibold text-ink-200 mb-2">
+                {isPPMode && win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name} — {sec.label} {type === 'upper' ? 'Upper' : 'Lower'} Glass
+              </div>
+              <GlassDrawing2D windowSpec={windowSpec} derived={derived} type={type} section={sec} windowTag={tagOf(win)} />
+            </div>
+          )))
           : [
           <div key={`${win.id}-upper`} className="card p-4">
             <div className="text-xs font-semibold text-ink-200 mb-2">

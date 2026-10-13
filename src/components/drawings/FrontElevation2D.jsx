@@ -9,7 +9,10 @@
  */
 import { useMemo } from 'react';
 import { CONSTANTS, sashBarPattern } from '../../engine/calculations.js';
-import { computeBarPositions, DimH, DimV, TitleBlock, tfs, HORN_DEF, HORN_W, buildHornPath, WindowTag } from './drawingUtils.jsx';
+import { computeBarPositions, DimH, DimV, DimChainH, TitleBlock, tfs, HORN_DEF, HORN_W, buildHornPath, WindowTag } from './drawingUtils.jsx';
+// Triple sash (Piotr 13.10.2026): the three sections and the two mullion posts are the engine's
+// (derived.tripleSections), laid out by tripleDrawUtils; a double-hung sash takes the path below unchanged.
+import { tripleSections } from './tripleDrawUtils.js';
 import { COLORS, FONT_FAMILY, SIZES, STROKES, VIEWBOX_REF, WEIGHTS } from './drawingTheme.js';
 // Arched sash (ARCHED-WINDOWS-v3 Block 1 H): every arc is the engine's ArcChain (derived.arch) serialised
 // by archDrawUtils — box head ring, upper sash top rail ring, upper glass outline, bars — never re-derived here.
@@ -100,26 +103,41 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber , 
 
     // arched sash: the engine's rings / outline / bars (null on every rectangular sash)
     const A = derived.arch && !derived.casement ? derived.arch : null;
+
+    // triple sash: each section's glass over ITS width (bars on the centre sash only, the 3D rule)
+    const T = tripleSections(derived);
+    const sections = T ? T.sections.map((s) => {
+      const pU = s.fixed ? BAR_PATTERNS['none'] : patternU;
+      const pL = s.fixed ? BAR_PATTERNS['none'] : patternL;
+      const glassW = s.width - 2 * stile;
+      return {
+        ...s,
+        glassW,
+        uBars: computeBarPositions({ glassX: uGlassX, glassY: uGlassY, glassW, glassH: uGlassH, vCount: pU.v, hCount: pU.h, barW: BAR_WIDTH }),
+        lBars: computeBarPositions({ glassX: lGlassX, glassY: lGlassY, glassW, glassH: lGlassH, vCount: pL.v, hCount: pL.h, barW: BAR_WIDTH }),
+      };
+    }) : null;
     return {
       fw, fh, sashW, topSashH, botSashH,
       stile, topRail, meetRail, botRail,
       uGlassX, uGlassY, uGlassW, uGlassH, uBars,
       lGlassX, lGlassY, lGlassW, lGlassH, lBars,
-      gridMode, A,
+      gridMode, A, T, sections,
     };
   }, [windowSpec, derived]);
 
   if (!geom) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
 
-  const { fw, fh, sashW, topSashH, botSashH, A } = geom;
+  const { fw, fh, sashW, topSashH, botSashH, A, T } = geom;
 
   // ─── Layout (SVG Y-down) ───
   const layoutSc = Math.max(fw, fh) / 500;
   const DM = 60 * layoutSc;
   const M = A ? 110 * layoutSc : 60 * layoutSc;          // arched: room for the start / rise dims on the right
   const TITLE_AREA = (A ? 75 : 50) * layoutSc;             // arched: third title line
+  const CHAIN_AREA = T ? 40 * layoutSc : 0;                // triple: the section / mullion chain under the window
   const totalW = M + fw + DM * 2 + M;
-  const totalH = M + fh + DM + TITLE_AREA;
+  const totalH = M + fh + DM + TITLE_AREA + CHAIN_AREA;
 
   const ox = M;               // frame left edge in SVG
   const oy = M;               // frame top edge in SVG
@@ -213,7 +231,7 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber , 
   const winName = windowSpec?.name || 'Window';
   const projNum = projectNumber || '';
   const titleText = `Front Elevation${projNum ? ` — ${projNum}` : ''} — ${winName}`;
-  const subtitleText = A ? `${fw} × ${fh} mm · arched sash` : `${fw} × ${fh} mm`;
+  const subtitleText = A ? `${fw} × ${fh} mm · arched sash` : T ? `${fw} × ${fh} mm · triple sash ${windowSpec.sash?.splitRatio || ''}`.trim() : `${fw} × ${fh} mm`;
   const archLine = A ? `${A.geometry.label} · start ${fmt(A.geometry.start)} · rise ${fmt(A.geometry.rise)} · ${radiiText(A.geometry.arcs)} · head ${fmt(A.geometry.head.thickness)}` : '';
 
   return (
@@ -264,6 +282,19 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber , 
             <path d={AP.daylightD} fill="none" stroke={COL.sash} strokeWidth={STROKES.glassLight} {...NS} strokeOpacity={0.6} />
             {AP.barsD.map((d, k) => <path key={`uab-${k}`} d={d} fill="none" stroke={COL.bar} strokeWidth={STROKES.bar} {...NS} />)}
           </g>
+        ) : T ? (
+          /* triple sash: each section's upper glass over its own engine width (bars: centre only) */
+          <g>
+            {geom.sections.map((s) => (
+              <g key={`tu-${s.key}`}>
+                <rect x={sashX + s.x + geom.uGlassX} y={upperSashY + geom.uGlassY}
+                  width={s.glassW} height={geom.uGlassH}
+                  fill={COL.glass} fillOpacity={COL.glassOpacity}
+                  stroke={COL.glass} strokeWidth={STROKES.glassLight} {...NS} />
+                {renderBars(s.uBars, sashX + s.x, upperSashY, geom.uGlassX, geom.uGlassY, s.glassW, geom.uGlassH)}
+              </g>
+            ))}
+          </g>
         ) : (<>
         {/* Upper glass */}
         <rect x={sashX + geom.uGlassX} y={upperSashY + geom.uGlassY}
@@ -275,6 +306,24 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber , 
         </>)}
 
         {/* ── LOWER SASH (only bottom edge visible) ── */}
+        {T ? (
+          /* triple sash: each section's lower glass, its bottom edge and its meeting rail line */
+          <g>
+            {geom.sections.map((s) => (
+              <g key={`tl-${s.key}`}>
+                <rect x={sashX + s.x + geom.lGlassX} y={lowerSashY + geom.lGlassY}
+                  width={s.glassW} height={geom.lGlassH}
+                  fill={COL.glass} fillOpacity={COL.glassOpacity}
+                  stroke={COL.glass} strokeWidth={STROKES.glassLight} {...NS} />
+                {renderBars(s.lBars, sashX + s.x, lowerSashY, geom.lGlassX, geom.lGlassY, s.glassW, geom.lGlassH)}
+                <line x1={sashX + s.x} y1={lowerSashY + botSashH} x2={sashX + s.x + s.width} y2={lowerSashY + botSashH}
+                  stroke={COL.sash} strokeWidth={STROKES.sash} {...NS} />
+                <line x1={sashX + s.x} y1={lowerSashY + meetRail / 2} x2={sashX + s.x + s.width} y2={lowerSashY + meetRail / 2}
+                  stroke={COL.meeting} strokeWidth={STROKES.meeting} {...NS} />
+              </g>
+            ))}
+          </g>
+        ) : (<>
         {/* Lower glass */}
         <rect x={sashX + geom.lGlassX} y={lowerSashY + geom.lGlassY}
           width={geom.lGlassW} height={geom.lGlassH}
@@ -295,21 +344,42 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber , 
         <line x1={ox + BOX.jambW_top} y1={lowerSashY + meetRail / 2}
           x2={ox + fw - BOX.jambW_top} y2={lowerSashY + meetRail / 2}
           stroke={COL.meeting} strokeWidth={STROKES.meeting} {...NS} />
+        </>)}
 
         {/* ── HORNS — upper-sash bottom corners, profile from 3D HornMesh ── */}
         {windowSpec?.sash?.horns && HORN_DEF[windowSpec.sash.hornType] && (() => {
           const type = windowSpec.sash.hornType;
           const hornTopY = upperSashY + topSashH;   // upper-sash bottom edge
           const inset = (geom.stile - HORN_W) / 2;  // centre horn on the stile (elevation only)
+          // triple: every section's upper sash carries its two horns (the cut list adds the
+          // horn extension to the stiles of all three sashes, the 3D draws all six)
+          const sashes = T ? geom.sections.map((s) => ({ x: sashX + s.x, w: s.width })) : [{ x: sashX, w: sashW }];
           return (
             <g>
-              <path d={buildHornPath(type, sashX, sashW, hornTopY, 'L', inset)}
-                fill={COL.frameFill} stroke={COL.meeting} strokeWidth={STROKES.sash} {...NS} />
-              <path d={buildHornPath(type, sashX, sashW, hornTopY, 'R', inset)}
-                fill={COL.frameFill} stroke={COL.meeting} strokeWidth={STROKES.sash} {...NS} />
+              {sashes.flatMap((s, k) => [
+                <path key={`horn-${k}-L`} d={buildHornPath(type, s.x, s.w, hornTopY, 'L', inset)}
+                  fill={COL.frameFill} stroke={COL.meeting} strokeWidth={STROKES.sash} {...NS} />,
+                <path key={`horn-${k}-R`} d={buildHornPath(type, s.x, s.w, hornTopY, 'R', inset)}
+                  fill={COL.frameFill} stroke={COL.meeting} strokeWidth={STROKES.sash} {...NS} />,
+              ])}
             </g>
           );
         })()}
+
+        {/* ── TRIPLE SASH: the two mullion posts (engine face) between head and sill, the section chain ── */}
+        {T && (
+          <g>
+            {T.mullions.map((m) => (
+              <rect key={`mullion-${m.key}`} x={sashX + m.x} y={SY(fh - BOX.headH)}
+                width={m.width} height={SY(BOX.sillTop) - SY(fh - BOX.headH)}
+                fill={COL.frameFill} stroke={COL.frame} strokeWidth={STROKES.frame} {...NS} />
+            ))}
+            <DimChainH y={oy + fh + DM * 0.55} extFrom={oy + fh}
+              cuts={[sashX, ...geom.sections.flatMap((s) => [sashX + s.x + s.width, sashX + s.x + s.width + T.mullionFace]).slice(0, -1)]}
+              labels={[geom.sections[0].width, T.mullionFace, geom.sections[1].width, T.mullionFace, geom.sections[2].width].map(fmt)}
+              vbw={totalW} fmt={fmt} />
+          </g>
+        )}
 
         {/* ── ARCHED SASH: springing line, start / rise dims, radii ── */}
         {AP && (
@@ -339,7 +409,7 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber , 
         {/* ── TITLE ── */}
         <TitleBlock
           x={totalW / 2}
-          y={oy + fh + DM + TITLE_AREA * 0.5}
+          y={oy + fh + DM + CHAIN_AREA + TITLE_AREA * 0.5}
           title={titleText}
           subtitle={subtitleText}
           vbw={totalW} />

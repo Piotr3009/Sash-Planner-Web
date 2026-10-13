@@ -41,7 +41,10 @@ function computeSegments(from, to, cutPairs) {
   return segs;
 }
 
-export default function SashDetail2D({ windowSpec, derived, type = 'upper', onExpand, projectNumber, selectedElement, onElementClick , windowTag }) {
+// `section` (triple sash, Piotr 13.10.2026): one of tripleDrawUtils.tripleSections(derived).sections.
+// The sheet then draws THAT section's sash (its engine width, the cut list row "(FIX L)" / "(C)" /
+// "(FIX R)"); a fixed section carries no bars (as the 3D). Without it: the double-hung sash as before.
+export default function SashDetail2D({ windowSpec, derived, type = 'upper', onExpand, projectNumber, selectedElement, onElementClick , windowTag, section = null }) {
   const clickable = typeof onElementClick === 'function';
   const hl = (key) => clickable && selectedElement === key;
   const [expanded, setExpanded] = useState(false);
@@ -54,7 +57,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
   const geom = useMemo(() => {
     if (!windowSpec || !derived) return null;
     const isUpper = type === 'upper';
-    const sashW = derived.sashWidth;
+    const sashW = section ? section.width : derived.sashWidth;
     const sashH = isUpper ? derived.topSashHeight : derived.bottomSashHeight;
     if (!sashW || !sashH) return null;
     // LIVE faces from the profile (derived.sashDims): edit Bottom rail 90→100
@@ -73,8 +76,9 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
     const rebateX = glassX - REBATE_OFFSET, rebateY = glassY - REBATE_OFFSET;
     const rebateW = glassW + 2 * REBATE_OFFSET;
     const rebateH = glassH + 2 * REBATE_OFFSET;
-    // bars per sash (Piotr 09.10.2026, owner box item 16): this sheet's own sash pattern
-    const gridMode = sashBarPattern(windowSpec, isUpper ? 'upper' : 'lower');
+    // bars per sash (Piotr 09.10.2026, owner box item 16): this sheet's own sash pattern;
+    // a fixed triple section carries none (the 3D rule)
+    const gridMode = section?.fixed ? 'none' : sashBarPattern(windowSpec, isUpper ? 'upper' : 'lower');
     const pattern = BAR_PATTERNS[gridMode] || BAR_PATTERNS['none'];
     const v = pattern.v, h = pattern.h;
     const { vBars, hBars, paneW, paneH } = computeBarPositions({
@@ -95,7 +99,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
     return { sashW, sashH, stile, topEdge, botEdge, glassX, glassY, glassW, glassH,
       rebateX, rebateY, rebateW, rebateH, vBars, hBars, v, h, paneW, paneH,
       isUpper, hasHorns, hornExt, gridMode, A: null };
-  }, [windowSpec, derived, type]);
+  }, [windowSpec, derived, type, section]);
 
   if (!geom) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
 
@@ -124,7 +128,7 @@ export default function SashDetail2D({ windowSpec, derived, type = 'upper', onEx
   const vCuts = geom.vBars.map(vb => [vb.left, vb.right]);
   const horizontalEdgeSegments = computeSegments(geom.glassX, geom.glassX + geom.glassW, vCuts);
 
-  const label = geom.isUpper ? 'US' : 'LS';
+  const label = `${geom.isUpper ? 'US' : 'LS'}${section ? ` (${section.label})` : ''}`;
   const winName = windowSpec?.name || 'Window';
   const projNum = projectNumber || '';
   const titleText = `${label} — Front${projNum ? ` — ${projNum}` : ''} — ${winName}`;

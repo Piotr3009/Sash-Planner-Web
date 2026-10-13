@@ -281,8 +281,12 @@ export function windowSpecToConfig(windowSpec, derived = null) {
     doubleGlazing: isDouble,
     spacerColor,
     ironmongery,
-    sashType: 'double',
-    splitRatio: '1/4-1/2-1/4',
+    // triple sash (Piotr 13.10.2026): the type and the split come from the
+    // windowSpec, as the configurator hands them to the same 3D component;
+    // they were hard-coded 'double' here, so the window page, the pack and
+    // the 3D PDF drew every triple as a double-hung sash.
+    sashType: windowSpec.sash?.type === 'triple' ? 'triple' : 'double',
+    splitRatio: windowSpec.sash?.splitRatio || '1/4-1/2-1/4',
     // cottage (Piotr 09.10.2026): the proportion and the meeting line fraction from
     // the engine (every sash window, standard included: the 3D meeting line sits
     // where production puts it). A page that derived the window (under the batch

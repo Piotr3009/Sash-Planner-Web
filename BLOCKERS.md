@@ -4,6 +4,34 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-10-13 · TRIPLE SASH on the window page, items for Piotr (chat fix on main 94ba0a6)
+
+**32.1 Bars on a triple sash (open owner decision).** The configurator's 3D draws the glazing bars on the centre
+(opening) sash only, the fixed sections carry none; the new sheets follow the 3D (elevation, sash sheets, glass
+sheets). The lists do not know a triple bar rule yet: the six glass rows of a triple carry no bar pattern (so the
+glass PDF, the glass DXF and the Glass tab print no bars for the centre unit), `derived.bars` is computed on the centre
+width, the beading runs (triangle / Georgian) are computed as for ONE sash of the full sash width (1822). Say which
+sashes carry bars on a triple (centre only, or all three) and the rows follow.
+
+**32.2 Section rounding.** The engine splits 1722 (1822 less two mullions) as 431 / 861 / 430 (Math.round of 430.5,
+the rest to the right); the sheets print what the engine says (FIX L 431, FIX R 430; glass 340 / 339). Say if both
+fixed sashes should be equal (430.5 each) and the engine changes, not the sheets.
+
+**32.3 Mullion post 50 x 141.** `DEFAULT_SASH_PROFILE.elements.mullion.face 50` (marked "FLAGGED default, matches the
+3D viewer's 50 mm", raw 63x63), length = the jamb length (H - 108). The sheets draw the engine post; confirm the 50.
+
+**32.4 The 3D proportions.** The 3D splits its own inner width (between its jamb boards) by the ratio, the engine
+splits the sash width 1822: the 3D sections are a few mm wider than the sheets (the same approximation the double-hung
+3D has had since PSW). The sheets carry the engine numbers; the 3D is the configurator's picture.
+
+**32.5 Estimate PDF.** `canvas-renderer.js` (the technical elevation of the estimate PDF) still draws a triple as a
+double-hung sash; not touched here (out of the window page scope).
+
+**32.6 PSW.** The same gizmo gating (`showGuides`) applies to PSW's ParametricSashWindow triple branch if PSW ever
+renders the triple with guides off; today PSW only shows it in the configurator, nothing to port.
+
+---
+
 ## 2026-10-09 · TURA PC: DOORS v3, SASH BARS PER SASH, SETTINGS SAVE, items for Piotr (branch `claude/doors-v3`)
 
 **31.1 Owner checks: the assumptions (ZAŁOŻENIE) of the box, the number used and where it lives.**

@@ -6,6 +6,9 @@ import { FONT, DimH, DimV, DimChainH, DimChainV, tfs, WindowTag } from './drawin
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 // Arched sash (v3 Block 1 H): the box head is the engine's ring (derived.arch.geometry.head), jambs stop at the springing
 import { archToSheet, ringBandD, arcLabelPoint, radiiText } from './archDrawUtils.js';
+// Triple sash (Piotr 13.10.2026): the two mullion posts are the engine's (derived.tripleSections, the
+// cut list MULLION rows), laid out by tripleDrawUtils inside the sash area; a double-hung box is unchanged.
+import { tripleSections, tripleMullionRecord } from './tripleDrawUtils.js';
 
 const NS = { vectorEffect: 'non-scaling-stroke' };
 
@@ -51,12 +54,16 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
     const fh = windowSpec.frame.height;
     const innerW = fw - 2 * BOX.jambW_top;
     const A = derived.arch && !derived.casement ? derived.arch : null;
-    return { fw, fh, innerW, A };
+    // triple sash: the sections and mullions sit inside the sash area, (fw - sashWidth) / 2 from the frame edge
+    const T = tripleSections(derived);
+    const sashX0 = T ? (fw - Number(derived.sashWidth)) / 2 : 0;
+    const mullionLen = T ? Number(tripleMullionRecord(derived, 'L')?.length) || null : null;
+    return { fw, fh, innerW, A, T, sashX0, mullionLen };
   }, [windowSpec, derived]);
 
   if (!d) return <div className="text-ink-400 text-sm p-8 text-center">No data.</div>;
 
-  const { fw, fh, A } = d;
+  const { fw, fh, A, T, sashX0, mullionLen } = d;
   const layoutSc = Math.max(fw, fh) / 500;
   const DM = 60 * layoutSc;
   const M = 80 * layoutSc;
@@ -192,6 +199,27 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
             CAVITY
           </text>
 
+          {/* Triple sash: the two mullion posts (engine face, between head and sill) and the section chain */}
+          {T && (
+            <g>
+              {T.mullions.map((m) => (
+                <g key={`mullion-${m.key}`}>
+                  <rect x={X(sashX0 + m.x)} y={Y(fh - BOX.headH)} width={m.width} height={Y(BOX.sillTop) - Y(fh - BOX.headH)}
+                    fill={COL.frameFill} stroke={COL.frame} strokeWidth={STROKES.frame} {...NS} />
+                  <text x={X(sashX0 + m.x + m.width / 2)} y={Y(fh / 2)} fill={COL.label}
+                    fontSize={tfs(SIZES.label, totalW)} fontWeight={WEIGHTS.label}
+                    fontFamily={FONT.family} textAnchor="middle" fillOpacity={0.7}
+                    transform={`rotate(-90, ${X(sashX0 + m.x + m.width / 2)}, ${Y(fh / 2)})`}>
+                    {m.label}{mullionLen ? ` ${Math.round(m.width)} x ${mullionLen}` : ''}
+                  </text>
+                </g>
+              ))}
+              <DimChainH y={Y(0) + DM * 2.1} extFrom={Y(0)} vbw={totalW}
+                cuts={[X(sashX0), ...T.sections.flatMap((s) => [X(sashX0 + s.x + s.width), X(sashX0 + s.x + s.width + T.mullionFace)]).slice(0, -1)]}
+                labels={[T.sections[0].width, T.mullionFace, T.sections[1].width, T.mullionFace, T.sections[2].width]} />
+            </g>
+          )}
+
           {/* Dimensions */}
           <DimChainH y={Y(0) + DM * 1.3} extFrom={Y(0)} vbw={totalW}
             cuts={isInternal
@@ -265,7 +293,7 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
           <text x={totalW / 2} y={totalH + 14 * totalW / VIEWBOX_REF} fill={COL.title}
             fontSize={tfs(SIZES.subtitle, totalW)}
             fontFamily={FONT.family} textAnchor="middle">
-            {fw} × {fh} mm{A ? ` · ${A.geometry.label} · ${radiiText(A.geometry.arcs)}` : ''}
+            {fw} × {fh} mm{A ? ` · ${A.geometry.label} · ${radiiText(A.geometry.arcs)}` : ''}{T ? ` · triple sash ${windowSpec.sash?.splitRatio || ''}`.trimEnd() : ''}
           </text>
           {windowTag ? <WindowTag tag={windowTag} vbw={totalW} /> : null}
         </svg>

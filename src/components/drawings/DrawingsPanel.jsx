@@ -15,6 +15,9 @@ import { doorSheetPlan } from './doorDrawUtils.js';
 import CasementFrameDetail2D from './CasementFrameDetail2D.jsx';
 import CasementLeafDetail2D from './CasementLeafDetail2D.jsx';
 import { groupCasementLeaves, paneTitle } from './casementDrawUtils.js';
+// Triple sash (Piotr 13.10.2026): one sash sheet per section (FIX L, C, FIX R) on the Upper / Lower
+// tabs and in the hidden rig, under the keys the Elements plan lists (tripleDrawUtils, one law).
+import { tripleSections, tripleSheetKey, tripleSheetLabel } from './tripleDrawUtils.js';
 import { useProjectStore } from '../../stores/projectStore.js';
 import { exportElevationsPDF, exportElementsPDF } from '../../utils/drawingsPdfExport.js';
 import { elementsPlan, buildElementsPayload, buildCillInset } from '../../utils/elementsPayload.js';
@@ -42,6 +45,11 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
   // plan the PDF rig, the Elements PDF and the production pack use.
   const doorSheets = isDoor ? doorSheetPlan(derived) : [];
   const renderDoorSheet = (sh) => <DoorSheet sheet={sh} windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />;
+  // triple sash: the sections of the engine (null on a double-hung, a casement, a door)
+  const triple = !isCasement && !isDoor ? tripleSections(derived) : null;
+  const renderSashSheet = (type, section) => (
+    <SashDetail2D key={tripleSheetKey(type, section)} windowSpec={windowSpec} derived={derived} type={type} section={section} />
+  );
   const visibleTabs = isDoor
     ? [
         { id: 'elevation', label: 'Front Elevation' },
@@ -180,10 +188,14 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
               <BoxDetail2D windowSpec={windowSpec} derived={derived} />
             )}
             {subTab === 'upper' && (
-              <SashDetail2D windowSpec={windowSpec} derived={derived} type="upper" />
+              triple
+                ? <div className="space-y-6">{triple.sections.map((s) => renderSashSheet('upper', s))}</div>
+                : <SashDetail2D windowSpec={windowSpec} derived={derived} type="upper" />
             )}
             {subTab === 'lower' && (
-              <SashDetail2D windowSpec={windowSpec} derived={derived} type="lower" />
+              triple
+                ? <div className="space-y-6">{triple.sections.map((s) => renderSashSheet('lower', s))}</div>
+                : <SashDetail2D windowSpec={windowSpec} derived={derived} type="lower" />
             )}
           </div>
         </div>
@@ -222,12 +234,18 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
           <div ref={(el) => { refs.current['box'] = el; }}>
             <BoxDetail2D windowSpec={windowSpec} derived={derived} />
           </div>
+          {triple ? ['upper', 'lower'].flatMap((type) => triple.sections.map((s) => (
+            <div key={tripleSheetKey(type, s)} ref={(el) => { refs.current[tripleSheetKey(type, s)] = el; }} title={tripleSheetLabel(type, s)}>
+              {renderSashSheet(type, s)}
+            </div>
+          ))) : (<>
           <div ref={(el) => { refs.current['upper'] = el; }}>
             <SashDetail2D windowSpec={windowSpec} derived={derived} type="upper" />
           </div>
           <div ref={(el) => { refs.current['lower'] = el; }}>
             <SashDetail2D windowSpec={windowSpec} derived={derived} type="lower" />
           </div>
+          </>)}
           </>)}
         </div>
       )}
