@@ -148,6 +148,8 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber , 
   const meetRail = geom.meetRail;
   const combinedH = topSashH + botSashH - meetRail;
   const sashX = ox + (fw - sashW) / 2;
+  // triple: the sashes and the posts are laid out from the clear opening between the internal jamb liners
+  const clearX = T ? ox + (fw - T.clear) / 2 : sashX;
   const centerY = oy + fh / 2;
   const upperSashY = centerY - combinedH / 2;
   const lowerSashY = upperSashY + topSashH - meetRail;
@@ -231,7 +233,9 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber , 
   const winName = windowSpec?.name || 'Window';
   const projNum = projectNumber || '';
   const titleText = `Front Elevation${projNum ? ` — ${projNum}` : ''} — ${winName}`;
-  const subtitleText = A ? `${fw} × ${fh} mm · arched sash` : T ? `${fw} × ${fh} mm · triple sash ${windowSpec.sash?.splitRatio || ''}`.trim() : `${fw} × ${fh} mm`;
+  const subtitleText = A ? `${fw} × ${fh} mm · arched sash`
+    : T ? `${fw} × ${fh} mm · triple sash ${windowSpec.sash?.splitRatio || ''} · sashes ${geom.sections.map((s) => fmt(s.width)).join(' / ')} (gap ${fmt(T.gap)})`.replace(/\s+/g, ' ')
+    : `${fw} × ${fh} mm`;
   const archLine = A ? `${A.geometry.label} · start ${fmt(A.geometry.start)} · rise ${fmt(A.geometry.rise)} · ${radiiText(A.geometry.arcs)} · head ${fmt(A.geometry.head.thickness)}` : '';
 
   return (
@@ -287,11 +291,11 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber , 
           <g>
             {geom.sections.map((s) => (
               <g key={`tu-${s.key}`}>
-                <rect x={sashX + s.x + geom.uGlassX} y={upperSashY + geom.uGlassY}
+                <rect x={clearX + s.x + geom.uGlassX} y={upperSashY + geom.uGlassY}
                   width={s.glassW} height={geom.uGlassH}
                   fill={COL.glass} fillOpacity={COL.glassOpacity}
                   stroke={COL.glass} strokeWidth={STROKES.glassLight} {...NS} />
-                {renderBars(s.uBars, sashX + s.x, upperSashY, geom.uGlassX, geom.uGlassY, s.glassW, geom.uGlassH)}
+                {renderBars(s.uBars, clearX + s.x, upperSashY, geom.uGlassX, geom.uGlassY, s.glassW, geom.uGlassH)}
               </g>
             ))}
           </g>
@@ -311,14 +315,14 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber , 
           <g>
             {geom.sections.map((s) => (
               <g key={`tl-${s.key}`}>
-                <rect x={sashX + s.x + geom.lGlassX} y={lowerSashY + geom.lGlassY}
+                <rect x={clearX + s.x + geom.lGlassX} y={lowerSashY + geom.lGlassY}
                   width={s.glassW} height={geom.lGlassH}
                   fill={COL.glass} fillOpacity={COL.glassOpacity}
                   stroke={COL.glass} strokeWidth={STROKES.glassLight} {...NS} />
-                {renderBars(s.lBars, sashX + s.x, lowerSashY, geom.lGlassX, geom.lGlassY, s.glassW, geom.lGlassH)}
-                <line x1={sashX + s.x} y1={lowerSashY + botSashH} x2={sashX + s.x + s.width} y2={lowerSashY + botSashH}
+                {renderBars(s.lBars, clearX + s.x, lowerSashY, geom.lGlassX, geom.lGlassY, s.glassW, geom.lGlassH)}
+                <line x1={clearX + s.x} y1={lowerSashY + botSashH} x2={clearX + s.x + s.width} y2={lowerSashY + botSashH}
                   stroke={COL.sash} strokeWidth={STROKES.sash} {...NS} />
-                <line x1={sashX + s.x} y1={lowerSashY + meetRail / 2} x2={sashX + s.x + s.width} y2={lowerSashY + meetRail / 2}
+                <line x1={clearX + s.x} y1={lowerSashY + meetRail / 2} x2={clearX + s.x + s.width} y2={lowerSashY + meetRail / 2}
                   stroke={COL.meeting} strokeWidth={STROKES.meeting} {...NS} />
               </g>
             ))}
@@ -353,7 +357,7 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber , 
           const inset = (geom.stile - HORN_W) / 2;  // centre horn on the stile (elevation only)
           // triple: every section's upper sash carries its two horns (the cut list adds the
           // horn extension to the stiles of all three sashes, the 3D draws all six)
-          const sashes = T ? geom.sections.map((s) => ({ x: sashX + s.x, w: s.width })) : [{ x: sashX, w: sashW }];
+          const sashes = T ? geom.sections.map((s) => ({ x: clearX + s.x, w: s.width })) : [{ x: sashX, w: sashW }];
           return (
             <g>
               {sashes.flatMap((s, k) => [
@@ -370,13 +374,13 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber , 
         {T && (
           <g>
             {T.mullions.map((m) => (
-              <rect key={`mullion-${m.key}`} x={sashX + m.x} y={SY(fh - BOX.headH)}
+              <rect key={`mullion-${m.key}`} x={clearX + m.x} y={SY(fh - BOX.headH)}
                 width={m.width} height={SY(BOX.sillTop) - SY(fh - BOX.headH)}
                 fill={COL.frameFill} stroke={COL.frame} strokeWidth={STROKES.frame} {...NS} />
             ))}
             <DimChainH y={oy + fh + DM * 0.55} extFrom={oy + fh}
-              cuts={[sashX, ...geom.sections.flatMap((s) => [sashX + s.x + s.width, sashX + s.x + s.width + T.mullionFace]).slice(0, -1)]}
-              labels={[geom.sections[0].width, T.mullionFace, geom.sections[1].width, T.mullionFace, geom.sections[2].width].map(fmt)}
+              cuts={[clearX, ...T.mullions.flatMap((m) => [clearX + m.x, clearX + m.x + m.width]), clearX + T.clear]}
+              labels={[geom.sections[0].opening, T.mullionFace, geom.sections[1].opening, T.mullionFace, geom.sections[2].opening].map(fmt)}
               vbw={totalW} fmt={fmt} />
           </g>
         )}

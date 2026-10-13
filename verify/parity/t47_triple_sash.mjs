@@ -17,17 +17,21 @@
  * the commit before the change (default 94ba0a6, `git archive`; pass another ref as the
  * first argument).
  *
- *   1  the engine (unchanged, the reference): 2000 x 1500 at 1/4-1/2-1/4 gives sections
- *      431 / 861 / 430 between two mullions of 50 (1822 - 100 = 1722), the cut list rows
- *      "(FIX L)" / "(C)" / "(FIX R)" and MULLION (L) / (R) 50x141 of the jamb length, six
- *      glass rows; 1/3-1/3-1/3 gives 574 x 3
+ *   1  the engine: the double-hung rule on every sash (Piotr 13.10.2026): the clear width
+ *      between the internal jamb liners (2000 - 172 = 1828) less two mullions of 50 splits
+ *      into the section openings 432 / 864 / 432 (left / right to 0.5 mm, the centre takes
+ *      the rest), every sash is its opening less the double-hung gap 6 (178 - 172): sashes
+ *      426 / 858 / 426; the cut list rows "(FIX L)" / "(C)" / "(FIX R)" and MULLION (L) / (R)
+ *      50x141 of the jamb length, six glass rows 335 / 767 / 335 x 610.5; 1/3-1/3-1/3 gives
+ *      570 x 3; START split the double SASH width (one gap for the window): 431 / 861 / 430;
+ *      the heights, the box and the mullion rows equal START
  *   2  tripleDrawUtils: the one layout law every sheet and panel reads (x offsets, the
  *      mullion x, keys and labels; null for a double-hung, a casement, a door)
  *   3  3D: the window page config carries sashType 'triple' and the stored split (START
  *      sent 'double'); the ParametricSashWindow meshes of the page config equal the
  *      configurator's (the same props) and differ from the double of START's config
  *   4  sheets: the elevation draws the three sections at the engine x with the two
- *      mullion posts and the 431 / 50 / 861 / 50 / 430 chain, bars on the centre sash
+ *      mullion posts and the 432 / 50 / 864 / 50 / 432 opening chain, bars on the centre sash
  *      only; the box sheet draws the posts with the cut list length; one sash sheet and
  *      one glass sheet per section with that section's engine numbers (no bar alarm)
  *   5  the Elements plan: box + six sash sheets, the keys the Drawings panel rig and the
@@ -130,23 +134,36 @@ const textsOf = (svg) => texts(svg).join(' | ');
 section('1 - the engine (unchanged): sections, cut list rows, glass rows');
 {
   const d = T1.derived;
-  ok(d.tripleSections && d.tripleSections.left === 431 && d.tripleSections.center === 861 && d.tripleSections.right === 430 && d.tripleSections.mullionFace === 50,
-    `2000 x 1500 at 1/4-1/2-1/4: sections ${JSON.stringify(d.tripleSections)} (sash width ${d.sashWidth} less two mullions 50 = 1722)`);
+  const ts = d.tripleSections;
+  ok(ts && ts.left === 426 && ts.center === 858 && ts.right === 426 && ts.mullionFace === 50 && ts.gap === 6 && ts.clear === 1828
+    && ts.openings.left === 432 && ts.openings.center === 864 && ts.openings.right === 432,
+    `2000 x 1500 at 1/4-1/2-1/4: ${JSON.stringify(ts)} (clear 1828 less two mullions 50 = 1728, openings by the ratio, every sash less the gap 6)`);
+  ok(ts.openings.left + ts.openings.center + ts.openings.right + 2 * ts.mullionFace === ts.clear && ts.left + ts.center + ts.right + 3 * ts.gap + 2 * ts.mullionFace === ts.clear,
+    'the openings and the posts add up to the clear width; the sashes, three gaps and the posts too');
+  const tS = T1S.derived.tripleSections;
+  ok(tS.left === 431 && tS.center === 861 && tS.right === 430, `START split the double sash width 1822 - 100: ${tS.left} / ${tS.center} / ${tS.right} (one gap for the whole window, the bug Piotr caught)`);
   ok(d.sashWidth === 1822 && near(d.topSashHeight, 687.5) && near(d.bottomSashHeight, 720.5), `sash width ${d.sashWidth}, upper ${d.topSashHeight}, lower ${d.bottomSashHeight}`);
   const rows = d.components.sash;
   const named = (sfx) => rows.filter((c) => c.elementName.endsWith(sfx));
   ok(named('(FIX L)').length === 8 && named('(C)').length === 8 && named('(FIX R)').length === 8, `cut list: 8 rows per sash (FIX L ${named('(FIX L)').length}, C ${named('(C)').length}, FIX R ${named('(FIX R)').length})`);
   const topRail = (sfx) => rows.find((c) => c.elementName === `TOP RAIL ${sfx}`)?.length;
-  ok(topRail('(FIX L)') === 431 && topRail('(C)') === 861 && topRail('(FIX R)') === 430, `top rails ${topRail('(FIX L)')} / ${topRail('(C)')} / ${topRail('(FIX R)')} = the section widths`);
+  ok(topRail('(FIX L)') === 426 && topRail('(C)') === 858 && topRail('(FIX R)') === 426, `top rails ${topRail('(FIX L)')} / ${topRail('(C)')} / ${topRail('(FIX R)')} = the sash widths`);
   const mL = rows.find((c) => c.elementName === 'MULLION (L)'), mR = rows.find((c) => c.elementName === 'MULLION (R)');
   ok(mL && mR && mL.section === '50x141' && mL.length === 1392 && mR.length === 1392, `MULLION (L) / (R): ${mL?.section} x ${mL?.length} (frame 1500 less the jamb deduction 108)`);
   const glass = LIVE.lists.buildGlassListForWindow(d, T1.spec);
   ok(glass.length === 6 && glass.map((g) => g.location).join(',') === 'fix L upper,fix L lower,centre upper,centre lower,fix R upper,fix R lower',
     `six glass rows: ${glass.map((g) => `${g.location} ${g.width}x${g.height}`).join(', ')}`);
-  ok(glass[0].width === 340 && glass[2].width === 770 && glass[4].width === 339 && glass.every((g) => near(g.height, 610.5)), 'glass widths 340 / 770 / 339 (section less 91), heights 610.5');
+  ok(glass[0].width === 335 && glass[2].width === 767 && glass[4].width === 335 && glass.every((g) => near(g.height, 610.5)), 'glass widths 335 / 767 / 335 (sash less 91), heights 610.5');
   const d3 = mk(LIVE, { sashType: 'triple', splitRatio: '1/3-1/3-1/3' }).derived;
-  ok(d3.tripleSections.left === 574 && d3.tripleSections.center === 574 && d3.tripleSections.right === 574, `1/3-1/3-1/3: ${JSON.stringify(d3.tripleSections)}`);
-  ok(JSON.stringify(d) === JSON.stringify(T1S.derived), 'the derived data of the triple equals START (the engine is untouched)');
+  ok(d3.tripleSections.left === 570 && d3.tripleSections.center === 570 && d3.tripleSections.right === 570 && d3.tripleSections.openings.left === 576, `1/3-1/3-1/3: ${JSON.stringify(d3.tripleSections)}`);
+  const d5 = mk(LIVE, { sashType: 'triple', splitRatio: '1/5-3/5-1/5' }).derived.tripleSections;
+  ok(d5.openings.left === 345.5 && d5.openings.right === 345.5 && d5.openings.center === 1037 && d5.left === 339.5 && d5.center === 1031, `1/5-3/5-1/5: openings ${d5.openings.left} / ${d5.openings.center} / ${d5.openings.right} (0.5 mm), sashes ${d5.left} / ${d5.center} / ${d5.right}`);
+  const dS = T1S.derived;
+  ok(near(d.topSashHeight, dS.topSashHeight) && near(d.bottomSashHeight, dS.bottomSashHeight) && d.sashWidth === dS.sashWidth
+    && JSON.stringify(d.components.box) === JSON.stringify(dS.components.box) && JSON.stringify(rows.filter((c) => /MULLION/.test(c.elementName))) === JSON.stringify(dS.components.sash.filter((c) => /MULLION/.test(c.elementName))),
+    'the heights, the sash width, the box rows and the mullion rows equal START (the height rules are the double-hung rules, unchanged)');
+  const stileRows = rows.filter((c) => /^STILES/.test(c.elementName)).map((c) => c.length), stileRowsS = dS.components.sash.filter((c) => /^STILES/.test(c.elementName)).map((c) => c.length);
+  ok(JSON.stringify(stileRows) === JSON.stringify(stileRowsS) && stileRows.length === 12, 'the twelve stile lengths equal START (only the rail lengths changed)');
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -154,10 +171,10 @@ section('2 - tripleDrawUtils: one layout law');
 {
   const U = LIVE.tdu;
   const T = U.tripleSections(T1.derived);
-  ok(T && T.sections.map((s) => `${s.key}:${s.label}:${s.width}@${s.x}${s.fixed ? ':fixed' : ''}`).join(' ') === 'L:FIX L:431@0:fixed C:C:861@481 R:FIX R:430@1392:fixed',
-    `sections ${T.sections.map((s) => `${s.label} ${s.width} at x ${s.x}`).join(', ')}`);
-  ok(T.mullions.map((m) => `${m.label}@${m.x}+${m.width}`).join(' ') === 'MULLION (L)@431+50 MULLION (R)@1342+50' && T.totalWidth === 1822 && T.totalWidth === T1.derived.sashWidth,
-    `mullions at ${T.mullions.map((m) => m.x).join(' and ')}, total ${T.totalWidth} = the sash width`);
+  ok(T && T.sections.map((s) => `${s.key}:${s.label}:${s.width}/${s.opening}@${s.x}${s.fixed ? ':fixed' : ''}`).join(' ') === 'L:FIX L:426/432@3:fixed C:C:858/864@485 R:FIX R:426/432@1399:fixed',
+    `sections ${T.sections.map((s) => `${s.label} ${s.width} in the opening ${s.opening} at x ${s.x}`).join(', ')} (x from the clear opening edge, gap / 2 in)`);
+  ok(T.mullions.map((m) => `${m.label}@${m.x}+${m.width}`).join(' ') === 'MULLION (L)@432+50 MULLION (R)@1346+50' && T.totalWidth === 1828 && T.clear === 1828 && T.gap === 6,
+    `mullions at ${T.mullions.map((m) => m.x).join(' and ')}, total ${T.totalWidth} = the clear width, gap ${T.gap}`);
   ok(T.sections.map((s) => s.listLocation).join(',') === 'fix L,centre,fix R', 'the glass-list locations of the sections');
   ok(U.tripleSheetKey('upper', T.sections[0]) === 'upperL' && U.tripleSheetLabel('lower', T.sections[2]) === 'Lower Sash FIX R', 'sheet keys and labels');
   ok(U.tripleMullionRecord(T1.derived, 'R')?.length === 1392 && U.tripleMullionRecord(T1.derived, 'L')?.section === '50x141', 'the mullion record from the cut list');
@@ -225,17 +242,20 @@ section('4 - sheets: elevation, box, sash and glass per section');
   const el = render(LIVE.FrontElevation, { windowSpec: bars.spec, derived: bars.derived });
   const R = rectsOf(el);
   const fw = 2000, layoutSc = fw / 500, M = 60 * layoutSc;
-  const sashX = M + (fw - 1822) / 2;
+  const clearX = M + (fw - 1828) / 2;
   const posts = R.filter((r) => r.w === 50 && r.h > 1000);
-  ok(posts.length === 2 && near(posts[0].x, sashX + 431) && near(posts[1].x, sashX + 1342), `elevation: two mullion posts 50 wide at x ${posts.map((r) => r.x - sashX).join(' and ')} from the sash edge (engine 431 and 1342)`);
+  ok(posts.length === 2 && near(posts[0].x, clearX + 432) && near(posts[1].x, clearX + 1346), `elevation: two mullion posts 50 wide at x ${posts.map((r) => r.x - clearX).join(' and ')} from the clear opening edge (engine 432 and 1346)`);
   const glass = R.filter((r) => r.h > 400 && r.w > 200 && r.fill !== 'none');
   const glassW = glass.map((r) => r.w).sort((a, b) => a - b);
-  ok(glass.length === 6 && glassW.join(',') === '316,316,317,317,747,747', `elevation: six glass panes ${glassW.join(', ')} wide (431 - 114, 861 - 114, 430 - 114)`);
+  ok(glass.length === 6 && glassW.join(',') === '312,312,312,312,744,744', `elevation: six glass panes ${glassW.join(', ')} wide (426 - 114, 858 - 114)`);
+  const paneX = glass.map((r) => r.x - clearX).sort((a, b) => a - b);
+  ok(near(paneX[0], 3 + 57) && near(paneX[2], 485 + 57) && near(paneX[4], 1399 + 57), `elevation: the panes start at ${[paneX[0], paneX[2], paneX[4]].join(' / ')} from the clear edge (gap 3 + stile 57 into each opening)`);
   const barRects = R.filter((r) => r.w === 22 && r.fill === 'none');
-  const centreX = [sashX + 481, sashX + 481 + 861];
+  const centreX = [clearX + 485, clearX + 485 + 858];
   ok(barRects.length === 2 && barRects.every((r) => r.x > centreX[0] && r.x < centreX[1]), `elevation 2x2: ${barRects.length} bar rects, all inside the centre section (the 3D rule: no bars on the fixed sashes)`);
   const tx = texts(el);
-  ok(['431', '50', '861', '430'].every((s) => tx.includes(s)) && tx.filter((s) => s === '50').length === 2, `elevation chain labels: ${tx.join(' ')}`);
+  ok(['432', '50', '864'].every((s) => tx.includes(s)) && tx.filter((s) => s === '50').length === 2 && tx.filter((s) => s === '432').length === 2, `elevation chain labels (the openings and the posts): ${tx.join(' ')}`);
+  ok(/sashes 426 \/ 858 \/ 426 \(gap 6\)/.test(textsOf(el)), 'elevation subtitle: the sash widths and the gap');
   ok(/triple sash 1\/4-1\/2-1\/4/.test(textsOf(el)), 'elevation subtitle names the triple and its split');
   const noHorns = mk(LIVE, { ...TRIPLE, upperBars: '2x2', lowerBars: '2x2', hornType: 'none' });
   const paths = (svg) => (svg.match(/<path /g) || []).length;
@@ -246,9 +266,9 @@ section('4 - sheets: elevation, box, sash and glass per section');
   const RB = rectsOf(box);
   const DMb = 60 * layoutSc, Mb = 80 * layoutSc, oxb = Mb + DMb * 2;
   const bposts = RB.filter((r) => r.w === 50 && r.h > 1000);
-  ok(bposts.length === 2 && near(bposts[0].x, oxb + 89 + 431) && near(bposts[1].x, oxb + 89 + 1342), `box sheet: two posts at frame x ${bposts.map((r) => r.x - oxb).join(' and ')} (89 + 431, 89 + 1342)`);
+  ok(bposts.length === 2 && near(bposts[0].x, oxb + 86 + 432) && near(bposts[1].x, oxb + 86 + 1346), `box sheet: two posts at frame x ${bposts.map((r) => r.x - oxb).join(' and ')} (liner 86 + 432, 86 + 1346)`);
   ok(texts(box).includes('MULLION (L) 50 x 1392') && texts(box).includes('MULLION (R) 50 x 1392'), 'box sheet labels: MULLION (L) 50 x 1392, MULLION (R) 50 x 1392 (the cut list record)');
-  ok(['431', '861', '430'].every((s) => texts(box).includes(s)), 'box sheet chain: 431 / 50 / 861 / 50 / 430');
+  ok(['432', '864'].every((s) => texts(box).includes(s)) && /openings 432 \/ 864 \/ 432, sashes 426 \/ 858 \/ 426 \(gap 6\)/.test(textsOf(box)), 'box sheet chain 432 / 50 / 864 / 50 / 432 and the subtitle with the openings, the sashes and the gap');
 
   for (const s of T.sections) {
     for (const type of ['upper', 'lower']) {
@@ -348,7 +368,7 @@ if (!chromium) {
   await page.locator('button', { hasText: /2D Drawings/ }).first().click();
   await waitText('Front Elevation');
   let st = await svgTexts();
-  ok(st.some((t) => /Front Elevation/.test(t)) && ['431', '861', '430'].every((s) => st.includes(s)), `drawings tab, elevation: the chain ${['431', '50', '861', '430'].map((s) => `${s}:${st.filter((t) => t === s).length}`).join(' ')}`);
+  ok(st.some((t) => /Front Elevation/.test(t)) && ['432', '864'].every((s) => st.includes(s)), `drawings tab, elevation: the chain ${['432', '50', '864'].map((s) => `${s}:${st.filter((t) => t === s).length}`).join(' ')}`);
   await page.locator('button', { hasText: /^Upper Sash$/ }).first().click();
   await page.waitForTimeout(300);
   st = await svgTexts();
@@ -371,7 +391,7 @@ if (!chromium) {
   ok(['FIX L Upper Glass', 'C Upper Glass', 'FIX R Upper Glass', 'FIX L Lower Glass', 'C Lower Glass', 'FIX R Lower Glass'].every((s) => b2.includes(s)) && pageErrors.length === 0,
     'Glass tab: six glass drawings, one per section and sash');
   st = await svgTexts();
-  ok(st.includes('770 mm') && st.includes('340 mm') && st.includes('339 mm'), `Glass tab drawings: 770 / 340 / 339 mm (${st.filter((t) => / mm$/.test(t)).join(', ')})`);
+  ok(st.includes('767 mm') && st.filter((t) => t === '335 mm').length === 4, `Glass tab drawings: 767 / 335 / 335 mm (${st.filter((t) => / mm$/.test(t)).join(', ')})`);
   ok((b2.match(/fix L upper|centre upper|fix R upper|fix L lower|centre lower|fix R lower/g) || []).length >= 6, 'Glass tab table: the six engine rows');
 
   // the double-hung window on the same page: two sheets, two glass drawings, as before

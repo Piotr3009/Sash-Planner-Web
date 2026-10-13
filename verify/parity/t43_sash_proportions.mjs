@@ -11,6 +11,9 @@
  * t43_sash_proportions: cottage sash proportions (Piotr 09.10.2026), measured on the
  * derived data and on the components that reach the screen, against the start of
  * this tura (default 719bfba, `git archive`; pass another ref as the first argument).
+ * Since 13.10.2026 the archived START carries the live `tripleSectionWidths` (the triple
+ * section rule moved on purpose, Piotr 13.10.2026; the rule itself is t47's business), so
+ * the triple controls here still demand byte-identity.
  *
  *   1  the owner box table (CLAUDE.md 3.3): every row of a double 1000 wide, total /
  *      top / bottom to 0.001, the upper and lower glass units to 0.01, the stiles and
@@ -60,6 +63,22 @@ const startTree = resolve(AUDIT, `${startTag}-tree`);
 rmSync(startTree, { recursive: true, force: true });
 mkdirSync(startTree, { recursive: true });
 execFileSync('sh', ['-c', `git archive ${startHash} src | tar -x -C "${startTree}"`], { cwd: ROOT, stdio: 'inherit' });
+
+// 13.10.2026 (Piotr): the triple sash section rule moved on purpose (every sash takes its own
+// running gap, the double-hung rule; t47_triple_sash checks the rule itself against 94ba0a6).
+// The controls below still demand byte-identity for the triple windows, so START carries that
+// ONE function from the live tree: `tripleSectionWidths` is copied over the archived one
+// (its body from "function tripleSectionWidths(" to the closing brace). Everything else in
+// START stays as archived; if the live function is renamed or moved, this fails loudly.
+{
+  const liveCalc = readFileSync(resolve(ROOT, 'src', 'engine', 'calculations.js'), 'utf8');
+  const startCalcPath = resolve(startTree, 'src', 'engine', 'calculations.js');
+  const startCalc = readFileSync(startCalcPath, 'utf8');
+  const fnOf = (src) => { const m = /\nfunction tripleSectionWidths\([\s\S]*?\n}\n/.exec(src); return m ? m[0] : null; };
+  const liveFn = fnOf(liveCalc), startFn = fnOf(startCalc);
+  if (!liveFn || !startFn) throw new Error('tripleSectionWidths not found in the live or the START calculations.js');
+  writeFileSync(startCalcPath, startCalc.replace(startFn, liveFn));
+}
 
 const ESBUILD = ['-y', 'esbuild@0.25.0'];
 // Engine, lists, BOM, pricing, sheets and exports of one tree (react / jspdf / three external).

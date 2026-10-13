@@ -13,16 +13,19 @@ glass PDF, the glass DXF and the Glass tab print no bars for the centre unit), `
 width, the beading runs (triangle / Georgian) are computed as for ONE sash of the full sash width (1822). Say which
 sashes carry bars on a triple (centre only, or all three) and the rows follow.
 
-**32.2 Section rounding.** The engine splits 1722 (1822 less two mullions) as 431 / 861 / 430 (Math.round of 430.5,
-the rest to the right); the sheets print what the engine says (FIX L 431, FIX R 430; glass 340 / 339). Say if both
-fixed sashes should be equal (430.5 each) and the engine changes, not the sheets.
+**32.2 Section widths: DECIDED 13.10.2026 (Piotr, answers 1 to 3).** Every sash takes its own running gap, as the
+standard double-hung sash (6 = 178 - 2 x 86 at the default profile): the clear width between the internal jamb liners
+less the two posts splits into the section openings by the ratio (left / right to 0.5 mm, the centre takes the
+remainder), each sash = its opening less the gap. 2000: openings 432 / 864 / 432, sashes 426 / 858 / 426 (START:
+431 / 861 / 430, one gap for the whole window). Heights follow the double-hung rules unchanged. Closed.
 
-**32.3 Mullion post 50 x 141.** `DEFAULT_SASH_PROFILE.elements.mullion.face 50` (marked "FLAGGED default, matches the
-3D viewer's 50 mm", raw 63x63), length = the jamb length (H - 108). The sheets draw the engine post; confirm the 50.
+**32.3 Mullion post 50 x 141: CONFIRMED 13.10.2026** ("50 stays, everything is designed around it"). The
+"FLAGGED default" comment on `elements.mullion` in profile.js can go on the next pass of that file.
 
-**32.4 The 3D proportions.** The 3D splits its own inner width (between its jamb boards) by the ratio, the engine
-splits the sash width 1822: the 3D sections are a few mm wider than the sheets (the same approximation the double-hung
-3D has had since PSW). The sheets carry the engine numbers; the 3D is the configurator's picture.
+**32.4 The 3D proportions.** The 3D splits its own inner width (between its jamb boards) by the ratio and takes
+3 a side off every section (the same rule as the engine now), but its inner width is not the engine's clear width
+1828, so the 3D sections differ from the sheets by a few mm (the same approximation the double-hung 3D has had since
+PSW). The sheets carry the engine numbers; the 3D is the configurator's picture.
 
 **32.5 Estimate PDF.** `canvas-renderer.js` (the technical elevation of the estimate PDF) still draws a triple as a
 double-hung sash; not touched here (out of the window page scope).

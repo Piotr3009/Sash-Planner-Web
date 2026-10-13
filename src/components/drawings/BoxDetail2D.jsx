@@ -54,9 +54,9 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
     const fh = windowSpec.frame.height;
     const innerW = fw - 2 * BOX.jambW_top;
     const A = derived.arch && !derived.casement ? derived.arch : null;
-    // triple sash: the sections and mullions sit inside the sash area, (fw - sashWidth) / 2 from the frame edge
+    // triple sash: the openings and the posts sit inside the clear width between the internal jamb liners
     const T = tripleSections(derived);
-    const sashX0 = T ? (fw - Number(derived.sashWidth)) / 2 : 0;
+    const sashX0 = T ? (fw - T.clear) / 2 : 0;
     const mullionLen = T ? Number(tripleMullionRecord(derived, 'L')?.length) || null : null;
     return { fw, fh, innerW, A, T, sashX0, mullionLen };
   }, [windowSpec, derived]);
@@ -215,8 +215,8 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
                 </g>
               ))}
               <DimChainH y={Y(0) + DM * 2.1} extFrom={Y(0)} vbw={totalW}
-                cuts={[X(sashX0), ...T.sections.flatMap((s) => [X(sashX0 + s.x + s.width), X(sashX0 + s.x + s.width + T.mullionFace)]).slice(0, -1)]}
-                labels={[T.sections[0].width, T.mullionFace, T.sections[1].width, T.mullionFace, T.sections[2].width]} />
+                cuts={[X(sashX0), ...T.mullions.flatMap((m) => [X(sashX0 + m.x), X(sashX0 + m.x + m.width)]), X(sashX0 + T.clear)]}
+                labels={[T.sections[0].opening, T.mullionFace, T.sections[1].opening, T.mullionFace, T.sections[2].opening]} />
             </g>
           )}
 
@@ -293,7 +293,7 @@ export default function BoxDetail2D({ windowSpec, derived, onExpand, projectNumb
           <text x={totalW / 2} y={totalH + 14 * totalW / VIEWBOX_REF} fill={COL.title}
             fontSize={tfs(SIZES.subtitle, totalW)}
             fontFamily={FONT.family} textAnchor="middle">
-            {fw} × {fh} mm{A ? ` · ${A.geometry.label} · ${radiiText(A.geometry.arcs)}` : ''}{T ? ` · triple sash ${windowSpec.sash?.splitRatio || ''}`.trimEnd() : ''}
+            {fw} × {fh} mm{A ? ` · ${A.geometry.label} · ${radiiText(A.geometry.arcs)}` : ''}{T ? ` · triple sash ${windowSpec.sash?.splitRatio || ''} · openings ${T.sections.map((s) => s.opening).join(' / ')}, sashes ${T.sections.map((s) => s.width).join(' / ')} (gap ${T.gap})` : ''}
           </text>
           {windowTag ? <WindowTag tag={windowTag} vbw={totalW} /> : null}
         </svg>

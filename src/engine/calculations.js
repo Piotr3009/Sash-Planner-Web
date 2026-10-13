@@ -326,6 +326,17 @@ function calculateSashComponentSet(windowSpec, settings, sashWidth, topSashHeigh
     return sashComponents;
 }
 
+// Triple sash sections (Piotr 13.10.2026): the double-hung rule applied to every sash.
+// A double-hung sash (frame - deductions.sashWidth) runs in the opening between the
+// internal jamb liners (frame - 2 x intJambLiner.h) with `gap` of play (178 - 172 = 6,
+// 3 a side at the default profile). A triple splits THAT opening less the two mullion
+// posts into three section openings by the ratio (left / right rounded to 0.5 mm,
+// the centre takes the remainder, so the openings, the gaps and the posts add up to
+// the clear width exactly) and every sash is its opening less the same gap. Until
+// 13.10.2026 the split ran on the double sash width (one gap for the whole window),
+// so each sash came out 4 to 5 mm too wide; the 3D (sideGap 3 a side) was right.
+// `left` / `center` / `right` stay the SASH widths (the cut list, the glass rows, the
+// sheets); `openings` are the section openings the mullion posts bound.
 function tripleSectionWidths(windowSpec, sashWidth) {
     const prof = getWindowProfile();
     const mullionFace = prof.elements.mullion?.face || 50;
@@ -333,11 +344,20 @@ function tripleSectionWidths(windowSpec, sashWidth) {
     let leftR = 0.25, centerR = 0.5;
     if (split === '1/3-1/3-1/3') { leftR = 1 / 3; centerR = 1 / 3; }
     else if (split === '1/5-3/5-1/5') { leftR = 0.2; centerR = 0.6; }
-    const avail = sashWidth - 2 * mullionFace;
-    const left = Math.round(avail * leftR);
-    const center = Math.round(avail * centerR);
-    const right = avail - left - center;
-    return { left, center, right, mullionFace };
+    const rightR = 1 - leftR - centerR;
+    const liner = Number(prof.elements.intJambLiner?.h) || 0;
+    const gap = Math.max(0, Number(prof.deductions.sashWidth) - 2 * liner);
+    const clear = sashWidth + gap;
+    const avail = clear - 2 * mullionFace;
+    const half = (v) => Math.round(v * 2) / 2;
+    const leftOpen = half(avail * leftR);
+    const rightOpen = half(avail * rightR);
+    const centerOpen = half(avail - leftOpen - rightOpen);
+    return {
+        left: leftOpen - gap, center: centerOpen - gap, right: rightOpen - gap,
+        mullionFace, gap, clear,
+        openings: { left: leftOpen, center: centerOpen, right: rightOpen },
+    };
 }
 
 function calculateTripleSashComponentSet(windowSpec, settings, sashWidth, topSashHeight, bottomSashHeight, frameHeight) {
