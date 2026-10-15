@@ -110,7 +110,9 @@ SWATCHES.forEach((s) => { const k = (s.hex || '').toUpperCase(); if (!COLOR_NAME
 const hexToName = (hex) => COLOR_NAME[(hex || '').toUpperCase()] || (hex || '—');
 
 // ─── Triple sash dimension constraints (matching PSW) ───
-const TRIPLE_CONSTRAINTS = { minW: 1400, maxW: 3000, defaultW: 2000, minH: 1200, maxH: 2500 };
+// Triple sash runs to 3500 wide (Piotr 15.10.2026; was 3000): the engine, lists, sheets, 3D and
+// pricing carry no width cap of their own, this clamp is the only one. Double stays at 3000.
+const TRIPLE_CONSTRAINTS = { minW: 1400, maxW: 3500, defaultW: 2000, minH: 1200, maxH: 2500 };
 const DOUBLE_CONSTRAINTS = { minW: 400, maxW: 3000, minH: 400, maxH: 3000 };
 // Casement runs wider than a sash box: four lights need more than 3000
 // (Piotr 21.08). Height stays at the sash limit. Note this is a FRAME limit

@@ -468,6 +468,36 @@ section('5b - the printouts name the triple opening (source evidence)');
   ok(/sashType === 'triple'\s*\?\s*<div[^>]*>Triple sash: \{TRIPLE_OPENING_LABEL\}/.test(src('pages/ConfiguratorPage.jsx')) && /sashType === 'triple' \? TRIPLE_OPENING_LABEL : opening/.test(src('pages/ConfiguratorPage.jsx')),
     'configurator: a triple shows the fixed opening text instead of the chips, the summary too');
   ok(/sashType === 'triple'\s*\?\s*<div[^>]*>Triple sash: \{TRIPLE_OPENING_LABEL\}/.test(src('pages/EstimateConfiguratorPage.jsx')), 'estimate configurator: the same');
+  // 15.10.2026 (Piotr): a triple sash runs to 3500 wide in both configurators, a double stays at 3000
+  for (const p of ['pages/ConfiguratorPage.jsx', 'pages/EstimateConfiguratorPage.jsx']) {
+    ok(/const TRIPLE_CONSTRAINTS = \{ minW: 1400, maxW: 3500,/.test(src(p)) && /const DOUBLE_CONSTRAINTS = \{ minW: 400, maxW: 3000,/.test(src(p)),
+      `${p}: triple width clamp 1400 to 3500, double 400 to 3000`);
+  }
+}
+
+section('5c - a 3500 triple derives: sections, glass, hardware, pre-cut (the only cap was the configurator)');
+{
+  const W = 3500, H = 2500;
+  const rows = [];
+  for (const split of ['1/4-1/2-1/4', '1/3-1/3-1/3', '1/5-3/5-1/5']) {
+    const spec = LIVE.specification.normaliseToWindowSpec({ id: 't3500', name: 'T3500', width: W, height: H }, { fullConfig: { windowCategory: 'sash', frameType: 'standard', sashType: 'triple', splitRatio: split } });
+    const d = LIVE.calculations.deriveWindowData(spec, {});
+    const ts = d.tripleSections;
+    const glass = LIVE.lists.buildGlassListForWindow(d, spec);
+    const hw = LIVE.lists.buildHardwareList(spec, d);
+    const qty = (re) => (hw.find((r) => re.test(r.name || r.item || '')) || {}).qty ?? (hw.find((r) => re.test(r.name || r.item || '')) || {}).quantity;
+    const pc = LIVE.lists.buildPrecutForWindow(d, spec, {}, null);
+    const longest = Math.max(...[...pc.sashEngineering, ...pc.boxSapele].flatMap((g) => g.items).map((i) => i.length || 0));
+    rows.push({ split, ts, glass, longest, locks: qty(/lock/i), pulleys: qty(/pulley/i) });
+  }
+  const r1 = rows[0];
+  ok(r1.ts.left === 801 && r1.ts.center === 1608 && r1.ts.right === 801 && r1.ts.openings.center === 1614,
+    `3500 x 2500 1/4-1/2-1/4: sashes 801 / 1608 / 801 (openings 807 / 1614 / 807, light 3328 less two 50 mullions)`, JSON.stringify(r1.ts));
+  ok(rows[1].ts.left === 1070 && rows[1].ts.center === 1070 && rows[2].ts.center === 1931, '1/3: 1070 each; 1/5-3/5-1/5: centre 1931', JSON.stringify([rows[1].ts, rows[2].ts]));
+  ok(r1.glass.length === 6 && r1.glass.some((g) => g.width === 1517 && g.height === 1110.5) && r1.glass.filter((g) => g.width === 710).length === 4,
+    'glass rows per section: 4 x 710 x 1110.5 and 2 x 1517 x 1110.5', JSON.stringify(r1.glass.map((g) => `${g.width}x${g.height}`)));
+  ok(rows.every((r) => r.locks === 2 && r.pulleys === 2), 'hardware keeps the triple rule: 2 locks, 2 pulley wheels (middle section, bottom only)', JSON.stringify(rows.map((r) => [r.locks, r.pulleys])));
+  ok(rows.every((r) => r.longest === W + 10), `longest pre-cut piece ${W + 10} (head / cill / head liner + 10): longer than the default box stock 2500, reported by the optimizer, never dropped`);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

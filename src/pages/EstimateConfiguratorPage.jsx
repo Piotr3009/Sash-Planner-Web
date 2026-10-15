@@ -30,7 +30,8 @@ const SOLE_OPTIONS = [{ value: true, label: 'Only window' }, { value: false, lab
 const HORN_OPTIONS = [{ value: 'none', label: 'No Horns' }, { value: 'A', label: 'Richmond' }, { value: 'D', label: 'Type D' }];
 const COLOUR_MODES = [{ value: 'single', label: 'Single' }, { value: 'dual', label: 'Dual (Ext/Int)' }];
 
-const TRIPLE_CONSTRAINTS = { minW: 1400, maxW: 3000, minH: 1200, maxH: 2500 };
+// Triple sash runs to 3500 wide (Piotr 15.10.2026; was 3000), the same clamp as ConfiguratorPage. Double stays at 3000.
+const TRIPLE_CONSTRAINTS = { minW: 1400, maxW: 3500, minH: 1200, maxH: 2500 };
 const DOUBLE_CONSTRAINTS = { minW: 400, maxW: 3000, minH: 400, maxH: 3000 };
 
 const WHITE_HEXES = ['#F6F6F6', '#FAFAFA', '#FFFFFF', '#FFF'];
