@@ -35,6 +35,10 @@ export const COLORS = {
   section:     '#7C8FA6',
   sectionFill: '#94A3B8',
   bg:          '#1a1f2e',
+  // Opening marks on the elevations (Piotr 15.10.2026): red X = never opens,
+  // green arrow = sliding sash. Not in the print palette map: they read on white.
+  markFixed:   '#EF4444',
+  markOpen:    '#22C55E',
 };
 
 // ─── Font ───
@@ -78,6 +82,7 @@ export const STROKES = {
 
   dim:         0.7,
   ext:         0.3,
+  mark:        2.2,   // opening marks (red X, green arrow) on the elevations
   leader:      0.3,
 
   outer:       1,

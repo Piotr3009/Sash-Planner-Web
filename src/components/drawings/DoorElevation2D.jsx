@@ -31,7 +31,7 @@
  * sash and casement way; glass sizes live on the leaf and glass sheets.
  */
 import { useMemo } from 'react';
-import { DimH, DimV, TitleBlock, Label, WindowTag } from './drawingUtils.jsx';
+import { DimH, DimV, TitleBlock, Label, WindowTag, FixedCross } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
 import {
   NS, num, fmt, safely, NoSheet, doorProfileParts, thresholdText, handingText,
@@ -269,6 +269,7 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber , w
             )}
             <BarBands day={fl.daylight} bars={fl.bars} X={X} Y={Y} />
             {!fl.fixed && <OpeningSymbol r={fl} hinge="top" X={X} Y={Y} dash={dash} />}
+            {fl.fixed && (() => { const r = fl.daylight || fl; return <FixedCross cx={X(r.x + r.w / 2)} cy={Y(r.y + r.h / 2)} w={r.w} h={r.h} />; })()}
           </g>
         ))}
 
@@ -283,6 +284,8 @@ export default function DoorElevation2D({ windowSpec, derived, projectNumber , w
                 stroke={COLORS.glass} strokeWidth={STROKES.glassLight} {...NS} />
             )}
             <BarBands day={pn.daylight} bars={pn.bars} X={X} Y={Y} />
+            {/* a side light never opens: red X (Piotr 15.10.2026) */}
+            {(() => { const r = pn.daylight || pn; return <FixedCross cx={X(r.x + r.w / 2)} cy={Y(r.y + r.h / 2)} w={r.w} h={r.h} />; })()}
           </g>
         ))}
 

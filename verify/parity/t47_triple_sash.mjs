@@ -512,7 +512,8 @@ section('6 - controls: double-hung windows equal START');
   for (const [label, extra] of CASES) {
     const a = mk(LIVE, { width: 1000, height: 1400, ...extra }), b = mk(START, { width: 1000, height: 1400, ...extra });
     ok(JSON.stringify(a.derived) === JSON.stringify(b.derived) && JSON.stringify(a.spec) === JSON.stringify(b.spec), `${label}: derived and windowSpec equal START`);
-    ok(JSON.stringify(sheets(LIVE, a)) === JSON.stringify(sheets(START, b)), `${label}: the two sash sheets, two glass sheets, elevation, box and section byte-identical to START`);
+    const noMarks = (arr) => arr.map((s) => String(s).replace(/<g data-opening-mark="[^"]*">.*?<\/g>/g, ''));   // 15.10.2026: opening marks on the live elevation only
+    ok(JSON.stringify(noMarks(sheets(LIVE, a))) === JSON.stringify(sheets(START, b)), `${label}: the two sash sheets, two glass sheets, elevation, box and section byte-identical to START (the elevation but for its opening marks)`);
     ok(JSON.stringify(LIVE.elementsPayload.elementsPlan(a.spec, a.derived)) === JSON.stringify(START.elementsPayload.elementsPlan(b.spec, b.derived)), `${label}: the Elements plan equal START`);
     ok(JSON.stringify(LIVE.wsc.windowSpecToConfig(a.spec, a.derived)) === JSON.stringify(START.wsc.windowSpecToConfig(b.spec, b.derived)), `${label}: the 3D config equal START`);
   }

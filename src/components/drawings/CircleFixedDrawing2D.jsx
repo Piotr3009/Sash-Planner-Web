@@ -17,7 +17,7 @@
  */
 import { useMemo } from 'react';
 import { getCasementProfile } from '../../engine/profile.js';
-import { DimH, DimV, TitleBlock, tfs, WindowTag } from './drawingUtils.jsx';
+import { DimH, DimV, TitleBlock, tfs, WindowTag, FixedCross } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
 import { archToSheet, glassToSheet, closedChainD, ringBandD, barBandD, arcLabelPoint } from './archDrawUtils.js';
 
@@ -124,6 +124,8 @@ export default function CircleFixedDrawing2D({ windowSpec, derived, projectNumbe
                 <path key={`b-${k}`} d={d} fill="none" stroke={COLORS.bar} strokeWidth={STROKES.bar} {...NS} />
               ))}
             </g>
+            {/* a circle never opens: red X on the elevation (Piotr 15.10.2026) */}
+            {view === 'elevation' && <FixedCross cx={cx} cy={cy} w={2 * rGlass} h={2 * rGlass} />}
           </>
         )}
         {/* centre lines */}

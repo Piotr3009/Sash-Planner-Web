@@ -7,9 +7,9 @@
  * has it higher, Piotr 09.10.2026).
  * Dim lines: overall frame width & height only.
  */
-import { useMemo } from 'react';
+import { useMemo, Fragment } from 'react';
 import { CONSTANTS, sashBarPattern } from '../../engine/calculations.js';
-import { computeBarPositions, DimH, DimV, DimChainH, TitleBlock, tfs, HORN_DEF, HORN_W, buildHornPath, WindowTag } from './drawingUtils.jsx';
+import { computeBarPositions, DimH, DimV, DimChainH, TitleBlock, tfs, HORN_DEF, HORN_W, buildHornPath, WindowTag, FixedCross, SlideArrow } from './drawingUtils.jsx';
 // Triple sash (Piotr 13.10.2026): the three sections and the two mullion posts are the engine's
 // (derived.tripleSections), laid out by tripleDrawUtils; a double-hung sash takes the path below unchanged.
 import { tripleSections, mullionExtBoardD } from './tripleDrawUtils.js';
@@ -349,6 +349,33 @@ export default function FrontElevation2D({ windowSpec, derived, projectNumber , 
           x2={ox + fw - BOX.jambW_top} y2={lowerSashY + meetRail / 2}
           stroke={COL.meeting} strokeWidth={STROKES.meeting} {...NS} />
         </>)}
+
+        {/* ── OPENING MARKS (Piotr 15.10.2026): green arrow = the sash slides (down on the
+            upper, up on the lower), red X = it never moves. Double: openingType both /
+            bottom / fixed. Triple: only the middle lower sash slides (the engine forces
+            'bottom'); the side sections are fixed. ── */}
+        {(() => {
+          const opening = windowSpec?.sash?.openingType || 'both';
+          const upper = (gx, gw) => ({ cx: gx + geom.uGlassX + gw / 2, cy: upperSashY + geom.uGlassY + geom.uGlassH / 2, w: gw, h: geom.uGlassH });
+          const lower = (gx, gw) => ({ cx: gx + geom.lGlassX + gw / 2, cy: lowerSashY + geom.lGlassY + geom.lGlassH / 2, w: gw, h: geom.lGlassH });
+          if (T) {
+            return geom.sections.map((s) => {
+              const gx = clearX + s.x;
+              return (
+                <Fragment key={`om-${s.key}`}>
+                  <FixedCross {...upper(gx, s.glassW)} />
+                  {s.fixed ? <FixedCross {...lower(gx, s.glassW)} /> : <SlideArrow {...lower(gx, s.glassW)} dir="up" />}
+                </Fragment>
+              );
+            });
+          }
+          return (
+            <>
+              {opening === 'both' ? <SlideArrow {...upper(sashX, geom.uGlassW)} dir="down" /> : <FixedCross {...upper(sashX, geom.uGlassW)} />}
+              {opening === 'fixed' ? <FixedCross {...lower(sashX, geom.lGlassW)} /> : <SlideArrow {...lower(sashX, geom.lGlassW)} dir="up" />}
+            </>
+          );
+        })()}
 
         {/* ── HORNS — upper-sash bottom corners, profile from 3D HornMesh ── */}
         {windowSpec?.sash?.horns && HORN_DEF[windowSpec.sash.hornType] && (() => {

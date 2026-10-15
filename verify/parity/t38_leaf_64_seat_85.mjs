@@ -764,7 +764,11 @@ section('12 - nothing else moved: the live tree with the old numbers pinned');
       // 08.10.2026: the sheets print member codes without the C- prefix (C-H -> H, C-M1 -> M1); the old
       // trees are read with the prefix stripped the same way, so everything else stays byte for byte
       const noPrefix = (sh) => JSON.parse(JSON.stringify(sh).replace(/(?<![A-Za-z0-9])C-(?=(H|CILL|J|M\d*|T\d*|AH|ATR|FRAME RING|LEAF RING)\b)/g, ''));
-      ok(exact && JSON.stringify(grid(sa)) === JSON.stringify(noPrefix(sb)), `${name} pinned, ${w.id}: elevation, production elevation, ${sa.leaf.length} leaf and ${sa.glass.length} glass sheets byte-identical, except the leaf sheets' glass printed to 0.1 mm (= the schedule)`);
+      // 15.10.2026: the elevations carry the opening marks (red X on a fixed light, green arrows on
+      // sliding sashes) in <g data-opening-mark> groups; the old trees have none, so they are
+      // stripped from the live sheets before the byte comparison (and only they)
+      const noMarks = (sh) => JSON.parse(JSON.stringify(sh).replace(/<g data-opening-mark=\\"[^\\"]*\\">.*?<\/g>/g, ''));
+      ok(exact && JSON.stringify(noMarks(grid(sa))) === JSON.stringify(noPrefix(sb)), `${name} pinned, ${w.id}: elevation, production elevation, ${sa.leaf.length} leaf and ${sa.glass.length} glass sheets byte-identical, except the leaf sheets' glass printed to 0.1 mm (= the schedule)`);
     }
     LIVE.profile.setActiveCasementProfile(null);
   }

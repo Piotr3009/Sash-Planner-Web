@@ -310,6 +310,39 @@ export function WindowTag({ tag, vbw }) {
   );
 }
 
+// ─── Opening marks (Piotr 15.10.2026) ───
+// On the ELEVATIONS only (the 3D shows the look of the window, not information):
+// a red X on every pane that never opens (casement fixed lights, the side lights
+// and the fixed fanlight of a door, the fixed sashes of a triple or of a
+// "bottom only" / "fixed" sash window) and a green arrow on a sliding sash (up on
+// the lower sash, down on the upper). Casement and door leaves keep the dashed
+// opening triangle they had. cx / cy / w / h are the pane's centre and size in
+// SVG units. The X leaves a gap at the centre so a pane label stays legible. Both
+// sit in <g data-opening-mark="..."> so a harness can strip or count them.
+export function FixedCross({ cx, cy, w, h }) {
+  const s = Math.max(10, Math.min(w, h) * 0.3);
+  const g = s * 0.3;
+  const seg = (dx, dy, k) => (
+    <line key={k} x1={cx + dx * g} y1={cy + dy * g} x2={cx + dx * s} y2={cy + dy * s}
+      stroke={COLORS.markFixed} strokeWidth={STROKES.mark} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+  );
+  return <g data-opening-mark="fixed">{[seg(-1, -1, 'a'), seg(1, -1, 'b'), seg(-1, 1, 'c'), seg(1, 1, 'd')]}</g>;
+}
+
+export function SlideArrow({ cx, cy, w, h, dir = 'up' }) {
+  const L = Math.max(20, Math.min(h * 0.45, w * 0.7, 260));
+  const a = Math.max(7, L * 0.2);
+  const t = dir === 'up' ? -1 : 1;                  // tip direction in SVG y
+  const tail = cy - t * L / 2, tip = cy + t * L / 2;
+  return (
+    <g data-opening-mark={`slide-${dir}`}>
+      <line x1={cx} y1={tail} x2={cx} y2={tip - t * a * 0.8}
+        stroke={COLORS.markOpen} strokeWidth={STROKES.mark} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+      <path d={`M ${cx} ${tip} L ${cx - a} ${tip - t * a * 1.4} L ${cx + a} ${tip - t * a * 1.4} Z`} fill={COLORS.markOpen} />
+    </g>
+  );
+}
+
 // ─── Glass spacer bar positions (derived from WOOD bar centers) ───
 // Spacer bars share the same center line as wood bars but are 18mm wide (not 22mm).
 // Positions returned in GLASS coordinate system (origin = glass top-left corner).

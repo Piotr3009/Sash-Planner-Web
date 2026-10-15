@@ -298,13 +298,15 @@ for (const c of CASES) {
   ok(tu.includes(`${c.upper} · double`) && tl.includes(`${c.lower} · double`), `${c.label}: the sash sheets print "${c.upper} · double" and "${c.lower} · double"`);
   // the elevation: each sash's bars; the rect count moves by exactly the other sash's bars
   const el = (M, x) => render(M.FrontElevation, { windowSpec: x.spec, derived: x.derived });
+  // 15.10.2026: the live elevation carries the opening marks (<g data-opening-mark>, red X / green arrows); START has none: strip them, nothing else
+  const noMarks = (s) => String(s).replace(/<g data-opening-mark="[^"]*">.*?<\/g>/g, '');
   const both = (p) => el(LIVE, mk(LIVE, 1000, 1400, { upperBars: p, lowerBars: p }));
   const n = rects(el(LIVE, o));
   const nNone = rects(both('none')), nU = rects(both(c.upper)), nL = rects(both(c.lower));
   const perSash = (p) => (rects(both(p)) - nNone) / 2;
   ok(n - nNone === perSash(c.upper) + perSash(c.lower) && (nU - nNone) % 2 === 0 && (nL - nNone) % 2 === 0,
     `${c.label}: the elevation draws ${n - nNone} bar rects (upper ${perSash(c.upper)} + lower ${perSash(c.lower)}; none ${nNone}, ${c.upper} on both ${nU}, ${c.lower} on both ${nL})`);
-  for (const p of [c.upper, c.lower]) ok(el(LIVE, mk(LIVE, 1000, 1400, { upperBars: p, lowerBars: p })) === el(START, mk(START, 1000, 1400, { upperBars: p, lowerBars: p })), `elevation ${p} on both sashes: byte-identical to START`);
+  for (const p of [c.upper, c.lower]) ok(noMarks(el(LIVE, mk(LIVE, 1000, 1400, { upperBars: p, lowerBars: p }))) === el(START, mk(START, 1000, 1400, { upperBars: p, lowerBars: p })), `elevation ${p} on both sashes: byte-identical to START`);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -389,7 +391,8 @@ for (const [label, extra] of SAME) {
     && JSON.stringify(LI.buildCutListForWindow(a.derived, a.spec)) === JSON.stringify(START.lists.buildCutListForWindow(b.derived, b.spec)),
     `${label}: glass rows and cut list equal START`);
   const sheets = (M, x) => ['upper', 'lower'].flatMap((t) => [render(M.SashDetail, { windowSpec: x.spec, derived: x.derived, type: t }), render(M.GlassDrawing, { windowSpec: x.spec, derived: x.derived, type: t })]).concat(render(M.FrontElevation, { windowSpec: x.spec, derived: x.derived }));
-  ok(JSON.stringify(sheets(LIVE, a)) === JSON.stringify(sheets(START, b)), `${label}: the two sash sheets, the two glass sheets and the elevation byte-identical to START`);
+  const noMarks2 = (arr) => arr.map((s) => String(s).replace(/<g data-opening-mark="[^"]*">.*?<\/g>/g, ''));   // 15.10.2026: opening marks on the live elevation only
+  ok(JSON.stringify(noMarks2(sheets(LIVE, a))) === JSON.stringify(sheets(START, b)), `${label}: the two sash sheets, the two glass sheets and the elevation byte-identical to START (the elevation but for its opening marks)`);
   ok(JSON.stringify(dxfBars(LIVE, a)) === JSON.stringify(dxfBars(START, b)), `${label}: glass DXF bars equal START`);
   ok(JSON.stringify(cfgOf(LIVE, item)) === JSON.stringify(cfgOf(START, item)), `${label}: the 3D config equal to START`);
 }

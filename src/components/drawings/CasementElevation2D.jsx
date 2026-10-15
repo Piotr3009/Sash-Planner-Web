@@ -18,7 +18,7 @@
 import { useMemo } from 'react';
 import { getCasementProfile } from '../../engine/profile.js';
 import { offsetArcs } from '../../engine/arch.js';
-import { DimH, DimV, TitleBlock, Label, tfs, WindowTag } from './drawingUtils.jsx';
+import { DimH, DimV, TitleBlock, Label, tfs, WindowTag, FixedCross } from './drawingUtils.jsx';
 import { COLORS, FONT_FAMILY, SIZES, WEIGHTS, STROKES, DIMS, VIEWBOX_REF } from './drawingTheme.js';
 import { archToSheet, glassToSheet, archedOutlineD, barBandD, arcLabelPoint, radiiText } from './archDrawUtils.js';
 import CircleFixedDrawing2D from './CircleFixedDrawing2D.jsx';
@@ -246,6 +246,10 @@ export default function CasementElevation2D({ windowSpec, derived, projectNumber
               <path d={`M ${X(lf.r.x)} ${Y(lf.r.y + lf.r.h)} L ${X(lf.r.x + lf.r.w / 2)} ${Y(lf.r.y)} L ${X(lf.r.x + lf.r.w)} ${Y(lf.r.y + lf.r.h)}`}
                 fill="none" stroke={COLORS.meeting} strokeWidth={STROKES.meeting} {...NS}
                 strokeDasharray={`${sw(6)},${sw(4)}`} />
+            )}
+            {/* a light that never opens: red X (Piotr 15.10.2026) */}
+            {!['left', 'right', 'top'].includes(lf.hinge) && (
+              <FixedCross cx={X(lf.glassX + lf.glassW / 2)} cy={Y(lf.glassY + lf.glassH / 2)} w={lf.glassW} h={lf.glassH} />
             )}
             <Label x={X(lf.r.x + lf.r.w / 2)} y={Y(lf.r.y + lf.r.h / 2) + sw(5)}
               text={`P${lf.i + 1}`} vbw={totalW} />

@@ -578,15 +578,17 @@ const sheetsOf = (M, spec, derived) => ({
   vsection: render(M.VerticalSection, { windowSpec: spec, derived }),
 });
 const texts = (svg) => [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]);
+// 15.10.2026: the live elevation carries the opening marks (<g data-opening-mark>, red X / green arrows); START has none: strip them, nothing else
+const noMarks = (s) => String(s).replace(/<g data-opening-mark="[^"]*">.*?<\/g>/g, '');
 for (const H of [900, 1400, 1800, 2000]) {
   const a = mk(LIVE, 1000, H), b = mk(START, 1000, H);
   const A = sheetsOf(LIVE, a.spec, a.derived), B = sheetsOf(START, b.spec, b.derived);
-  ok(Object.keys(A).every((k) => A[k] === B[k]), `standard ${H}: the seven sash sheets byte-identical to START`);
+  ok(Object.keys(A).every((k) => noMarks(A[k]) === B[k]) && A.elevation.includes('data-opening-mark'), `standard ${H}: the seven sash sheets byte-identical to START (the elevation but for its opening marks)`);
 }
 for (const [label, w, h, fc] of [['gothic arched 700 x 1800', 700, 1800, { sashType: 'arched-group', archShape: 'gothic-arch' }], ['semi-circle arched 1000 x 2100', 1000, 2100, { sashType: 'arched-group', archShape: 'semi-circle' }]]) {
   const a = mk(LIVE, w, h, fc), b = mk(START, w, h, fc);
   const A = sheetsOf(LIVE, a.spec, a.derived), B = sheetsOf(START, b.spec, b.derived);
-  ok(Object.keys(A).every((k) => A[k] === B[k]), `standard ${label}: the seven sash sheets byte-identical to START (the vertical section label too)`);
+  ok(Object.keys(A).every((k) => noMarks(A[k]) === B[k]), `standard ${label}: the seven sash sheets byte-identical to START (the vertical section label too; the elevation but for its opening marks)`);
 }
 {
   const fmt05 = (n) => { const r = Math.round(n * 2) / 2; return Number.isInteger(r) ? String(r) : r.toFixed(1); };
