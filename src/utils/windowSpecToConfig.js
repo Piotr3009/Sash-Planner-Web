@@ -460,7 +460,15 @@ export function doorGeometryFromSpec(windowSpec, derivedIn = null) {
       hinges: [...(l.hinges || [])],
       hingeEdgeX: l.hingeEdgeX,
       handleY: l.handleY,
+      // the french meeting stile of this leaf (24.10.2026): its lip face and
+      // thickness, the rebate the CNC cuts and the lip plane the 3D splits at
+      meeting: l.meeting ? {
+        role: l.meeting.role, lipFace: l.meeting.lipFace, lip: l.meeting.lip, splitZ: l.meeting.splitZ,
+        rebate: l.meeting.rebate ? { width: l.meeting.rebate.width, depth: l.meeting.rebate.depth, fromFace: l.meeting.rebate.fromFace } : null,
+      } : null,
     })),
+    // the joint numbers (rebate width = lap + gap, the lips, the seal space)
+    meeting: d.meeting ? { ...d.meeting } : null,
     panels: (d.panels || []).map((pn) => ({ leaf: pn.leaf, thickness: pn.thickness, paneling: pn.paneling })),
     // side panels: casement fixed lights behind the mullion (64 / 64 / 180 x 57)
     panelLeaves: (d.panelLeaves || d.sidePanels || []).map((pl) => ({

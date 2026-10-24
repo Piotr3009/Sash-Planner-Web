@@ -478,11 +478,21 @@ export function doorPlan(windowSpec, derived) {
     const stile = (sx0, sx1, side) => {
       let notches = [];
       if (side && strip && strip[1] > strip[0]) {
-        const lapFace = lap?.face || 'exterior';
-        const laps = l.role === (lap?.leaf || 'active');
-        // the lapping leaf owns the strip on the lap face, the other leaf the other half
-        const notchFace = laps ? (lapFace === 'exterior' ? 'interior' : 'exterior') : lapFace;
-        notches = [{ corner: cornerOf(side, notchFace), w: strip[1] - strip[0], d: ld / 2 }];
+        // The meeting rebate of this leaf (24.10.2026, derived.door.leaves[i]
+        // .meeting): rebate width = the lap + the gap, cut from the face
+        // opposite the lip, as deep as the leaf less the lip that stays. A
+        // derived without it (an older copy) falls back to the half lap over
+        // the overlap strip.
+        const mt = l.meeting?.rebate;
+        if (mt && num(mt.width, 0) > 0 && num(mt.depth, 0) > 0) {
+          notches = [{ corner: cornerOf(side, mt.fromFace), w: mt.width, d: mt.depth }];
+        } else {
+          const lapFace = lap?.face || 'exterior';
+          const laps = l.role === (lap?.leaf || 'active');
+          // the lapping leaf owns the strip on the lap face, the other leaf the other half
+          const notchFace = laps ? (lapFace === 'exterior' ? 'interior' : 'exterior') : lapFace;
+          notches = [{ corner: cornerOf(side, notchFace), w: strip[1] - strip[0], d: ld / 2 }];
+        }
       }
       return notchedRect(sx0, sx1, dz0, dz0 + ld, notches);
     };
@@ -514,6 +524,8 @@ export function doorPlan(windowSpec, derived) {
       x: num(z.meetingX, (strip[0] + strip[1]) / 2), strip,
       lapFace: lap?.face || 'exterior',
       left: sorted[0], right: sorted[1],
+      // the joint numbers (24.10.2026): rebate width, gap, lips, seal space
+      geo: dr.meeting || null,
     } : null,
   };
 }
@@ -671,16 +683,34 @@ export function PlanDetail({ plan, dr, win, left, top, s, ts, vbw, clipId }) {
     depthDim(xl, lf.z0, lf.z1, `leaf ${fmt(plan.ld)}`, 'dl');
     depthDim(xf, 0, plan.fd, fmt(plan.fd), 'df');
   } else if (win.kind === 'meeting') {
-    const { left: L, right: R, strip, x: mx } = plan.meeting;
-    const cuts = [L.x + L.w - L.stileR, strip[0], strip[1], R.x + R.stileL];
-    dims.push(<DimChainH key="m1" y={row(0)} cuts={cuts.map(PX)} extFrom={ext} vbw={vbw}
-      minSegment={0} labels={[fmt(strip[0] - cuts[0]), fmt(strip[1] - strip[0]), fmt(cuts[3] - strip[1])]} />);
+    const { left: L, right: R, strip, geo } = plan.meeting;
+    // the chain along the exterior: stile to its shoulder, the gap, the lap,
+    // the gap, the other stile (24.10.2026: rebate = lap + gap); the two gaps
+    // are too narrow for a label of their own and read from the window label
+    const gap = num(geo?.gap, 0);
+    const shL = strip[0] - gap, shR = strip[1] + gap;
+    const cuts = gap > 0
+      ? [L.x + L.w - L.stileR, shL, strip[0], strip[1], shR, R.x + R.stileL]
+      : [L.x + L.w - L.stileR, strip[0], strip[1], R.x + R.stileL];
+    const labels = gap > 0
+      ? [fmt(shL - cuts[0]), '', fmt(strip[1] - strip[0]), '', fmt(cuts[5] - shR)]
+      : [fmt(strip[0] - cuts[0]), fmt(strip[1] - strip[0]), fmt(cuts[3] - strip[1])];
+    dims.push(<DimChainH key="m1" y={row(0)} cuts={cuts.map(PX)} extFrom={ext} vbw={vbw} minSegment={0} labels={labels} />);
     dims.push(<DimH key="m2" y={row(1)} x1={PX(L.x + L.w - L.stileR)} x2={PX(L.x + L.w)} extFrom={ext}
       label={`${fmt(L.stileR)}`} small vbw={vbw} />);
     dims.push(<DimH key="m3" y={row(2)} x1={PX(R.x)} x2={PX(R.x + R.stileL)} extFrom={ext}
       label={`${fmt(R.stileL)}`} small vbw={vbw} />);
     const lz0 = plan.leaves[0].z0, lz1 = plan.leaves[0].z1;
     depthDim(winRight + 14 * ts, lz0, lz1, `leaf ${fmt(plan.ld)}`, 'm5');
+    if (geo && num(geo.lipActive, 0) > 0 && num(geo.lipPassive, 0) > 0) {
+      // the lips: the active lip from the lap face, the passive from the other
+      // face, the seal space between them (the depth column further out)
+      const lapExt = geo.lapFace === 'exterior';
+      const zA = lapExt ? [lz0, lz0 + geo.lipActive] : [lz1 - geo.lipActive, lz1];
+      const zP = lapExt ? [lz1 - geo.lipPassive, lz1] : [lz0, lz0 + geo.lipPassive];
+      depthDim(winRight + 40 * ts, zA[0], zA[1], `lip ${fmt(geo.lipActive)}`, 'm6');
+      depthDim(winRight + 66 * ts, zP[0], zP[1], `lip ${fmt(geo.lipPassive)}`, 'm7');
+    }
   } else if (win.kind === 'mullion') {
     const mu = win.mullion;
     // the mullion: rebate · land · rebate and its face in one label over the
@@ -715,7 +745,9 @@ export function PlanDetail({ plan, dr, win, left, top, s, ts, vbw, clipId }) {
             stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={`${8 * ts},${3 * ts},${2 * ts},${3 * ts}`} />
           {/* in the empty half of the window: inside on an outward door, outside on an inward one */}
           <Label x={PX(plan.meeting.x)} y={plan.inward ? winBottom - 8 * ts : winTop + 32 * ts}
-            text={`lip ${fmt(plan.meeting.x - plan.meeting.strip[0])} + ${fmt(plan.meeting.strip[1] - plan.meeting.x)}`} vbw={vbw} />
+            text={plan.meeting.geo && num(plan.meeting.geo.gap, 0) > 0
+              ? `rebate ${fmt(plan.meeting.geo.rebateWidth)} = lap ${fmt(plan.meeting.geo.overlap)} + gap ${fmt(plan.meeting.geo.gap)}`
+              : `lip ${fmt(plan.meeting.x - plan.meeting.strip[0])} + ${fmt(plan.meeting.strip[1] - plan.meeting.x)}`} vbw={vbw} />
           {[plan.meeting.left, plan.meeting.right].map((l, i) => (
             <Label key={`r${i}`} x={PX(i === 0 ? l.x + l.w - l.stileR / 2 : l.x + l.stileL / 2)} y={winTop + 14 * ts}
               text={String(l.role || '').toUpperCase()} vbw={vbw} />

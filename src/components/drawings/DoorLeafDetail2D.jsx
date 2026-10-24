@@ -181,7 +181,9 @@ export default function DoorLeafDetail2D({ windowSpec, derived, projectNumber, w
       ? `Panel edge: tongue ${fmt(edge.tongue)}, ${fmt(panel.inset)} deep in the ${fmt(pp.glazingRebate)} glazing rebate; slope ${fmt(edge.slope)} up to ${fmt(panel.thickness)}, flat ${fmt(edge.flat)} at the bead`
       : '',
     french
-      ? `Meeting stile ${fmt(m.meeting)} (${fmt(m.stile)} + lip ${fmt(dr.lip)}), half lapped; active leaf laps on the ${dr.zones?.meetingLap?.face || 'exterior'}`
+      ? (dr.meeting && num(dr.meeting.gap, 0) > 0
+        ? `Meeting stile ${fmt(m.meeting)}: rebate ${fmt(dr.meeting.rebateWidth)} x ${fmt(dr.meeting.cutActive)} active (lip ${fmt(dr.meeting.lipActive)} ${dr.meeting.lapFace === 'exterior' ? 'ext' : 'int'}), ${fmt(dr.meeting.rebateWidth)} x ${fmt(dr.meeting.cutPassive)} passive (lip ${fmt(dr.meeting.lipPassive)}); Lock Machining sheet`
+        : `Meeting stile ${fmt(m.meeting)} (${fmt(m.stile)} + lip ${fmt(dr.lip)}), half lapped; active leaf laps on the ${dr.zones?.meetingLap?.face || 'exterior'}`)
       : '',
     french
       ? (kit === 'fgte'

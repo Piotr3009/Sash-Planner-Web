@@ -22,7 +22,7 @@ import { casementPaneFinish } from './casementDrawUtils.js';
  * sheet per side panel, one per fan leaf (doors v3: fixed fanlights are
  * non-opening casement leaves with their own sheet, labelled fixed; the keys
  * stay doorfan-<i> over derived.door.fanLeaves), and the plan section.
- * Each entry: { key, label, sheet: 'frame' | 'leaf' | 'side' | 'fan' | 'section', props }.
+ * Each entry: { key, label, sheet: 'frame' | 'leaf' | 'machining' | 'side' | 'fan' | 'section', props }.
  */
 export function doorSheetPlan(derived) {
   const dr = derived?.door;
@@ -32,6 +32,9 @@ export function doorSheetPlan(derived) {
     { key: 'doorframe', label: 'Frame', sheet: 'frame', props: {} },
     { key: 'doorleaf', label: 'Leaf', sheet: 'leaf', props: {} },
   ];
+  // the lock machining sheet (24.10.2026): the lock edges laid down with the
+  // pockets and keeps from the spindle datum, when the engine derived them
+  if ((dr.leaves || []).some((l) => l.machining)) plan.push({ key: 'doormachining', label: 'Lock Machining', sheet: 'machining', props: {} });
   (dr.panelLeaves || []).forEach((pl) => {
     plan.push({ key: `doorside-${pl.side}`, label: `Side Panel ${pl.side === 'left' ? 'Left' : 'Right'}`, sheet: 'side', props: { side: pl.side } });
   });

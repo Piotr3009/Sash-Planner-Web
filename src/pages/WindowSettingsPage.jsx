@@ -1364,6 +1364,7 @@ function DoorSettings() {
   const p = door;
   const g = p.geometry || {}, d = p.deductions || {}, L = p.lengths || {};
   const H = p.hardware || {}, HG = p.hinges || {}, PN = p.panel || {};
+  const MT = p.meeting || {};
   const W = Number(sampleW) || 1600;
   const Hh = Number(sampleH) || 2100;
   const num = (v, fb = 0) => (v === '' ? '' : Number(v) || fb);
@@ -1458,6 +1459,10 @@ function DoorSettings() {
               <PathField label="Leaf depth, triple (mm)" value={p.leafDepthTriple} onCommit={(v) => setPath(['leafDepthTriple'], v)} />
               <PathField label="Glass into rebate / side" value={g.glassInset} onCommit={(v) => setPath(['geometry', 'glassInset'], v)} />
               <PathField label="French lip (each leaf)" value={p.frenchLip} onCommit={(v) => setPath(['frenchLip'], v)} hint="meeting stile laps the centre line" />
+              <PathField label="Meeting gap" value={MT.gap} onCommit={(v) => setPath(['meeting', 'gap'], v)} hint={`rebate = lap ${2 * (Number(p.frenchLip) || 0)} + gap`} />
+              <PathField label="Active lip" value={MT.lipActive} onCommit={(v) => setPath(['meeting', 'lipActive'], v)} hint={`cut ${Math.round(((Number(p.leafDepth) || 0) - (Number(MT.lipActive) || 0)) * 10) / 10} from the other face`} />
+              <PathField label="Passive lip" value={MT.lipPassive} onCommit={(v) => setPath(['meeting', 'lipPassive'], v)} hint={`cut ${Math.round(((Number(p.leafDepth) || 0) - (Number(MT.lipPassive) || 0)) * 10) / 10}, seal space ${Math.round(((Number(p.leafDepth) || 0) - (Number(MT.lipActive) || 0) - (Number(MT.lipPassive) || 0)) * 10) / 10}`} />
+              <PathField label="Seal groove" value={MT.sealGroove} onCommit={(v) => setPath(['meeting', 'sealGroove'], v)} hint="in the passive shoulder" />
               <div className="text-ink-300 pb-1.5 text-[11px]">
                 {leaf0 && glass0 ? (
                   <>sample leaf <span className="text-accent-400 font-medium">{leaf0.w} × {leaf0.h}</span>
@@ -1598,7 +1603,22 @@ function DoorSettings() {
                     {['full length', 'individual'].map((v) => <option key={v} value={v}>{v}</option>)}
                   </select>
                 </div>
-                <PathField label="Handle height" value={H.handleHeight} onCommit={(v) => setPath(['hardware', 'handleHeight'], v)} hint="above floor, drawings" />
+                <PathField label="Handle height" value={H.handleHeight} onCommit={(v) => setPath(['hardware', 'handleHeight'], v)} hint="above floor; read only without a spindle height" />
+              </div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Lock machining (spindle datum, every door)</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <PathField label="Spindle above leaf bottom" value={H.spindleFromLeafBottom} onCommit={(v) => setPath(['hardware', 'spindleFromLeafBottom'], v)} hint="one height, single and french" />
+                <PathField label="Edge margin" value={H.lockEdgeMargin} onCommit={(v) => setPath(['hardware', 'lockEdgeMargin'], v)} hint="lip face to the faceplate recess" />
+                <PathField label="Faceplate recess width" value={H.faceplateWidth} onCommit={(v) => setPath(['hardware', 'faceplateWidth'], v)} hint={`axis ${Math.round(((Number(H.lockEdgeMargin) || 0) + (Number(H.faceplateWidth) || 0) / 2) * 10) / 10} from the lip face`} />
+                <PathField label="Recess depth, master" value={H.faceplateRecessMaster} onCommit={(v) => setPath(['hardware', 'faceplateRecessMaster'], v)} />
+                <PathField label="Recess depth, slave" value={H.faceplateRecessSlave} onCommit={(v) => setPath(['hardware', 'faceplateRecessSlave'], v)} />
+                <div>
+                  <div className="text-ink-400 mb-1">ThunderBolt aux housing</div>
+                  <select value={H.auxHousing === false ? 'no' : 'yes'} onChange={(e) => setPath(['hardware', 'auxHousing'], e.target.value === 'yes')} className={selectCls}>
+                    <option value="no">not on this lock (the DXF lock)</option>
+                    <option value="yes">machined (the data sheet variant)</option>
+                  </select>
+                </div>
               </div>
               <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">FGTE (double door kit, french with two handles)</div>
               <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">

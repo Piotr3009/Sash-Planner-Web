@@ -5,6 +5,7 @@ import { buildArchGeometry, buildSashArchGeometry, planArchSegments, buildGlassO
 import { buildTraceryForDerived } from './cnc/traceryExport.js';
 import { casementLeafBars, leafBarsToUnit, computeBarPositions, BAR_WIDTH } from './casementBarGrid.js';
 import { selectDoorHardware, doorHingePositions } from './doorHardware.js';
+import { frenchMeetingGeometry, leafMeeting, leafLockMachining, jambKeepMachining } from './doorLockMachining.js';
 import { leafWidthInField, leafHeightInTier, leafOrigin, fieldLandX, mullionLength, fullMullionRun, transomSegmentLength, transomRun } from './casementRules.js';
 import { isAcousticUnit, SASH_PROPORTIONS, SashProportionError } from './specification.js';
 
@@ -1325,6 +1326,8 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight, settings = {}) {
     const spP = { ...DD.sidePanel, ...(p.sidePanel || {}) };
     const ffP = { ...DD.fixedFan, ...(p.fixedFan || {}) };
     const panelP = { ...DD.panel, ...(p.panel || {}), edge: { ...DD.panel.edge, ...(p.panel?.edge || {}) } };
+    const hwP = { ...DD.hardware, ...(p.hardware || {}) };
+    const meetP = { ...DD.meeting, ...(p.meeting || {}) };
     const d = windowSpec.door || {};
     const R = (v) => Math.round(v * 10) / 10;
     const face = (k, fallback) => Number(els[k]?.face ?? fallback);
@@ -1491,7 +1494,19 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight, settings = {}) {
         ]
         : [{ x: R(doorOrigin.x), hinge: hingeOnRight ? 'right' : 'left', role: 'single', meetingSide: null }];
     const hingeRule = p.hinges || DD.hinges;
-    const handleHeight = Number(p.hardware?.handleHeight ?? DD.hardware.handleHeight);
+    // The spindle axis (Piotr 24.10.2026): ONE height above the LEAF BOTTOM for
+    // the single and the french door (hardware.spindleFromLeafBottom, 1050);
+    // a copy without it (pre 24.10) still reads handleHeight above the floor.
+    const spindleFromBottom = Number.isFinite(Number(hwP.spindleFromLeafBottom)) && Number(hwP.spindleFromLeafBottom) > 0
+        ? Number(hwP.spindleFromLeafBottom)
+        : null;
+    const handleHeight = Number(hwP.handleHeight ?? DD.hardware.handleHeight);
+    const handleYOf = (lY, lH) => R(spindleFromBottom != null ? lY + lH - spindleFromBottom : frameHeight - handleHeight);
+    // French meeting joint (Piotr 24.10.2026): rebate = lap + gap on each
+    // meeting stile, the active lip 37 on the swing face, the passive lip 14.5
+    // on the other face, the seal between them (doorLockMachining.js).
+    const meetingGeo = isFrench ? frenchMeetingGeometry({ leafDepth: ld, lip, clearance, meeting: meetP, inward }) : null;
+    const twoHandles = isFrench && (d.lockType || 'single') === 'double';
     const axis = axisRatio ? R(leafH * axisRatio) : null;      // mid rail axis, from the leaf top
     const leaves = leafBase.map((b) => {
         const stileL = b.meetingSide === 'L' ? fMeet : fStile;
@@ -1519,10 +1534,21 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight, settings = {}) {
             midRail, panel,
             hinges: doorHingePositions(leafH, hingeRule).map((hy) => R(leafY + hy)),
             hingeEdgeX: b.hinge === 'right' ? R(b.x + leafW) : b.x,
-            handleY: R(frameHeight - handleHeight),
+            handleY: handleYOf(leafY, leafH),
             weightKg: R((timberKg + glassKg + panelKg) * wMargin),
         };
+    }).map((leaf) => {
+        // The meeting stile of this leaf (french) and its lock machining, every
+        // position from the spindle axis (doorLockMachining.js).
+        const meeting = isFrench ? leafMeeting(leaf.role, meetingGeo) : null;
+        const backset = leaf.role === 'passive' && twoHandles ? Number(hwP.fgteSlaveBackset ?? hwP.backset) : Number(hwP.backset);
+        const machining = leafLockMachining({ leafH: leaf.h, role: leaf.role, twoHandles, hw: hwP, leafDepth: ld, meeting, backset });
+        return { ...leaf, meeting, machining };
     });
+    // A single door: the ThunderBolt keeps sit in the lock side jamb rebate wall.
+    const jambMachining = !isFrench && leaves.length === 1
+        ? { side: leaves[0].hinge === 'left' ? 'right' : 'left', ...jambKeepMachining({ leafH, hw: hwP, backset: Number(hwP.backset) }) }
+        : null;
 
     // ── Side panels: casement fixed lights behind the mullion (owner box item 5) ──
     const glassDedOf = (stile, top, bottom) => casementGlassDeductions({
@@ -1773,7 +1799,7 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight, settings = {}) {
     const doorHw = selectDoorHardware({
         leaves, isFrench, lockType: d.lockType, inward, hingeSide, threshold: effectiveThreshold, hasTimberCill,
         thresholdSeal: thresholdInfo.seal,
-        hinges: hingeRule, hw: p.hardware || DD.hardware, leafDepth: ld,
+        hinges: hingeRule, hw: hwP, leafDepth: ld,
     });
     let fanHw = null;
     const openingFans = fanLeaves.filter((fl) => !fl.fixed);
@@ -1833,6 +1859,14 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight, settings = {}) {
             handing,
             bottomRailFace: fBottom,
             overlap: isFrench ? R(2 * lip - clearance) : 0,
+            // The french meeting joint (24.10.2026): rebate width = overlap +
+            // gap, the two lips, the cut depths, the seal space; null on a
+            // single door. The per-leaf side is leaves[i].meeting.
+            meeting: meetingGeo,
+            // The lock machining datum: the spindle axis above the leaf bottom
+            // (one height for every door), the lock axis from the lip face.
+            spindleFromLeafBottom: spindleFromBottom,
+            jambMachining,
             members: {
                 stile: fStile, top: fTop, bottom: fBottom, mid: fMid, meeting: fMeet,
                 frameHead: fHead, frameJamb: fJamb, frameCill: cillFace, transomRail: railFace, mullion: fMull,

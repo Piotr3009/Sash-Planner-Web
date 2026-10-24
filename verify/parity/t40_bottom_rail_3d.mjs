@@ -539,8 +539,18 @@ section('6 - DoorWindow with doorGeo: the owner box numbers in the door 3D (LIVE
       const ah = halves(am, act), ph = halves(pm, pas);
       const aExt = w(ah.ext), aInt = w(ah.int), pExt = w(ph.ext), pInt = w(ph.int);
       const lapsExt = D.geo.meetingLap?.face === 'exterior';
-      ok(D.geo.members.meeting === 100 && D.geo.lip === 6 && lapsExt && near(aExt, 100, 0.02) && near(aInt, 88, 0.02) && near(pExt, 88, 0.02) && near(pInt, 100, 0.02),
-        `french: meeting stiles 100 (94 + lip 6): the active leaf laps on the ${D.geo.meetingLap?.face} (EXT ${aExt} / INT ${aInt}), the passive leaf is rebated (EXT ${pExt} / INT ${pInt})`);
+      // 24.10.2026: the meeting rebate is lap 12 + gap 4 = 16 wide, cut to the lip (active lip 37 on the
+      // exterior, passive lip 14.5 on the interior), so the member parts split at the lip plane
+      const dz = (m) => R2(m.max[2] - m.min[2]);
+      const MG = D.geo.meeting;
+      ok(D.geo.members.meeting === 100 && D.geo.lip === 6 && lapsExt && MG && MG.rebateWidth === 16 && MG.gap === 4
+        && near(aExt, 100, 0.02) && near(aInt, 84, 0.02) && near(pExt, 84, 0.02) && near(pInt, 100, 0.02)
+        && near(dz(ah.ext), 37, 0.02) && near(dz(ah.int), 20, 0.02) && near(dz(ph.ext), 42.5, 0.02) && near(dz(ph.int), 14.5, 0.02),
+        `french: meeting stiles 100 (94 + lip 6), rebate ${MG?.rebateWidth} = lap 12 + gap 4: the active lip ${dz(ah.ext)} thick on the ${D.geo.meetingLap?.face} (EXT ${aExt} / INT ${aInt} x ${dz(ah.int)}), the passive lip ${dz(ph.int)} inside (EXT ${pExt} x ${dz(ph.ext)} / INT ${pInt})`);
+      // the gap: the active lip edge stands 4 clear of the passive shoulder (and the passive lip of the active shoulder)
+      const actLipEdge = act.hinge === 'right' ? ah.ext.min[0] : ah.ext.max[0];
+      const pasShoulder = act.hinge === 'right' ? ph.ext.max[0] : ph.ext.min[0];
+      ok(near(Math.abs(actLipEdge - pasShoulder), 4, 0.02), `french: gap ${R2(Math.abs(actLipEdge - pasShoulder))} between the active lip edge and the passive shoulder`);
       const zone = (ms) => ms.filter((m) => m.min[0] < mx + 6 - 0.01 && m.max[0] > mx - 6 + 0.01);
       const clash = zone(am).some((a) => zone(pm).some((p) => a.min[2] < p.max[2] - 0.01 && p.min[2] < a.max[2] - 0.01));
       ok(!clash && zone(am).length > 0 && zone(pm).length > 0, 'french: in the 12 overlap the two leaves never occupy the same depth (rebated meeting stiles, no clash)');

@@ -714,6 +714,26 @@ export const DEFAULT_DOOR_PROFILE = Object.freeze({
   // since 05.08.2026): 200 below the top, 100 above the centre, 150 above the
   // bottom; the 4th halfway between top and middle.
   hinges: { perLeaf: 3, perLeafTall: 4, tallAbove: 2100, fromTop: 200, aboveCentre: 100, fromBottom: 150, barrel: 102 },
+  // French MEETING STILES (Piotr 24.10.2026, the Winkhaus FGTE rebated routing
+  // detail for a 58 slab as the pattern): each meeting stile 100 = 94 + the
+  // 6 lip keeps a full-length rebate at its meeting edge,
+  //   rebate width  = the two lips (2 x frenchLip - frenchClearance = 12) + gap
+  //                   (4 between a lip edge and the other leaf's shoulder) = 16;
+  //   rebate depth  = leafDepth - the lip that stays: the ACTIVE lip (lipActive
+  //                   37, on the face the door swings to) is cut 20 deep from
+  //                   the other face; the PASSIVE lip (lipPassive 14.5, on the
+  //                   other face) is cut 42.5 deep from the swing face;
+  //   between the two lips 57 - 37 - 14.5 = 5.5 stays for the seal, which sits
+  //   in a 3 mm groove in the passive shoulder at the foot of its lip (Q-lon
+  //   Aquamac 124, the Winkhaus detail).
+  // The lock axis sits lockEdgeMargin 12 + faceplate 21 / 2 = 22.5 from the
+  // lip face on BOTH leaves (the FGTE "22 mm centre line" variant).
+  meeting: {
+    gap: 4,
+    lipActive: 37,
+    lipPassive: 14.5,
+    sealGroove: 3,
+  },
   // Variant attributes the buyer selects on the BJ Waller page (owner links
   // 08.10.2026). Every value is a FLAGGED default (BLOCKERS 5.5).
   hardware: {
@@ -725,7 +745,22 @@ export const DEFAULT_DOOR_PROFILE = Object.freeze({
     fgteSlaveBackset: 45,       // FGTE slave backset: 35 or 45
     fgteCentreLine: 22,         // FGTE lock centre line: 12 or 22
     cillKeep: 'yes',            // FGTE shootbolt keep cill option, when the door has a timber cill
-    handleHeight: 1000,         // handle centre above the floor (3D DoorPanel.jsx), drawings only
+    handleHeight: 1000,         // handle centre above the floor: read only when spindleFromLeafBottom is unset (pre 24.10 copies)
+    // Lock machining (Piotr 24.10.2026, Winkhaus data sheets): ONE spindle axis
+    // for the single door (ThunderBolt) and the french door (FGTE master and
+    // slave), measured from the LEAF BOTTOM, so the leaf programs share it.
+    // 1050 = the Winkhaus routing example; the ThunderBolt 1770 faceplate then
+    // lies 144 to 1914 on a 1998 leaf and the FGTE handle range 1040 to 1247
+    // holds (ASSUMPTION, owner check: BLOCKERS 32).
+    spindleFromLeafBottom: 1050,
+    lockEdgeMargin: 12,         // lip face to the faceplate recess edge
+    faceplateWidth: 21,         // the routed recess for the 20 mm faceplate (Winkhaus 20.5)
+    faceplateRecessMaster: 3,   // recess depth, the master / single lock faceplate
+    faceplateRecessSlave: 5,    // recess depth, the FGTE slave faceplate
+    rodChannelWidth: 12.2,      // the connecting rod channel under the faceplate (FGTE routing)
+    rodChannelDepthMaster: 12,
+    rodChannelDepthSlave: 15,
+    auxHousing: false,          // ThunderBolt: the 4th pocket (the "additional lock, prepared" housing of the data sheet); the product DXF (24.10.2026) has three housings, so off
   },
   lengths: {
     headDeduct: 0,
@@ -823,6 +858,7 @@ export function migrateDoorProfile(profile) {
     deductions,
     hinges: { ...D.hinges, ...(profile.hinges || {}) },
     hardware: { ...D.hardware, ...(profile.hardware || {}) },
+    meeting: { ...D.meeting, ...(profile.meeting || {}) },
     lengths: { ...D.lengths, ...(profile.lengths || {}) },
   };
 }

@@ -149,7 +149,9 @@ export default function DoorSection2D({ windowSpec, derived, projectNumber, wind
   const notes = [
     `Frame ${fmt(m.frameJamb)}×${fmt(fd)}, land ${fmt(m.land)}, rebate ${fmt(m.rebate)} on the ${inward ? 'interior' : 'exterior'}; leaf ${fmt(plan.ld)}, gap ${fmt(m.gap)}; glass ${glassSpecText(windowSpec)}`,
     french
-      ? `Meeting stiles ${fmt(m.meeting)}, lip ${fmt(dr.lip)} past the centre line, half lapped; active leaf on the ${plan.meeting.lapFace}`
+      ? (plan.meeting.geo && num(plan.meeting.geo.gap, 0) > 0
+        ? `Meeting stiles ${fmt(m.meeting)}: rebate ${fmt(plan.meeting.geo.rebateWidth)} wide (lap ${fmt(plan.meeting.geo.overlap)} + gap ${fmt(plan.meeting.geo.gap)}); active lip ${fmt(plan.meeting.geo.lipActive)} on the ${plan.meeting.lapFace} (cut ${fmt(plan.meeting.geo.cutActive)}), passive lip ${fmt(plan.meeting.geo.lipPassive)} (cut ${fmt(plan.meeting.geo.cutPassive)}), ${fmt(plan.meeting.geo.sealSpace)} between the lips for the seal`
+        : `Meeting stiles ${fmt(m.meeting)}, lip ${fmt(dr.lip)} past the centre line, half lapped; active leaf on the ${plan.meeting.lapFace}`)
       : '',
     mullCodes.length
       ? `Mullion ${mullCodes.join(', ')} ${fmt(plan.fM)}×${fmt(fd)}: rebate ${fmt(plan.mReb)} each side of the land ${fmt(plan.mLand)}, the leaf ${fmt(plan.mLand / 2)} + gap ${fmt(m.gap)} from the axis`

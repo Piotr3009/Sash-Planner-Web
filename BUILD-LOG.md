@@ -4,6 +4,59 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-10-24 · FRENCH MEETING STILES AND LOCK MACHINING (chat change, main 20fba5c)
+
+### Verdict ✅ the french meeting joint is parametric (rebate = lap 12 + gap 4, active lip 37 / passive lip 14.5, 5.5 seal space), one spindle datum 1050 above the leaf bottom on every door, the Winkhaus ThunderBolt / FGTE / keep machining as data (`derived.door.leaves[i].machining`) and as a new Lock Machining sheet; the plan detail, the leaf and section notes and the 3D follow; suite run (see the summary below); build OK
+
+**Owner input (Piotr 24.10.2026, chat):** "rebate 12 + 4 gap, the other leaf 12 (the lap 12, the gap 4); depths 20
+and 14.5, the rest for the seal; the lock 12 from the edge, 21 / 2 + 12 = 22.5 to the axis; one height for the single
+and the double door; koduj." Documents: ThunderBolt data sheet 4941787 (milling dimensions), FGTE rebated master /
+slave routing details (58 slab, 45 backset), BJ Waller double door sections, F24-912W and F2402 keep datasheets.
+
+**What changed**
+- `engine/profile.js`: `DEFAULT_DOOR_PROFILE.meeting { gap 4, lipActive 37, lipPassive 14.5, sealGroove 3 }`;
+  `hardware.spindleFromLeafBottom 1050`, `lockEdgeMargin 12`, `faceplateWidth 21`, `faceplateRecessMaster 3`,
+  `faceplateRecessSlave 5`, `rodChannelWidth 12.2`, `rodChannelDepthMaster 12`, `rodChannelDepthSlave 15`,
+  `auxHousing true`; `migrateDoorProfile` merges `meeting` (a stored copy without the keys takes the defaults).
+- `engine/doorLockMachining.js` (new): `frenchMeetingGeometry`, `leafMeeting`, `leafLockMachining`,
+  `jambKeepMachining`, `pocketDepth`; the Winkhaus constants `THUNDERBOLT_1770`, `FGTE_MASTER`, `FGTE_SLAVE`,
+  `KEEPS`. Every position from the spindle (+ up) with the absolute form from the leaf bottom beside it.
+- `engine/calculations.js` `deriveDoorWindow`: `handleY` from the spindle above the leaf bottom (0 or unset falls
+  back to `handleHeight` above the floor); `leaf.meeting`, `leaf.machining`; `door.meeting`,
+  `door.spindleFromLeafBottom`, `door.jambMachining` (single door: the keeps in the lock side jamb).
+- `components/drawings/doorSheetParts.jsx`: `doorPlan` notches each meeting stile by `leaf.meeting.rebate` (16 wide,
+  20 / 42.5 deep from the face opposite the lip; the old half lap stays as the fallback for an older derived);
+  the plan detail chain shows stile · gap · lap · gap · stile, the lips as depth dims, the window label "rebate 16 =
+  lap 12 + gap 4".
+- `components/drawings/DoorLockMachining2D.jsx` (new) + `doorDrawUtils.doorSheetPlan` (key `doormachining`, after
+  the leaf sheet) + `DoorSheet.jsx`: the lock edges laid down, bands with the pockets (hatched), keeps, spindle and
+  cylinder, a table with every row from the leaf bottom and from the spindle, the notes; passes the collision and
+  the dimension rules (t41 §18).
+- `DoorLeafDetail2D.jsx`, `DoorSection2D.jsx`: the meeting note names the rebate, the cuts and the lips; the leaf
+  note points at the Lock Machining sheet; the handle note already prints the spindle above the leaf bottom.
+- `3d/components/door/DoorAssembly.jsx`: the stile and rail halves split at the lip plane (`L.split`, from
+  `leaf.meeting.splitZ`), the meeting cut is the rebate width 16 on the face opposite the lip;
+  `utils/windowSpecToConfig.js` carries `leaf.meeting` and `door.meeting` into the 3D geometry.
+- `pages/WindowSettingsPage.jsx`: Doors · Depths & glazing: Meeting gap, Active lip, Passive lip, Seal groove (with
+  the cut depths and the seal space as hints); Doors · Hardware: "Lock machining" row (spindle above the leaf bottom,
+  edge margin, faceplate recess width with the axis hint, recess depths, aux housing on / off).
+  `stores/windowProfileStore.js`: `DOOR_PATH_ROOTS` + `meeting`, the boolean `hardware.auxHousing`.
+- Tests: `t49_door_meeting_machining.mjs` (new, 55 checks); `t40` french meeting expectation (lip 37 / cut 20, lip
+  14.5 / cut 42.5, gap 4); `t41` sheet plan with `doormachining`.
+- Docs: `DOORS-PRODUCTION.md` §1 rows + §1a, `BLOCKERS.md` 33.1 to 33.9, this entry, `CO-ZMIENIONE-french-2410.md`.
+
+**Evening, the product DXF (T-FGAO2070 L29/45 92/8 D2, read with ezdxf):** three housings, no auxiliary one
+(`auxHousing` now off by default); the deadbolt pockets centred on the housings (-840.5..-700.5, +649.5..+789.5),
+the keeps on the double bolt axes (-753.5 / +736.5, not 56.5 from the plate ends), a 12.2 x 8 rail channel under
+the plate recess; BLOCKERS 33.2 settled, 33.3 narrowed to the 18 / 10 widths. t49 55 checks.
+
+**Checks:** french 1600 x 2100 outward one handle: active lip edge faceplate 144 to 1914, pockets 209.5..349.5 /
+914.5..1144.5 / 1699.5..1839.5, spindle 1050 (958 cylinder), keeps 296.5 / 1050 / 1786.5 on the passive shoulder; two handles inward: FGTE master pockets -835..-705 / -130..+70 / +508..+638, slave -795..-730 /
+-130..+70 / +340..+430 / +548..+613, end plates 0..65 and 1933..1998; single 900 x 2100: the lock centred (28.5),
+keeps in the lock side jamb; 3D: EXT 100 / INT 84 x 20 on the active, EXT 84 x 42.5 / INT 100 on the passive, gap 4.
+
+---
+
 ## 2026-10-13 · TRIPLE SASH on the window page, the pack and the PDFs (chat fix, small-change mode, main 94ba0a6)
 
 Piotr, 13.10.2026: "triple window does not work at all: no drawings, no 3D, although the configurator shows it".

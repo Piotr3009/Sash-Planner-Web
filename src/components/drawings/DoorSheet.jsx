@@ -15,6 +15,7 @@
  */
 import DoorFrameDetail2D from './DoorFrameDetail2D.jsx';
 import DoorLeafDetail2D from './DoorLeafDetail2D.jsx';
+import DoorLockMachining2D from './DoorLockMachining2D.jsx';
 import DoorSidePanelDetail2D from './DoorSidePanelDetail2D.jsx';
 import DoorFanlightDetail2D from './DoorFanlightDetail2D.jsx';
 import DoorSection2D from './DoorSection2D.jsx';
@@ -22,6 +23,7 @@ import DoorSection2D from './DoorSection2D.jsx';
 const SHEETS = {
   frame: DoorFrameDetail2D,
   leaf: DoorLeafDetail2D,
+  machining: DoorLockMachining2D,
   side: DoorSidePanelDetail2D,
   fan: DoorFanlightDetail2D,
   section: DoorSection2D,

@@ -110,8 +110,8 @@ function toShape(pts) {
 // A stile half (X = mm from the leaf's LEFT edge, Y = mm from the EXT face).
 // a = the stile's outer edge (0, or the meeting rebate cut), f = its glazing
 // edge. Written for a left stile; a right stile is mirrored about the leaf.
-function stileProfile(half, a, f, D) {
-  const hd = D / 2;
+function stileProfile(half, a, f, D, split = D / 2) {
+  const hd = split;
   return half === 'ext'
     ? [[a, 0], [f - EBW, 0], [f, EBD], [f, hd], [a, hd]]
     : [[a, hd], [f, hd], [f, D - IBR], ...arcPts(f - IBR, D - IBR, IBR, 0, Math.PI / 2), [a, D]];
@@ -119,8 +119,8 @@ function stileProfile(half, a, f, D) {
 // A rail half (X = mm from the EXT face, Y = mm from the rail's lower edge,
 // F = the rail face). 'bottom' glazes on its upper edge, 'top' on its lower
 // edge, 'mid' on both.
-function railProfile(kind, half, F, D) {
-  const hd = D / 2;
+function railProfile(kind, half, F, D, split = D / 2) {
+  const hd = split;
   if (kind === 'bottom') {
     return half === 'ext'
       ? [[0, 0], [0, F - EBW], [EBD, F], [hd, F], [hd, 0]]
@@ -155,12 +155,16 @@ function LeafBody({ L, mat, matInt, spacerColor, glassFinish }) {
   const key = JSON.stringify(L);
   const parts = useMemo(() => {
     const { W, H, D, sL, sR } = L;
+    // the EXT / INT split plane (mm from the EXT face): D / 2, or the lip plane
+    // of a french leaf (24.10.2026: the meeting rebate is cut to the lip, not
+    // to half the depth, so the two member halves meet at the lip)
+    const split = Number(L.split) > 0 && Number(L.split) < D ? Number(L.split) : D / 2;
     const out = [];
     // stiles: full leaf height
     for (const [side, s] of [['L', sL], ['R', sR]]) {
       for (const half of ['ext', 'int']) {
         const cut = half === 'ext' ? s.cutExt : s.cutInt;
-        let pts = stileProfile(half, cut, s.face, D);
+        let pts = stileProfile(half, cut, s.face, D, split);
         if (side === 'R') pts = pts.map(([x, y]) => [W - x, y]);
         out.push({ name: `stile-${side}-${half}`, half, shape: toShape(pts), depth: H, rot: [-Math.PI / 2, 0, 0], pos: [-W / 2, -H / 2, D / 2] });
       }
@@ -172,7 +176,7 @@ function LeafBody({ L, mat, matInt, spacerColor, glassFinish }) {
       for (const half of ['ext', 'int']) {
         const x0 = half === 'ext' ? sL.cutExt : sL.cutInt;
         const x1 = W - (half === 'ext' ? sR.cutExt : sR.cutInt);
-        out.push({ name: `rail-${kind}-${half}`, half, shape: toShape(railProfile(kind, half, F, D)), depth: x1 - x0, rot: [0, Math.PI / 2, 0], pos: [-W / 2 + x0, H / 2 - (yTop + F), D / 2] });
+        out.push({ name: `rail-${kind}-${half}`, half, shape: toShape(railProfile(kind, half, F, D, split)), depth: x1 - x0, rot: [0, Math.PI / 2, 0], pos: [-W / 2 + x0, H / 2 - (yTop + F), D / 2] });
       }
     }
     return out;
@@ -482,20 +486,28 @@ function leafSpec(l, { depth, top, bottom, unit, paneling, panelThick, meeting }
   const lx = (x) => R2(x - l.x), ly = (y) => R2(y - l.y);
   const sL = { face: l.stileL, cutExt: 0, cutInt: 0 };
   const sR = { face: l.stileR, cutExt: 0, cutInt: 0 };
+  let split = null;
   if (meeting && l.meetingSide) {
-    // the meeting stile: the half on the lap face runs to the leaf edge on the
-    // lapping (active) leaf and is cut back by the overlap on the other leaf;
-    // the other half the opposite way round
     const s = l.meetingSide === 'L' ? sL : sR;
-    const laps = l.role === meeting.leaf;
-    const lapHalf = meeting.face === 'interior' ? 'cutInt' : 'cutExt';
-    const otherHalf = lapHalf === 'cutExt' ? 'cutInt' : 'cutExt';
-    s[laps ? otherHalf : lapHalf] = meeting.overlap;
+    const mt = l.meeting?.rebate;
+    if (mt && Number(mt.width) > 0 && Number(mt.depth) > 0) {
+      // 24.10.2026: the meeting rebate of this leaf (engine leafMeeting): cut
+      // `width` back from the meeting edge on the face opposite the lip, as
+      // deep as the leaf less the lip; the member halves split at the lip plane
+      s[mt.fromFace === 'interior' ? 'cutInt' : 'cutExt'] = mt.width;
+      split = Number(l.meeting.splitZ);
+    } else {
+      // older derived: the half lap over the overlap strip
+      const laps = l.role === meeting.leaf;
+      const lapHalf = meeting.face === 'interior' ? 'cutInt' : 'cutExt';
+      const otherHalf = lapHalf === 'cutExt' ? 'cutInt' : 'cutExt';
+      s[laps ? otherHalf : lapHalf] = meeting.overlap;
+    }
   }
   const g = l.daylight;
   const gcx = g ? g.x + g.w / 2 : 0, gcy = g ? g.y + g.h / 2 : 0;
   return {
-    W: l.w, H: l.h, D: depth, sL, sR, top, bottom,
+    W: l.w, H: l.h, D: depth, sL, sR, top, bottom, split,
     mid: l.midRail ? { y: ly(l.midRail.y), face: l.midRail.face } : null,
     glass: g ? { x: lx(g.x), y: ly(g.y), w: g.w, h: g.h } : null,
     unit,

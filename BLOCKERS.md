@@ -4,6 +4,66 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-10-24 · FRENCH MEETING STILES AND LOCK MACHINING, items for Piotr (chat change on main 20fba5c)
+
+**33.1 Spindle height: ASSUMPTION 1050 above the leaf bottom (owner check).** One axis for the single door
+(ThunderBolt) and the french door (FGTE master and slave), `hardware.spindleFromLeafBottom`. The Winkhaus routing
+detail uses 1050; the ThunderBolt 1770 faceplate then lies 144 to 1914 on a 1998 leaf (no cutting); the BJ Waller
+FGTE page gives a handle range of 1040 to 1247. On the 1998 leaf this is 1101 above the floor (the old rule was 1000
+above the floor = 949 on the leaf, below the FGTE range). Set it in Window Settings · Doors · Lock machining; 0
+switches back to `handleHeight` above the floor.
+
+**33.2 ThunderBolt 4th pocket: SETTLED by the product DXF (24.10.2026, evening).** The data sheet (4941787,
+2070/45, radius faceplate 1770) mills FOUR pockets, the fourth an auxiliary housing 110 long (D + 21) from +256.7 to
++366.7 above the spindle ("additional lock, without bolt, prepared"). Piotr's DXF of the lock (T-FGAO2070 L29/45
+92/8 D2) has THREE housings on the back of the plate and no auxiliary housing, as Piotr said. `hardware.auxHousing`
+now defaults to off; on puts the data sheet pocket back for a lock that has the housing.
+
+**33.3 Pocket positions and widths (partly settled by the DXF).** From the DXF, from the bottom end of the 1770
+plate (the end with the cylinder below the spindle, G = 906): deadbolt housings 93 x 44 at 89 to 182 and 1579 to 1672,
+their double bolts at 134 to 171 and 1624 to 1661 (axes 152.5 and 1642.5 = -753.5 / +736.5 from the spindle; the
+keeps centre there, NOT 56.5 from the plate ends as first read from the data sheet), the main case 178 x 63 at 788
+to 966 (deadbolt 821 to 851, latch 917 to 946), the rail 2.2 under the plate with clips to 7.7. The engine sets the
+deadbolt pockets 140 long centred on the housings (-840.5..-700.5 and +649.5..+789.5), the main pocket as the data
+sheet (770.5 to 1000.5), and a 12.2 x 8 channel under the plate recess for the rail and clips. OPEN: the data sheet
+labels every pocket with two widths (18 and 10) and the DXF side view cannot show thickness; the engine takes 18 for
+the whole pocket. Piotr's bSuite program holds the real widths.
+
+**33.4 Faceplate recess 21 (Piotr) vs 20.5 (Winkhaus).** The owner's number is in the profile (`faceplateWidth 21`,
+`lockEdgeMargin 12`, axis 22.5 from the lip face). Winkhaus routes 20.5 (+0.5) at 11.75 from the face (axis 22.0);
+the 0.5 difference stays inside the FGTE "22 mm centre line" variant. On the 37 active lip, 12 + 21 leaves 4 to the
+step (Winkhaus 6.75 on a 39 lip).
+
+**33.5 Rebate width 16 = lap 12 + gap 4 (Piotr) vs 18 + 4 (Winkhaus, overlap 14).** Decided by Piotr 24.10.2026
+(the lap 12 kept, the gap 4 added). The lips (active 37 / passive 14.5, 5.5 between for the seal) follow the
+Winkhaus 58 slab detail (39 / 15 / 4) adapted to 57. `meeting.gap`, `meeting.lipActive`, `meeting.lipPassive` in
+Window Settings.
+
+**33.6 Keeps on the passive leaf: 'full length' (profile default) vs 'individual'.** The machining always lays out
+the three ThunderBolt keeps (F2402 at the deadbolts -849.5 / +807.5, F24-912W at the spindle, from the BJ Waller
+datasheets). With `keeps 'full length'` it adds a 24 x 2.5 recess over the faceplate length for the F24-908P rail:
+an ASSUMPTION, no routing drawing for the rail exists in the pack. Say which keep set the workshop buys.
+
+**33.7 Not modelled (owner products, later):** flush bolts of the passive leaf (lockType single), hinge recesses on
+the leaf edge and the frame rebate wall, the handle fixing holes of the FGTE face drawing (detail E: 142 / 90 / 22 /
+20, R6, O20), the Winkhaus "12 to 14 mm centre line" FGTE variant for an inward door (the engine mirrors the joint;
+the FGTE slave variant to buy for an inward door is to confirm with BJ Waller), the seal groove dimensions beyond its
+3 mm width (Q-lon Aquamac 124 datasheet).
+
+**33.8 `frenchClearance` (correction of the 24.10 analysis PDF).** In the engine the clearance narrows the LAP, not
+the gap: `overlap = 2 x lip - clearance`, `rebate = overlap + gap`. The lip edge to shoulder gap is `meeting.gap`
+alone. The analysis PDF said the clearance appears at every lip / shoulder pair: wrong for the drawn geometry, now
+documented here and in DOORS-PRODUCTION.md.
+
+**33.9 Next step: doors in the bSuite export.** `utils/bsuiteExport.js` still writes casement frames only (the
+`category !== 'casement'` gate, six frame programs, window document variables). The machining tables of this change
+(`derived.door.leaves[i].machining`, `derived.door.jambMachining`, every position from the spindle datum) are the
+document variables a door leaf program would take; the leaf programs do not exist yet (Piotr 24.10.2026: Matt has
+none, not soon). When they do: a door row builder beside `buildBsuiteFrameRows` with the variable names agreed with
+Matt.
+
+---
+
 ## 2026-10-13 · TRIPLE SASH on the window page, items for Piotr (chat fix on main 94ba0a6)
 
 **32.1 Bars on a triple sash (open owner decision).** The configurator's 3D draws the glazing bars on the centre

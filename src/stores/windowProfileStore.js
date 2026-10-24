@@ -89,8 +89,11 @@ function syncGlassDeduction(casement) {
 // Schema 3 (doors v3): fixedFan joins; sidePanel and panel carry nested keys
 // (sidePanel.stile / top / bottom / depth, panel.inset, panel.edge.*).
 // couplingPost stays writable for stored copies (not read by the engine).
-const DOOR_PATH_ROOTS = ['frameDepth', 'leafDepth', 'leafDepthTriple', 'frenchLip', 'elements', 'geometry', 'deductions', 'cillInward', 'sidePanel', 'fixedFan', 'couplingPost', 'panel', 'hinges', 'hardware', 'lengths'];
+// 24.10.2026: meeting (the french meeting joint) joins; hardware.auxHousing is
+// the one boolean leaf (the ThunderBolt auxiliary housing pocket on / off).
+const DOOR_PATH_ROOTS = ['frameDepth', 'leafDepth', 'leafDepthTriple', 'frenchLip', 'elements', 'geometry', 'deductions', 'cillInward', 'sidePanel', 'fixedFan', 'couplingPost', 'panel', 'hinges', 'hardware', 'meeting', 'lengths'];
 const DOOR_STRING_LEAVES = ['faceplate', 'keeps', 'fgteShootbolts', 'cillKeep'];
+const DOOR_BOOLEAN_LEAVES = ['auxHousing'];
 
 /**
  * Workshop window-construction profile (Window Settings page): sash, casement
@@ -278,8 +281,9 @@ export const useWindowProfileStore = create(
         if (!Array.isArray(path) || !path.length || !DOOR_PATH_ROOTS.includes(path[0])) return;
         const leaf = path[path.length - 1];
         const isString = path[0] === 'hardware' && DOOR_STRING_LEAVES.includes(leaf);
-        const v = isString ? String(value ?? '') : Number(value);
-        if (!isString && (value === '' || value == null || !Number.isFinite(v))) return;
+        const isBool = path[0] === 'hardware' && DOOR_BOOLEAN_LEAVES.includes(leaf);
+        const v = isString ? String(value ?? '') : isBool ? (value === true || value === 'true' || value === 'yes') : Number(value);
+        if (!isString && !isBool && (value === '' || value == null || !Number.isFinite(v))) return;
         get()._edit([`door.${path[0]}`], (s) => {
           const door = clone(s.door);
           let node = door;
