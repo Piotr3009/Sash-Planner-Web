@@ -229,6 +229,11 @@ export default function AppSidebar() {
                 className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
                 Doors
               </NavLink>
+              {/* Partition walls (25.10.2026): the partition profile card */}
+              <NavLink to="/window-settings/partition"
+                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                Partition walls
+              </NavLink>
             </div>
           </div>
         )}

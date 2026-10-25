@@ -21,10 +21,13 @@
 import { parseSpecification, normaliseToWindowSpec, SashProportionError, BarPatternError } from '../engine/specification.js';
 import { ArchError } from '../engine/arch.js';
 import { sashBarPattern, DoorGeometryError } from '../engine/calculations.js';
+import { PartitionGeometryError } from '../engine/partition.js';
 
 /** The engine errors that describe the window's own data (the owner fixes the window, not the code). */
 export function isWindowDataError(e) {
-  return e instanceof SashProportionError || e instanceof BarPatternError || e instanceof ArchError || e instanceof DoorGeometryError;
+  // PartitionGeometryError (25.10.2026): a partition bay that does not fit its
+  // layout (a door wider than the wall, no room for a screen) fails that wall only.
+  return e instanceof SashProportionError || e instanceof BarPatternError || e instanceof ArchError || e instanceof DoorGeometryError || e instanceof PartitionGeometryError;
 }
 
 /** The error a page prints for one window: the engine message, the error name for the log. */

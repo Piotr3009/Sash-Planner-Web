@@ -21,6 +21,7 @@ import CasementGlassDrawing2D from '../components/drawings/CasementGlassDrawing2
 import { groupCasementGlass } from '../components/drawings/casementDrawUtils.js';
 import DoorGlassDrawing2D from '../components/drawings/DoorGlassDrawing2D.jsx';
 import { groupDoorGlass } from '../components/drawings/doorDrawUtils.js';
+import { groupPartitionGlass } from '../components/drawings/partitionDrawUtils.js';
 // Triple sash (Piotr 13.10.2026): one glass drawing per section and sash (FIX L / C / FIX R)
 import { tripleSections } from '../components/drawings/tripleDrawUtils.js';
 import CutListPanel from '../components/dashboard/CutListPanel.jsx';
@@ -84,7 +85,7 @@ export default function WindowDetailPage() {
   // an unknown sash proportion or bar pattern, or an arch the engine refuses,
   // shows its message on this page instead of a blank one.
   const bounded = useMemo(() => (item
-    ? deriveWindowBounded(item, (ws) => withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, () => deriveWindowData(ws, settings)))
+    ? deriveWindowBounded(item, (ws) => withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition, () => deriveWindowData(ws, settings)))
     : null), [item, settings, currentBatch]);
   const windowSpec = bounded?.windowSpec || null;
   const derived = bounded?.derived || null;
@@ -93,7 +94,7 @@ export default function WindowDetailPage() {
   // exactly like `derived` above; `skip` doubles as the button tooltip.
   const archExport = useMemo(() => {
     if (!windowSpec) return { skip: 'no data' };
-    return withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, () => archParamsForWindow(windowSpec, item?.name));
+    return withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition, () => archParamsForWindow(windowSpec, item?.name));
   }, [windowSpec, item?.name, currentBatch]);
 
   const [tab, setTab] = useState('3d');
@@ -174,7 +175,7 @@ export default function WindowDetailPage() {
           {((windowSpec?.category || 'sash') === 'casement' || !!windowSpec?.arch?.shape) && (
             <button
               onClick={() => {
-                const r = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, () => exportArchDxfForWindow(windowSpec, item.name));
+                const r = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition, () => exportArchDxfForWindow(windowSpec, item.name));
                 if (r.error) alert(`Arch DXF unavailable: ${r.error}`);
               }}
               disabled={!!archExport.skip}
@@ -188,10 +189,10 @@ export default function WindowDetailPage() {
           )}
           {((windowSpec?.category || 'sash') === 'casement' || !!windowSpec?.arch?.shape) && (() => {
             // v3 0.4: tracery board (DXF for VCarve + LSP for AutoCAD) — only with a bar pattern in the arch
-            const tr = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, () => traceryParamsForWindow(windowSpec, derived, item?.name));
+            const tr = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition, () => traceryParamsForWindow(windowSpec, derived, item?.name));
             const cls = `btn text-sm bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 ${tr.skip ? 'opacity-40 cursor-not-allowed' : ''}`;
             const run = (fn, label) => {
-              const r = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, () => fn(windowSpec, derived, item?.name));
+              const r = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition, () => fn(windowSpec, derived, item?.name));
               if (r.error) alert(`${label} unavailable: ${r.error}`);
               else if (r.warnings?.length) alert(`${label}: ${r.warnings.join('; ')}`);
             };
@@ -205,7 +206,7 @@ export default function WindowDetailPage() {
             // 12.09: bSuite worklist for ONE window (Piotr: single window first, the pack is built from them)
             <button
               onClick={async () => {
-                const r = await withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door,
+                const r = await withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition,
                   () => exportBsuiteFramesMerged([{ windowSpec, derived, name: item?.name }], item?.name || 'window', undefined, null, downloadBsuiteProgram));
                 if (r.error) { alert(`bSuite frames unavailable: ${r.error}`); return; }
                 const sk = r.skipped?.length ? `\nSkipped: ${r.skipped.map((x) => `${x.element} (${x.reason})`).join(', ')}` : '';
@@ -271,7 +272,19 @@ export default function WindowDetailPage() {
             {/* a door: the door profile depth (93) from the engine, never the sash box default */}
             <SpecRow label="Depth" value={`${(derived?.category === 'door' && derived.door?.frameDepth) || windowSpec?.frame.depth || 164} mm`} />
           </SpecSection>
-          {windowSpec?.category === 'door' ? (
+          {windowSpec?.category === 'partition' ? (
+            // Partition walls (25.10.2026): the layout as typed and the wall numbers the engine built from it
+            <SpecSection title="Partition wall">
+              <SpecRow label="Layout" value={`${windowSpec.partition?.layout || 'S'} (S = screen, D = door)`} />
+              {derived?.partition && <SpecRow label="Screens" value={derived.partition.screens?.length ? `${derived.partition.screens.length} × ${derived.partition.screens[0].w} mm` : 'none'} />}
+              {derived?.partition && <SpecRow label="Lights" value={`${derived.partition.lightsPerScreen} × ${derived.partition.lightH} mm high`} />}
+              <SpecRow label="Panel" value={windowSpec.partition?.panelHeight > 0 ? `${windowSpec.partition.panelHeight} mm` : 'none (glazed full height)'} />
+              {derived?.partition?.doors?.map((d) => (
+                <SpecRow key={d.n} label={derived.partition.doors.length > 1 ? `Door D${d.n}` : 'Door'} value={`opening ${d.w} · leaf ${d.leaf.w} × ${d.leaf.h} mm · hinge ${d.hingeSide}, opens ${d.swing}`} />
+              ))}
+              {!derived?.partition?.doors?.length && <SpecRow label="Door" value="none" />}
+            </SpecSection>
+          ) : windowSpec?.category === 'door' ? (
             <SpecSection title="Door">
               <SpecRow label="Type" value={windowSpec.door?.type === 'french' ? 'French' : 'Single'} />
               <SpecRow label="Style" value={windowSpec.door?.style} />
@@ -317,10 +330,21 @@ export default function WindowDetailPage() {
           </SpecSection>
           <SpecSection title="Hardware">
             <SpecRow label="Finish" value={windowSpec?.hardware.finish} />
-            <SpecRow label="Security" value={windowSpec?.hardware.catches} />
-            <SpecRow label="Trickle vent" value={`${buildVentGrilles(windowSpec)} · ${windowSpec?.vent?.roomType || 'habitable'}`} />
+            {windowSpec?.category !== 'partition' && <SpecRow label="Security" value={windowSpec?.hardware.catches} />}
+            {windowSpec?.category !== 'partition' && <SpecRow label="Trickle vent" value={`${buildVentGrilles(windowSpec)} · ${windowSpec?.vent?.roomType || 'habitable'}`} />}
           </SpecSection>
-          {derived && derived.category === 'door' && derived.door ? (
+          {derived && derived.category === 'partition' && derived.partition ? (
+            <SpecSection title="Calculated">
+              <SpecRow label="Wall" value={`${derived.partition.totalWidth} × ${derived.partition.totalHeight} mm`} />
+              <SpecRow label="Members" value={`${derived.partition.depth} deep · ${derived.partition.finish}`} />
+              {derived.partition.doors?.map((d) => (
+                <SpecRow key={`h${d.n}`} label={derived.partition.doors.length > 1 ? `Hinges D${d.n}` : 'Hinges'} value={`${d.hinges?.count} · ${d.hinges?.name || ''}`} />
+              ))}
+              {derived.partition.doors?.[0] && <SpecRow label="Handle" value={`${derived.partition.doors[0].latch?.fromFloor} mm from the floor`} />}
+              <SpecRow label="Dowels" value={`${derived.partition.dowels?.count || 0} × ${derived.partition.dowels?.dia} mm`} />
+              <SpecRow label="Weight" value={`${derived.weights?.total} kg`} />
+            </SpecSection>
+          ) : derived && derived.category === 'door' && derived.door ? (
             <SpecSection title="Calculated">
               {derived.door.leaves.map((lf, i) => (
                 <SpecRow key={i} label={derived.door.isFrench ? `Leaf ${lf.role}` : 'Leaf'} value={`${lf.w} × ${lf.h} mm`} />
@@ -353,8 +377,8 @@ export default function WindowDetailPage() {
 // ─── Glass Panel — same source as Production Pack ───
 function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity, projectLabel }) {
   const barsText = (spec, g) => {
-    if ((spec?.category || 'sash') === 'casement' || spec?.category === 'door') {
-      // Single source: the engine row carries the label (barsV/barsH + type); doors too (08.10.2026).
+    if ((spec?.category || 'sash') === 'casement' || spec?.category === 'door' || spec?.category === 'partition') {
+      // Single source: the engine row carries the label (barsV/barsH + type); doors too (08.10.2026), partitions (25.10.2026).
       return g.bars || '—';
     }
     // sash rows carry their own sash's pattern (lists.js, 09.10.2026); this read
@@ -395,7 +419,8 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
     if (glassBusy || !derived) return;
     setGlassBusy(true);
     try {
-      const groups = windowSpec?.category === 'door' ? groupDoorGlass(derived, windowSpec) : groupCasementGlass(derived, windowSpec);
+      const groups = windowSpec?.category === 'partition' ? groupPartitionGlass(derived)
+        : windowSpec?.category === 'door' ? groupDoorGlass(derived, windowSpec) : groupCasementGlass(derived, windowSpec);
       const drawings = [];
       for (const gp of groups) {
         const svg = glassDrawRefs.current[gp.key]?.querySelector('svg');
@@ -432,7 +457,7 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
                 (night 7 stage 1: the glazier gets ONE file with all the glass).
                 Same row and style as the PDF export; disabled with the reason on
                 a window that carries no glass. */}
-            {(['casement', 'sash'].includes(windowSpec?.category || 'sash') || windowSpec?.category === 'door') && (() => {
+            {(['casement', 'sash'].includes(windowSpec?.category || 'sash') || windowSpec?.category === 'door' || windowSpec?.category === 'partition') && (() => {
               const r = glassDxfParamsForWindow(windowSpec, derived, item?.name);
               return (
                 <button
@@ -504,8 +529,27 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
       </div>
 
 
-      {/* Glass drawings: per sash (upper/lower), per unique casement unit, or per unique door unit */}
-      {windowSpec?.category === 'door' ? (
+      {/* Glass drawings: per sash (upper/lower), per unique casement unit, per unique door unit, or per unique partition unit */}
+      {windowSpec?.category === 'partition' ? (
+        <div>
+          <div className="flex items-center justify-end mb-2">
+            <button onClick={handleExportGlassDrawings} disabled={glassBusy}
+              className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              📐 Glass Drawings PDF
+            </button>
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {groupPartitionGlass(derived).map((gp) => (
+            <div key={gp.key} className="card p-4" ref={(el) => { glassDrawRefs.current[gp.key] = el; }}>
+              <div className="text-xs font-semibold text-ink-200 mb-2">
+                Glass {gp.w} × {gp.h} · ×{gp.panes.length}
+              </div>
+              <DoorGlassDrawing2D windowSpec={windowSpec} derived={derived} group={gp} />
+            </div>
+          ))}
+          </div>
+        </div>
+      ) : windowSpec?.category === 'door' ? (
         <div>
           <div className="flex items-center justify-end mb-2">
             <button onClick={handleExportGlassDrawings} disabled={glassBusy}
@@ -738,12 +782,12 @@ function BOMPanel({ item, windowSpec, settings, derived, batch, projectLabel }) 
       {/* Doors (08.10.2026): the door hardware is engine-counted on the door Assign
           Materials rows (cards above); this card prints the detail the buyer
           selects on the supplier page (handing, kit variants, FGTE band, leaf weight). */}
-      {windowSpec?.category === 'door' && (() => {
+      {(windowSpec?.category === 'door' || windowSpec?.category === 'partition') && (() => {
         const rows = windowHardwareDetailRows(windowSpec, batch, ironmongeryItems, derived);
         return rows.length > 0 && (
           <div className="card p-4">
-            <div className="text-sm font-semibold text-ink-50 mb-1">Door hardware</div>
-            <div className="text-[10px] text-ink-400 mb-3">Counted on the Assign Materials rows above · the detail to select on the supplier page</div>
+            <div className="text-sm font-semibold text-ink-50 mb-1">{windowSpec?.category === 'partition' ? 'Partition hardware' : 'Door hardware'}</div>
+            <div className="text-[10px] text-ink-400 mb-3">{windowSpec?.category === 'partition' ? 'The door hinges, latch and handles by the profile rules, and the dowels of the whole wall' : 'Counted on the Assign Materials rows above · the detail to select on the supplier page'}</div>
             <table className="w-full text-xs">
               <tbody>
                 {rows.map((r, i) => (
@@ -759,7 +803,7 @@ function BOMPanel({ item, windowSpec, settings, derived, batch, projectLabel }) 
         );
       })()}
       {hardwareGroups.length === 0 ? (
-        <div className="card p-4 text-xs text-ink-500 italic">{windowSpec?.category === 'door' ? 'No client-chosen products (the door hardware is counted above)' : 'Fixed window — no hardware'}</div>
+        <div className="card p-4 text-xs text-ink-500 italic">{windowSpec?.category === 'door' ? 'No client-chosen products (the door hardware is counted above)' : windowSpec?.category === 'partition' ? 'No client-chosen products (the partition hardware is listed above)' : 'Fixed window — no hardware'}</div>
       ) : (
         hardwareGroups.map((g, gi) => (
           <div key={gi} className="card p-4">

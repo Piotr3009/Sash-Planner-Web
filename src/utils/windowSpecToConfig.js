@@ -138,6 +138,29 @@ export function windowSpecToConfig(windowSpec, derived = null) {
     };
   }
 
+  // Partition walls (25.10.2026): the flat partition fields for the pricing
+  // and the 3D App (which renders nothing for this category yet).
+  if ((windowSpec.category || 'sash') === 'partition') {
+    const pw = windowSpec.partition || {};
+    const col = windowSpec.color || {};
+    return {
+      windowCategory: 'partition',
+      width: windowSpec.frame?.width || 2500,
+      height: windowSpec.frame?.height || 2165,
+      extWidth: windowSpec.frame?.width || 2500,
+      extHeight: windowSpec.frame?.height || 2165,
+      partitionLayout: pw.layout || 'S',
+      partitionDoorWidth: pw.doorWidth,
+      partitionLights: pw.lights,
+      partitionPanelHeight: pw.panelHeight,
+      partitionHingeSide: pw.hingeSide || 'left',
+      partitionSwing: pw.swing || 'out',
+      woodColor: col.single || COLOR_MAP.oak,
+      doubleGlazing: true,
+      quantity: windowSpec.quantity || 1,
+    };
+  }
+
   // Doors: the 3D App reads FLAT door fields (it was ported from PSW that way),
   // so translate the nested windowSpec.door block into those exact keys.
   if (['door', 'doors'].includes(windowSpec.category || 'sash')) {

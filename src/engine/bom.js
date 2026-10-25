@@ -218,6 +218,10 @@ export const HARDWARE_TO_SLOT_KEY = {
   // Doors (08.10.2026): the door hardware lines show the product of the
   // window's door ironmongery slot (doorHardware.js DOOR_ITEM_SLOT).
   ...DOOR_ITEM_SLOT,
+  // Partition walls (25.10.2026): the door hinge and handle slots serve the
+  // wall's door (ironmongeryStore alsoFor); the latch and the dowels have no slot yet.
+  'Door hinge': 'doorHinges',
+  'Lever handle set': 'doorHandles',
 };
 
 // Format a quantity for display by unit (pcs are whole; tubes/m/L/etc. keep 2dp)
@@ -301,7 +305,7 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
   // ── Weights (total window mass +5% = counterbalance to buy) ──
   // Sash only: casement and doors report real weights too (hinge selection,
   // information), but they have no counterweights to purchase.
-  if (derived.weights?.total && derived.category !== 'casement' && derived.category !== 'door') {
+  if (derived.weights?.total && derived.category !== 'casement' && derived.category !== 'door' && derived.category !== 'partition') {
     const wPid = (c?.weightType === 'slim') ? 'weights_slim' : 'weights_normal';
     setQty(wPid, derived.weights.total, 'kg');
   }
@@ -310,7 +314,8 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
   // Topcoat material depends on colour: 9016 (default white) → white paint;
   // any other colour → bespoke. Quantity (litres) is the same either way.
   // Doors paint on the casement rows (08.10.2026), same area model.
-  const p = derived.paint;
+  // Partition walls (25.10.2026) are oiled oak: no paint rows.
+  const p = derived.category === 'partition' ? null : derived.paint;
   if (p) {
     const isCas = derived.category === 'casement' || derived.category === 'door';
     setQty(isCas ? 'c_paint_primer' : 'paint_primer', p.primer, 'L');
@@ -468,7 +473,7 @@ export function resolvePartTotal(entry, yieldCoeff = 1.0) {
 export function buildWindowHardware(windowSpec, batch, ironmongeryItems = [], derived = null) {
   if (!windowSpec) return [];
   const cat = windowSpec.category || 'sash';
-  if (cat !== 'sash' && cat !== 'casement' && cat !== 'door') return [];
+  if (cat !== 'sash' && cat !== 'casement' && cat !== 'door' && cat !== 'partition') return [];
   const lines = buildHardwareList(windowSpec, derived);
   const slots = {
     ...(batch?.defaults?.ironmongerySlots || {}),

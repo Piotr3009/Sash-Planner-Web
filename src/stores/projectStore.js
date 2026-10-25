@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { profileBoxDepth, getWindowProfile, getCasementProfile, getDoorProfile } from '../engine/profile.js';
+import { profileBoxDepth, getWindowProfile, getCasementProfile, getDoorProfile, getPartitionProfile } from '../engine/profile.js';
 import * as cloud from '../services/cloudSync.js';
 
 // ─── Production settings (preserved from original — used by calculations engine) ───
@@ -99,6 +99,21 @@ const BATCH_DEFAULTS = {
     glassType: 'double',
     glassSpec: 'toughened',
     spacerColor: 'white',
+    spacerType: 'warm',
+    pas24: false,
+    frameType: 'standard',
+    hornType: 'none',
+  },
+  // meeting room partition walls (25.10.2026): solid oak, oiled (no paint colour), 6/16/6 units, no PAS24
+  partition: {
+    ironmongery: 'stainless',
+    colourMode: 'single',
+    woodColor: '#D9B98A',
+    woodColorExt: '#D9B98A',
+    woodColorInt: '#D9B98A',
+    glassType: 'double',
+    glassSpec: 'toughened',
+    spacerColor: 'black',
     spacerType: 'warm',
     pas24: false,
     frameType: 'standard',
@@ -391,6 +406,7 @@ export const useProjectStore = create((set, get) => ({
                 sash: JSON.parse(JSON.stringify(getWindowProfile())),
                 casement: JSON.parse(JSON.stringify(getCasementProfile())),
                 door: JSON.parse(JSON.stringify(getDoorProfile())),
+                partition: JSON.parse(JSON.stringify(getPartitionProfile())),
               },
             }
           : b.defaults;
@@ -680,6 +696,15 @@ export const useProjectStore = create((set, get) => ({
       transomBars: windowConfig.transomBars || 'none',
       thresholdType: windowConfig.thresholdType || 'standard',
       thresholdExtension: windowConfig.thresholdExtension || 0,
+      // ── Partition fields (meeting room walls, 25.10.2026): the bay layout
+      // ('S' screen, 'D' door, left to right), the door opening, the lights per
+      // screen, the panel height (0 = fully glazed), the door hand and swing
+      partitionLayout: windowConfig.partitionLayout || 'SDS',
+      partitionDoorWidth: windowConfig.partitionDoorWidth ?? null,
+      partitionLights: windowConfig.partitionLights ?? null,
+      partitionPanelHeight: windowConfig.partitionPanelHeight ?? null,
+      partitionHingeSide: windowConfig.partitionHingeSide || 'left',
+      partitionSwing: windowConfig.partitionSwing || 'out',
       // Full specification JSON for calculations engine
       specification: JSON.stringify({
         windowType: batch.type,

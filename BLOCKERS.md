@@ -4,6 +4,111 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-10-25 · MEETING ROOM PARTITION WALLS v1, items for Piotr (chat change on main f4b0e47)
+
+Every item below is an ASSUMPTION the programmer took from the Windmill Street DXF and the section mockup v1 where
+the owner input of 25.10.2026 gave no number. Each one names the profile key (Window Settings > Partition, or
+`DEFAULT_PARTITION_PROFILE` in `src/engine/profile.js`) that changes it; the engine, the lists and the sheets
+follow the key. The reference bay 2525 x 2165 SDS (door 800, 3 lights, panel 790) is checked by
+`verify/parity/t50_partition.mjs`.
+
+**34.1 The section split across the 54 depth: front upstand 12 / glass zone 30 / bead 12.** The glass zone is the
+unit 28 + 2 x 1 tape (`glazing.unit`, `glazing.tape`); the bead on the ROOM side is 18 wide (the rebate) x 12 thick
+(`elements.bead.thickness`); the front upstand is DERIVED: depth - zone - bead = 54 - 30 - 12 = 12. The pocket is
+therefore 18 x 42 from the room face. A thicker bead thins the upstand (the engine refuses one under 8). The 12 / 30
+/ 12 split was option 1 of the mockup; Piotr did not answer.
+
+**34.2 Applied bars 22 x 8 on both faces over a 22 dummy spacer.** `elements.bar.face 22`, `elements.bar.thickness 8`
+(the thickness is the assumption; Piotr gave the 22 width), `glazing.dummySpacer 22` in the cavity behind the bars.
+The spacer colour of the unit follows the batch default (black, `BATCH_DEFAULTS.partition.spacerColor`); the
+glass list prints "2H x 0V applied" and the bar axes from the unit top (411.5 / 820.5 on the bay).
+
+**34.3 The solid panel 30 thick in the same pocket as the glass.** `panel.thickness 30`, `panel.build 'veneered'`
+(oak 6 + MDF 18 + oak 6; 'solid' and 'packed' are the other words the key accepts, nothing else reads them yet),
+`panel.panelIn 13.5` (as the glass: panel size = daylight + 27), `panel.densityKgM3 700` for the weights. Its face
+sits 12 behind the front like the glass, with the same 18 x 12 beads on the room side. The mockup offered options
+A / B / C for the panel; none was answered, this is option A.
+
+**34.4 The joint geometry: stopped pockets on the posts and stiles, through rebates on the rails, mitred beads.**
+Posts and door stiles carry STOPPED pockets 18 wide x 42 deep from the room face (`glazing.rebateDepth 18`), one
+per opening, running 18 past each opening end so the glass pocket turns the corner (P1 on the bay: glass 0 to 1223,
+panel 1237 to 2063 from the post top). Rails are cut square at the field width (`lengths.railSeat 0`) with THROUGH
+rebates (the mid rail on both edges). The top rail carries one stopped pocket per screen on its underside (32 to
+810.5 and 1674.5 to 2453 on the bay). Beads are mitred: length = daylight + 2 x 18 (778.5 / 1241 / 826 on a screen).
+
+**34.5 Dowels 8 x 40, three per joint, half in each part.** `joints.dowel { dia 8, length 40, perJoint 3 }` (Piotr:
+8 mm, 3 per joint, no screws); the length 40 means 20 into each part. The pattern (`joints.pattern50`, `rowDepth`,
+`rowMargin`): a triangle [[10, 20], [22, 33], [10, 46]] (across from the solid edge, depth from the front face) in
+a 32 wide body (a post or rail with one rebated edge: 50 - 18); a row of three at depth 33, 15 in from the body
+edges, in bodies 62 and wider (the door top rail 82: 15 / 41 / 67; the bottom rail 162: 33 / 99 / 165); a vertical
+row 18 / 33 / 48 at the centre of a 14 wide body (a mid rail rebated on both edges, a post between two screens:
+across 25). Every hole stays clear of the 12 upstand and the room face.
+
+**34.6 The lock post stop lip from solid, the head stop planted, the hinge post plain.** The lock post blank is
+67 x 54: the 50 post plus a 17 stop lip (`door.stopWidth 17`) on the door side, 31 deep on the room face (depth -
+`door.lipFront` 20 - `door.gap` 3). The head stop over the door is a PLANTED strip 17 x 31 x the opening width
+under the top rail (`door.headStop 'planted'`; the cut list row W-DOOR HEAD STOP). The hinge post has no stop.
+Piotr did not say stop from solid vs planted; the mockup took solid on the post and planted at the head.
+
+**34.7 Hinges: knuckle 14, flap 31 each side, recess 102 x 31 x 3, positions by the single door rule.** The Enduro
+102 x 76 x 3 radius fire hinge (`hinges.length / open / thickness / radius`); the knuckle 14 (`hinges.knuckle`) is
+the assumption, so each flap is (76 - 14) / 2 = 31 and the recess 102 x 31 x 3 goes in from the swing face on the
+hinge edge and the hinge post. Positions as the single door (`hinges.fromTop 200`, `aboveCentre 100`, `fromBottom
+150`, a 4th hinge above a 2200 leaf): 200 / 943.5 / 1937 on the 2087 leaf.
+
+**34.8 The tubular latch 76 case, 57 backset, in the REBATED part of the lock edge.** `hardware.latchCase 76`,
+`hardware.latchBackset 57`: the latch sits behind the 20 lip, its axis 37 from the front face (lip 20 + 34 / 2), the
+spindle 74 from the lip edge (57 + 17), bore 16 (`hardware.latchBore`), spindle 8 in a 10 bore (`spindle`,
+`spindleBore`), forend and keep plate 57 x 25 x 2 (`hardware.forend`), keep bolt pocket 16 x 15 (`hardware.keepBolt`)
+in the stop lip of the lock post. The lever handle set on a rose, stainless; handle 1000 above the floor
+(`hardware.handleHeight`, Piotr). Piotr said "a normal latch"; the product is to name.
+
+**34.9 The lock edge rebate 17 x 34 behind the 20 front lip, full height; the same at the leaf head.** The leaf lock
+stile is cut back 17 (the stop width) x 34 (depth - lip 20) on the stop side over its full length, so the 20 lip
+closes on the stop lip of the post with the 3 gap. With the planted head stop the leaf top rail carries the same 17
+x 34 rebate (W-DOOR TOP RAIL "head rebate 17 x 34"). A head stop from solid would drop that rebate and change the
+top rail blank; not modelled.
+
+**34.10 Glass 6/16/6 toughened throughout; the door unit flagged "safety glass (AD K)".** `glazing.makeup '6/16/6'`,
+`glazing.unit 28`, batch `glassSpec 'toughened'`; the unit sits 13.5 into the 18 rebate (`glazing.glassIn`, Piotr:
+1000 daylight = 1027 unit) on 4.5 packers (`glazing.packer`). Glass weight 30 kg/m2 (`glazing.kgPerSqm`), weight
+margin 5 % (the window rule): the bay leaf 54 kg against the 120 kg hinge.
+
+**34.11 Pricing placeholders.** `pricing.partition { basePerSqm 0, doorLeafPrice 0 }` (`src/engine/pricing.js`,
+`calculatePartition`: wall area x the rate + a price per D in the layout), so a wall prices at 0 until PSW sets
+the rates in Settings > Pricing. The configurator shows 0, not a sash price.
+
+**34.12 No Assign Materials rows for the W- parts yet.** The material lines of a wall are the cut list (every row
+'Oak (solid)'), the glass m2 on the glass_double row and the hardware lines (Door hinge, Tubular latch, Lever
+handle set, Dowels); no counterweights, no paint rows. The pre-cut groups the W- members by their finished
+section (50x54, 120x54, 100x54, 180x54, 67x54, 20x74, 22x8, 18x12, 17x31) until an oak stock is assigned.
+
+**34.13 The 3D viewer shows a placeholder for a wall** (the configurator preview, the window page and the pack 3D
+tab say so; the 3D PDF button is off). The elevation and the sheets are the drawings.
+
+**34.14 One straight wall per record, layout letters S and D only.** The layout string is read left to right seen
+from the corridor; corners, returns, more than one door per wall and a fanlight over the door are future options
+(the engine lays out any count of S and D, the sheets and the hardware list are written for one door).
+
+**34.15 The door bars follow the screen bar lines.** The door lights are 284 / 387 / 387 on the bay (the top light
+shorter by the leaf top rail 100 and the 3 gap); a door-only wall ('D') splits its own zone into equal lights.
+
+**34.16 Swing 'in' mirrors the stop and the lip to the front face.** The engine models it (`stopFace 'front'`,
+`swingFace 'room'`, the knuckles and the lip on the room face, the recesses from the room face); the sheets print
+the faces by name, the plan section draws the stop on the named face; not drawn in further detail.
+
+**34.17 The open mockup questions Piotr did not answer, all taken as the defaults above:** the 12 / 30 / 12 split
+(34.1), the panel option A / B / C (34.3), the bar thickness and the spacer colour (34.2), stop from solid vs
+planted (34.6), the site fixing gaps at the end boards and the head (none modelled: the boards are the wall
+width and height), whether the door panel matches the screens (it does: the door mid rail sits on the screen mid
+rail axis, `door.glazed 'upper'`; 'full' glazes the leaf to its bottom rail).
+
+**34.18 Superseded DXF numbers.** The DXF depth 80 was superseded by Piotr's 54; the DXF hinges 10 x 100 by the
+Enduro 102 x 76 x 3; the 20 "frame" of the DXF is a decorative board 20 x 74 standing 10 proud of each face
+(`elements.board { face 20, overhang 10 }`: the head board over the end boards, the end boards 2145 long on the bay).
+
+---
+
 ## 2026-10-24 · FRENCH MEETING STILES AND LOCK MACHINING, items for Piotr (chat change on main 20fba5c)
 
 **33.1 Spindle height: ASSUMPTION 1050 above the leaf bottom (owner check).** One axis for the single door

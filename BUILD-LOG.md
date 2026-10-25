@@ -4,6 +4,119 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-10-25 · MEETING ROOM PARTITION WALLS v1 (chat change, main f4b0e47)
+
+### Verdict: the 'partition' category derives the Windmill Street bay (2525 x 2165 SDS) to the owner numbers (screens 742.5, lights 387, unit 769.5 x 1232, leaf 794 x 2087, daylight 554, hinges 200 / 943.5 / 1937, 54 dowels in 18 joints), with the W- cut list, pre-cut, glass rows with applied bars, hardware lines, a placeholder price, the front elevation, the door leaf, the member (CNC) sheets with the dowel holes and the glass drawings; t50 engine, lists, pricing, variants and controls green; the member sheets still fail the text collision and dimension rule checks (in progress, see Verification); t27 flags one bare 40 in partitionJoints.js
+
+**Owner input (Piotr 25.10.2026, chat):** one 6/16/6 unit per screen with applied 22 bars (no separate panes);
+rebate 18; glass = opening + 27 (a 1000 daylight takes a 1027 unit); member depth 54 and the leaf 54 ("looks
+better"); no threshold; panels and mid rails selectable (height, 0 = none); dowels 8 mm, 3 per joint, no screws
+at this stage; L shaped elements (the rebate from the room face, a solid upstand on the corridor face); Enduro
+102 x 76 x 3 radius fire hinges; handle 1000 with a normal latch; the door opens from the room outward (to the
+corridor); the 20 element of the DXF is a wider decorative board (20 x 74, 10 proud each face); one straight wall
+per record; solid oak, oiled; the hinge rule as the single door; "KODU CO CHCESZ" for everything else (the
+assumptions in BLOCKERS 34.1 to 34.18). The DXF (Windmill Street meeting room) gave the bay 2525 x 2165, the SDS
+layout with the 800 door, three lights and the 790 panel.
+
+**What changed**
+- `engine/partition.js` (new): `derivePartitionWindow(windowSpec, W, H, settings)`, `normalisePartitionLayout`,
+  `partitionFields`, `PartitionGeometryError` (with `.details`). The whole wall from the partition profile: the
+  head and end boards, the top rail with its stopped pockets, the posts (roles end / hinge / lock / mullion, the
+  rebated sides, the lock lip, the blank 67, the stopped pockets per opening), the screens (zone, lights, bars,
+  mid rail, panel, bottom rail, the unit with its bar axes), the doors (leaf, daylight, lights on the screen bar
+  lines, rails, panel, unit, hinges by the door rule, the latch in the rebated lock edge, the lock edge and head
+  rebates, the stop from solid and the planted head stop, the faces by hinge side and swing), the dowel joints
+  (`joints[]`, `dowels`), the W- cut list records with codes, the glass units (the door unit flagged safety
+  glass), the panels, the weights (timber by section, glass 30 kg/m2, panel 700 kg/m3, margin 5 %), the
+  consumables (dowels, hinges, latches). Throws on a wall too narrow, a door too narrow, lights too low.
+- `engine/partitionJoints.js` (new): `dowelHoles` (the triangle in a 32 body, a row at `rowDepth` in a wide body,
+  a vertical row at the centre of a narrow body; every hole clear of the upstand and the room face), `bodyBand`
+  (the solid band of an end face: the face width less the rebated edges).
+- `engine/records.js` (new): `createComponentRecord`, `round`, `parseSection` moved out of `calculations.js`
+  (the partition engine imports them; `calculations.js` imports `partition.js`, so no cycle). A pure move.
+- `engine/calculations.js`: `deriveWindowData` dispatches `category === 'partition'` to `derivePartitionWindow`;
+  imports `records.js`.
+- `engine/profile.js`: `DEFAULT_PARTITION_PROFILE` (schema 1: depth, elements, glazing, panel, door, hinges,
+  hardware, joints, lengths, defaults), `migratePartitionProfile` (block by block over the default),
+  `setActivePartitionProfile` / `getPartitionProfile`; `withProfiles(sash, casement, door, partition, fn)` with the
+  older (sash, casement, door, fn) and (sash, casement, fn) forms kept.
+- `engine/specification.js`: category 'partition': the frame depth from the partition profile (54), the
+  `partition` block (layout normalised to S / D, doorWidth, lights, panelHeight, hingeSide, swing; from the item or
+  the fullConfig, else the profile defaults), glazing thickness 28 and makeup '6/16/6'. Other categories carry NO
+  partition key.
+- `engine/lists.js`: the W- pre-cut rule (assigned material, else the section map, else the finished section, as the
+  doors), the 'Oak (solid)' material label, the 'applied' bar label and `barAxes` on the partition glass rows, the
+  partition hardware list (Door hinge, Tubular latch, Lever handle set, Dowels), `CUT_LIST_ORDER` W- entries (HB,
+  EB, TR, P, PL, MR, BR, HS, DS-H, DS-L, DTR, DMR, DBR, GB, DGB, BD, DBD), the notes kept for W- groups.
+- `engine/partSymbols.js`: the W- prefix stripped on the sheets. `engine/partColours.js`: the `wall_frame` and
+  `wall_leaf` families (boards, top rail, posts, mid rails, bottom rails, door stiles / rails, the small parts).
+- `engine/bom.js`: no counterweight and no paint rows for a wall; the hardware lines allowed through.
+- `engine/pricing.js`: `calculatePartition`, `DEFAULT_PRICING.partition { basePerSqm 0, doorLeafPrice 0 }`,
+  `calculatePrice` dispatch on `windowCategory 'partition'`.
+- `stores/projectStore.js`: the batch `_profileSnapshot.partition`, `BATCH_DEFAULTS.partition` (stainless, oak
+  colour, 6/16/6 toughened, black spacer, no PAS24), the partition* item fields whitelisted in `addWindowToBatch`.
+- `stores/windowProfileStore.js`: the 'partition' kind (hydration, migration, the cloud load / save and merge),
+  `setPartitionPath` (`PARTITION_PATH_ROOTS`, the string leaves makeup / beadSide / build / glazed / headStop /
+  latch / name / layout / hingeSide / swing, the boolean radius), `resetPartitionToDefaults`, the engine sync.
+- `pages/WindowDetailPage.jsx`, `ProjectDetailPage.jsx`, `ProductionPackPage.jsx`: `withProfiles` with the 4th
+  (partition) snapshot argument. The UI (the batch type "Partition walls", the configurator "Partition Wall"
+  section with layout / door width / lights / panel height / hinge side / swing, Window Settings > Partition, the
+  dashboard type colour, the 3D placeholder note) by the UI agent.
+- `utils/windowSpecToConfig.js`: the flat partition config (windowCategory, partitionLayout, partitionDoorWidth,
+  partitionLights, partitionPanelHeight, partitionHingeSide, partitionSwing) for the pricing and the 3D.
+- `utils/glassDxfExport.js`: the partition category allowed. `utils/precutPdfExport.js`: the partition colour key
+  page (the wall families).
+- `components/drawings/partitionDrawUtils.js` (new): `partitionSheetPlan` (the tabs and PDF order), `postGroups`
+  (P1 and P4 share one sheet as mirror images), `groupPartitionGlass`, `partitionPlanGeometry` and
+  `partitionVerticalSection` (the Sections sheet geometry), `memberSheetItems` (the member descriptors: pockets,
+  edge recesses, bores, lips, the end face dowel holes, the rail holes in the stiles).
+- `components/drawings/PartitionSheet.jsx` (new, the DoorSheet pattern), `PartitionElevation2D.jsx` (new: the front
+  elevation with the field chain, the member chain, the leaf and handle dims), `PartitionLeaf2D.jsx` (new: the
+  leaf with its members, bars, panel, hinge recesses, latch and spindle, the hinge chain), `PartitionMember2D.jsx`
+  (new: the CNC member sheets, the member laid down with the ROOM face up, the edge bands unfolded, the end faces
+  at 3:1 with the numbered dowel holes, the operation table), `PartitionSection2D.jsx` (new, the Sections sheet,
+  by the sheets agent), `DoorGlassDrawing2D.jsx` (the partition units: the 6/16/6 makeup, the applied bars and
+  the dummy spacer from the partition profile), `DrawingsPanel.jsx` (one tab per partition sheet, the Front
+  Elevation tab; a partition never reaches the sash sheets) and the UI pages by the UI agent.
+- `verify/parity/t50_partition.mjs` (new): the harness, sections 1 to 10 (see Verification).
+- Docs: `BLOCKERS.md` 34.1 to 34.18, `docs/handover/PARTITION-WALLS.md` (new), `CO-ZMIENIONE-walls-2510.md` (new),
+  this entry.
+
+**Verification (t50, `node verify/parity/t50_partition.mjs`, final run after every sheet landed):** 139 passed,
+0 failed. Green: the profile, migration, the store setter and reset, `withProfiles` 4th argument; the spec block
+and the layout normalisation; every bay number of the engine (fields, posts, section, top rail pockets, screen,
+post pockets, door leaf / daylight / lights / rails / panel / unit / hinges / latch / lock edge / stop); the 18
+joints (54 dowels, the triangle, the rebated post 28 / 40 / 28, the narrow row at 25, the wide rows 15 / 41 / 67
+and 33 / 99 / 165); every W- record, the glass units, panels, weights (leaf 54.1 kg), consumables; the cut list
+('Oak (solid)', 29 rows), the 17 grouped symbols, the pre-cut groups (50x54 x 7, 120x54 x 2), the glass rows
+(6/16/6, '2H x 0V applied', barAxes), the hardware lines; the config and the 0 price; the SS, D, panelHeight 0,
+hinge right and swing in variants; the two geometry errors with details; the casement, sash and door controls;
+the sheet plan keys and labels, `postGroups`; on the bay, SS, D and panelHeight 0: every sheet (elevation, leaf,
+the member sheets, the Sections sheet, the glass drawings) renders with no text collisions and no NaN / undefined
+/ long dash; the dimension rule (width on top, heights right, chains bottom / left) on the elevation, the leaf
+and the glass drawings (the member sheets are folded CNC sheets with a chain under every row and the Sections
+sheet a set of detail windows, so they are checked for their captions instead: ROOM / FRONT face, the end
+captions, the large length and 'face N' dims over the first row; 'PLAN 1:1' and a head detail); the elevation
+texts, the leaf, post (P1 / P4 mirror, the dowel coordinates 10 / 20, 22 / 33, 10 / 46 and 28 / 40 / 28), top
+rail (pockets 778.5 x 18, the planted head stop, the post dowel holes), rails, stiles (lock edge rebate, spindle
+74, the rail holes) and door rails (15 / 41 / 67, 33 / 99 / 165, the head rebate) texts, the glass drawings 769.5
+x 1232 and 581 x 1129. Two sheet items found by the harness during the day and fixed: the member sheets' first
+layout (callouts over the row captions, 10 / 12 chain labels at the dowel positions) was replaced by the folded
+rows with the large dims; the elevation's "leaf 2087" dim moved left of the chain leader column (it touched the
+"22" bar label with panelHeight 0). The first Sections sheet padded its top to satisfy the dimension rule (a
+half-empty page); the pad was removed and the rule scoped as above.
+**t27** (`node verify/arch/t27.mjs`): 97 passed, 0 failed (the bare `|| 40` dowel fallback in
+`partitionJoints.js` became `dia * 5`). Lint of every changed file: 0 errors. Build: OK (1207 modules).
+Full suite: see the line below (written after the run).
+**Suite** (`verify/arch/t*.mjs` + `verify/parity/t*.mjs`, 37 harnesses, 25.10.2026 afternoon): every harness exit 0 (ALL PASS or N passed, 0 failed), t50 139 / 0, t41 ALL PASS, t49 80 / 0, t27 ALL PASS.
+
+**Open:** BLOCKERS 34.1 to 34.18 (the section split, the bars and spacer, the panel, the joint geometry, the dowel
+pattern, the stops, the hinge knuckle, the latch, the lock edge rebate, the glass, the pricing rates, the BOM
+rows, the 3D, corners and two doors, the door bars, swing in, the unanswered mockup questions, the superseded DXF
+numbers).
+
+---
+
 ## 2026-10-24 · FRENCH MEETING STILES AND LOCK MACHINING (chat change, main 20fba5c)
 
 ### Verdict ✅ the french meeting joint is parametric (rebate = lap 12 + gap 4, active lip 37 / passive lip 14.5, 5.5 seal space), one spindle datum 1050 above the leaf bottom on every door, the Winkhaus ThunderBolt / FGTE / keep machining as data (`derived.door.leaves[i].machining`) and as a new Lock Machining sheet; the plan detail, the leaf and section notes and the 3D follow; suite run (see the summary below); build OK

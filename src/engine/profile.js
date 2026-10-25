@@ -873,6 +873,132 @@ export function getDoorProfile() {
   return activeDoorProfile || DEFAULT_DOOR_PROFILE;
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// PARTITION (meeting room walls) PROFILE, Piotr 25.10.2026
+//
+// An internal glazed partition in solid oak: a bay of screens and one door
+// between an end board on each wall and a head board under the ceiling, no
+// threshold. Every member is 50 wide x 54 deep, machined as an L: a rebate
+// 18 deep (into the width) x 42 (into the depth: the 30 glass zone and the
+// 12 bead) on the ROOM face, a solid 12 upstand on the FRONT (corridor) face.
+// One 6/16/6 unit (28) per screen sits 13.5 into the rebate (the 12 spacer
+// hidden 1.5 in the timber: a 1000 daylight takes a 1027 unit), on 4.5 packers,
+// with the 22 glazing bars applied on both faces and a dummy spacer in the
+// cavity. The solid panel is made 30 thick so it takes the same rebate and
+// bead. The door leaf is as deep as the wall (54), stiles 120, top rail 100,
+// bottom rail 180, the mid rail at the screens' mid rail; its lock edge is
+// rebated 17 x 34 leaving a 20 lip on the front, the lock post carries a
+// 17 x 31 stop lip on the room side (3 clearance), the hinge post is plain.
+// Owner numbers of 25.10.2026 (the Windmill Street DXF read with the owner's
+// corrections: depth 54 not 80, rebate 18 not 15, applied bars, no screws).
+// Numbers marked ASSUMPTION are the programmer's proposal from the section
+// mockup v1, to confirm (BLOCKERS 34).
+// ═════════════════════════════════════════════════════════════════════════════
+export const DEFAULT_PARTITION_PROFILE = Object.freeze({
+  schema: 1,
+  depth: 54,                      // every member through the wall, the door leaf too (Piotr 25.10.2026)
+  elements: {
+    board:      { face: 20, overhang: 10 },   // the head board and the end boards: 20 thick, depth + 2 x 10 wide, separate elements
+    post:       { face: 50 },
+    topRail:    { face: 50 },                 // one piece between the end boards, over the posts
+    midRail:    { face: 50 },                 // per screen, between the glass and the panel
+    bottomRail: { face: 50 },                 // per screen, on the floor
+    bar:        { face: 22, thickness: 8 },   // applied glazing bar, both faces (thickness ASSUMPTION)
+    bead:       { width: 18, thickness: 12 }, // the bead fills the rebate width on the room side (ASSUMPTION 12 / 30 / 12)
+    doorStile:  { face: 120 },
+    doorTop:    { face: 100 },
+    doorMid:    { face: 50 },
+    doorBottom: { face: 180 },
+  },
+  glazing: {
+    unit: 28,                 // 6 / 16 / 6
+    makeup: '6/16/6',
+    tape: 1,                  // glazing tape each side of the unit: the glass zone = unit + 2 x tape = 30; the front upstand = depth - zone - bead (12)
+    rebateDepth: 18,          // the rebate into the member width (Piotr: 18)
+    glassIn: 13.5,            // the unit into the rebate: spacer 12 + 1.5 hidden in the timber (Piotr: 1000 -> 1027)
+    packer: 4.5,              // setting blocks under the unit = the play (18 - 13.5), so the top cover stays 13.5
+    spacer: 12,               // the unit's spacer frame width
+    dummySpacer: 22,          // the dummy spacer behind the applied bars
+    beadSide: 'room',         // the beads (and the unit) go in from the room; the stop lip of the door is on the same face
+    kgPerSqm: 30,             // 6 / 16 / 6: 12 mm of glass at 2.5 kg per m2 per mm (the door double unit rate)
+  },
+  panel: {
+    thickness: 30,            // made 30 thick so it takes the glass rebate and bead (ASSUMPTION; option A, B or C)
+    build: 'veneered',        // 'veneered' (oak 6 + MDF 18 + oak 6), 'solid' (oak 30), 'packed' (oak 20 + 2 x 5 strips)
+    panelIn: 13.5,            // into the rebate, as the glass
+    densityKgM3: 700,         // veneered MDF / oak board, for the weights
+  },
+  door: {
+    leafDepth: 54,            // as the wall (Piotr: looks better)
+    gap: 3,                   // fitting gap each side and at the head (the DXF: 3 / 3 / 3)
+    floorClearance: 5,        // leaf bottom above the floor (the DXF: 5)
+    lipFront: 20,             // the leaf lock edge keeps a 20 lip on the front; the rebate behind it = leafDepth - 20 (34)
+    stopWidth: 17,            // the stop lip on the lock post (room side), 17 wide x (leafDepth - lipFront - gap) deep (31)
+    glazed: 'upper',          // the leaf: glazed above the mid rail, a panel below ('upper') or glazed full height ('full')
+    headStop: 'planted',      // the head stop over the door: a planted 17 x 31 strip under the top rail (ASSUMPTION); the lock post stop is from solid
+  },
+  hinges: {
+    perLeaf: 3, fromTop: 200, aboveCentre: 100, fromBottom: 150, perLeafTall: 4, tallAbove: 2200,   // the door rule (Piotr 25.10: as the single door)
+    length: 102, open: 76, thickness: 3, radius: true, knuckle: 14,   // knuckle 14 (ASSUMPTION): flap (76 - 14) / 2 = 31 each side
+    name: 'Enduro radius ball bearing butt hinge grade 13, 102 x 76 x 3, stainless (fire rated, 120 kg)',
+  },
+  hardware: {
+    handleHeight: 1000,       // lever handle centre above the floor (Piotr 25.10)
+    latch: 'tubular',         // a plain tubular latch with lever handles on a rose (Piotr: "normalny latch")
+    latchCase: 76, latchBackset: 57,   // ASSUMPTION: the 76 mm tubular latch, 57 backset
+    latchBore: 16,            // the latch body bore from the leaf edge (ASSUMPTION)
+    spindle: 8, spindleBore: 10,
+    forend: { length: 57, width: 25, thickness: 2 },   // the latch forend and the keep plate, radius ends (ASSUMPTION)
+    keepBolt: { width: 16, depth: 15 },                 // the latch bolt pocket behind the keep (ASSUMPTION)
+  },
+  joints: {
+    dowel: { dia: 8, length: 40, perJoint: 3 },          // Piotr 25.10: dowels 8 mm, 3 per joint, no screws at this stage
+    // where the three dowels sit in a rail end (the L section: body 32 wide x 54 deep behind the 12 front strip):
+    // [across the width from the solid edge, depth from the front face]; a triangle clear of the rebate (ASSUMPTION)
+    pattern50: [[10, 20], [22, 33], [10, 46]],
+    rowDepth: 33,             // wider members (the door rails 100 / 180): three dowels in a row at this depth
+    rowMargin: 15,            // ... the first and last this far from the solid edges
+  },
+  lengths: {
+    preCut: 10,               // pre-cut allowance per member, as the windows (Piotr 25.10)
+    railSeat: 0,              // a rail is cut to its field width (dowelled, no tenon)
+  },
+  // the configurator defaults (the Windmill Street bay)
+  defaults: { lights: 3, panelHeight: 790, doorWidth: 800, layout: 'SDS', hingeSide: 'left', swing: 'out' },
+});
+
+/**
+ * Partition profile migration: schema 1, block by block over the default (a
+ * missing key takes the default, a stored one stays), ready for key moves.
+ */
+export function migratePartitionProfile(profile) {
+  if (!profile) return null;
+  const D = DEFAULT_PARTITION_PROFILE;
+  const elements = Object.fromEntries(Object.keys(D.elements).map((k) => [k, { ...D.elements[k], ...(profile.elements?.[k] || {}) }]));
+  for (const k of Object.keys(profile.elements || {})) if (!elements[k]) elements[k] = { ...profile.elements[k] };
+  return {
+    ...D, ...profile,
+    schema: D.schema,
+    elements,
+    glazing: { ...D.glazing, ...(profile.glazing || {}) },
+    panel: { ...D.panel, ...(profile.panel || {}) },
+    door: { ...D.door, ...(profile.door || {}) },
+    hinges: { ...D.hinges, ...(profile.hinges || {}) },
+    hardware: { ...D.hardware, ...(profile.hardware || {}) },
+    joints: { ...D.joints, ...(profile.joints || {}), dowel: { ...D.joints.dowel, ...(profile.joints?.dowel || {}) } },
+    lengths: { ...D.lengths, ...(profile.lengths || {}) },
+    defaults: { ...D.defaults, ...(profile.defaults || {}) },
+  };
+}
+
+let activePartitionProfile = null;
+export function setActivePartitionProfile(profile) {
+  activePartitionProfile = profile ? migratePartitionProfile(profile) : null;
+}
+export function getPartitionProfile() {
+  return activePartitionProfile || DEFAULT_PARTITION_PROFILE;
+}
+
 
 /**
  * Schema migration for stored sash profiles (Supabase, localStorage cache,
@@ -946,22 +1072,29 @@ export function boardWidthForDepth(frameDepth) {
 
 /**
  * Temporarily compute with frozen (batch snapshot) profiles.
- * withProfiles(sash, casement, door, fn), or the older withProfiles(sash,
- * casement, fn): a function in third place is the callback and the door
- * profile stays the live one (a batch frozen before doors had a snapshot).
+ * withProfiles(sash, casement, door, partition, fn), or the older
+ * withProfiles(sash, casement, door, fn) and withProfiles(sash, casement, fn):
+ * a function in third or fourth place is the callback and the profiles not
+ * given stay the live ones (a batch frozen before that kind had a snapshot).
  */
-export function withProfiles(sashProfile, casementProfile, doorProfile, fn) {
+export function withProfiles(sashProfile, casementProfile, doorProfile, partitionProfile, fn) {
+  // withProfiles(sash, casement, door, partition, fn) since 25.10.2026; the
+  // older shapes (sash, casement, door, fn) and (sash, casement, fn) keep working
+  if (typeof partitionProfile === 'function') { fn = partitionProfile; partitionProfile = null; }
   if (typeof doorProfile === 'function') { fn = doorProfile; doorProfile = null; }
   const prevSash = activeProfile;
   const prevCas = activeCasementProfile;
   const prevDoor = activeDoorProfile;
+  const prevPartition = activePartitionProfile;
   if (sashProfile) activeProfile = normalizeSashProfile(sashProfile);
   if (casementProfile) activeCasementProfile = migrateCasementProfile(casementProfile);
   if (doorProfile) activeDoorProfile = migrateDoorProfile(doorProfile);
+  if (partitionProfile) activePartitionProfile = migratePartitionProfile(partitionProfile);
   try { return fn(); } finally {
     activeProfile = prevSash;
     activeCasementProfile = prevCas;
     activeDoorProfile = prevDoor;
+    activePartitionProfile = prevPartition;
   }
 }
 

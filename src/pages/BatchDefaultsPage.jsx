@@ -103,7 +103,7 @@ export default function BatchDefaultsPage() {
           <Sec title="Ironmongery — Assign Products">
             <div className="space-y-2">
               {/* both batch spellings show the door slots (09.10.2026: 'doors' from the project page, 'door' from an estimate) */}
-              {IRONMONGERY_CATEGORIES.filter(c => (c.windowType === (batch.type === 'doors' ? 'door' : (batch.type || 'sash')) || c.windowType === 'all') && c.slot !== false).map(cat => {
+              {IRONMONGERY_CATEGORIES.filter(c => (c.windowType === (batch.type === 'doors' ? 'door' : (batch.type || 'sash')) || c.windowType === 'all' || (c.alsoFor || []).includes(batch.type)) && c.slot !== false).map(cat => {
                 const item = getSlotItem(cat.key);
                 return (
                   <div key={cat.key}

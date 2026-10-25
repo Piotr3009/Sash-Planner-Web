@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { uploadBsuiteProgram, removeBsuiteProgram } from '../services/bsuitePrograms.js';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
-import { kgPerM, VARIANT_ORDER, casementGlassDeductions, DEFAULT_DOOR_PROFILE } from '../engine/profile.js';
+import { kgPerM, VARIANT_ORDER, casementGlassDeductions, DEFAULT_DOOR_PROFILE, DEFAULT_PARTITION_PROFILE } from '../engine/profile.js';
 import NumInput from '../components/NumInput.jsx';
 import { CONSTANTS, deriveWindowData } from '../engine/calculations.js';
 import { buildArchPlan, ArchError } from '../engine/arch.js';
@@ -16,6 +16,7 @@ import CasementLeafDetail2D from '../components/drawings/CasementLeafDetail2D.js
 import CasementSection2D from '../components/drawings/CasementSection2D.jsx';
 import { groupCasementLeaves } from '../components/drawings/casementDrawUtils.js';
 import DoorElevation2D from '../components/drawings/DoorElevation2D.jsx';
+import PartitionElevation2D from '../components/drawings/PartitionElevation2D.jsx';
 
 // ─── Element metadata: engine names, groups, editable fields, length rules ───
 const RAW_OPTIONS = ['63x63', '63x95'];
@@ -151,6 +152,9 @@ export default function WindowSettingsPage() {
   }
   if (typeId === 'door') {
     return <DoorSettings />;
+  }
+  if (typeId === 'partition') {
+    return <PartitionSettings />;
   }
   if (typeId && typeId !== 'sash') {
     return (
@@ -1669,6 +1673,241 @@ function DoorSettings() {
             </>
           ) : (
             <div className="card p-6 text-center text-xs text-ink-400">Sample drawing unavailable.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Partition walls (25.10.2026) ────────────────────────────────────────────
+// The partition profile card, in the door card's layout: the member depth and
+// faces, the glazing rebate and unit, the panel, the door leaf fitting, the
+// hinge rule, the hardware heights, the dowel joints and the configurator
+// defaults. Every field writes the partition profile through setPartitionPath;
+// the sample wall on the right is the live engine. The numbers marked
+// ASSUMPTION in the profile are listed in docs/BLOCKERS.md 34.x.
+const PARTITION_MEMBER_ROWS = [
+  { key: 'post', name: 'Post', note: 'between the screens and at the door; the end posts against the end boards' },
+  { key: 'topRail', name: 'Top rail', note: 'one piece between the end boards, over the posts' },
+  { key: 'midRail', name: 'Mid rail', note: 'per screen, between the glass and the panel' },
+  { key: 'bottomRail', name: 'Bottom rail', note: 'per screen, on the floor' },
+  { key: 'doorStile', name: 'Door stile', note: 'x2 per leaf' },
+  { key: 'doorTop', name: 'Door top rail' },
+  { key: 'doorMid', name: 'Door mid rail', note: 'at the screens\' mid rail' },
+  { key: 'doorBottom', name: 'Door bottom rail' },
+];
+
+function PartitionSettings() {
+  const partition = useWindowProfileStore((s) => s.partition) || DEFAULT_PARTITION_PROFILE;
+  const setPath = useWindowProfileStore((s) => s.setPartitionPath);
+  const resetPartition = useWindowProfileStore((s) => s.resetPartitionToDefaults);
+  const [sampleW, setSampleW] = useState(2525);
+  const [sampleH, setSampleH] = useState(2165);
+  const [sampleLayout, setSampleLayout] = useState('SDS');
+  const [membersLock, setMembersLock] = useState(true);
+  const [glazingLock, setGlazingLock] = useState(true);
+  const [doorLock, setDoorLock] = useState(true);
+  const [jointsLock, setJointsLock] = useState(true);
+
+  const p = partition;
+  const E = p.elements || {}, G = p.glazing || {}, PN = p.panel || {}, D = p.door || {};
+  const HG = p.hinges || {}, HW = p.hardware || {}, J = p.joints || {}, DW = J.dowel || {}, DF = p.defaults || {};
+  const W = Number(sampleW) || 2525;
+  const Hh = Number(sampleH) || 2165;
+  const num = (v, fb = 0) => (v === '' ? '' : Number(v) || fb);
+  const inputCls = 'w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm';
+  const cleanLayout = (v) => String(v || '').toUpperCase().replace(/[^SD]/g, '');
+
+  // Live sample wall: the engine with this profile (the owner's bay by default).
+  const sample = useMemo(() => {
+    try {
+      const ws = normaliseToWindowSpec({ name: 'SAMPLE', width: W, height: Hh, windowCategory: 'partition', partitionLayout: cleanLayout(sampleLayout) || 'S', glassType: 'double' });
+      return { ws, derived: deriveWindowData(ws), error: null };
+    } catch (err) {
+      console.error('WindowSettings partition sample derive failed:', err);
+      return { ws: null, derived: null, error: err?.message || String(err) };
+    }
+  }, [W, Hh, sampleLayout, p]);
+  const pw = sample?.derived?.partition;
+  const screen0 = pw?.screens?.[0];
+  const door0 = pw?.doors?.[0];
+
+  const FaceCard = ({ r, locked }) => {
+    const face = E?.[r.key]?.face;
+    return (
+      <div className="p-2 rounded-lg border border-surface-500 bg-surface-700/30">
+        <div className="flex items-center justify-between gap-1">
+          <span className="text-[12px] font-medium truncate text-ink-100">{r.name}</span>
+          <span className="text-[10px] text-ink-400">{face} × {p.depth}</span>
+        </div>
+        <div className="flex items-center gap-1.5 mt-1 text-[11px] text-ink-300">
+          <span>Face</span>
+          <NumInput value={face} onCommit={(v) => setPath(['elements', r.key, 'face'], v)} disabled={locked}
+            className={`w-14 px-1 py-0.5 bg-surface-800 border border-surface-500 text-ink-50 rounded text-[11px] text-center ${locked ? 'opacity-50 cursor-not-allowed' : ''}`} />
+        </div>
+        {r.note && <div className="text-[10px] text-ink-500 mt-0.5">{r.note}</div>}
+      </div>
+    );
+  };
+
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-ink-50">Window Settings · Partition walls</h1>
+          <div className="text-xs text-ink-400">Partition profile (schema {p.schema}) · solid oak, oiled · screens and a door between end boards · feeds cut lists, drawings, BOM, hardware and weights · per-tenant</div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 text-xs text-ink-400">
+            Sample wall:
+            <input type="text" value={sampleLayout} maxLength={12} spellCheck={false}
+              onChange={(e) => setSampleLayout(cleanLayout(e.target.value))}
+              onBlur={() => setSampleLayout(cleanLayout(sampleLayout) || 'S')}
+              title="S = glazed screen, D = door"
+              className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs text-center font-mono tracking-widest" />
+            <NumInput value={sampleW} onCommit={(v) => setSampleW(num(v, 2525))}
+              className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs text-center" />
+            ×
+            <NumInput value={sampleH} onCommit={(v) => setSampleH(num(v, 2165))}
+              className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs text-center" />
+            mm
+          </div>
+          <button
+            onClick={() => { if (window.confirm('Reset the partition profile to defaults?')) resetPartition(); }}
+            className="px-3 py-1.5 text-xs rounded-lg border border-surface-500 text-ink-200 bg-surface-700 hover:bg-surface-600 transition-colors">
+            Reset partition to defaults
+          </button>
+        </div>
+      </div>
+
+      <div className="flex gap-5 items-start">
+        {/* LEFT 2/3: settings */}
+        <div className="w-2/3 min-w-0">
+
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm font-semibold text-ink-50">Members <span className="text-ink-500 font-normal text-xs">· every member {p.depth} deep</span></div>
+            <LockToggle locked={membersLock} onToggle={() => setMembersLock((x) => !x)} />
+          </div>
+          <fieldset disabled={membersLock} className={`flex flex-wrap gap-x-5 gap-y-3 items-end text-xs border-0 p-0 m-0 mb-2 min-w-0 ${membersLock ? 'opacity-60' : ''}`}>
+            <PathField label="Member depth (mm)" value={p.depth} onCommit={(v) => setPath(['depth'], v)} hint="through the wall, the door leaf too" />
+            <PathField label="End / head board" value={E.board?.face} onCommit={(v) => setPath(['elements', 'board', 'face'], v)} hint="thick" />
+            <PathField label="Board overhang" value={E.board?.overhang} onCommit={(v) => setPath(['elements', 'board', 'overhang'], v)} hint="each face: board width = depth + 2 x" />
+            <PathField label="Glazing bar face" value={E.bar?.face} onCommit={(v) => setPath(['elements', 'bar', 'face'], v)} hint="applied, both faces" />
+            <PathField label="Glazing bar thickness" value={E.bar?.thickness} onCommit={(v) => setPath(['elements', 'bar', 'thickness'], v)} hint="ASSUMPTION" />
+            <PathField label="Bead width" value={E.bead?.width} onCommit={(v) => setPath(['elements', 'bead', 'width'], v)} hint="fills the rebate" />
+            <PathField label="Bead thickness" value={E.bead?.thickness} onCommit={(v) => setPath(['elements', 'bead', 'thickness'], v)} hint="ASSUMPTION" />
+          </fieldset>
+          <div className={`grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-1.5 mb-4 ${membersLock ? '' : 'ring-1 ring-amber-500/40 rounded-lg p-1'}`}>
+            {PARTITION_MEMBER_ROWS.map((r) => <FaceCard key={r.key} r={r} locked={membersLock} />)}
+          </div>
+
+          <div className={`card p-4 mb-4 ${glazingLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-ink-200">Glazing &amp; panel
+                <span className="text-ink-500 font-normal"> · one unit per screen, the panel in the same rebate</span>
+              </div>
+              <LockToggle locked={glazingLock} onToggle={() => setGlazingLock((x) => !x)} />
+            </div>
+            <fieldset disabled={glazingLock} className={`flex flex-wrap gap-x-6 gap-y-2 items-end text-xs border-0 p-0 m-0 min-w-0 ${glazingLock ? 'opacity-60' : ''}`}>
+              <PathField label="Rebate depth" value={G.rebateDepth} onCommit={(v) => setPath(['glazing', 'rebateDepth'], v)} hint="into the member width" />
+              <PathField label="Glass into rebate" value={G.glassIn} onCommit={(v) => setPath(['glazing', 'glassIn'], v)} hint="per side: unit = daylight + 2 x" />
+              <PathField label="Unit thickness" value={G.unit} onCommit={(v) => setPath(['glazing', 'unit'], v)} />
+              <div>
+                <div className="text-ink-400 mb-1">Unit makeup</div>
+                <input type="text" value={G.makeup || ''} onChange={(e) => setPath(['glazing', 'makeup'], e.target.value)} className={inputCls + ' w-24'} />
+              </div>
+              <PathField label="Dummy spacer" value={G.dummySpacer} onCommit={(v) => setPath(['glazing', 'dummySpacer'], v)} hint="behind the applied bars" />
+              <PathField label="Panel thickness" value={PN.thickness} onCommit={(v) => setPath(['panel', 'thickness'], v)} hint="ASSUMPTION: takes the glass rebate and bead" />
+              <div className="text-ink-300 pb-1.5 text-[11px]">
+                {screen0 ? (
+                  <>sample screen <span className="text-accent-400 font-medium">{screen0.w} wide</span>
+                    <span className="text-ink-500"> · unit </span>
+                    <span className="text-accent-400 font-medium">{screen0.unit?.w} × {screen0.unit?.h}</span>
+                    {screen0.panel && <span className="text-ink-500"> · panel {screen0.panel.size?.w} × {screen0.panel.size?.h}</span>}</>
+                ) : 'n/a'}
+              </div>
+            </fieldset>
+          </div>
+
+          <div className={`card p-4 mb-4 ${doorLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-ink-200">Door leaf, hinges &amp; hardware
+                <span className="text-ink-500 font-normal"> · fitting gaps, the hinge rule, the handle</span>
+              </div>
+              <LockToggle locked={doorLock} onToggle={() => setDoorLock((x) => !x)} />
+            </div>
+            <fieldset disabled={doorLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${doorLock ? 'opacity-60' : ''}`}>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <PathField label="Leaf gap" value={D.gap} onCommit={(v) => setPath(['door', 'gap'], v)} hint="each side and at the head" />
+                <PathField label="Floor clearance" value={D.floorClearance} onCommit={(v) => setPath(['door', 'floorClearance'], v)} hint="leaf bottom above the floor" />
+                <PathField label="Front lip" value={D.lipFront} onCommit={(v) => setPath(['door', 'lipFront'], v)} hint={`lock edge rebate = ${Math.round(((Number(p.depth) || 0) - (Number(D.lipFront) || 0)) * 10) / 10}`} />
+                <PathField label="Stop width" value={D.stopWidth} onCommit={(v) => setPath(['door', 'stopWidth'], v)} hint="the stop lip on the lock post" />
+              </div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Hinges (the door rule)</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <PathField label="Top hinge" value={HG.fromTop} onCommit={(v) => setPath(['hinges', 'fromTop'], v)} hint="below leaf top" />
+                <PathField label="Middle hinge" value={HG.aboveCentre} onCommit={(v) => setPath(['hinges', 'aboveCentre'], v)} hint="above centre" />
+                <PathField label="Bottom hinge" value={HG.fromBottom} onCommit={(v) => setPath(['hinges', 'fromBottom'], v)} hint="above leaf bottom" />
+              </div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Hardware</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-2">
+                <PathField label="Handle height" value={HW.handleHeight} onCommit={(v) => setPath(['hardware', 'handleHeight'], v)} hint="above the floor" />
+                <PathField label="Latch backset" value={HW.latchBackset} onCommit={(v) => setPath(['hardware', 'latchBackset'], v)} hint="ASSUMPTION" />
+              </div>
+              <div className="text-ink-300 text-[11px]">
+                {door0 ? (
+                  <>sample leaf <span className="text-accent-400 font-medium">{door0.leaf?.w} × {door0.leaf?.h}</span>
+                    <span className="text-ink-500"> · {door0.hinges?.count} hinges · handle {door0.latch?.fromFloor} from the floor</span></>
+                ) : 'no door in the sample layout'}
+              </div>
+            </fieldset>
+          </div>
+
+          <div className={`card p-4 ${jointsLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-ink-200">Dowel joints &amp; configurator defaults</div>
+              <LockToggle locked={jointsLock} onToggle={() => setJointsLock((x) => !x)} />
+            </div>
+            <fieldset disabled={jointsLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${jointsLock ? 'opacity-60' : ''}`}>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <PathField label="Dowel diameter" value={DW.dia} onCommit={(v) => setPath(['joints', 'dowel', 'dia'], v)} />
+                <PathField label="Dowel length" value={DW.length} onCommit={(v) => setPath(['joints', 'dowel', 'length'], v)} />
+                <PathField label="Dowels per joint" value={DW.perJoint} onCommit={(v) => setPath(['joints', 'dowel', 'perJoint'], v)} hint={pw?.dowels ? `sample wall: ${pw.dowels.count} dowels` : ''} />
+              </div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Defaults of a new wall in the configurator</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-2">
+                <div>
+                  <div className="text-ink-400 mb-1">Layout</div>
+                  <input type="text" value={DF.layout || ''} maxLength={12} spellCheck={false}
+                    onChange={(e) => setPath(['defaults', 'layout'], cleanLayout(e.target.value) || 'S')}
+                    className={inputCls + ' font-mono tracking-widest text-center'} />
+                </div>
+                <PathField label="Lights per screen" value={DF.lights} onCommit={(v) => setPath(['defaults', 'lights'], v)} />
+                <PathField label="Panel height" value={DF.panelHeight} onCommit={(v) => setPath(['defaults', 'panelHeight'], v)} hint="0 = no panel" />
+                <PathField label="Door opening width" value={DF.doorWidth} onCommit={(v) => setPath(['defaults', 'doorWidth'], v)} />
+              </div>
+              <div className="text-[10px] text-ink-500">
+                Defaults: the owner's numbers of 25.10.2026 (the Windmill Street bay). The numbers marked ASSUMPTION are the programmer's proposals, listed in docs/BLOCKERS.md 34.x, to confirm.
+              </div>
+            </fieldset>
+          </div>
+        </div>
+
+        {/* RIGHT 1/3: live drawing */}
+        <div className="w-1/3 min-w-0 shrink-0 sticky top-4">
+          {sample?.derived ? (
+            <>
+              <div className="text-sm font-semibold text-ink-50 mb-2">
+                Drawing <span className="text-ink-500 font-normal text-xs">· {W} × {Hh} · {cleanLayout(sampleLayout) || 'S'}</span>
+              </div>
+              <div className="card p-2"><PartitionElevation2D windowSpec={sample.ws} derived={sample.derived} /></div>
+              <div className="text-[10px] text-ink-500 mt-2">
+                Live from the engine: every field on the left reshapes it.
+              </div>
+            </>
+          ) : (
+            <div className="card p-6 text-center text-xs text-ink-400">Sample drawing unavailable{sample?.error ? `: ${sample.error}` : '.'}</div>
           )}
         </div>
       </div>

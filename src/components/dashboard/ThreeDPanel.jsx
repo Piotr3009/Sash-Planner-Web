@@ -16,12 +16,14 @@ export default function ThreeDPanel({ item, windowSpec, batch, editUrl, derived 
 
   const winW = item?.width || windowSpec?.frame?.width || '';
   const winH = item?.height || windowSpec?.frame?.height || '';
+  // Partition walls (25.10.2026): no 3D model yet, the preview shows a note and the PDF button is off.
+  const isPartition = (windowSpec?.category || 'sash') === 'partition';
 
   // Header "Export PDF" triggers an off-screen, fixed-angle capture run.
   const handleExport = useCallback(() => {
-    if (capturing || !windowSpec) return;
+    if (capturing || !windowSpec || isPartition) return;
     setCapturing(true);
-  }, [capturing, windowSpec]);
+  }, [capturing, windowSpec, isPartition]);
 
   // When the rig finishes: build the PDF, then unmount the rig.
   const handleComplete = useCallback((results) => {
@@ -44,7 +46,8 @@ export default function ThreeDPanel({ item, windowSpec, batch, editUrl, derived 
       <div className="flex items-center justify-between p-2">
         <div className="text-sm font-medium text-ink-50">3D Preview</div>
         <div className="flex items-center gap-2">
-          <button onClick={handleExport} disabled={capturing}
+          <button onClick={handleExport} disabled={capturing || isPartition}
+            title={isPartition ? '3D preview is not available for partition walls yet' : undefined}
             className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
             📄 Export PDF
           </button>

@@ -94,7 +94,11 @@ function CaptureScene({ config, side, onCaptured }) {
       <directionalLight position={[-3, 2, 4]} intensity={0.45} />
       <directionalLight position={[0, -3, 4]} intensity={0.25} />
       <group rotation={groupRotation}>
-        {config.windowCategory === 'casement' ? (
+        {config.windowCategory === 'partition' ? (
+          // Partition walls (25.10.2026): no 3D model yet; an empty capture rather
+          // than the sash renderer on partition data (NaN geometry).
+          null
+        ) : config.windowCategory === 'casement' ? (
           <CasementWindow {...config.casementProps} />
         ) : config.windowCategory === 'door' ? (
           <DoorWindow

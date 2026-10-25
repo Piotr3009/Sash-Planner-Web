@@ -34,8 +34,10 @@ export const IRONMONGERY_CATEGORIES = [
   { key: 'casementLocks', label: 'Casement Locks', windowType: 'casement', slot: false },
   // Doors (Piotr 04.08). Multipoint is standard on our doors, so the lock slot
   // is about the product, not the mechanism type.
-  { key: 'doorHandles', label: 'Door Handles', windowType: 'door' },
-  { key: 'doorHinges', label: 'Door Hinges', windowType: 'door' },
+  // alsoFor: further batch types that take the same slot (partition walls,
+  // 25.10.2026: the partition door is hung on butt hinges with lever handles).
+  { key: 'doorHandles', label: 'Door Handles', windowType: 'door', alsoFor: ['partition'] },
+  { key: 'doorHinges', label: 'Door Hinges', windowType: 'door', alsoFor: ['partition'] },
   { key: 'multipointLocks', label: 'Multipoint Locks', windowType: 'door' },
   { key: 'thresholds', label: 'Thresholds', windowType: 'door' },
   { key: 'bolts', label: 'Bolts', windowType: 'door' },
