@@ -821,8 +821,9 @@ section('18 - door sheets: the components the screen, the PDFs and the pack moun
   for (const { name, spec, derived, plan, sheets, groups, forced } of RUNS) {
     const dr = derived.door;
     // the plan: frame, leaf, one per side panel, one per fan leaf (opening or fixed, doors v3), the plan section
-    // 24.10.2026: the lock machining sheet follows the leaf sheet on every door
-    const wantKeys = ['doorframe', 'doorleaf', 'doormachining', ...(dr.panelLeaves || []).map((pl) => `doorside-${pl.side}`),
+    // 24.10.2026: the lock machining sheets follow the leaf sheet on every door, one per
+    // machined edge (the lock leaf, then the passive leaf of a french door or the jamb)
+    const wantKeys = ['doorframe', 'doorleaf', 'doormachining', dr.isFrench ? 'doormachining-passive' : 'doormachining-jamb', ...(dr.panelLeaves || []).map((pl) => `doorside-${pl.side}`),
       ...(dr.fanLeaves || []).map((_, i) => `doorfan-${i}`), 'doorsection'];
     ok(JSON.stringify(plan.map((p) => p.key)) === JSON.stringify(wantKeys), `${name}: sheet plan ${plan.map((p) => p.key).join(', ')}`);
     // CLAUDE.md 3.15 (doors v3): no two texts overlap on any door sheet (font size x 0.55 x characters, rotation applied)

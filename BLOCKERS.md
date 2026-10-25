@@ -40,8 +40,8 @@ Winkhaus 58 slab detail (39 / 15 / 4) adapted to 57. `meeting.gap`, `meeting.lip
 Window Settings.
 
 **33.6 Keeps on the passive leaf: 'full length' (profile default) vs 'individual'.** The machining always lays out
-the three ThunderBolt keeps (F2402 at the deadbolts -849.5 / +807.5, F24-912W at the spindle, from the BJ Waller
-datasheets). With `keeps 'full length'` it adds a 24 x 2.5 recess over the faceplate length for the F24-908P rail:
+the three ThunderBolt keeps (F2402 at the deadbolts -753.5 / +736.5 of the DXF, F24-912W at the spindle, from the BJ
+Waller datasheets; since the evening drawn with their R12 plates, R6 pockets, bolt windows and screws). With `keeps 'full length'` it adds a 24 x 2.5 recess over the faceplate length for the F24-908P rail:
 an ASSUMPTION, no routing drawing for the rail exists in the pack. Say which keep set the workshop buys.
 
 **33.7 Not modelled (owner products, later):** flush bolts of the passive leaf (lockType single), hinge recesses on
@@ -54,6 +54,31 @@ the FGTE slave variant to buy for an inward door is to confirm with BJ Waller), 
 the gap: `overlap = 2 x lip - clearance`, `rebate = overlap + gap`. The lip edge to shoulder gap is `meeting.gap`
 alone. The analysis PDF said the clearance appears at every lip / shoulder pair: wrong for the drawn geometry, now
 documented here and in DOORS-PRODUCTION.md.
+
+**33.10 The Lock Machining sheets now draw the plates (24.10.2026, late evening): two assumptions to check.**
+(a) The FGTE slave strip (G3 Stulpe TFTE 2062-9 92 MDE, the LH 22 mm drawing) is placed with its spindle 919.5 above
+its bottom end: the follower of the matching slave LOCK drawing (T-FGTE2062-908) stands 783.18 from the drawing's
+left end, the cylinder keyhole 92 to its right with the slot pointing right (down), and the deadbolt keep window sits
+70.6 right of the follower where the master deadbolt is (70 below its spindle), the latch keep 25.5 left: so the
+drawing's right end is the leaf BOTTOM. The strip then lies 130.5 to 1833.2 on a 1998 leaf (spindle 1050) inside the
+full height recess; the "450 mm top extension" and the bottom extension to the leaf ends are not drawn (only the end
+plate recesses). (b) The strip is drawn as the LH drawing (the latch keep lever reaching 25 on one side); the RH strip
+is its mirror image across the plate, and which hand goes on which leaf (and which way the lever faces, exterior or
+interior) is for Piotr to say; the sheet does not mirror yet. The hook keep boxes land 755 below and 590 above the
+spindle (the master hooks 770 / 573: the keep boxes sit 15 to 17 higher, as hooks that swing up need), the two guide
+blocks and angled brackets at the strip ends are drawn as in the DXF.
+
+**33.11 FGTE master faceplate: no Winkhaus drawing in the pack.** Piotr's FGTE DXF set holds the slave strips (LH and
+RH), the slave lock, the reversing mechanism, the 450 top extension and the FAB shootbolt keeps, but not the master
+lock or its faceplate. The master sheet draws the plate schematic (20 wide, full height, dashed; hook windows 52 x 9 on
+the pocket centres, the latch and deadbolt windows as the ThunderBolt main case) over the Winkhaus routing pockets.
+A DXF of the master (T-FGTE 2062-9xx, 45 backset) would replace it the same way the ThunderBolt plate was done
+(`verify/tools/winkhaus_dxf_outlines.py`).
+
+**33.12 The ThunderBolt plate across the leaf: symmetric, no handing.** Every opening of the 1770 plate is symmetric
+about its centre line (screw holes on it, the bolt and latch windows centred), so the same drawing serves both hands;
+the keeps (F2402 screws 17.5 / 6.5 from the long edge, point symmetric) are drawn as the data sheet shows them, a keep
+turned end for end gives the same pattern.
 
 **33.9 Next step: doors in the bSuite export.** `utils/bsuiteExport.js` still writes casement frames only (the
 `category !== 'casement'` gate, six frame programs, window document variables). The machining tables of this change

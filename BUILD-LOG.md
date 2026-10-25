@@ -50,6 +50,40 @@ slave routing details (58 slab, 45 backset), BJ Waller double door sections, F24
 the keeps on the double bolt axes (-753.5 / +736.5, not 56.5 from the plate ends), a 12.2 x 8 rail channel under
 the plate recess; BLOCKERS 33.2 settled, 33.3 narrowed to the 18 / 10 widths. t49 55 checks.
 
+**Late evening, the plates drawn (Piotr: "tam maja byc wybrania plus plyty, plyty sa rounded edge i maja specjalne
+wciecia; przekoduj to na poprawne sciezki"):** the Lock Machining sheet is redrawn from the product drawings and
+split into ONE SHEET PER MACHINED EDGE.
+- `verify/tools/winkhaus_dxf_outlines.py` (new, ezdxf): reads Piotr's Winkhaus DXF files (the ThunderBolt
+  T-FGAO2070 1770 radius plate, the FGTE slave strip G3 Stulpe TFTE 2062-9 LH 22) and writes
+  `src/engine/hardware/winkhausOutlines.js` (generated: polylines flattened to 0.02, rounded to 0.05, in LEAF
+  coordinates from the plate's bottom end; the DXF files stay out of the repo). ThunderBolt: the 1770 x 20 loop
+  with R10 ends, the bolt, deadbolt and latch windows, ten countersunk screw holes, the housings 89..182 / 788..966 /
+  1579..1672 (11.5 / 15.1 thick from the end view), the follower and PZ bores. Slave strip: 1702.68 x 20 with the
+  keep lever to 25, the spindle 919.5 above its bottom end (the follower of the slave LOCK drawing; the drawing's
+  right end is the leaf bottom: cylinder keyhole 92 right of the follower, deadbolt keep window 70.6 right, latch keep
+  25.5 left), the hook keep boxes, guide blocks and brackets as drawn (BLOCKERS 33.10).
+- `src/engine/hardware/winkhausKeeps.js` (new): the keep faces of the BJ Waller pages, F2402 (176 x 24 R12, pocket
+  120 x 18 R6, bolt window 54 x 15, screws at 76 / 66 at 17.5 / 6.5 from the long edge, adjusters at 46) and
+  F24-912W (235 x 24, -126.5..+108.5 about the handle, pocket -106.5..+75.5, latch window on +26, deadbolt window on
+  -68.5, screws +96.5 / -31.5 / -114.5 on the centre line, three adjusters).
+- `engine/doorLockMachining.js`: every machining result names its `plate` (outline 'thunderbolt' 144..1914 on the
+  1998 leaf, 'fgte-slave' 130.5..1833.2 from `FGTE_SLAVE.strip { 1702.7, below 919.5, above 783.2 }`, 'fgte-master'
+  schematic full height) and its pocket `cutter` (12 / 17); the keep plates and pockets carry `endRadius` (12 / 6);
+  `jambKeepMachining` now takes the leaf depth: the single door jamb keeps sit on the leaf's lock axis 28.5 (centred,
+  as the lock is; it printed 22.5) and the wall is drawn 57 wide.
+- `DoorLockMachining2D.jsx` rewritten: `band` prop (one edge per sheet; `machiningBands` exported), the overview at
+  1:1 across and along (the plate from the outline, pockets hatched with the cutter radius, housings and bores
+  dashed, keeps with windows and screws, lettered callouts A, B, C...), the DETAILS: the features clustered into
+  windows (a gap over 110 mm starts a new one), all at one scale from 3:1 down (one row at 2:1 or better, else two
+  rows), every window at least as wide as its widest label, the labels packed in rows under it (spans with a bracket,
+  points with a leader), the face width dim right of the widest row, the table (plate row added), the title and the
+  notes in two columns; the primitives outside a window are culled. `doorSheetPlan`: keys `doormachining` and
+  `doormachining-passive` / `doormachining-jamb`, labels "Lock Machining: active / passive / leaf / jamb".
+- Tests: t49 extended (80 checks: the plate descriptors, both sheets of the one handle, two handle and single door
+  cases, the plate loops and screw holes in the SVG, the outline module against the kits, the keep faces against
+  KEEPS); t41 sheet plan with the second machining sheet (683 checks).
+- Docs: BLOCKERS 33.6 corrected, 33.10 to 33.12 added; DOORS-PRODUCTION.md; CO-ZMIENIONE-french-2410.md v3.
+
 **Checks:** french 1600 x 2100 outward one handle: active lip edge faceplate 144 to 1914, pockets 209.5..349.5 /
 914.5..1144.5 / 1699.5..1839.5, spindle 1050 (958 cylinder), keeps 296.5 / 1050 / 1786.5 on the passive shoulder; two handles inward: FGTE master pockets -835..-705 / -130..+70 / +508..+638, slave -795..-730 /
 -130..+70 / +340..+430 / +548..+613, end plates 0..65 and 1933..1998; single 900 x 2100: the lock centred (28.5),

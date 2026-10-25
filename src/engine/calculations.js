@@ -1547,7 +1547,7 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight, settings = {}) {
     });
     // A single door: the ThunderBolt keeps sit in the lock side jamb rebate wall.
     const jambMachining = !isFrench && leaves.length === 1
-        ? { side: leaves[0].hinge === 'left' ? 'right' : 'left', ...jambKeepMachining({ leafH, hw: hwP, backset: Number(hwP.backset) }) }
+        ? { side: leaves[0].hinge === 'left' ? 'right' : 'left', ...jambKeepMachining({ leafH, hw: hwP, backset: Number(hwP.backset), leafDepth: ld }) }
         : null;
 
     // ── Side panels: casement fixed lights behind the mullion (owner box item 5) ──

@@ -24,7 +24,12 @@
  *      handleHeight above the floor, a lip pair taller than the leaf is flagged;
  *   5  the store: setDoorPath writes meeting.* and the boolean hardware.auxHousing;
  *   6  the sheets: the plan detail draws the rebate 16 x 20 / 16 x 42.5 with the 4 gap,
- *      the Lock Machining sheet is in the door sheet plan and lists every pocket.
+ *      the Lock Machining sheets (one per machined edge) are in the door sheet plan,
+ *      draw the Winkhaus plates and the keeps and label every pocket;
+ *   7  the plates (evening of 24.10): the generated outlines of the ThunderBolt faceplate
+ *      and the FGTE slave strip agree with the engine kits (length, spindle, housings,
+ *      bolt windows, keep boxes), the keep faces with the KEEPS routing numbers, and
+ *      every machining result names its plate.
  *
  * Run: node verify/parity/t49_door_meeting_machining.mjs
  */
@@ -51,6 +56,8 @@ const build = (name, lines) => {
 };
 const url = build('t49-live', [
   ...['specification', 'calculations', 'profile', 'doorLockMachining'].map((m) => `export * as ${m} from '${resolve(ROOT, `src/engine/${m}.js`)}';`),
+  `export * as outlines from '${resolve(ROOT, 'src/engine/hardware/winkhausOutlines.js')}';`,
+  `export * as keepFaces from '${resolve(ROOT, 'src/engine/hardware/winkhausKeeps.js')}';`,
   `export * from '${resolve(ROOT, 'src/stores/windowProfileStore.js')}';`,
   `export { default as DoorSheet } from '${resolve(ROOT, 'src/components/drawings/DoorSheet.jsx')}';`,
   `export * as ddu from '${resolve(ROOT, 'src/components/drawings/doorDrawUtils.js')}';`,
@@ -197,6 +204,15 @@ section('3b - two handles (FGTE master + slave), inward, and the single door');
   const J = S.derived.door.jambMachining;
   ok(J && l.hinge === 'right' && J.side === 'left' && J.edge === 'jamb rebate wall' && J.keeps.length === 3 && J.keeps[1].code === 'F24-912W' && J.keeps[1].centreBottom === 1050,
     'single door hinge left (from inside): the three keeps in the lock side jamb (left in the exterior view), the centre keep on the spindle height');
+  ok(J.datum.axisFromFace === 28.5 && J.faceWidth === 57 && J.plate === null && J.keeps[0].plate.endRadius === 12 && J.keeps[0].pocket.endRadius === 6,
+    'jamb keeps on the single door lock axis 28.5 (centred on the 57 leaf), the wall drawn 57 wide, no plate, keep radii 12 / 6');
+  // every machining result names the plate the sheet draws
+  ok(l.machining.plate.outline === 'thunderbolt' && l.machining.plate.fromBottom === 144 && l.machining.plate.toBottom === 1914 && l.machining.plate.length === 1770 && l.machining.plate.width === 20 && l.machining.cutter === 12,
+    'ThunderBolt: plate 1770 x 20 from 144 to 1914 (906 below the spindle), cutter 12');
+  ok(mp.plate.outline === 'fgte-slave' && mp.plate.fromBottom === 130.5 && mp.plate.toBottom === 1833.2 && mp.plate.length === 1702.7 && mp.plate.cropBottom === 0 && mp.plate.cropTop === 0 && mp.cutter === 17,
+    'FGTE slave: the strip 1702.7 from 130.5 to 1833.2 (spindle 919.5 above its bottom end), cutter 17');
+  ok(ma.plate.outline === 'fgte-master' && ma.plate.schematic === true && ma.plate.fromBottom === 0 && ma.plate.toBottom === 1998 && /schematic/.test(ma.notes.join(' ')),
+    'FGTE master: a schematic full height plate (no Winkhaus drawing of it), said in the notes');
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -273,14 +289,97 @@ section('6 - the sheets: the plan detail rebate and the Lock Machining sheet');
   ok(zs(ap).includes(37) && zs(pp).includes(42.5), 'doorPlan: the active notch 20 deep from the interior (step at z 37 from the exterior), the passive 42.5 deep from the exterior (step at z 42.5)');
   ok(plan.meeting.geo?.rebateWidth === 16 && plan.meeting.strip[1] - plan.meeting.strip[0] === 12, 'the plan carries the joint numbers; the overlap strip stays 12');
   const sheetPlan = M.ddu.doorSheetPlan(F.derived);
-  ok(sheetPlan.map((s) => s.key).join(',') === 'doorframe,doorleaf,doormachining,doorsection', `door sheet plan: ${sheetPlan.map((s) => s.key).join(', ')}`);
-  const svg = renderToStaticMarkup(createElement(M.DoorSheet, { sheet: sheetPlan[2], windowSpec: F.spec, derived: F.derived, projectNumber: 'P-1' }));
-  ok(/^<div/.test(svg) && /<svg/.test(svg) && !/NaN|undefined|[\u2013\u2014]/.test(svg), 'the Lock Machining sheet renders (no NaN / undefined / long dash)');
-  ok(['bolt-bottom 209.5 to 349.5', 'main 914.5 to 1144.5', 'bolt-top 1699.5 to 1839.5', 'F24-912W at 1050', 'F2402 at 296.5', 'F2402 at 1786.5', 'spindle 1050 above the leaf bottom', '-135.5 to 94.5']
-    .every((t) => svg.includes(t)), 'the sheet labels every pocket and keep from the leaf bottom and the table from the spindle');
-  ok(svg.includes('37 face') && svg.includes('42.5 face') && svg.includes('rebate 16 wide (lap 12 + gap 4)'), 'the bands name the 37 lip and the 42.5 shoulder, the notes the rebate 16 = 12 + 4');
-  const section = renderToStaticMarkup(createElement(M.DoorSheet, { sheet: sheetPlan[3], windowSpec: F.spec, derived: F.derived, projectNumber: 'P-1' }));
+  ok(sheetPlan.map((s) => s.key).join(',') === 'doorframe,doorleaf,doormachining,doormachining-passive,doorsection' && sheetPlan[2].props.band === 'active' && sheetPlan[3].props.band === 'passive'
+    && sheetPlan[2].label === 'Lock Machining: active' && sheetPlan[3].label === 'Lock Machining: passive',
+    `door sheet plan, one lock machining sheet per edge: ${sheetPlan.map((s) => s.key).join(', ')}`);
+  const sheet = (plan, i, F2 = F) => renderToStaticMarkup(createElement(M.DoorSheet, { sheet: plan[i], windowSpec: F2.spec, derived: F2.derived, projectNumber: 'P-1' }));
+  const svg = sheet(sheetPlan, 2), svg2 = sheet(sheetPlan, 3);
+  ok([svg, svg2].every((t) => /^<div/.test(t) && /<svg/.test(t) && !/NaN|undefined|[\u2013\u2014]/.test(t)), 'both Lock Machining sheets render (no NaN / undefined / long dash)');
+  ok(['bolt-bottom 209.5 to 349.5', 'main 914.5 to 1144.5', 'bolt-top 1699.5 to 1839.5', 'spindle 1050 above the leaf bottom', '-135.5 to 94.5', 'plate end 144', 'plate end 1914', 'plate 1770 x 20 (drawn)', 'cylinder 958', 'spindle 1050']
+    .every((t) => svg.includes(t)), 'sheet 1 (active lip, ThunderBolt): every pocket, the plate ends and the bores from the leaf bottom, the table from the spindle');
+  ok(['F24-912W at 1050', 'F2402 at 296.5', 'F2402 at 1786.5', 'pocket 236.5 to 356.5', 'pocket 943.5 to 1125.5', 'pocket 1726.5 to 1846.5']
+    .every((t) => svg2.includes(t)), 'sheet 2 (passive shoulder, keeps): every keep on its axis and its pocket from the leaf bottom');
+  ok(svg.includes('37 face') && svg2.includes('42.5 face') && svg.includes('Lock Machining 1/2') && svg2.includes('Lock Machining 2/2') && svg2.includes('Meeting rebate 16 = lap 12 + gap 4'),
+    'the sheets name the 37 lip and the 42.5 shoulder, 1/2 and 2/2, the notes the rebate 16 = 12 + 4');
+  // the drawn plate: the ThunderBolt outline loops (one evenodd path with the R10 ends, the bolt
+  // windows), its screw holes (circles), three dashed housings, the detail windows A, B, C at one scale
+  const loops = (svg.match(/fill-rule="evenodd"/g) || []).length;
+  const circles = (svg.match(/<circle /g) || []).length;
+  const scales = [...svg.matchAll(/>(?:bolt-bottom|main|bolt-top)  ((?:1|1\.5|2|2\.5|3)):1</g)].map((m2) => m2[1]);
+  ok(loops >= 2 && circles >= 39 && scales.length === 3 && new Set(scales).size === 1 && Number(scales[0]) >= 2,
+    `sheet 1 draws the plate loops (${loops} evenodd paths), ${circles} circles (screw holes, rivets), details A, B, C at one scale ${scales[0]}:1`);
+  ok(/A<\/text>/.test(svg) && /B<\/text>/.test(svg) && /C<\/text>/.test(svg) && !/D<\/text>/.test(svg), 'three lettered detail callouts on the ThunderBolt sheet');
+  // the keeps: plate with its windows (evenodd), screws, pocket slots
+  const keepLoops = (svg2.match(/fill-rule="evenodd"/g) || []).length;
+  ok(keepLoops >= 3 && (svg2.match(/<circle /g) || []).length >= 3 * 2 * 3, `sheet 2 draws the three keep plates with their bolt windows and countersunk screws (${keepLoops} plate paths)`);
+  // two handles: the slave strip drawn at its place, the master schematic
+  const D2 = french({ lockType: 'double' });
+  const plan2 = M.ddu.doorSheetPlan(D2.derived);
+  const m1 = sheet(plan2, 2, D2), m2 = sheet(plan2, 3, D2);
+  ok(['plate 1702.7 x 20 (drawn)', 'plate end 130.5', 'plate end 1833.2', 'end plate 0 to 65', 'end plate 1933 to 1998', 'shootbolt-lower 255 to 320', 'gear 1390 to 1480', 'slave strip TFTE'].every((t) => m2.includes(t))
+    && !/NaN|undefined|[\u2013\u2014]/.test(m2), 'two handles, sheet 2: the slave strip 130.5 to 1833.2 with the end plates and every pocket from the leaf bottom');
+  ok(['hook-lower 215 to 345', 'main 920 to 1120', 'hook-upper 1558 to 1688', 'schematic'].every((t) => m1.includes(t)) && !/NaN|undefined|[\u2013\u2014]/.test(m1),
+    'two handles, sheet 1: the master pockets and the schematic plate note');
+  // the single door: the lock stile sheet and the jamb sheet
+  const S1 = mk(900, 2100, {});
+  const plan1 = M.ddu.doorSheetPlan(S1.derived);
+  ok(plan1.map((s) => s.key).join(',') === 'doorframe,doorleaf,doormachining,doormachining-jamb,doorsection' && plan1[3].label === 'Lock Machining: jamb', `single door sheet plan: ${plan1.map((s) => s.key).join(', ')}`);
+  const j = sheet(plan1, 3, S1);
+  ok(j.includes('JAMB') && j.includes('jamb rebate wall') && j.includes('keeps on the lock axis 28.5') && j.includes('57 face') && j.includes('F24-912W at 1050'),
+    'the jamb sheet: the keeps on the lock axis 28.5 of the 57 wide wall, the centre keep on the spindle');
+  const section = sheet(sheetPlan, 4);
   ok(section.includes('rebate 16 = lap 12 + gap 4') && section.includes('lip 37') && section.includes('lip 14.5'), 'the plan section labels the rebate and dimensions both lips');
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+section('7 - the plates: the generated Winkhaus outlines and the keep faces agree with the kits');
+{
+  const { THUNDERBOLT_PLATE: TB, FGTE_SLAVE_STRIP: SL } = M.outlines;
+  const { F2402, F24_912W, keepFace } = M.keepFaces;
+  const K = DLM.THUNDERBOLT_1770, FS = DLM.FGTE_SLAVE, KP = DLM.KEEPS;
+  const isClosed = (pl) => pl.length > 2 && pl[0][0] === pl[pl.length - 1][0] && pl[0][1] === pl[pl.length - 1][1];
+  const ext = (pl) => { const xs = pl.map((p) => p[0]), ys = pl.map((p) => p[1]); return [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]; };
+  const outer = TB.polys.filter(isClosed).map(ext).find((e) => e[1] - e[0] > 1700);
+  ok(TB.length === 1770 && TB.width === 20 && TB.thickness === 3 && TB.spindleFromBottom === K.faceplate.below && outer && near(outer[0], 0) && near(outer[1], 1770) && near(outer[2], 0) && near(outer[3], 20),
+    'ThunderBolt outline: one closed loop 1770 x 20, the spindle 906 above the bottom end as the kit says');
+  // the double deadbolt windows 134 to 171 and 1624 to 1661 from the bottom end (two closed loops each)
+  const loopsIn = (a, b) => TB.polys.filter(isClosed).map(ext).filter((e) => e[0] >= a - 0.5 && e[1] <= b + 0.5 && e[3] - e[2] > 5);
+  ok(loopsIn(134, 171).length >= 2 && loopsIn(1624, 1661).length >= 2, 'the bolt windows 134 to 171 and 1624 to 1661 are closed loops of the outline');
+  ok(TB.housings.length === 3 && TB.housings.map((h) => `${h.x0}-${h.x1}`).join(',') === '89-182,788-966,1579-1672' && TB.housings[1].thickness === 15.1 && TB.housings[0].thickness === 11.5,
+    'three housings behind the plate (89 to 182, 788 to 966, 1579 to 1672), 15.1 and 11.5 thick');
+  // the kit pockets centre on the housings (140 / 230 long): the data sheet pocket round each housing
+  const mid = (a, b) => (a + b) / 2;
+  ok(near(mid(K.pockets[0].from, K.pockets[0].to) + K.faceplate.below, mid(89, 182)) && near(mid(K.pockets[3].from, K.pockets[3].to) + K.faceplate.below, mid(1579, 1672)),
+    'the deadbolt pockets of the kit are centred on the DXF housings');
+  // the screw holes: ten countersunk pairs (r 2.2 + 4.1) on the plate centre line
+  const screws = TB.circles.filter(([, cy, r]) => near(cy, 10, 0.1) && near(r, 4.1, 0.05));
+  ok(screws.length === 10 && screws.every(([cx]) => TB.circles.some(([x2, y2, r2]) => near(x2, cx, 0.05) && near(y2, 10, 0.1) && near(r2, 2.2, 0.05))),
+    'ten countersunk screw holes (r 2.2 in r 4.1) on the plate centre line');
+  // the slave strip: its length and spindle as the kit's strip block, the keep boxes 113 long 1345 apart,
+  // the deadbolt keep window 70.6 below the spindle, the latch keep 25.5 above (where the master bolts are)
+  ok(near(FS.strip.length, SL.length, 0.05) && FS.strip.below === SL.spindleFromBottom && near(FS.strip.below + FS.strip.above, SL.length, 0.05),
+    'FGTE slave strip: the kit block (1702.7, spindle 919.5 above the bottom end) agrees with the generated outline');
+  const feat = (k) => SL.features.find((f) => f.key === k);
+  ok(near(feat('hook-keep-lower').x1 - feat('hook-keep-lower').x0, 113) && near(feat('hook-keep-upper').x1 - feat('hook-keep-upper').x0, 113)
+    && near(mid(feat('hook-keep-upper').x0, feat('hook-keep-upper').x1) - mid(feat('hook-keep-lower').x0, feat('hook-keep-lower').x1), 1345.2, 0.2),
+    'the hook keep boxes 113 long, 1345 apart (the master hooks 1343 apart)');
+  ok(near(SL.spindleFromBottom - mid(feat('deadbolt-keep').x0, feat('deadbolt-keep').x1), 70.4, 0.5) && near(feat('latch-keep').x0 + 18.4 + 20 - SL.spindleFromBottom, 25.7, 0.5),
+    'the deadbolt keep window 70.4 below the spindle, the latch keep window 25.7 above it (the master deadbolt 70 below, latch 25.5 above)');
+  const slOuter = SL.polys.map(ext);
+  ok(slOuter.some((e) => e[0] <= 0.1 && e[1] >= 17) && slOuter.some((e) => e[1] >= SL.length - 0.1) && Math.max(...slOuter.map((e) => e[3])) <= 25.01 && Math.min(...slOuter.map((e) => e[2])) >= -0.01,
+    'the strip outline runs from its bottom end to its top end, 20 wide with the keep lever to 25');
+  // the keep faces agree with the routing numbers of KEEPS
+  ok(F2402.plate.x1 - F2402.plate.x0 === 2 * KP.single.plate.half && F2402.pocket.x1 - F2402.pocket.x0 === 2 * KP.single.pocket.half && F2402.plate.width === KP.single.plate.width && F2402.pocket.width === KP.single.pocket.width
+    && F2402.plate.endRadius === KP.single.plate.endRadius && F2402.pocket.endRadius === KP.single.pocket.endRadius,
+    'F2402 face: plate 176 x 24 R12, pocket 120 x 18 R6 as KEEPS.single');
+  ok(F24_912W.plate.x0 === KP.centre.plate.from && F24_912W.plate.x1 === KP.centre.plate.to && F24_912W.pocket.x0 === KP.centre.pocket.from && F24_912W.pocket.x1 === KP.centre.pocket.to,
+    'F24-912W face: plate -126.5 to +108.5, pocket -106.5 to +75.5 as KEEPS.centre');
+  const sym = F2402.screws.every(([x, y]) => F2402.screws.some(([x2, y2]) => near(x2, -x) && near(y2, 24 - y)));
+  ok(sym && F2402.screws.length === 4 && F24_912W.screws.length === 3 && F24_912W.screws.every(([, y]) => y === 12) && F24_912W.screws.map(([x]) => x).join(',') === '96.5,-31.5,-114.5',
+    'F2402 screws point symmetric (76 / 66, 17.5 / 6.5 from the edge); F24-912W screws 96.5 above, 31.5 and 114.5 below the handle on the centre line');
+  const lw = F24_912W.windows.find((w) => w.key === 'latch'), dw = F24_912W.windows.find((w) => w.key === 'deadbolt');
+  ok(near(mid(lw.x0, lw.x1), 26) && near(mid(dw.x0, dw.x1), -68.5) && keepFace('F2402') === F2402 && keepFace('F24-912W') === F24_912W && keepFace('F24-908P') === null,
+    'the centre keep windows on the latch (+25.5) and the deadbolt (-70); keepFace by product code, none for the rail');
 }
 
 console.log(`\n${passes} passed, ${fails} failed`);
