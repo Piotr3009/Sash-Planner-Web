@@ -29,6 +29,8 @@ export default function BatchDefaultsPage() {
   if (!project || !batch) return <div className="p-8 text-ink-400">Batch not found.</div>;
 
   const isSash = batch.type === 'sash';
+  // Fire doors (27.10.2026): an internal door set has no sash box frame, no PAS24 and no trickle vents
+  const isFireDoor = batch.type === 'firedoor';
   const upd = (key, val) => setD(prev => ({ ...prev, [key]: val }));
   const [pickerSlot, setPickerSlot] = useState(null);
 
@@ -74,18 +76,18 @@ export default function BatchDefaultsPage() {
           </Sec>
 
           {/* 3. SECURITY */}
-          <Sec title="Security">
+          {!isFireDoor && <Sec title="Security">
             <HChips o={[{ value: false, label: 'Standard' }, { value: true, label: 'PAS 24' }]} v={d.pas24} c={v => upd('pas24', v)} />
-          </Sec>
+          </Sec>}
 
           {/* 4. FRAME */}
-          <Sec title="Frame">
+          {!isFireDoor && <Sec title="Frame">
             {d.glassType === 'triple' ? (
               <div className="bg-accent-500/10 border border-accent-500/30 rounded-lg p-3 text-xs text-accent-400">Triple glazing → 172mm frame (auto)</div>
             ) : (
               <HChips o={FRAME_TYPES} v={d.frameType} c={v => upd('frameType', v)} />
             )}
-          </Sec>
+          </Sec>}
 
           {/* 5. HORNS (sash only) */}
           {isSash && (
@@ -103,7 +105,8 @@ export default function BatchDefaultsPage() {
           <Sec title="Ironmongery — Assign Products">
             <div className="space-y-2">
               {/* both batch spellings show the door slots (09.10.2026: 'doors' from the project page, 'door' from an estimate) */}
-              {IRONMONGERY_CATEGORIES.filter(c => (c.windowType === (batch.type === 'doors' ? 'door' : (batch.type || 'sash')) || c.windowType === 'all' || (c.alsoFor || []).includes(batch.type)) && c.slot !== false).map(cat => {
+              {/* fire doors: the fire door slots (windowType 'firedoor' and alsoFor), never the trickle vents of the 'all' group */}
+              {IRONMONGERY_CATEGORIES.filter(c => (c.windowType === (batch.type === 'doors' ? 'door' : (batch.type || 'sash')) || (c.windowType === 'all' && !isFireDoor) || (c.alsoFor || []).includes(batch.type)) && c.slot !== false).map(cat => {
                 const item = getSlotItem(cat.key);
                 return (
                   <div key={cat.key}
@@ -145,8 +148,8 @@ export default function BatchDefaultsPage() {
             <SR l="Glass" v={`${d.glassType} / ${d.glassSpec}`} />
             <SR l="Spacer" v={d.spacerColor} />
             <SR l="Spacer Type" v={(SPACER_TYPES.find(t => t.value === (d.spacerType || 'warm')) || {}).label || 'Warm Edge'} />
-            <SR l="PAS24" v={d.pas24 ? 'Yes' : 'No'} />
-            <SR l="Frame" v={d.glassType === 'triple' ? '172mm (triple)' : (d.frameType === 'standard' ? '164mm' : '144mm')} />
+            {!isFireDoor && <SR l="PAS24" v={d.pas24 ? 'Yes' : 'No'} />}
+            {!isFireDoor && <SR l="Frame" v={d.glassType === 'triple' ? '172mm (triple)' : (d.frameType === 'standard' ? '164mm' : '144mm')} />}
             {isSash && <SR l="Horns" v={d.hornType === 'none' ? 'None' : d.hornType} />}
             <SR l="Ironmongery" v={d.ironmongery} />
           </div>

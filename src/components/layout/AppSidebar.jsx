@@ -187,6 +187,11 @@ export default function AppSidebar() {
                 className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
                 Doors
               </NavLink>
+              {/* Fire doors (27.10.2026): the internal door set slots (blanks, frame timber, ironmongery, intumescent, glass) */}
+              <NavLink to="/materials/assignments/firedoor"
+                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                Fire doors
+              </NavLink>
               <NavLink to="/materials/assignments/other"
                 className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
                 Other
@@ -233,6 +238,11 @@ export default function AppSidebar() {
               <NavLink to="/window-settings/partition"
                 className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
                 Partition walls
+              </NavLink>
+              {/* Fire doors (27.10.2026): the fire door profile card */}
+              <NavLink to="/window-settings/firedoor"
+                className={({ isActive }) => `block px-3 py-1 rounded-md text-[11px] mb-0.5 transition-colors ${isActive ? 'bg-accent-500/12 text-accent-400 font-medium' : 'text-ink-300 hover:bg-surface-700/60 hover:text-ink-100'}`}>
+                Fire doors
               </NavLink>
             </div>
           </div>

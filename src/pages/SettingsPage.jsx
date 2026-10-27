@@ -508,6 +508,19 @@ function PricingTab() {
         <div className="text-[10px] text-ink-500 mt-1">Detailed casement/door options (mullions, layouts, sliding rates…) keep the defaults; editable later.</div>
       </Section>
 
+      {/* Fire doors (27.10.2026): the four rates of DEFAULT_PRICING.firedoor (zero by default, the owner fills them in);
+          the card only shows once the pricing engine carries the firedoor block */}
+      {p.firedoor && (
+        <Section title="Fire doors (internal door sets)">
+          <div className="grid grid-cols-4 gap-4">
+            <NumF label="Leaf (per door)" value={p.firedoor.leafPrice} onChange={(v) => setIn('firedoor', 'leafPrice', v)} />
+            <NumF label="Frame (per m)" value={p.firedoor.framePerM} onChange={(v) => setIn('firedoor', 'framePerM', v)} hint="head + two jambs" />
+            <NumF label="Vision panel (per m²)" value={p.firedoor.vpPerSqm} onChange={(v) => setIn('firedoor', 'vpPerSqm', v)} />
+            <NumF label="Concealed closer" value={p.firedoor.closerPrice} onChange={(v) => setIn('firedoor', 'closerPrice', v)} />
+          </div>
+        </Section>
+      )}
+
       <Section title="VAT">
         <PctF label="VAT rate" value={p.vatRate} onChange={(v) => set('vatRate', v)} />
       </Section>

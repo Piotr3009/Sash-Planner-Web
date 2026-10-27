@@ -10,10 +10,12 @@ const TYPE_COLORS = {
   casement: { bg: 'rgba(212,83,126,0.12)',  border: 'rgba(212,83,126,0.3)',  text: '#ED93B1', line: '#D4537E', dot: '#D4537E' },
   doors:    { bg: 'rgba(239,159,39,0.12)',  border: 'rgba(239,159,39,0.3)',  text: '#FAC775', line: '#EF9F27', dot: '#EF9F27' },
   partition: { bg: 'rgba(14,165,233,0.12)', border: 'rgba(14,165,233,0.3)', text: '#7DD3FC', line: '#0EA5E9', dot: '#0EA5E9' },
+  // fire doors (27.10.2026): internal door sets, a red of their own (the key below lists every category)
+  firedoor: { bg: 'rgba(220,38,38,0.12)',   border: 'rgba(220,38,38,0.3)',   text: '#FCA5A5', line: '#DC2626', dot: '#DC2626' },
   special:  { bg: 'rgba(29,158,117,0.12)',  border: 'rgba(29,158,117,0.3)',  text: '#5DCAA5', line: '#1D9E75', dot: '#1D9E75' },
 };
 const typeColor = (type) => TYPE_COLORS[type] || TYPE_COLORS.sash;
-const typeLabel = (type) => ({ sash: 'Sash', casement: 'Casement', doors: 'Doors', partition: 'Partition walls', special: 'Special / Other' }[type] || type);
+const typeLabel = (type) => ({ sash: 'Sash', casement: 'Casement', doors: 'Doors', partition: 'Partition walls', firedoor: 'Fire doors', special: 'Special / Other' }[type] || type);
 
 const STATUS_CONFIG = {
   preparation:     { label: 'Prep',    color: '#F59E0B' },
@@ -399,6 +401,7 @@ function NewPPForm({ onCreate, onCancel }) {
           <option value="sash">Sash</option>
           <option value="casement">Casement</option>
           <option value="doors">Doors</option>
+          <option value="firedoor">Fire doors</option>
           <option value="special">Special / Other</option>
         </select>
         <input type="date" className="input text-[13px] flex-1" value={deadline} onChange={(e) => setDeadline(e.target.value)} />

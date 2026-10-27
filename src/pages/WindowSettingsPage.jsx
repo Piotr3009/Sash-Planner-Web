@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { uploadBsuiteProgram, removeBsuiteProgram } from '../services/bsuitePrograms.js';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
-import { kgPerM, VARIANT_ORDER, casementGlassDeductions, DEFAULT_DOOR_PROFILE, DEFAULT_PARTITION_PROFILE } from '../engine/profile.js';
+import { kgPerM, VARIANT_ORDER, casementGlassDeductions, DEFAULT_DOOR_PROFILE, DEFAULT_PARTITION_PROFILE, DEFAULT_FIREDOOR_PROFILE } from '../engine/profile.js';
 import NumInput from '../components/NumInput.jsx';
 import { CONSTANTS, deriveWindowData } from '../engine/calculations.js';
 import { buildArchPlan, ArchError } from '../engine/arch.js';
@@ -155,6 +155,10 @@ export default function WindowSettingsPage() {
   }
   if (typeId === 'partition') {
     return <PartitionSettings />;
+  }
+  // Fire doors (27.10.2026): the fire door profile card
+  if (typeId === 'firedoor') {
+    return <FireDoorSettings />;
   }
   if (typeId && typeId !== 'sash') {
     return (
@@ -1908,6 +1912,623 @@ function PartitionSettings() {
             </>
           ) : (
             <div className="card p-6 text-center text-xs text-ink-400">Sample drawing unavailable{sample?.error ? `: ${sample.error}` : '.'}</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Fire doors (27.10.2026): Window Settings · Fire Doors ───
+// One card per block of DEFAULT_FIREDOOR_PROFILE (leaf, frame, hinges, lock,
+// keep, vision panel, intumescent, bSuite, configurator defaults). Every field
+// writes through setFireDoorPath (numbers finite, strings for the string
+// leaves, booleans for the boolean leaves), the two suggestion lists through
+// setFireDoorList, the bSuite targets whole through setFireDoorBsuiteTargets.
+// The right column derives the reference door (FD30, leaf 826 x 2040, depth
+// 100 by default) through normaliseToWindowSpec + deriveWindowData and prints
+// the numbers of brief 3.10 live: nothing here is a literal.
+const FD_PROGRAM_LABEL = { leaf: 'LEAF', head: 'HEAD', jambHinge: 'JAMB HINGE', jambLock: 'JAMB LOCK' };
+const FD_SET_RATINGS = [['FD30', 'FD30'], ['FD60', 'FD60']];
+const FD_SET_HANDS = [['left', 'Hinge left'], ['right', 'Hinge right']];
+const FD_SET_SWINGS = [['in', 'Opens in'], ['out', 'Opens out']];
+const FD_SET_LOCKS = [['latch', 'Latch'], ['euro', 'Sashlock euro'], ['bathroom', 'Bathroom']];
+
+function FireDoorSettings() {
+  const firedoor = useWindowProfileStore((s) => s.firedoor) || DEFAULT_FIREDOOR_PROFILE;
+  const setPath = useWindowProfileStore((s) => s.setFireDoorPath);
+  const setList = useWindowProfileStore((s) => s.setFireDoorList);
+  const setBsuiteTargets = useWindowProfileStore((s) => s.setFireDoorBsuiteTargets);
+  const resetFireDoor = useWindowProfileStore((s) => s.resetFireDoorToDefaults);
+  const p = firedoor;
+  const L = p.leaf || DEFAULT_FIREDOOR_PROFILE.leaf, FR = p.frame || DEFAULT_FIREDOOR_PROFILE.frame;
+  const HG = p.hinges || DEFAULT_FIREDOOR_PROFILE.hinges, LK = p.lock || DEFAULT_FIREDOOR_PROFILE.lock;
+  const KP = p.keep || DEFAULT_FIREDOOR_PROFILE.keep, VP = p.vp || DEFAULT_FIREDOOR_PROFILE.vp;
+  const IN = p.intumescent || DEFAULT_FIREDOOR_PROFILE.intumescent, BS = p.bsuite || DEFAULT_FIREDOOR_PROFILE.bsuite;
+  const DF = p.defaults || DEFAULT_FIREDOOR_PROFILE.defaults;
+  const FO = LK.forend || {}, CS = LK.case || {}, KPK = KP.pocket || {}, LIM = L.limits || {}, TBR = L.thicknessByRating || {};
+  // the sample door: the reference door of brief 3.10 (the profile defaults), its size and rating editable here
+  const [sampleW, setSampleW] = useState(() => Number(DEFAULT_FIREDOOR_PROFILE.leaf.defaultWidth));
+  const [sampleH, setSampleH] = useState(() => Number(DEFAULT_FIREDOOR_PROFILE.leaf.defaultHeight));
+  const [sampleDepth, setSampleDepth] = useState(() => Number(DEFAULT_FIREDOOR_PROFILE.frame.defaultDepth));
+  const [sampleRating, setSampleRating] = useState(() => DEFAULT_FIREDOOR_PROFILE.defaults.rating);
+  const [sampleFire, setSampleFire] = useState(() => DEFAULT_FIREDOOR_PROFILE.defaults.fire !== false);
+  const [leafLock, setLeafLock] = useState(true);
+  const [frameLock, setFrameLock] = useState(true);
+  const [hingesLock, setHingesLock] = useState(true);
+  const [lockLock, setLockLock] = useState(true);
+  const [keepLock, setKeepLock] = useState(true);
+  const [vpLock, setVpLock] = useState(true);
+  const [intuLock, setIntuLock] = useState(true);
+  const [bsuiteLock, setBsuiteLock] = useState(true);
+  const [defaultsLock, setDefaultsLock] = useState(true);
+  const W = Number(sampleW) || Number(DEFAULT_FIREDOOR_PROFILE.leaf.defaultWidth);
+  const Hh = Number(sampleH) || Number(DEFAULT_FIREDOOR_PROFILE.leaf.defaultHeight);
+  const Dd = Number(sampleDepth) || Number(DEFAULT_FIREDOOR_PROFILE.frame.defaultDepth);
+  const num = (v, fb = 0) => (v === '' ? '' : Number(v) || fb);
+  const inputCls = 'w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm';
+  const selectCls = 'px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm';
+  const chip = (on) => `px-2.5 py-1 text-[11px] rounded-lg border transition-all ${on ? 'border-accent-500 bg-accent-500/15 text-accent-400 font-medium' : 'border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500'}`;
+  const BoolChips = ({ value, onPick }) => (
+    <div className="flex gap-1.5">
+      {[[true, 'Yes'], [false, 'No']].map(([v, l]) => <button key={String(v)} type="button" onClick={() => onPick(v)} className={chip(value === v)}>{l}</button>)}
+    </div>
+  );
+  const StringChips = ({ value, options, onPick }) => (
+    <div className="flex flex-wrap gap-1.5">
+      {options.map(([v, l]) => <button key={v} type="button" onClick={() => onPick(v)} className={chip(value === v)}>{l}</button>)}
+    </div>
+  );
+
+  // Live sample door: the engine with this profile. The sheets are another
+  // agent's; this column prints the numbers only.
+  const sample = useMemo(() => {
+    try {
+      const ws = normaliseToWindowSpec({
+        name: 'SAMPLE', width: W, height: Hh, windowCategory: 'firedoor',
+        firedoorFire: sampleFire, firedoorRating: sampleRating, firedoorLeafWidth: W, firedoorLeafHeight: Hh, firedoorFrameDepth: Dd,
+        firedoorHingeSide: DF.hingeSide, firedoorSwing: DF.swing, firedoorLockType: DF.lockType,
+        firedoorVpStyle: DF.vpStyle, firedoorIntuStyle: DF.intuStyle, firedoorLeadEdge: DF.leadEdge, glassType: 'double',
+      });
+      const derived = deriveWindowData(ws);
+      if (!derived?.firedoor) throw new Error('The engine returned no fire door data');
+      return { ws, derived, error: null };
+    } catch (err) {
+      console.error('WindowSettings fire door sample derive failed:', err);
+      return { ws: null, derived: null, error: err?.message || String(err) };
+    }
+  }, [W, Hh, Dd, sampleRating, sampleFire, p]);
+  const fd = sample?.derived?.firedoor || null;
+  const fdFrame = fd?.frame || null;
+  const fdHinges = fd?.hinges?.positions || [];
+  const fmt = (v) => (v == null || v === '' ? 'n/a' : String(v));
+  // profile-side arithmetic shown as hints (the engine does the same sums)
+  const rebateW = (Number(FR.overlap) || 0) + (Number(FR.gapSide) || 0);
+  const faceOutside = (Number(FR.thickness) || 0) - rebateW;
+
+  return (
+    <div className="p-6" data-firedoor-settings>
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-ink-50">Window Settings · Fire Doors</h1>
+          <div className="text-xs text-ink-400">Fire door profile (schema {p.schema}) · internal door sets FDR / DR, leaf + frame · feeds the configurator, cut lists, drawings, BOM, hardware, the bSuite rows and the machining export · per-tenant</div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 text-xs text-ink-400">
+            Sample door:
+            <div className="flex gap-1">
+              {[[true, 'Fire'], [false, 'Non-fire']].map(([v, l]) => <button key={String(v)} type="button" onClick={() => setSampleFire(v)} className={chip(sampleFire === v)}>{l}</button>)}
+            </div>
+            {sampleFire && <div className="flex gap-1">
+              {FD_SET_RATINGS.map(([v, l]) => <button key={v} type="button" onClick={() => setSampleRating(v)} className={chip(sampleRating === v)}>{l}</button>)}
+            </div>}
+            leaf
+            <NumInput value={sampleW} onCommit={(v) => setSampleW(num(v, DEFAULT_FIREDOOR_PROFILE.leaf.defaultWidth))}
+              className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs text-center" />
+            ×
+            <NumInput value={sampleH} onCommit={(v) => setSampleH(num(v, DEFAULT_FIREDOOR_PROFILE.leaf.defaultHeight))}
+              className="w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs text-center" />
+            wall
+            <NumInput value={sampleDepth} onCommit={(v) => setSampleDepth(num(v, DEFAULT_FIREDOOR_PROFILE.frame.defaultDepth))}
+              className="w-16 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-100 rounded-lg text-xs text-center" />
+            mm
+          </div>
+          <button
+            onClick={() => { if (window.confirm('Reset the fire door profile to defaults?')) resetFireDoor(); }}
+            className="px-3 py-1.5 text-xs rounded-lg border border-surface-500 text-ink-200 bg-surface-700 hover:bg-surface-600 transition-colors">
+            Reset fire doors to defaults
+          </button>
+        </div>
+      </div>
+
+      <div className="flex gap-5 items-start">
+        {/* LEFT 2/3: the blocks */}
+        <div className="w-2/3 min-w-0">
+
+          {/* ══ Leaf ══ */}
+          <div className={`card p-4 mb-4 ${leafLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-ink-200">Leaf
+                <span className="text-ink-500 font-normal"> · the blank (bSolid LPX x LPY x LPZ), the suggestion chips of the form, the thickness by rating, the sanity limits</span>
+              </div>
+              <LockToggle locked={leafLock} onToggle={() => setLeafLock((x) => !x)} />
+            </div>
+            <fieldset disabled={leafLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${leafLock ? 'opacity-60' : ''}`}>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <div>
+                  <div className="text-ink-400 mb-1">Width suggestions (chips, comma list)</div>
+                  <ListInput value={L.widthSuggestions} onCommit={(t) => setList(['leaf', 'widthSuggestions'], t)} className={inputCls + ' w-72'} />
+                </div>
+                <PathField label="Height suggestion" value={L.heightSuggestion} onCommit={(v) => setPath(['leaf', 'heightSuggestion'], v)} />
+                <PathField label="Default width" value={L.defaultWidth} onCommit={(v) => setPath(['leaf', 'defaultWidth'], v)} hint="a new door starts here" />
+                <PathField label="Default height" value={L.defaultHeight} onCommit={(v) => setPath(['leaf', 'defaultHeight'], v)} />
+              </div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Leaf thickness by rating (the macro has conditions on 44 and 54)</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <PathField label="FD30" value={TBR.FD30} onCommit={(v) => setPath(['leaf', 'thicknessByRating', 'FD30'], v)} />
+                <PathField label="FD60" value={TBR.FD60} onCommit={(v) => setPath(['leaf', 'thicknessByRating', 'FD60'], v)} />
+                <PathField label="Non-fire" value={TBR.none} onCommit={(v) => setPath(['leaf', 'thicknessByRating', 'none'], v)} />
+                <PathField label="Blank allowance" value={L.blankAllowance} onCommit={(v) => setPath(['leaf', 'blankAllowance'], v)} hint="ASSUMPTION: each way on the bought blank" />
+                <PathField label="LEAD_EDGE macro value" value={L.leadEdgeMacroValue} onCommit={(v) => setPath(['leaf', 'leadEdgeMacroValue'], v)} hint="the macro expression value" />
+              </div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Sanity limits (outside = that one door fails with a message; nothing is clamped)</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-2">
+                <PathField label="Min width" value={LIM.minWidth} onCommit={(v) => setPath(['leaf', 'limits', 'minWidth'], v)} />
+                <PathField label="Max width" value={LIM.maxWidth} onCommit={(v) => setPath(['leaf', 'limits', 'maxWidth'], v)} />
+                <PathField label="Min height" value={LIM.minHeight} onCommit={(v) => setPath(['leaf', 'limits', 'minHeight'], v)} />
+                <PathField label="Max height" value={LIM.maxHeight} onCommit={(v) => setPath(['leaf', 'limits', 'maxHeight'], v)} />
+                <PathField label="Min depth" value={LIM.minDepth} onCommit={(v) => setPath(['leaf', 'limits', 'minDepth'], v)} />
+                <PathField label="Max depth" value={LIM.maxDepth} onCommit={(v) => setPath(['leaf', 'limits', 'maxDepth'], v)} />
+              </div>
+              <div className="text-ink-300 text-[11px]">
+                {fd ? (<>sample leaf <span className="text-accent-400 font-medium">{fd.leaf?.width} × {fd.leaf?.height} × {fd.leaf?.thickness}</span>
+                  <span className="text-ink-500"> · blank {fd.leaf?.blank?.width} × {fd.leaf?.blank?.height} × {fd.leaf?.blank?.thickness}</span></>) : 'n/a'}
+              </div>
+            </fieldset>
+          </div>
+
+          {/* ══ Frame ══ */}
+          <div className={`card p-4 mb-4 ${frameLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-ink-200">Frame
+                <span className="text-ink-500 font-normal"> · 63 raw machined to 50, the rebate from solid, the gaps, the overall = leaf + 2 x (gap + 35) wide, floor gap + leaf + gap + 35 high</span>
+              </div>
+              <LockToggle locked={frameLock} onToggle={() => setFrameLock((x) => !x)} />
+            </div>
+            <fieldset disabled={frameLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${frameLock ? 'opacity-60' : ''}`}>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <PathField label="Raw thickness" value={FR.rawThickness} onCommit={(v) => setPath(['frame', 'rawThickness'], v)} hint="the board bought" />
+                <PathField label="Finished thickness" value={FR.thickness} onCommit={(v) => setPath(['frame', 'thickness'], v)} hint="machined" />
+                <PathField label="Raw width allowance" value={FR.rawWidthAllowance} onCommit={(v) => setPath(['frame', 'rawWidthAllowance'], v)} hint="ASSUMPTION: raw width = depth + this" />
+                <PathField label="Overlap" value={FR.overlap} onCommit={(v) => setPath(['frame', 'overlap'], v)} hint="the leaf over the stop" />
+                <PathField label="Gap side" value={FR.gapSide} onCommit={(v) => setPath(['frame', 'gapSide'], v)} hint={`rebate width = overlap + gap = ${rebateW}`} />
+                <PathField label="Gap head" value={FR.gapHead} onCommit={(v) => setPath(['frame', 'gapHead'], v)} />
+                <PathField label="Floor gap" value={FR.floorGap} onCommit={(v) => setPath(['frame', 'floorGap'], v)} hint="ASSUMPTION (the LSP)" />
+                <PathField label="Rebate clearance" value={FR.rebateClearance} onCommit={(v) => setPath(['frame', 'rebateClearance'], v)} hint="rebate depth = leaf thickness + this" />
+                <div>
+                  <div className="text-ink-400 mb-1">Head joint</div>
+                  <select value={FR.headJoint || 'mitre'} onChange={(e) => setPath(['frame', 'headJoint'], e.target.value)} className={selectCls}>
+                    <option value="mitre">mitre (45, ASSUMPTION)</option>
+                  </select>
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Depth suggestions (wall thickness chips)</div>
+                  <ListInput value={FR.depthSuggestions} onCommit={(t) => setList(['frame', 'depthSuggestions'], t)} className={inputCls + ' w-56'} />
+                </div>
+                <PathField label="Default depth" value={FR.defaultDepth} onCommit={(v) => setPath(['frame', 'defaultDepth'], v)} hint="a new door starts here" />
+              </div>
+              <div className="text-ink-300 text-[11px]">
+                {fdFrame ? (<>sample frame overall <span className="text-accent-400 font-medium">{fdFrame.overall?.width} × {fdFrame.overall?.height}</span>
+                  <span className="text-ink-500"> · rebate {fdFrame.rebate?.width} × {fdFrame.rebate?.depth} · faces {fdFrame.faces?.outside} / {fdFrame.faces?.inside} · finished {fdFrame.thickness} × {fdFrame.depth} · raw {fdFrame.rawThickness} × {fdFrame.rawWidth}</span>
+                  <span className="text-ink-500"> · visible outside face {faceOutside} from the profile</span></>) : 'n/a'}
+              </div>
+            </fieldset>
+          </div>
+
+          {/* ══ Hinges ══ */}
+          <div className={`card p-4 mb-4 ${hingesLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-ink-200">Hinges
+                <span className="text-ink-500 font-normal"> · the macro rule: top 150 from the leaf top, bottom ending 200 above the leaf bottom, the middle equal (step = (H - top - bottom - length) / (count - 1))</span>
+              </div>
+              <LockToggle locked={hingesLock} onToggle={() => setHingesLock((x) => !x)} />
+            </div>
+            <fieldset disabled={hingesLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${hingesLock ? 'opacity-60' : ''}`}>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-2">
+                <PathField label="Count" value={HG.count} onCommit={(v) => setPath(['hinges', 'count'], v)} hint="3 (a 4th is a BLOCKERS question)" />
+                <PathField label="Hinge length" value={HG.length} onCommit={(v) => setPath(['hinges', 'length'], v)} />
+                <PathField label="Top offset" value={HG.topOffset} onCommit={(v) => setPath(['hinges', 'topOffset'], v)} hint="leaf top to the top hinge" />
+                <PathField label="Bottom offset" value={HG.bottomOffset} onCommit={(v) => setPath(['hinges', 'bottomOffset'], v)} hint="bottom hinge end to the leaf bottom" />
+                <PathField label="Recess length" value={HG.recessLength} onCommit={(v) => setPath(['hinges', 'recessLength'], v)} hint="ASSUMPTION: plate + 1" />
+                <PathField label="Recess width" value={HG.recessWidth} onCommit={(v) => setPath(['hinges', 'recessWidth'], v)} hint="ASSUMPTION" />
+                <PathField label="Recess depth" value={HG.recessDepth} onCommit={(v) => setPath(['hinges', 'recessDepth'], v)} hint="ASSUMPTION (Weeke had 3.2 / 4 / 4.2)" />
+                <PathField label="Corner radius" value={HG.cornerRadius} onCommit={(v) => setPath(['hinges', 'cornerRadius'], v)} hint="ASSUMPTION: R6 (12 cutter)" />
+              </div>
+              <div className="text-ink-300 text-[11px]" data-fd-sample-hinges>
+                {fd ? (<>sample hinges from the leaf top <span className="text-accent-400 font-medium">{fdHinges.map((h) => h.top).join(' / ')}</span>
+                  <span className="text-ink-500"> · step {fd.hinges?.step} · on the jamb from the top long point {fdHinges.map((h) => h.jambTop).join(' / ')} · recess {fd.hinges?.recess?.length} × {fd.hinges?.recess?.width} × {fd.hinges?.recess?.depth} R{fd.hinges?.recess?.radius}</span></>) : 'n/a'}
+              </div>
+            </fieldset>
+          </div>
+
+          {/* ══ Lock ══ */}
+          <div className={`card p-4 mb-4 ${lockLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-ink-200">Lock
+                <span className="text-ink-500 font-normal"> · DIN lock case: forend, case pocket, spindle (LOCK_H from the leaf bottom), euro / bathroom centres below the spindle</span>
+              </div>
+              <LockToggle locked={lockLock} onToggle={() => setLockLock((x) => !x)} />
+            </div>
+            <fieldset disabled={lockLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${lockLock ? 'opacity-60' : ''}`}>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <PathField label="Spindle height" value={LK.spindleHeight} onCommit={(v) => setPath(['lock', 'spindleHeight'], v)} hint="LOCK_H, from the leaf bottom" />
+                <PathField label="Backset" value={LK.backset} onCommit={(v) => setPath(['lock', 'backset'], v)} />
+                <PathField label="Euro centres" value={LK.euroCentres} onCommit={(v) => setPath(['lock', 'euroCentres'], v)} hint="cylinder below the spindle" />
+                <PathField label="Bathroom centres" value={LK.bathroomCentres} onCommit={(v) => setPath(['lock', 'bathroomCentres'], v)} />
+                <PathField label="Case top above spindle" value={LK.caseTopAboveSpindle} onCommit={(v) => setPath(['lock', 'caseTopAboveSpindle'], v)} hint="ASSUMPTION: macro lock_h + 46.5" />
+                <PathField label="Forend centre below spindle" value={LK.forendCentreBelowSpindle} onCommit={(v) => setPath(['lock', 'forendCentreBelowSpindle'], v)} hint="ASSUMPTION: macro lock_h - 15" />
+              </div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Forend (milled + oversize, full radius ends)</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <PathField label="Length" value={FO.length} onCommit={(v) => setPath(['lock', 'forend', 'length'], v)} />
+                <PathField label="Width" value={FO.width} onCommit={(v) => setPath(['lock', 'forend', 'width'], v)} />
+                <PathField label="Mill oversize" value={FO.millOversize} onCommit={(v) => setPath(['lock', 'forend', 'millOversize'], v)} />
+                <PathField label="Depth" value={FO.depth} onCommit={(v) => setPath(['lock', 'forend', 'depth'], v)} />
+              </div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Case (the pocket on the lock edge, ASSUMPTION 87 x 153)</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <PathField label="Case depth" value={CS.depth} onCommit={(v) => setPath(['lock', 'case', 'depth'], v)} />
+                <PathField label="Case height" value={CS.height} onCommit={(v) => setPath(['lock', 'case', 'height'], v)} />
+                <PathField label="Pocket width" value={CS.pocketWidth} onCommit={(v) => setPath(['lock', 'case', 'pocketWidth'], v)} />
+                <PathField label="Pocket depth" value={CS.pocketDepth} onCommit={(v) => setPath(['lock', 'case', 'pocketDepth'], v)} />
+                <PathField label="Pocket height" value={CS.pocketHeight} onCommit={(v) => setPath(['lock', 'case', 'pocketHeight'], v)} />
+              </div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Bores (ASSUMPTION: for the sheets and the export)</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-2">
+                <PathField label="Spindle bore" value={LK.spindleBore} onCommit={(v) => setPath(['lock', 'spindleBore'], v)} />
+                <PathField label="Euro bore" value={LK.euroBore} onCommit={(v) => setPath(['lock', 'euroBore'], v)} />
+                <PathField label="Bathroom bore" value={LK.bathroomBore} onCommit={(v) => setPath(['lock', 'bathroomBore'], v)} />
+              </div>
+              <div className="text-ink-300 text-[11px]">
+                {fd ? (<>sample spindle <span className="text-accent-400 font-medium">{fd.lock?.spindle?.fromBottom}</span> above the leaf bottom
+                  <span className="text-ink-500"> · forend centre {fd.lock?.forend?.centreFromBottom} up, milled {fd.lock?.forend?.millLength} × {fd.lock?.forend?.millWidth} · case pocket top {fd.lock?.case?.topFromBottom} up</span></>) : 'n/a'}
+              </div>
+            </fieldset>
+          </div>
+
+          {/* ══ Keep ══ */}
+          <div className={`card p-4 mb-4 ${keepLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-ink-200">Keep
+                <span className="text-ink-500 font-normal"> · on the lock jamb opposite the forend: the plate (milled + oversize) and one pocket for the latch and the bolt</span>
+              </div>
+              <LockToggle locked={keepLock} onToggle={() => setKeepLock((x) => !x)} />
+            </div>
+            <fieldset disabled={keepLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${keepLock ? 'opacity-60' : ''}`}>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-2">
+                <PathField label="Plate length" value={KP.length} onCommit={(v) => setPath(['keep', 'length'], v)} />
+                <PathField label="Plate width" value={KP.width} onCommit={(v) => setPath(['keep', 'width'], v)} />
+                <PathField label="Mill oversize" value={KP.millOversize} onCommit={(v) => setPath(['keep', 'millOversize'], v)} />
+                <PathField label="Plate depth" value={KP.plateDepth} onCommit={(v) => setPath(['keep', 'plateDepth'], v)} hint="ASSUMPTION" />
+                <PathField label="Pocket length" value={KPK.length} onCommit={(v) => setPath(['keep', 'pocket', 'length'], v)} hint="ASSUMPTION" />
+                <PathField label="Pocket width" value={KPK.width} onCommit={(v) => setPath(['keep', 'pocket', 'width'], v)} />
+                <PathField label="Pocket depth" value={KPK.depth} onCommit={(v) => setPath(['keep', 'pocket', 'depth'], v)} />
+              </div>
+              <div className="text-ink-300 text-[11px]" data-fd-sample-keep>
+                {fd ? (<>sample keep centre <span className="text-accent-400 font-medium">{fd.keep?.centreFromFoot}</span> above the jamb foot
+                  <span className="text-ink-500"> · {fd.keep?.centreFromTop} from the top long point · plate milled {fd.keep?.plate?.millLength} × {fd.keep?.plate?.millWidth} · KEEP {fd.keep?.macroKeep}</span></>) : 'n/a'}
+              </div>
+            </fieldset>
+          </div>
+
+          {/* ══ Vision panel ══ */}
+          <div className={`card p-4 mb-4 ${vpLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-ink-200">Vision panel
+                <span className="text-ink-500 font-normal"> · the placement the sheets and the 3D use (ASSUMPTION: the macro placement is not decoded, the export sends the style id); the style table is the macro's, read only</span>
+              </div>
+              <LockToggle locked={vpLock} onToggle={() => setVpLock((x) => !x)} />
+            </div>
+            <fieldset disabled={vpLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${vpLock ? 'opacity-60' : ''}`}>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <PathField label="Top rail" value={VP.topRail} onCommit={(v) => setPath(['vp', 'topRail'], v)} hint="leaf top to the first pane (D_TOP_RAIL)" />
+                <PathField label="Mid rail" value={VP.midRail} onCommit={(v) => setPath(['vp', 'midRail'], v)} hint="the A/B pair gap (D_MID_RAIL)" />
+                <PathField label="Side margin" value={VP.sideMargin} onCommit={(v) => setPath(['vp', 'sideMargin'], v)} hint="D_SIDE_MARGIN" />
+                <PathField label="Stack gap" value={VP.stackGap} onCommit={(v) => setPath(['vp', 'stackGap'], v)} hint="the nNo styles" />
+                <PathField label="Corner radius" value={VP.cornerRadius} onCommit={(v) => setPath(['vp', 'cornerRadius'], v)} />
+                <PathField label="Bead faces" value={VP.beadFaces} onCommit={(v) => setPath(['vp', 'beadFaces'], v)} hint="bead metres = perimeter x this" />
+                <PathField label="Glass thickness" value={VP.glassThickness} onCommit={(v) => setPath(['vp', 'glassThickness'], v)} hint="fire glass and toughened" />
+              </div>
+            </fieldset>
+            <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">VP_STYLE table (ids 1:1 with the macro)</div>
+            <table className="w-full text-[11px]">
+              <thead><tr className="text-ink-500 text-left"><th className="pr-2 font-medium">id</th><th className="pr-2 font-medium">label</th><th className="pr-2 font-medium">pane</th><th className="pr-2 font-medium">count</th><th className="font-medium">arrange</th></tr></thead>
+              <tbody>
+                {(VP.styles || []).map((s) => (
+                  <tr key={s.id} className="text-ink-300 border-t border-surface-500/40">
+                    <td className="pr-2 py-0.5 font-mono">{s.id}</td><td className="pr-2 py-0.5">{s.label}</td>
+                    <td className="pr-2 py-0.5">{s.panes ? s.panes.map((q) => `${q.w} × ${q.h}`).join(' + ') : (s.count ? `${s.w} × ${s.h}` : '')}</td>
+                    <td className="pr-2 py-0.5">{s.count || ''}</td><td className="py-0.5">{s.arrange}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ══ Intumescent ══ */}
+          <div className={`card p-4 mb-4 ${intuLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-ink-200">Intumescent
+                <span className="text-ink-500 font-normal"> · the groove the macro cuts (strip + oversize) and the two-strip spacing; metres = strips x (2 x H + W); the INTU_STYLE table is the macro's, read only</span>
+              </div>
+              <LockToggle locked={intuLock} onToggle={() => setIntuLock((x) => !x)} />
+            </div>
+            <fieldset disabled={intuLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${intuLock ? 'opacity-60' : ''}`}>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-2">
+                <PathField label="Groove oversize" value={IN.grooveOversize} onCommit={(v) => setPath(['intumescent', 'grooveOversize'], v)} hint="ASSUMPTION: 15.5 for a 15 strip" />
+                <PathField label="Two-strip offset" value={IN.twoStripOffset} onCommit={(v) => setPath(['intumescent', 'twoStripOffset'], v)} hint="ASSUMPTION: LPZ / 2 +- this" />
+              </div>
+              <div className="text-ink-300 text-[11px] mb-2" data-fd-sample-intu>
+                {fd ? (fd.intumescent
+                  ? (<>sample strip <span className="text-accent-400 font-medium">{fd.intumescent.width} × {fd.intumescent.thickness}</span> × {fd.intumescent.strips} = <span className="text-accent-400 font-medium">{fd.intumescent.metres} m</span></>)
+                  : 'sample door: non-fire, no intumescent') : 'n/a'}
+              </div>
+            </fieldset>
+            <table className="w-full text-[11px]">
+              <thead><tr className="text-ink-500 text-left"><th className="pr-2 font-medium">id</th><th className="pr-2 font-medium">label</th><th className="pr-2 font-medium">strip</th><th className="font-medium">strips per edge</th></tr></thead>
+              <tbody>
+                {(IN.styles || []).map((s) => (
+                  <tr key={s.id} className="text-ink-300 border-t border-surface-500/40">
+                    <td className="pr-2 py-0.5 font-mono">{s.id}</td><td className="pr-2 py-0.5">{s.label}</td>
+                    <td className="pr-2 py-0.5">{s.width} × {s.thickness}</td><td className="py-0.5">{s.strips}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ══ bSuite ══ */}
+          {BS && (() => {
+            const T = BS.targets || [];
+            const active = T.find((t) => t.id === BS.activeTarget) || T[0];
+            if (!active) return null;
+            const save = (targets, activeId = BS.activeTarget) => setBsuiteTargets(targets, activeId);
+            const patchActive = (patch) => save(T.map((t) => (t.id === active.id ? { ...t, ...patch } : t)));
+            const patchProgram = (key, patch) => patchActive({ programs: { ...active.programs, [key]: { ...active.programs[key], ...patch } } });
+            const addTarget = () => {
+              const n = T.length + 1; const id = `target-${Date.now().toString(36)}`;
+              save([...T, { ...active, id, name: `Computer ${n}`, programs: Object.fromEntries(Object.entries(active.programs).map(([k, v]) => [k, { ...v }])), executionParameters: { ...active.executionParameters } }], id);
+            };
+            const removeTarget = () => { if (T.length > 1 && window.confirm(`Remove target "${active.name}"?`)) save(T.filter((t) => t.id !== active.id), T.find((t) => t.id !== active.id).id); };
+            // Explorer's "Copy as path" wraps the path in quotes: strip them, and any whitespace
+            const cleanPath = (v) => String(v || '').replace(/"/g, '').trim().replace(/^'+|'+$/g, '').trim().replace(/\\/g, '/');
+            const fillFromFolder = (folder) => {
+              const f = cleanPath(folder).replace(/\/+$/, '');
+              if (!f) return;
+              patchActive({ programs: Object.fromEntries(Object.entries(active.programs).map(([k, v]) => [k, { ...v, path: v.path ? `${f}/${String(v.path).split(/[\\/]/).pop()}` : v.path }])) });
+            };
+            const EP = active.executionParameters || {};
+            return (
+              <div className={`card p-4 mb-4 ${bsuiteLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-semibold text-ink-200">bSuite export
+                    <span className="text-ink-500 font-normal"> · four rows per door (leaf, head, hinge jamb, lock jamb), the Label = the door name, document variables named as the macro parameters; one target per computer</span>
+                  </div>
+                  <LockToggle locked={bsuiteLock} onToggle={() => setBsuiteLock((x) => !x)} />
+                </div>
+                <fieldset disabled={bsuiteLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${bsuiteLock ? 'opacity-60' : ''}`}>
+                  <div className="text-ink-400 mb-1">Target computer (the list is built for the active one)</div>
+                  <div className="flex flex-wrap gap-1.5 items-center mb-3">
+                    {T.map((t) => (
+                      <button key={t.id} type="button" onClick={() => save(T, t.id)} className={chip(t.id === active.id)}>{t.name}</button>
+                    ))}
+                    <button type="button" onClick={addTarget} className="px-2.5 py-1 text-[11px] rounded-lg border border-dashed border-surface-500 text-ink-300 hover:text-ink-50 hover:border-surface-400">+ add</button>
+                  </div>
+                  <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                    <div>
+                      <div className="text-ink-400 mb-1">Name</div>
+                      <input type="text" defaultValue={active.name} key={`${active.id}-name`}
+                        onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== active.name) patchActive({ name: v }); }}
+                        className="w-52 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+                    </div>
+                    <div>
+                      <div className="text-ink-400 mb-1">Fill the set paths from a folder (keeps the file names)</div>
+                      <input type="text" placeholder="C:/Users/Xp600/Desktop/Biesse Piotr" key={`${active.id}-fill`}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { fillFromFolder(e.target.value); e.target.value = ''; } }}
+                        onBlur={(e) => { if (e.target.value.trim()) { fillFromFolder(e.target.value); e.target.value = ''; } }}
+                        className="w-80 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+                    </div>
+                    {T.length > 1 && (
+                      <button type="button" onClick={removeTarget} className="px-2.5 py-1.5 text-[11px] rounded-lg border border-surface-500 text-ink-300 hover:text-red-400 hover:border-red-500/60">remove target</button>
+                    )}
+                  </div>
+                  <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Programs: path on this computer (ProgramUri) and the .bSolid file embedded in the list. An empty path = that block is skipped with a message (the 5-axis frame masters do not exist yet).</div>
+                  <div className="space-y-1.5 max-w-4xl">
+                    {Object.keys(FD_PROGRAM_LABEL).map((k) => {
+                      const prog = active.programs?.[k] || { path: '' };
+                      const st = prog.stored;
+                      const fileName = String(prog.path || '').split(/[\\/]/).pop();
+                      const mismatch = st && fileName && st.fileName !== fileName;
+                      return (
+                        <div key={k} className="flex items-center gap-2">
+                          <span className="text-ink-400 w-24 shrink-0">{FD_PROGRAM_LABEL[k]}</span>
+                          <input type="text" defaultValue={prog.path} key={`${active.id}-${k}-${prog.path}`}
+                            placeholder="no program yet: rows skipped"
+                            onBlur={(e) => { const v = cleanPath(e.target.value); if (v !== prog.path) patchProgram(k, { path: v }); }}
+                            className="flex-1 px-2 py-1 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-xs font-mono" />
+                          <label className={`shrink-0 px-2.5 py-1 text-[11px] rounded-lg border cursor-pointer ${st ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/5' : 'border-amber-500/50 text-amber-400 bg-amber-500/5'}`}
+                            title={st ? `${st.fileName} · ${(st.bytes / 1048576).toFixed(1)} MB · ${new Date(st.uploadedAt).toLocaleString('en-GB')}` : 'No file uploaded: the list would show this row red'}>
+                            {st ? `✓ ${(st.bytes / 1048576).toFixed(1)} MB` : '↑ Upload .bSolid'}
+                            <input type="file" accept=".bSolid,.bsolid" className="hidden"
+                              onChange={async (e) => {
+                                const f = e.target.files?.[0]; e.target.value = '';
+                                if (!f) return;
+                                try {
+                                  const stored = await uploadBsuiteProgram(active.id, k, f);
+                                  patchProgram(k, { stored, path: prog.path ? prog.path.replace(/[^\\/]+$/, f.name) : f.name });
+                                } catch (err) { alert(`Upload failed: ${err?.message || err}`); }
+                              }} />
+                          </label>
+                          {st && (
+                            <button type="button" onClick={async () => { if (!window.confirm(`Remove the uploaded ${st.fileName}?`)) return; try { await removeBsuiteProgram(st.storagePath); } catch { /* keep going */ } patchProgram(k, { stored: null }); }}
+                              className="shrink-0 text-[11px] text-ink-500 hover:text-red-400" title="Remove the uploaded file">✕</button>
+                          )}
+                          {mismatch && <span className="text-[10px] text-amber-400" title="The uploaded file's name differs from the path's file name: the list uses the path's name">name differs</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="text-[11px] text-ink-500 mt-1">Green = file uploaded and embedded on export. Amber = missing: that row would be red in bSolid. The leaf master is FD_LEAF_MASTER_PIOTR.bSolid (macro Master_Door_PIOTR); the frame masters come with the 5-axis programs.</div>
+                  <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mt-4 mb-3">
+                    <div>
+                      <div className="text-ink-400 mb-1">STOP rows between the blocks</div>
+                      <BoolChips value={BS.stopRows !== false} onPick={(v) => setPath(['bsuite', 'stopRows'], v)} />
+                    </div>
+                    <div>
+                      <div className="text-ink-400 mb-1">Table placement (ExecutionParameters)</div>
+                      <div className="flex gap-1.5">
+                        {[[true, 'Write placement'], [false, 'Default origins']].map(([v, l]) => (
+                          <button key={String(v)} type="button" onClick={() => patchActive({ writeExecutionParameters: v })} className={chip(active.writeExecutionParameters === v)}>{l}</button>
+                        ))}
+                      </div>
+                    </div>
+                    {active.writeExecutionParameters && (
+                      <div className="flex flex-wrap gap-x-3 gap-y-2 items-end">
+                        {[['origin', 'ExOrigin'], ['refCorner', 'Corner'], ['offsetX', 'Offset X'], ['offsetY', 'Offset Y'], ['offsetZ', 'Offset Z'], ['rotZ', 'Rot Z']].map(([k, l]) => (
+                          <div key={k}>
+                            <div className="text-ink-400 mb-1 text-[10px]">{l}</div>
+                            <input type="text" inputMode="decimal" defaultValue={EP[k]} key={`${active.id}-ex-${k}-${EP[k]}`}
+                              onBlur={(e) => { const v = Number(e.target.value); if (Number.isFinite(v) && v !== EP[k]) patchActive({ executionParameters: { ...EP, [k]: v } }); }}
+                              className="w-20 px-2 py-1 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-xs text-right" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">HAND map (ASSUMPTION: macro HAND 0 = "Hinge left" of the form; the owner checks in bSolid)</div>
+                  <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                    <PathField label="Hinge left" value={BS.hand?.left} onCommit={(v) => setPath(['bsuite', 'hand', 'left'], v)} />
+                    <PathField label="Hinge right" value={BS.hand?.right} onCommit={(v) => setPath(['bsuite', 'hand', 'right'], v)} />
+                  </div>
+                  <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Macro defaults (the parameters a single door never changes, table 4.7)</div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-2 items-end mb-2">
+                    {Object.keys(BS.macroDefaults || {}).map((k) => (
+                      <div key={k}>
+                        <div className="text-ink-400 mb-1 text-[10px] font-mono">{k}</div>
+                        <NumInput value={BS.macroDefaults[k]} onCommit={(v) => setPath(['bsuite', 'macroDefaults', k], v)}
+                          className="w-16 px-2 py-1 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-xs text-right" />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-[11px] text-ink-500">
+                    Today the leaf master has only LPX / LPY / LPZ as document variables; the rest (HAND, HINGE, LOCK, LOCK_H, EURO, KEEP, INTU_STYLE, VP_STYLE, C_VP_*, HINGE_1..3, HINGE_D, CLOSER) must be added as document variables in bSolid and bound inside Master_Door_PIOTR before a row from PC steers the hinges and the lock (BLOCKERS 35).
+                  </div>
+                </fieldset>
+              </div>
+            );
+          })()}
+
+          {/* ══ Configurator defaults ══ */}
+          <div className={`card p-4 ${defaultsLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-ink-200">Defaults of a new door in the configurator</div>
+              <LockToggle locked={defaultsLock} onToggle={() => setDefaultsLock((x) => !x)} />
+            </div>
+            <fieldset disabled={defaultsLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${defaultsLock ? 'opacity-60' : ''}`}>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <div>
+                  <div className="text-ink-400 mb-1">Fire</div>
+                  <BoolChips value={DF.fire !== false} onPick={(v) => setPath(['defaults', 'fire'], v)} />
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Rating</div>
+                  <StringChips value={DF.rating} options={FD_SET_RATINGS} onPick={(v) => setPath(['defaults', 'rating'], v)} />
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Hinge side</div>
+                  <StringChips value={DF.hingeSide} options={FD_SET_HANDS} onPick={(v) => setPath(['defaults', 'hingeSide'], v)} />
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Swing</div>
+                  <StringChips value={DF.swing} options={FD_SET_SWINGS} onPick={(v) => setPath(['defaults', 'swing'], v)} />
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Lock</div>
+                  <StringChips value={DF.lockType} options={FD_SET_LOCKS} onPick={(v) => setPath(['defaults', 'lockType'], v)} />
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Leading edge</div>
+                  <BoolChips value={DF.leadEdge !== false} onPick={(v) => setPath(['defaults', 'leadEdge'], v)} />
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <div>
+                  <div className="text-ink-400 mb-1">Vision panel style</div>
+                  <select value={DF.vpStyle ?? 0} onChange={(e) => setPath(['defaults', 'vpStyle'], e.target.value)} className={selectCls}>
+                    {(VP.styles || []).map((s) => <option key={s.id} value={s.id}>{s.id} · {s.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Intumescent style</div>
+                  <select value={DF.intuStyle ?? 1} onChange={(e) => setPath(['defaults', 'intuStyle'], e.target.value)} className={selectCls}>
+                    {(IN.styles || []).map((s) => <option key={s.id} value={s.id}>{s.id} · {s.label}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Custom vision panel (style 14) defaults</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-2">
+                <PathField label="Length" value={DF.vpCustom?.length} onCommit={(v) => setPath(['defaults', 'vpCustom', 'length'], v)} />
+                <PathField label="Width" value={DF.vpCustom?.width} onCommit={(v) => setPath(['defaults', 'vpCustom', 'width'], v)} />
+                <PathField label="Count" value={DF.vpCustom?.count} onCommit={(v) => setPath(['defaults', 'vpCustom', 'count'], v)} />
+                <PathField label="Rail" value={DF.vpCustom?.rail} onCommit={(v) => setPath(['defaults', 'vpCustom', 'rail'], v)} />
+                <PathField label="Position" value={DF.vpCustom?.pos} onCommit={(v) => setPath(['defaults', 'vpCustom', 'pos'], v)} hint="0 vertical / 90 horizontal" />
+              </div>
+              <div className="text-[10px] text-ink-500">
+                Defaults: the owner's numbers of 27.10.2026 (CLAUDE.md fire doors v1). The values marked ASSUMPTION are the programmer's proposals, listed in docs/BLOCKERS.md 35, to confirm.
+              </div>
+            </fieldset>
+          </div>
+        </div>
+
+        {/* RIGHT 1/3: the live sample numbers */}
+        <div className="w-1/3 min-w-0 shrink-0 sticky top-4" data-fd-sample>
+          <div className="text-sm font-semibold text-ink-50 mb-2">
+            Sample door <span className="text-ink-500 font-normal text-xs">· {sampleFire ? sampleRating : 'non-fire'} · leaf {W} × {Hh} · wall {Dd}</span>
+          </div>
+          {fd ? (
+            <div className="card p-3 text-xs">
+              {[
+                ['Name', fmt(fd.name)],
+                ['Rating', fd.fire ? fmt(fd.rating) : 'non-fire'],
+                ['Hand', fmt(fd.handing?.label)],
+                ['Leaf', `${fmt(fd.leaf?.width)} × ${fmt(fd.leaf?.height)} × ${fmt(fd.leaf?.thickness)}`],
+                ['Frame overall', `${fmt(fdFrame?.overall?.width)} × ${fmt(fdFrame?.overall?.height)}`],
+                ['Rebate', `${fmt(fdFrame?.rebate?.width)} × ${fmt(fdFrame?.rebate?.depth)} · faces ${fmt(fdFrame?.faces?.outside)} / ${fmt(fdFrame?.faces?.inside)}`],
+                ['Members', `${fmt(fdFrame?.thickness)} × ${fmt(fdFrame?.depth)} finished · ${fmt(fdFrame?.rawThickness)} × ${fmt(fdFrame?.rawWidth)} raw`],
+                ...(fdFrame?.members || []).map((m) => [m.id, `${fmt(m.length)} long point · ${m.rawSection || ''}${m.mitreTop ? ' · mitre top' : ''}${m.mitreBottom ? ' · mitre bottom' : ''}`]),
+                ['Hinges (leaf top)', fdHinges.map((h) => h.top).join(' / ') || 'n/a'],
+                ['Hinge step', fmt(fd.hinges?.step)],
+                ['Hinges (jamb top)', fdHinges.map((h) => h.jambTop).join(' / ') || 'n/a'],
+                ['Hinge macro', `HINGE ${fmt(fd.hinges?.macroHinge)} · ${fmt(fd.hinges?.product)}`],
+                ['Lock', `${fmt(fd.lock?.type)} · LOCK ${fmt(fd.lock?.macroLock)} · EURO ${fd.lock?.euro ? 1 : 0}`],
+                ['Spindle', `${fmt(fd.lock?.spindle?.fromBottom)} above the leaf bottom · backset ${fmt(fd.lock?.backset)}`],
+                ['Forend', `centre ${fmt(fd.lock?.forend?.centreFromBottom)} up · ${fmt(fd.lock?.forend?.millLength)} × ${fmt(fd.lock?.forend?.millWidth)}`],
+                ['Keep centre', `${fmt(fd.keep?.centreFromFoot)} above the jamb foot · KEEP ${fmt(fd.keep?.macroKeep)}`],
+                ['Closer', fd.closer ? 'yes' : 'no'],
+                ['Vision panel', `${fmt(fd.vp?.label)}${fd.vp?.panes?.length ? ` · ${fd.vp.panes.length} pane(s) · ${fmt(fd.vp?.glassSqm)} m²` : ''}`],
+                ['Intumescent', fd.intumescent ? `${fmt(fd.intumescent.width)} × ${fmt(fd.intumescent.thickness)} × ${fmt(fd.intumescent.strips)} · ${fmt(fd.intumescent.metres)} m` : 'none'],
+                ['Paint area', `${fmt(fd.paintAreaSqm)} m²`],
+              ].map(([l, v]) => (
+                <div key={l} className="flex justify-between gap-3 py-0.5 border-b border-surface-500/30 last:border-0">
+                  <span className="text-ink-400 shrink-0">{l}</span><span className="text-ink-100 font-medium text-right">{v}</span>
+                </div>
+              ))}
+              <div className="text-[10px] text-ink-500 mt-2">
+                Live from the engine: every field on the left reshapes these numbers. The sheets live on the window page and in the pack.
+              </div>
+            </div>
+          ) : (
+            <div className="card p-6 text-center text-xs text-ink-400">Sample door unavailable{sample?.error ? `: ${sample.error}` : '.'}</div>
           )}
         </div>
       </div>
