@@ -6,19 +6,26 @@ import CasementWindow from '../../3d/components/casement/CasementWindow.jsx';
 import ArchedCasementWindow from '../../3d/components/casement/ArchedCasementWindow.jsx';
 import FixFrameWindow from '../../3d/components/fix-frame/FixFrameWindow.jsx';
 import DoorWindow from '../../3d/components/door/DoorWindow.jsx';
+import FireDoor from '../../3d/components/firedoor/FireDoor.jsx';
 import { windowSpecToConfig, windowSpecToCasementProps } from '../../utils/windowSpecToConfig.js';
 
-function Scene({ config, side }) {
+// The engine geometry the camera and the floor frame on: a door (doorGeo) or a
+// fire door (fireDoorGeo, fire doors v1 27.10.2026); both carry totalWidth /
+// totalHeight and are centred on their frame. Null for the other types.
+const framingGeo = (config) => config.doorGeo || config.fireDoorGeo || null;
+
+function Scene({ config, side, openAngle = null }) {
   // Exterior = front (+Z camera), Interior = back (-Z camera) achieved by rotating group
   const groupRotation = side === 'interior' ? [0, Math.PI, 0] : [0, 0, 0];
 
   // Auto-fit camera distance based on window dimensions (a door: the whole
   // assembly with side panels and fanlight, from the engine totals)
-  const h = (config.doorGeo ? Math.max(config.doorGeo.totalHeight, config.doorGeo.totalWidth) : (config.height || 1800)) / 1000;
+  const fg = framingGeo(config);
+  const h = (fg ? Math.max(fg.totalHeight, fg.totalWidth) : (config.height || 1800)) / 1000;
   const cameraZ = Math.max(h * 1.4, 1.8);
   // the floor line under the model: a door group is centred on its frame
   // (doorGeo.origin), so its floor is half the frame height down
-  const floorY = config.doorGeo ? -(config.doorGeo.totalHeight / 1000) / 2 : -h / 2;
+  const floorY = fg ? -(fg.totalHeight / 1000) / 2 : -h / 2;
 
   return (
     <>
@@ -78,6 +85,16 @@ function Scene({ config, side }) {
           />
         ) : config.windowCategory === 'casement' ? (
           <CasementWindow {...config.casementProps} />
+        ) : config.windowCategory === 'firedoor' ? (
+          // Fire doors v1 (27.10.2026): the internal door set from the engine geometry
+          // (fireDoorGeo); the leaf open angle from the page (openAngle) or the config default.
+          <FireDoor
+            geo={config.fireDoorGeo || null}
+            woodColor={config.woodColor}
+            openAngle={Number.isFinite(Number(openAngle)) ? Number(openAngle) : config.fireDoorOpen}
+            ironmongery={config.ironmongery || 'brass'}
+            glassFinish={config.glassFinish || 'clear'}
+          />
         ) : config.windowCategory === 'door' ? (
           // Layout code mirrors the 3D App: french = 040F, otherwise hinge side.
           <DoorWindow
@@ -142,7 +159,9 @@ function Scene({ config, side }) {
   );
 }
 
-export default function WindowPreview3D({ windowSpec, side, derived = null }) {
+// openAngle (fire doors v1): the leaf open angle in degrees from the page's
+// control; null leaves the config default (30).
+export default function WindowPreview3D({ windowSpec, side, derived = null, openAngle = null }) {
   if (!windowSpec) {
     return (
       <div className="grid place-items-center h-full text-ink-400">
@@ -166,7 +185,8 @@ export default function WindowPreview3D({ windowSpec, side, derived = null }) {
   }
 
   // Camera position based on window size (a door: the whole assembly)
-  const h = (config.doorGeo ? Math.max(config.doorGeo.totalHeight, config.doorGeo.totalWidth) : (config.height || 1800)) / 1000;
+  const fg = framingGeo(config);
+  const h = (fg ? Math.max(fg.totalHeight, fg.totalWidth) : (config.height || 1800)) / 1000;
   const cameraZ = Math.max(h * 1.4, 1.8);
 
   return (
@@ -184,7 +204,7 @@ export default function WindowPreview3D({ windowSpec, side, derived = null }) {
         gl={{ alpha: true, antialias: true, preserveDrawingBuffer: true }}
         style={{ width: '100%', height: '100%' }}
       >
-        <Scene config={config} side={side} />
+        <Scene config={config} side={side} openAngle={openAngle} />
       </Canvas>
     </Suspense>
   );

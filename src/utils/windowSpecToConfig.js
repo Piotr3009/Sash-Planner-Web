@@ -48,7 +48,7 @@ const COLOR_MAP = {
 import { buildVentGrilles } from '../engine/lists.js';
 import { RAL_LOOKUP as RAL_COLORS } from '../config.js';
 import { fanAxisToRatio, fan2AxisToRatio, CASEMENT_GEO_DEFAULTS } from '../engine/casementLayouts.js';
-import { profileBoxDepth, getCasementProfile, getWindowProfile, getDoorProfile } from '../engine/profile.js';
+import { profileBoxDepth, getCasementProfile, getWindowProfile, getDoorProfile, getFireDoorProfile } from '../engine/profile.js';
 import { deriveWindowData, meetingFractionFor, sashBarPattern } from '../engine/calculations.js';
 
 function resolveColor(name, ral) {
@@ -158,6 +158,53 @@ export function windowSpecToConfig(windowSpec, derived = null) {
       woodColor: col.single || COLOR_MAP.oak,
       doubleGlazing: true,
       quantity: windowSpec.quantity || 1,
+    };
+  }
+
+  // Fire doors (27.10.2026): the engine geometry for the 3D (FireDoor.jsx,
+  // fireDoorGeometryFromSpec) and the flat firedoor numbers the pricing reads.
+  // Never throws on a missing or failed derived: the config then carries no
+  // fireDoorGeo and the 3D draws nothing for the door.
+  if ((windowSpec.category || 'sash') === 'firedoor') {
+    const fd = windowSpec.firedoor || {};
+    const col = windowSpec.color || {};
+    const gz = windowSpec.glazing || {};
+    const dual = col.type === 'dual';
+    const single = (col.single || col.outside) ? resolveColor(col.single || col.outside, col.ral) : '#F6F6F6';
+    const geo = fireDoorGeometryFromSpec(windowSpec, derived);
+    const members = geo?.frame?.members || [];
+    const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+    const W = geo?.totalWidth || Number(windowSpec.frame?.width) || 0;
+    const H = geo?.totalHeight || Number(windowSpec.frame?.height) || 0;
+    return {
+      windowCategory: 'firedoor',
+      width: W,
+      height: H,
+      extWidth: W,
+      extHeight: H,
+      ...(geo ? { fireDoorGeo: geo } : {}),
+      fireDoorOpen: 30,
+      sameColor: !dual,
+      woodColor: single,
+      woodColorExt: dual && col.outside ? resolveColor(col.outside, col.ral) : single,
+      woodColorInt: dual && col.inside ? resolveColor(col.inside, col.ral) : single,
+      ironmongery: windowSpec.hardware?.finish || 'brass',
+      glassFinish: gz.finish || 'clear',
+      quantity: windowSpec.quantity || 1,
+      // the pricing's flat numbers (pricing.js calculateFireDoor)
+      firedoorFire: !!fd.fire,
+      firedoorRating: geo?.rating ?? fd.rating ?? null,
+      firedoorLeafWidth: geo?.leaf?.w ?? num(fd.leafWidth),
+      firedoorLeafHeight: geo?.leaf?.h ?? num(fd.leafHeight),
+      firedoorFrameDepth: geo?.frame?.depth ?? num(fd.frameDepth),
+      firedoorHingeSide: fd.hingeSide || 'left',
+      firedoorSwing: fd.swing || 'in',
+      firedoorLockType: fd.lockType || 'latch',
+      firedoorCloser: !!fd.closer,
+      firedoorVpStyle: Number(fd.vpStyle) || 0,
+      firedoorIntuStyle: Number(fd.intuStyle) || 0,
+      firedoorVpSqm: geo?.vp?.glassSqm ?? num(derived?.firedoor?.vp?.glassSqm) ?? 0,
+      firedoorFrameMetres: members.reduce((s, m) => s + (Number(m.length) || 0) * (Number(m.quantity) || 1), 0) / 1000,
     };
   }
 
@@ -553,5 +600,115 @@ export function windowSpecToCasementProps(windowSpec) {
     showGuides: false,
     ironmongery: windowSpec?.hardware?.finish || 'brass',
     frameDims,
+  };
+}
+
+// ─── Fire door geometry for the 3D (fire doors v1, 27.10.2026) ───
+// The fire door 3D (src/3d/components/firedoor/FireDoor.jsx) draws the frame,
+// the leaf, the vision panel glass, the hinges, the handle and the keep from
+// the engine (derived.firedoor), so it cannot disagree with the sheets, the
+// cut list and the machine export. Plain numbers in mm. Coordinates for the
+// model: frame mm, origin at the frame top-left seen from the PULL side (the
+// face the hinge knuckles show on, the 35 face), y DOWN; the group is
+// centred on `origin` (W / 2, H / 2) like the door (doorGeo), so the viewer
+// Scenes, the capture rig and the harness read totalWidth / totalHeight /
+// origin the same way for both. The vision panel panes keep the engine's
+// own fields: x from the leaf TOP to the pane top, y from the HINGE edge to
+// the pane left. The only profile number read here is the vision panel glass
+// thickness (the windowSpec glazing thickness when the spec carries it).
+//
+// `derived` is the page's own deriveWindowData result (batch profile
+// snapshot applied there); the door is derived again, with the active
+// profile, only when the caller has none (the configurator). Returns null
+// for anything that is not a fire door, or one the engine cannot derive.
+export function fireDoorGeometryFromSpec(windowSpec, derivedIn = null) {
+  if (!windowSpec || (windowSpec.category || 'sash') !== 'firedoor') return null;
+  let derived = derivedIn?.category === 'firedoor' && derivedIn.firedoor ? derivedIn : null;
+  if (!derived) {
+    try { derived = deriveWindowData(windowSpec, {}); } catch { return null; }
+  }
+  const f = derived?.firedoor;
+  if (!f || !f.leaf || !f.frame?.overall) return null;
+  const n = (v, fb = 0) => (Number.isFinite(Number(v)) ? Number(v) : fb);
+  const fr = f.frame;
+  const W = n(fr.overall.width), H = n(fr.overall.height);
+  const lw = n(f.leaf.width), lh = n(f.leaf.height), lt = n(f.leaf.thickness);
+  if (!(W > 0) || !(H > 0) || !(lw > 0) || !(lh > 0)) return null;
+  const faces = { outside: n(fr.faces?.outside), inside: n(fr.faces?.inside) };
+  const gaps = { side: n(fr.gaps?.side), head: n(fr.gaps?.head), floor: n(fr.gaps?.floor) };
+  // the leaf in the frame: the visible face plus the side gap in from the
+  // frame edge, the same down from the top, the floor gap above the feet
+  // (W = leaf + 2 x 38, H = leaf + 38 + 5 at the defaults)
+  const leafX = faces.outside + gaps.side;
+  const leafY = faces.outside + gaps.head;
+  const hingeSide = f.handing?.hingeSide === 'right' ? 'right' : 'left';
+  const swing = f.handing?.swing === 'out' ? 'out' : 'in';
+  const specGlass = n(windowSpec.glazing?.thickness);
+  const glassThickness = specGlass > 0 ? specGlass : n(getFireDoorProfile()?.vp?.glassThickness);
+  const lk = f.lock || {};
+  const sp = lk.spindle || {};
+  const cyl = lk.cylinder || null;
+  const fo = lk.forend || null;
+  const kp = f.keep || null;
+  return {
+    name: f.name ?? windowSpec.name ?? '',
+    fire: !!f.fire,
+    rating: f.rating ?? null,
+    leaf: { w: lw, h: lh, t: lt, x: leafX, y: leafY },
+    frame: {
+      overall: { w: W, h: H },
+      depth: n(fr.depth), thickness: n(fr.thickness),
+      rebate: { w: n(fr.rebate?.width), d: n(fr.rebate?.depth) },
+      faces, gaps,
+      headJoint: fr.headJoint ?? null,
+      members: (fr.members || []).map((m) => ({
+        id: m.id, role: m.role, length: n(m.length), quantity: n(m.quantity, 1),
+        mitreTop: !!m.mitreTop, mitreBottom: !!m.mitreBottom,
+      })),
+    },
+    hinges: {
+      count: n(f.hinges?.count), length: n(f.hinges?.length),
+      recess: f.hinges?.recess ? { ...f.hinges.recess } : null,
+      positions: (f.hinges?.positions || []).map((p, i) => ({
+        i: p.i ?? i, top: n(p.top), bottom: n(p.bottom), centre: n(p.centre), jambTop: n(p.jambTop),
+      })),
+    },
+    lock: {
+      type: lk.type ?? null,
+      spindle: {
+        fromBottom: n(sp.fromBottom), fromTop: n(sp.fromTop),
+        fromLockEdge: n(sp.fromLockEdge ?? lk.backset), bore: n(sp.bore),
+      },
+      cylinder: cyl ? {
+        kind: cyl.kind ?? null, fromBottom: n(cyl.fromBottom), fromTop: n(cyl.fromTop),
+        fromLockEdge: n(cyl.fromLockEdge ?? sp.fromLockEdge ?? lk.backset), bore: n(cyl.bore),
+      } : null,
+      forend: fo ? {
+        length: n(fo.millLength ?? fo.length), width: n(fo.millWidth ?? fo.width),
+        centreFromTop: n(fo.centreFromTop), centreFromBottom: n(fo.centreFromBottom),
+      } : null,
+    },
+    keep: kp ? {
+      centreFromFoot: n(kp.centreFromFoot), centreFromTop: n(kp.centreFromTop),
+      plate: { length: n(kp.plate?.millLength ?? kp.plate?.length), width: n(kp.plate?.millWidth ?? kp.plate?.width) },
+    } : null,
+    vp: {
+      style: f.vp?.style ?? 0, label: f.vp?.label ?? '',
+      glassThickness, glassSqm: n(f.vp?.glassSqm),
+      // angle: 45 the diamond (drawn turned), 90 a pane the engine turned to
+      // fit (w / h already swapped, axis aligned), 0 upright; box = the
+      // axis-aligned bounding box the leaf is cut to
+      panes: (f.vp?.panes || []).map((p, i) => ({
+        i: p.i ?? i, w: n(p.w), h: n(p.h), x: n(p.x), y: n(p.y),
+        rotated: !!p.rotated, angle: n(p.angle),
+        box: { w: n(p.box?.w ?? p.w), h: n(p.box?.h ?? p.h) },
+      })),
+    },
+    handing: { hingeSide, swing, label: f.handing?.label ?? '' },
+    closer: !!f.closer,
+    // the overall frame W x H and the point the 3D group is centred on
+    totalWidth: W,
+    totalHeight: H,
+    origin: { x: W / 2, y: H / 2 },
   };
 }
