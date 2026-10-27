@@ -15,6 +15,9 @@ import { doorSheetPlan } from './doorDrawUtils.js';
 import PartitionElevation2D from './PartitionElevation2D.jsx';
 import PartitionSheet from './PartitionSheet.jsx';
 import { partitionSheetPlan } from './partitionDrawUtils.js';
+import FireDoorSheet from './FireDoorSheet.jsx';
+import FireDoorElevation2D from './FireDoorElevation2D.jsx';
+import { fireDoorSheetPlan } from './fireDoorDrawUtils.js';
 import CasementFrameDetail2D from './CasementFrameDetail2D.jsx';
 import CasementLeafDetail2D from './CasementLeafDetail2D.jsx';
 import { groupCasementLeaves, paneTitle } from './casementDrawUtils.js';
@@ -54,12 +57,24 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
   const isPartition = (windowSpec?.category || 'sash') === 'partition';
   const partitionSheets = isPartition ? partitionSheetPlan(derived) : [];
   const renderPartitionSheet = (sh) => <PartitionSheet sheet={sh} windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} windowTag={item?.name} />;
-  // triple sash: the sections of the engine (null on a double-hung, a casement, a door, a partition)
-  const triple = !isCasement && !isDoor && !isPartition ? tripleSections(derived) : null;
+  // Fire doors (27.10.2026): one tab per fire door sheet (the outside and the
+  // inside elevation, the plan, the leaf and the frame machining), the same
+  // plan the PDF rig, the Elements PDF and the production pack use. A fire
+  // door must never reach the sash / casement / door sheets; its 'elevation'
+  // rig key (the Elevation PDF) is the outside elevation, and the panel's
+  // default 'elevation' tab opens the first fire door sheet.
+  const isFireDoor = (windowSpec?.category || 'sash') === 'firedoor';
+  const fireDoorSheets = isFireDoor ? fireDoorSheetPlan(derived) : [];
+  const renderFireDoorSheet = (sh) => <FireDoorSheet sheet={sh} windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} windowTag={item?.name} />;
+  const activeTab = isFireDoor && subTab === 'elevation' ? (fireDoorSheets[0]?.key || 'elevation') : subTab;
+  // triple sash: the sections of the engine (null on a double-hung, a casement, a door, a partition, a fire door)
+  const triple = !isCasement && !isDoor && !isPartition && !isFireDoor ? tripleSections(derived) : null;
   const renderSashSheet = (type, section) => (
     <SashDetail2D key={tripleSheetKey(type, section)} windowSpec={windowSpec} derived={derived} type={type} section={section} />
   );
-  const visibleTabs = isPartition
+  const visibleTabs = isFireDoor
+    ? fireDoorSheets.map((sh) => ({ id: sh.key, label: sh.label }))
+    : isPartition
     ? [
         { id: 'elevation', label: 'Front Elevation' },
         ...partitionSheets.map((sh) => ({ id: sh.key, label: sh.label })),
@@ -145,7 +160,7 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
         {visibleTabs.map((t) => (
           <button key={t.id} onClick={() => setSubTab(t.id)}
             className={`px-3 py-1.5 text-xs rounded-lg border transition-all ${
-              subTab === t.id
+              activeTab === t.id
                 ? 'border-accent-500 bg-accent-500/15 text-accent-400 font-medium'
                 : 'border-surface-500 text-ink-400 bg-surface-600 hover:bg-surface-500 hover:text-ink-200'
             }`}>
@@ -190,7 +205,14 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
                 {sh.sheet === 'section' && <div className="mt-4"><SectionsUpload item={item} batch={batch} /></div>}
               </div>
             ))}
-            {subTab === 'elevation' && (
+            {isFireDoor && fireDoorSheets.map((sh) => activeTab === sh.key && (
+              <div key={sh.key}>
+                {renderFireDoorSheet(sh)}
+                {/* uploaded sections stay available on the plan sheet (as on the door plan section tab) */}
+                {sh.sheet === 'plan' && <div className="mt-4"><SectionsUpload item={item} batch={batch} /></div>}
+              </div>
+            ))}
+            {subTab === 'elevation' && !isFireDoor && (
               isPartition
                 ? <PartitionElevation2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} windowTag={item?.name} />
                 : isDoor
@@ -228,7 +250,9 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
       {derived && (
         <div aria-hidden="true" style={{ position: 'absolute', left: '-99999px', top: 0, width: '1200px' }}>
           <div ref={(el) => { refs.current['elevation'] = el; }}>
-            {isPartition
+            {isFireDoor
+              ? <FireDoorElevation2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} windowTag={item?.name} view="outside" />
+              : isPartition
               ? <PartitionElevation2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} windowTag={item?.name} />
               : isDoor
               ? <DoorElevation2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
@@ -246,6 +270,11 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
               {renderPartitionSheet(sh)}
             </div>
           ))}
+          {isFireDoor && fireDoorSheets.map((sh) => (
+            <div key={sh.key} ref={(el) => { refs.current[sh.key] = el; }}>
+              {renderFireDoorSheet(sh)}
+            </div>
+          ))}
           {isCasement && (<>
           <div ref={(el) => { refs.current['vsection'] = el; }}>
             <CasementSection2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
@@ -259,7 +288,7 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
             </div>
           ))}
           </>)}
-          {!isCasement && !isDoor && !isPartition && (<>
+          {!isCasement && !isDoor && !isPartition && !isFireDoor && (<>
           <div ref={(el) => { refs.current['box'] = el; }}>
             <BoxDetail2D windowSpec={windowSpec} derived={derived} />
           </div>
