@@ -8,6 +8,8 @@ import { selectDoorHardware, doorHingePositions } from './doorHardware.js';
 import { frenchMeetingGeometry, leafMeeting, leafLockMachining, jambKeepMachining } from './doorLockMachining.js';
 import { leafWidthInField, leafHeightInTier, leafOrigin, fieldLandX, mullionLength, fullMullionRun, transomSegmentLength, transomRun } from './casementRules.js';
 import { isAcousticUnit, SASH_PROPORTIONS, SashProportionError } from './specification.js';
+import { round, createComponentRecord } from './records.js';
+import { derivePartitionWindow } from './partition.js';
 
 /**
  * calculations.js - ETAP 3
@@ -274,33 +276,8 @@ export function calculateWindow(frameWidth, frameHeight, configuration = '2x2', 
     };
 }
 
-function parseSection(section) {
-    if (!section) return { width: null, height: null };
-    const normalised = section.replace(/×/g, 'x');
-    const parts = normalised.split('x').map((value) => Number(value.trim()));
-    return { width: parts[0] ?? null, height: parts[1] ?? null };
-}
-
-function round(value) {
-    return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
-}
-
-function createComponentRecord(windowSpec, group, elementName, section, length, quantity = 1, notes = '') {
-    const sectionInfo = parseSection(section);
-    return {
-        windowId: windowSpec.id,
-        windowName: windowSpec.name,
-        group,
-        elementName,
-        section,
-        sizeLabel: section,
-        finishedWidth: sectionInfo.height ?? sectionInfo.width ?? null,
-        thickness: sectionInfo.width ?? null,
-        length: round(length),
-        quantity,
-        notes,
-    };
-}
+// parseSection, round and createComponentRecord live in records.js since
+// 25.10.2026 (the partition engine imports them too); a pure move.
 
 function calculateSashComponentSet(windowSpec, settings, sashWidth, topSashHeight, bottomSashHeight, suffix = '') {
     const hornExtra = windowSpec.sash?.horns ? Number(windowSpec.sash?.hornExtension ?? getWindowProfile().hornExtension ?? settings?.hornExtensionDefault ?? 70) : 0;
@@ -1547,7 +1524,7 @@ function deriveDoorWindow(windowSpec, frameWidth, frameHeight, settings = {}) {
     });
     // A single door: the ThunderBolt keeps sit in the lock side jamb rebate wall.
     const jambMachining = !isFrench && leaves.length === 1
-        ? { side: leaves[0].hinge === 'left' ? 'right' : 'left', ...jambKeepMachining({ leafH, hw: hwP, backset: Number(hwP.backset) }) }
+        ? { side: leaves[0].hinge === 'left' ? 'right' : 'left', ...jambKeepMachining({ leafH, hw: hwP, backset: Number(hwP.backset), leafDepth: ld }) }
         : null;
 
     // ── Side panels: casement fixed lights behind the mullion (owner box item 5) ──
@@ -1928,6 +1905,8 @@ export function deriveWindowData(windowSpec, settings = {}) {
     const category = windowSpec.category || 'sash';
     if (category === 'casement') return deriveCasementWindow(windowSpec, frameWidth, frameHeight, settings);
     if (category === 'door' || category === 'doors') return deriveDoorWindow(windowSpec, frameWidth, frameHeight, settings);
+    // meeting room partition walls (25.10.2026): engine/partition.js
+    if (category === 'partition') return derivePartitionWindow(windowSpec, frameWidth, frameHeight, settings);
     if (category !== 'sash') return emptyDerived(category, frameWidth, frameHeight);
     const isTripleSash = windowSpec.sash?.type === 'triple';
     const gridMode = windowSpec.sash?.grid?.mode ?? 'none';

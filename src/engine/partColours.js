@@ -42,6 +42,18 @@ export const PART_COLOUR_GROUPS = [
   { id: 'door_bottom_rail', family: 'door_leaf', name: 'Door Bottom Rail', note: 'bottom of the leaf', hex: '#E04A2A' },
   { id: 'door_side_panel', family: 'door_leaf', name: 'Side Panel', note: 'side panel fixed light members', hex: '#B5D99C' },
   { id: 'door_fan', family: 'door_leaf', name: 'Fan Leaf', note: 'fanlight leaf members, opening or fixed', hex: '#E8C38F' },
+  // Partition walls (25.10.2026): own families (wall_frame / wall_leaf), the
+  // same hexes as the doors where the parts correspond.
+  { id: 'wall_boards', family: 'wall_frame', name: 'Head and End Boards', note: 'the 20 boards round the wall', hex: '#F5E050' },
+  { id: 'wall_top_rail', family: 'wall_frame', name: 'Wall Top Rail', note: 'one piece over the posts', hex: '#D99AC5' },
+  { id: 'wall_posts', family: 'wall_frame', name: 'Posts', note: 'end, hinge and lock posts', hex: '#7CC4F5' },
+  { id: 'wall_mid_rail', family: 'wall_frame', name: 'Screen Mid Rails', note: 'between glass and panel', hex: '#8FB3E8' },
+  { id: 'wall_bottom_rail', family: 'wall_frame', name: 'Screen Bottom Rails', note: 'on the floor', hex: '#F2A03D' },
+  { id: 'wall_door_stiles', family: 'wall_leaf', name: 'Door Stiles', note: 'hinge and lock stiles', hex: '#FFFFFF' },
+  { id: 'wall_door_top_rail', family: 'wall_leaf', name: 'Door Top Rail', note: 'top of the leaf', hex: '#A98BE8' },
+  { id: 'wall_door_mid_rail', family: 'wall_leaf', name: 'Door Mid Rail', note: 'between glass and panel', hex: '#5CCBA9' },
+  { id: 'wall_door_bottom_rail', family: 'wall_leaf', name: 'Door Bottom Rail', note: 'bottom of the leaf', hex: '#E04A2A' },
+  { id: 'wall_small', family: 'wall_leaf', name: 'Bars, Beads, Stops', note: 'applied bars, beads, the head stop', hex: '#B5D99C' },
 ];
 
 const BY_ID = Object.fromEntries(PART_COLOUR_GROUPS.map((g) => [g.id, g]));
@@ -69,6 +81,16 @@ const ELEMENT_TO_GROUP = {
   'D-SIDE STILE': 'door_side_panel', 'D-SIDE TOP RAIL': 'door_side_panel', 'D-SIDE BOTTOM RAIL': 'door_side_panel',
   'D-FAN STILE (L)': 'door_fan', 'D-FAN STILE (R)': 'door_fan', 'D-FAN TOP RAIL': 'door_fan', 'D-FAN BOTTOM RAIL': 'door_fan',
   'D-FIX FAN STILE (L)': 'door_fan', 'D-FIX FAN STILE (R)': 'door_fan', 'D-FIX FAN TOP RAIL': 'door_fan', 'D-FIX FAN BOTTOM RAIL': 'door_fan',
+  'W-HEAD BOARD': 'wall_boards', 'W-END BOARD': 'wall_boards',
+  'W-TOP RAIL': 'wall_top_rail',
+  'W-POST': 'wall_posts', 'W-POST (LOCK)': 'wall_posts',
+  'W-MID RAIL': 'wall_mid_rail',
+  'W-BOTTOM RAIL': 'wall_bottom_rail',
+  'W-DOOR STILE (HINGE)': 'wall_door_stiles', 'W-DOOR STILE (LOCK)': 'wall_door_stiles',
+  'W-DOOR TOP RAIL': 'wall_door_top_rail',
+  'W-DOOR MID RAIL': 'wall_door_mid_rail',
+  'W-DOOR BOTTOM RAIL': 'wall_door_bottom_rail',
+  'W-BAR': 'wall_small', 'W-DOOR BAR': 'wall_small', 'W-BEAD': 'wall_small', 'W-DOOR BEAD': 'wall_small', 'W-DOOR HEAD STOP': 'wall_small',
 };
 
 // Cut List group symbol (lists.js CUT_LIST_ORDER) to the same colour group.
@@ -93,6 +115,9 @@ const CUT_SYMBOL_TO_GROUP = {
   'SP-ST': 'door_side_panel', 'SP-TR': 'door_side_panel', 'SP-BR': 'door_side_panel',
   'FS-L/R': 'door_fan', 'FTR': 'door_fan', 'FBR': 'door_fan',
   'FFS-L/R': 'door_fan', 'FFTR': 'door_fan', 'FFBR': 'door_fan',
+  'HB': 'wall_boards', 'EB': 'wall_boards', 'P': 'wall_posts', 'PL': 'wall_posts',
+  'DS-H': 'wall_door_stiles', 'DS-L': 'wall_door_stiles', 'DTR': 'wall_door_top_rail', 'DMR': 'wall_door_mid_rail', 'DBR': 'wall_door_bottom_rail',
+  'GB': 'wall_small', 'DGB': 'wall_small', 'BD': 'wall_small', 'DBD': 'wall_small', 'HS': 'wall_small',
   // the pre-08.10 symbols, for anything saved with them
   'C-FH': 'frame_head', 'C-AH': 'frame_head', 'C-FRR': 'frame_head', 'C-J-L/R': 'frame_jambs', 'C-CILL': 'frame_cill',
   'C-M': 'mullion', 'C-T': 'transom', 'C-ST-L/R': 'leaf_stiles', 'C-TR': 'leaf_top_rail', 'C-ATR': 'leaf_top_rail',

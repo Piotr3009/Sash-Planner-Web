@@ -534,6 +534,10 @@ function Scene({ config, isMobile }) {
                 fixCircleBarOffset={config.fixCircleBarOffset || 200}
                 fixSemiBarPattern={config.fixSemiBarPattern || 'none'}
               />
+            ) : config.windowCategory === 'partition' ? (
+              // Partition walls (25.10.2026): no 3D model yet. Nothing is drawn so the
+              // sash renderer never receives partition data (it renders NaN on it).
+              null
             ) : config.windowCategory === 'door' ? (
               <DoorWindow
                 width={config.extWidth}
@@ -1181,7 +1185,7 @@ export default function App() {
                 />
               </div>
             </>
-          ) : windowCategory === 'fix-only' ? null : windowCategory === 'door' ? (
+          ) : (windowCategory === 'fix-only' || windowCategory === 'partition') ? null : windowCategory === 'door' ? (
             <Slider
               label="Opening"
               value={Math.round(doorOpening * 100)}

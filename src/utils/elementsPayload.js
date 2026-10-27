@@ -23,6 +23,7 @@
  */
 import { groupCasementLeaves, paneTitle } from '../components/drawings/casementDrawUtils.js';
 import { doorSheetPlan } from '../components/drawings/doorDrawUtils.js';
+import { partitionSheetPlan } from '../components/drawings/partitionDrawUtils.js';
 import { tripleSections, tripleSheetKey, tripleSheetLabel } from '../components/drawings/tripleDrawUtils.js';
 import { svgNodeToPng } from './svgRaster.js';
 
@@ -93,6 +94,25 @@ export function elementsPlan(windowSpec, derived) {
       rig: sheets.map((x) => x.key),
       hero: { key: heroSheet.key, label: heroSheet.label },
       drawings: sheets.filter((x) => x.key !== heroSheet.key).map((x) => ({ key: x.key, label: x.label })),
+      cill: null,
+    };
+  }
+
+  // Partition walls (25.10.2026): the front elevation is the hero sheet (the
+  // 'elevation' rig key every panel mounts), then the door leaf, the member
+  // (CNC) sheets and the sections. One plan (partitionDrawUtils.partitionSheetPlan)
+  // for the Drawings panel, its PDF rig and the production pack. No cill page.
+  if (category === 'partition') {
+    const sheets = partitionSheetPlan(derived);
+    if (!sheets.length) return { category, supported: false, leafGroups: [], partitionSheets: [], rig: [], hero: null, drawings: [], cill: null };
+    return {
+      category,
+      supported: true,
+      leafGroups: [],
+      partitionSheets: sheets,
+      rig: ['elevation', ...sheets.map((x) => x.key)],
+      hero: { key: 'elevation', label: 'Front Elevation' },
+      drawings: sheets.map((x) => ({ key: x.key, label: x.label })),
       cill: null,
     };
   }

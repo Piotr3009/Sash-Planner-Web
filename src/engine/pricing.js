@@ -159,6 +159,13 @@ export const DEFAULT_PRICING = Object.freeze({
     singleColourSurcharge: 0.05,
     dualColourSurcharge: 0.15,
   },
+
+  // ── Partition wall (25.10.2026): a placeholder rate per m2 of the wall
+  //    elevation plus a door leaf price; no PSW rate yet (BLOCKERS 34.x).
+  partition: {
+    basePerSqm: 0,
+    doorLeafPrice: 0,
+  },
 });
 
 // Merge a (possibly partial) tenant config over the defaults so missing keys
@@ -308,6 +315,9 @@ export function calculatePrice(config, pricingConfig) {
   }
   if (config.productType === 'door' || config.windowCategory === 'door') {
     return calculateDoor(pricing, config, frameWidth, frameHeight);
+  }
+  if (config.windowCategory === 'partition') {
+    return calculatePartition(pricing, config, frameWidth, frameHeight);
   }
 
   // ── SASH ──
@@ -608,6 +618,38 @@ export function calculateDoor(pricing, config, frameWidth, frameHeight) {
       basePrice: basePrice.toFixed(2), panelPrice: panelPrice.toFixed(2), panelCount,
       barsPrice: barsPrice.toFixed(2), sillPrice: sillPrice.toFixed(2), panelingPrice: panelingPrice.toFixed(2),
       additionalOptions: additionalPrice, colourSurcharge: colourSurcharge.toFixed(2),
+      subtotal: subtotal.toFixed(2), quantity,
+      unitPrice: unitPrice.toFixed(2), totalPrice: totalPrice.toFixed(2),
+      vatAmount: (totalPrice * pricing.vatRate).toFixed(2),
+      totalWithVat: (totalPrice * (1 + pricing.vatRate)).toFixed(2),
+    },
+  };
+}
+
+/**
+ * Partition wall (25.10.2026): wall area x the partition rate + a price per
+ * door leaf (the layout string's D count). The rates default to 0 until PSW
+ * sets them (Settings > Pricing), so the configurator shows 0 rather than a
+ * sash price for a wall.
+ */
+export function calculatePartition(pricing, config, frameWidth, frameHeight) {
+  const pw = pricing.partition || DEFAULT_PRICING.partition;
+  const sqm = (frameWidth / 1000) * (frameHeight / 1000);
+  const doors = String(config.partitionLayout || '').toUpperCase().split('').filter((c) => c === 'D').length;
+  const basePrice = (Number(pw.basePerSqm) || 0) * sqm;
+  const doorPrice = (Number(pw.doorLeafPrice) || 0) * doors;
+  const subtotal = basePrice + doorPrice;
+  const quantity = config.quantity || 1;
+  const discount = getQuantityDiscount(pricing, quantity);
+  const unitPrice = subtotal - subtotal * discount;
+  const totalPrice = unitPrice * quantity;
+  return {
+    unitPrice: round2(unitPrice),
+    totalPrice: round2(totalPrice),
+    total: round2(unitPrice),
+    breakdown: {
+      windowType: 'partition', wallSqm: sqm.toFixed(2), doors,
+      basePrice: basePrice.toFixed(2), doorPrice: doorPrice.toFixed(2),
       subtotal: subtotal.toFixed(2), quantity,
       unitPrice: unitPrice.toFixed(2), totalPrice: totalPrice.toFixed(2),
       vatAmount: (totalPrice * pricing.vatRate).toFixed(2),

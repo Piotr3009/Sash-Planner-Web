@@ -37,6 +37,12 @@
 // rebate = lap 12 + gap 4 = 16 wide; active lip 37, passive lip 14.5, 5.5
 // between them for the seal; lock axis 12 + 21 / 2 = 22.5 from the lip face.
 //
+// The PLATES the Lock Machining sheet draws come from the Winkhaus product DXF
+// drawings (engine/hardware/winkhausOutlines.js, generated; the keeps from the
+// BJ Waller data sheets in engine/hardware/winkhausKeeps.js). Each machining
+// result names its plate (`plate`: outline, from / to the spindle and from the
+// leaf bottom, crop) and its pocket cutter; the sheet places the outlines.
+//
 // Everything here is PURE: no profile store, no React. The engine calls it
 // once per door (deriveDoorWindow) and the sheets read derived.door only.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -94,6 +100,11 @@ export const FGTE_MASTER = Object.freeze({
 export const FGTE_SLAVE = Object.freeze({
   name: 'FGTE slave, rebated routing detail',
   faceplate: { plateWidth: 20, recessWidth: 20.5, recessDepth: 5 },
+  // the slave faceplate strip of the Winkhaus product DXF (G3 Stulpe TFTE
+  // 2062-9 92 MDE, read 24.10.2026 by verify/tools/winkhaus_dxf_outlines.py):
+  // 1702.7 long, its spindle 919.5 above the strip's bottom end; the strip sits
+  // inside the full height recess, extension strips reach the leaf ends
+  strip: { length: 1702.7, below: 919.5, above: 783.2, width: 20 },
   rodChannel: { width: 12.2, depth: 15 },
   pockets: [
     { key: 'shootbolt-lower', from: -795, to: -730, width: 17, depth: 25, note: 'lower shootbolt housing' },
@@ -194,10 +205,16 @@ const resolvePockets = (list, backset) => list.map((p) => ({ ...p, depth: pocket
  *            'fgte-master' / 'fgte-slave' (french with two handles)
  *   edge     the edge face the faceplate sits on: 'lock stile' (a single door),
  *            'active lip' or 'passive shoulder' (a french door)
+ *   plate    the plate the sheet draws: outline ('thunderbolt' | 'fgte-slave' |
+ *            'fgte-master' schematic | null for the keeps), from / to the
+ *            spindle and the leaf bottom, length, width, crop
+ *   cutter   the pocket cutter diameter (the corner radius of the pockets)
  * opts: { leafH, role: 'single'|'active'|'passive', twoHandles, hw (profile
- *         hardware), leafDepth, meeting: leafMeeting(...) | null, backset }
+ *         hardware), leafDepth, meeting: leafMeeting(...) | null, backset,
+ *         centred (the keeps of a single door's jamb: the lock axis centred
+ *         on the leaf depth, as the single door lock is) }
  */
-export function leafLockMachining({ leafH, role, twoHandles, hw = {}, leafDepth, meeting = null, backset }) {
+export function leafLockMachining({ leafH, role, twoHandles, hw = {}, leafDepth, meeting = null, backset, centred = false }) {
   const H = n(leafH, 0);
   // the datum numbers come from the door profile (hardware.*): no defaults here
   const spindle = n(hw.spindleFromLeafBottom, 0);
@@ -208,14 +225,14 @@ export function leafLockMachining({ leafH, role, twoHandles, hw = {}, leafDepth,
   const active = role === 'active';
   // the french lips measure the lock axis from the lip face (12 + 21 / 2 = 22.5,
   // the FGTE 22 mm centre line); a single door lock sits centred on the leaf
-  const margin = single ? R((ld - plateW) / 2) : n(hw.lockEdgeMargin, 0);
+  const margin = single || centred ? R((ld - plateW) / 2) : n(hw.lockEdgeMargin, 0);
   const axisFromFace = R(margin + plateW / 2);
   const kind = single || (active && !twoHandles) ? 'thunderbolt'
     : active ? 'fgte-master'
     : twoHandles ? 'fgte-slave' : 'keeps';
   // the edge face the plate sits on and its width across the leaf
   const edge = single ? 'lock stile' : active ? 'active lip' : 'passive shoulder';
-  const faceWidth = single ? ld : active ? n(meeting?.lip, ld) : R(ld - n(meeting?.lip, 0));
+  const faceWidth = single || centred ? ld : active ? n(meeting?.lip, ld) : R(ld - n(meeting?.lip, 0));
   // the lip face the axis is measured from: the active lip face, which is the
   // face the passive shoulder shares (both leaves measure from the same face)
   const axisFace = meeting ? (active ? meeting.lipFace : other(meeting.lipFace)) : 'exterior';
@@ -235,8 +252,10 @@ export function leafLockMachining({ leafH, role, twoHandles, hw = {}, leafDepth,
     const cropTop = Math.max(0, abs(to) - H);
     const pockets = resolvePockets(K.pockets.filter((p) => !p.optional || hw.auxHousing !== false), D).map(withAbs);
     return {
-      ...base, kit: K.name,
+      ...base, kit: K.name, cutter: K.cutter,
       faceplate: withAbs({ from, to, width: plateW, depth: n(hw.faceplateRecessMaster, fp.plateThickness), plateWidth: fp.plateWidth, cropBottom: R(cropBottom), cropTop: R(cropTop) }),
+      // the plate the sheet draws (engine/hardware/winkhausOutlines.js THUNDERBOLT_PLATE), its bottom end 906 below the spindle
+      plate: withAbs({ outline: 'thunderbolt', from, to, length: fp.length, width: fp.plateWidth, cropBottom: R(cropBottom), cropTop: R(cropTop) }),
       rodChannel: { width: n(hw.rodChannelWidth, K.rodChannel.width), depth: K.rodChannel.depth, over: 'the faceplate length' },
       pockets,
       holes: [
@@ -254,23 +273,25 @@ export function leafLockMachining({ leafH, role, twoHandles, hw = {}, leafDepth,
   if (kind === 'keeps') {
     const K = THUNDERBOLT_1770;
     const full = String(hw.keeps || '').toLowerCase().includes('full');
+    const S = KEEPS.single, Cn = KEEPS.centre;
     const keeps = [
-      { key: 'keep-bottom', code: KEEPS.single.code, name: KEEPS.single.name,
-        plate: { from: K.bolts[0] - KEEPS.single.plate.half, to: K.bolts[0] + KEEPS.single.plate.half, width: KEEPS.single.plate.width, depth: KEEPS.single.plate.depth },
-        pocket: { from: K.bolts[0] - KEEPS.single.pocket.half, to: K.bolts[0] + KEEPS.single.pocket.half, width: KEEPS.single.pocket.width, depth: KEEPS.single.pocket.depth },
+      { key: 'keep-bottom', code: S.code, name: S.name,
+        plate: { from: K.bolts[0] - S.plate.half, to: K.bolts[0] + S.plate.half, width: S.plate.width, depth: S.plate.depth, endRadius: S.plate.endRadius },
+        pocket: { from: K.bolts[0] - S.pocket.half, to: K.bolts[0] + S.pocket.half, width: S.pocket.width, depth: S.pocket.depth, endRadius: S.pocket.endRadius },
         centre: K.bolts[0] },
-      { key: 'keep-centre', code: KEEPS.centre.code, name: KEEPS.centre.name,
-        plate: { ...KEEPS.centre.plate }, pocket: { ...KEEPS.centre.pocket }, centre: 0 },
-      { key: 'keep-top', code: KEEPS.single.code, name: KEEPS.single.name,
-        plate: { from: K.bolts[1] - KEEPS.single.plate.half, to: K.bolts[1] + KEEPS.single.plate.half, width: KEEPS.single.plate.width, depth: KEEPS.single.plate.depth },
-        pocket: { from: K.bolts[1] - KEEPS.single.pocket.half, to: K.bolts[1] + KEEPS.single.pocket.half, width: KEEPS.single.pocket.width, depth: KEEPS.single.pocket.depth },
+      { key: 'keep-centre', code: Cn.code, name: Cn.name,
+        plate: { ...Cn.plate }, pocket: { ...Cn.pocket }, centre: 0 },
+      { key: 'keep-top', code: S.code, name: S.name,
+        plate: { from: K.bolts[1] - S.plate.half, to: K.bolts[1] + S.plate.half, width: S.plate.width, depth: S.plate.depth, endRadius: S.plate.endRadius },
+        pocket: { from: K.bolts[1] - S.pocket.half, to: K.bolts[1] + S.pocket.half, width: S.pocket.width, depth: S.pocket.depth, endRadius: S.pocket.endRadius },
         centre: K.bolts[1] },
     ].map((k) => ({ ...k, plate: withAbs(k.plate), pocket: withAbs(k.pocket), centreBottom: abs(k.centre) }));
     return {
-      ...base, kit: full ? KEEPS.rail.name : 'ThunderBolt keeps: centre + top + bottom',
+      ...base, kit: full ? KEEPS.rail.name : 'ThunderBolt keeps: centre + top + bottom', cutter: 2 * S.pocket.endRadius,
       faceplate: full
         ? withAbs({ from: -THUNDERBOLT_1770.faceplate.below, to: THUNDERBOLT_1770.faceplate.above, width: KEEPS.rail.plateWidth, depth: KEEPS.rail.plateDepth, plateWidth: KEEPS.rail.plateWidth, cropBottom: 0, cropTop: 0 })
         : null,
+      plate: null,
       rodChannel: null, pockets: [], holes: [], bolts: K.bolts.map((b) => ({ at: b, atBottom: abs(b) })),
       keeps,
       notes: [
@@ -283,9 +304,18 @@ export function leafLockMachining({ leafH, role, twoHandles, hw = {}, leafDepth,
   const slave = kind === 'fgte-slave';
   const pockets = resolvePockets(K.pockets, D).map(withAbs);
   const fp = K.faceplate;
+  // the plate the sheet draws: the slave strip of the Winkhaus DXF at its place
+  // (919.5 below the spindle, cropped to the leaf), the master plate schematic
+  // over the full height (no Winkhaus drawing of the master faceplate yet)
+  const strip = slave ? K.strip : null;
+  const plate = strip
+    ? withAbs({ outline: 'fgte-slave', from: -strip.below, to: strip.above, length: strip.length, width: strip.width,
+      cropBottom: R(Math.max(0, strip.below - spindle)), cropTop: R(Math.max(0, abs(strip.above) - H)) })
+    : withAbs({ outline: 'fgte-master', from: -spindle, to: R(H - spindle), length: H, width: fp.plateWidth, cropBottom: 0, cropTop: 0, schematic: true });
   return {
-    ...base, kit: K.name,
+    ...base, kit: K.name, cutter: K.cutter,
     faceplate: withAbs({ from: -spindle, to: R(H - spindle), width: plateW, depth: n(slave ? hw.faceplateRecessSlave : hw.faceplateRecessMaster, fp.recessDepth), plateWidth: fp.plateWidth, cropBottom: 0, cropTop: 0, fullLength: true }),
+    plate,
     rodChannel: { width: n(hw.rodChannelWidth, K.rodChannel.width), depth: n(slave ? hw.rodChannelDepthSlave : hw.rodChannelDepthMaster, K.rodChannel.depth) },
     pockets,
     holes: [
@@ -300,18 +330,23 @@ export function leafLockMachining({ leafH, role, twoHandles, hw = {}, leafDepth,
     ] : [],
     notes: [
       'faceplate recess runs the full leaf height (the FGTE strips are cropped to the leaf)',
-      slave ? 'shootbolt end plate recess 3 deep at both leaf ends (detail A)' : 'the master locks into the slave faceplate: no keeps',
+      slave
+        ? `slave strip ${R(strip.length)} long from ${plate.fromBottom} to ${plate.toBottom} (spindle ${R(strip.below)} above its bottom end); extension strips reach the leaf ends`
+        : 'the master locks into the slave faceplate: no keeps; the master faceplate is drawn schematic (no Winkhaus drawing of it yet)',
+      slave ? 'shootbolt end plate recess 3 deep at both leaf ends (detail A)' : '',
       'handle fixing holes per the Winkhaus face drawing (detail E), not modelled',
-    ],
+    ].filter(Boolean),
   };
 }
 
 /**
  * The machining of a single door's frame JAMB on the lock side: the ThunderBolt
- * keeps in the rebate wall, positions from the leaf bottom carried to the frame
- * (leafBottomY = the leaf bottom in frame coordinates, from the frame top).
+ * keeps in the rebate wall, on the leaf's lock axis (centred on the leaf depth,
+ * as the single door lock is), positions from the leaf bottom carried to the
+ * frame (leafBottomY = the leaf bottom in frame coordinates, from the frame top).
+ * The wall is drawn as wide as the leaf is deep (faceWidth = leafDepth).
  */
-export function jambKeepMachining({ leafH, hw = {}, backset }) {
-  const m = leafLockMachining({ leafH, role: 'passive', twoHandles: false, hw, leafDepth: 0, meeting: null, backset });
-  return { ...m, edge: 'jamb rebate wall', faceWidth: null, fits: { plateToStep: null } };
+export function jambKeepMachining({ leafH, hw = {}, backset, leafDepth = 0 }) {
+  const m = leafLockMachining({ leafH, role: 'passive', twoHandles: false, hw, leafDepth, meeting: null, backset, centred: true });
+  return { ...m, edge: 'jamb rebate wall', faceWidth: n(leafDepth, 0) > 0 ? n(leafDepth, 0) : null, fits: { plateToStep: null } };
 }

@@ -375,6 +375,7 @@ section('8 — src/engine grep gate: no bare 57 / 36 / 40 / 114 in casement / do
     [/specification\.js$/, /toString\(36\)/],                                 // random id base
     [/(specification|calculations)\.js$/, /'cottage-40-60'/],                // the PSW sashProportion value (09.10.2026), a name, not a dimension
     [/profile\.js$/, /./],                                                    // the profile IS the home of workshop numbers
+    [/engine[\\/]hardware[\\/]/, /./],                                         // product drawings (24.10.2026): the Winkhaus plate outlines generated from the DXF files and the data sheet keep faces are product geometry, not workshop numbers
   ];
   const dir = resolve(ROOT, 'src', 'engine');
   const files = [];

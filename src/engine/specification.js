@@ -144,7 +144,7 @@ export class SashProportionError extends Error {
   constructor(message) { super(message); this.name = 'SashProportionError'; }
 }
 import { FAN_AXIS_OFFSET_TOP, FAN_AXIS_OFFSET_BOTTOM } from './casementLayouts.js';
-import { profileBoxDepth, getDoorProfile, DEFAULT_DOOR_PROFILE } from './profile.js';
+import { profileBoxDepth, getDoorProfile, DEFAULT_DOOR_PROFILE, getPartitionProfile } from './profile.js';
 import {
   PSW_ARCH_SHAPE, PSW_ARCH_RISE_RATIO, PSW_SASH_RADIO_SHAPE, LEGACY_ARCH_SHAPES, ARCH_RISE_RATIO, GOTHIC_PROFILE_RATIO,
   ARCH_BAR_PATTERNS, isArchShape, isRoundShape, resolveRoundShape, ArchError, CIRCLE_SHAPE, patternsForShape,
@@ -444,12 +444,14 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
   const rawCategory = item?.windowCategory || ((item?.windowType || fc.windowType) === 'fix-only' ? 'casement' : fc.windowCategory) || 'sash';
   const category = rawCategory === 'doors' ? 'door' : rawCategory;
   const isDoorCategory = category === 'door';
+  const isPartition = category === 'partition';
   // Frame depth — stored on the window; legacy windows fall back to the profile
   // Doors: always the door profile's frame depth (93). The configurator saved
   // the SASH box depth (164) on doors until 08.10.2026, so a stored value is
-  // not read for a door.
+  // not read for a door. A partition (25.10.2026): the partition profile depth.
   const frameDepth = isDoorCategory
     ? (Number(getDoorProfile().frameDepth) || DOOR_FRAME_DEPTH)
+    : isPartition ? (Number(getPartitionProfile().depth) || 54)
     : (item?.frameDepth || profileBoxDepth(glassType === 'triple' ? 'triple' : frameType));
 
   // Opening type — new: item.openingType
@@ -606,6 +608,20 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
         bars: item?.transomBars || fc.transomBars || 'none',
       },
     },
+    // ── Partition walls (meeting rooms, 25.10.2026), only on that category so
+    // every other windowSpec stays as it was (t41 section 17 controls).
+    // layout: the bay left to right, 'S' a glazed screen, 'D' the door; the
+    // screens share the width left after the boards, the posts and the door.
+    ...(isPartition ? {
+      partition: {
+        layout: String(item?.partitionLayout || fc.partitionLayout || getPartitionProfile().defaults.layout || 'SDS').toUpperCase().replace(/[^SD]/g, '') || 'S',
+        doorWidth: Number(item?.partitionDoorWidth ?? fc.partitionDoorWidth) || getPartitionProfile().defaults.doorWidth,
+        lights: Math.max(1, Math.round(Number(item?.partitionLights ?? fc.partitionLights) || getPartitionProfile().defaults.lights)),
+        panelHeight: Math.max(0, Number(item?.partitionPanelHeight ?? fc.partitionPanelHeight ?? getPartitionProfile().defaults.panelHeight) || 0),
+        hingeSide: (item?.partitionHingeSide || fc.partitionHingeSide || getPartitionProfile().defaults.hingeSide) === 'right' ? 'right' : 'left',
+        swing: (item?.partitionSwing || fc.partitionSwing || getPartitionProfile().defaults.swing) === 'in' ? 'in' : 'out',
+      },
+    } : {}),
     color: {
       ral: fc.ralCode || '',
       inside: colorInside,
@@ -639,13 +655,15 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       gas: item?.glassGas ?? fc.glassGas ?? glassGas(glassType),
       thickness: isAcousticUnit({ spec: glassSpec, type: glassType }) ? ACOUSTIC_THICKNESS
         : isDoorCategory ? (DOOR_GLASS_THICKNESS[glassType] ?? GLASS_THICKNESS[glassType] ?? 24)
+        : isPartition ? (Number(getPartitionProfile().glazing.unit) || 28)
         : (GLASS_THICKNESS[glassType] ?? 24),
       // Explicit per-window override only; otherwise undefined so consumers
       // fall back to the workshop profile's glassMakeup (live, snapshot-aware).
       // A door double is the 6x12x6 door unit; a door slim / triple / Laminate
       // / Acoustic unit takes the window makeup through the same fallback.
       makeup: item?.makeup ?? item?.glazing?.makeup
-        ?? ((isDoorCategory && !isAcousticUnit({ spec: glassSpec, type: glassType }) && DOOR_GLASS_MAKEUP[glassType]) || undefined),
+        ?? ((isDoorCategory && !isAcousticUnit({ spec: glassSpec, type: glassType }) && DOOR_GLASS_MAKEUP[glassType]) || undefined)
+        ?? (isPartition ? getPartitionProfile().glazing.makeup : undefined),
       toughened: glassSpec === 'toughened',
       frosted: glassFinish === 'frosted',
       spacerColour: spacerColor,

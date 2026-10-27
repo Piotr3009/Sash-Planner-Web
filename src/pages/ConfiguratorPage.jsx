@@ -11,7 +11,7 @@ import {
   GOTHIC_PROFILE_RATIO, ROUND_AUTO_RATIO, LEGACY_ARCH_SHAPES, PATTERNS_FOR_SHAPE, ARCH_BAR_PATTERN_LABELS,
   isHubPattern, isGothicShape, resolveRoundShape, buildArchPlan, buildSashArchGeometry, planArchSegments, buildCirclePlan,
 } from '../engine/arch.js';
-import { DEFAULT_DOOR_PROFILE, getCasementProfile, getDoorProfile, getWindowProfile } from '../engine/profile.js';
+import { DEFAULT_DOOR_PROFILE, DEFAULT_PARTITION_PROFILE, getCasementProfile, getDoorProfile, getPartitionProfile, getWindowProfile } from '../engine/profile.js';
 import { casementFrameDims, doorFrameDims, doorGeometryFromSpec } from '../utils/windowSpecToConfig.js';
 import { normaliseToWindowSpec, SASH_PROPORTIONS, SASH_PROPORTION_OPTIONS, SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, effectiveSashProportion, TRIPLE_OPENING_LABEL } from '../engine/specification.js';
 import { CONSTANTS, meetingFractionFor } from '../engine/calculations.js';
@@ -92,6 +92,17 @@ const DOOR_DIMS = {
   french: { wMin: 1000, wMax: 2000, hMin: 1900, hMax: 3000, defW: 1600, defH: 2000 },
 };
 const DOOR_DEFAULT_SIZES = Object.values(DOOR_DIMS).map((x) => `${x.defW}x${x.defH}`);
+// Partition walls (25.10.2026): W x H is the wall (the bay between the end
+// boards and the head board), typed as a layout string of screens (S) and
+// doors (D). A fresh wall starts at the owner's Windmill Street bay; the range
+// is a UI clamp only (the engine raises PartitionGeometryError when the bay
+// cannot hold its layout). The partition numbers come from the partition profile.
+const PARTITION_CONSTRAINTS = { minW: 600, maxW: 8000, minH: 1800, maxH: 4000, defW: 2525, defH: 2165 };
+const PARTITION_LIGHTS = [1, 2, 3, 4, 5, 6].map((n) => ({ value: n, label: String(n) }));
+// Hinge side seen from the corridor (the front face); swing out = towards the corridor.
+const PARTITION_HINGE_SIDES = [{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }];
+const PARTITION_SWINGS = [{ value: 'out', label: 'Out (to the corridor)' }, { value: 'in', label: 'In (into the room)' }];
+const cleanPartitionLayout = (v) => String(v || '').toUpperCase().replace(/[^SD]/g, '');
 
 // ─── Frame drives the glass type (box depth + glazing are one decision) ───
 // Depths come from the workshop Window Settings profile (live).
@@ -282,6 +293,16 @@ export default function ConfiguratorPage() {
   const [threshold, setThreshold] = useState('standard');
   const [thresholdExt, setThresholdExt] = useState(0);
 
+  // Partition wall state (25.10.2026): the keys the window record stores
+  // (partition* in projectStore.addWindowToBatch) and specification.js reads.
+  const partitionDefaults = getPartitionProfile().defaults || DEFAULT_PARTITION_PROFILE.defaults;
+  const [partitionLayout, setPartitionLayout] = useState(partitionDefaults.layout || 'SDS');
+  const [partitionDoorWidth, setPartitionDoorWidth] = useState(partitionDefaults.doorWidth || 800);
+  const [partitionLights, setPartitionLights] = useState(partitionDefaults.lights || 3);
+  const [partitionPanelHeight, setPartitionPanelHeight] = useState(partitionDefaults.panelHeight ?? 790);
+  const [partitionHingeSide, setPartitionHingeSide] = useState(partitionDefaults.hingeSide || 'left');
+  const [partitionSwing, setPartitionSwing] = useState(partitionDefaults.swing || 'out');
+
   // Frame choice drives glass type; heritage opens a passive/single choice instead.
   const changeFrame = (v) => {
     setFrameType(v);
@@ -395,6 +416,15 @@ export default function ConfiguratorPage() {
     setDoorBarType(w.doorBarType || 'astragal');
     setThreshold(w.thresholdType || 'standard');
     setThresholdExt(Number(w.thresholdExtension) || 0);
+    // Partition fields (harmless no-ops for the other categories); a stored
+    // panel height of 0 (no panel) is kept, only a missing one takes the default.
+    const pd = getPartitionProfile().defaults || DEFAULT_PARTITION_PROFILE.defaults;
+    setPartitionLayout(cleanPartitionLayout(w.partitionLayout) || pd.layout || 'SDS');
+    setPartitionDoorWidth(Number(w.partitionDoorWidth) || pd.doorWidth || 800);
+    setPartitionLights(Number(w.partitionLights) || pd.lights || 3);
+    setPartitionPanelHeight(w.partitionPanelHeight != null && w.partitionPanelHeight !== '' ? Math.max(0, Number(w.partitionPanelHeight) || 0) : (pd.panelHeight ?? 790));
+    setPartitionHingeSide(w.partitionHingeSide === 'right' ? 'right' : (w.partitionHingeSide === 'left' ? 'left' : (pd.hingeSide || 'left')));
+    setPartitionSwing(w.partitionSwing === 'in' ? 'in' : (w.partitionSwing === 'out' ? 'out' : (pd.swing || 'out')));
   }, [def]);
 
   // Prefill form when editing an existing window
@@ -444,6 +474,11 @@ export default function ConfiguratorPage() {
           setInW(dims.defW);
           setInH(dims.defH);
         }
+        // First wall in a PARTITION batch: the owner's reference bay size.
+        if (batch.type === 'partition') {
+          setInW(PARTITION_CONSTRAINTS.defW);
+          setInH(PARTITION_CONSTRAINTS.defH);
+        }
       }
       setPrefilled(true);
     }
@@ -476,6 +511,8 @@ export default function ConfiguratorPage() {
   // isCasement is also derived below with the other effective values; this
   // early copy exists because the dimension inputs are constrained by it.
   const isCasementBatch = batch?.type === 'casement';
+  // Partition walls (25.10.2026): one flag for the form, the 3D sync, the save and the size clamp.
+  const isPartition = batch?.type === 'partition';
   // batch.type read directly: `isSash` is declared much later in this component (TDZ crash on render, 06.09)
   const isArchedSash = batch?.type === 'sash' && sashType !== 'triple' && sashFrameShape === 'arched';
   const isArched = (isCasementBatch && casFrameShape === 'arched') || isArchedSash;
@@ -523,6 +560,8 @@ export default function ConfiguratorPage() {
         minH: Math.max(CASEMENT_CONSTRAINTS.minH, isGothicUi ? Math.round(gothicRatio * extW + minStraight) : minStraight + 1),
         maxH: CASEMENT_CONSTRAINTS.maxH,
       }
+    : isPartition
+    ? PARTITION_CONSTRAINTS
     : isCasementBatch
       ? CASEMENT_CONSTRAINTS
       : (sashType === 'triple' ? TRIPLE_CONSTRAINTS : DOUBLE_CONSTRAINTS);
@@ -604,6 +643,9 @@ export default function ConfiguratorPage() {
   // isDoor is declared below.
   const frameDepth = (batch?.type === 'door' || batch?.type === 'doors')
     ? (Number(getDoorProfile().frameDepth) || DEFAULT_DOOR_PROFILE.frameDepth)
+    // a partition wall: the member depth of the partition profile (54)
+    : batch?.type === 'partition'
+    ? (Number(getPartitionProfile().depth) || DEFAULT_PARTITION_PROFILE.depth)
     : (FRAME_DEPTHS[frameType] || 164);
   const effectiveLBars = sameBars ? uBars : lBars;
   const isCasement = batch?.type === 'casement';
@@ -624,6 +666,11 @@ export default function ConfiguratorPage() {
   };
   const isFrench = isDoor && doorType === 'french';
   const doorLimits = DOOR_DIMS[doorType] || DOOR_DIMS['single-external'];
+  // Partition walls: the layout as the engine reads it (S and D only, at least one bay)
+  const partitionLayoutClean = cleanPartitionLayout(partitionLayout) || 'S';
+  const partitionHasDoor = partitionLayoutClean.includes('D');
+  const partitionScreens = partitionLayoutClean.split('').filter((c) => c === 'S').length;
+  const partitionDoors = partitionLayoutClean.length - partitionScreens;
   // Doors v3 (09.10.2026): W is the overall frame and the side panel zones sit
   // inside it, so the PSW door width limits apply to the door field (W less
   // the side zones); the height limits stay on H.
@@ -679,6 +726,16 @@ export default function ConfiguratorPage() {
   // ─── 3D sync ───
   const sync = useCallback(() => {
     if (typeof window.update3D !== 'function') return;
+    if (isPartition) {
+      // Partition walls (25.10.2026): no 3D model yet. The category alone makes
+      // the 3D App draw nothing (never the sash model on wall data).
+      window.update3D({
+        windowCategory: 'partition', extWidth: extW, extHeight: extH,
+        woodColor, woodColorExt: woodColor, woodColorInt: woodColor, sameColor: true,
+        doubleGlazing: true, spacerColor, glassFinish: gFin, ironmongery: iron,
+      });
+      return;
+    }
     if (isDoor) {
       // Flat door keys — the 3D App was ported from PSW and reads them directly.
       window.update3D({
@@ -808,7 +865,7 @@ export default function ConfiguratorPage() {
       sashProportion: sashProp, meetingFraction: proportionError ? undefined : meetingFractionFor(extH, sashProp),
       boxType: frameType === 'slim' ? 'slim' : 'standard', boxDepth: frameDepth,
     });
-  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, sashProp, proportionError, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, isArched, isFixedCas, isCircle, pcArchShape, isGothicUi, casArchProfile, casArchRiseSource, archStartNum, archRiseNum, casArchHinge, casArchPattern, isCustomHub, casArchSpokes, casArchRings, isArchedSash, sashArchHB, sashArchVB, sashLowerHB, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType, glassSpec, glassCoating, glassGas, spacerType]);
+  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, sashProp, proportionError, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, isArched, isFixedCas, isCircle, pcArchShape, isGothicUi, casArchProfile, casArchRiseSource, archStartNum, archRiseNum, casArchHinge, casArchPattern, isCustomHub, casArchSpokes, casArchRings, isArchedSash, sashArchHB, sashArchVB, sashLowerHB, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType, glassSpec, glassCoating, glassGas, spacerType, isPartition]);
   useEffect(() => { sync(); }, [sync]);
 
   // ─── B4: Listen for 3D ready event and re-sync ───
@@ -875,6 +932,14 @@ export default function ConfiguratorPage() {
         transomHeight, transomBars: isFrench ? transomBars : 'none',
         thresholdType: threshold, thresholdExtension: thresholdExt,
       } : {}),
+      // Partition walls (25.10.2026): the layout string and the wall numbers;
+      // the door width only when the layout has a door. No trickle vents and no
+      // PAS24 on an internal wall, whatever the hidden sections still hold.
+      ...(isPartition ? {
+        partitionLayout: partitionLayoutClean,
+        partitionDoorWidth, partitionLights, partitionPanelHeight, partitionHingeSide, partitionSwing,
+        ventRoomType: 'other', pas24: false, childRestrictor: false,
+      } : {}),
     };
 
     if (isEditMode) {
@@ -909,7 +974,8 @@ export default function ConfiguratorPage() {
   // Batch type may be 'door' or 'doors' depending on how it was created —
   // normalise so door slots surface either way.
   const slotType = (batch.type === 'doors' ? 'door' : (batch.type || 'sash'));
-  const slotCategories = IRONMONGERY_CATEGORIES.filter(c => (c.windowType === slotType || c.windowType === 'all') && c.slot !== false);
+  // alsoFor: a partition wall takes the door hinge / handle slots (ironmongeryStore); an internal wall has no trickle vents
+  const slotCategories = IRONMONGERY_CATEGORIES.filter(c => (c.windowType === slotType || (c.windowType === 'all' && slotType !== 'partition') || (c.alsoFor || []).includes(slotType)) && c.slot !== false);
   const getSlotItem = (key) => ironItems.find(m => m.id === ironSlots[key]) || null;
 
   // Format custom bars for spec panel
@@ -1062,7 +1128,7 @@ export default function ConfiguratorPage() {
             </div>
           </Sec>}
 
-          <Sec t="Dimensions (Frame)">
+          <Sec t={isPartition ? 'Dimensions (Wall)' : 'Dimensions (Frame)'}>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Lbl>Width (mm)</Lbl>
@@ -1254,14 +1320,44 @@ export default function ConfiguratorPage() {
             </Sec>
           </>}
 
-          <Sec t="Ventilation">
+          {/* Partition walls (25.10.2026): the bay as a layout string, the lights,
+               the panel and the door; the wall size is the Dimensions section above. */}
+          {isPartition && <Sec t="Partition Wall">
+            <Lbl>Layout (left to right, seen from the corridor)</Lbl>
+            <input type="text" value={partitionLayout} maxLength={12} spellCheck={false}
+              onChange={(e) => setPartitionLayout(cleanPartitionLayout(e.target.value))}
+              onBlur={() => setPartitionLayout(partitionLayoutClean)}
+              className="w-full px-3 py-2 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm font-mono tracking-[0.3em] uppercase mb-1" />
+            <div className="text-[11px] text-ink-500 mb-2">S = glazed screen, D = door. {partitionScreens} screen{partitionScreens === 1 ? '' : 's'}{partitionDoors > 0 ? `, ${partitionDoors} door${partitionDoors === 1 ? '' : 's'}` : ', no door'}.</div>
+            {partitionHasDoor && <>
+              <Lbl>Door opening width (mm)</Lbl>
+              <NumInput value={partitionDoorWidth} onCommit={(v) => setPartitionDoorWidth(Math.max(400, Math.round(Number(v) || partitionDefaults.doorWidth || 800)))}
+                className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm mb-2" />
+            </>}
+            <Lbl>Lights per screen</Lbl>
+            <HChips o={PARTITION_LIGHTS} v={partitionLights} c={setPartitionLights} />
+            <Lbl>Panel height (mm, 0 = no panel)</Lbl>
+            <NumInput value={partitionPanelHeight} onCommit={(v) => setPartitionPanelHeight(Math.max(0, Math.round(Number(v) || 0)))}
+              className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm mb-2" />
+            {partitionHasDoor && <>
+              <Lbl>Hinge side (seen from the corridor)</Lbl>
+              <HChips o={PARTITION_HINGE_SIDES} v={partitionHingeSide} c={setPartitionHingeSide} />
+              <Lbl>Swing</Lbl>
+              <HChips o={PARTITION_SWINGS} v={partitionSwing} c={setPartitionSwing} />
+            </>}
+            <div className="text-[11px] text-ink-300 bg-surface-700/50 border border-surface-500 rounded-lg px-3 py-2 mt-1">
+              Solid oak, oiled; members {frameDepth} deep. The screen widths are derived from the wall width less the door and the posts.
+            </div>
+          </Sec>}
+
+          {!isPartition && <Sec t="Ventilation">
             <Lbl>Room type</Lbl>
             <HChips o={ROOM_TYPES} v={ventRoomType} c={setVentRoomType} />
             {(ventRoomType === 'habitable' || ventRoomType === 'kitchen') && (
               <><Lbl>Only window in this room?</Lbl><HChips o={SOLE_OPTIONS} v={ventSoleWindow} c={setVentSoleWindow} /></>
             )}
             <div className="text-[11px] text-ink-300 mt-1.5">Trickle vents: <span className="text-accent-400 font-medium">{buildVentGrilles({ vent: { roomType: ventRoomType, soleWindow: ventSoleWindow } })}</span></div>
-          </Sec>
+          </Sec>}
 
           <Sec t="Glass">
             {isCasement ? (
@@ -1284,7 +1380,7 @@ export default function ConfiguratorPage() {
             ) : (hasGasFill && <div className="text-[11px] text-ink-300 mt-1">Gas: <span className="text-accent-400 font-medium">Argon</span> <span className="text-ink-500">— fixed</span></div>)}
           </Sec>
 
-          <Sec t={isCasement ? 'Security & External Cill' : 'Horns & Security'}>
+          {!isPartition && <Sec t={isCasement ? 'Security & External Cill' : 'Horns & Security'}>
             {isSash && <><Lbl>Horns</Lbl><HChips o={HORN_OPTIONS} v={horn} c={setHorn} /></>}
             {isCasement && <>
               <Lbl>Cill projection</Lbl><HChips o={SILL_OPTIONS} v={sillExt} c={setSillExt} />
@@ -1302,7 +1398,7 @@ export default function ConfiguratorPage() {
                 >?</span>
               </label>
             )}
-          </Sec>
+          </Sec>}
 
           <Sec t="Colour">
             <HChips o={COLOUR_MODES} v={colourMode} c={setColourMode} />
@@ -1397,10 +1493,20 @@ export default function ConfiguratorPage() {
             {!sameBars && <SR l="Lower" v={lBars} />}
             {!sameBars && lBars === 'custom' && lCustom.length > 0 && <div className="px-4 py-0.5 text-[10px] text-accent-400">{formatBars(lCustom)}</div>}
           </SG>}
-          <SG t="Frame & Horns">
-            <SR l="Frame" v={`${frameType} · ${frameDepth}mm`} />
-            {isSash && <SR l="Horns" v={horn} />}
-          </SG>
+          {isPartition && <SG t="Partition Wall">
+            <SR l="Layout" v={partitionLayoutClean} />
+            <SR l="Screens" v={String(partitionScreens)} />
+            {partitionHasDoor && <SR l="Door opening" v={`${partitionDoorWidth} mm`} />}
+            <SR l="Lights" v={`${partitionLights} per screen`} />
+            <SR l="Panel" v={partitionPanelHeight > 0 ? `${partitionPanelHeight} mm` : 'none'} />
+            {partitionHasDoor && <SR l="Hinge" v={`${partitionHingeSide} · opens ${partitionSwing}`} />}
+          </SG>}
+          {isPartition
+            ? <SG t="Members"><SR l="Timber" v="solid oak, oiled" /><SR l="Depth" v={`${frameDepth}mm`} /></SG>
+            : <SG t="Frame & Horns">
+              <SR l="Frame" v={`${frameType} · ${frameDepth}mm`} />
+              {isSash && <SR l="Horns" v={horn} />}
+            </SG>}
           <SG t="Colour">
             <SR l="Mode" v={colourMode} />
             <div className="flex items-center gap-2 px-4 py-1">
@@ -1421,11 +1527,11 @@ export default function ConfiguratorPage() {
             <SR l="Spacer" v={spacerColor} />
             <SR l="Spacer Type" v={(SPACER_TYPES.find(t => t.value === spacerType) || {}).label || 'Warm Edge'} />
           </SG>
-          <SG t="Ventilation">
+          {!isPartition && <SG t="Ventilation">
             <SR l="Room" v={ventRoomType} />
             <SR l="Sole window" v={ventSoleWindow ? 'Yes' : 'No'} />
             <SR l="Trickle vents" v={String(buildVentGrilles({ vent: { roomType: ventRoomType, soleWindow: ventSoleWindow } }))} />
-          </SG>
+          </SG>}
           {isCasement && <SG t="External Cill">
             <SR l="Projection" v={sillExt ? `${sillExt}mm` : 'None'} />
             <SR l="Wider" v={sillWider ? '+50mm each side' : 'No'} />
@@ -1433,7 +1539,7 @@ export default function ConfiguratorPage() {
           </SG>}
           {isSash && <SG t="Opening"><SR l="Type" v={sashType === 'triple' ? TRIPLE_OPENING_LABEL : opening} /></SG>}
           <SG t="Hardware">
-            <SR l="PAS24" v={pas24 ? 'Yes' : 'No'} />
+            {!isPartition && <SR l="PAS24" v={pas24 ? 'Yes' : 'No'} />}
             <SR l="Ironmongery" v={iron} />
             {slotCategories.map(cat => {
               const item = getSlotItem(cat.key);

@@ -496,9 +496,31 @@ const KEY_DOOR_LEAF = [
   [40, 196, 120, 24, 'door_mid_rail'],
   [40, 330, 120, 56, 'door_bottom_rail'],
 ];
+// Partition wall key (25.10.2026): a screen / door / screen bay under the head
+// board and the one top rail (boards, top rail, posts, the screens' mid and
+// bottom rails), and the door leaf (stiles, top / mid / bottom rail; the bars
+// and beads are one colour).
+const KEY_WALL_FRAME = [
+  [0, 0, 340, 14, 'wall_boards'], [0, 14, 14, 372, 'wall_boards'], [326, 14, 14, 372, 'wall_boards'],
+  [14, 14, 312, 24, 'wall_top_rail'],
+  [14, 38, 24, 348, 'wall_posts'], [118, 38, 24, 348, 'wall_posts'], [198, 38, 24, 348, 'wall_posts'], [302, 38, 24, 348, 'wall_posts'],
+  [38, 230, 80, 22, 'wall_mid_rail'], [222, 230, 80, 22, 'wall_mid_rail'],
+  [38, 362, 80, 24, 'wall_bottom_rail'], [222, 362, 80, 24, 'wall_bottom_rail'],
+  [38, 38, 80, 192, null], [222, 38, 80, 192, null],
+];
+const KEY_WALL_LEAF = [
+  [40, 36, 120, 180, null],
+  [40, 240, 120, 100, null],
+  [10, 6, 30, 380, 'wall_door_stiles'], [160, 6, 30, 380, 'wall_door_stiles'],
+  [40, 6, 120, 30, 'wall_door_top_rail'],
+  [40, 216, 120, 24, 'wall_door_mid_rail'],
+  [40, 340, 120, 46, 'wall_door_bottom_rail'],
+  [40, 96, 120, 8, 'wall_small'], [40, 156, 120, 8, 'wall_small'],
+];
 const KEY_SHEETS = {
   casement: { title: 'COLOUR KEY · CASEMENT', frame: KEY_FRAME, leaf: KEY_LEAF, families: ['frame', 'leaf'] },
   door: { title: 'COLOUR KEY · DOOR', frame: KEY_DOOR_FRAME, leaf: KEY_DOOR_LEAF, families: ['door_frame', 'door_leaf'] },
+  partition: { title: 'COLOUR KEY · PARTITION WALL', frame: KEY_WALL_FRAME, leaf: KEY_WALL_LEAF, families: ['wall_frame', 'wall_leaf'], titles: ['WALL', 'DOOR LEAF'] },
 };
 
 function drawColourKeyPage(doc, PG, topY, kind = 'casement') {
@@ -551,8 +573,8 @@ function drawColourKeyPage(doc, PG, topY, kind = 'casement') {
     });
   };
 
-  drawPart('FRAME', K.frame, K.families[0], x0);
-  drawPart('LEAF', K.leaf, K.families[1], x0 + 610 * u);
+  drawPart(K.titles?.[0] || 'FRAME', K.frame, K.families[0], x0);
+  drawPart(K.titles?.[1] || 'LEAF', K.leaf, K.families[1], x0 + 610 * u);
 }
 
 // ─── COLOUR BY WINDOW (08.10.2026) ───
@@ -769,6 +791,7 @@ export function exportPreCutPDF({
     const fams = new Set(summaryGroups.flatMap((sg) => colourGroupsIn(sg.items).map((g) => g.family)));
     if (fams.has('frame') || fams.has('leaf')) drawColourKeyPage(doc, PG, beginPage(), 'casement');
     if (fams.has('door_frame') || fams.has('door_leaf')) drawColourKeyPage(doc, PG, beginPage(), 'door');
+    if (fams.has('wall_frame') || fams.has('wall_leaf')) drawColourKeyPage(doc, PG, beginPage(), 'partition');
   }
   // Per window: the window colour sheet at the end.
   if (mode === 'window' && content !== 'list' && windowList.length) {

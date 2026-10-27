@@ -25,7 +25,7 @@
  * glazier DXF.
  */
 import { useMemo } from 'react';
-import { getCasementProfile, DEFAULT_CASEMENT_PROFILE } from '../../engine/profile.js';
+import { getCasementProfile, DEFAULT_CASEMENT_PROFILE, getPartitionProfile } from '../../engine/profile.js';
 import { readGlassProfile } from '../../engine/glassBars.js';
 import { DimChainH, DimChainV, DimH, DimV, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, VIEWBOX_REF } from './drawingTheme.js';
@@ -36,14 +36,18 @@ import { NS, num, fmtGlass, safely, NoSheet, glassSpecText, SheetTitle } from '.
 const NOTE_CHARS = 80;
 
 function buildGlass(windowSpec, derived, group) {
-  if (!windowSpec || !group || derived?.category !== 'door') return null;
+  if (!windowSpec || !group || (derived?.category !== 'door' && derived?.category !== 'partition')) return null;
   const unit = derived.customGlassUnits?.[group.rep];
   const w = num(unit?.width, num(group.w));
   const h = num(unit?.height, num(group.h));
   if (!(w > 0 && h > 0)) return null;
   const type = windowSpec.glazing?.type || 'double';
-  const G = safely(() => readGlassProfile(getCasementProfile(), type))
-    || safely(() => readGlassProfile(DEFAULT_CASEMENT_PROFILE, type));
+  // Partition units (25.10.2026): the perimeter spacer of the profile and the
+  // DUMMY spacer behind the applied bars, both from the partition profile.
+  const G = derived.category === 'partition'
+    ? safely(() => { const g = getPartitionProfile().glazing; return { edgeCover: Number(g.spacer), barWidth: Number(g.dummySpacer) }; })
+    : (safely(() => readGlassProfile(getCasementProfile(), type))
+      || safely(() => readGlassProfile(DEFAULT_CASEMENT_PROFILE, type)));
   if (!G) return null;
   const bars = unit?.bars || {};
   const xs = (Array.isArray(bars.x) ? bars.x : []).map(Number).filter(Number.isFinite);
@@ -90,9 +94,13 @@ export default function DoorGlassDrawing2D({ windowSpec, derived, group , window
     if (last >= 0 && paneLines[last].length + 1 + item.length <= NOTE_CHARS) paneLines[last] += ` ${item}`;
     else paneLines.push(last < 0 ? `Panes: ${item}` : item);
   });
+  const isWall = derived.category === 'partition';
   const notes = [
     ...paneLines,
-    `Edge seal ${fmtGlass(edge)} · spacer bars ${fmtGlass(geom.spacer)} on the wood bar centre lines${geom.vBars.length || geom.hBars.length ? ` (${geom.vBars.length} vertical, ${geom.hBars.length} horizontal)` : ''}`,
+    isWall
+      ? `Spacer ${fmtGlass(edge)} · dummy spacer ${fmtGlass(geom.spacer)} on the applied bar lines${geom.hBars.length || geom.vBars.length ? ` (${geom.hBars.length} H, ${geom.vBars.length} V)` : ''} · bars on the faces, not in the unit`
+      : `Edge seal ${fmtGlass(edge)} · spacer bars ${fmtGlass(geom.spacer)} on the wood bar centre lines${geom.vBars.length || geom.hBars.length ? ` (${geom.vBars.length} vertical, ${geom.hBars.length} horizontal)` : ''}`,
+    ...(isWall && (derived.customGlassUnits?.[group.rep]?.role === 'door') ? ['Door unit: safety glass to AD K (both panes)'] : []),
   ];
 
   const topCuts = [0, ...geom.vBars.flatMap((b) => [b.left, b.right]), w];

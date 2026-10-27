@@ -76,6 +76,8 @@ export function buildCutListForWindow(derived, windowSpec) {
   if (derived?.unsupported) return [];
   if (!derived) return [];
   const out = [];
+  // Partition walls (25.10.2026) are solid oak throughout, frame and leaf.
+  const isWall = derived.category === 'partition';
   // Box (frame) components
   derived.components.box.forEach((c) => {
     out.push({
@@ -83,7 +85,7 @@ export function buildCutListForWindow(derived, windowSpec) {
       section: c.section,
       length: c.length,
       quantity: c.quantity,
-      material: 'Sapele / Engineered timber',
+      material: isWall ? 'Oak (solid)' : 'Sapele / Engineered timber',
       notes: c.notes || ''
     });
   });
@@ -94,7 +96,7 @@ export function buildCutListForWindow(derived, windowSpec) {
       section: c.section,
       length: c.length,
       quantity: c.quantity,
-      material: 'Hardwood (sash)',
+      material: isWall ? 'Oak (solid)' : 'Hardwood (sash)',
       notes: c.notes || ''
     });
   });
@@ -240,7 +242,8 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg, resolveRa
   // map, else the finished section. Never profileRawForSection: it reads the
   // second number as a sash face, so 94x57, 100x57 and 180x57 would all fall
   // into the sash 63x63 stock.
-  const rawFor = (c) => (String(c.elementName || '').startsWith('D-')
+  // Partition oak (W-*, 25.10.2026) follows the door rule.
+  const rawFor = (c) => (/^[DW]-/.test(String(c.elementName || ''))
     ? (resolveRaw?.(c.elementName) || settings?.sectionMap?.[c.section] || c.section)
     : (resolveRaw?.(c.elementName) || settings?.sectionMap?.[c.section] || profileRawForSection(c.section) || c.section));
   derived.components.sash.forEach((c) => {
@@ -274,7 +277,8 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg, resolveRa
     // leaves lands in ONE group and the optimizer cuts it from the same bars.
     // Door frame members (D-*, owner box item 17, 08.10.2026) the same way:
     // they take their assigned material and merge with every door member of it.
-    if (c.elementName?.startsWith('C-') || c.elementName?.startsWith('D-')) {
+    // Partition members (W-*, 25.10.2026) too: one oak stock across the wall.
+    if (c.elementName?.startsWith('C-') || c.elementName?.startsWith('D-') || c.elementName?.startsWith('W-')) {
       const raw = rawFor(c);
       if (!bySection.has(raw)) bySection.set(raw, []);
       bySection.get(raw).push({
@@ -334,7 +338,8 @@ export function buildGlassListForWindow(derived, windowSpec) {
   // Non-double-hung sources (casement, triple sections) supply units directly
   if (Array.isArray(derived.customGlassUnits) && derived.customGlassUnits.length > 0) {
     const barSrc = derived.category === 'door' ? windowSpec?.door : windowSpec?.casement;
-    const barType = barSrc?.barType === 'georgian' ? 'georgian' : 'astragal';
+    // Partition units (25.10.2026) carry APPLIED bars both faces over a dummy spacer.
+    const barType = derived.category === 'partition' ? 'applied' : (barSrc?.barType === 'georgian' ? 'georgian' : 'astragal');
     return derived.customGlassUnits.map((u) => {
       // Casement frosted scope lives in ONE place: casementPaneFinish
       // ('bottom' = main lights only, 'both' = every pane). Screen drawings
@@ -350,7 +355,7 @@ export function buildGlassListForWindow(derived, windowSpec) {
       // to recompute them locally while the PDF printed nothing — one engine
       // field now feeds the panel text, the PDF column AND the PDF sketch.
       // Doors (08.10.2026): the same per-unit bars from the door engine.
-      if ((derived.category === 'casement' || derived.category === 'door') && u.bars) {
+      if ((derived.category === 'casement' || derived.category === 'door' || derived.category === 'partition') && u.bars) {
         // the unit's OWN bars from the engine grid (casementBarGrid.js): a
         // light under a fan carries only the window lines that cross it
         const { v, h } = u.bars;
@@ -588,6 +593,28 @@ export function buildHardwareList(windowSpec, derived = null) {
     }
     return list;
   }
+  if (cat === 'partition') {
+    // Partition walls (25.10.2026): the door hinges (the fire door butt, three
+    // or four per leaf by the door rule), one tubular latch and one lever
+    // handle set per door at the profile handle height, and the dowels of the
+    // whole wall (the joint schedule). No Assign Materials rows yet (BLOCKERS
+    // 34.x), so no `enginePart` flags: every line is a plain hardware line.
+    const pw = derived?.partition;
+    if (!pw) return [];
+    const list = [];
+    const doors = pw.doors || [];
+    const hinges = doors.reduce((a, d) => a + (d.hinges?.count || 0), 0);
+    if (hinges > 0) {
+      const h0 = doors[0].hinges;
+      list.push({ item: 'Door hinge', detail: `${h0.name} · ${doors.map((d) => `D${d.n} ${d.hinges.count} (${d.hingeSide}, opens ${d.swing})`).join(' / ')}`, quantity: hinges });
+      list.push({ item: 'Tubular latch', detail: `${doors[0].latch.caseLength} case, ${doors[0].latch.backset} backset · per door`, quantity: doors.length });
+      list.push({ item: 'Lever handle set', detail: `on rose, ${windowSpec?.hardware?.finish || 'stainless'} · ${doors[0].latch.fromFloor} from the floor`, quantity: doors.length });
+    }
+    if (pw.dowels?.count > 0) {
+      list.push({ item: 'Dowels', detail: `${pw.dowels.dia} x ${pw.dowels.length} hardwood · ${pw.dowels.perJoint} per joint`, quantity: pw.dowels.count });
+    }
+    return list;
+  }
   if (cat !== 'sash') return [];
   const finish = windowSpec?.hardware?.finish || 'brass';
   const isPas24 = windowSpec?.hardware?.catches === 'PAS24';
@@ -728,6 +755,24 @@ export const CUT_LIST_ORDER = [
   { match: 'D-FIX FAN STILE (L)',       symbol: 'FFS-L/R', label: 'Fixed Fan Stiles (pair)',  isPair: true },
   { match: 'D-FIX FAN TOP RAIL',        symbol: 'FFTR',  label: 'Fixed Fan Top Rail' },
   { match: 'D-FIX FAN BOTTOM RAIL',     symbol: 'FFBR',  label: 'Fixed Fan Bottom Rail' },
+  // ── PARTITION WALL (W-*, 25.10.2026: boards, frame, screens, the door leaf, beads) ──
+  { match: 'W-HEAD BOARD',              symbol: 'HB',    label: 'Head Board' },
+  { match: 'W-END BOARD',               symbol: 'EB',    label: 'End Boards' },
+  { match: 'W-TOP RAIL',                symbol: 'TR',    label: 'Wall Top Rail' },
+  { match: 'W-POST',                    symbol: 'P',     label: 'Posts' },
+  { match: 'W-POST (LOCK)',             symbol: 'PL',    label: 'Lock Post (stop lip from solid)' },
+  { match: 'W-MID RAIL',                symbol: 'MR',    label: 'Screen Mid Rails' },
+  { match: 'W-BOTTOM RAIL',             symbol: 'BR',    label: 'Screen Bottom Rails' },
+  { match: 'W-DOOR HEAD STOP',          symbol: 'HS',    label: 'Door Head Stop' },
+  { match: 'W-DOOR STILE (HINGE)',      symbol: 'DS-H',  label: 'Door Stile (hinge)' },
+  { match: 'W-DOOR STILE (LOCK)',       symbol: 'DS-L',  label: 'Door Stile (lock)' },
+  { match: 'W-DOOR TOP RAIL',           symbol: 'DTR',   label: 'Door Top Rail' },
+  { match: 'W-DOOR MID RAIL',           symbol: 'DMR',   label: 'Door Mid Rail' },
+  { match: 'W-DOOR BOTTOM RAIL',        symbol: 'DBR',   label: 'Door Bottom Rail' },
+  { match: 'W-BAR',                     symbol: 'GB',    label: 'Applied Glazing Bars' },
+  { match: 'W-DOOR BAR',                symbol: 'DGB',   label: 'Door Applied Glazing Bars' },
+  { match: 'W-BEAD',                    symbol: 'BD',    label: 'Screen Beads' },
+  { match: 'W-DOOR BEAD',               symbol: 'DBD',   label: 'Door Beads' },
 ];
 
 /**
@@ -779,7 +824,7 @@ export function buildGroupedCutList(rawCutList) {
     }));
     return [...merged, ...(keepNotes ? passthrough.map((r) => ({ ...r, notes: (r.notes || []).filter(Boolean).join(' / ') })) : passthrough)];
   };
-  const isDoorGroup = (name) => String(name || '').startsWith('D-');
+  const isDoorGroup = (name) => /^[DW]-/.test(String(name || ''));   // doors and partition walls keep their notes
   const notesOf = (...rs) => rs.map((r) => r?.notes).filter(Boolean);
 
   // Bucket rows by engine element name.

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { normalizeSashProfile, migrateCasementProfile, migrateDoorProfile, DEFAULT_SASH_PROFILE, DEFAULT_CASEMENT_PROFILE, DEFAULT_DOOR_PROFILE, setActiveWindowProfile, setActiveCasementProfile, setActiveDoorProfile, casementGlassDeduction } from '../engine/profile.js';
+import { normalizeSashProfile, migrateCasementProfile, migrateDoorProfile, migratePartitionProfile, DEFAULT_SASH_PROFILE, DEFAULT_CASEMENT_PROFILE, DEFAULT_DOOR_PROFILE, DEFAULT_PARTITION_PROFILE, setActiveWindowProfile, setActiveCasementProfile, setActiveDoorProfile, setActivePartitionProfile, casementGlassDeduction } from '../engine/profile.js';
 import { loadWindowProfiles, saveWindowProfiles } from '../services/cloudSync.js';
 
 // Deep clone helper for the plain-JSON profile object
@@ -20,7 +20,8 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
 //
 // The cloud is an adapter so a harness can run two tabs over one fake cloud
 // (setWindowProfileCloud); the default is the Supabase settings row.
-const KINDS = ['sash', 'casement', 'door'];
+const KINDS = ['sash', 'casement', 'door', 'partition'];   // partition since 25.10.2026 (meeting room walls)
+const DEFAULTS_BY_KIND = { sash: DEFAULT_SASH_PROFILE, casement: DEFAULT_CASEMENT_PROFILE, door: DEFAULT_DOOR_PROFILE, partition: DEFAULT_PARTITION_PROFILE };
 let cloudAdapter = { load: loadWindowProfiles, save: saveWindowProfiles };
 export function setWindowProfileCloud(adapter) {
   cloudAdapter = adapter || { load: loadWindowProfiles, save: saveWindowProfiles };
@@ -31,6 +32,7 @@ function migrateKind(kind, profile) {
   if (!profile) return null;
   if (kind === 'sash') return normalizeSashProfile(clone(profile));
   if (kind === 'casement') return migrateCasementProfile(clone(profile)) || clone(DEFAULT_CASEMENT_PROFILE);
+  if (kind === 'partition') return migratePartitionProfile(clone(profile));
   return migrateDoorProfile(clone(profile));
 }
 
@@ -45,7 +47,7 @@ export function mergeWindowProfiles(cloud, local, dirty) {
   const out = {};
   for (const kind of KINDS) {
     const base = migrateKind(kind, cloud?.[kind]);
-    if (!base) { out[kind] = clone(local[kind]); continue; }
+    if (!base) { out[kind] = local?.[kind] ? clone(local[kind]) : clone(DEFAULTS_BY_KIND[kind]); continue; }
     const paths = (dirty || []).filter((d) => d === kind || d.startsWith(`${kind}.`));
     if (paths.includes(kind)) { out[kind] = clone(local[kind]); continue; }
     for (const d of paths) {
@@ -94,6 +96,13 @@ function syncGlassDeduction(casement) {
 const DOOR_PATH_ROOTS = ['frameDepth', 'leafDepth', 'leafDepthTriple', 'frenchLip', 'elements', 'geometry', 'deductions', 'cillInward', 'sidePanel', 'fixedFan', 'couplingPost', 'panel', 'hinges', 'hardware', 'meeting', 'lengths'];
 const DOOR_STRING_LEAVES = ['faceplate', 'keeps', 'fgteShootbolts', 'cillKeep'];
 const DOOR_BOOLEAN_LEAVES = ['auxHousing'];
+// Partition profile keys the Window Settings Partition card may write
+// (setPartitionPath, 25.10.2026): the same rule as the doors (root whitelisted,
+// the leaf must exist). String leaves: the glazing makeup and bead side, the
+// panel build, the latch kind, the configurator default layout / hand / swing.
+const PARTITION_PATH_ROOTS = ['depth', 'elements', 'glazing', 'panel', 'door', 'hinges', 'hardware', 'joints', 'lengths', 'defaults'];
+const PARTITION_STRING_LEAVES = ['makeup', 'beadSide', 'build', 'glazed', 'headStop', 'latch', 'name', 'layout', 'hingeSide', 'swing'];
+const PARTITION_BOOLEAN_LEAVES = ['radius'];
 
 /**
  * Workshop window-construction profile (Window Settings page): sash, casement
@@ -108,6 +117,7 @@ export const useWindowProfileStore = create(
       sash: clone(DEFAULT_SASH_PROFILE),
       casement: clone(DEFAULT_CASEMENT_PROFILE),
       door: clone(DEFAULT_DOOR_PROFILE),
+      partition: clone(DEFAULT_PARTITION_PROFILE),
 
       setVariantField: (variantKey, field, value) => {
         get()._edit(['sash.variants'], (s) => {
@@ -301,6 +311,36 @@ export const useWindowProfileStore = create(
         get()._edit(['door'], { door: clone(DEFAULT_DOOR_PROFILE) });
       },
 
+      // ── Partition walls (25.10.2026): the same generic setter for the Partition card
+      setPartitionPath: (path, value) => {
+        if (!Array.isArray(path) || !path.length || !PARTITION_PATH_ROOTS.includes(path[0])) return;
+        const leaf = path[path.length - 1];
+        const isString = PARTITION_STRING_LEAVES.includes(leaf);
+        const isBool = PARTITION_BOOLEAN_LEAVES.includes(leaf);
+        const v = isString ? String(value ?? '') : isBool ? (value === true || value === 'true' || value === 'yes') : Number(value);
+        if (!isString && !isBool && (value === '' || value == null || !Number.isFinite(v))) return;
+        get()._edit([`partition.${path[0]}`], (s) => {
+          const partition = clone(s.partition);
+          if (path.length === 1) {
+            if (!(leaf in partition) || typeof partition[leaf] === 'object') return {};
+            partition[leaf] = v;
+            return { partition };
+          }
+          let node = partition;
+          for (let i = 0; i < path.length - 1; i++) {
+            if (node[path[i]] == null || typeof node[path[i]] !== 'object') return {};
+            node = node[path[i]];
+          }
+          if (!(leaf in node)) return {};
+          node[leaf] = v;
+          return { partition };
+        });
+      },
+
+      resetPartitionToDefaults: () => {
+        get()._edit(['partition'], { partition: clone(DEFAULT_PARTITION_PROFILE) });
+      },
+
       resetToDefaults: () => {
         get()._edit(['sash', 'casement'], { sash: clone(DEFAULT_SASH_PROFILE), casement: clone(DEFAULT_CASEMENT_PROFILE) });
       },
@@ -322,6 +362,7 @@ export const useWindowProfileStore = create(
         setActiveWindowProfile(get().sash);
         setActiveCasementProfile(get().casement);
         setActiveDoorProfile(get().door);
+        setActivePartitionProfile(get().partition);
         if ((get().dirty || []).length) scheduleCloudSave(() => get().saveToCloud());
       },
 
@@ -336,7 +377,7 @@ export const useWindowProfileStore = create(
         saveChain = saveChain.then(async () => {
           const dirty = [...(get().dirty || [])];
           if (!dirty.length) return null;
-          const local = { sash: clone(get().sash), casement: clone(get().casement), door: clone(get().door) };
+          const local = { sash: clone(get().sash), casement: clone(get().casement), door: clone(get().door), partition: clone(get().partition || DEFAULT_PARTITION_PROFILE) };
           let merged;
           try {
             const cloud = await cloudAdapter.load();
@@ -353,6 +394,7 @@ export const useWindowProfileStore = create(
           setActiveWindowProfile(get().sash);
           setActiveCasementProfile(get().casement);
           setActiveDoorProfile(get().door);
+          setActivePartitionProfile(get().partition);
           return merged;
         });
         return saveChain;
@@ -363,12 +405,13 @@ export const useWindowProfileStore = create(
       loadFromCloud: async () => {
         try {
           const cloud = await cloudAdapter.load();
-          if (cloud?.sash || cloud?.casement || cloud?.door) {
-            const local = { sash: get().sash, casement: get().casement, door: get().door };
+          if (cloud?.sash || cloud?.casement || cloud?.door || cloud?.partition) {
+            const local = { sash: get().sash, casement: get().casement, door: get().door, partition: get().partition || clone(DEFAULT_PARTITION_PROFILE) };
             set(mergeWindowProfiles(cloud, local, get().dirty || []));
             setActiveWindowProfile(get().sash);
             setActiveCasementProfile(get().casement);
             setActiveDoorProfile(get().door);
+            setActivePartitionProfile(get().partition);
           }
         } catch (err) {
           console.error('windowProfile loadFromCloud', err);
@@ -394,6 +437,13 @@ export const useWindowProfileStore = create(
           const d = migrateDoorProfile(state.door);
           setActiveDoorProfile(d);
           setTimeout(() => useWindowProfileStore.setState({ door: d }), 0);
+        }
+        // Partition walls (25.10.2026): a cache saved before the kind existed
+        // has no copy; the engine then reads the default until the first edit.
+        if (state?.partition) {
+          const w = migratePartitionProfile(state.partition);
+          setActivePartitionProfile(w);
+          setTimeout(() => useWindowProfileStore.setState({ partition: w }), 0);
         }
         // Tenant profile from Supabase wins over the local cache, but for the
         // paths this browser changed and has not saved yet (persisted `dirty`):

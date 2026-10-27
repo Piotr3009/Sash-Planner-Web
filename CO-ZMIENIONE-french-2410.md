@@ -1,4 +1,4 @@
-# Co zmienione 24.10.2026: french meeting stiles i obrobka pod zamek (main 20fba5c)
+# Co zmienione 24.10.2026: french meeting stiles i obrobka pod zamek (main 20fba5c; v3 na 44a6b11)
 
 Zmiana z czatu (bez tury nocnej). Pliki w ZIP-ie, wszystkie sciezki jak w repo.
 
@@ -44,6 +44,31 @@ Zmiana z czatu (bez tury nocnej). Pliki w ZIP-ie, wszystkie sciezki jak w repo.
 * nowy `verify/parity/t49_door_meeting_machining.mjs` (55 checks), poprawione oczekiwania w t40 i t41.
 * Build OK. Suite: patrz BUILD-LOG (wpis 24.10).
 
+## 6. Wieczor, wersja v3: plyty narysowane z DXF (Piotr: "wybrania plus plyty, rounded edge, specjalne wciecia")
+
+* **Dwa arkusze zamiast jednego:** "Lock Machining: active" i "Lock Machining: passive" (french) albo "leaf" i
+  "jamb" (single). Kazdy arkusz: krawedz w skali 1:1 (dol skrzydla po lewej) z PRAWDZIWA plyta, wybrania
+  (kreskowane, promien freza 12 / 17 w narozach), obudowy i otwory przelotowe (spindle 8, PZ) liniami kreskowanymi,
+  potem DETALE A, B, C... w jednej skali (3:1 do 1.5:1, jeden rzad przy 2:1 lub lepiej, inaczej dwa rzedy), pod
+  kazdym oknem pozycje od dolu skrzydla, tabela (od dolu skrzydla i od spindle), notatki w dwoch kolumnach.
+* **ThunderBolt:** plyta 1770 x 20 z twojego DXF (T-FGAO2070): zaokraglone konce R10, okna rygli podwojnych, okno
+  rygla glownego i zapadki, 10 otworow pod wkrety z pogłebieniem, nity, obudowy 89..182 / 788..966 / 1579..1672
+  (grubosc 11.5 / 15.1 z widoku od konca) kreskowane za plyta.
+* **Keeps (F2402, F24-912W) z kart BJ Waller:** plytki 24 x 2.5 z koncami R12, kieszen 18 x 25 R6, okna na rygle,
+  wkrety (F2402: 76 / 66 od srodka, 17.5 / 6.5 od krawedzi; F24-912W: 96.5 nad klamka, 31.5 i 114.5 pod, na osi),
+  srubki regulacyjne.
+* **FGTE slave:** listwa 1702.68 x 20 z DXF (G3 Stulpe TFTE 2062-9 LH 22): skrzynki keepow na haki, okna keepa
+  rygla i zapadki, dzwignia regulacji (do 25), klocki prowadzace na koncach. Spindle 919.5 nad dolnym koncem listwy
+  (wg rysunku zamka slave: follower 783.18 od lewego konca, dziurka PZ 92 dalej, szczelina w dol) -> listwa lezy
+  130.5..1833.2 na skrzydle 1998; recess na cala wysokosc, plytki koncowe 0..65 i 1933..1998.
+* **FGTE master:** brak DXF plyty w paczce -> plyta schematyczna (kreskowana, 20 szer., okna na haki i rygle) na
+  kieszeniach Winkhaus. Jak dasz DXF mastera, wchodzi tym samym generatorem.
+* **Jamb (single):** keeps teraz na osi zamka 28.5 (srodek skrzydla 57), nie 22.5 (blad poprzedniej wersji).
+* Generator: `verify/tools/winkhaus_dxf_outlines.py <ThunderBolt.dxf> <slave LH.dxf>` (ezdxf) pisze
+  `src/engine/hardware/winkhausOutlines.js`; pliki DXF Winkhaus zostaja poza repo. Keeps recznie w
+  `src/engine/hardware/winkhausKeeps.js`.
+* Testy: t49 80 checks (plyty, oba arkusze, zgodnosc outline z silnikiem), t41 z drugim arkuszem. Build OK.
+
 ## 5. Otwarte (BLOCKERS 33)
 
 1. [HIGH] 33.1 Spindle 1050 nad dolem skrzydla: potwierdz (zakres FGTE 1040 do 1247).
@@ -54,3 +79,7 @@ Zmiana z czatu (bez tury nocnej). Pliki w ZIP-ie, wszystkie sciezki jak w repo.
 5. [MEDIUM] 33.7 Nie modelowane: flush bolts, kieszenie zawiasow, otwory pod srubki klamki (detail E), wariant
    FGTE 12 / 14 dla inward, rowek uszczelki poza szerokoscia 3.
 6. [LOW] 33.9 Export drzwi do bSuite: nastepny krok, gdy beda programy skrzydla (zmienne = tabela machining).
+7. [HIGH] 33.10 Listwa slave: orientacja (spindle 919.5 nad dolnym koncem) wywnioskowana z rysunku zamka slave;
+   LH / RH i w ktora strone dzwignia (exterior / interior) do potwierdzenia, arkusz jeszcze nie lustrzy.
+8. [MEDIUM] 33.11 Brak DXF plyty FGTE master: plyta schematyczna do czasu rysunku.
+9. [LOW] 33.12 Plyta ThunderBolt symetryczna w poprzek: jeden rysunek na obie rece.

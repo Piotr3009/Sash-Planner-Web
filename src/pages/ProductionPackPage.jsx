@@ -54,6 +54,10 @@ import DoorElevation2D from '../components/drawings/DoorElevation2D.jsx';
 import DoorSheet from '../components/drawings/DoorSheet.jsx';
 import DoorGlassDrawing2D from '../components/drawings/DoorGlassDrawing2D.jsx';
 import { groupDoorGlass } from '../components/drawings/doorDrawUtils.js';
+// Partition walls (25.10.2026): the elevation, the sheets and the glass grouping
+import PartitionElevation2D from '../components/drawings/PartitionElevation2D.jsx';
+import PartitionSheet from '../components/drawings/PartitionSheet.jsx';
+import { groupPartitionGlass } from '../components/drawings/partitionDrawUtils.js';
 import { elementsPlan, buildElementsPayload, buildCillInset } from '../utils/elementsPayload.js';
 // Triple sash (Piotr 13.10.2026): one sash sheet and one glass sheet per section (FIX L, C, FIX R)
 import { tripleSections } from '../components/drawings/tripleDrawUtils.js';
@@ -247,7 +251,7 @@ export default function ProductionPackPage() {
     if (!sourceWindows.length) return { windowsData: [], excludedWindows: [] };
     const rows = sourceWindows.map((win) => {
       const b = win._batch || batch;
-      const { spec, windowSpec, derived, error } = deriveWindowBounded(win, (ws) => withProfiles(b?.defaults?._profileSnapshot?.sash, b?.defaults?._profileSnapshot?.casement, b?.defaults?._profileSnapshot?.door, () => deriveWindowData(ws, settings)));
+      const { spec, windowSpec, derived, error } = deriveWindowBounded(win, (ws) => withProfiles(b?.defaults?._profileSnapshot?.sash, b?.defaults?._profileSnapshot?.casement, b?.defaults?._profileSnapshot?.door, b?.defaults?._profileSnapshot?.partition, () => deriveWindowData(ws, settings)));
       return { win, spec, windowSpec, derived, error };
     });
     const { ok, excluded } = splitBounded(rows);
@@ -304,7 +308,7 @@ export default function ProductionPackPage() {
       // Hardware
       // doors (08.10.2026): the door hardware lines need the engine picks (derived);
       // sash and casement keep the call they had
-      const hw = buildHardwareList(windowSpec, windowSpec?.category === 'door' ? derived : null);
+      const hw = buildHardwareList(windowSpec, (windowSpec?.category === 'door' || windowSpec?.category === 'partition') ? derived : null);
       allHardware.push(...hw.map((h) => ({ ...h, windowName: win.name, _projectNumber: win._projectNumber })));
 
       // Beading
@@ -683,7 +687,7 @@ export default function ProductionPackPage() {
 // PDFs used win.upperBars here, which is a sash-only field → casement always
 // showed "none" while the Glass PDF was right (Piotr 02.08).
 function winBarsLabel(wd) {
-  if ((wd?.windowSpec?.category || 'sash') === 'casement' || wd?.windowSpec?.category === 'door') {
+  if ((wd?.windowSpec?.category || 'sash') === 'casement' || wd?.windowSpec?.category === 'door' || wd?.windowSpec?.category === 'partition') {
     const rows = buildGlassListForWindow(wd.derived, wd.windowSpec) || [];
     const uniq = [...new Set(rows.map((r) => r.bars).filter(Boolean))];
     return uniq.length ? uniq.join(' / ') : 'none';
@@ -713,6 +717,22 @@ function overviewCells(wd) {
       // doors v3 (CLAUDE.md 3.8): the handing as the configurator states it ("Hinge left · opens outward")
       opening: `${wd?.derived?.door?.handing?.label || d.openDirection || 'outward'} · ${lock} · ${threshold}`,
       box: wd?.derived?.door?.frameDepth ?? wd?.windowSpec?.frame?.depth,
+    };
+  }
+  // Partition walls (25.10.2026): the layout in the Type column, screens x lights
+  // in the Head column, the door (opening, hinge, swing) in the Opening column,
+  // the member depth (54) in the Box column.
+  const pw = wd?.windowSpec?.partition;
+  if (wd?.windowSpec?.category === 'partition' && pw) {
+    const dp = wd?.derived?.partition;
+    const doors = dp?.doors || [];
+    return {
+      type: `wall ${pw.layout || 'S'}`,
+      head: dp ? `${dp.screens?.length || 0} screen${(dp.screens?.length || 0) === 1 ? '' : 's'} · ${dp.lightsPerScreen} lights${pw.panelHeight > 0 ? ` · panel ${pw.panelHeight}` : ''}` : `${pw.lights} lights`,
+      opening: doors.length
+        ? doors.map((d) => `door ${d.w} · hinge ${d.hingeSide} · opens ${d.swing}`).join(' / ')
+        : 'no door',
+      box: dp?.depth ?? wd?.windowSpec?.frame?.depth,
     };
   }
   return {
@@ -975,7 +995,9 @@ function ElevationsTab({ windowsData, pp, batch, isPPMode, registerExport }) {
             ) : (
               <>
                 <div ref={(el) => { refs.current[win.id] = el; }}>
-                  {plan.category === 'door'
+                  {plan.category === 'partition'
+                    ? <PartitionElevation2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} windowTag={tagOf(win)} />
+                    : plan.category === 'door'
                     ? <DoorElevation2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} windowTag={tagOf(win)} />
                     : plan.category === 'casement'
                     ? <CasementElevation2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} windowTag={tagOf(win)} />
@@ -1196,6 +1218,28 @@ function ElementsTab({ windowsData, pp, batch, isPPMode, registerExport }) {
                 </div>
               ))}
             </div>
+          ) : plan.category === 'partition' ? (
+            /* Partition walls (25.10.2026): the front elevation (the hero sheet of
+               the Elements PDF) then one card per partition sheet (door leaf, the
+               member CNC sheets, the sections), refs by plan key. */
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+              <div className="card p-4 cursor-zoom-in"
+                onClick={() => setExpandedDrawing({ windowSpec, derived, type: 'partitionelev', title: `${win.name}: Front Elevation`, projectNumber: win._projectNumber, windowTag })}>
+                <div className="text-xs font-semibold text-ink-200 mb-2">Front Elevation</div>
+                <div ref={(el) => { refs.current[`${win.id}-elevation`] = el; }}>
+                  <PartitionElevation2D windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} windowTag={windowTag} />
+                </div>
+              </div>
+              {plan.partitionSheets.map((sh) => (
+                <div key={sh.key} className="card p-4 cursor-zoom-in"
+                  onClick={() => setExpandedDrawing({ windowSpec, derived, type: 'partitionsheet', sheet: sh, title: `${win.name}: ${sh.label}`, projectNumber: win._projectNumber, windowTag })}>
+                  <div className="text-xs font-semibold text-ink-200 mb-2">{sh.label}</div>
+                  <div ref={(el) => { refs.current[`${win.id}-${sh.key}`] = el; }}>
+                    <PartitionSheet sheet={sh} windowSpec={windowSpec} derived={derived} projectNumber={win._projectNumber} windowTag={windowTag} />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : plan.category === 'casement' ? (
             <>
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -1317,6 +1361,12 @@ function ElementsTab({ windowsData, pp, batch, isPPMode, registerExport }) {
               )}
               {expandedDrawing.type === 'doorsheet' && (
                 <DoorSheet sheet={expandedDrawing.sheet} windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} projectNumber={expandedDrawing.projectNumber} windowTag={expandedDrawing.windowTag} />
+              )}
+              {expandedDrawing.type === 'partitionelev' && (
+                <PartitionElevation2D windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} projectNumber={expandedDrawing.projectNumber} windowTag={expandedDrawing.windowTag} />
+              )}
+              {expandedDrawing.type === 'partitionsheet' && (
+                <PartitionSheet sheet={expandedDrawing.sheet} windowSpec={expandedDrawing.windowSpec} derived={expandedDrawing.derived} projectNumber={expandedDrawing.projectNumber} windowTag={expandedDrawing.windowTag} />
               )}
             </div>
           </div>
@@ -1512,7 +1562,17 @@ function GlassTab({ merged, windowsData, isPPMode, batch, pp, registerExport, ex
 
       {/* Glass drawings per window — upper + lower */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {windowsData.flatMap(({ win, windowSpec, derived }) => windowSpec?.category === 'door'
+        {windowsData.flatMap(({ win, windowSpec, derived }) => windowSpec?.category === 'partition'
+          // Partition walls (25.10.2026): one drawing per unique screen / door unit, the door glass sheet
+          ? groupPartitionGlass(derived).map((gp) => (
+            <div key={`${win.id}-${gp.key}`} className="card p-4">
+              <div className="text-xs font-semibold text-ink-200 mb-2">
+                {isPPMode && win._projectNumber ? `${win._projectNumber} · ` : ''}{win.name}: Glass {gp.w} × {gp.h} · ×{gp.panes.length}
+              </div>
+              <DoorGlassDrawing2D windowSpec={windowSpec} derived={derived} group={gp} windowTag={tagOf(win)} />
+            </div>
+          ))
+          : windowSpec?.category === 'door'
           // Doors (08.10.2026): one drawing per unique door unit (door leaves, side panels, fanlights)
           ? groupDoorGlass(derived, windowSpec).map((gp) => (
             <div key={`${win.id}-${gp.key}`} className="card p-4">
@@ -2375,7 +2435,10 @@ function SprayMeta({ label, value }) {
 
 function SprayingTab({ windowsData, batch, pp, registerExport }) {
   const data = useMemo(() => {
-    const wins = (windowsData || []).filter((wd) => wd.derived);
+    // Partition walls (25.10.2026): oiled oak, no paint (derived.paint.areaSqm 0),
+    // so they never enter the spraying list; the header names them.
+    const oiled = (windowsData || []).filter((wd) => wd.derived && wd.derived.category === 'partition').map((wd) => wd.win?.name).filter(Boolean);
+    const wins = (windowsData || []).filter((wd) => wd.derived && wd.derived.category !== 'partition');
     const colorSections = {};  // hex → { hex, name, rows:[{projectNum, window, element, colour, size, sort}] }
     const beadByColor = {};    // interior hex → { hex, name, beads:{label: mm} }
 
@@ -2464,7 +2527,7 @@ function SprayingTab({ windowsData, batch, pp, registerExport }) {
     const projects = [...new Set(wins.map((w) => w.win._projectNumber).filter(Boolean))];
     const colourChips = sections.map((s) => ({ hex: s.hex, name: s.name }));
 
-    return { sections, beadGroups, projects, colourChips };
+    return { sections, beadGroups, projects, colourChips, oiled };
   }, [windowsData]);
 
   const handleExport = () => {
@@ -2494,7 +2557,7 @@ function SprayingTab({ windowsData, batch, pp, registerExport }) {
   registerExport('spraying', handleExport);
 
   if (!data.sections.length && !data.beadGroups.length) {
-    return <div className="card p-8 text-center text-ink-400">No data available.</div>;
+    return <div className="card p-8 text-center text-ink-400">{data.oiled.length ? `No spraying: ${data.oiled.join(', ')} ${data.oiled.length === 1 ? 'is' : 'are'} oiled oak (partition walls, no paint).` : 'No data available.'}</div>;
   }
 
   const countBoxes = (rows) => rows.filter((r) => r.element === 'Box').length;
@@ -2523,6 +2586,9 @@ function SprayingTab({ windowsData, batch, pp, registerExport }) {
         </div>
         {data.projects.length > 0 && (
           <div className="mt-1.5 text-xs"><span className="text-ink-500">Projects: </span><span className="text-ink-200">{data.projects.join(' · ')}</span></div>
+        )}
+        {data.oiled.length > 0 && (
+          <div className="mt-1.5 text-xs"><span className="text-ink-500">Not sprayed: </span><span className="text-ink-200">{data.oiled.join(', ')} (oiled oak partition walls, no paint)</span></div>
         )}
       </div>
 

@@ -155,6 +155,16 @@ export default function WindowPreview3D({ windowSpec, side, derived = null }) {
   // derived (when the page has it): the meeting line under the batch profile snapshot
   const config = useMemo(() => windowSpecToConfig(windowSpec, derived), [windowSpec, derived]);
 
+  // Partition walls (25.10.2026): no 3D model yet; a placeholder instead of the
+  // sash renderer, which would draw NaN geometry on partition data.
+  if (config.windowCategory === 'partition') {
+    return (
+      <div className="grid place-items-center h-full text-ink-400 text-sm text-center px-4">
+        3D preview is not available for partition walls yet.
+      </div>
+    );
+  }
+
   // Camera position based on window size (a door: the whole assembly)
   const h = (config.doorGeo ? Math.max(config.doorGeo.totalHeight, config.doorGeo.totalWidth) : (config.height || 1800)) / 1000;
   const cameraZ = Math.max(h * 1.4, 1.8);

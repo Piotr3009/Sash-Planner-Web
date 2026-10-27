@@ -12,6 +12,9 @@ import CasementElevation2D from './CasementElevation2D.jsx';
 import DoorElevation2D from './DoorElevation2D.jsx';
 import DoorSheet from './DoorSheet.jsx';
 import { doorSheetPlan } from './doorDrawUtils.js';
+import PartitionElevation2D from './PartitionElevation2D.jsx';
+import PartitionSheet from './PartitionSheet.jsx';
+import { partitionSheetPlan } from './partitionDrawUtils.js';
 import CasementFrameDetail2D from './CasementFrameDetail2D.jsx';
 import CasementLeafDetail2D from './CasementLeafDetail2D.jsx';
 import { groupCasementLeaves, paneTitle } from './casementDrawUtils.js';
@@ -45,12 +48,23 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
   // plan the PDF rig, the Elements PDF and the production pack use.
   const doorSheets = isDoor ? doorSheetPlan(derived) : [];
   const renderDoorSheet = (sh) => <DoorSheet sheet={sh} windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />;
-  // triple sash: the sections of the engine (null on a double-hung, a casement, a door)
-  const triple = !isCasement && !isDoor ? tripleSections(derived) : null;
+  // Partition walls (25.10.2026): one tab per partition sheet (door leaf, the
+  // member CNC sheets, the sections), the same plan the PDF rig, the Elements
+  // PDF and the production pack use. A partition must never reach the sash sheets.
+  const isPartition = (windowSpec?.category || 'sash') === 'partition';
+  const partitionSheets = isPartition ? partitionSheetPlan(derived) : [];
+  const renderPartitionSheet = (sh) => <PartitionSheet sheet={sh} windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} windowTag={item?.name} />;
+  // triple sash: the sections of the engine (null on a double-hung, a casement, a door, a partition)
+  const triple = !isCasement && !isDoor && !isPartition ? tripleSections(derived) : null;
   const renderSashSheet = (type, section) => (
     <SashDetail2D key={tripleSheetKey(type, section)} windowSpec={windowSpec} derived={derived} type={type} section={section} />
   );
-  const visibleTabs = isDoor
+  const visibleTabs = isPartition
+    ? [
+        { id: 'elevation', label: 'Front Elevation' },
+        ...partitionSheets.map((sh) => ({ id: sh.key, label: sh.label })),
+      ]
+    : isDoor
     ? [
         { id: 'elevation', label: 'Front Elevation' },
         ...doorSheets.map((sh) => ({ id: sh.key, label: sh.label })),
@@ -170,8 +184,16 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
                 {sh.sheet === 'section' && <div className="mt-4"><SectionsUpload item={item} batch={batch} /></div>}
               </div>
             ))}
+            {isPartition && partitionSheets.map((sh) => subTab === sh.key && (
+              <div key={sh.key}>
+                {renderPartitionSheet(sh)}
+                {sh.sheet === 'section' && <div className="mt-4"><SectionsUpload item={item} batch={batch} /></div>}
+              </div>
+            ))}
             {subTab === 'elevation' && (
-              isDoor
+              isPartition
+                ? <PartitionElevation2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} windowTag={item?.name} />
+                : isDoor
                 ? <DoorElevation2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
                 : isCasement
                 ? <CasementElevation2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
@@ -206,7 +228,9 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
       {derived && (
         <div aria-hidden="true" style={{ position: 'absolute', left: '-99999px', top: 0, width: '1200px' }}>
           <div ref={(el) => { refs.current['elevation'] = el; }}>
-            {isDoor
+            {isPartition
+              ? <PartitionElevation2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} windowTag={item?.name} />
+              : isDoor
               ? <DoorElevation2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
               : isCasement
               ? <CasementElevation2D windowSpec={windowSpec} derived={derived} projectNumber={batch?.projectNumber} />
@@ -215,6 +239,11 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
           {isDoor && doorSheets.map((sh) => (
             <div key={sh.key} ref={(el) => { refs.current[sh.key] = el; }}>
               {renderDoorSheet(sh)}
+            </div>
+          ))}
+          {isPartition && partitionSheets.map((sh) => (
+            <div key={sh.key} ref={(el) => { refs.current[sh.key] = el; }}>
+              {renderPartitionSheet(sh)}
             </div>
           ))}
           {isCasement && (<>
@@ -230,7 +259,7 @@ export default function DrawingsPanel({ item, windowSpec, settings, derived, bat
             </div>
           ))}
           </>)}
-          {!isCasement && !isDoor && (<>
+          {!isCasement && !isDoor && !isPartition && (<>
           <div ref={(el) => { refs.current['box'] = el; }}>
             <BoxDetail2D windowSpec={windowSpec} derived={derived} />
           </div>

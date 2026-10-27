@@ -13,7 +13,7 @@ import { deriveWindowBounded, splitBounded, excludedWindowsNote, sashBarsLabel }
 import ImageLightbox from '../components/ImageLightbox.jsx';
 
 
-const TYPE_LABELS = { sash: 'Sash Windows', casement: 'Casement Windows', 'fix-frame': 'Fix Frame', doors: 'Doors', special: 'Special / Other' };
+const TYPE_LABELS = { sash: 'Sash Windows', casement: 'Casement Windows', 'fix-frame': 'Fix Frame', doors: 'Doors', partition: 'Partition walls', special: 'Special / Other' };
 const STATUS_STYLES = {
   'preparation': { cls: 'badge-prep', icon: '📋' },
   'in-production': { cls: 'badge-active', icon: '🔧' },
@@ -65,7 +65,7 @@ export default function ProjectDetailPage() {
     const rows = [];
     batches.forEach((b) => {
       (b.windows || []).forEach((win) => {
-        const row = deriveWindowBounded(win, (windowSpec) => withProfiles(b?.defaults?._profileSnapshot?.sash, b?.defaults?._profileSnapshot?.casement, b?.defaults?._profileSnapshot?.door, () => deriveWindowData(windowSpec, settings)));
+        const row = deriveWindowBounded(win, (windowSpec) => withProfiles(b?.defaults?._profileSnapshot?.sash, b?.defaults?._profileSnapshot?.casement, b?.defaults?._profileSnapshot?.door, b?.defaults?._profileSnapshot?.partition, () => deriveWindowData(windowSpec, settings)));
         rows.push({ ...row, batch: b });
       });
     });
@@ -195,6 +195,7 @@ export default function ProjectDetailPage() {
               { type: 'sash', icon: '🪟', label: 'Sash Windows' },
               { type: 'casement', icon: '🔲', label: 'Casement' },
               { type: 'doors', icon: '🚪', label: 'Doors' },
+              { type: 'partition', icon: '▦', label: 'Partition walls' },
               { type: 'special', icon: '✦', label: 'Special / Other' },
             ].map(({ type, icon, label }) => (
               <button key={type} onClick={() => handleAddBatch(type)}
@@ -260,7 +261,10 @@ export default function ProjectDetailPage() {
                         <div className="font-semibold text-sm text-ink-50">{win.name}</div>
                         <div className="text-xs text-ink-400 mt-0.5">{win.width} × {win.height} mm</div>
                         <div className="text-[10px] text-ink-400 mt-1">
-                          {sashBars != null
+                          {bounded?.windowSpec?.category === 'partition'
+                            /* partition walls (25.10.2026): the layout and the lights, no bars field */
+                            ? `Layout ${bounded.windowSpec.partition?.layout || 'S'} · ${bounded.windowSpec.partition?.lights || 1} lights`
+                            : sashBars != null
                             ? (sashBars !== 'none' ? `Bars: ${sashBars}` : 'No bars')
                             : (win.upperBars && win.upperBars !== 'none' ? `Bars: ${win.upperBars}` : 'No bars')}
                           {win.glassFinish === 'frosted' ? ' · Frosted' : ''}
