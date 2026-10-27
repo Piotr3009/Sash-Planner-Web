@@ -4,6 +4,170 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-10-27 · FIRE DOORS v1, items for Piotr (branch `claude/fire-doors-v1`)
+
+Every item below is either an ASSUMPTION (ZAŁOŻENIE) the tura took where the owner box of 27.10.2026 gave no
+number, or something only the owner can do or decide. Each assumption names the profile key (Window Settings ·
+Fire Doors, or `DEFAULT_FIREDOOR_PROFILE` in `src/engine/profile.js`) and the value used; the engine, the lists, the
+sheets, the 3D and both exports follow the key, so a change in the morning is a number, not a rework. The reference
+door FD30 826 x 2040, depth 100, hinge left, latch (frame 902 x 2083, hinges 150 / 944 / 1738, jamb recesses 188 /
+982 / 1776, keep 990, intumescent 4.906 m) is checked by `verify/parity/t51_fire_door.mjs`. The model:
+`docs/handover/FIRE-DOORS.md`.
+
+**35.1 One PC type with a Fire switch; the numbering FDR-nn / DR-nn (owner check).** `defaults.fire true`,
+`defaults.rating 'FD30'`. Fire ON gives FDR-01, FDR-02 ..., Fire OFF DR-01 ..., two digits, the lowest free number
+per prefix over every window of the project; the configurator suggests it, the name is editable; the prefix follows
+the switch on an unsaved door only, a saved door is never renamed. Fire ON = FD30 or FD60 (leaf 44 / 54,
+`leaf.thicknessByRating`), fire hinges, lock FD30 / FD60, keep FD30 / FD60, intumescent, fire glass, closer on by
+default; Fire OFF = standard hinges, standard lock and keep, no intumescent, toughened glass, closer off. The
+non-fire leaf is 44 (`leaf.thicknessByRating.none 44`).
+
+**35.2 The leaf blank is bought oversize and the CNC cuts the size: blank = leaf + 0 (owner check).**
+`leaf.blankAllowance 0`: the BOM counts one blank per door on the row of its rating (Door Blank FD30 44 / FD60 54 /
+non-fire 44, pieces), never timber metres. The macro LEAD_EDGE expression value -8 (`leaf.leadEdgeMacroValue`,
+unit not decoded) goes only into the machining CSV as `value` of the leadEdge op; the macro cuts the bevel. The
+hard sanity limits that fail ONE door with a message (never a clamp): width 300 to 1500, height 1500 to 3000,
+depth 50 to 400 (`leaf.limits`).
+
+**35.3 The frame: raw width = depth + 5, the leaf 5 above the floor, the head on a 45 mitre (owner check).**
+`frame.rawWidthAllowance 5` (raw 63 x 105 on a 100 wall, machined to 50 x 100); `frame.floorGap 5` (the LSP: the
+jambs stand 5 below the leaf; overall height = leaf + 43 = 5 + leaf + 3 + 35); `frame.headJoint 'mitre'` (the LSP
+draws the head corners mitred; only 'mitre' is implemented, another word fails the door with a message). The faces
+35 outside / 50 inside follow the elevations of the LSP and the owner's 50 (the LSP plan draws the jamb 45: ignored).
+
+**35.4 Hinges: the macro rule counted from the leaf TOP; the recess 103 x 30 x 3 R6 (owner check in bSolid).**
+`hinges.count 3`, `length 102`, `topOffset 150`, `bottomOffset 200`: the macro expression `(lpx - 150 - 200 - w) /
+(repn - 1)` gives step 794 on a 2040 leaf (the number stored in the master) and hinges 150 / 944 / 1738 from the
+leaf top to the hinge top edge, the last ending 200 above the bottom. Which end of LPX is the door top is NOT
+confirmed in the master: PC assumes the 150 end is the TOP (the top hinge nearer the head). Check it on the
+machine before a leaf is cut; if the macro counts the 150 from the bottom, swap `topOffset` and `bottomOffset`.
+The recess (`recessLength 103`, `recessWidth 30`, `recessDepth 3`, `cornerRadius 6`): plate + 1 mm (your rule),
+3 deep, R6 corners (the 12 cutter); the old Weeke programs cut 3.2 / 4 / 4.2 deep, so the depth is a key
+(HINGE_D in the list). The macro reading "29.5 + 7" (recess about 29.5 plus a run-out) is not used.
+
+**35.5 The lock: the case pocket 87 x 153, the case top 46.5 above the spindle, the forend centre 15 below it,
+the hole bores (owner check).** `lock.case.pocketWidth 17` (your 14 + 3), `pocketDepth 87`, `pocketHeight 153` (your
+proposal "to confirm"); `lock.caseTopAboveSpindle 46.5` (from the macro `lock_h + 46.5`) and
+`lock.forendCentreBelowSpindle 15` (from the macro `lock_h - 15` family) place the pocket and the forend on the leaf
+and the keep on the jamb; `lock.spindleBore 10`, `euroBore 18`, `bathroomBore 10` are drawing and CSV numbers only
+(the macro bores its own). Spindle 1000 (`lock.spindleHeight`, LOCK_H), backset 60, forend 235 x 24 milled 236 x
+25, euro 72 / bathroom 78 as you gave them. A latch = the same pocket without the second hole (LOCK_TYPE as agreed).
+
+**35.6 The keep: plate 3 deep, one pocket 120 x 18 x 15 behind it, KEEP_STYLE 1 (owner check).** `keep.plateDepth 3`;
+`keep.pocket { length 120, width 18, depth 15 }` is ONE pocket for the latch and the bolt centred on the 176 x 40
+plate (the macro expressions `lock_h - 15 +- 10 / - 15` were not decoded into two pockets). The lock jamb row
+writes KEEP 1 / 2 / 3 as the lock (standard / FD30 / FD60), `KEEP_STYLE 1` (the macro: 1 keep lock, 2 dead lock
+keep) and KEEP_Y = the keep centre above the jamb foot (990 = 5 + 1000 - 15).
+
+**35.7 The vision panel placement is PC's own, not the macro's (owner check).** The macro cut is not decoded;
+the sheets and the 3D put the first pane top at `vp.topRail 150`, the panes centred across the leaf, the A/B pair
+styles (2, 12) `vp.midRail 450` apart, the nNo styles (6, 7, 8, 13) `vp.stackGap 100` apart, a pane turned 90 when the
+stack does not fit the height, the diamond a square turned 45; `vp.sideMargin 150` (the macro D_SIDE_MARGIN) only
+raises a warning; every sheet says "layout per bSolid macro". The export sends VP_STYLE and the C_VP_* values and
+the macro places the cut. `vp.cornerRadius 6` (half the 12 cutter), `vp.beadFaces 2` (bead metres = perimeter x 2),
+`vp.glassThickness 6` for the fire glass AND the toughened glass (one number). Style 3 does not exist in the macro.
+
+**35.8 Intumescent: strips per edge by the label, groove = strip + 0.5, two strips at T / 2 +- 11 (owner check).**
+`intumescent.styles[].strips`: 1 for the single strip labels (1, 2, 5, 6), 2 for the 2No labels (3, 4, 7); metres =
+strips x (2 x height + width) (4.906 m on the reference door with style 1); one Assign Materials row per strip
+width (10 / 15 / 20). `intumescent.grooveOversize 0.5` (the macro cuts 15.5 for a 15 strip). `twoStripOffset 11`:
+the two grooves centred 11 either side of the leaf middle (centres 11 and 33 on a 44 leaf, 6.5 apart), NOT the
+2.75 of the macro samples `lpz / 2 +- 2.75`, which are the two passes of the 10 saw cutting ONE 15.5 groove (at 2.75
+two 15.5 grooves would overlap). The "2L Top" of styles 5 to 7 is not decoded (counted like the others). Styles 8
+to 13 of the macro (TH, pairs) are not in the form (single doors only).
+
+**35.9 bSuite: HAND 0 = Hinge left, the leaf master path, the target folder 'fd-machine', REBATE 0 (owner check in
+bSolid).** `bsuite.hand { left 0, right 1 }`: the macro's "Stan Hinge LH" condition is `(hinge = 0) & (hand = 0)`,
+so PC writes HAND 0 for "Hinge left" of the form (seen from the PULL side, the knuckle side) and 1 for "Hinge
+right", with LH / RH 1 on the matching side. Check on the first leaf that the macro's hand 0 is the door you call
+hinge left (the LSP kit hands the door the other way round, from the push side: its "L" is PC's right). The leaf
+path `C:/Users/Xp600/Desktop/Biesse Piotr/FD_LEAF_MASTER_PIOTR.bSolid` (editable); the three frame paths empty. The
+uploaded programs live under the target id 'fd-machine' (a folder of their own, never shared with the casement
+'machine' uploads). `bsuite.macroDefaults.REBATE 0` is written (a single door has no meeting rebate) although the
+saved master stores 1 (35.11); `bsuite.stopRows true`.
+
+**35.10 What you must add in bSolid: document variables on FD_LEAF_MASTER_PIOTR, and the three frame masters.**
+The leaf master has ONLY LPX, LPY, LPZ at the document level; a worklist row can set nothing else today, so PC can
+change the board size and nothing more. For the list to drive the hinges and the lock, add a DOCUMENT variable
+with each of these names and bind the macro parameter of the same name to it inside `Master_Door_PIOTR`: HAND, LH,
+RH, HINGE, LOCK, LOCK_H, SPINDLE, EURO, KEEP, KEEP_STYLE, INTU_STYLE, VP_STYLE, C_VP_L, C_VP_W, C_VP_NUM, C_VP_RAIL,
+C_VP_POS, D_TOP_RAIL, D_MID_RAIL, D_SIDE_MARGIN, LEAD_EDGE, REBATE, REBATE_STYLE, SPY_ON, SPY_H, LBOX, L_BOX_H,
+DROP_CILL, PREM_DOOR, and the NEW names the master does not have at all: HINGE_1, HINGE_2, HINGE_3 (the hinge tops
+from the leaf top, one per hinge), HINGE_D (the recess depth), CLOSER (0 / 1). PC writes every one of them as a
+document variable (String) on the FD_LEAF row in that order, and LPX / LPY / LPZ on the panel node as Double (the
+way the casement rows and your own saved list write the board). The frame masters FD_HEAD, FD_JAMB_HINGE and
+FD_JAMB_LOCK (5-axis) do not exist: their rows need the variables LPX (the long point length), LPY (the frame
+depth), LPZ (50), REB_W, REB_D, HAND, HINGE, HINGE_D, MITRE_TOP, MITRE_BOTTOM, plus HINGE_1 .. HINGE_3 (from the jamb
+top long point) on the hinge jamb and KEEP, KEEP_STYLE, KEEP_Y (from the jamb foot) on the lock jamb. Until a path
+is set in Window Settings · Fire Doors · bSuite those rows are skipped with a message naming the doors (never an
+error); the machining CSV / JSON carries every op for the programmer meanwhile. Prove on the machine that the
+master reacts to the document variables from a worklist before trusting the export (the 06.10.2026 lesson).
+
+**35.11 Values in your saved master that look wrong for a single door.** `REBATE 1` with `REBATE_STYLE 1` ("Rebate
+& Meeting Style RH pull FD30", the meeting rebate of a PAIR): PC writes REBATE 0 and REBATE_STYLE 1. `EURO 1` fixed
+on: PC writes EURO 1 only for the euro sashlock, 0 for a latch and a bathroom lock. Also `HAND 1` and `LOCK 2` /
+`KEEP 2` are the values of the door you last saved, not defaults: the list sets them per door.
+
+**35.12 Concealed closer: a row in the order and the CLOSER flag, NO machining.** The old Weeke programs call the
+components `concealed_closer_lhits11.mpr` / `concealed_closer_RHits1120.mpr` and those files are not in the pack,
+so the recess sizes are unknown. PC: the hardware line "Concealed closer", the Assign Materials row `fd_closer`,
+the price rate `pricing.firedoor.closerPrice`, CLOSER 0 / 1 in the leaf row, nothing in the machining list. Needed
+from you: the closer model, the recess on the leaf top (length x width x depth, the position from the hinge edge)
+and the recess in the head (the same, its position from the hinge jamb), whether the arm channel is in the head or
+the leaf, and whether the closer changes with the hand.
+
+**35.13 Hinge positions: three sources disagree; the count stays 3 (owner decision).** The macro rule is used
+(150 from the top, the last hinge ending 200 above the bottom, equal spacing: 150 / 944 / 1738 on 2040). The old
+Weeke programs cut 145 / 700 / 1722 from the top; the LSP draws 145 and 700 from the top and 200 from the bottom.
+Say which is the workshop rule; the keys of 35.4 change it. A 4th hinge: the macro supports REPN and the engine
+writes HINGE_n for every hinge of `hinges.count` (4 gives HINGE_1 .. HINGE_4 on the leaf and the jamb rows and four
+recesses on both), but the master would need HINGE_4 too; say whether a 4th hinge rule is wanted (and from what
+leaf height or weight).
+
+**35.14 Not modelled, ask: smoke seals (FD30S), architraves, door signs, the drop seal.** No row, no key, no
+drawing for any of them (the macro has DROP_CILL, written 0). If a doorset is sold with them, say which are
+standard and whether they are ordered per door (metres of seal, sets of architrave, signs per leaf).
+
+**35.15 Double doors: the next tura (the KIT_DOOR_DOUBLE rules).** From the LSP kit: the overall frame is typed;
+frame width = the two leaves + 3 + 76 = leaves + 79; height = leaf + 43; centre gap 3; the active leaf rebated 12 at
+the meeting edge (the macro REBATE / REBATE_STYLE 1 to 4); the handle leaf asked from INSIDE and mirrored for the
+outside view. Not in this tura; the model and the keys are written so a double is a second record type, not a
+rewrite.
+
+**35.16 The STOP row: found, no action.** The form `<StopWorklistItem Id="GUID" Label="" />`, a sibling of the
+program items inside `<Items>`, a new GUID per STOP, is in the Biesse UK sample
+`docs/handover/workshop/JOINERY_NETWORK_EVENT.ewlist` and matches your line of 27.10.2026. The fire door list writes
+one between the leaf, head, hinge jamb and lock jamb blocks (`bsuite.stopRows`, switchable).
+
+**35.17 Intumescent pads for the hinges and the lock plates (question).** Your standard doorset list has pads
+behind the hinges and the lock plates; the brief's slot list (3.9) does not, so no Assign Materials row and no
+hardware line was added. Say whether to add them (per hinge, per forend, per keep; pieces) and they become rows
+like the others.
+
+**35.18 The two bSolid checks before the first leaf (summary).** (a) Which end of LPX the macro treats as the door
+top (35.4): the 150 end must be the head end. (b) HAND 0 = the door PC calls "Hinge left" seen from the pull side
+(35.9). Both are single keys (`hinges.topOffset` / `bottomOffset`, `bsuite.hand`) if they turn out the other way.
+
+**35.19 Skipped or left as it was, with the reason.** Nothing of the brief's scope was skipped. Out of scope per
+the brief, not done: the Weeke MPR export (the old machine), the closer machining (35.12), double doors (35.15).
+Pricing: the four rates of `pricing.firedoor` (leaf, frame per m, vision panel per m2, closer) are 0; the card in
+Settings > Pricing > Fire doors holds them, PSW fills them in. Known partition gaps found by the sweep and left as
+they were (partition is out of scope): `updateWindowInBatch` never whitelisted the partition* fields (the fire door
+fields ARE written on add and update), `moveToProduction` has no partition entry (firedoor has one), and the batch
+label template of `projectStore` ("Batch n <dash> type") carries a long dash from before this tura (the fire door
+label is 'Fire doors'). Styles 8 to 13 of the macro INTU_STYLE table (TH and pair variants) and the SPY / letter
+box / premium door switches are written at their macro defaults, not exposed in the form.
+
+**35.20 bSuite: identical doors share one row, Quantity n, the names joined (owner check).**
+`buildBsuiteFireDoorRows` groups identical rows the way the casement frame rows are grouped (`groupBsuiteRows`):
+two doors of the same size, rating, handing, lock, closer, vision panel and intumescent become ONE FD_LEAF row with
+Quantity 2 and Label "FDR-01, FDR-03" (the same for their three frame rows); the block order and the STOP rows do
+not change. The brief's wording is four rows per door with Label = the door number. If you want one row per door
+on the machine screen (a label per door), say so: it is one line (skip the grouping for the fire door blocks) and
+nothing else changes.
+
+---
+
 ## 2026-10-25 · MEETING ROOM PARTITION WALLS v1, items for Piotr (chat change on main f4b0e47)
 
 Every item below is an ASSUMPTION the programmer took from the Windmill Street DXF and the section mockup v1 where
