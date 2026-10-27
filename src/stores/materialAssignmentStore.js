@@ -3,7 +3,10 @@ import * as cloud from '../services/cloudSync.js';
 import { normalizeAssignments, expandAssignments, legacyToCanonical } from '../engine/partRegistry.js';
 import { CASEMENT_HINGE_PARTS, CASEMENT_LOCK_PARTS } from '../engine/casementHardware.js';
 import { DOOR_HARDWARE_PARTS } from '../engine/doorHardware.js';
-import { DEFAULT_DOOR_PROFILE } from '../engine/profile.js';
+import { DEFAULT_DOOR_PROFILE, DEFAULT_FIREDOOR_PROFILE } from '../engine/profile.js';
+// Fire doors (27.10.2026): the one hardware table (line, row id, slot) and the
+// intumescent strip widths live with the lists; the rows here mirror them.
+import { FIREDOOR_HARDWARE, FIREDOOR_INTUMESCENT_WIDTHS, fireDoorIntumescentPartId } from '../engine/lists.js';
 
 // ─── Sash Window Parts (hardcoded — structural, used by calculations engine) ───
 // section = pre-cut (raw) section that needs to be matched to a stock material
@@ -289,6 +292,70 @@ export const DOOR_ALL_PARTS = [
 // Acoustic): shown read-only on the Doors page, "shared with windows".
 export const DOOR_SHARED_GLASS_IDS = ['glass_double_slim', 'glass_triple', 'glass_acoustic'];
 
+// ─── Fire doors (27.10.2026, internal door sets FDR / DR, leaf + frame) ───
+// Own rows for the leaf blanks (bought, one per door by rating), the frame
+// timber (one raw section across head and jambs, metres from the pre-cut), the
+// ironmongery (one row per hardware line of lists.FIREDOOR_HARDWARE; the row
+// opens on the ironmongery tab of its slot, defaultCategory), the intumescent
+// strip by width, the vision panel glass (single fire glass or toughened), its
+// beads and its glazing intumescent. Paint counts on the casement rows as the
+// external doors do. Section labels from the default fire door profile (one
+// source for the numbers). windowType marks the rows as the brief asks (3.9).
+const FP = DEFAULT_FIREDOOR_PROFILE;
+const FH = FIREDOOR_HARDWARE;
+const fdRow = (row) => ({ section: '-', pcs: 1, windowType: 'firedoor', ...row });
+const fdIntuSection = (w) => {
+  const style = (FP.intumescent?.styles || []).find((s) => Number(s.width) === w);
+  return style ? `${w} x ${style.thickness}` : `${w}mm`;
+};
+export const FIREDOOR_PARTS = {
+  timber: [
+    fdRow({ id: 'fd_blank_fd30', name: 'Door Blank FD30', section: `${FP.leaf.thicknessByRating.FD30}mm`, materialType: 'board', unit: 'pcs',
+      hint: `One blank per FD30 door (fire ON, rating FD30), ${FP.leaf.thicknessByRating.FD30} thick, bought oversize: the CNC cuts the leaf size (Window Settings, Fire Doors: blank allowance). Pieces.` }),
+    fdRow({ id: 'fd_blank_fd60', name: 'Door Blank FD60', section: `${FP.leaf.thicknessByRating.FD60}mm`, materialType: 'board', unit: 'pcs',
+      hint: `One blank per FD60 door (fire ON, rating FD60), ${FP.leaf.thicknessByRating.FD60} thick. Pieces.` }),
+    fdRow({ id: 'fd_blank_std', name: 'Door Blank (non-fire)', section: `${FP.leaf.thicknessByRating.none}mm`, materialType: 'board', unit: 'pcs',
+      hint: `One blank per non-fire internal door (fire OFF, DR-nn), ${FP.leaf.thicknessByRating.none} thick. Pieces.` }),
+    fdRow({ id: 'fd_frame_timber', name: 'Frame Timber', section: `${FP.frame.rawThickness} x (depth + ${FP.frame.rawWidthAllowance})`, pcs: 3, materialType: 'hardwood', unit: 'm',
+      hint: `Head and both jambs of every door set: raw ${FP.frame.rawThickness} thick, machined to ${FP.frame.thickness}; raw width = the wall depth + ${FP.frame.rawWidthAllowance} (${FP.frame.rawThickness} x ${FP.frame.defaultDepth + FP.frame.rawWidthAllowance} on a ${FP.frame.defaultDepth} wall). Metres from the pre-cut: the long point lengths plus the allowance.` }),
+  ],
+  ironmongery: [
+    fdRow({ id: FH.hingeFire.partId, name: 'Fire Door Hinge', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.hingeFire.slot,
+      hint: `${FP.hinges.count} per leaf on a fire door (FD30 / FD60), ${FP.hinges.length} long, at the macro positions (${FP.hinges.topOffset} from the leaf top, the last one ending ${FP.hinges.bottomOffset} above the bottom). Pieces.` }),
+    fdRow({ id: FH.hingeStd.partId, name: 'Door Hinge (standard)', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.hingeStd.slot,
+      hint: `${FP.hinges.count} per leaf on a non-fire internal door, the same positions as the fire hinge. Pieces.` }),
+    fdRow({ id: FH.lockLatch.partId, name: 'Lock Case, Latch', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.lockLatch.slot,
+      hint: `One per door with the latch lock: ${FP.lock.forend.length} x ${FP.lock.forend.width} forend, ${FP.lock.backset} backset, no cylinder hole. FD30 / FD60 / standard case by the door.` }),
+    fdRow({ id: FH.lockEuro.partId, name: 'Lock Case, Sashlock Euro', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.lockEuro.slot,
+      hint: `One per door with the euro sashlock: euro centres ${FP.lock.euroCentres} under the spindle. FD30 / FD60 / standard case by the door.` }),
+    fdRow({ id: FH.lockBathroom.partId, name: 'Lock Case, Bathroom', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.lockBathroom.slot,
+      hint: `One per bathroom door: bathroom centres ${FP.lock.bathroomCentres} under the spindle. FD30 / FD60 / standard case by the door.` }),
+    fdRow({ id: FH.cylinder.partId, name: 'Euro Cylinder', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.cylinder.slot,
+      hint: 'One per door with the euro sashlock. Pieces.' }),
+    fdRow({ id: FH.thumbturn.partId, name: 'Thumbturn and Release', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.thumbturn.slot,
+      hint: 'One per bathroom door: the turn inside, the emergency release outside. Pieces.' }),
+    fdRow({ id: FH.handle.partId, name: 'Lever Handle Set', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.handle.slot,
+      hint: `One set on roses per door, spindle ${FP.lock.spindleHeight} from the leaf bottom. Pieces.` }),
+    fdRow({ id: FH.keep.partId, name: 'Keep', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.keep.slot,
+      hint: `One per door on the lock jamb: ${FP.keep.length} x ${FP.keep.width} plate, FD30 / FD60 / standard by the door. Pieces.` }),
+    fdRow({ id: FH.closer.partId, name: 'Concealed Closer', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.closer.slot,
+      hint: 'One per door with the closer ticked (on by default for a fire door, off for a non-fire door). No machining yet (BLOCKERS 35). Pieces.' }),
+  ],
+  consumables: [
+    ...FIREDOOR_INTUMESCENT_WIDTHS.map((w) => fdRow({ id: fireDoorIntumescentPartId(w), name: `Intumescent Strip ${w}mm`, section: fdIntuSection(w), materialType: 'consumable', unit: 'm',
+      hint: `Fire doors with a ${w} wide strip style (Window Settings, Fire Doors: the macro INTU_STYLE table): strips per edge x (2 x leaf height + leaf width) per door, in metres. No row on a non-fire door.` })),
+    fdRow({ id: 'fd_glass_fire', name: 'Fire Glass', section: `${FP.vp.glassThickness}mm`, materialType: 'glass', unit: 'm²',
+      hint: `Vision panel glass of a fire door: single fire rated pane, ${FP.vp.glassThickness} thick, the m² of every pane. Nothing on vision panel style 0.` }),
+    fdRow({ id: 'fd_glass_toughened', name: 'Toughened Glass (vision panel)', section: `${FP.vp.glassThickness}mm`, materialType: 'glass', unit: 'm²',
+      hint: `Vision panel glass of a non-fire door: single toughened pane, ${FP.vp.glassThickness} thick, the m² of every pane.` }),
+    fdRow({ id: 'fd_glazing_bead', name: 'Vision Panel Beads', section: 'profile', materialType: 'beading', unit: 'm',
+      hint: `Vision panel glazing beads: the pane perimeters x ${FP.vp.beadFaces} faces per door, in metres.` }),
+    fdRow({ id: 'fd_glazing_intu', name: 'Glazing Intumescent', materialType: 'consumable', unit: 'm',
+      hint: 'Fire doors with a vision panel: the glazing intumescent round every pane, the pane perimeters in metres. No row on a non-fire door.' }),
+  ],
+};
+export const FIREDOOR_ALL_PARTS = [...FIREDOOR_PARTS.timber, ...FIREDOOR_PARTS.ironmongery, ...FIREDOOR_PARTS.consumables];
+
 // Flat list for lookups — includes casement parts: mergeWindowMaterials and
 // the per-window material table iterate THIS list, so anything missing here
 // is silently dropped from every BOM (the audit's casement drop bug).
@@ -301,6 +368,7 @@ export const ALL_PARTS = [
   ...SASH_WINDOW_PARTS.consumables,
   ...CASEMENT_ALL_PARTS,
   ...DOOR_ALL_PARTS,   // appended LAST: index-based assignment sets (t37) keep every earlier row
+  ...FIREDOOR_ALL_PARTS,   // fire doors (27.10.2026) after the door rows, for the same reason
 ];
 
 // ─── Store ───

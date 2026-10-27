@@ -20,7 +20,7 @@
  * the single window and its purchase list drifted apart (05.10.2026).
  */
 
-import { buildPrecutForWindow, buildHardwareList } from './lists.js';
+import { buildPrecutForWindow, buildHardwareList, FIREDOOR_HARDWARE, fireDoorIntumescentPartId } from './lists.js';
 import { assignmentFor, legacyToCanonical, PART_DEFAULT_FROM } from './partRegistry.js';
 import { lockPartId, hingeWedgeMm, childRestrictorCounts, CHILD_RESTRICTOR_PART } from './casementHardware.js';
 import { isAcousticUnit } from './specification.js';
@@ -162,6 +162,27 @@ Object.assign(ELEMENT_TO_PART_ID, {
 // A door with a slim, triple or Laminate / Acoustic unit counts on the window rows.
 export const DOOR_GLASS_PART_ID = 'd_glass_double_6_12_6';
 
+// Fire doors (27.10.2026, internal door sets FDR / DR): the three frame
+// members buy the one frame timber row (raw 63 x (depth + 5), metres from the
+// pre-cut like every timber row). The leaf (FD-LEAF) is NOT timber metres: a
+// bought blank, one piece on the blank row of its rating (buildWindowPartQtys).
+Object.assign(ELEMENT_TO_PART_ID, {
+  'FD-HEAD': 'fd_frame_timber',
+  'FD-JAMB-H': 'fd_frame_timber',
+  'FD-JAMB-L': 'fd_frame_timber',
+});
+// The fire door glass rows: fire glass on a fire door, toughened otherwise
+// (derived.consumables.glass.type from fireDoor.js).
+export const FIREDOOR_GLASS_PART_ID = Object.freeze({ fire: 'fd_glass_fire', toughened: 'fd_glass_toughened' });
+// The fire door blank row by rating (FD30 44, FD60 54, non-fire 44).
+export const FIREDOOR_BLANK_PART_ID = Object.freeze({ FD30: 'fd_blank_fd30', FD60: 'fd_blank_fd60', none: 'fd_blank_std' });
+// Assign Materials row -> the ironmongery slot whose product that row buys on a
+// fire door (the door rule of 08.10.2026: the window's slot product, else the
+// row's own material), and hardware line -> slot (HARDWARE_TO_SLOT_KEY), both
+// from the one table in lists.js.
+export const FIREDOOR_PART_SLOT = Object.freeze(Object.fromEntries(Object.values(FIREDOOR_HARDWARE).filter((h) => h.partId && h.slot).map((h) => [h.partId, h.slot])));
+export const FIREDOOR_ITEM_SLOT = Object.freeze(Object.fromEntries(Object.values(FIREDOOR_HARDWARE).filter((h) => h.slot).map((h) => [h.item, h.slot])));
+
 // Box head/jamb parts split per frame type (raw board width differs)
 /**
  * makeRawResolver — elementName → raw stock section from Material Assignments.
@@ -222,6 +243,10 @@ export const HARDWARE_TO_SLOT_KEY = {
   // wall's door (ironmongeryStore alsoFor); the latch and the dowels have no slot yet.
   'Door hinge': 'doorHinges',
   'Lever handle set': 'doorHandles',
+  // Fire doors (27.10.2026): hinges, lock cases, cylinder / thumbturn, handle,
+  // keep and closer by the one table in lists.js (FIREDOOR_HARDWARE); 'Door
+  // hinge' and 'Lever handle set' keep the slots above.
+  ...FIREDOOR_ITEM_SLOT,
 };
 
 // Format a quantity for display by unit (pcs are whole; tubes/m/L/etc. keep 2dp)
@@ -273,8 +298,10 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
   });
 
   // ── Consumables (native units) ──
+  // Fire doors (27.10.2026) have none of the sash consumables (no cord, clips,
+  // packers, tape, silicone, seals): their own block below.
   const c = derived.consumables;
-  if (c) {
+  if (c && derived.category !== 'firedoor') {
     setQty('cord', c.cord?.meters, 'm');
     setQty(CLIP_SIZE_TO_PART_ID[c.clips?.size], c.clips?.qty, 'pcs');
     setQty('spacer_1mm', c.spacer1mm?.qty, 'pcs');
@@ -293,8 +320,12 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
   // ── Glass (sqm to purchase) ──
   // Doors (owner box item 8, 08.10.2026): the door double is the 6-12-6 row;
   // slim, triple and the Laminate / Acoustic unit take the window rows.
+  // Fire doors (27.10.2026): the vision panel glass is single fire glass or
+  // single toughened, on its own rows (never a sealed unit row).
   const g = derived.consumables?.glass;
-  if (g?.sqm) {
+  if (g?.sqm && derived.category === 'firedoor') {
+    setQty(FIREDOOR_GLASS_PART_ID[g.type === 'fire' ? 'fire' : 'toughened'], g.sqm, 'm²');
+  } else if (g?.sqm) {
     const acoustic = isAcousticUnit(windowSpec.glazing);
     const doorDouble = derived.category === 'door' && (g.type || 'double') === 'double';
     setQty(acoustic ? GLASS_ACOUSTIC_PART_ID
@@ -305,7 +336,7 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
   // ── Weights (total window mass +5% = counterbalance to buy) ──
   // Sash only: casement and doors report real weights too (hinge selection,
   // information), but they have no counterweights to purchase.
-  if (derived.weights?.total && derived.category !== 'casement' && derived.category !== 'door' && derived.category !== 'partition') {
+  if (derived.weights?.total && derived.category !== 'casement' && derived.category !== 'door' && derived.category !== 'partition' && derived.category !== 'firedoor') {
     const wPid = (c?.weightType === 'slim') ? 'weights_slim' : 'weights_normal';
     setQty(wPid, derived.weights.total, 'kg');
   }
@@ -315,9 +346,11 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
   // any other colour → bespoke. Quantity (litres) is the same either way.
   // Doors paint on the casement rows (08.10.2026), same area model.
   // Partition walls (25.10.2026) are oiled oak: no paint rows.
+  // Fire doors (27.10.2026) paint on the casement rows as the external doors
+  // (the engine's area: leaf both faces + the frame's visible faces).
   const p = derived.category === 'partition' ? null : derived.paint;
   if (p) {
-    const isCas = derived.category === 'casement' || derived.category === 'door';
+    const isCas = derived.category === 'casement' || derived.category === 'door' || derived.category === 'firedoor';
     setQty(isCas ? 'c_paint_primer' : 'paint_primer', p.primer, 'L');
     setQty(isCas ? 'c_paint_preserver' : 'paint_preserver', Math.round((Number(p.primer) || 0) * PRESERVER_OF_PRIMER * 100) / 100, 'L');
     const hex = (windowSpec.color?.single || '').toUpperCase();
@@ -450,6 +483,34 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
     if (doorExtPid) addMm(doorExtPid, dw.cill.length || 0);
   }
 
+  // ── Fire doors (27.10.2026, internal door sets FDR / DR) ──
+  // Every count from derived.firedoor (fireDoor.js): the blank by rating (one
+  // piece; the frame timber metres came from the pre-cut above), the hinges
+  // (fire or standard product, the macro count), the lock case by type, the
+  // euro cylinder or the bathroom thumbturn, one handle set and one keep per
+  // door, the concealed closer when ticked, the intumescent strip metres on the
+  // row of its width, and the vision panel glazing beads and glazing
+  // intumescent metres. No counterweights, no sash consumables.
+  const fd = derived.firedoor;
+  if (derived.category === 'firedoor' && fd) {
+    const H = FIREDOOR_HARDWARE;
+    const rating = fd.fire ? (fd.rating === 'FD60' ? 'FD60' : 'FD30') : 'none';
+    setQty(FIREDOOR_BLANK_PART_ID[rating], 1, 'pcs');
+    setQty((fd.fire ? H.hingeFire : H.hingeStd).partId, Number(fd.hinges?.count) || 0, 'pcs');
+    const lockType = fd.lock?.type;
+    setQty((lockType === 'euro' ? H.lockEuro : lockType === 'bathroom' ? H.lockBathroom : H.lockLatch).partId, 1, 'pcs');
+    if (lockType === 'euro') setQty(H.cylinder.partId, 1, 'pcs');
+    if (lockType === 'bathroom') setQty(H.thumbturn.partId, 1, 'pcs');
+    setQty(H.handle.partId, 1, 'pcs');
+    setQty(H.keep.partId, 1, 'pcs');
+    if (fd.closer) setQty(H.closer.partId, 1, 'pcs');
+    const intu = fd.intumescent;
+    if (fd.fire && intu && Number(intu.metres) > 0) setQty(fireDoorIntumescentPartId(intu.width), Number(intu.metres), 'm');
+    const vp = fd.vp || {};
+    if (Number(vp.beadM) > 0) setQty('fd_glazing_bead', Number(vp.beadM), 'm');
+    if (fd.fire && Number(vp.intuM) > 0) setQty('fd_glazing_intu', Number(vp.intuM), 'm');
+  }
+
   return map;
 }
 
@@ -473,7 +534,7 @@ export function resolvePartTotal(entry, yieldCoeff = 1.0) {
 export function buildWindowHardware(windowSpec, batch, ironmongeryItems = [], derived = null) {
   if (!windowSpec) return [];
   const cat = windowSpec.category || 'sash';
-  if (cat !== 'sash' && cat !== 'casement' && cat !== 'door' && cat !== 'partition') return [];
+  if (cat !== 'sash' && cat !== 'casement' && cat !== 'door' && cat !== 'partition' && cat !== 'firedoor') return [];
   const lines = buildHardwareList(windowSpec, derived);
   const slots = {
     ...(batch?.defaults?.ironmongerySlots || {}),
@@ -549,9 +610,13 @@ export function buildWindowMaterialLines(win, { assignments, assignmentsData, ma
   // Door ironmongery (08.10.2026): the product in the window's door slot
   // (configurator, windowSpec.hardware.slots; batch defaults below it) is what
   // that window buys on the row's count; without one, the row's own material.
-  const doorSlots = windowSpec.category === 'door'
+  // Fire doors (27.10.2026) follow the door rule with their own row -> slot
+  // table (FIREDOOR_PART_SLOT: hinges, lock case, cylinder / thumbturn,
+  // handle, keep, closer).
+  const doorSlots = windowSpec.category === 'door' || windowSpec.category === 'firedoor'
     ? { ...(batch?.defaults?.ironmongerySlots || {}), ...(windowSpec?.hardware?.slots || {}) }
     : null;
+  const partSlot = windowSpec.category === 'firedoor' ? FIREDOOR_PART_SLOT : DOOR_PART_SLOT;
   // Door lock kits and FGTE cylinders come in variants the buyer selects on
   // the supplier page (handing, backset, height band...): the variant of the
   // engine's hardware row travels with the line as its note, and the
@@ -570,7 +635,7 @@ export function buildWindowMaterialLines(win, { assignments, assignmentsData, ma
     const { total, unit } = resolvePartTotal(entry, yieldCoeff);
     if (!total) return;
 
-    const slotItemId = doorSlots && DOOR_PART_SLOT[part.id] ? doorSlots[DOOR_PART_SLOT[part.id]] : null;
+    const slotItemId = doorSlots && partSlot[part.id] ? doorSlots[partSlot[part.id]] : null;
     const slotProduct = slotItemId ? (ironmongeryItems || []).find((m) => m.id === slotItemId) : null;
     if (slotProduct) {
       lines.push(withVariant({

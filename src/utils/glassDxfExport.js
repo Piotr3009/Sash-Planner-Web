@@ -411,7 +411,8 @@ export function glassDxfParamsForWindow(windowSpec, derived, name) {
   const category = windowSpec.category || 'sash';
   // Doors (08.10.2026): rectangular units from the glass schedule, bars from the rows.
   // Partition walls (25.10.2026): the screen and door units, rectangular, with their applied bar lines.
-  if (category !== 'casement' && category !== 'sash' && category !== 'door' && category !== 'partition') return { skip: 'not a casement or sash window' };
+  // Fire doors (27.10.2026): the vision panel panes, rectangular, no bars (a door with style 0 has no unit and is skipped below).
+  if (category !== 'casement' && category !== 'sash' && category !== 'door' && category !== 'partition' && category !== 'firedoor') return { skip: 'not a casement or sash window' };
   if (!derived) return { skip: 'window could not be calculated' };
   // night 7 stage 1: EVERY glass unit goes in the file, shaped or not — only a
   // window that carries no glass at all is skipped

@@ -517,10 +517,24 @@ const KEY_WALL_LEAF = [
   [40, 340, 120, 46, 'wall_door_bottom_rail'],
   [40, 96, 120, 8, 'wall_small'], [40, 156, 120, 8, 'wall_small'],
 ];
+// Fire door key (27.10.2026, internal door sets): the frame is a head over two
+// jambs standing on the floor (no cill), the leaf is one blank with a vision
+// panel hole. One colour family (fire_door, partColours.js), so each side of
+// the sheet lists its own groups (`legend`) instead of the whole family.
+const KEY_FD_FRAME = [
+  [12, 6, 316, 26, 'fire_door_head'],
+  [12, 32, 26, 354, 'fire_door_jambs'], [302, 32, 26, 354, 'fire_door_jambs'],
+];
+const KEY_FD_LEAF = [
+  [10, 6, 180, 380, 'fire_door_leaf'],
+  [70, 40, 60, 150, null],
+];
 const KEY_SHEETS = {
   casement: { title: 'COLOUR KEY · CASEMENT', frame: KEY_FRAME, leaf: KEY_LEAF, families: ['frame', 'leaf'] },
   door: { title: 'COLOUR KEY · DOOR', frame: KEY_DOOR_FRAME, leaf: KEY_DOOR_LEAF, families: ['door_frame', 'door_leaf'] },
   partition: { title: 'COLOUR KEY · PARTITION WALL', frame: KEY_WALL_FRAME, leaf: KEY_WALL_LEAF, families: ['wall_frame', 'wall_leaf'], titles: ['WALL', 'DOOR LEAF'] },
+  firedoor: { title: 'COLOUR KEY · FIRE DOOR', frame: KEY_FD_FRAME, leaf: KEY_FD_LEAF, families: ['fire_door', 'fire_door'], titles: ['FRAME', 'LEAF'],
+    legend: [['fire_door_head', 'fire_door_jambs'], ['fire_door_leaf']] },
 };
 
 function drawColourKeyPage(doc, PG, topY, kind = 'casement') {
@@ -541,7 +555,7 @@ function drawColourKeyPage(doc, PG, topY, kind = 'casement') {
   doc.text('One colour = one compartment', PG.w - PG.bx - 6, y, { align: 'right' });
   y += 10 * k;
 
-  const drawPart = (title, rects, family, ox) => {
+  const drawPart = (title, rects, family, ox, legendIds = null) => {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13 * k);
     tc(doc, C.black);
@@ -555,10 +569,11 @@ function drawColourKeyPage(doc, PG, topY, kind = 'casement') {
       doc.rect(ox + rx * u, top + ry * u, rw * u, rh * u, 'FD');
       maxX = Math.max(maxX, rx + rw);
     });
-    // Legend of this drawing, to its right.
+    // Legend of this drawing, to its right: the family's groups, or the listed
+    // ids when both sides of the sheet share one family (fire doors).
     const lx = ox + (maxX + 22) * u;
     let ly = top + 14 * u;
-    PART_COLOUR_GROUPS.filter((g) => g.family === family).forEach((g) => {
+    PART_COLOUR_GROUPS.filter((g) => (legendIds ? legendIds.includes(g.id) : g.family === family)).forEach((g) => {
       fc(doc, hexToRgb(g.hex));
       doc.rect(lx, ly - 5 * u, 44 * u, 24 * u, 'FD');
       doc.setFont('helvetica', 'bold');
@@ -573,8 +588,8 @@ function drawColourKeyPage(doc, PG, topY, kind = 'casement') {
     });
   };
 
-  drawPart(K.titles?.[0] || 'FRAME', K.frame, K.families[0], x0);
-  drawPart(K.titles?.[1] || 'LEAF', K.leaf, K.families[1], x0 + 610 * u);
+  drawPart(K.titles?.[0] || 'FRAME', K.frame, K.families[0], x0, K.legend?.[0] || null);
+  drawPart(K.titles?.[1] || 'LEAF', K.leaf, K.families[1], x0 + 610 * u, K.legend?.[1] || null);
 }
 
 // ─── COLOUR BY WINDOW (08.10.2026) ───
@@ -792,6 +807,7 @@ export function exportPreCutPDF({
     if (fams.has('frame') || fams.has('leaf')) drawColourKeyPage(doc, PG, beginPage(), 'casement');
     if (fams.has('door_frame') || fams.has('door_leaf')) drawColourKeyPage(doc, PG, beginPage(), 'door');
     if (fams.has('wall_frame') || fams.has('wall_leaf')) drawColourKeyPage(doc, PG, beginPage(), 'partition');
+    if (fams.has('fire_door')) drawColourKeyPage(doc, PG, beginPage(), 'firedoor');   // fire doors (27.10.2026)
   }
   // Per window: the window colour sheet at the end.
   if (mode === 'window' && content !== 'list' && windowList.length) {

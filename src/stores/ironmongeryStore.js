@@ -18,8 +18,9 @@ const nextItemNumber = (items) => {
   return `IRN-${String(max + 1).padStart(3, '0')}`;
 };
 
-// windowType: 'sash' | 'casement' | 'all' (shared categories, e.g. trickle
-// vents are the same physical product on both window types).
+// windowType: 'sash' | 'casement' | 'door' | 'firedoor' | 'all' (shared
+// categories, e.g. trickle vents are the same physical product on both window
+// types); alsoFor: further batch types that take the same slot.
 export const IRONMONGERY_CATEGORIES = [
   { key: 'pulleys', label: 'Pulleys', windowType: 'sash' },
   { key: 'fingerLifts', label: 'Finger Lifts', windowType: 'sash' },
@@ -36,13 +37,21 @@ export const IRONMONGERY_CATEGORIES = [
   // is about the product, not the mechanism type.
   // alsoFor: further batch types that take the same slot (partition walls,
   // 25.10.2026: the partition door is hung on butt hinges with lever handles).
-  { key: 'doorHandles', label: 'Door Handles', windowType: 'door', alsoFor: ['partition'] },
-  { key: 'doorHinges', label: 'Door Hinges', windowType: 'door', alsoFor: ['partition'] },
+  // Fire doors (27.10.2026, internal door sets FDR / DR) take the door handle,
+  // hinge and cylinder slots too (lists.FIREDOOR_HARDWARE).
+  { key: 'doorHandles', label: 'Door Handles', windowType: 'door', alsoFor: ['partition', 'firedoor'] },
+  { key: 'doorHinges', label: 'Door Hinges', windowType: 'door', alsoFor: ['partition', 'firedoor'] },
   { key: 'multipointLocks', label: 'Multipoint Locks', windowType: 'door' },
   { key: 'thresholds', label: 'Thresholds', windowType: 'door' },
   { key: 'bolts', label: 'Bolts', windowType: 'door' },
   // Euro cylinders for the door locks (08.10.2026, doors to production).
-  { key: 'cylinders', label: 'Cylinders', windowType: 'door' },
+  { key: 'cylinders', label: 'Cylinders', windowType: 'door', alsoFor: ['firedoor'] },
+  // Fire doors (27.10.2026): the lock cases (latch, sashlock euro, bathroom;
+  // FD30 / FD60 / standard), the keeps and the concealed closers. A tab on the
+  // Ironmongery page and a slot on a firedoor batch each (windowType rule).
+  { key: 'fireDoorLocks', label: 'Fire Door Locks', windowType: 'firedoor' },
+  { key: 'keeps', label: 'Keeps', windowType: 'firedoor' },
+  { key: 'doorClosers', label: 'Door Closers', windowType: 'firedoor' },
   { key: 'other', label: 'Others', windowType: 'sash' },
 ];
 
