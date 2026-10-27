@@ -1104,9 +1104,11 @@ export const DEFAULT_FIREDOOR_PROFILE = Object.freeze({
   // 1.5 m2 2 L primer + 1 L topcoat) on the leaf both faces + the frame visible
   // faces (35 outside + 50 inside per member); mirrored in fireDoor.js
   bsuite: {
-    activeTarget: 'machine',
+    // the target id is the folder of the uploaded programs (<tenant>/<targetId>/<key>/<file>): 'fd-machine',
+    // not the casement's 'machine', so a same named upload of the two kinds never overwrites the other
+    activeTarget: 'fd-machine',
     targets: [{
-      id: 'machine', name: 'Machine (Rover)',
+      id: 'fd-machine', name: 'Machine (Rover)',
       programs: {
         leaf:      { path: 'C:/Users/Xp600/Desktop/Biesse Piotr/FD_LEAF_MASTER_PIOTR.bSolid', panelId: 1001, panelName: 'P1001' },   // ZAŁOŻENIE path, editable
         head:      { path: '', panelId: 1001, panelName: 'P1001' },   // the 5-axis frame masters do not exist yet: empty = rows skipped with a message
@@ -1133,6 +1135,8 @@ const FIREDOOR_BSUITE_KEYS = ['leaf', 'head', 'jambHinge', 'jambLock'];
  * for the casement: every stored target keeps what it carries (its uploaded
  * `stored` program entries included) and gains the missing keys; a copy
  * without targets takes the default target; the active target must exist.
+ * A stored copy whose target is still called 'machine' (the id before 'fd-machine') keeps that id and stays active:
+ * the id is only the key of its upload folder; an activeTarget no stored target carries falls back to the first.
  */
 function migrateFireDoorBsuite(stored, D) {
   const defTarget = D.targets[0];

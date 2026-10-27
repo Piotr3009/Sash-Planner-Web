@@ -286,6 +286,8 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
   const recess = { length: Number(HG.recessLength), width: Number(HG.recessWidth), depth: Number(HG.recessDepth), radius: Number(HG.cornerRadius) };
   const hinges = {
     count: hCount, length: hLen, step: R(step), macroHinge: fire ? 1 : 0, product: fire ? 'fire' : 'standard',
+    // the rule's two offsets travel with the positions so a sheet can print the rule it was cut by
+    topOffset: Number(HG.topOffset), bottomOffset: Number(HG.bottomOffset),
     recess, positions: hingePositions,
   };
 

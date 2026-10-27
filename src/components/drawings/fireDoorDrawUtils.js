@@ -119,13 +119,42 @@ export function swingWord(fd) {
 /** The swing explained for the notes: which side of the wall the pull face (the 35 frame face, the hinge knuckles) is on. */
 export function pullFaceNote(fd) {
   const s = fd?.handing?.swing === 'out' ? 'out' : 'in';
-  return `Opens ${s}: the pull face (the ${s === 'in' ? 'room' : 'corridor'} side) shows the 35 frame face and the hinge knuckles, the push face (the ${s === 'in' ? 'corridor' : 'room'} side) the 50 face with the stop`;
+  // the two frame faces come from derived.firedoor.frame.faces (thickness - rebate width, thickness),
+  // printed the way the sheets print a number (doorSheetParts fmt: to 0.5, integers without decimals)
+  const face = (v) => { const r = Math.round(Number(v) * 2) / 2; return Number.isFinite(r) ? (Number.isInteger(r) ? String(r) : r.toFixed(1)) : ''; };
+  const outside = face(fd?.frame?.faces?.outside), inside = face(fd?.frame?.faces?.inside);
+  return `Opens ${s}: the pull face (the ${s === 'in' ? 'room' : 'corridor'} side) shows the ${outside} frame face and the hinge knuckles, the push face (the ${s === 'in' ? 'corridor' : 'room'} side) the ${inside} face with the stop`;
 }
 
 /** The rating word of a door: FD30 / FD60 / non-fire. */
 export function ratingWord(fd) {
   if (!fd?.fire) return 'non-fire';
   return String(fd.rating || 'FD30');
+}
+
+/**
+ * The glass drawing groups of a fire door (the pack Glass tab, the window
+ * Glass tab and the glass drawings PDF): one group per unique vision panel
+ * pane size, grouped from the engine's units exactly as groupDoorGlass
+ * groups a door's: { key, w, h, finish, rep, units, panes } with rep = the
+ * index of the first unit of the group and panes = the unit locations. The
+ * finish is the window's glazing finish (the glass schedule row carries the
+ * same). Empty for any other category and for a door without a vision panel.
+ */
+export function groupFireDoorGlass(derived, windowSpec) {
+  if (derived?.category !== 'firedoor') return [];
+  const groups = [];
+  (derived.customGlassUnits || []).forEach((u, i) => {
+    const w = u?.width, h = u?.height;
+    if (!w || !h) return;
+    const finish = windowSpec?.glazing?.finish || 'clear';
+    const key = `${w}x${h}|${u.fire ? 'fire' : 'toughened'}|${finish}`;
+    let g = groups.find((x) => x.key === key);
+    if (!g) { g = { key, w, h, finish, rep: i, units: [], panes: [] }; groups.push(g); }
+    g.units.push(i);
+    g.panes.push(u.location || `vision panel ${i + 1}`);
+  });
+  return groups;
 }
 
 /** The cut list record of an element by its code (FD-HEAD, FD-JAMB-H, FD-JAMB-L, FD-LEAF). */
@@ -368,15 +397,21 @@ export function leafOpsByKind(derived) {
   return out;
 }
 
-/** Whole paragraphs wrapped to a sheet width: `chars` characters per line at 0.55 x font size per character. */
-export function wrapLines(notes, width, fontSize) {
+/**
+ * Whole paragraphs wrapped to a sheet width: `chars` characters per line at
+ * 0.55 x font size per character. `sep` is where a line may break: the
+ * default ' ' wraps by word; a subtitle of ' · ' joined segments passes ' · '
+ * so a line never breaks inside a segment ('leaf 826 × 44' stays together).
+ */
+export function wrapLines(notes, width, fontSize, sep = ' ') {
   const chars = Math.max(20, Math.floor(width / (0.55 * fontSize)));
+  const join = (a, b) => (sep === ' ' ? (a + ' ' + b).trim() : (a ? a + sep + b : b));
   const out = [];
   (notes || []).filter(Boolean).forEach((t) => {
-    const words = String(t).split(' ');
+    const words = String(t).split(sep);
     let cur = '';
     for (const w of words) {
-      if ((cur + ' ' + w).trim().length > chars && cur) { out.push(cur); cur = w; } else cur = (cur + ' ' + w).trim();
+      if (cur && join(cur, w).length > chars) { out.push(cur); cur = w; } else cur = join(cur, w);
     }
     if (cur) out.push(cur);
   });

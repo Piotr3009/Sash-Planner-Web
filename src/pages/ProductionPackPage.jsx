@@ -61,6 +61,7 @@ import { groupPartitionGlass } from '../components/drawings/partitionDrawUtils.j
 // Fire doors (27.10.2026): the outside elevation (the hero sheet) and the sheets of fireDoorSheetPlan
 import FireDoorElevation2D from '../components/drawings/FireDoorElevation2D.jsx';
 import FireDoorSheet from '../components/drawings/FireDoorSheet.jsx';
+import { groupFireDoorGlass } from '../components/drawings/fireDoorDrawUtils.js';
 import { elementsPlan, buildElementsPayload, buildCillInset } from '../utils/elementsPayload.js';
 // Triple sash (Piotr 13.10.2026): one sash sheet and one glass sheet per section (FIX L, C, FIX R)
 import { tripleSections } from '../components/drawings/tripleDrawUtils.js';
@@ -135,26 +136,6 @@ const STATUS_CONFIG = {
 // and the frame member names of the spraying list, by the engine's member role
 const FIREDOOR_LOCK_LABELS = { latch: 'latch', euro: 'sashlock euro', bathroom: 'bathroom' };
 const FIREDOOR_MEMBER_LABELS = { head: 'Head', jambHinge: 'Jamb hinge', jambLock: 'Jamb lock' };
-
-// Fire doors (27.10.2026): one glass drawing per unique vision panel pane size,
-// grouped from the engine's units exactly as groupDoorGlass groups a door's
-// (rep = the first unit of the group, panes = the unit locations). The finish
-// is the window's glazing finish (the glass schedule row carries the same).
-function groupFireDoorGlass(derived, windowSpec) {
-  if (derived?.category !== 'firedoor') return [];
-  const groups = [];
-  (derived.customGlassUnits || []).forEach((u, i) => {
-    const w = u?.width, h = u?.height;
-    if (!w || !h) return;
-    const finish = windowSpec?.glazing?.finish || 'clear';
-    const key = `${w}x${h}|${u.fire ? 'fire' : 'toughened'}|${finish}`;
-    let g = groups.find((x) => x.key === key);
-    if (!g) { g = { key, w, h, finish, rep: i, units: [], panes: [] }; groups.push(g); }
-    g.units.push(i);
-    g.panes.push(u.location || `vision panel ${i + 1}`);
-  });
-  return groups;
-}
 
 function windowTagsOf(windowsData, precutSettings) {
   if (normaliseColourMode(precutSettings) !== 'window') return () => null;

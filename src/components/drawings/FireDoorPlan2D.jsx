@@ -62,12 +62,21 @@ export default function FireDoorPlan2D({ windowSpec, derived, projectNumber, win
   const winName = windowSpec?.name || fd.name || 'Fire door';
   const projNum = projectNumber || '';
   const rec = fd.hinges?.recess || {};
+  // the subtitle wrapped at its own font size to the sheet width (30 text
+  // units of margin each side, as the notes), breaking only at its ' · '
+  // separators: a wide door or a long handing never runs it off the sheet;
+  // the notes follow the last subtitle line
+  const subFs = SIZES.subtitle * ts;
+  const subLines = wrapLines([
+    `${ratingWord(fd)} · leaf ${fmt(W)} × ${fmt(T)} · frame ${fmt(thk)} × ${fmt(depth)} · ${hingeWord(fd)} · ${swingWord(fd)}`,
+  ], svgW - 2 * 30 * ts, subFs, ' · ');
+  const notesY = titleY + 20 * Math.max(0, subLines.length - 1) * ts;
   const notes = wrapLines([
     `${pullFaceNote(fd)}; seen from above with the pull face at the bottom of the page, the hinge on the ${hingeLeft ? 'left' : 'right'}`,
     `Jambs ${fmt(thk)} x ${fmt(depth)} with the rebate ${fmt(rebW)} x ${fmt(rebD)} from solid (${fmt(rebW - gap)} overlap + ${fmt(gap)} gap across the thickness, leaf ${fmt(T)} + ${fmt(rebD - T)} along the depth); the leaf closes flush with the pull face (the bottom of the page): ${fmt(faceOut)} face on the pull side, ${fmt(thk)} on the push side`,
     `Hinge knuckle in the ${fmt(gap)} gap in front of the pull face; flaps ${fmt(rec.depth)} deep let into the leaf edge and the rebate cheek, ${fmt(rec.width)} across the thickness; handle ${fmt(g.backset)} from the lock edge on both faces, lever to the hinge; the open view swings the leaf ${fmt(g.openAngle)} degrees about the knuckle`,
   ], svgW - 2 * 30 * ts, codeFs);
-  const svgH = titleY + (44 + 18 * notes.length) * ts;
+  const svgH = notesY + (44 + 18 * notes.length) * ts;
 
   const arc = open.arc;
   const [ax, ay] = P(arc.from[0], arc.from[1], ox2);
@@ -100,9 +109,13 @@ export default function FireDoorPlan2D({ windowSpec, derived, projectNumber, win
         <path d={arcPath} fill="none" stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={dash} />
         <text x={ox2 + FW / 2} y={openLabelY} fill={COLORS.label} fontSize={labelFs} fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>{`Open ${fmt(g.openAngle)}`}</text>
 
-        <SheetTitle x={svgW / 2} y={titleY} title={`Plan${projNum ? ` · ${projNum}` : ''} · ${winName}`}
-          subtitle={`${ratingWord(fd)} · leaf ${fmt(W)} × ${fmt(T)} · frame ${fmt(thk)} × ${fmt(depth)} · ${hingeWord(fd)} · ${swingWord(fd)}`}
-          notes={notes} ts={ts} vbw={svgW} />
+        <SheetTitle x={svgW / 2} y={titleY} title={`Plan${projNum ? ` · ${projNum}` : ''} · ${winName}`} subtitle={subLines[0]} ts={ts} vbw={svgW} />
+        {subLines.slice(1).map((t, i) => (
+          <text key={`s${i}`} x={svgW / 2} y={titleY + (40 + 20 * i) * ts} fill={COLORS.subtitle} fontSize={subFs} fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>{t}</text>
+        ))}
+        {notes.map((t, i) => (
+          <text key={`n${i}`} x={svgW / 2} y={notesY + (42 + 18 * i) * ts} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.subtitle}>{t}</text>
+        ))}
         {windowTag ? <WindowTag tag={windowTag} vbw={svgW} /> : null}
       </svg>
     </div>

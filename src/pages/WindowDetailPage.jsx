@@ -22,6 +22,8 @@ import { groupCasementGlass } from '../components/drawings/casementDrawUtils.js'
 import DoorGlassDrawing2D from '../components/drawings/DoorGlassDrawing2D.jsx';
 import { groupDoorGlass } from '../components/drawings/doorDrawUtils.js';
 import { groupPartitionGlass } from '../components/drawings/partitionDrawUtils.js';
+// Fire doors (27.10.2026): the vision panel glass groups of the Glass tab and the glass drawings PDF
+import { groupFireDoorGlass } from '../components/drawings/fireDoorDrawUtils.js';
 // Triple sash (Piotr 13.10.2026): one glass drawing per section and sash (FIX L / C / FIX R)
 import { tripleSections } from '../components/drawings/tripleDrawUtils.js';
 import CutListPanel from '../components/dashboard/CutListPanel.jsx';
@@ -49,26 +51,6 @@ const TABS = [
 
 // Fire doors (27.10.2026): the lock as the configurator names it, for the spec aside
 const FIREDOOR_LOCK_LABELS = { latch: 'latch (standard)', euro: 'sashlock euro', bathroom: 'bathroom' };
-
-// Fire doors (27.10.2026): one glass drawing per unique vision panel pane size,
-// grouped from the engine's units exactly as groupDoorGlass groups a door's
-// (rep = the first unit of the group, panes = the unit locations). The finish
-// is the window's glazing finish (the glass schedule row carries the same).
-function groupFireDoorGlass(derived, windowSpec) {
-  if (derived?.category !== 'firedoor') return [];
-  const groups = [];
-  (derived.customGlassUnits || []).forEach((u, i) => {
-    const w = u?.width, h = u?.height;
-    if (!w || !h) return;
-    const finish = windowSpec?.glazing?.finish || 'clear';
-    const key = `${w}x${h}|${u.fire ? 'fire' : 'toughened'}|${finish}`;
-    let g = groups.find((x) => x.key === key);
-    if (!g) { g = { key, w, h, finish, rep: i, units: [], panes: [] }; groups.push(g); }
-    g.units.push(i);
-    g.panes.push(u.location || `vision panel ${i + 1}`);
-  });
-  return groups;
-}
 
 export default function WindowDetailPage() {
   const { projectId, batchId, windowId } = useParams();

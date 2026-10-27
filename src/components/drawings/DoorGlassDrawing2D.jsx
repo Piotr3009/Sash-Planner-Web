@@ -23,6 +23,11 @@
  * cover and the spacer bar width are the glazier numbers of the casement
  * profile `glass` block (readGlassProfile), shared with the glass PDF and the
  * glazier DXF.
+ *
+ * Fire doors (27.10.2026): `group` is one element of groupFireDoorGlass
+ * (fireDoorDrawUtils.js), the unit a vision panel pane: SINGLE glass (fire
+ * glass on a fire door, toughened otherwise), its thickness the spec glazing
+ * thickness (the glass schedule row's), no edge seal, no spacer, no bars.
  */
 import { useMemo } from 'react';
 import { getCasementProfile, DEFAULT_CASEMENT_PROFILE, getPartitionProfile } from '../../engine/profile.js';
@@ -36,7 +41,7 @@ import { NS, num, fmtGlass, safely, NoSheet, glassSpecText, SheetTitle } from '.
 const NOTE_CHARS = 80;
 
 function buildGlass(windowSpec, derived, group) {
-  if (!windowSpec || !group || (derived?.category !== 'door' && derived?.category !== 'partition')) return null;
+  if (!windowSpec || !group || (derived?.category !== 'door' && derived?.category !== 'partition' && derived?.category !== 'firedoor')) return null;
   const unit = derived.customGlassUnits?.[group.rep];
   const w = num(unit?.width, num(group.w));
   const h = num(unit?.height, num(group.h));
@@ -44,7 +49,12 @@ function buildGlass(windowSpec, derived, group) {
   const type = windowSpec.glazing?.type || 'double';
   // Partition units (25.10.2026): the perimeter spacer of the profile and the
   // DUMMY spacer behind the applied bars, both from the partition profile.
-  const G = derived.category === 'partition'
+  // Fire door vision panels (27.10.2026): a single pane, so no edge seal and
+  // no spacer (both 0); the glass kind from the unit (fire / toughened), the
+  // thickness from the spec glazing block (the glass schedule row's number).
+  const G = derived.category === 'firedoor'
+    ? { edgeCover: 0, barWidth: 0, single: { fire: !!unit?.fire, thickness: num(windowSpec.glazing?.thickness) } }
+    : derived.category === 'partition'
     ? safely(() => { const g = getPartitionProfile().glazing; return { edgeCover: Number(g.spacer), barWidth: Number(g.dummySpacer) }; })
     : (safely(() => readGlassProfile(getCasementProfile(), type))
       || safely(() => readGlassProfile(DEFAULT_CASEMENT_PROFILE, type)));
@@ -53,7 +63,7 @@ function buildGlass(windowSpec, derived, group) {
   const xs = (Array.isArray(bars.x) ? bars.x : []).map(Number).filter(Number.isFinite);
   const ys = (Array.isArray(bars.y) ? bars.y : []).map(Number).filter(Number.isFinite);
   return {
-    w, h, edge: G.edgeCover, spacer: G.barWidth,
+    w, h, edge: G.edgeCover, spacer: G.barWidth, single: G.single || null,
     vBars: xs.map((cx) => ({ cx, left: cx - G.barWidth / 2, right: cx + G.barWidth / 2 })),
     hBars: ys.map((cy) => ({ cy, top: cy - G.barWidth / 2, bot: cy + G.barWidth / 2 })),
   };
@@ -77,13 +87,21 @@ export default function DoorGlassDrawing2D({ windowSpec, derived, group , window
   const isFrosted = group.finish === 'frosted';
   const patternId = `frost-door-${String(windowSpec?.id || windowSpec?.name || 'd').replace(/[^a-zA-Z0-9]/g, '_')}-${String(group.key).replace(/[^a-zA-Z0-9]/g, '_')}`;
   const panes = group.panes || [];
-  const spec = [
+  // a fire door pane: the count, the single glass (thickness and kind as the
+  // glass schedule row prints them) and the finish; no spec word, no spacer
+  const single = geom.single;
+  const singleText = single ? `${single.thickness != null ? `${fmtGlass(single.thickness)}mm ` : ''}${single.fire ? 'fire' : 'toughened'}` : '';
+  const spec = (single ? [
+    `×${panes.length || 1}`,
+    singleText,
+    group.finish || 'clear',
+  ] : [
     `×${panes.length || 1}`,
     glassSpecText(windowSpec),
     gz.spec || '',
     group.finish || 'clear',
     `spacer ${gz.spacerColour || 'silver'}`,
-  ].filter(Boolean).join(' · ');
+  ]).filter(Boolean).join(' · ');
   // The pane locations of a door are long ('fanlight over door (opening, top
   // hung leaf)'): they go on note lines of their own, wrapped, so the subtitle
   // never runs off the sheet of a narrow unit.
@@ -97,7 +115,9 @@ export default function DoorGlassDrawing2D({ windowSpec, derived, group , window
   const isWall = derived.category === 'partition';
   const notes = [
     ...paneLines,
-    isWall
+    single
+      ? `Single ${singleText} glass, no spacer and no bars (a vision panel pane, the cut-out per bSolid macro)`
+      : isWall
       ? `Spacer ${fmtGlass(edge)} · dummy spacer ${fmtGlass(geom.spacer)} on the applied bar lines${geom.hBars.length || geom.vBars.length ? ` (${geom.hBars.length} H, ${geom.vBars.length} V)` : ''} · bars on the faces, not in the unit`
       : `Edge seal ${fmtGlass(edge)} · spacer bars ${fmtGlass(geom.spacer)} on the wood bar centre lines${geom.vBars.length || geom.hBars.length ? ` (${geom.vBars.length} vertical, ${geom.hBars.length} horizontal)` : ''}`,
     ...(isWall && (derived.customGlassUnits?.[group.rep]?.role === 'door') ? ['Door unit: safety glass to AD K (both panes)'] : []),
@@ -121,8 +141,10 @@ export default function DoorGlassDrawing2D({ windowSpec, derived, group , window
         {/* Sealed unit and its edge seal */}
         <rect x={X(0)} y={Y(0)} width={w} height={h} fill={COLORS.glass} fillOpacity={COLORS.glassOpacity}
           stroke={COLORS.glass} strokeWidth={STROKES.glass} {...NS} />
-        <rect x={X(edge)} y={Y(edge)} width={w - 2 * edge} height={h - 2 * edge} fill="none"
-          stroke={COLORS.glass} strokeWidth={STROKES.glassLight} {...NS} strokeOpacity={0.6} strokeDasharray={`${sw(5)},${sw(4)}`} />
+        {!single && (
+          <rect x={X(edge)} y={Y(edge)} width={w - 2 * edge} height={h - 2 * edge} fill="none"
+            stroke={COLORS.glass} strokeWidth={STROKES.glassLight} {...NS} strokeOpacity={0.6} strokeDasharray={`${sw(5)},${sw(4)}`} />
+        )}
         {isFrosted && (
           <rect x={X(edge)} y={Y(edge)} width={w - 2 * edge} height={h - 2 * edge} fill={`url(#${patternId})`} stroke="none" />
         )}

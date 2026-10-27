@@ -1191,14 +1191,26 @@ export default function ConfiguratorPage() {
         <div className="flex items-center gap-3">
           <input type="text" placeholder="Window name (max 7)" maxLength={7} value={winName} onChange={e => setWinName(e.target.value)}
             className={`px-3 py-2 border-2 rounded-lg text-sm w-56 bg-surface-800 ${winName.trim() ? 'border-accent-500 text-ink-50' : 'border-status-danger/50 text-ink-200'}`} />
+          {isFireDoor ? (
+            // fire door: Save waits for the engine (a refused size keeps its message in the summary, nothing is saved)
+            <button
+              onClick={save}
+              disabled={fdBlocked}
+              title={fdBlocked ? `Fire door: ${fdLive?.error || 'not derived'}` : undefined}
+              className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'} ${fdBlocked ? 'opacity-40 cursor-not-allowed' : ''}`}
+            >
+              {isEditMode ? '✓ Update Window' : '✓ Save to Batch'}
+            </button>
+          ) : (
           <button
             onClick={save}
-            disabled={shapeBlocked || fdBlocked}
-            title={shapeBlocked ? `${isCircle ? 'Circle' : 'Arch'}: ${archError}` : fdBlocked ? `Fire door: ${fdLive?.error || 'not derived'}` : (isSash && proportionError) || undefined}
-            className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'} ${shapeBlocked || fdBlocked || (isSash && proportionError) ? 'opacity-40 cursor-not-allowed' : ''}`}
+            disabled={shapeBlocked}
+            title={shapeBlocked ? `${isCircle ? 'Circle' : 'Arch'}: ${archError}` : (isSash && proportionError) || undefined}
+            className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'} ${shapeBlocked || (isSash && proportionError) ? 'opacity-40 cursor-not-allowed' : ''}`}
           >
             {isEditMode ? '✓ Update Window' : '✓ Save to Batch'}
           </button>
+          )}
         </div>
       </div>
 

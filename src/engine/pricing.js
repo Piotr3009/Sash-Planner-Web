@@ -685,9 +685,17 @@ export function calculatePartition(pricing, config, frameWidth, frameHeight) {
  */
 export function calculateFireDoor(pricing, config, frameWidth, frameHeight) {
   const fp = pricing.firedoor || DEFAULT_PRICING.firedoor;
+  // A fire door's config.width / height ARE the overall frame (the configurator stores
+  // derived.firedoor.frame.overall, windowSpecToConfig passes it on); the frameWidth / frameHeight
+  // calculatePrice computes carry the window types' measurement allowance (brick-to-brick + 150 / 75),
+  // which a door set does not have, so the breakdown and the metres fallback use the stored overall
+  // and fall back to the computed size only when the config has no size.
+  const sizeOf = (v, fallback) => (v != null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : (Number(fallback) || 0));
+  const overallWidth = sizeOf(config.width, frameWidth);
+  const overallHeight = sizeOf(config.height, frameHeight);
   const frameMetres = Number.isFinite(Number(config.firedoorFrameMetres)) && config.firedoorFrameMetres !== '' && config.firedoorFrameMetres != null
     ? Number(config.firedoorFrameMetres)
-    : ((Number(frameWidth) || 0) + 2 * (Number(frameHeight) || 0)) / 1000;
+    : (overallWidth + 2 * overallHeight) / 1000;
   const vpSqm = Number(config.firedoorVpSqm) || 0;
   const closer = config.firedoorCloser === true || config.firedoorCloser === 'true' || config.firedoorCloser === 'yes';
   const fire = config.firedoorFire === true || config.firedoorFire === 'true' || config.firedoorFire === 'yes';
@@ -707,7 +715,7 @@ export function calculateFireDoor(pricing, config, frameWidth, frameHeight) {
     breakdown: {
       windowType: 'firedoor', fire, rating: fire ? (config.firedoorRating || 'FD30') : 'none',
       leafWidth: Number(config.firedoorLeafWidth) || null, leafHeight: Number(config.firedoorLeafHeight) || null,
-      frameDepth: Number(config.firedoorFrameDepth) || null, frameWidth, frameHeight,
+      frameDepth: Number(config.firedoorFrameDepth) || null, frameWidth: overallWidth, frameHeight: overallHeight,
       frameMetres: frameMetres.toFixed(3), vpSqm: vpSqm.toFixed(4), closer,
       leafPrice: leafPrice.toFixed(2), framePrice: framePrice.toFixed(2), vpPrice: vpPrice.toFixed(2), closerPrice: closerPrice.toFixed(2),
       subtotal: subtotal.toFixed(2), quantity,
