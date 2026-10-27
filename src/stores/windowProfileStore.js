@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { normalizeSashProfile, migrateCasementProfile, migrateDoorProfile, migratePartitionProfile, DEFAULT_SASH_PROFILE, DEFAULT_CASEMENT_PROFILE, DEFAULT_DOOR_PROFILE, DEFAULT_PARTITION_PROFILE, setActiveWindowProfile, setActiveCasementProfile, setActiveDoorProfile, setActivePartitionProfile, casementGlassDeduction } from '../engine/profile.js';
+import { normalizeSashProfile, migrateCasementProfile, migrateDoorProfile, migratePartitionProfile, migrateFireDoorProfile, DEFAULT_SASH_PROFILE, DEFAULT_CASEMENT_PROFILE, DEFAULT_DOOR_PROFILE, DEFAULT_PARTITION_PROFILE, DEFAULT_FIREDOOR_PROFILE, setActiveWindowProfile, setActiveCasementProfile, setActiveDoorProfile, setActivePartitionProfile, setActiveFireDoorProfile, casementGlassDeduction } from '../engine/profile.js';
 import { loadWindowProfiles, saveWindowProfiles } from '../services/cloudSync.js';
 
 // Deep clone helper for the plain-JSON profile object
@@ -20,8 +20,8 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
 //
 // The cloud is an adapter so a harness can run two tabs over one fake cloud
 // (setWindowProfileCloud); the default is the Supabase settings row.
-const KINDS = ['sash', 'casement', 'door', 'partition'];   // partition since 25.10.2026 (meeting room walls)
-const DEFAULTS_BY_KIND = { sash: DEFAULT_SASH_PROFILE, casement: DEFAULT_CASEMENT_PROFILE, door: DEFAULT_DOOR_PROFILE, partition: DEFAULT_PARTITION_PROFILE };
+const KINDS = ['sash', 'casement', 'door', 'partition', 'firedoor'];   // partition since 25.10.2026 (meeting room walls), firedoor since 27.10.2026 (internal door sets)
+const DEFAULTS_BY_KIND = { sash: DEFAULT_SASH_PROFILE, casement: DEFAULT_CASEMENT_PROFILE, door: DEFAULT_DOOR_PROFILE, partition: DEFAULT_PARTITION_PROFILE, firedoor: DEFAULT_FIREDOOR_PROFILE };
 let cloudAdapter = { load: loadWindowProfiles, save: saveWindowProfiles };
 export function setWindowProfileCloud(adapter) {
   cloudAdapter = adapter || { load: loadWindowProfiles, save: saveWindowProfiles };
@@ -33,6 +33,7 @@ function migrateKind(kind, profile) {
   if (kind === 'sash') return normalizeSashProfile(clone(profile));
   if (kind === 'casement') return migrateCasementProfile(clone(profile)) || clone(DEFAULT_CASEMENT_PROFILE);
   if (kind === 'partition') return migratePartitionProfile(clone(profile));
+  if (kind === 'firedoor') return migrateFireDoorProfile(clone(profile));
   return migrateDoorProfile(clone(profile));
 }
 
@@ -103,6 +104,19 @@ const DOOR_BOOLEAN_LEAVES = ['auxHousing'];
 const PARTITION_PATH_ROOTS = ['depth', 'elements', 'glazing', 'panel', 'door', 'hinges', 'hardware', 'joints', 'lengths', 'defaults'];
 const PARTITION_STRING_LEAVES = ['makeup', 'beadSide', 'build', 'glazed', 'headStop', 'latch', 'name', 'layout', 'hingeSide', 'swing'];
 const PARTITION_BOOLEAN_LEAVES = ['radius'];
+// Fire door profile keys the Window Settings Fire Doors card may write
+// (setFireDoorPath, 27.10.2026): the same rule (root whitelisted, the leaf must
+// exist, numbers finite, an empty field commits nothing). String leaves: the
+// head joint, the configurator defaults (rating, hand, swing, lock), the bSuite
+// target names / program paths / panel names / active target, the vp and
+// intumescent style labels and the vp arrangement. Boolean leaves: the fire
+// default, the leading edge default, the STOP rows and the execution block.
+// The comma lists (leaf.widthSuggestions, frame.depthSuggestions) go through
+// setFireDoorList; the bSuite targets are replaced whole by setFireDoorBsuiteTargets.
+const FIREDOOR_PATH_ROOTS = ['leaf', 'frame', 'hinges', 'lock', 'keep', 'vp', 'intumescent', 'bsuite', 'defaults'];
+const FIREDOOR_STRING_LEAVES = ['headJoint', 'rating', 'hingeSide', 'swing', 'lockType', 'path', 'name', 'activeTarget', 'panelName', 'label', 'arrange'];
+const FIREDOOR_BOOLEAN_LEAVES = ['fire', 'leadEdge', 'stopRows', 'writeExecutionParameters'];
+const FIREDOOR_PROGRAM_KEYS = ['leaf', 'head', 'jambHinge', 'jambLock'];
 
 /**
  * Workshop window-construction profile (Window Settings page): sash, casement
@@ -118,6 +132,7 @@ export const useWindowProfileStore = create(
       casement: clone(DEFAULT_CASEMENT_PROFILE),
       door: clone(DEFAULT_DOOR_PROFILE),
       partition: clone(DEFAULT_PARTITION_PROFILE),
+      firedoor: clone(DEFAULT_FIREDOOR_PROFILE),
 
       setVariantField: (variantKey, field, value) => {
         get()._edit(['sash.variants'], (s) => {
@@ -341,6 +356,74 @@ export const useWindowProfileStore = create(
         get()._edit(['partition'], { partition: clone(DEFAULT_PARTITION_PROFILE) });
       },
 
+      // ── Fire doors (27.10.2026): the same generic setter for the Fire Doors card.
+      // `path` = ['hinges', 'count'] or ['bsuite', 'targets', 0, 'programs', 'leaf', 'path'];
+      // roots whitelisted (FIREDOOR_PATH_ROOTS), the key must already exist.
+      setFireDoorPath: (path, value) => {
+        if (!Array.isArray(path) || path.length < 2 || !FIREDOOR_PATH_ROOTS.includes(path[0])) return;
+        const leaf = path[path.length - 1];
+        const isString = FIREDOOR_STRING_LEAVES.includes(leaf);
+        const isBool = FIREDOOR_BOOLEAN_LEAVES.includes(leaf);
+        const v = isString ? String(value ?? '') : isBool ? (value === true || value === 'true' || value === 'yes') : Number(value);
+        if (!isString && !isBool && (value === '' || value == null || !Number.isFinite(v))) return;
+        get()._edit([`firedoor.${path[0]}`], (s) => {
+          const firedoor = clone(s.firedoor || DEFAULT_FIREDOOR_PROFILE);
+          let node = firedoor;
+          for (let i = 0; i < path.length - 1; i++) {
+            if (node[path[i]] == null || typeof node[path[i]] !== 'object') return {};
+            node = node[path[i]];
+          }
+          if (!(leaf in node) || (node[leaf] !== null && typeof node[leaf] === 'object')) return {};
+          node[leaf] = v;
+          return { firedoor };
+        });
+      },
+
+      // The suggestion lists (leaf.widthSuggestions, frame.depthSuggestions) as a
+      // comma list ("626, 686, 726") -> sorted positive unique numbers; an empty
+      // or all-junk list is refused (the chips need at least one value). The key
+      // must already exist and hold an array.
+      setFireDoorList: (path, text) => {
+        if (!Array.isArray(path) || path.length < 2 || !FIREDOOR_PATH_ROOTS.includes(path[0])) return;
+        const values = String(text ?? '').split(/[,\s;]+/).map(Number).filter((n) => Number.isFinite(n) && n > 0);
+        if (!values.length) return;
+        const sorted = [...new Set(values)].sort((a, b) => a - b);
+        const leaf = path[path.length - 1];
+        get()._edit([`firedoor.${path[0]}`], (s) => {
+          const firedoor = clone(s.firedoor || DEFAULT_FIREDOOR_PROFILE);
+          let node = firedoor;
+          for (let i = 0; i < path.length - 1; i++) {
+            if (node[path[i]] == null || typeof node[path[i]] !== 'object') return {};
+            node = node[path[i]];
+          }
+          if (!Array.isArray(node[leaf])) return {};
+          node[leaf] = sorted;
+          return { firedoor };
+        });
+      },
+
+      // bSuite targets of the fire door programs, replaced whole and validated:
+      // ids unique and non-empty, names non-empty, the four program keys (leaf,
+      // head, jambHinge, jambLock) each with a string path (empty = no program yet).
+      setFireDoorBsuiteTargets: (targets, activeTarget) => {
+        if (!Array.isArray(targets) || !targets.length) return;
+        const ids = new Set();
+        for (const t of targets) {
+          if (!t || typeof t.id !== 'string' || !t.id || ids.has(t.id) || typeof t.name !== 'string' || !t.name.trim()) return;
+          if (!t.programs || !FIREDOOR_PROGRAM_KEYS.every((k) => typeof t.programs[k]?.path === 'string')) return;
+          ids.add(t.id);
+        }
+        get()._edit(['firedoor.bsuite'], (s) => {
+          const firedoor = clone(s.firedoor || DEFAULT_FIREDOOR_PROFILE);
+          firedoor.bsuite = { ...firedoor.bsuite, targets: clone(targets), activeTarget: ids.has(activeTarget) ? activeTarget : targets[0].id };
+          return { firedoor };
+        });
+      },
+
+      resetFireDoorToDefaults: () => {
+        get()._edit(['firedoor'], { firedoor: clone(DEFAULT_FIREDOOR_PROFILE) });
+      },
+
       resetToDefaults: () => {
         get()._edit(['sash', 'casement'], { sash: clone(DEFAULT_SASH_PROFILE), casement: clone(DEFAULT_CASEMENT_PROFILE) });
       },
@@ -363,6 +446,7 @@ export const useWindowProfileStore = create(
         setActiveCasementProfile(get().casement);
         setActiveDoorProfile(get().door);
         setActivePartitionProfile(get().partition);
+        setActiveFireDoorProfile(get().firedoor);
         if ((get().dirty || []).length) scheduleCloudSave(() => get().saveToCloud());
       },
 
@@ -377,7 +461,7 @@ export const useWindowProfileStore = create(
         saveChain = saveChain.then(async () => {
           const dirty = [...(get().dirty || [])];
           if (!dirty.length) return null;
-          const local = { sash: clone(get().sash), casement: clone(get().casement), door: clone(get().door), partition: clone(get().partition || DEFAULT_PARTITION_PROFILE) };
+          const local = { sash: clone(get().sash), casement: clone(get().casement), door: clone(get().door), partition: clone(get().partition || DEFAULT_PARTITION_PROFILE), firedoor: clone(get().firedoor || DEFAULT_FIREDOOR_PROFILE) };
           let merged;
           try {
             const cloud = await cloudAdapter.load();
@@ -395,6 +479,7 @@ export const useWindowProfileStore = create(
           setActiveCasementProfile(get().casement);
           setActiveDoorProfile(get().door);
           setActivePartitionProfile(get().partition);
+          setActiveFireDoorProfile(get().firedoor);
           return merged;
         });
         return saveChain;
@@ -405,13 +490,14 @@ export const useWindowProfileStore = create(
       loadFromCloud: async () => {
         try {
           const cloud = await cloudAdapter.load();
-          if (cloud?.sash || cloud?.casement || cloud?.door || cloud?.partition) {
-            const local = { sash: get().sash, casement: get().casement, door: get().door, partition: get().partition || clone(DEFAULT_PARTITION_PROFILE) };
+          if (cloud?.sash || cloud?.casement || cloud?.door || cloud?.partition || cloud?.firedoor) {
+            const local = { sash: get().sash, casement: get().casement, door: get().door, partition: get().partition || clone(DEFAULT_PARTITION_PROFILE), firedoor: get().firedoor || clone(DEFAULT_FIREDOOR_PROFILE) };
             set(mergeWindowProfiles(cloud, local, get().dirty || []));
             setActiveWindowProfile(get().sash);
             setActiveCasementProfile(get().casement);
             setActiveDoorProfile(get().door);
             setActivePartitionProfile(get().partition);
+            setActiveFireDoorProfile(get().firedoor);
           }
         } catch (err) {
           console.error('windowProfile loadFromCloud', err);
@@ -444,6 +530,12 @@ export const useWindowProfileStore = create(
           const w = migratePartitionProfile(state.partition);
           setActivePartitionProfile(w);
           setTimeout(() => useWindowProfileStore.setState({ partition: w }), 0);
+        }
+        // Fire doors (27.10.2026): the same, a cache without the kind reads the default.
+        if (state?.firedoor) {
+          const f = migrateFireDoorProfile(state.firedoor);
+          setActiveFireDoorProfile(f);
+          setTimeout(() => useWindowProfileStore.setState({ firedoor: f }), 0);
         }
         // Tenant profile from Supabase wins over the local cache, but for the
         // paths this browser changed and has not saved yet (persisted `dirty`):

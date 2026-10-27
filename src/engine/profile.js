@@ -999,6 +999,213 @@ export function getPartitionProfile() {
   return activePartitionProfile || DEFAULT_PARTITION_PROFILE;
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// FIRE DOOR PROFILE (internal door sets FDR / DR, Piotr 27.10.2026)
+//
+// An internal timber door set: one leaf (a bought blank, machined on the Rover
+// by the owner's bSolid master FD_LEAF_MASTER_PIOTR, macro Master_Door_PIOTR)
+// in a three-member frame (head, hinge jamb, lock jamb) machined from 63 thick
+// stock to 50, as wide as the wall (frameDepth 100 to 200). The rebate is cut
+// from solid on every member: 15 wide (12 overlap + 3 gap) across the 50 and
+// (leaf + 3) deep along the depth, so the frame shows 35 outside and 50 inside.
+// Hinges, lock and keep are the macro's rule (hinges 150 from the top, the
+// last one ending 200 above the bottom, equal spacing; the DIN lock spindle at
+// 1000 from the leaf bottom, backset 60). Fire ON (FD30 leaf 44, FD60 leaf
+// 54) switches fire hinges, the FD lock and keep, intumescent and fire glass;
+// Fire OFF the standard set. Every number below is a workshop default edited
+// in Window Settings, Fire Doors; the ones marked ZAŁOŻENIE are the
+// programmer's reading where the owner gave no number (BLOCKERS 35).
+// fireDoor.js is the only reader that turns them into sizes and positions.
+// ═════════════════════════════════════════════════════════════════════════════
+export const DEFAULT_FIREDOOR_PROFILE = Object.freeze({
+  schema: 1,
+  leaf: {
+    widthSuggestions: [626, 686, 726, 762, 826, 838, 926, 1056],   // chips in the form; the field stays free, never clamped
+    heightSuggestion: 2040,
+    defaultWidth: 826, defaultHeight: 2040,
+    thicknessByRating: { FD30: 44, FD60: 54, none: 44 },           // the macro has conditions on 44 and 54
+    blankAllowance: 0,                 // ZAŁOŻENIE: blank bought oversize, CNC cuts the size
+    leadEdgeMacroValue: -8,            // the macro LEAD_EDGE expression value (unit not decoded)
+    limits: { minWidth: 300, maxWidth: 1500, minHeight: 1500, maxHeight: 3000, minDepth: 50, maxDepth: 400 },   // hard sanity only: outside = that door fails with a message
+  },
+  frame: {
+    rawThickness: 63, thickness: 50,
+    rawWidthAllowance: 5,              // ZAŁOŻENIE: raw board width = frame depth + 5
+    overlap: 12, gapSide: 3, gapHead: 3,
+    floorGap: 5,                       // ZAŁOŻENIE (the LSP): leaf bottom above the floor
+    rebateClearance: 3,                // rebate depth = leaf thickness + this
+    headJoint: 'mitre',                // ZAŁOŻENIE: the head meets the jambs on a 45 mitre (the LSP); only 'mitre' is implemented
+    depthSuggestions: [100, 125, 150, 175, 200], defaultDepth: 100,
+  },
+  hinges: {
+    count: 3, length: 102, topOffset: 150, bottomOffset: 200,     // the macro rule (lpx - 150 - 200 - w) / (repn - 1)
+    recessLength: 103, recessWidth: 30, recessDepth: 3, cornerRadius: 6,   // ZAŁOŻENIE: plate + 1, R6 (12 cutter); old Weeke depths were 3.2 / 4 / 4.2
+  },
+  lock: {
+    spindleHeight: 1000, backset: 60,  // LOCK_H from the leaf bottom; DIN lock backset
+    forend: { length: 235, width: 24, millOversize: 1, depth: 4 },
+    case: { depth: 85, height: 150, pocketWidth: 17, pocketDepth: 87, pocketHeight: 153 },   // pocket 87 x 153 = owner proposal, ZAŁOŻENIE
+    euroCentres: 72, bathroomCentres: 78,
+    caseTopAboveSpindle: 46.5,         // ZAŁOŻENIE from the macro expression lock_h + 46.5
+    forendCentreBelowSpindle: 15,      // ZAŁOŻENIE from the macro expressions lock_h - 15
+    spindleBore: 10, euroBore: 18, bathroomBore: 10,   // ZAŁOŻENIE (hole diameters for the drawings / export)
+  },
+  keep: {
+    length: 175, width: 39, millOversize: 1,
+    plateDepth: 3,                     // ZAŁOŻENIE
+    pocket: { length: 120, width: 18, depth: 15 },   // ZAŁOŻENIE: one pocket for the latch and the bolt, centred on the plate
+  },
+  vp: {
+    // ZAŁOŻENIE: the macro placement is not decoded; the sheets and the 3D put
+    // the first pane top at topRail, the A/B pair styles midRail apart, the
+    // nNo styles stackGap apart, centred across the leaf; the export sends the
+    // style id and the macro places the cut. glassThickness 6 (fire and toughened).
+    topRail: 150, midRail: 450, sideMargin: 150, stackGap: 100, cornerRadius: 6, beadFaces: 2, glassThickness: 6,
+    // the macro VP_STYLE table, ids 1:1 (no style 3 in the macro). arrange:
+    // 'none' | 'single' | 'stack' | 'diamond' | 'custom'; a stack takes its gap
+    // from the vp key named in `gap`; style 2 lists its two different panes.
+    styles: [
+      { id: 0, label: 'None', w: 0, h: 0, count: 0, arrange: 'none' },
+      { id: 1, label: '450mm Square', w: 450, h: 450, count: 1, arrange: 'single' },
+      { id: 2, label: '150mm x 760mm/150mm x 450mm', w: 150, h: 760, count: 2, arrange: 'stack', gap: 'midRail', panes: [{ w: 150, h: 760 }, { w: 150, h: 450 }] },
+      { id: 4, label: '150mm x 1410mm', w: 150, h: 1410, count: 1, arrange: 'single' },
+      { id: 5, label: '350mm Diamond', w: 350, h: 350, count: 1, arrange: 'diamond' },
+      { id: 6, label: '2No. 150mm 800mm', w: 150, h: 800, count: 2, arrange: 'stack', gap: 'stackGap' },
+      { id: 7, label: '3No 200mm 450mm', w: 200, h: 450, count: 3, arrange: 'stack', gap: 'stackGap' },
+      { id: 8, label: '5No 200mm 500mm', w: 200, h: 500, count: 5, arrange: 'stack', gap: 'stackGap' },
+      { id: 9, label: '450mm x 700mm', w: 450, h: 700, count: 1, arrange: 'single' },
+      { id: 10, label: '150mm x 760mm', w: 150, h: 760, count: 1, arrange: 'single' },
+      { id: 11, label: '508mm x 1500mm', w: 508, h: 1500, count: 1, arrange: 'single' },
+      { id: 12, label: '150mm x 700mm/150mm x 700mm', w: 150, h: 700, count: 2, arrange: 'stack', gap: 'midRail' },
+      { id: 13, label: '5No 200mm 200mm', w: 200, h: 200, count: 5, arrange: 'stack', gap: 'stackGap' },
+      { id: 14, label: 'Custom', w: 0, h: 0, count: 0, arrange: 'custom' },
+    ],
+  },
+  intumescent: {
+    // the macro INTU_STYLE table, ids 1:1; strips per edge ZAŁOŻENIE (1 for the
+    // single-strip labels, 2 for the 2No labels); thickness 4 everywhere
+    styles: [
+      { id: 1, label: '15mm x 4mm Intu Strip Lock Center', width: 15, thickness: 4, strips: 1 },
+      { id: 2, label: '20mm x 4mm Intu Strip Lock Center', width: 20, thickness: 4, strips: 1 },
+      { id: 3, label: '2No 10mm x 4mm', width: 10, thickness: 4, strips: 2 },
+      { id: 4, label: '2No 15mm x 4mm', width: 15, thickness: 4, strips: 2 },
+      { id: 5, label: '15mm x 4mm Central 2L Top', width: 15, thickness: 4, strips: 1 },
+      { id: 6, label: '20mm x 4mm Central 2L Top', width: 20, thickness: 4, strips: 1 },
+      { id: 7, label: '2No 15mm x 4mm 2L Top', width: 15, thickness: 4, strips: 2 },
+    ],
+    grooveOversize: 0.5,               // ZAŁOŻENIE: groove = strip + 0.5 (the macro cuts 15.5 for a 15 strip)
+    // ZAŁOŻENIE: two strips sit LPZ / 2 +- this (centres 11 and 33 on a 44 leaf, the
+    // 15.5 grooves 6.5 apart). The macro's lpz / 2 +- 2.75 samples are the two
+    // passes of the 10 saw that make ONE 15.5 groove, not two strips: at 2.75
+    // two grooves would overlap, so the contract value is not used here.
+    twoStripOffset: 11,
+  },
+  // paint: the casement / door rule of calculations.js paintFromAreaSqm (per
+  // 1.5 m2 2 L primer + 1 L topcoat) on the leaf both faces + the frame visible
+  // faces (35 outside + 50 inside per member); mirrored in fireDoor.js
+  bsuite: {
+    activeTarget: 'machine',
+    targets: [{
+      id: 'machine', name: 'Machine (Rover)',
+      programs: {
+        leaf:      { path: 'C:/Users/Xp600/Desktop/Biesse Piotr/FD_LEAF_MASTER_PIOTR.bSolid', panelId: 1001, panelName: 'P1001' },   // ZAŁOŻENIE path, editable
+        head:      { path: '', panelId: 1001, panelName: 'P1001' },   // the 5-axis frame masters do not exist yet: empty = rows skipped with a message
+        jambHinge: { path: '', panelId: 1001, panelName: 'P1001' },
+        jambLock:  { path: '', panelId: 1001, panelName: 'P1001' },
+      },
+      writeExecutionParameters: false,
+      executionParameters: { origin: 0, refCorner: 0, rotX: 0, rotY: 0, rotZ: 0, offsetX: 0, offsetY: 0, offsetZ: 0 },
+    }],
+    stopRows: true,                    // a StopWorklistItem between the leaf / head / hinge jamb / lock jamb blocks
+    hand: { left: 0, right: 1 },       // ZAŁOŻENIE: macro HAND 0 = "Hinge left" of the form
+    // the macro parameters a single door never changes (table 4.7 of the brief);
+    // the D_* placement values are written from vp.topRail / midRail / sideMargin
+    // (one source for the sheets and the export), these copies are the macro's own defaults
+    macroDefaults: { SPINDLE: 1, KEEP_LEAF: 0, KEEP_STYLE_LEAF: 0, REBATE: 0, REBATE_STYLE: 1, SPY_ON: 0, SPY_H: 1450, LBOX: 0, L_BOX_H: 1000, DROP_CILL: 0, PREM_DOOR: 0, D_TOP_RAIL: 150, D_MID_RAIL: 450, D_SIDE_MARGIN: 150 },
+  },
+  defaults: { fire: true, rating: 'FD30', hingeSide: 'left', swing: 'in', lockType: 'latch', vpStyle: 0, intuStyle: 1, leadEdge: true, vpCustom: { length: 600, width: 150, count: 1, rail: 100, pos: 0 } },
+});
+
+const FIREDOOR_BSUITE_KEYS = ['leaf', 'head', 'jambHinge', 'jambLock'];
+
+/**
+ * The fire door bSuite block merged over the default the way migrateBsuite does
+ * for the casement: every stored target keeps what it carries (its uploaded
+ * `stored` program entries included) and gains the missing keys; a copy
+ * without targets takes the default target; the active target must exist.
+ */
+function migrateFireDoorBsuite(stored, D) {
+  const defTarget = D.targets[0];
+  const mergePrograms = (p) => Object.fromEntries(FIREDOOR_BSUITE_KEYS.map((k) => [k, { ...defTarget.programs[k], ...(p?.[k] || {}) }]));
+  let targets;
+  if (Array.isArray(stored?.targets) && stored.targets.length) {
+    targets = stored.targets.map((t, i) => ({
+      ...defTarget, ...t,
+      id: t.id || `target-${i + 1}`,
+      programs: mergePrograms(t.programs),
+      executionParameters: { ...defTarget.executionParameters, ...(t.executionParameters || {}) },
+    }));
+  } else targets = D.targets.map((t) => ({ ...t, programs: mergePrograms(null), executionParameters: { ...t.executionParameters } }));
+  const activeTarget = targets.some((t) => t.id === stored?.activeTarget) ? stored.activeTarget : targets[0].id;
+  return {
+    ...D, ...(stored || {}), targets, activeTarget,
+    hand: { ...D.hand, ...(stored?.hand || {}) },
+    macroDefaults: { ...D.macroDefaults, ...(stored?.macroDefaults || {}) },
+  };
+}
+
+/** A styles table merged by id over the default: default order, a stored entry overrides its fields, extra stored ids follow. */
+function mergeStylesById(defaults, stored) {
+  if (!Array.isArray(stored) || !stored.length) return defaults.map((s) => ({ ...s }));
+  const out = defaults.map((s) => ({ ...s, ...(stored.find((x) => x && Number(x.id) === s.id) || {}) }));
+  for (const s of stored) if (s && !defaults.some((d) => d.id === Number(s.id))) out.push({ ...s, id: Number(s.id) });
+  return out;
+}
+
+/**
+ * Fire door profile migration: schema 1, block by block over the default (a
+ * missing key takes the default, a stored one stays), ready for key moves. The
+ * bsuite block goes through migrateFireDoorBsuite so a stored target keeps its
+ * uploaded programs.
+ */
+export function migrateFireDoorProfile(profile) {
+  if (!profile) return null;
+  const D = DEFAULT_FIREDOOR_PROFILE;
+  const P = profile;
+  const list = (stored, def) => (Array.isArray(stored) ? stored.map(Number).filter((n) => Number.isFinite(n)) : [...def]);
+  return {
+    ...D, ...P,
+    schema: D.schema,
+    leaf: {
+      ...D.leaf, ...(P.leaf || {}),
+      widthSuggestions: list(P.leaf?.widthSuggestions, D.leaf.widthSuggestions),
+      thicknessByRating: { ...D.leaf.thicknessByRating, ...(P.leaf?.thicknessByRating || {}) },
+      limits: { ...D.leaf.limits, ...(P.leaf?.limits || {}) },
+    },
+    frame: { ...D.frame, ...(P.frame || {}), depthSuggestions: list(P.frame?.depthSuggestions, D.frame.depthSuggestions) },
+    hinges: { ...D.hinges, ...(P.hinges || {}) },
+    lock: {
+      ...D.lock, ...(P.lock || {}),
+      forend: { ...D.lock.forend, ...(P.lock?.forend || {}) },
+      case: { ...D.lock.case, ...(P.lock?.case || {}) },
+    },
+    keep: { ...D.keep, ...(P.keep || {}), pocket: { ...D.keep.pocket, ...(P.keep?.pocket || {}) } },
+    vp: { ...D.vp, ...(P.vp || {}), styles: mergeStylesById(D.vp.styles, P.vp?.styles) },
+    intumescent: { ...D.intumescent, ...(P.intumescent || {}), styles: mergeStylesById(D.intumescent.styles, P.intumescent?.styles) },
+    bsuite: migrateFireDoorBsuite(P.bsuite, D.bsuite),
+    defaults: { ...D.defaults, ...(P.defaults || {}), vpCustom: { ...D.defaults.vpCustom, ...(P.defaults?.vpCustom || {}) } },
+  };
+}
+
+let activeFireDoorProfile = null;
+// Pushed in by windowProfileStore (hydrate, cloud load, every edit); migrated on the way in.
+export function setActiveFireDoorProfile(profile) {
+  activeFireDoorProfile = profile ? migrateFireDoorProfile(profile) : null;
+}
+export function getFireDoorProfile() {
+  return activeFireDoorProfile || DEFAULT_FIREDOOR_PROFILE;
+}
+
 
 /**
  * Schema migration for stored sash profiles (Supabase, localStorage cache,
@@ -1072,29 +1279,35 @@ export function boardWidthForDepth(frameDepth) {
 
 /**
  * Temporarily compute with frozen (batch snapshot) profiles.
- * withProfiles(sash, casement, door, partition, fn), or the older
- * withProfiles(sash, casement, door, fn) and withProfiles(sash, casement, fn):
- * a function in third or fourth place is the callback and the profiles not
- * given stay the live ones (a batch frozen before that kind had a snapshot).
+ * withProfiles(sash, casement, door, partition, firedoor, fn), or the older
+ * withProfiles(sash, casement, door, partition, fn), withProfiles(sash,
+ * casement, door, fn) and withProfiles(sash, casement, fn): a function in
+ * third, fourth or fifth place is the callback and the profiles not given
+ * stay the live ones (a batch frozen before that kind had a snapshot).
  */
-export function withProfiles(sashProfile, casementProfile, doorProfile, partitionProfile, fn) {
-  // withProfiles(sash, casement, door, partition, fn) since 25.10.2026; the
-  // older shapes (sash, casement, door, fn) and (sash, casement, fn) keep working
+export function withProfiles(sashProfile, casementProfile, doorProfile, partitionProfile, fireDoorProfile, fn) {
+  // withProfiles(sash, casement, door, partition, firedoor, fn) since 27.10.2026;
+  // the older shapes (sash, casement, door, partition, fn), (sash, casement,
+  // door, fn) and (sash, casement, fn) keep working
+  if (typeof fireDoorProfile === 'function') { fn = fireDoorProfile; fireDoorProfile = null; }
   if (typeof partitionProfile === 'function') { fn = partitionProfile; partitionProfile = null; }
   if (typeof doorProfile === 'function') { fn = doorProfile; doorProfile = null; }
   const prevSash = activeProfile;
   const prevCas = activeCasementProfile;
   const prevDoor = activeDoorProfile;
   const prevPartition = activePartitionProfile;
+  const prevFireDoor = activeFireDoorProfile;
   if (sashProfile) activeProfile = normalizeSashProfile(sashProfile);
   if (casementProfile) activeCasementProfile = migrateCasementProfile(casementProfile);
   if (doorProfile) activeDoorProfile = migrateDoorProfile(doorProfile);
   if (partitionProfile) activePartitionProfile = migratePartitionProfile(partitionProfile);
+  if (fireDoorProfile) activeFireDoorProfile = migrateFireDoorProfile(fireDoorProfile);
   try { return fn(); } finally {
     activeProfile = prevSash;
     activeCasementProfile = prevCas;
     activeDoorProfile = prevDoor;
     activePartitionProfile = prevPartition;
+    activeFireDoorProfile = prevFireDoor;
   }
 }
 

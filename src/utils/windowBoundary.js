@@ -22,12 +22,15 @@ import { parseSpecification, normaliseToWindowSpec, SashProportionError, BarPatt
 import { ArchError } from '../engine/arch.js';
 import { sashBarPattern, DoorGeometryError } from '../engine/calculations.js';
 import { PartitionGeometryError } from '../engine/partition.js';
+import { FireDoorGeometryError } from '../engine/fireDoor.js';
 
 /** The engine errors that describe the window's own data (the owner fixes the window, not the code). */
 export function isWindowDataError(e) {
   // PartitionGeometryError (25.10.2026): a partition bay that does not fit its
   // layout (a door wider than the wall, no room for a screen) fails that wall only.
-  return e instanceof SashProportionError || e instanceof BarPatternError || e instanceof ArchError || e instanceof DoorGeometryError || e instanceof PartitionGeometryError;
+  // FireDoorGeometryError (27.10.2026): a fire door leaf or frame depth outside
+  // the hard sanity limits fails that door only.
+  return e instanceof SashProportionError || e instanceof BarPatternError || e instanceof ArchError || e instanceof DoorGeometryError || e instanceof PartitionGeometryError || e instanceof FireDoorGeometryError;
 }
 
 /** The error a page prints for one window: the engine message, the error name for the log. */

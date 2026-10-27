@@ -54,6 +54,13 @@ export const PART_COLOUR_GROUPS = [
   { id: 'wall_door_mid_rail', family: 'wall_leaf', name: 'Door Mid Rail', note: 'between glass and panel', hex: '#5CCBA9' },
   { id: 'wall_door_bottom_rail', family: 'wall_leaf', name: 'Door Bottom Rail', note: 'bottom of the leaf', hex: '#E04A2A' },
   { id: 'wall_small', family: 'wall_leaf', name: 'Bars, Beads, Stops', note: 'applied bars, beads, the head stop', hex: '#B5D99C' },
+  // Fire doors (27.10.2026, internal door sets): own family (fire_door), the
+  // head and jambs in the frame colours of the other families (the same raw
+  // 63 section and both jambs the same length: one compartment), the leaf
+  // blank in the leaf purple.
+  { id: 'fire_door_head', family: 'fire_door', name: 'Frame Head', note: 'top of the frame, mitred both ends', hex: '#F5E050' },
+  { id: 'fire_door_jambs', family: 'fire_door', name: 'Frame Jambs', note: 'hinge and lock jambs together', hex: '#7CC4F5' },
+  { id: 'fire_door_leaf', family: 'fire_door', name: 'Door Leaf', note: 'the bought blank, cut by the CNC', hex: '#A98BE8' },
 ];
 
 const BY_ID = Object.fromEntries(PART_COLOUR_GROUPS.map((g) => [g.id, g]));
@@ -91,6 +98,9 @@ const ELEMENT_TO_GROUP = {
   'W-DOOR MID RAIL': 'wall_door_mid_rail',
   'W-DOOR BOTTOM RAIL': 'wall_door_bottom_rail',
   'W-BAR': 'wall_small', 'W-DOOR BAR': 'wall_small', 'W-BEAD': 'wall_small', 'W-DOOR BEAD': 'wall_small', 'W-DOOR HEAD STOP': 'wall_small',
+  'FD-HEAD': 'fire_door_head',
+  'FD-JAMB-H': 'fire_door_jambs', 'FD-JAMB-L': 'fire_door_jambs',
+  'FD-LEAF': 'fire_door_leaf',
 };
 
 // Cut List group symbol (lists.js CUT_LIST_ORDER) to the same colour group.
@@ -118,6 +128,8 @@ const CUT_SYMBOL_TO_GROUP = {
   'HB': 'wall_boards', 'EB': 'wall_boards', 'P': 'wall_posts', 'PL': 'wall_posts',
   'DS-H': 'wall_door_stiles', 'DS-L': 'wall_door_stiles', 'DTR': 'wall_door_top_rail', 'DMR': 'wall_door_mid_rail', 'DBR': 'wall_door_bottom_rail',
   'GB': 'wall_small', 'DGB': 'wall_small', 'BD': 'wall_small', 'DBD': 'wall_small', 'HS': 'wall_small',
+  // fire doors (27.10.2026): the symbols of partSymbols.js; FH stays on frame_head (the same hex)
+  'HJ': 'fire_door_jambs', 'LJ': 'fire_door_jambs', 'LEAF': 'fire_door_leaf',
   // the pre-08.10 symbols, for anything saved with them
   'C-FH': 'frame_head', 'C-AH': 'frame_head', 'C-FRR': 'frame_head', 'C-J-L/R': 'frame_jambs', 'C-CILL': 'frame_cill',
   'C-M': 'mullion', 'C-T': 'transom', 'C-ST-L/R': 'leaf_stiles', 'C-TR': 'leaf_top_rail', 'C-ATR': 'leaf_top_rail',

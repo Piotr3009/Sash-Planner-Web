@@ -4,6 +4,42 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-10-27 · FIRE DOORS v1 (branch `claude/fire-doors-v1`, from main 623b282)
+
+### Stage 0: baseline and sweep (no code changes)
+
+**Baseline on the starting commit 623b282** (`npm ci`, `pip install ezdxf`, every `verify/arch/t*.mjs` except the `*baseline*` generators, every `verify/parity/*.mjs`, then `git checkout -- docs/handover/samples/`, then `npm run build`): 37 test files, 4,795 PASS, 0 FAIL; build OK (vite 17 s, only the usual chunk size notice). Two files are not tests: `psw-casement-layouts.mjs` needs a PSW clone (exit 2, not run), `render_door_samples.mjs` renders the door sample PNGs in Chromium (restored by the checkout).
+
+| File | PASS | File | PASS |
+|---|---|---|---|
+| arch/t16 | 369 | parity/t37_single_window_bom | 50 |
+| arch/t17_edges | 70 | parity/t38_leaf_64_seat_85 | 472 |
+| arch/t18 | 179 | parity/t39_settings_leaf_cards | 23 |
+| arch/t19 | 280 | parity/t40_bottom_rail_3d | 96 |
+| arch/t20 | 117 | parity/t41_doors_production | 683 |
+| arch/t20_bars | 31 | parity/t42_precut_colours_labels | 32 |
+| arch/t21 | 120 | parity/t43_sash_proportions | 239 |
+| arch/t22 | 118 | parity/t43_window_tag | 98 |
+| arch/t23 | 81 | parity/t44_doors_v3 | 127 |
+| arch/t24_stage4 | 26 | parity/t45_sash_bars_per_sash | 124 |
+| arch/t25 | 226 | parity/t46_settings_save | 40 |
+| arch/t26 | 38 | parity/t47_triple_sash | 124 |
+| arch/t27 | 97 | parity/t48_opening_marks | 27 |
+| arch/t28 | 51 | parity/t49_door_meeting_machining | 80 |
+| arch/t29 | 34 | parity/t50_partition | 139 |
+| arch/t30_preview | 30 | parity/t31_bars_8x8 | 18 |
+| arch/t33_bar_grid | 43 | parity/t32_bsuite | 54 |
+| parity/t34_glass_minus1 | 46 | parity/t35_locks | 51 |
+| parity/t36_hinges | 110 | | |
+
+Control dumps for the Stage 4 byte identical check (a 1200 x 1200 casement, a 900 x 1500 sash, a 900 x 2100 single door, the t50 partition bay 2525 x 2165 SDS, default profiles, `normaliseToWindowSpec` + `deriveWindowData`) were written on the starting commit; two consecutive runs were byte identical (no timestamp, random or uuid keys in the engine output).
+
+**STOP row source** (owner decision 27.10.2026): the form `<StopWorklistItem Id="GUID" Label="" />` as a sibling of `CadProgramWorklistItem` inside `<Items>`, a new GUID per STOP, from the Biesse UK sample list `docs/handover/workshop/JOINERY_NETWORK_EVENT.ewlist` (read by the owner on 05.09.2026). `docs/handover/samples/sample_frames_052L_040L.ewlist` has no STOP row.
+
+**Sweep (read only agents): every place a category is registered.** See the list below (filled from the sweep and its completeness critic).
+
+---
+
 ## 2026-10-25 · MEETING ROOM PARTITION WALLS v1 (chat change, main f4b0e47)
 
 ### Verdict: the 'partition' category derives the Windmill Street bay (2525 x 2165 SDS) to the owner numbers (screens 742.5, lights 387, unit 769.5 x 1232, leaf 794 x 2087, daylight 554, hinges 200 / 943.5 / 1937, 54 dowels in 18 joints), with the W- cut list, pre-cut, glass rows with applied bars, hardware lines, a placeholder price, the front elevation, the door leaf, the member (CNC) sheets with the dowel holes and the glass drawings; t50 engine, lists, pricing, variants and controls green; the member sheets still fail the text collision and dimension rule checks (in progress, see Verification); t27 flags one bare 40 in partitionJoints.js
