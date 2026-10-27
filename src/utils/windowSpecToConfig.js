@@ -191,18 +191,21 @@ export function windowSpecToConfig(windowSpec, derived = null) {
       ironmongery: windowSpec.hardware?.finish || 'brass',
       glassFinish: gz.finish || 'clear',
       quantity: windowSpec.quantity || 1,
-      // the pricing's flat numbers (pricing.js calculateFireDoor)
+      // the pricing's flat numbers (pricing.js calculateFireDoor). v1.1: the
+      // structural opening the engine reports (typed, or from a typed leaf),
+      // the leaf as derived, the closer as a kind ('none' | 'surface' |
+      // 'builtin'); no swing, no intumescent style.
       firedoorFire: !!fd.fire,
       firedoorRating: geo?.rating ?? fd.rating ?? null,
+      firedoorOpeningWidth: geo?.opening?.w ?? num(fd.openingWidth),
+      firedoorOpeningHeight: geo?.opening?.h ?? num(fd.openingHeight),
       firedoorLeafWidth: geo?.leaf?.w ?? num(fd.leafWidth),
       firedoorLeafHeight: geo?.leaf?.h ?? num(fd.leafHeight),
       firedoorFrameDepth: geo?.frame?.depth ?? num(fd.frameDepth),
       firedoorHingeSide: fd.hingeSide || 'left',
-      firedoorSwing: fd.swing || 'in',
       firedoorLockType: fd.lockType || 'latch',
-      firedoorCloser: !!fd.closer,
+      firedoorCloser: geo ? (geo.closer ? geo.closer.type : 'none') : (typeof fd.closer === 'string' ? fd.closer : (fd.closer ? 'builtin' : 'none')),
       firedoorVpStyle: Number(fd.vpStyle) || 0,
-      firedoorIntuStyle: Number(fd.intuStyle) || 0,
       firedoorVpSqm: geo?.vp?.glassSqm ?? num(derived?.firedoor?.vp?.glassSqm) ?? 0,
       firedoorFrameMetres: members.reduce((s, m) => s + (Number(m.length) || 0) * (Number(m.quantity) || 1), 0) / 1000,
     };
@@ -641,8 +644,9 @@ export function fireDoorGeometryFromSpec(windowSpec, derivedIn = null) {
   // (W = leaf + 2 x 38, H = leaf + 38 + 5 at the defaults)
   const leafX = faces.outside + gaps.side;
   const leafY = faces.outside + gaps.head;
+  // v1.1: handed by the hinge side only (no swing on an internal door)
   const hingeSide = f.handing?.hingeSide === 'right' ? 'right' : 'left';
-  const swing = f.handing?.swing === 'out' ? 'out' : 'in';
+  const op = f.opening || null;
   const specGlass = n(windowSpec.glazing?.thickness);
   const glassThickness = specGlass > 0 ? specGlass : n(getFireDoorProfile()?.vp?.glassThickness);
   const lk = f.lock || {};
@@ -704,8 +708,11 @@ export function fireDoorGeometryFromSpec(windowSpec, derivedIn = null) {
         box: { w: n(p.box?.w ?? p.w), h: n(p.box?.h ?? p.h) },
       })),
     },
-    handing: { hingeSide, swing, label: f.handing?.label ?? '' },
-    closer: !!f.closer,
+    handing: { hingeSide, label: f.handing?.label ?? '' },
+    // v1.1: the closer as the engine reports it (null = none) and the
+    // structural opening the frame sits in (informational for the 3D)
+    closer: f.closer ? { type: f.closer.type ?? null, label: f.closer.label ?? '', machined: !!f.closer.machined } : null,
+    opening: op ? { w: n(op.width), h: n(op.height), source: op.source ?? null } : null,
     // the overall frame W x H and the point the 3D group is centred on
     totalWidth: W,
     totalHeight: H,

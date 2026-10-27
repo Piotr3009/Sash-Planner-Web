@@ -774,16 +774,16 @@ function overviewCells(wd) {
   }
   // Fire doors (27.10.2026): the rating (FD30 / FD60, DR for a non-fire door) in
   // the Type column, the leaf size and the vision panel style in the Head column,
-  // the handing ('Hinge left · opens in'), the lock and the closer in the Opening
-  // column, the wall depth (= the frame depth) in the Box column; every value
-  // from derived.firedoor.
+  // the handing ('Hinge left', v1.1: no swing), the lock and the closer kind
+  // label in the Opening column, the wall depth (= the frame depth) in the Box
+  // column; every value from derived.firedoor.
   const fd = wd?.derived?.firedoor;
   if (wd?.windowSpec?.category === 'firedoor' && fd) {
     const lock = FIREDOOR_LOCK_LABELS[fd.lock?.type] || fd.lock?.type || '';
     return {
       type: fd.fire ? (fd.rating || 'FD30') : 'DR',
       head: `leaf ${fd.leaf?.width} × ${fd.leaf?.height} × ${fd.leaf?.thickness}${fd.vp?.panes?.length ? ` · VP ${fd.vp.label}` : ' · no VP'}`,
-      opening: [fd.handing?.label, lock, fd.closer ? 'closer' : ''].filter(Boolean).join(' · '),
+      opening: [fd.handing?.label, lock, fd.closer ? (fd.closer.label || 'closer') : ''].filter(Boolean).join(' · '),
       box: fd.frame?.depth ?? wd?.windowSpec?.frame?.depth,
     };
   }

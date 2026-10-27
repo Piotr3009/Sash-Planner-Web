@@ -150,9 +150,14 @@ const BATCH_STATUSES = ['preparation', 'in-production', 'complete'];
 // from the configurator config by name. A number that does not parse and a
 // missing key are stored as null (the profile default applies downstream);
 // booleans keep false; vpCustom is a plain copy of its five numbers.
-const FIREDOOR_ITEM_BOOLS = ['firedoorFire', 'firedoorCloser', 'firedoorLeadEdge'];
-const FIREDOOR_ITEM_NUMBERS = ['firedoorLeafWidth', 'firedoorLeafHeight', 'firedoorFrameDepth', 'firedoorVpStyle', 'firedoorIntuStyle'];
-const FIREDOOR_ITEM_STRINGS = ['firedoorRating', 'firedoorHingeSide', 'firedoorSwing', 'firedoorLockType'];
+// v1.1 (27.10.2026 evening): the structural opening (firedoorOpeningWidth /
+// Height) is the size input and the leaf (firedoorLeafWidth / Height) an
+// optional override: a 0 or null leaf is stored as such (never forced to a
+// default) so the engine derives the leaf from the opening. The closer is a
+// kind string ('none' | 'surface' | 'builtin'); no swing, no intumescent style.
+const FIREDOOR_ITEM_BOOLS = ['firedoorFire', 'firedoorLeadEdge'];
+const FIREDOOR_ITEM_NUMBERS = ['firedoorOpeningWidth', 'firedoorOpeningHeight', 'firedoorLeafWidth', 'firedoorLeafHeight', 'firedoorFrameDepth', 'firedoorVpStyle'];
+const FIREDOOR_ITEM_STRINGS = ['firedoorRating', 'firedoorHingeSide', 'firedoorLockType', 'firedoorCloser'];
 const FIREDOOR_VP_CUSTOM_KEYS = ['length', 'width', 'count', 'rail', 'pos'];
 export function fireDoorItemFields(windowConfig) {
   const c = windowConfig || {};

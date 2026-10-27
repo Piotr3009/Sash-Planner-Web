@@ -9,7 +9,7 @@ import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
 import { SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, isCottageProportion } from '../engine/specification.js';
 import { deriveWindowData, sashBarPattern } from '../engine/calculations.js';
 import { deriveWindowBounded, sashBarsLabel } from '../utils/windowBoundary.js';
-import { withProfiles, getCasementProfile, getFireDoorProfile, bsuiteActiveTarget } from '../engine/profile.js';
+import { withProfiles, getCasementProfile, getFireDoorProfile, bsuiteActiveTarget, FIREDOOR_CLOSER_LABELS } from '../engine/profile.js';
 import { buildGlassListForWindow, buildVentGrilles } from '../engine/lists.js';
 import { formatQty, buildWindowMaterialLines, windowBomCards, windowHardwareDetailRows } from '../engine/bom.js';
 import { liveSectionsFor } from '../engine/partRegistry.js';
@@ -317,21 +317,29 @@ export default function WindowDetailPage() {
           {windowSpec?.category === 'firedoor' ? (
             // Fire doors (27.10.2026): the door as configured, every value from derived.firedoor
             // (the inputs of the spec block when the engine has not run), the handing in
-            // the PSW wording ('Hinge left / Hinge right')
+            // the PSW wording ('Hinge left / Hinge right'; v1.1: no swing). v1.1 adds the
+            // structural opening (marked when it was worked back from a typed leaf), the
+            // closer kind label and the single intumescent strip label.
             (() => {
               const fd = derived?.category === 'firedoor' ? derived.firedoor : null;
               const inp = fd?.inputs || windowSpec.firedoor || {};
               const fire = fd ? fd.fire : !!windowSpec.firedoor?.fire;
+              const op = fd?.opening || null;
+              const openingText = op
+                ? `${op.width} × ${op.height} mm${op.source === 'leaf' ? ' (from the leaf)' : ''}`
+                : (inp.openingWidth && inp.openingHeight ? `${inp.openingWidth} × ${inp.openingHeight} mm` : 'n/a');
+              const closerText = fd ? (fd.closer ? fd.closer.label : 'none') : FIREDOOR_CLOSER_LABELS[inp.closer] || 'none';
               return (
                 <SpecSection title="Fire door">
                   <SpecRow label="Rating" value={fire ? (fd?.rating || windowSpec.firedoor?.rating || 'FD30') : 'Non fire'} />
-                  <SpecRow label="Leaf" value={fd ? `${fd.leaf.width} × ${fd.leaf.height} × ${fd.leaf.thickness} mm` : `${inp.leafWidth} × ${inp.leafHeight} mm`} />
-                  <SpecRow label="Handing" value={fd?.handing?.label || `Hinge ${inp.hingeSide || 'left'} · opens ${inp.swing || 'in'}`} />
+                  <SpecRow label="Structural opening" value={openingText} />
+                  <SpecRow label="Leaf" value={fd ? `${fd.leaf.width} × ${fd.leaf.height} × ${fd.leaf.thickness} mm` : `${inp.leafWidth || 'n/a'} × ${inp.leafHeight || 'n/a'} mm`} />
+                  <SpecRow label="Handing" value={fd?.handing?.label || `Hinge ${inp.hingeSide || 'left'}`} />
                   <SpecRow label="Wall depth" value={`${fd?.frame?.depth ?? inp.frameDepth} mm`} />
                   <SpecRow label="Lock" value={FIREDOOR_LOCK_LABELS[fd?.lock?.type || inp.lockType] || inp.lockType} />
-                  <SpecRow label="Closer" value={(fd ? fd.closer : inp.closer) ? 'concealed closer' : 'none'} />
+                  <SpecRow label="Closer" value={closerText} />
                   <SpecRow label="Vision panel" value={fd ? (fd.vp?.panes?.length ? fd.vp.label : 'none') : `style ${inp.vpStyle}`} />
-                  <SpecRow label="Intumescent" value={fd ? (fd.intumescent ? fd.intumescent.label : 'none (non-fire door)') : `style ${inp.intuStyle}`} />
+                  <SpecRow label="Intumescent" value={fd ? (fd.intumescent ? fd.intumescent.label : 'none (non-fire)') : (fire ? 'by rating' : 'none (non-fire)')} />
                   <SpecRow label="Leading edge" value={inp.leadEdge ? 'bevelled (macro LEAD_EDGE)' : 'square'} />
                 </SpecSection>
               );
