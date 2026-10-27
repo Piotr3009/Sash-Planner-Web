@@ -264,8 +264,9 @@ export default function ProjectDetailPage() {
                         <div className="text-xs text-ink-400 mt-0.5">{win.width} × {win.height} mm</div>
                         <div className="text-[10px] text-ink-400 mt-1">
                           {bounded?.windowSpec?.category === 'firedoor'
-                            /* fire doors (27.10.2026): the rating, the leaf and the hand (PSW wording: Hinge left / right); the card size above is the frame overall */
-                            ? `${bounded.windowSpec.firedoor?.fire ? (bounded.windowSpec.firedoor?.rating || 'Fire') : 'Non-fire'} · leaf ${bounded.windowSpec.firedoor?.leafWidth} x ${bounded.windowSpec.firedoor?.leafHeight} · Hinge ${bounded.windowSpec.firedoor?.hingeSide === 'right' ? 'right' : 'left'}`
+                            /* fire doors (27.10.2026): the rating, the leaf and the hand (PSW wording: Hinge left / right); the card size above is the frame overall.
+                               v1.1: the leaf comes from the derived door (the spec may hold the opening only), the stored leaf is the fallback */
+                            ? `${bounded.windowSpec.firedoor?.fire ? (bounded.windowSpec.firedoor?.rating || 'Fire') : 'Non-fire'} · leaf ${bounded.derived?.firedoor?.leaf?.width ?? bounded.windowSpec.firedoor?.leafWidth} x ${bounded.derived?.firedoor?.leaf?.height ?? bounded.windowSpec.firedoor?.leafHeight} · ${bounded.derived?.firedoor?.handing?.label || `Hinge ${bounded.windowSpec.firedoor?.hingeSide === 'right' ? 'right' : 'left'}`}`
                             : bounded?.windowSpec?.category === 'partition'
                             /* partition walls (25.10.2026): the layout and the lights, no bars field */
                             ? `Layout ${bounded.windowSpec.partition?.layout || 'S'} · ${bounded.windowSpec.partition?.lights || 1} lights`

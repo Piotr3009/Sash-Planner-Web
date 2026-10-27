@@ -214,22 +214,32 @@ The reference doors, every row from the live engine with the default profile and
 
 ## 3. The configurator and the settings
 
-**Configurator** (`ConfiguratorPage`, batch type 'firedoor', the "Fire door" section): Fire door / Non-fire chips;
-rating FD30 / FD60 (fire only); leaf width with the suggestion chips of `leaf.widthSuggestions` (626 / 686 / 726 /
-762 / 826 / 838 / 926 / 1056, a click inserts, the field stays free and is never clamped); leaf height with the 2040
-chip; Hinge left / Hinge right; opens in / out; wall thickness = frame depth with the chips of
-`frame.depthSuggestions` (100 to 200, default 100); lock Latch (standard) / Sashlock euro / Bathroom; concealed
-closer yes / no (follows the Fire switch until picked); vision panel style from `vp.styles` with the custom fields
-(length, width, count, rail, pos 0 / 90) on style 14; intumescent style from `intumescent.styles` (fire only);
-leading edge; colour and finish as the other types. Number inputs without spinners. The name field carries the auto
+**Configurator** (`ConfiguratorPage`, batch type 'firedoor', the "Fire door" section; v1.1): Fire door / Non-fire
+chips; rating FD30 / FD60 (fire only); the STRUCTURAL OPENING width and height first, with chips made from
+`leaf.widthSuggestions` and `leaf.heightSuggestion` through `fireDoorOpeningForLeaf` ("912 (leaf 826)" ... "1142
+(leaf 1056)", "2088 (leaf 2040)"; a click inserts, the fields stay free and are never clamped); then "Leaf (optional
+override)" width and height, empty by default with the derived leaf as the placeholder (a typed value wins on its
+axis, "derive from the opening" clears it, an empty field stores 0); Hinge left / Hinge right (no swing); wall
+thickness = frame depth with the chips of `frame.depthSuggestions` (100 to 200, default 100); lock Latch
+(standard) / Sashlock euro / Bathroom; closer None / Surface closer / Built in closer (follows the Fire switch
+through `defaults.closerFire / closerNonFire` until picked); vision panel style from `vp.styles` with the custom
+fields (length, width, count, rail, pos 0 / 90) on style 14; the intumescent as a read only line from the live
+derive ("1 x 15 x 4 all around" / "2 x ..." / "none (non-fire)"); leading edge; colour and finish as the other
+types. Number inputs without spinners. The name field carries the auto
 number (FDR-nn / DR-nn, editable). The engine runs live on the fields exactly as the save stores them
 (`deriveWindowData` on a spec built from the `firedoor*` keys) and the summary prints the frame overall, the hinge
 positions, the rebate and the FD30 / FD60 / non-fire rating; a door the engine refuses shows its message in the
-summary and blocks the save. The 3D preview draws the door set from the same derive. The save stores the
-`firedoor*` keys (`fireDoorItemFields`) and width / height = the overall frame.
+summary and blocks the save (an opening too small fails on the LEAF limit, naming the leaf value). The summary
+also prints the structural opening (with "(from the leaf)" / "(one axis from the leaf)"), the corner dowels, the
+middle hinge rule, the closer and the intumescent label with its metres. The 3D preview draws the door set from the
+same derive. The save stores the `firedoor*` keys (`fireDoorItemFields`: `firedoorOpeningWidth / Height`,
+`firedoorLeafWidth / Height` 0 when not overridden, `firedoorCloser` the kind) and width / height = the overall
+frame. A v1 door saved with the leaf only loads with the override filled and the opening it needs shown.
 
-**Window Settings · Fire Doors** (`/window-settings/firedoor`): one card per block of the profile (leaf, frame,
-hinges, lock, keep, vision panel, intumescent, bSuite, configurator defaults), every field through `setFireDoorPath`
+**Window Settings · Fire Doors** (`/window-settings/firedoor`): one card per block of the profile (leaf, frame
+with the wall gaps, the size rule line and the dowels block, hinges with midAboveCentre, lock, keep, vision panel,
+intumescent as the single strip with the strips per rating, bSuite with the INTU / CLOSER / DOWEL_* notes,
+configurator defaults with the two closer selects), every field through `setFireDoorPath`
 (root whitelisted, the key must exist, numbers finite), the comma lists through `setFireDoorList`, a lock toggle per
 card, a reset button; a live sample door (the reference door, its size, rating and depth editable on the page) prints
 the leaf, the frame overall, the hinge positions, the spindle, the keep centre and the strip metres under the
@@ -258,7 +268,11 @@ left / Hinge right") and never the LSP's LH / RH, so the two conventions cannot 
   rectangles with three bearing lines, the handle rose on the spindle with the lever towards the hinge side, the
   euro cylinder or the bathroom turn symbol at the cylinder height (nothing for a latch), the vision panel panes
   (the diamond rotated), the handing and the door name; the dimensions as the LSP places them: the frame height on
-  the far left, the leaf height nearer, the leaf width above the frame and the frame width above that.
+  the far left, the leaf height nearer, the leaf width above the frame and the frame width above that. v1.1: the
+  STRUCTURAL OPENING as a dashed rectangle around the frame (5 outside each jamb and above the head, the sill on the
+  frame foot) with its own width and height dimensions outside the frame ones; the subtitle "opening W x H" and no
+  swing word; the notes print the v1.1 hinge rule (`hingeRuleWord`), the closer kind (`closerWord`) and the strip
+  with its 15.5 x 4 groove.
 - **Inside Elevation** (view 'inside', the LSP's C, the PUSH side): the 50 face lapping the leaf edge by 12, the leaf
   dashed behind it, no hinges, the handle and the lock symbol mirrored; the frame width on top and the height on the
   right (the LSP draws no dimensions on this view; the house rule places them).
@@ -270,18 +284,23 @@ left / Hinge right") and never the LSP's LH / RH, so the two conventions cannot 
 - **Leaf Machining** (`FireDoorLeaf2D`): the leaf 1:1 seen from the pull face with its three machined edges unfolded
   beside it (hinge edge, lock edge, top edge as bands one thickness wide): every op of `machining.leaf` where the
   engine puts it (hinge recesses, forend recess and case pocket, spindle and cylinder bores, vision panel cut-outs,
-  intumescent grooves, the leading edge); the leaf width on top, the height on the right, the hinge chain (150 /
-  hinge / 794 / hinge / 794 / hinge / 200) beside the hinge edge, the vision panel chain on the left, the spindle and
+  intumescent grooves, the leading edge); the leaf width on top, the height on the right, the hinge chain (v1.1:
+  150 / hinge / 517 / hinge / 867 / hinge / 200 on a 2040 leaf) beside the hinge edge, the vision panel chain on the left, the spindle and
   cylinder heights from the leaf bottom on the right, the backset along the bottom; then the op table (no, operation,
   face, x, y, z, length, width, depth, radius, note) and the notes. Board coordinates as the bSolid master.
 - **Frame Machining** (`FireDoorFrame2D`, for the 5-axis programmer): the three members 1:1 one above the other,
   each seen from the opening side with the outside (35) face and the inside (50) face unfolded beside it, the
   rebate cheek hatched, the mitres as the 45 lines and the stepped ends, the hinge recesses on the hinge jamb
-  dimensioned from the top long point by the macro chain (188 / 982 / 1776), the keep plate and pocket on the lock
+  dimensioned from the top long point by the chain (v1.1: 188 / 807 / 1776), the keep plate and pocket on the lock
   jamb from the top and from the foot (990), the rebate section enlarged beside the head, the op table and the notes.
+  v1.1: the dowel bores drawn on every mitred end (the circles at the engine's positions along the depth), one
+  enlarged "MITRE FACE 4:1 (unfolded)" detail with the bores and their chain from the outside face (20 / 30 / 30 /
+  20 on a 100 deep frame) and the across-thickness dimension, the dowel note (8 x 40, 3 per corner, 20 deep, 6 per
+  frame) and 12 "dowel bore" op rows with the angle 45.
 
-The harness renders every sheet of six doors through `renderToStaticMarkup` and checks: svg, no NaN / undefined /
-Infinity / long dash, no two texts overlapping (`verify/arch/lib/textCollision.mjs`), the dimension rule
+The harness renders every sheet of seven doors (v1.1: plus the owner's opening 1000 x 2100) through
+`renderToStaticMarkup` and checks: svg, no NaN / undefined / Infinity / long dash, no swing word, no two texts
+overlapping (`verify/arch/lib/textCollision.mjs`), the dimension rule
 (`dimRule.mjs`) on the Inside Elevation and the Leaf sheet (the Outside Elevation follows the LSP placement with
 the heights on the left by design, `OUTSIDE_HEIGHT_DIMS_SIDE`; the Plan and the Frame sheet are multi-detail
 sheets with chains under their members) and the reference strings (902, 2083, 826, 2040, the hinge chain, 1000).
@@ -307,24 +326,24 @@ sheets with chains under their members) and the reference strings (902, 2083, 82
   `FIREDOOR_HARDWARE`): Fire door hinge / Door hinge (3, the length, the positions from the leaf top and the handing),
   Lock case latch / sashlock euro / bathroom (the rating, the backset, the spindle height), Euro cylinder (euro) or
   Thumbturn and release (bathroom, on the cylinders slot), Lever handle set (on rose, the batch finish), Keep (the
-  plate, the centre from the jamb foot), Concealed closer (when ticked, "no machining yet"), Intumescent strip (fire
+  plate, the centre from the jamb foot), Surface closer or Built in closer by kind (v1.1; the built in one "no machining yet"), Intumescent strip (fire
   only, in metres, the style label and the strips per edge). Slots: `doorHinges`, `fireDoorLocks`, `cylinders`,
   `doorHandles`, `keeps`, `doorClosers` (`HARDWARE_TO_SLOT_KEY`); the window's slot product shows on the line and on
   the material row (the door rule of 08.10.2026, `FIREDOOR_PART_SLOT`).
 - **Assign Materials** (`FIREDOOR_PARTS`, `windowType 'firedoor'`, `/materials/assignments/firedoor`): Door Blank
   FD30 44 / FD60 54 / non-fire 44 (pcs), Frame Timber 63 x (depth + 5) (m, by raw section), Fire Door Hinge, Door
   Hinge (standard), Lock Case Latch / Sashlock Euro / Bathroom, Euro Cylinder, Thumbturn and Release, Lever Handle
-  Set, Keep, Concealed Closer (pcs, from the Ironmongery catalogue, the tab of their slot), Intumescent Strip 10 / 15 /
-  20 (m), Fire Glass, Toughened Glass (vision panel) (m2), Vision Panel Beads (m), Glazing Intumescent (m). Paint on
+  Set, Keep, Built in Closer (concealed; the v1 `fd_closer`) and Surface Closer (overhead; `fd_closer_surface`, v1.1) (pcs, from the Ironmongery catalogue, the tab of their slot), Intumescent Strip 15 x 4
+  (m, the one row `fd_intu_15`; the 10 / 20 rows are gone), Frame Dowels (`fd_frame_dowel`, 8 x 40, pcs, consumables, v1.1), Fire Glass, Toughened Glass (vision panel) (m2), Vision Panel Beads (m), Glazing Intumescent (m). Paint on
   the casement rows as the external doors (`derived.paint`, the casement / door rule: per 1.5 m2 2 L primer + 1 L
   topcoat on the leaf both faces + the 35 and 50 faces of the three members).
 - **BOM** (`buildWindowPartQtys`): one blank by rating (pcs), the frame timber metres from the pre-cut, the hinges,
-  the lock case by type, the cylinder or the thumbturn, one handle set and one keep per door, the closer when ticked,
-  the intumescent metres on the row of its width, the vision panel glass m2 (rounded to 2 dp: 0.2 for a 450 x 450
+  the lock case by type, the cylinder or the thumbturn, one handle set and one keep per door, the closer row of its
+  kind, 6 frame dowels, the intumescent metres (strips x the perimeter) on the one strip row, the vision panel glass m2 (rounded to 2 dp: 0.2 for a 450 x 450
   pane) on the fire or toughened row, the beads and the glazing intumescent metres; no counterweights, no sash
   consumables. Purchase list from the single doors under the client; the batch is the sum.
 - **Pricing**: `calculateFireDoor` = `leafPrice` + frame metres (head + two jambs at the long points) x `framePerM` +
-  vision panel m2 x `vpPerSqm` + `closerPrice` when the door has one, the quantity discount as the other types; every
+  vision panel m2 x `vpPerSqm` + `closerPrice` when the door has a closer of any kind (v1.1), the quantity discount as the other types; every
   rate 0 until set in Settings > Pricing > Fire doors, so a door prices at 0, never at a sash rate.
 - **Weights**: `derived.weights { timber, glass, total, leaves[] }` (the frame by `kgPerM`, the leaf by its section,
   glass 2.5 kg per m2 per mm, margin 5 %): the reference leaf 47.5 kg.
@@ -339,8 +358,8 @@ three knuckles at the engine's hinge positions, a lever on a rose at the spindle
 a bathroom turn below it when the lock has one), a keep plate on the lock jamb cheek, one `woodColor` from the
 finish. The leaf swings about the knuckle axis by the open angle (0 to 90, default 30: the slider of the
 configurator 3D and the control of the window page 3D tab, the PDF capture takes the same angle). The viewer's
-exterior camera is the corridor side: swing 'in' (the default) shows the PUSH face (the 50 frame face, the leaf in
-the opening, the handle), swing 'out' turns the set and shows the PULL face with the knuckles. Look only: no
+exterior camera sees the PUSH face (the 50 frame face, the leaf in the opening, the handle); the pull face with the
+knuckles is on the far side and the leaf opens away from the viewer (v1.1: one orientation, no swing). Look only: no
 dimensions in 3D. Wired in `App.jsx` (the configurator), `WindowPreview3D.jsx`, `Window3DCaptureRig.jsx`,
 `windowSpecToConfig.js` (`config.windowCategory 'firedoor'`, `fireDoorGeo`, `fireDoorOpen`), `ThreeDPanel.jsx`.
 
@@ -389,7 +408,9 @@ them inside `Master_Door_PIOTR` (BLOCKERS 35.10). The reference FD30 826 x 2040,
 | | SPINDLE | 1 | `bsuite.macroDefaults` |
 | | EURO | 0 | 1 only on the euro lock |
 | | KEEP / KEEP_STYLE | 0 / 0 | the leaf of a single door (`macroDefaults.KEEP_LEAF`, `KEEP_STYLE_LEAF`) |
-| | INTU_STYLE | 1 | the intumescent style, 0 when fire is off |
+| | INTU | 1 | (v1.1) the strip count 0 / 1 / 2 (15 x 4 all around; FD30 1, FD60 2) |
+| | INTU_W, INTU_T | 15, 4 | (v1.1) the strip width and thickness |
+| | INTU_STYLE | 1 | the Master_Door style the count maps to (1 strip = 1, 2 strips = 4), 0 when fire is off |
 | | VP_STYLE | 0 | the vision panel style id |
 | | C_VP_L / C_VP_W / C_VP_NUM / C_VP_RAIL / C_VP_POS | 600 / 150 / 1 / 100 / 0 | `vpCustom` (style 14) |
 | | D_TOP_RAIL / D_MID_RAIL / D_SIDE_MARGIN | 150 / 450 / 150 | `vp.topRail / midRail / sideMargin` (one source with the sheets) |
@@ -400,7 +421,7 @@ them inside `Master_Door_PIOTR` (BLOCKERS 35.10). The reference FD30 826 x 2040,
 | | DROP_CILL / PREM_DOOR | 0 / 0 | `macroDefaults` |
 | | HINGE_1 / HINGE_2 / HINGE_3 | 150 / 944 / 1738 | top_i (one per hinge of `hinges.count`; new names, the owner adds them) |
 | | HINGE_D | 3 | `hinges.recessDepth` (new name) |
-| | CLOSER | 1 | the closer switch (new name) |
+| | CLOSER | 1 | (v1.1) 0 none, 1 surface, 2 built in |
 | FD_HEAD | LPX / LPY / LPZ | 902 / 100 / 50 | the long point length / the frame depth / 50 |
 | | REB_W / REB_D | 15 / 47 | the rebate |
 | | HAND / HINGE / HINGE_D | 0 / 1 / 3 | as the leaf |
@@ -414,14 +435,14 @@ them inside `Master_Door_PIOTR` (BLOCKERS 35.10). The reference FD30 826 x 2040,
 | | KEEP_Y | 990 | the keep centre from the jamb foot |
 | | MITRE_TOP / MITRE_BOTTOM | 1 / 0 | |
 
-FD60 writes LPZ 54, REB_D 57, LOCK 3, KEEP 3; a non-fire door HINGE 0, LOCK 1, KEEP 1, INTU_STYLE 0, CLOSER 0; hinge
+FD60 writes LPZ 54, REB_D 57, LOCK 3, KEEP 3, INTU 2, INTU_STYLE 4; a non-fire door HINGE 0, LOCK 1, KEEP 1, INTU 0, INTU_STYLE 0, CLOSER 0; the frame rows carry DOWEL_N 3, DOWEL_D 8, DOWEL_L 40, DOWEL_DEPTH 20, DOWEL_1..3 (20 / 50 / 80 on a 100 deep frame, v1.1); hinge
 right HAND 1, LH 0, RH 1; the euro lock EURO 1.
 
 **The machine neutral machining list** (`exportFireDoorMachining(windows, label)`): `{label}_firedoor_machining.csv`
 (one line per op, the columns `door, element, op, face, x, y, z, length, width, depth, radius, angle, value, note`,
 comma separated, CRLF, UTF-8, numbers to 0.1, the element names the cut list names FD-LEAF / FD-HEAD / FD-JAMB-H /
 FD-JAMB-L, doors in the list order, groups leaf / head / hinge jamb / lock jamb, ops in the engine's order) and
-`{label}_firedoor_machining.json` (the format header `production-core-firedoor-machining` v1, the coordinate notes,
+`{label}_firedoor_machining.json` (the format header `production-core-firedoor-machining` v2 (v1.1: per door the opening, the closer, the intumescent and the frame dowels; no swing), the coordinate notes,
 one object per door with name, fire, rating, handing, inputs, leaf, frame, hinges, lock, keep, vp, intumescent,
 closer, bsuiteVars and machining, all copied from `derived.firedoor`). The ops come from
 `derived.firedoor.machining` and are never recomputed in the export.
@@ -448,6 +469,7 @@ into the face.
   shows 50). The rebate occupies y in [35, 50] and z in [0, 47] along the full length: op `rebate` on face `opening`.
   The hinge recesses (FD-JAMB-H, x = jambTop_i - 0.5) and the keep plate / pocket (FD-JAMB-L, centred on the keep
   centre and on z = T / 2) sit on face `rebateCheek`, the face at y = 35 that meets the leaf edge. Mitres: op
+  `dowelBore` on face `mitre` (v1.1, x y z = the bore centre on the mitre face, 8 dia, 20 deep, angle 45),
   `mitre` on face `end`, x = 0 (top / left) or x = length (the head's right end), angle 45, width 50, depth = the
   frame depth.
 
@@ -509,8 +531,9 @@ bare workshop numbers), t41 and t50 (the door and partition keys), t32 (the case
 
 ## 9. Assumptions (ZAŁOŻENIE, every one a profile key)
 
-The owner items are `BLOCKERS.md` 35.1 to 35.19. The assumptions, with the key in `DEFAULT_FIREDOOR_PROFILE` and
-the value used:
+The owner items are `BLOCKERS.md` 35.1 to 35.20 (v1) and 36.1 to 36.8 (v1.1). The assumptions, with the key in
+`DEFAULT_FIREDOOR_PROFILE` and the value used (the v1 rows about `swing` and the intumescent style table no longer
+apply):
 
 | assumption | key | value |
 |---|---|---|
@@ -530,9 +553,13 @@ the value used:
 | one keep pocket for the latch and the bolt, centred on the plate | `keep.pocket` | 120 x 18 x 15 |
 | the vision panel placement (not the macro's) | `vp.topRail`, `vp.midRail`, `vp.sideMargin`, `vp.stackGap` | 150, 450, 150, 100 |
 | the cut-out corner radius, the bead faces, the glass thickness (fire and toughened) | `vp.cornerRadius`, `vp.beadFaces`, `vp.glassThickness` | 6, 2, 6 |
-| strips per edge of the INTU_STYLE labels | `intumescent.styles[].strips` | 1 for 1, 2, 5, 6; 2 for 3, 4, 7 |
-| the groove is the strip + 0.5 (the macro cuts 15.5 for a 15 strip) | `intumescent.grooveOversize` | 0.5 |
+| (v1.1) one strip 15 x 4 all around, groove 15.5 x 4, FD30 one / FD60 two (owner) | `intumescent.width / thickness / grooveWidth / grooveDepth / stripsByRating` | 15, 4, 15.5, 4, { FD30 1, FD60 2 } |
+| (v1.1) the Master_Door style the strip count maps to (INTU_STYLE next to INTU) | `intumescent.macroStyleByStrips` | { 1: 1, 2: 4 } |
 | two strips sit at T / 2 +- 11 (the macro's +- 2.75 are the two saw passes of ONE groove) | `intumescent.twoStripOffset` | 11 |
+| (v1.1) the wall gaps: frame = opening - 5 a side / - 5 at the head (owner) | `frame.wallGapSide`, `frame.wallGapHead` | 5, 5 |
+| (v1.1) the corner dowels 8 x 40, 3 per corner (owner); 20 in from each face, on the thickness centre (ZAŁOŻENIE) | `frame.dowels` | { dia 8, length 40, perJoint 3, margin 20 } |
+| (v1.1) the middle hinge centre 200 above the leaf centre (owner) | `hinges.midAboveCentre` | 200 |
+| (v1.1) the closer kind of a new fire / non-fire door | `defaults.closerFire`, `defaults.closerNonFire` | 'surface', 'none' |
 | macro HAND 0 = Hinge left of the form | `bsuite.hand` | { left 0, right 1 } |
 | the leaf master path | `bsuite.targets[0].programs.leaf.path` | `C:/Users/Xp600/Desktop/Biesse Piotr/FD_LEAF_MASTER_PIOTR.bSolid` |
 | the frame masters do not exist: empty paths, rows skipped with a message | `bsuite.targets[0].programs.head / jambHinge / jambLock.path` | '' |
@@ -542,9 +569,14 @@ the value used:
 
 ## 10. Next steps
 
-1. The owner adds the document variables of section 7 to `FD_LEAF_MASTER_PIOTR` and binds them in
-   `Master_Door_PIOTR` (BLOCKERS 35.10), then proves on the machine that a worklist row moves the hinges and the
-   lock (the lesson of 06.10.2026: the casement macros did not react from a list that looked fine).
+1. The owner builds his own simple leaf macro (27.10.2026 evening: Master_Door has far too many options) with the
+   names of section 7 (HAND, HINGE, LOCK, LOCK_H, EURO, HINGE_1..3, HINGE_D, INTU, INTU_W, INTU_T, VP_STYLE, C_VP_*,
+   LEAD_EDGE, CLOSER), inserts it once in the leaf master and binds the parameters to document variables of those
+   names (BLOCKERS 36.7), then proves on the machine that a worklist row moves the hinges and the lock (the lesson
+   of 06.10.2026: the casement macros did not react from a list that looked fine). The Master_Door extras the export
+   still writes can then be dropped.
+1b. The built in closer machining once the two Weeke component files (`concealed_closer_lhits11.mpr`,
+   `concealed_closer_RHits1120.mpr`) or the closer's data sheet arrive (BLOCKERS 36.4).
 2. The three frame masters (FD_HEAD, FD_JAMB_HINGE, FD_JAMB_LOCK) for the 5-axis CNC from the machining CSV / JSON
    and the Frame Machining sheet; their paths and uploads in Window Settings · Fire Doors · bSuite; then the head
    and jamb rows go in the list.

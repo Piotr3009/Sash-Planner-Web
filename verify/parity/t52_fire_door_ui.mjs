@@ -277,7 +277,7 @@ createRoot(document.getElementById('root')).render(
   let lp = await leftPanel();
   ok(/Fire Door/.test(lp) && !/Dimensions \(Frame\)/.test(lp) && !/Ventilation/.test(lp) && !/Horns & Security/.test(lp), 'the form: a Fire Door section, no Dimensions / Ventilation / Horns sections');
   let lb = await liveBox();
-  ok(/Frame overall 902 x 2083 · rebate 15 x 47 · members 50 x 100 finished, 63 x 105 raw/.test(lb), `the live box: "${lb}"`);
+  ok(/^Opening 912 x 2088 · frame overall 902 x 2083 · leaf 826 x 2040 · rebate 15 x 47 · members 50 x 100 finished, 63 x 105 raw · hinges 150 \/ 769 \/ 1738 from the leaf top/.test(lb), `the live box (v1.1: the opening first, the leaf, the hinges): "${lb}"`);
   let rp = await rightPanel();
   ok(/Frame\s*902 × 2083/.test(rp) && /Depth\s*100mm/.test(rp), 'the summary: frame overall 902 × 2083, depth 100', rp);
   ok(/Hinges \(leaf top\)\s*150 \/ 769 \/ 1738/.test(rp) && /Hinges \(jamb top\)\s*188 \/ 807 \/ 1776/.test(rp) && /Middle hinge\s*centre 200 above the leaf centre/.test(rp), 'the summary: hinges 150 / 769 / 1738 and 188 / 807 / 1776, the middle hinge rule', rp);
@@ -304,9 +304,9 @@ createRoot(document.getElementById('root')).render(
   // a free opening, the opening chips, a bad opening (fails on the leaf), the leaf override
   await openingWidthInput().fill('889'); await page.waitForTimeout(100);
   lb = await liveBox();
-  ok(/Frame overall 879 x 2083/.test(lb) && /Leaf\s*803 × 2040/.test(await rightPanel()), `a free opening 889 derives without clamp: leaf 803, ${lb.split(' · ')[0]}`);
+  ok(/frame overall 879 x 2083/.test(lb) && /Leaf\s*803 × 2040/.test(await rightPanel()), `a free opening 889 derives without clamp: leaf 803, ${lb.split(' · ').slice(0, 2).join(' · ')}`);
   await fdSec().locator('button', { hasText: /^1012 \(leaf 926\)$/ }).click(); await page.waitForTimeout(100);
-  ok(/Frame overall 1002 x 2083/.test(await liveBox()) && await openingWidthInput().inputValue() === '1012', 'the 1012 (leaf 926) chip inserts the opening: overall 1002 x 2083');
+  ok(/frame overall 1002 x 2083/.test(await liveBox()) && await openingWidthInput().inputValue() === '1012', 'the 1012 (leaf 926) chip inserts the opening: overall 1002 x 2083');
   await openingWidthInput().fill('286'); await page.waitForTimeout(100);
   ok(await saveBtn().isDisabled(), 'an opening 286 (leaf 200): Save disabled');
   const err = (await page.locator('[data-firedoor-error]').innerText()).trim();
@@ -315,9 +315,9 @@ createRoot(document.getElementById('root')).render(
   ok(!(await saveBtn().isDisabled()) && (await page.locator('[data-firedoor-error]').count()) === 0, 'the opening 912 again: Save enabled, the error gone');
   await leafWidthInput().fill('838'); await page.waitForTimeout(100);
   rp = await rightPanel();
-  ok(/Frame overall 914 x 2083/.test(await liveBox()) && /Structural opening\s*924 × 2088 \(one axis from the leaf\)/.test(rp), 'a typed leaf 838 overrides the opening on its axis: frame 914, the opening reported 924 (one axis from the leaf)', rp);
+  ok(/frame overall 914 x 2083/.test(await liveBox()) && /Structural opening\s*924 × 2088 \(one axis from the leaf\)/.test(rp), 'a typed leaf 838 overrides the opening on its axis: frame 914, the opening reported 924 (one axis from the leaf)', rp);
   await fdSec().locator('button', { hasText: /^derive from the opening$/ }).click(); await page.waitForTimeout(100);
-  ok(/Frame overall 902 x 2083/.test(await liveBox()) && await leafWidthInput().inputValue() === '', 'derive from the opening: the override cleared, frame 902 again');
+  ok(/frame overall 902 x 2083/.test(await liveBox()) && await leafWidthInput().inputValue() === '', 'derive from the opening: the override cleared, frame 902 again');
   await leafWidthInput().fill('826'); await page.waitForTimeout(100);
   // the closer picked by hand, a euro lock, a VP style
   await fdSec().locator('button', { hasText: /^None$/ }).first().click(); await page.waitForTimeout(50);   // the closer chips None / Surface closer / Built in closer
@@ -449,13 +449,13 @@ createRoot(document.getElementById('root')).render(
   t = await body();
   ok(/Material Assignments . Fire doors/.test(t), 'materials page: the heading "Material Assignments ... Fire doors"', t.slice(0, 200));
   ok(!/coming soon/.test(t), 'materials page: live, not "coming soon"');
-  ok(/Blanks and frame timber/.test(t) && /Ironmongery/.test(t) && /Intumescent and beads/.test(t) && /Vision panel glass/.test(t), 'materials page: the four grouped sections');
+  ok(/Blanks and frame timber/.test(t) && /Ironmongery/.test(t) && /Intumescent, beads and dowels/.test(t) && /Vision panel glass/.test(t), 'materials page: the four grouped sections (v1.1: Intumescent, beads and dowels)');
   const counts = [...t.matchAll(/(\d+)\/(\d+) assigned/g)].map((m) => Number(m[2]));
   ok(counts.length === 4 && counts.reduce((a, b) => a + b, 0) === 21 && counts.every((n) => n > 0), `materials page: the section row counts ${counts.join(' / ')} (21 rows in all)`);
   ok(/Door blank FD30/i.test(t) && /Frame timber/i.test(t) && /Fire Door Hinge/i.test(t), 'materials page: the blanks, the frame timber and the hinge rows open by default', t.slice(0, 800));
-  await page.locator('button', { hasText: /Intumescent and beads/ }).click(); await page.waitForTimeout(80);
+  await page.locator('button', { hasText: /Intumescent, beads and dowels/ }).click(); await page.waitForTimeout(80);
   t = await body();
-  ok(/Intumescent/i.test(t) && /Glazing/i.test(t), 'materials page: the intumescent and glazing bead rows open on click', t.slice(0, 1200));
+  ok(/Intumescent/i.test(t) && /Glazing/i.test(t) && /Frame Dowels/i.test(t) && !/10 x 4/.test(t) && !/20 x 4/.test(t), 'materials page: the intumescent, glazing bead and frame dowel rows open on click; no 10 / 20 strip rows', t.slice(0, 1200));
 
   // the dashboard: the type key and the new pack select
   await page.locator('[data-link="dashboard"]').click();

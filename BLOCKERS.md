@@ -4,6 +4,74 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-10-27 evening · FIRE DOORS v1.1, items for Piotr (branch `claude/fire-doors-v1-1`, from main e42a092)
+
+The six changes you asked for in the chat after the v1 merge (opening as the input, no swing, one intumescent
+strip, closer kinds, corner dowels, the middle hinge 200 above the centre) are applied end to end: profile,
+spec, engine, configurator, Window Settings, the window page, the lists, the BOM and the slots, the five sheets,
+the 3D, both exports and the harnesses. Every number is a profile key in Window Settings · Fire Doors. Items 35.x
+below stay valid except where an item here says it replaces one.
+
+**36.1 The structural opening is the input (your rule, applied).** `frame.wallGapSide 5`, `frame.wallGapHead 5`
+(both new keys). Frame overall = opening - 10 wide, opening - 5 high (the foot on the floor); leaf = frame - 76 /
+- 43. Your example: 1000 x 2100 -> frame 990 x 2095 -> leaf 914 x 2052. The configurator asks for the opening
+first (chips = the standard leaves translated: 912 for the 826 leaf, 2088 for 2040); the leaf fields are an
+optional override (empty = derived, a typed leaf wins on its axis and the opening is shown from it). The v1 doors
+saved on main carry a leaf only: they derive exactly as before and show the opening they need. OWNER CHECK: the
+head gap 5 (you confirmed "też"); and whether the opening you type is the brick opening or the plastered one (PC
+does not care, but the 5 must match what you measure).
+
+**36.2 No swing (applied).** The in / out choice is gone from the form, the spec, the sheets, the 3D and the
+exports; `handing.label` is "Hinge left" / "Hinge right". The outside elevation is the pull side (the 35 face, the
+knuckles), the inside elevation the 50 face, the plan opens the leaf out of the rebate. A stored
+`firedoorSwing` on an old door is ignored, never written again.
+
+**36.3 One intumescent strip 15 x 4 all around (applied; replaces 35.8).** `intumescent.width 15`, `thickness 4`,
+`grooveWidth 15.5`, `grooveDepth 4`, `stripsByRating { FD30: 1, FD60: 2 }`, `twoStripOffset 11` (two grooves at
+T / 2 +- 11: 16 and 38 on the 54 leaf, 6.5 apart). Metres = strips x (2 x H + W): 4.906 m FD30 / 9.812 m FD60 on
+826 x 2040. The 10 and 20 strips, their slots and the macro style select are gone. The leaf row writes INTU (0 /
+1 / 2), INTU_W 15, INTU_T 4 and, for the Master_Door macro only, INTU_STYLE 1 (one strip) / 4 (two strips, the
+macro's "2No 15mm x 4mm"); your new macro can read INTU alone. OWNER CHECK: FD60 two strips of 15 (you said "2
+paski") rather than one 20: the engine follows `stripsByRating`.
+
+**36.4 The closer is a kind: none / surface / built in (applied; extends 35.12).** `defaults.closerFire 'surface'`,
+`defaults.closerNonFire 'none'`; CLOSER 0 / 1 / 2 in the leaf row; a slot and a hardware row per kind: `fd_closer`
+(now "Built in closer (concealed)", so a saved assignment on it survives; a v1 boolean closer true reads as built
+in) and the new `fd_closer_surface` ("Surface closer (overhead)"), both on the Door Closers category; one price
+rate for any closer (Settings · Pricing "Closer (surface or built in)"). STILL NO MACHINING for the built in closer: the old Weeke programs call
+`ASkyloonJoinery/concealed_closer_lhits11.mpr` and `concealed_closer_RHits1120.mpr`, and those two component
+files are not in the zip or the repo. Send those two .mpr files (from the ASkyloonJoinery folder of the old
+machine) or the closer's data sheet and the leaf top / head pockets go into the engine in one short change.
+
+**36.5 Corner dowels (applied).** `frame.dowels { dia 8, length 40, perJoint 3, margin 20 }`. Three dowels per
+mitred corner, bored square to the mitre face (45 to the member), 20 deep in each piece (half the dowel), on the
+centre of the 50 thickness, at 20 / 50 / 80 along a 100 deep frame (equal spacing between the margins). On the
+frame machining sheet, in the CSV / JSON (op `dowelBore`, angle 45, x y z = the centre) and the frame rows
+(DOWEL_N / DOWEL_D / DOWEL_L / DOWEL_DEPTH / DOWEL_1..3); 6 dowels per door in the order (the new consumable row
+`fd_frame_dowel`, 8 x 40, pcs); on the frame sheet a MITRE FACE 4:1 detail with the bores and their chain. ZAŁOŻENIE (owner check):
+the margin 20 from each face and the bore on the thickness centre (a dowel in the rebate zone, z < 47, has 35 of
+wood: 21 to 29 on the 8 bore). `perJoint 0` switches the dowels off.
+
+**36.6 The middle hinge 200 above the leaf centre (applied; replaces the rule part of 35.13).**
+`hinges.midAboveCentre 200`: the middle hinge CENTRE = H / 2 - 200 (2040: tops 150 / 769 / 1738, jamb 188 / 807 /
+1776; 2052: 150 / 775 / 1750). Top 150 from the top and bottom ending 200 above the bottom unchanged. This is PC's
+rule and goes out as HINGE_1..3; your new leaf macro must read HINGE_1..3 (the old Master_Door computes its own
+equal spacing and would put the middle hinge at 944).
+
+**36.7 The bSuite names for your new macro (summary).** Leaf row: LPX, LPY, LPZ, HAND (0 left / 1 right), HINGE
+(1 fire / 0 standard), LOCK (1 / 2 / 3), LOCK_H, EURO, HINGE_1, HINGE_2, HINGE_3, HINGE_D, INTU (0 / 1 / 2),
+INTU_W, INTU_T, VP_STYLE, C_VP_L, C_VP_W, C_VP_NUM, C_VP_RAIL, C_VP_POS, LEAD_EDGE, CLOSER (0 / 1 / 2). The
+Master_Door extras (SPINDLE, KEEP, KEEP_STYLE, INTU_STYLE, D_*, REBATE*, SPY*, LBOX, L_BOX_H, DROP_CILL, PREM_DOOR)
+are still written for the old master and can be dropped from the export once your macro replaces it. Frame
+rows: LPX, LPY, LPZ, REB_W, REB_D, HAND, HINGE, HINGE_1..3 (hinge jamb), HINGE_D, KEEP / KEEP_STYLE / KEEP_Y
+(lock jamb), MITRE_TOP, MITRE_BOTTOM, DOWEL_N, DOWEL_D, DOWEL_L, DOWEL_DEPTH, DOWEL_1..n.
+
+**36.8 Skipped, with the reason.** Nothing of the six changes. The 3D does not show the dowels or the opening
+(look only, as the brief says). The pricing keeps one closer rate for any kind (a second rate for the built in
+closer is a one line change when you give the number).
+
+---
+
 ## 2026-10-27 · FIRE DOORS v1, items for Piotr (branch `claude/fire-doors-v1`)
 
 Every item below is either an ASSUMPTION (ZAŁOŻENIE) the tura took where the owner box of 27.10.2026 gave no

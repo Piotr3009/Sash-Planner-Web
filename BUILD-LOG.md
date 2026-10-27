@@ -4,6 +4,109 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-10-27 evening · FIRE DOORS v1.1 (branch `claude/fire-doors-v1-1`, from main e42a092 = the v1 merge)
+
+The owner's six changes from the chat after the v1 merge, applied end to end in one evening session with three
+parallel agents on disjoint files (UI pages and stores; sheets and 3D; lists, slots and exports) over the lead's
+engine, profile and spec, then the harnesses, the docs and an independent review.
+
+**The six changes (BLOCKERS 36.1 to 36.6):** the structural opening as the input (frame = opening - 5 a side / - 5
+head, leaf = frame - 76 / - 43; 1000 x 2100 -> 990 x 2095 -> 914 x 2052; a typed leaf overrides on its axis); no
+swing; one intumescent strip 15 x 4 all around (groove 15.5 x 4, FD30 one strip, FD60 two; the style table and the
+10 / 20 strips gone); the closer a kind none / surface / built in (CLOSER 0 / 1 / 2, a slot per kind); the mitred
+corners dowelled 8 x 40 x 3 (dowelBore ops, DOWEL_* on the frame rows, the frame sheet detail, a dowel row); the
+middle hinge centre 200 above the leaf centre (2040: 150 / 769 / 1738).
+
+### Stage 1: engine, profile, spec (7cf2567)
+`profile.js`: `frame.wallGapSide / wallGapHead 5`, `frame.dowels { 8, 40, 3, margin 20 }`, `hinges.midAboveCentre
+200`, the intumescent block as one strip (`width / thickness / grooveWidth / grooveDepth / stripsByRating /
+macroStyleByStrips / twoStripOffset`), `defaults.closerFire 'surface' / closerNonFire 'none'`, no `swing` /
+`intuStyle`; migrations drop the v1 style table, `grooveOversize`, `defaults.swing / intuStyle` and read a v1
+boolean closer default (`FIREDOOR_CLOSER_KINDS / LABELS` exported). `specification.js`: `openingWidth / Height`,
+`leafWidth / Height` 0 = derived, `closer` a kind (`fireDoorCloserKind`), no swing / intuStyle. `fireDoor.js`: the
+size axis rule (leaf typed > opening typed > the default leaf) with `opening { width, height, wallGapSide,
+wallGapHead, source }`, the hinge rule (top / bottom fixed, the middle centre H / 2 - 200, equal spacing for other
+counts), the strip count by rating with INTU / INTU_W / INTU_T next to INTU_STYLE, the closer object and CLOSER 0 /
+1 / 2, the dowel block and `dowelBore` ops (x y z = the bore centre on the mitre face, 20 deep, angle 45, at 20 / 50
+/ 80 on a 100 deep frame) with DOWEL_N / D / L / DEPTH / 1..n on the frame rows, the member notes, the dowel and
+closer consumables; helpers `fireDoorSizeRule / fireDoorOpeningForLeaf / fireDoorLeafForOpening` for the form.
+
+### Stage 2: the pages and the stores (3f50079)
+Configurator (the opening first with chips "912 (leaf 826)" ..., the leaf as an optional override with the derived
+value as the placeholder and a "derive from the opening" button, no swing chips, the closer chips None / Surface
+closer / Built in closer, the intumescent read only, the summary with the opening, the dowels and the middle hinge
+rule), Window Settings (the wall gaps, the size rule line with the worked example, the dowels block, midAboveCentre,
+the single strip card, the two closer defaults, the INTU / CLOSER / DOWEL notes on the bSuite card), the window
+page (Structural opening row, handing without swing, the closer label, the strip label), the pack overview, the
+stores (`firedoorOpeningWidth / Height` numbers, `firedoorCloser` a string, no swing / intuStyle; `closerFire /
+closerNonFire` string leaves), the config bridge, the batch strip (closer by kind) and the pricing (one closer rate
+for any kind; the Settings label "Closer (surface or built in)").
+
+### Stage 3: lists, BOM, slots, exports (6fd47c3)
+Hardware lines "Surface closer" / "Built in closer" by kind, the one "Intumescent strip" line with the engine
+label and metres, a "Frame dowels" line; `fd_intu_10 / fd_intu_20` removed, `fd_closer` renamed "Built in closer
+(concealed)", `fd_closer_surface` and `fd_frame_dowel` appended at the END of FIREDOOR_ALL_PARTS (the index-based
+assignment sets keep the v1 rows); BOM rows by kind and count; the machining CSV (the `angle` column carries the 45 of
+the dowel bores, 12 per door) and JSON v2 (per door the opening, the closer, the intumescent, the frame dowels; no
+swing). `bsuiteExport.js` needed no change: it copies every variable of the engine's objects in order.
+
+### Stage 4: the harnesses (ad97d02, and the stage 5 / 6 commits)
+`t51_fire_door.mjs` on the v1.1 numbers: 415 PASS (v1: 397). New checks: the opening 1000 x 2100 door end to end
+(engine, sheets, export), the leaf override and the mixed source, the form helpers, the hinge rule with the middle
+centre and its jamb mapping, the strip count by rating (FD60 two grooves at 27 +- 11 on the 54 leaf), the closer
+kinds (a v1 boolean true = built in), the dowel block, bores, rows, DOWEL_* variables and CSV lines, the dowels off,
+the migrations of a v1 profile, the v1 record on the pages (the leaf only, a boolean closer) deriving as before,
+no swing word on 35 sheets. `t52_fire_door_ui.mjs` in Chromium: 89 PASS (v1: 78): the opening inputs and chips, the
+override and its reset, the geometry error on the leaf of a small opening, the three closer chips, the saved keys,
+the settings cards. Both files keep every v1 check that still applies; the checks of removed features (the
+intumescent select, the swing, the 10 / 20 rows) are replaced by the checks of what replaced them.
+
+### Stage 5: sheets and 3D (aa33d99)
+The outside elevation with the dashed structural opening and its dimensions, the subtitle "opening W x H", the v1.1
+hinge rule, closer and strip notes; the leaf sheet chain 150 / 102 / 517 / 102 / 867 / 102 / 200; the frame sheet
+with the dowel bores on every mitred end, a "MITRE FACE 4:1 (unfolded)" detail with the bores and their chain (20 /
+30 / 30 / 20), the dowel note and the 12 "dowel bore" op rows; no swing word anywhere; the 3D in the one
+orientation (the push face to the camera, the leaf opens away; `swingIn` removed).
+
+### Stage 6: full suite, build, docs
+Every `verify/arch/t*.mjs` (except the baseline generators) and `verify/parity/*.mjs` on the final tree, one pass each,
+5048 PASS in all, 0 FAIL (`psw-casement-layouts` exits 2 = no PSW checkout, as before; t19 / t26 / t27 / t28 need
+the git history of the compared trees: fetched to 3000 commits and re-run). `npm run build` OK (vite, 16 s).
+
+| File | PASS | File | PASS |
+|---|---|---|---|
+| arch/t16 | 369 | parity/t30_preview | 30 |
+| arch/t17_edges | 70 | parity/t33_bar_grid | 43 |
+| arch/t18 | 179 | parity/t31_bars_8x8 | 18 |
+| arch/t19 | 280 | parity/t32_bsuite | 54 |
+| arch/t20 | 117 | parity/t34_glass_minus1 | 46 |
+| arch/t20_bars | 31 | parity/t35_locks | 51 |
+| arch/t21 | 120 | parity/t36_hinges | 110 |
+| arch/t22 | 118 | parity/t37_single_window_bom | 50 |
+| arch/t23 | 81 | parity/t38_leaf_64_seat_85 | 473 |
+| arch/t24_stage4 | 26 | parity/t39_settings_leaf_cards | 23 |
+| arch/t25 | 226 | parity/t40_bottom_rail_3d | 96 |
+| arch/t26 | 38 | parity/t41_doors_production | 683 |
+| arch/t27 | 97 | parity/t42_precut_colours_labels | 32 |
+| arch/t28 | 51 | parity/t43_sash_proportions | 239 |
+| arch/t29 | 34 | parity/t43_window_tag | 98 |
+|  |  | parity/t44_doors_v3 | 127 |
+|  |  | parity/t45_sash_bars_per_sash | 124 |
+|  |  | parity/t46_settings_save | 40 |
+|  |  | parity/t47_triple_sash | 124 |
+|  |  | parity/t48_opening_marks | 27 |
+|  |  | parity/t49_door_meeting_machining | 80 |
+|  |  | parity/t50_partition | 139 |
+|  |  | parity/t51_fire_door | 415 |
+|  |  | parity/t52_fire_door_ui | 89 |
+
+Docs: `docs/handover/FIRE-DOORS.md` (the v1.1 banner, the opening, the hinge rule, the strip, the closer, the dowels,
+the reference table on the v1.1 numbers, the sheets, the lists, the export variables, the assumptions, the next
+steps), `BLOCKERS.md` 36.1 to 36.8 (the six changes applied, the owner checks, the closer component files still
+missing, the dowel margin and the thickness centre as the only new assumptions).
+
+---
+
 ## 2026-10-27 · FIRE DOORS v1 (branch `claude/fire-doors-v1`, from main 623b282)
 
 ### Stage 0: baseline and sweep (no code changes)

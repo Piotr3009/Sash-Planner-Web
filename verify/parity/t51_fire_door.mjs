@@ -788,7 +788,8 @@ section('6 - pricing with zero rates, resolvePricing, windowSpecToConfig');
 // ═════════════════════════════════════════════════════════════════════════════
 section('7 - the sheets: six doors x five sheets, collisions, the dimension rule, the reference strings, the Drawings panel');
 {
-  const BASE = { firedoorFire: true, firedoorRating: 'FD30', firedoorLeafWidth: 826, firedoorLeafHeight: 2040, firedoorFrameDepth: 100, firedoorHingeSide: 'left', firedoorSwing: 'in', firedoorLockType: 'euro', firedoorCloser: true, firedoorVpStyle: 1, firedoorIntuStyle: 1, firedoorLeadEdge: true };
+  // v1.1: the ref door through the opening 912 x 2088 (= leaf 826 x 2040), a v1 closer true = built in; a stored swing / intu style is ignored
+  const BASE = { firedoorFire: true, firedoorRating: 'FD30', firedoorOpeningWidth: 912, firedoorOpeningHeight: 2088, firedoorFrameDepth: 100, firedoorHingeSide: 'left', firedoorSwing: 'in', firedoorLockType: 'euro', firedoorCloser: true, firedoorVpStyle: 1, firedoorIntuStyle: 1, firedoorLeadEdge: true };
   const door = (key, name, extra) => ({ key, name, ...mkB({ ...BASE, ...extra }, name, { width: 902, height: 2083 }) });
   const DOORS = [
     door('ref', 'FDR-01', {}),
@@ -797,6 +798,7 @@ section('7 - the sheets: six doors x five sheets, collisions, the dimension rule
     door('fd60-bathroom', 'FDR-03', { firedoorRating: 'FD60', firedoorLockType: 'bathroom', firedoorVpStyle: 5, firedoorIntuStyle: 4 }),
     door('762x1981', 'FDR-04', { firedoorLeafWidth: 762, firedoorLeafHeight: 1981, firedoorSwing: 'out', firedoorVpStyle: 2 }),
     door('custom-vp-pos90', 'FDR-05', { firedoorLeafWidth: 1056, firedoorVpStyle: 14, firedoorVpCustom: { length: 600, width: 150, count: 3, rail: 100, pos: 90 }, firedoorFrameDepth: 150 }),
+    door('opening-1000', 'FDR-06', { firedoorOpeningWidth: 1000, firedoorOpeningHeight: 2100, firedoorCloser: 'surface', firedoorLockType: 'latch', firedoorVpStyle: 0 }),
   ];
   const tag = { number: 3, hex: '#F59E0B', name: 'FDR-01' };
   const all = {}, kinds = {};
@@ -817,8 +819,10 @@ section('7 - the sheets: six doors x five sheets, collisions, the dimension rule
   }
   const bad = Object.entries(all).filter(([, m]) => !/<svg/.test(m) || /NaN|undefined|Infinity|[\u2013\u2014]/.test(m)).map(([k]) => k);
   ok(bad.length === 0, `every sheet renders as svg with no NaN / undefined / Infinity / U+2013 / U+2014 (${Object.keys(all).length} sheets)`, bad.join(', '));
+  const swung = Object.entries(all).filter(([, m]) => /opens (in|out)/.test(m)).map(([k]) => k);
+  ok(swung.length === 0, 'no sheet prints a swing word (v1.1)', swung.join(', '));
   const col = collisionFailures(all);
-  ok(col.length === 0, 'collisionFailures empty: no overlapping texts on any of the 30 sheets', describeFailures(col, 40));
+  ok(col.length === 0, 'collisionFailures empty: no overlapping texts on any of the 35 sheets', describeFailures(col, 40));
   const outside = [];
   for (const [k, m] of Object.entries(all)) {
     const vb = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(m);
@@ -832,37 +836,46 @@ section('7 - the sheets: six doors x five sheets, collisions, the dimension rule
   // the plan and the frame sheet are multi detail sheets
   const ruled = Object.entries(all).filter(([k]) => kinds[k] === 'inside' || kinds[k] === 'leaf');
   const dimBad = ruled.map(([k, m]) => [k, checkDimRule(m)]).filter(([, r]) => !r.ok).map(([k, r]) => `${k}: ${r.why}`);
-  ok(ruled.length === 12 && dimBad.length === 0, `the inside elevation and the leaf sheet of every door keep the dimension rule (${ruled.length} sheets)`, dimBad.join(' | '));
+  ok(ruled.length === 14 && dimBad.length === 0, `the inside elevation and the leaf sheet of every door keep the dimension rule (${ruled.length} sheets)`, dimBad.join(' | '));
   ok(M.fdu.OUTSIDE_HEIGHT_DIMS_SIDE === 'left', "the outside elevation's heights sit on the LEFT (OUTSIDE_HEIGHT_DIMS_SIDE), the LSP placement");
   const S = (k) => all[k];
-  ok(['902', '2083', '826', '2040', 'Hinge left - Outside', 'FDR-01', 'VP 450 × 450'].every((t) => has(S('ref-fdoutside'), t)), 'ref outside: 902 / 2083 / 826 / 2040, "Hinge left - Outside", FDR-01, the VP label');
+  ok(['902', '2083', '826', '2040', 'Hinge left - Outside', 'FDR-01', 'VP 450 × 450', 'opening 912 x 2088', '912', '2088'].every((t) => has(S('ref-fdoutside'), t)), 'ref outside: 902 / 2083 / 826 / 2040, "Hinge left - Outside", FDR-01, the VP label, the opening 912 x 2088 in the subtitle and its dimensions');
   ok(['Hinge left - Inside', '902', '2083'].every((t) => has(S('ref-fdinside'), t)) && !/VP 450/.test(S('ref-fdinside')), 'ref inside: "Hinge left - Inside", 902 / 2083, no VP label');
-  // rule 7 on the notes: the hinge rule and the two frame faces are printed from derived.firedoor, never a literal
-  const RULE = 'the macro rule 150 from the top, 200 from the bottom', FACES = ['shows the 35 frame face', 'the 50 face with the stop'];
-  ok(has(S('ref-fdoutside'), RULE) && has(S('ref-fdinside'), RULE), 'ref outside and inside: the hinge note prints the rule offsets 150 / 200 from derived.firedoor.hinges');
+  // rule 7 on the notes: the hinge rule and the two frame faces are printed from derived.firedoor, never a literal (v1.1 wording, no swing)
+  const RULE = 'the rule: top 150 from the top, bottom 200 from the bottom, middle centre 200 above the leaf centre', FACES = ['shows the 35 frame face', 'the 50 face with the stop'];
+  // the notes wrap over several text lines on the sheet, so a long phrase is checked on the joined text
+  const joined = (m) => m.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  ok(has(joined(S('ref-fdoutside')), RULE) && has(joined(S('ref-fdinside')), RULE) && has(joined(S('ref-fdleaf')), RULE), 'ref outside, inside and leaf: the hinge note prints the v1.1 rule 150 / 200 / 200 from derived.firedoor.hinges');
   ok(['ref-fdoutside', 'ref-fdinside', 'ref-fdplan', 'ref-fdleaf', 'ref-fdframe'].every((k) => FACES.every((t) => has(S(k), t))), 'every ref sheet: the pull face note prints the 35 / 50 faces from derived.firedoor.frame.faces');
-  ok(M.fdu.pullFaceNote({ handing: { swing: 'out' }, frame: { faces: { outside: 40, inside: 55 } } }) === 'Opens out: the pull face (the corridor side) shows the 40 frame face and the hinge knuckles, the push face (the room side) the 55 face with the stop',
-    'pullFaceNote follows the derived faces (40 / 55) and the swing');
+  ok(M.fdu.pullFaceNote({ frame: { faces: { outside: 40, inside: 55 } } }) === 'Pull face shows the 40 frame face and the knuckles, push face the 55 face with the stop' && typeof M.fdu.swingWord === 'undefined',
+    'pullFaceNote follows the derived faces (40 / 55) and needs no swing; swingWord is gone');
+  ok(/Built in closer \(no machining yet\)/.test(S('ref-fdleaf')) && /Built in closer/.test(S('ref-fdoutside')) && /1 x 15 x 4 all around/.test(S('ref-fdleaf')) && /15\.5 x 4/.test(S('ref-fdleaf')),
+    'ref leaf and outside: the closer kind and the single strip with its 15.5 x 4 groove in the notes');
   {
     const mut = JSON.parse(JSON.stringify(DOORS[0].derived));
-    mut.firedoor.hinges.topOffset = 145; mut.firedoor.hinges.bottomOffset = 210; mut.firedoor.frame.faces = { outside: 40, inside: 55 };
+    mut.firedoor.hinges.topOffset = 145; mut.firedoor.hinges.bottomOffset = 210; mut.firedoor.hinges.midAboveCentre = 180; mut.firedoor.frame.faces = { outside: 40, inside: 55 };
     const sheets = M.fdu.fireDoorSheetPlan(mut);
     const out = render(M.FireDoorSheet, { sheet: sheets[0], windowSpec: DOORS[0].spec, derived: mut, projectNumber: 'P-1', windowTag: tag });
-    const ins = render(M.FireDoorSheet, { sheet: sheets[1], windowSpec: DOORS[0].spec, derived: mut, projectNumber: 'P-1', windowTag: tag });
-    ok(has(out, 'the macro rule 145 from the top, 210 from the bottom') && has(ins, 'the macro rule 145 from the top, 210 from the bottom') && has(out, 'shows the 40 frame face') && has(out, 'the 55 face with the stop') && !has(out, RULE) && !FACES.some((t) => has(out, t)),
-      'a derived with offsets 145 / 210 and faces 40 / 55 renders those numbers in the notes (no 150 / 200 / 35 / 50 literal survives)');
+    const lf = render(M.FireDoorSheet, { sheet: sheets[3], windowSpec: DOORS[0].spec, derived: mut, projectNumber: 'P-1', windowTag: tag });
+    const MUT = 'the rule: top 145 from the top, bottom 210 from the bottom, middle centre 180 above the leaf centre';
+    ok(has(joined(out), MUT) && has(joined(lf), MUT) && has(out, 'shows the 40 frame face') && has(out, 'the 55 face with the stop') && !has(joined(out), RULE) && !FACES.some((t) => has(out, t)),
+      'a derived with offsets 145 / 210 / 180 and faces 40 / 55 renders those numbers in the notes (no 150 / 200 / 35 / 50 literal survives)');
   }
   ok(['Closed', 'Open 30', '826', '100'].every((t) => has(S('ref-fdplan'), t)), 'ref plan: Closed / Open 30 / 826 / 100');
-  ok(['150', '102', '692', '200', 'H1 150', 'H2 944', 'H3 1738', 'spindle 1000', 'euro 928', 'FOREND 236 × 25', 'CASE 17 × 153 × 87', '60', 'hinge recess', 'intumescent groove', 'leading edge'].every((t) => has(S('ref-fdleaf'), t)),
-    'ref leaf: the hinge chain 150 / 102 / 692 / 200, H1 150 / H2 944 / H3 1738, spindle 1000, euro 928, FOREND 236 × 25, CASE 17 × 153 × 87, backset 60, the op kinds');
-  ok(['H1 188', 'H2 982', 'H3 1776', '188', '205', 'KEEP 990 from the foot', '902', '2083', 'depth 100', 'SECTION 4:1', 'rebate 15 × 47', 'mitre', 'keep plate', 'keep pocket'].every((t) => has(S('ref-fdframe'), t)),
-    'ref frame: H1 188 / H2 982 / H3 1776, the chain 188 / 205, KEEP 990 from the foot, 902 / 2083, depth 100, SECTION 4:1, rebate 15 × 47, the op kinds');
+  ok(['150', '102', '517', '867', '200', 'H1 150', 'H2 769', 'H3 1738', 'spindle 1000', 'euro 928', 'FOREND 236 × 25', 'CASE 17 × 153 × 87', '60', 'hinge recess', 'intumescent groove', 'leading edge'].every((t) => has(S('ref-fdleaf'), t)),
+    'ref leaf: the hinge chain 150 / 102 / 517 / 102 / 867 / 102 / 200, H1 150 / H2 769 / H3 1738, spindle 1000, euro 928, FOREND 236 × 25, CASE 17 × 153 × 87, backset 60, the op kinds');
+  ok(['H1 188', 'H2 807', 'H3 1776', '188', '205', 'KEEP 990 from the foot', '902', '2083', 'depth 100', 'SECTION 4:1', 'rebate 15 × 47', 'mitre', 'keep plate', 'keep pocket', 'dowel bore', 'MITRE FACE 4:1', '8 x 40', '3 per corner', '20 deep'].every((t) => has(S('ref-fdframe'), t)),
+    'ref frame: H1 188 / H2 807 / H3 1776, the chain 188 / 205, KEEP 990 from the foot, 902 / 2083, depth 100, SECTION 4:1, rebate 15 × 47, the op kinds, the dowel bores with the MITRE FACE 4:1 detail and the dowel note');
+  ok(count(S('ref-fdframe'), /dowel bore/g) === 12 && count(S('ref-fdframe'), /45 deg/g) >= 12, `ref frame: 12 "dowel bore" op rows with 45 deg (${count(S('ref-fdframe'), /dowel bore/g)})`);
+  ok(['1000', '2100', 'opening 1000 x 2100', '990', '2095', '914', '2052', 'Surface closer', 'FDR-06'].every((t) => has(S('opening-1000-fdoutside'), t)) && ['H1 150', 'H2 775', 'H3 1750'].every((t) => has(S('opening-1000-fdleaf'), t)),
+    'opening 1000 x 2100: the outside elevation prints the opening, the frame 990 x 2095 and the leaf 914 x 2052, the surface closer; the leaf sheet H1 150 / H2 775 / H3 1750');
   ok(/Hinge right - Outside/.test(S('right-fdoutside')) && /Hinge right - Inside/.test(S('right-fdinside')), 'hinge right: "Hinge right - Outside" / "Hinge right - Inside"');
   ok(/non-fire/.test(S('nonfire-latch-fdoutside')) && /DR-01/.test(S('nonfire-latch-fdoutside')) && count(S('nonfire-latch-fdleaf'), /intumescent groove/g) === 0 && /No intumescent strip/.test(S('nonfire-latch-fdleaf'))
     && count(S('nonfire-latch-fdleaf'), /cylinder hole/g) === 1 && /no cylinder hole/.test(S('nonfire-latch-fdleaf')) && count(S('ref-fdleaf'), /intumescent groove/g) === 3 && count(S('ref-fdleaf'), /cylinder hole/g) === 1 && !/no cylinder hole/.test(S('ref-fdleaf')),
     'non-fire latch: "non-fire", DR-01, no groove rows, "No intumescent strip", "no cylinder hole" (the ref leaf lists 3 grooves and a cylinder hole)');
-  ok(/FD60/.test(S('fd60-bathroom-fdoutside')) && /bathroom 922/.test(S('fd60-bathroom-fdleaf')) && /rebate 15 × 57/.test(S('fd60-bathroom-fdframe')) && /diamond/.test(S('fd60-bathroom-fdleaf')), 'FD60 bathroom diamond: FD60, bathroom 922, rebate 15 × 57, diamond');
-  ok(['150', '102', '662', '200', 'H2 914.5', 'H3 1679'].every((t) => has(S('762x1981-fdleaf'), t)) && /838/.test(S('762x1981-fdoutside')) && /2024/.test(S('762x1981-fdoutside')), '762 x 1981: the chain 150 / 102 / 662 / 200, H2 914.5, H3 1679, frame 838 x 2024');
+  ok(/FD60/.test(S('fd60-bathroom-fdoutside')) && /bathroom 922/.test(S('fd60-bathroom-fdleaf')) && /rebate 15 × 57/.test(S('fd60-bathroom-fdframe')) && /diamond/.test(S('fd60-bathroom-fdleaf')) && /2 x 15 x 4 all around/.test(S('fd60-bathroom-fdleaf')) && count(S('fd60-bathroom-fdleaf'), /intumescent groove/g) === 6,
+    'FD60 bathroom diamond: FD60, bathroom 922, rebate 15 × 57, diamond, two strips (6 groove rows)');
+  ok(['150', '102', '487.5', '200', 'H2 739.5', 'H3 1679'].every((t) => has(S('762x1981-fdleaf'), t)) && /838/.test(S('762x1981-fdoutside')) && /2024/.test(S('762x1981-fdoutside')), '762 x 1981: the chain 150 / 102 / 487.5 / 200, H2 739.5, H3 1679, frame 838 x 2024');
   ok(/1056/.test(S('custom-vp-pos90-fdoutside')) && /1132/.test(S('custom-vp-pos90-fdoutside')) && /depth 150/.test(S('custom-vp-pos90-fdframe')) && count(S('custom-vp-pos90-fdleaf'), /vision panel/g) >= 3, 'custom VP pos 90 on a 1056 leaf: 1056 / 1132 on the outside, depth 150 on the frame sheet, three vision panel rows');
   // the Drawings panel for a fire door: the five tabs, never a sash / casement / door sheet
   {
@@ -887,10 +900,10 @@ section('8 - the 3D: fireDoorGeometryFromSpec and the model mounted headless');
   ok(geo.frame.overall.w === 902 && geo.frame.overall.h === 2083 && geo.totalWidth === 902 && geo.totalHeight === 2083 && geo.origin.x === 451 && geo.origin.y === 1041.5, 'geo frame overall 902 x 2083, origin at the frame centre (451, 1041.5)');
   ok(geo.frame.depth === 100 && geo.frame.thickness === 50 && geo.frame.rebate.w === 15 && geo.frame.rebate.d === 47 && geo.frame.faces.outside === 35 && geo.frame.faces.inside === 50 && geo.frame.gaps.floor === 5,
     'geo frame depth 100, thickness 50, rebate 15 x 47, faces 35 / 50, floor gap 5');
-  ok(J(geo.hinges.positions.map((p) => p.top)) === J([150, 944, 1738]) && geo.hinges.length === 102, 'geo hinges 150 / 944 / 1738, 102 long');
+  ok(J(geo.hinges.positions.map((p) => p.top)) === J([150, 769, 1738]) && geo.hinges.length === 102, 'geo hinges 150 / 769 / 1738, 102 long');
   ok(geo.lock.spindle.fromBottom === 1000 && geo.lock.spindle.fromLockEdge === 60 && geo.lock.cylinder?.kind === 'euro' && geo.lock.cylinder.fromBottom === 928, 'geo spindle 1000 / 60, euro cylinder 928');
   ok(geo.vp.panes.length === 1 && geo.vp.panes[0].w === 450 && geo.vp.panes[0].h === 450 && !geo.vp.panes[0].rotated && geo.vp.glassThickness === 6, 'geo one VP pane 450 x 450, glass 6');
-  ok(geo.handing.hingeSide === 'left' && geo.handing.swing === 'in' && geo.keep?.centreFromFoot === 990 && geo.keep.plate.length === 176 && geo.keep.plate.width === 40, 'geo handing left / in, keep 990 from the foot, plate 176 x 40');
+  ok(geo.handing.hingeSide === 'left' && geo.handing.label === 'Hinge left' && !('swing' in geo.handing) && geo.closer?.type === 'builtin' && geo.keep?.centreFromFoot === 990 && geo.keep.plate.length === 176 && geo.keep.plate.width === 40, 'geo handing left (no swing), closer built in, keep 990 from the foot, plate 176 x 40');
   ok(geo.frame.members.length === 3 && J(geo.frame.members.map((m) => m.length)) === J([902, 2083, 2083]), 'geo members 902 / 2083 / 2083');
   // the model mounted with R3F on a stub renderer (the t40 / C2 mechanics): the bundle carries react, three and fiber
   const OUT3D = resolve(AUDIT, 't51-3d');
@@ -953,8 +966,8 @@ section('8 - the 3D: fireDoorGeometryFromSpec and the model mounted headless');
     ok(!!leaf && near(leaf.min[1], -1036.5, 0.02) && near(leaf.max[1], 1003.5, 0.02), `the leaf stands 5 above the feet (${leaf?.min[1]}) and 38 under the frame top (${leaf?.max[1]})`);
     const hinges = ms.filter((m) => hasN(m, 'fd-hinge'));
     const hy = hinges.map(cy).sort((a, b) => b - a);
-    ok(hinges.length === 3 && near(hy[0], 802.5, 0.02) && near(hy[1], 8.5, 0.02) && near(hy[2], -785.5, 0.02) && hinges.every((m) => near(hh(m), 102, 0.02)),
-      `3 hinge knuckles 102 long centred at y ${hy.join(' / ')} (leaf top 1003.5 - 201 / 995 / 1789)`);
+    ok(hinges.length === 3 && near(hy[0], 802.5, 0.02) && near(hy[1], 183.5, 0.02) && near(hy[2], -785.5, 0.02) && hinges.every((m) => near(hh(m), 102, 0.02)),
+      `3 hinge knuckles 102 long centred at y ${hy.join(' / ')} (leaf top 1003.5 - 201 / 820 / 1789)`);
     const glass = ms.filter((m) => hasN(m, 'vp-glass'));
     ok(glass.length === 1 && near(w(glass[0]), 450, 0.02) && near(hh(glass[0]), 450, 0.02) && near(dd(glass[0]), 6, 0.02) && near(cx(glass[0]), 0, 0.02) && near(glass[0].max[1], 1003.5 - 150, 0.02),
       `the VP glass 450 x 450 x 6 centred across the leaf, its top 150 under the leaf top (${glass[0] ? `${w(glass[0])} x ${hh(glass[0])} x ${dd(glass[0])}, top ${glass[0].max[1]}` : 'missing'})`);
@@ -1100,8 +1113,8 @@ const unzip = (buf) => {
   try { parsed = JSON.parse(json); } catch { parsed = null; }
   ok(!!parsed && parsed.doors.length === 3 && parsed.doors.every((d) => d.name && d.inputs && d.leaf && d.frame?.members?.length === 3 && d.hinges && d.lock && d.keep && d.vp && 'intumescent' in d && d.bsuiteVars?.leaf && d.machining?.leaf) && parsed.coordinates?.leaf && parsed.doors[2].intumescent === null,
     'the JSON parses: 3 doors with name, inputs, leaf, frame, hinges, lock, keep, vp, intumescent, bsuiteVars, machining; the coordinate notes; DR-01 intumescent null');
-  ok(parsed.doors[0].opening?.width === 912 && parsed.doors[0].opening?.source === 'leaf' && parsed.doors[0].closer?.type === 'builtin' && parsed.doors[1].closer === null && parsed.doors[0].frameDowels?.count === 6 && parsed.doors[0].intumescent?.strips === 1 && parsed.doors[1].intumescent?.strips === 2 && !('swing' in (parsed.doors[0].inputs || {})),
-    'the JSON v1.1: the opening (912 from the leaf), the closer kind (built in / null), the frame dowels (6), the strips (1 / 2), no swing');
+  ok(parsed.doors[0].opening?.width === 912 && parsed.doors[0].opening?.source === 'default' && parsed.doors[0].closer?.type === 'builtin' && parsed.doors[1].closer === null && parsed.doors[0].frameDowels?.count === 6 && parsed.doors[0].intumescent?.strips === 1 && parsed.doors[1].intumescent?.strips === 2 && !('swing' in (parsed.doors[0].inputs || {})),
+    'the JSON v1.1: the opening (912, the default leaf), the closer kind (built in / null), the frame dowels (6), the strips (1 / 2), no swing');
   const ex = M.machining.exportFireDoorMachining(windows, 'Pack 1');
   ok(ex.ok && J(ex.files) === J(['Pack_1_firedoor_machining.csv', 'Pack_1_firedoor_machining.json']) && ex.doors === 3 && ex.rows === mr.length && !!M.machining.exportFireDoorMachining([{ derived: { category: 'sash' } }], 'x').error,
     'exportFireDoorMachining: the two files, 3 doors, the row count; an error without a fire door');
