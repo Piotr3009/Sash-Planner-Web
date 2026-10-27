@@ -28,7 +28,8 @@ const TYPE_LABELS = {
 
 // Fire doors (27.10.2026): the slot rows of FIREDOOR_ALL_PARTS grouped for the
 // page by their id / material type (blanks and frame timber, ironmongery from
-// the Ironmongery catalogue, glass, the consumables: intumescent and beads).
+// the Ironmongery catalogue, glass, the consumables: intumescent, beads and
+// the frame dowels).
 const FD_PARTS = Array.isArray(FIREDOOR_ALL_PARTS) ? FIREDOOR_ALL_PARTS : [];
 const FD_TIMBER_PARTS = FD_PARTS.filter((p) => String(p.id).startsWith('fd_blank') || p.id === 'fd_frame_timber');
 const FD_IRON_PARTS = FD_PARTS.filter((p) => p.materialType === 'ironmongery');
@@ -890,8 +891,9 @@ export default function MaterialAssignmentsPage() {
         {/* ══ Fire doors (27.10.2026): the door blank per rating and the frame
              timber, the ironmongery from the Ironmongery catalogue (fire / standard
              hinges, the three lock cases, cylinder, thumbturn, handle set, keep,
-             closer), the intumescent strips and glazing beads, the vision panel
-             glass. Paint counts on the casement rows (as the external doors). ══ */}
+             the surface and the built in closer), the intumescent strip, glazing
+             beads and frame dowels, the vision panel glass. Paint counts on the
+             casement rows (as the external doors). ══ */}
         {isFireDoor && (() => {
           const common = {
             assignments, onAssign: setAssignment, onFilter: setFilter, onYieldChange: setYield,
@@ -907,13 +909,13 @@ export default function MaterialAssignmentsPage() {
                 subtitle={`${FD_TIMBER_PARTS.length} rows · one door blank per leaf by rating (FD30 44, FD60 54, non-fire 44) · frame timber 63 thick, width = wall depth + allowance, metres of head and jambs`}
                 parts={FD_TIMBER_PARTS} {...timber} />
               <PartGroupSection defaultOpen title="🔩 Ironmongery"
-                subtitle={`${FD_IRON_PARTS.length} rows · counts from the engine · hinges by fire / standard, the lock case by type, cylinder (euro) or thumbturn (bathroom), handle set, keep, concealed closer · products from the Ironmongery catalogue`}
+                subtitle={`${FD_IRON_PARTS.length} rows · counts from the engine · hinges by fire / standard, the lock case by type, cylinder (euro) or thumbturn (bathroom), handle set, keep, the closer by kind (surface or built in) · products from the Ironmongery catalogue`}
                 parts={FD_IRON_PARTS}
                 {...common} materials={ironItems} categories={fireDoorIronCategories}
                 subcategoriesByCategory={ironSubcategoriesByCategory} categoryLabels={ironCategoryLabels}
                 disabled={locked} />
-              <PartGroupSection title="🧴 Intumescent and beads"
-                subtitle={`${FD_CONSUMABLE_PARTS.length} rows · intumescent strips 10 / 15 / 20 by INTU_STYLE (metres = strips x (2 x H + W)), glazing beads and glazing intumescent per vision panel perimeter`}
+              <PartGroupSection title="🧴 Intumescent, beads and dowels"
+                subtitle={`${FD_CONSUMABLE_PARTS.length} rows · one intumescent strip size all around (FD30 one strip, FD60 two; metres = strips x (2 x H + W)), glazing beads and glazing intumescent per vision panel perimeter, the frame corner dowels in pieces`}
                 parts={FD_CONSUMABLE_PARTS} {...timber} />
               <PartGroupSection title="🧊 Vision panel glass"
                 subtitle={`${FD_GLASS_PARTS.length} rows · fire glass on a fire door, toughened on a non-fire door · m² of every pane`}

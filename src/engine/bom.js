@@ -244,8 +244,9 @@ export const HARDWARE_TO_SLOT_KEY = {
   'Door hinge': 'doorHinges',
   'Lever handle set': 'doorHandles',
   // Fire doors (27.10.2026): hinges, lock cases, cylinder / thumbturn, handle,
-  // keep and closer by the one table in lists.js (FIREDOOR_HARDWARE); 'Door
-  // hinge' and 'Lever handle set' keep the slots above.
+  // keep and the two closer kinds (v1.1: 'Surface closer' / 'Built in closer')
+  // by the one table in lists.js (FIREDOOR_HARDWARE); 'Door hinge' and 'Lever
+  // handle set' keep the slots above.
   ...FIREDOOR_ITEM_SLOT,
 };
 
@@ -484,16 +485,20 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
   }
 
   // ── Fire doors (27.10.2026, internal door sets FDR / DR) ──
-  // Every count from derived.firedoor (fireDoor.js): the blank by rating (one
-  // piece; the frame timber metres came from the pre-cut above), the hinges
-  // (fire or standard product, the macro count), the lock case by type, the
-  // euro cylinder or the bathroom thumbturn, one handle set and one keep per
-  // door, the concealed closer when ticked, the intumescent strip metres on the
-  // row of its width, and the vision panel glazing beads and glazing
-  // intumescent metres. No counterweights, no sash consumables.
+  // Every count from derived.firedoor / derived.consumables (fireDoor.js): the
+  // blank by rating (one piece; the frame timber metres came from the pre-cut
+  // above), the hinges (fire or standard product, the engine count), the lock
+  // case by type, the euro cylinder or the bathroom thumbturn, one handle set
+  // and one keep per door, the closer on the row of its KIND (v1.1: surface or
+  // built in, consumables.closer), the intumescent strip metres on the one
+  // strip row (v1.1: one size, consumables.intumescent), the frame corner
+  // dowels (v1.1: consumables.dowels, six per door), and the vision panel
+  // glazing beads and glazing intumescent metres. No counterweights, no sash
+  // consumables.
   const fd = derived.firedoor;
   if (derived.category === 'firedoor' && fd) {
     const H = FIREDOOR_HARDWARE;
+    const C = derived.consumables || {};
     const rating = fd.fire ? (fd.rating === 'FD60' ? 'FD60' : 'FD30') : 'none';
     setQty(FIREDOOR_BLANK_PART_ID[rating], 1, 'pcs');
     setQty((fd.fire ? H.hingeFire : H.hingeStd).partId, Number(fd.hinges?.count) || 0, 'pcs');
@@ -503,9 +508,11 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
     if (lockType === 'bathroom') setQty(H.thumbturn.partId, 1, 'pcs');
     setQty(H.handle.partId, 1, 'pcs');
     setQty(H.keep.partId, 1, 'pcs');
-    if (fd.closer) setQty(H.closer.partId, 1, 'pcs');
-    const intu = fd.intumescent;
+    const closerKind = C.closer?.type || fd.closer?.type || null;
+    if (closerKind) setQty((closerKind === 'builtin' ? H.closerBuiltin : H.closerSurface).partId, Number(C.closer?.count) || 1, 'pcs');
+    const intu = C.intumescent || fd.intumescent;
     if (fd.fire && intu && Number(intu.metres) > 0) setQty(fireDoorIntumescentPartId(intu.width), Number(intu.metres), 'm');
+    if (C.dowels && Number(C.dowels.count) > 0) setQty(H.dowels.partId, Number(C.dowels.count), 'pcs');
     const vp = fd.vp || {};
     if (Number(vp.beadM) > 0) setQty('fd_glazing_bead', Number(vp.beadM), 'm');
     if (fd.fire && Number(vp.intuM) > 0) setQty('fd_glazing_intu', Number(vp.intuM), 'm');
@@ -612,7 +619,7 @@ export function buildWindowMaterialLines(win, { assignments, assignmentsData, ma
   // that window buys on the row's count; without one, the row's own material.
   // Fire doors (27.10.2026) follow the door rule with their own row -> slot
   // table (FIREDOOR_PART_SLOT: hinges, lock case, cylinder / thumbturn,
-  // handle, keep, closer).
+  // handle, keep, the surface and the built in closer).
   const doorSlots = windowSpec.category === 'door' || windowSpec.category === 'firedoor'
     ? { ...(batch?.defaults?.ironmongerySlots || {}), ...(windowSpec?.hardware?.slots || {}) }
     : null;
