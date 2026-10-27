@@ -7,7 +7,18 @@
  * prohibited without prior written permission from Skylon Development Ltd.
 -->
 
-# Fire doors: internal door sets as built (v1, 27.10.2026)
+# Fire doors: internal door sets as built (v1 27.10.2026, v1.1 the same evening)
+
+**v1.1 (27.10.2026 evening, branch `claude/fire-doors-v1-1`, owner decisions in the chat after the v1 merge):**
+the STRUCTURAL OPENING is the size input (frame = opening - 5 a side / - 5 at the head, leaf = frame - 76 / - 43;
+1000 x 2100 -> 990 x 2095 -> 914 x 2052; a typed leaf still overrides); NO swing (an internal door is handed by its
+hinge side only); the middle hinge sits 200 ABOVE the leaf centre (2040: tops 150 / 769 / 1738); ONE intumescent
+strip size 15 x 4 all around (groove 15.5 x 4; FD30 one strip, FD60 two; the macro style table and the 10 / 20
+strips are gone); the closer is a KIND (none / surface / built in, CLOSER 0 / 1 / 2); the mitred corners are
+DOWELLED 8 x 40, 3 per corner, bored square to the mitre face (on the frame sheet, in the CSV / JSON and the frame
+rows as DOWEL_*). Every number is a profile key (`frame.wallGapSide / wallGapHead / dowels`,
+`hinges.midAboveCentre`, `intumescent.*`, `defaults.closerFire / closerNonFire`). Items for Piotr: `BLOCKERS.md`
+36.x. The sections below describe the v1 model with the v1.1 changes marked.
 
 Owner input (Piotr, 27.10.2026 conversation; his bSolid leaf master `FD_LEAF_MASTER_PIOTR.bSolid` with the macro
 `Master_Door_PIOTR`; the AutoCAD kits `KIT_DOOR_SINGLE.lsp` / `KIT_DOOR_DOUBLE.lsp`; the old Weeke programs; every
@@ -25,14 +36,24 @@ Every number lives in `DEFAULT_FIREDOOR_PROFILE` (`src/engine/profile.js`, schem
 Settings · Fire Doors. `deriveFireDoorWindow` (`src/engine/fireDoor.js`) is the only place that turns it into sizes,
 positions, cut list records, machining ops and the bSuite variable table; the lists, BOM, pricing, sheets, 3D,
 PDFs, the pack and both exports read `derived.firedoor`. A door set is a window record of the batch type
-'firedoor' (`windowSpec.category 'firedoor'`, `windowSpec.firedoor { fire, rating, leafWidth, leafHeight,
-hingeSide, swing, frameDepth, lockType, closer, vpStyle, vpCustom, intuStyle, leadEdge }`); the item stores the
-same values as `firedoor*` keys and its width / height = the overall frame the engine derives from the leaf.
+'firedoor' (`windowSpec.category 'firedoor'`, `windowSpec.firedoor { fire, rating, openingWidth, openingHeight,
+leafWidth, leafHeight, hingeSide, frameDepth, lockType, closer, vpStyle, vpCustom, leadEdge }` (v1.1: no swing, no
+intuStyle; `closer` a kind); the item stores the same values as `firedoor*` keys and its width / height = the
+overall frame the engine derives.
+
+**Structural opening (v1.1).** The user types the wall opening W x H (`firedoorOpeningWidth / Height`). Frame
+overall = opening - 2 x `frame.wallGapSide` 5 wide and opening - `frame.wallGapHead` 5 high (the frame foot
+stands on the floor); the leaf = overall - 76 / - 43 (below). A typed leaf (`firedoorLeafWidth / Height` > 0) wins
+on its axis and the opening is reported from it; nothing typed = the profile's default leaf 826 x 2040 (opening
+912 x 2088). `derived.firedoor.opening { width, height, wallGapSide, wallGapHead, source 'opening' | 'leaf' |
+'default' | 'mixed' }`; helpers `fireDoorSizeRule`, `fireDoorOpeningForLeaf`, `fireDoorLeafForOpening` give the
+form the same arithmetic. Example: 1000 x 2100 -> frame 990 x 2095 -> leaf 914 x 2052.
 
 **Leaf.** One bought blank W x H x T; T = `leaf.thicknessByRating` (FD30 44, FD60 54, non-fire 44). The bSolid
 board is LPX = H, LPY = W, LPZ = T (owner decision 09.10.2026). Width and height are NEVER clamped: only the hard
 sanity limits `leaf.limits` (width 300 to 1500, height 1500 to 3000, depth 50 to 400) fail that ONE door with a
-message on its card (`FireDoorGeometryError` with `.details`); the page never blanks.
+message on its card (`FireDoorGeometryError` with `.details`, the LEAF value even when the opening was typed); the
+page never blanks.
 
 **Frame section.** Raw 63 x (depth + 5) (`frame.rawThickness`, `frame.rawWidthAllowance`), finished 50 x depth
 (`frame.thickness`; depth = the finished wall thickness, `frameDepth`). The rebate is milled from solid on every
@@ -45,12 +66,21 @@ side) and 50 on the inside, as the LSP draws it.
 (hinge jamb) and FD-JAMB-L (lock jamb) = the overall height at the long point, top mitred 45, bottom square on the
 floor (`frame.headJoint 'mitre'` is the only value implemented; any other fails the door with a message).
 
-**Hinges (the macro rule, nothing else).** From the leaf TOP to the hinge top edge: top_i = topOffset 150 + i x step,
-step = (H - 150 - 200 - 102) / (count - 1), the macro expression `(lpx - 150 - 200 - w) / (repn - 1)` with w = 102
-and repn = 3 (`hinges.topOffset`, `bottomOffset`, `length`, `count`); the last hinge ends 200 above the leaf bottom.
-Recess 103 x 30 x 3 with R6 corners (`hinges.recessLength / recessWidth / recessDepth / cornerRadius`, plate + 1,
-the 12 cutter) on the hinge edge from the pull face. On the hinge jamb the same recesses at the same heights shifted
-by the head: jambTop_i = (50 - 15) + gapHead 3 + top_i from the jamb top long point. Macro HINGE 1 fire / 0 standard.
+**Corner dowels (v1.1).** Each mitred corner takes `frame.dowels.perJoint` 3 dowels `dia` 8 x `length` 40, bored
+square to the mitre face (45 to the member axis), half the length (20) into each piece, on the centre of the 50
+thickness, spread along the frame depth `margin` 20 in from each face (depth 100: 20 / 50 / 80). Ops `dowelBore`
+on face `mitre` (x y z = the bore centre, angle 45) on every mitred end; 6 dowels per door in the order; the frame
+rows carry DOWEL_N / DOWEL_D / DOWEL_L / DOWEL_DEPTH / DOWEL_1..n. `perJoint 0` switches them off.
+
+**Hinges (v1.1, the owner's rule).** From the leaf TOP to the hinge top edge: the top hinge at `hinges.topOffset`
+150; the bottom hinge ends `hinges.bottomOffset` 200 above the leaf bottom (top edge = H - 200 - 102); with three
+hinges the middle one has its CENTRE `hinges.midAboveCentre` 200 above the leaf centre (top edge = H / 2 - 200 -
+51; 2040: 150 / 769 / 1738; 2052: 150 / 775 / 1750); with more than three the inner ones spread equally. The old
+equal spacing (the macro's `(lpx - 150 - 200 - w) / (repn - 1)`, 794 on 2040) is kept as `hinges.step` for the
+sheets only. Recess 103 x 30 x 3 with R6 corners (`hinges.recessLength / recessWidth / recessDepth /
+cornerRadius`, plate + 1, the 12 cutter) on the hinge edge from the pull face. On the hinge jamb the same recesses
+at the same heights shifted by the head: jambTop_i = (50 - 15) + gapHead 3 + top_i from the jamb top long point
+(2040: 188 / 807 / 1776). Macro HINGE 1 fire / 0 standard; the positions go out as HINGE_1..3.
 
 **Lock (the DIN lock from Petros).** Spindle 1000 above the leaf bottom (`lock.spindleHeight`, the macro LOCK_H),
 backset 60 from the lock edge; forend 235 x 24 milled 236 x 25 (full radius ends, R12.5), 4 deep, its centre 15
@@ -74,45 +104,57 @@ export sends only VP_STYLE and the C_VP_* values and the macro places the cut. P
 x `vp.beadFaces` 2, glazing intumescent = perimeter (fire only); glass 6 thick (`vp.glassThickness`), fire glass on a
 fire door, toughened otherwise; one Glass Schedule row per pane.
 
-**Intumescent (fire only).** The macro INTU_STYLE table (`intumescent.styles` ids 1 to 7, the strip width 10 / 15 /
-20, thickness 4, strips per edge 1 for the single strip labels and 2 for the 2No labels); metres = strips x
-(2 x H + W) / 1000; the macro cuts the grooves on the top, hinge and lock edges (PC lists them: width = strip +
-`grooveOversize` 0.5, depth 4, one strip on T / 2, two strips at T / 2 +- `twoStripOffset` 11). Fire OFF: INTU_STYLE 0,
-no strip rows, no grooves.
+**Intumescent (v1.1, fire only).** ONE strip size, `intumescent.width` 15 x `thickness` 4, all around (top,
+hinge and lock edges); the groove `grooveWidth` 15.5 x `grooveDepth` 4 (two passes of the 10 disk); strips by
+rating `stripsByRating` FD30 1 / FD60 2 (two strips at T / 2 +- `twoStripOffset` 11: 16 and 38 on the 54 leaf);
+metres = strips x (2 x H + W) / 1000 (826 x 2040: 4.906 m FD30, 9.812 m FD60). The leaf row writes INTU (the
+strip count 0 / 1 / 2), INTU_W 15, INTU_T 4 and, for the Master_Door macro, INTU_STYLE = `macroStyleByStrips`
+(1 strip = style 1, 2 strips = style 4). Fire OFF: INTU 0, no strip row, no grooves. The v1 style table and the
+10 / 20 strips are gone (a stored profile loses them in the migration).
 
-**Closer.** `closer` defaults to the Fire switch (on for a fire door, off for a non-fire one): a hardware line and a
-slot in the order, CLOSER 0 / 1 in the leaf row, a price rate; no machining (BLOCKERS 35.12).
+**Closer (v1.1).** A kind: 'none' / 'surface' (overhead, the standard fire door set) / 'builtin' (concealed in
+the leaf top and the head). Defaults `defaults.closerFire` 'surface' on a fire door, `defaults.closerNonFire`
+'none' on a DR door, until the user picks one (a v1 boolean true reads as 'builtin'). `derived.firedoor.closer`
+= null or `{ type, label, machined false }`; a hardware line and a slot per kind, CLOSER 0 / 1 / 2 in the leaf row,
+one price rate for any closer; the built in closer is NOT machined until the owner's component files arrive
+(BLOCKERS 36).
 
 **Numbering.** `nextFireDoorName(existingNames, fire)`: the lowest free FDR-nn (fire) / DR-nn (non-fire), two digits,
 counted per prefix over every window of every batch of the project; the configurator suggests it, the user may
 overwrite it; the prefix follows the Fire switch on an unsaved door only, a saved door is never renamed.
 
-**Handing.** `hingeSide` 'left' / 'right' is seen from the PULL side (the side the hinge knuckles show, which is
-the 35 frame face: the leaf sits against the stop and can only swing out of the rebate towards the 35 face) and
-is printed "Hinge left / Hinge right" (the PSW wording rule) on every sheet, list and page. `swing` 'in' / 'out'
-only says which side of the wall the pull face is on (the subtitles, the 3D view side); the geometry is the same.
+**Handing (v1.1).** `hingeSide` 'left' / 'right' is seen from the PULL side (the side the hinge knuckles show,
+which is the 35 frame face: the leaf sits against the stop and can only swing out of the rebate towards the 35
+face) and is printed "Hinge left / Hinge right" (the PSW wording rule) on every sheet, list and page. There is no
+swing: in / out belongs to external doors, an internal door is handed by its hinge side only (the outside
+elevation is the pull side, the inside elevation the 50 face, the plan opens the leaf out of the rebate).
 
-The reference door of the brief (3.10), every row from the live engine with the default profile and asserted by
-`verify/parity/t51_fire_door.mjs`:
+The reference doors, every row from the live engine with the default profile and asserted by
+`verify/parity/t51_fire_door.mjs` (v1.1 numbers):
 
-| | FD30, leaf 826 x 2040, depth 100, hinge left, latch | rule |
+| | FD30, leaf 826 x 2040 (nothing typed = the default leaf; opening 912 x 2088), depth 100, hinge left, latch | rule |
 |---|---|---|
 | leaf | 826 x 2040 x 44, the blank the same (allowance 0) | `leaf.thicknessByRating.FD30` |
-| frame overall | 902 x 2083 | W + 76, H + 43 |
+| frame overall | 902 x 2083; opening 912 x 2088 reported | W + 76, H + 43; + 5 a side / + 5 head |
 | members | FD-HEAD 902 (mitre / mitre), FD-JAMB-H 2083 and FD-JAMB-L 2083 (mitre / square) | long points |
 | section | raw 63x105, finished 50x100, rebate 15 x 47, faces 35 / 50 | 63 x (100 + 5); 12 + 3; 44 + 3 |
-| hinges | step 794; tops 150 / 944 / 1738 from the leaf top (bottoms 252 / 1046 / 1840) | (2040 - 150 - 200 - 102) / 2 |
-| jamb recesses | tops 188 / 982 / 1776 from the jamb top long point | 35 + 3 + top_i |
+| dowels | 3 per corner, 8 x 40, 20 deep, at 20 / 50 / 80 along the depth, y 25; 6 per door | `frame.dowels` |
+| hinges | tops 150 / 769 / 1738 from the leaf top (bottoms 252 / 871 / 1840, centres 201 / 820 / 1789) | 150; H / 2 - 200 - 51; H - 200 - 102 |
+| jamb recesses | tops 188 / 807 / 1776 from the jamb top long point | 35 + 3 + top_i |
 | lock | spindle 1000 from the bottom (1040 from the top), forend centre 985, case top 1046.5; LOCK 2 | |
 | keep | centre 990 above the jamb foot (1093 from the jamb top); KEEP 2, KEEP_STYLE 1, KEEP_Y 990 | 5 + 1000 - 15 |
-| intumescent | style 1 (15 x 4), 1 strip, 4.906 m | 1 x (2 x 2040 + 826) / 1000 |
+| intumescent | 1 x 15 x 4 all around, 4.906 m, groove 15.5 x 4 on z 14.3; INTU 1, INTU_STYLE 1 | 1 x (2 x 2040 + 826) / 1000 |
+| closer | surface (the fire default): CLOSER 1 | `defaults.closerFire` |
 | paint | 3.8 m2: 5.07 L primer, 2.53 L topcoat | leaf both faces + (35 + 50) x the three lengths |
-| FD60 | leaf 54, rebate 15 x 57, REB_D 57, LOCK 3, KEEP 3; the rest unchanged | `leaf.thicknessByRating.FD60` |
-| non-fire DR | HINGE 0, LOCK 1, KEEP 1, INTU_STYLE 0, no intumescent, closer off, toughened glass | |
-| leaf 762 x 1981 | overall 838 x 2024; step 764.5; hinges 150 / 914.5 / 1679; jamb 188 / 952.5 / 1717 | |
+| **opening 1000 x 2100** | frame 990 x 2095, leaf 914 x 2052; hinges 150 / 775 / 1750; spindle 1052 from the top; LPX 2052 LPY 914, head 990, jambs 2095 | the owner's example |
+| opening 1000 x 2100 + leaf 826 typed | leaf 826 x 2052, frame 902 x 2095, opening reported 912 x 2100 (source mixed) | the leaf wins on its axis |
+| FD60 | leaf 54, rebate 15 x 57, REB_D 57, LOCK 3, KEEP 3; 2 x 15 x 4, 9.812 m, grooves at z 8.3 and 30.3 (16 / 38 +- 7.75); INTU 2, INTU_STYLE 4 | `leaf.thicknessByRating.FD60`, T / 2 +- 11 |
+| non-fire DR | HINGE 0, LOCK 1, KEEP 1, INTU 0, no intumescent, no closer, toughened glass | |
+| leaf 762 x 1981 | overall 838 x 2024 (opening 848 x 2029); hinges 150 / 739.5 / 1679; jamb 188 / 777.5 / 1717 | |
 | euro, VP style 1, hinge right | cylinder 928 from the bottom (bore 18), EURO 1, HAND 1 / RH 1; pane 450 x 450 at x 150, y 188; 0.203 m2, beads 3.6 m, glazing intumescent 1.8 m | |
-| bathroom, intumescent style 4 | hole 922 from the bottom (bore 10); 2 strips, 9.812 m, grooves at z 3.3 and 25.3 | T / 2 +- 11 |
-| free width 803 | overall 879 x 2083, no clamp; width 200 fails that door: "leaf width 200 is outside 300 to 1500" | `leaf.limits` |
+| bathroom | hole 922 from the bottom (bore 10) | |
+| closer kinds | none CLOSER 0 (no row), surface CLOSER 1, built in CLOSER 2 (a v1 boolean true = built in) | |
+| free width 803 | overall 879 x 2083, no clamp; width 200 fails that door: "leaf width 200 is outside 300 to 1500"; an opening 350 fails on the leaf 264 | `leaf.limits` |
 
 ## 2. Where it lives
 
