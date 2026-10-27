@@ -19,12 +19,13 @@
  * ironmongery SYMBOL sizes of the LSP (IRON below): they are drawn, never
  * printed as a number.
  *
- * Handing on the sheets. The engine's hingeSide is seen from the PULL side,
- * the side the hinge knuckles show (the brief, 3.1). The leaf sits in the
- * rebate against the stop (the 50 face), so it can only swing out of the
- * rebate towards the 35 face: the 35 face view is the pull side and shows the
- * hinges, exactly the LSP's "Outside" view (frame face 35, hinges drawn), and
- * the 50 face view is the push side, the LSP's "Inside" view (no hinges). So:
+ * Handing on the sheets (v1.1: hinge side only, an internal door has no
+ * swing). The engine's hingeSide is seen from the PULL side, the side the
+ * hinge knuckles show (the brief, 3.1). The leaf sits in the rebate against
+ * the stop (the 50 face), so it can only swing out of the rebate towards the
+ * 35 face: the 35 face view is the pull side and shows the hinges, exactly
+ * the LSP's "Outside" view (frame face 35, hinges drawn), and the 50 face
+ * view is the push side, the LSP's "Inside" view (no hinges). So:
  *   hingeSide 'left'  = hinges on the LEFT of the OUTSIDE view (and on the
  *                       right of the inside view);
  *   hingeSide 'right' = hinges on the RIGHT of the outside view.
@@ -32,13 +33,14 @@
  * (it hands the door from the push side, as the UK trade does), so the LSP's
  * "LH" is the engine's 'right'. The sheets print the engine's wording
  * ("Hinge left / Hinge right", the PSW rule) and never the LSP's LH / RH, so
- * the owner cannot read one convention as the other. The swing ('in' into the
- * room, 'out' into the corridor) only says which side of the wall the pull
- * face is on: the subtitles print it, the geometry is the same.
+ * the owner cannot read one convention as the other.
  *
  * Elevation coordinates (mm): x from the frame's LEFT outer edge as seen in
  * that view, y DOWN from the frame top (the head's top edge); the frame foot
- * is at y = overall height (the jambs stand floorGap below the leaf).
+ * is at y = overall height (the jambs stand floorGap below the leaf). The
+ * structural opening (v1.1, derived.firedoor.opening) sits wallGapSide
+ * outside each jamb and wallGapHead above the head, its sill on the floor
+ * line: x from -wallGapSide, y from -wallGapHead to the frame foot.
  * Plan coordinates (mm): x as the OUTSIDE view (the pull side viewer's left
  * is the page's left), z through the frame depth from the pull face (0, the
  * 35 face) to the push face (depth, the 50 face). The sheets put the pull
@@ -111,19 +113,47 @@ export function hingeWord(fd) {
   return fd?.handing?.hingeSide === 'right' ? 'Hinge right' : 'Hinge left';
 }
 
-/** The swing in words for a subtitle: 'opens in' / 'opens out'. */
-export function swingWord(fd) {
-  return `opens ${fd?.handing?.swing === 'out' ? 'out' : 'in'}`;
-}
-
-/** The swing explained for the notes: which side of the wall the pull face (the 35 frame face, the hinge knuckles) is on. */
+/**
+ * The two faces explained for the notes: the pull face (the 35 frame face,
+ * the hinge knuckles) and the push face (the 50 face with the stop). No swing
+ * word (v1.1). Kept under one note line of a sheet (89 characters at the
+ * default faces) so the two face phrases never wrap apart.
+ */
 export function pullFaceNote(fd) {
-  const s = fd?.handing?.swing === 'out' ? 'out' : 'in';
   // the two frame faces come from derived.firedoor.frame.faces (thickness - rebate width, thickness),
   // printed the way the sheets print a number (doorSheetParts fmt: to 0.5, integers without decimals)
   const face = (v) => { const r = Math.round(Number(v) * 2) / 2; return Number.isFinite(r) ? (Number.isInteger(r) ? String(r) : r.toFixed(1)) : ''; };
   const outside = face(fd?.frame?.faces?.outside), inside = face(fd?.frame?.faces?.inside);
-  return `Opens ${s}: the pull face (the ${s === 'in' ? 'room' : 'corridor'} side) shows the ${outside} frame face and the hinge knuckles, the push face (the ${s === 'in' ? 'corridor' : 'room'} side) the ${inside} face with the stop`;
+  return `Pull face shows the ${outside} frame face and the knuckles, push face the ${inside} face with the stop`;
+}
+
+/** The structural opening in words for a subtitle: 'opening 1000 x 2100' (empty without the engine's opening). */
+export function openingWord(fd) {
+  const w = num(fd?.opening?.width), h = num(fd?.opening?.height);
+  if (!(w > 0 && h > 0)) return '';
+  const f = (v) => { const r = Math.round(v * 2) / 2; return Number.isInteger(r) ? String(r) : r.toFixed(1); };
+  return `opening ${f(w)} x ${f(h)}`;
+}
+
+/** The closer in words for the notes: 'No closer' / the engine's label (the built in closer adds 'no machining yet' while it is not machined). */
+export function closerWord(fd) {
+  const c = fd?.closer;
+  if (!c) return 'No closer';
+  const label = c.label || (c.type === 'builtin' ? 'Built in closer' : c.type === 'surface' ? 'Surface closer' : 'Closer');
+  return c.type === 'builtin' && !c.machined ? `${label} (no machining yet)` : label;
+}
+
+/**
+ * The hinge rule in words (v1.1): the top hinge topOffset from the top, the
+ * bottom hinge bottomOffset from the bottom, the middle hinge's centre
+ * midAboveCentre above the leaf centre; every number from derived.firedoor.hinges.
+ */
+export function hingeRuleWord(fd) {
+  const hg = fd?.hinges || {};
+  const f = (v) => { const r = Math.round(Number(v) * 2) / 2; return Number.isFinite(r) ? (Number.isInteger(r) ? String(r) : r.toFixed(1)) : ''; };
+  const mid = num(hg.midAboveCentre, num(hg.midCentreAboveLeafCentre));
+  const midWord = mid != null ? `, middle centre ${f(mid)} above the leaf centre` : '';
+  return `top ${f(hg.topOffset)} from the top, bottom ${f(hg.bottomOffset)} from the bottom${midWord}`;
 }
 
 /** The rating word of a door: FD30 / FD60 / non-fire. */
@@ -172,6 +202,10 @@ export function fireDoorRecord(derived, code) {
  *   hinges   [{ i, top, bottom, x0, x1 }] the LSP hinge rectangles (outside view only)
  *   spindle  { x, y } the handle rose centre; cylinder { kind, x, y } or null
  *   panes    [{ i, x, y, w, h, rotated }] the vision panel panes
+ *   opening  { w, h, x0, y0, x1, y1, gapSide, gapHead } the structural opening
+ *            (v1.1) in the view's coordinates: wallGapSide outside each jamb,
+ *            wallGapHead above the head, its sill on the frame foot; null when
+ *            the engine gives none
  *   label    'Hinge left - Outside' as the LSP prints under the door
  */
 export function fireDoorElevationGeometry(derived, view = 'outside') {
@@ -210,10 +244,17 @@ export function fireDoorElevationGeometry(derived, view = 'outside') {
     const px = hingesOnLeft ? leaf.x + b.y : leaf.x + W - b.y - b.w;
     return { i: num(p.i, k), x: px, y: leaf.y + b.x, w: b.w, h: b.h, paneW: b.paneW, paneH: b.paneH, diamond: b.diamond };
   });
+  // the structural opening (v1.1): the frame sits wallGapSide in from each
+  // side and wallGapHead below the opening top, its foot on the floor line;
+  // the rectangle is the engine's opening W x H centred on the frame width
+  const opW = num(fd.opening?.width), opH = num(fd.opening?.height);
+  const opening = opW > 0 && opH > 0
+    ? { w: opW, h: opH, x0: R1((FW - opW) / 2), x1: R1((FW + opW) / 2), y0: R1(FH - opH), y1: FH, gapSide: R1((opW - FW) / 2), gapHead: R1(opH - FH) }
+    : null;
   const viewWord = inside ? 'Inside' : 'Outside';
   return {
     fd, frame: { w: FW, h: FH, face }, faceOut, faceIn, floorGap, gapSide, gapHead, leaf, inside, view: inside ? 'inside' : 'outside',
-    hingesOnLeft, hingeEdgeX, lockEdgeX, dirToHinge, hinges, hingeLen, spindle, cylinder, panes,
+    hingesOnLeft, hingeEdgeX, lockEdgeX, dirToHinge, hinges, hingeLen, spindle, cylinder, panes, opening,
     label: `${hingeWord(fd)} - ${viewWord}`, viewWord,
   };
 }
@@ -339,6 +380,7 @@ export function faceWord(face) {
   const words = {
     pull: 'pull face', push: 'push face', hingeEdge: 'hinge edge', lockEdge: 'lock edge', top: 'top edge', bottom: 'bottom edge',
     opening: 'opening face', rebateCheek: 'rebate cheek', end: 'end', wall: 'wall face', outside: 'outside face', inside: 'inside face',
+    mitre: 'mitre face',
   };
   return words[face] || String(face || '');
 }
@@ -348,7 +390,7 @@ export function kindWord(kind) {
   const words = {
     hingeRecess: 'hinge recess', forendRecess: 'forend recess', casePocket: 'case pocket', spindleHole: 'spindle hole', cylinderHole: 'cylinder hole',
     vpCutout: 'vision panel cut-out', intuGroove: 'intumescent groove', leadEdge: 'leading edge', rebate: 'rebate', keepPlate: 'keep plate',
-    keepPocket: 'keep pocket', mitre: 'mitre',
+    keepPocket: 'keep pocket', mitre: 'mitre', dowelBore: 'dowel bore',
   };
   return words[kind] || String(kind || '');
 }
@@ -386,7 +428,27 @@ export function fireDoorFrameMembers(derived) {
     title: titles[m.role] || String(m.role || m.id || '').toUpperCase(),
     ops: mach[m.role] || [],
     record: fireDoorRecord(derived, m.id),
+    dowelEnds: dowelEndsOf(mach[m.role] || []),
   }));
+}
+
+/**
+ * The dowel bores of a member grouped by mitred end (v1.1): the `dowelBore`
+ * ops of face `mitre` share an x per end (0 = the top / left long point, the
+ * member length = the head's right end). Returns [{ x, atStart, bores: [{ z,
+ * dia, depth, angle, note }] }] in x order, [] without dowels. Every number
+ * is the engine's (x, y, z = the bore centre on the mitre face).
+ */
+export function dowelEndsOf(ops) {
+  const ends = [];
+  (ops || []).filter((o) => o.kind === 'dowelBore').forEach((o) => {
+    const x = num(o.x, 0);
+    let e = ends.find((q) => Math.abs(q.x - x) < 0.05);
+    if (!e) { e = { x, atStart: x < 0.05, bores: [] }; ends.push(e); }
+    e.bores.push({ z: num(o.z, 0), y: num(o.y, 0), dia: num(o.length, num(o.width, 0)), depth: num(o.depth, 0), angle: num(o.angle, 45), note: o.note || '' });
+  });
+  ends.forEach((e) => e.bores.sort((a, b) => a.z - b.z));
+  return ends.sort((a, b) => a.x - b.x);
 }
 
 /** The leaf ops grouped by kind: { hingeRecess: [], forendRecess: [], ... } (every kind present). */

@@ -20,8 +20,14 @@
  * short of the long point). On the cheek: the hinge recesses of the hinge jamb
  * (dimensioned from the jamb top long point by the macro chain) and the keep
  * plate and pocket of the lock jamb (from the top and from the foot). The
- * rebate section (the finished 50 x depth with the 15 x 47 notch) is drawn
- * enlarged beside the head, then the op table and the notes.
+ * corner dowels (v1.1, derived.firedoor.frame.dowels and the dowelBore ops):
+ * at each mitred end the perJoint dowel circles sit on the mitre line of the
+ * opening view (the stepped end: the cheek and the lip short of the long
+ * point) at the engine's positions along the depth, with one chain of those
+ * positions from the outside face under the first mitred end of each member
+ * (the head's left end, the jambs' top end). The rebate section (the finished
+ * 50 x depth with the 15 x 47 notch) is drawn enlarged beside the head, then
+ * the op table and the notes.
  * Member coordinates as fireDoor.js: x along the length from the top long
  * point (the left long point of the head), y across the thickness from the
  * wall face, z along the depth from the outside face. A multi-detail sheet:
@@ -32,10 +38,10 @@ import { useMemo } from 'react';
 import { DimH, DimV, DimChainH, DimChainV, Label, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
 import { NS, fmt, safely, NoSheet, SheetTitle } from './doorSheetParts.jsx';
-import { num, fireDoorFrameMembers, opTableRows, hingeWord, swingWord, pullFaceNote, ratingWord, wrapLines } from './fireDoorDrawUtils.js';
+import { num, fireDoorFrameMembers, opTableRows, hingeWord, pullFaceNote, ratingWord, wrapLines } from './fireDoorDrawUtils.js';
 import { OpTable, opTableMetrics } from './FireDoorLeaf2D.jsx';
 
-const C = { band: 'rgba(148,163,184,0.05)', cheek: 'rgba(14,165,233,0.07)', recess: 'rgba(14,165,233,0.14)', pocket: 'rgba(239,68,68,0.10)', cut: 'rgba(239,68,68,0.10)' };
+const C = { band: 'rgba(148,163,184,0.05)', cheek: 'rgba(14,165,233,0.07)', recess: 'rgba(14,165,233,0.14)', pocket: 'rgba(239,68,68,0.10)', cut: 'rgba(239,68,68,0.10)', dowel: '#F59E0B' };
 const SECTION_SCALE = 4;
 
 function build(derived) {
@@ -56,6 +62,11 @@ export default function FireDoorFrame2D({ windowSpec, derived, projectNumber, wi
   const maxLen = Math.max(...members.map((m) => num(m.length, 0)));
   const hg = fd.hinges || {};
   const keep = fd.keep || {};
+  // the corner dowels (v1.1): the engine's sizes and positions along the depth; none = no dowel drawing
+  const dw = fr.dowels || {};
+  const dowelZ = (dw.positionsAlongDepth || []).map((z) => num(z, 0));
+  const hasDowels = num(dw.count, 0) > 0 && num(dw.dia, 0) > 0 && dowelZ.length > 0;
+  const dowelR = hasDowels ? num(dw.dia, 0) / 2 : 0;
 
   const mL = 82, mR = 104, mT = 24;         // the left margin holds the band captions ('outside 35', 'opening', 'inside 50')
   const svgW = maxLen / (1 - (mL + mR) / VIEWBOX_REF);
@@ -120,6 +131,44 @@ export default function FireDoorFrame2D({ windowSpec, derived, projectNumber, wi
   }
   const secPts = [[0, 0], [faceOut, 0], [faceOut, rebD], [thk, rebD], [thk, D], [0, D]].map(([y, z]) => `${secLeft + y * S},${secTop + z * S}`).join(' ');
 
+  // ── the mitre face detail (v1.1): the 45 end face unfolded at S:1, the wall edge at its left ──
+  // The face is thk x sqrt 2 wide along the cut (faceOut x sqrt 2 over the rebated
+  // depth 0..rebD) and D tall along the depth; the dowel bores sit on it at the
+  // engine's yCentre across the thickness (yCentre x sqrt 2 along the cut) and at
+  // positionsAlongDepth from the outside face. One detail serves every mitred
+  // end (the engine bores them alike). Beside the section when the row has the
+  // room past the section caption, else under it; its caption sits UNDER the
+  // detail (below the across dimension) so it never meets the section caption.
+  const SQ2 = Math.SQRT2;
+  const mitW = thk * SQ2 * S, mitH = D * S;
+  const mitCap = hasDowels ? `MITRE FACE ${S}:1 (unfolded) · dowels ${fmt(dw.dia)} × ${fmt(dw.length)}, ${fmt(dw.perJoint)} per corner, ${fmt(dw.boreDepth)} deep` : '';
+  const mitCapW = mitCap.length * 0.55 * codeFs;
+  const secCapX = Math.min(secLeft, svgW - 8 * ts - secCapW);
+  const mitBesideLeft = Math.max(secLeft + secW + 80 * ts, secCapX + secCapW + 60 * ts);
+  const mitBeside = hasDowels && mitBesideLeft + mitW + 64 * ts <= svgW - 8 * ts;
+  const mitLeft = mitBeside ? mitBesideLeft : ML;
+  let mitTop = null, mitCapY = null;
+  if (hasDowels) {
+    mitTop = mitBeside ? secTop : cursor + 20 * ts;
+    mitCapY = mitTop + mitH + 64 * ts;
+    cursor = Math.max(cursor, mitCapY + 24 * ts);
+  }
+  const mitPts = hasDowels
+    ? [[0, 0], [faceOut * SQ2, 0], [faceOut * SQ2, rebD], [thk * SQ2, rebD], [thk * SQ2, D], [0, D]].map(([u, z]) => `${mitLeft + u * S},${mitTop + z * S}`).join(' ')
+    : '';
+  const mitDowelU = hasDowels ? num(dw.yCentre, thk / 2) * SQ2 : 0;
+  // the one chain of the dowel positions along the depth, from the outside face (mm labels, the detail is at S:1)
+  const mitCuts = hasDowels ? uniq([0, ...dowelZ, D]) : [];
+  const mitLabels = mitCuts.slice(0, -1).map((z, k) => fmt(mitCuts[k + 1] - z));
+
+  // the mitre face as the opening view sees it (foreshortened along y): x from the
+  // long point to the stepped end (the cheek faceOut, the lip thk); the bore
+  // centre at y = yCentre projects to x = yCentre from the long point
+  const mitreFacePts = (atStart, L) => {
+    const pts = [[0, 0], [faceOut, 0], [faceOut, rebD], [thk, rebD], [thk, D], [0, D]];
+    return atStart ? pts : pts.map(([x, z]) => [L - x, z]);
+  };
+
   // ── the table, the notes ──
   const tableRows = [];
   let no = 1;
@@ -140,6 +189,9 @@ export default function FireDoorFrame2D({ windowSpec, derived, projectNumber, wi
     `Each member seen from the opening with its outside face unfolded above and its inside face below (the wall edge at the far side of each band); x from the top long point (the left long point of the head), the head mitred 45 both ends, the jambs mitred at the top and square at the foot: the cheek ends ${fmt(faceOut)} and the lip ${fmt(thk)} short of the long point`,
     `Hinge jamb: recesses ${fmt(hg.recess?.length)} x ${fmt(hg.recess?.width)} x ${fmt(hg.recess?.depth)} R${fmt(hg.recess?.radius)} on the rebate cheek from the outside face, hinge tops at ${(hg.positions || []).map((p) => fmt(p.jambTop)).join(' / ')} from the top long point (${fmt(faceOut)} + ${fmt(fr.gaps?.head)} + the leaf positions ${(hg.positions || []).map((p) => fmt(p.top)).join(' / ')})`,
     `Lock jamb: keep plate ${fmt(keep.plate?.millLength)} x ${fmt(keep.plate?.millWidth)} x ${fmt(keep.plate?.depth)} (full radius ends) centred ${fmt(keep.centreFromFoot)} above the foot (${fmt(keep.centreFromTop)} from the top long point) on the cheek, centred on the leaf thickness; bolt pocket ${fmt(keep.pocket?.length)} x ${fmt(keep.pocket?.width)} x ${fmt(keep.pocket?.depth)} centred on the plate`,
+    hasDowels
+      ? `Corner dowels ${fmt(dw.dia)} x ${fmt(dw.length)}, ${fmt(dw.perJoint)} per corner, bored square to the mitre, ${fmt(dw.boreDepth)} deep in each piece (${fmt(dw.count)} dowels per frame): on every mitred end at ${dowelZ.map(fmt).join(' / ')} along the depth from the outside face, ${fmt(dw.yCentre)} across the thickness (the mitre face detail)`
+      : 'No corner dowels',
   ], svgW - 2 * 30 * ts, codeFs);
   const svgH = titleY + (44 + 18 * notes.length) * ts;
 
@@ -207,6 +259,21 @@ export default function FireDoorFrame2D({ windowSpec, derived, projectNumber, wi
               {m.role === 'jambLock' && plate && (
                 <Label x={X(num(plate.x, 0) + num(plate.length, 0) / 2)} y={b.labelsY} text={`KEEP ${fmt(keep.centreFromFoot)} from the foot`} vbw={svgW} />
               )}
+              {/* the corner dowels (v1.1): at each mitred end the mitre line of the opening view carries the
+                  perJoint bore circles (dia at the engine's positions along the depth); the bore centre
+                  y = yCentre across the thickness projects to x = yCentre from the long point */}
+              {hasDowels && (m.dowelEnds || []).map((e, ei) => {
+                const xc = e.atStart ? num(dw.yCentre, thk / 2) : L - num(dw.yCentre, thk / 2);
+                const mitreLine = mitreFacePts(e.atStart, L);
+                return (
+                  <g key={`dw${ei}`}>
+                    <polygon points={mitreLine.map(([x, z]) => `${X(x)},${b.stripTop + z}`).join(' ')} fill={`url(#${cutId})`} stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={dash(4, 3)} />
+                    {e.bores.map((bo, k) => (
+                      <circle key={k} cx={X(xc)} cy={b.stripTop + bo.z} r={bo.dia / 2 || dowelR} fill={C.dowel} fillOpacity={0.45} stroke={C.dowel} strokeWidth={STROKES.sash} {...NS} />
+                    ))}
+                  </g>
+                );
+              })}
               {/* the chains under the member */}
               {hingeCuts && <DimChainH y={b.rowY(0)} cuts={hingeCuts.map(X)} extFrom={b.inBottom + 2 * ts} vbw={svgW} fmt={fmt} />}
               {m.role === 'jambLock' && plate && (
@@ -235,9 +302,32 @@ export default function FireDoorFrame2D({ windowSpec, derived, projectNumber, wi
           <DimChainV x={secLeft + secW + 26 * ts} cuts={[0, rebD, D].map((z) => secTop + z * S)} extFrom={secLeft + secW + 4 * ts} vbw={svgW} labels={[fmt(rebD), fmt(D - rebD)]} />
         </g>
 
+        {/* ── the mitre face detail (v1.1): the dowel bores on the unfolded 45 end face, their positions along the depth ── */}
+        {hasDowels && mitTop != null && (
+          <g>
+            <polygon points={mitPts} fill={`url(#${cutId})`} stroke={COLORS.frame} strokeWidth={STROKES.section} {...NS} />
+            {dowelZ.map((z, k) => (
+              <g key={k}>
+                <circle cx={mitLeft + mitDowelU * S} cy={mitTop + z * S} r={dowelR * S} fill={C.dowel} fillOpacity={0.45} stroke={C.dowel} strokeWidth={STROKES.sash} {...NS} />
+                <line x1={mitLeft + mitDowelU * S - dowelR * S * 1.6} y1={mitTop + z * S} x2={mitLeft + mitDowelU * S + dowelR * S * 1.6} y2={mitTop + z * S} stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} />
+                <line x1={mitLeft + mitDowelU * S} y1={mitTop + z * S - dowelR * S * 1.6} x2={mitLeft + mitDowelU * S} y2={mitTop + z * S + dowelR * S * 1.6} stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} />
+              </g>
+            ))}
+            {/* the face captions at the left: 'outside' at the top edge, 'inside' a line above the bottom edge so the across dimension under it stays clear */}
+            <text x={mitLeft - 6 * ts} y={mitTop + codeFs * 0.35} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor="end" fontWeight={WEIGHTS.subtitle}>outside</text>
+            <text x={mitLeft - 6 * ts} y={mitTop + mitH - codeFs * 0.9} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor="end" fontWeight={WEIGHTS.subtitle}>inside</text>
+            {/* the dowel positions along the depth from the outside face (the one chain of the sheet for them) */}
+            <DimChainV x={mitLeft + mitW + 26 * ts} cuts={mitCuts.map((z) => mitTop + z * S)} extFrom={mitLeft + mitW + 4 * ts} vbw={svgW} labels={mitLabels} />
+            {/* the bore centre across the thickness, along the cut (yCentre x sqrt 2 on the unfolded face): its text to the right of the dimension, off the caption column */}
+            <DimH y={mitTop + mitH + 30 * ts} x1={mitLeft} x2={mitLeft + mitDowelU * S} extFrom={mitTop + mitH + 4 * ts} label="" small vbw={svgW} />
+            <text x={mitLeft + mitDowelU * S + 8 * ts} y={mitTop + mitH + 30 * ts + codeFs * 0.35} fill={COLORS.dim} fontSize={SIZES.dimSmall * ts} fontFamily={FONT_FAMILY} fontWeight={WEIGHTS.dim}>{`${fmt(dw.yCentre)} across the thickness`}</text>
+            <text x={Math.min(mitLeft, svgW - 8 * ts - mitCapW)} y={mitCapY} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} fontWeight={WEIGHTS.label}>{mitCap}</text>
+          </g>
+        )}
+
         <OpTable left={tableLeft} top={tableTop} rows={tableRows} ts={ts} />
         <SheetTitle x={svgW / 2} y={titleY} title={`Frame Machining${projNum ? ` · ${projNum}` : ''} · ${winName}`}
-          subtitle={`${ratingWord(fd)} · ${fmt(fr.overall?.width)} × ${fmt(fr.overall?.height)} · ${fmt(thk)} × ${fmt(D)} · ${hingeWord(fd)} · ${swingWord(fd)}`} notes={notes} ts={ts} vbw={svgW} />
+          subtitle={`${ratingWord(fd)} · ${fmt(fr.overall?.width)} × ${fmt(fr.overall?.height)} · ${fmt(thk)} × ${fmt(D)} · ${hingeWord(fd)}`} notes={notes} ts={ts} vbw={svgW} />
         {windowTag ? <WindowTag tag={windowTag} vbw={svgW} /> : null}
       </svg>
     </div>

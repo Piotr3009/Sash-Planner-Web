@@ -25,13 +25,13 @@
  * the leaf opens toward), y DOWN. This group is centred on geo.origin, the
  * frame centre (W / 2, H / 2):
  *     x3 = x - origin.x,   y3 = origin.y - y   (to m)
- * and, inside the pull-side frame, +z is the pull side. The viewer's
- * exterior (+z camera) is the corridor side of the room: a door that swings
- * OUT (into the corridor) opens toward the viewer and shows its pull face;
- * a door that swings IN (into the room, the default) is turned by PI about
- * Y so its pull face looks into the room (-z) and the viewer sees the push
- * face (the 50 frame face, the leaf in the opening, the handle). Hinge left
- * / right is the engine's: seen from the pull side.
+ * and, inside the pull-side frame, +z is the pull side. v1.1 (27.10.2026
+ * evening): an internal door has no swing, so the group is always turned by
+ * PI about Y (the former 'in' orientation, now the only one): the pull face
+ * with the knuckles looks to -z and the viewer's +z camera sees the push
+ * face (the 50 frame face, the leaf in the opening, the handle); the leaf
+ * opens away from the viewer. Hinge left / right is the engine's: seen from
+ * the pull side. Only handing.hingeSide is read from geo.handing.
  *
  * What is drawn:
  *   frame   three members as L sections: the wall part (the 35 face, full
@@ -190,7 +190,6 @@ export default function FireDoor({
   const lw = Number(leaf.w) || 0, lh = Number(leaf.h) || 0, lt = Number(leaf.t) || 0;
   const leafX = Number(leaf.x) || 0, leafY = Number(leaf.y) || 0;
   const hinge = g?.handing?.hingeSide === 'right' ? 'right' : 'left';
-  const swingIn = (g?.handing?.swing || 'in') !== 'out';
   // the leaf closes against the stop (rebate depth behind the pull face),
   // its pull face is the rebate clearance behind the pull face plane
   const leafPullZ = d / 2 - (rebD - lt);
@@ -274,7 +273,7 @@ export default function FireDoor({
   const hingeLen = Number(g.hinges?.length) || 0;
 
   return (
-    <group name="fire-door" rotation={[0, swingIn ? Math.PI : 0, 0]}>
+    <group name="fire-door" rotation={[0, Math.PI, 0]}>
       {/* ═══ Frame ═══ */}
       <group name="fd-frame">{frameMeshes}</group>
 

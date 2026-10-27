@@ -20,8 +20,9 @@
  * the face, the vision panel cut-outs (the diamond rotated), the intumescent
  * grooves along the edge bands and the leading edge on the lock edge.
  * Dimensions: the leaf width at the top, the height on the right, the hinge
- * chain (the macro rule: top offset, hinge, step, hinge, step, hinge, bottom
- * offset) beside the hinge edge, the vision panel chain on the left, the
+ * chain (the v1.1 rule: top offset, hinge, gap, hinge, gap, hinge, bottom
+ * offset, the middle hinge centred above the leaf centre by the engine's
+ * midAboveCentre) beside the hinge edge, the vision panel chain on the left, the
  * spindle and cylinder heights from the leaf bottom on the right, the chain
  * of the panes, the spindle (its backset) along the bottom. The op table
  * (kind, face, x, y, z, length, width, depth, radius) follows, then the notes.
@@ -34,7 +35,7 @@ import { useMemo } from 'react';
 import { DimH, DimV, DimChainH, DimChainV, Label, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
 import { NS, fmt, safely, NoSheet, SheetTitle } from './doorSheetParts.jsx';
-import { num, leafOpsByKind, opTableRows, fireDoorRecord, diamondPoints, paneBox, isDiamond, hingeWord, swingWord, pullFaceNote, ratingWord, wrapLines } from './fireDoorDrawUtils.js';
+import { num, leafOpsByKind, opTableRows, fireDoorRecord, diamondPoints, paneBox, isDiamond, hingeWord, closerWord, hingeRuleWord, pullFaceNote, ratingWord, wrapLines } from './fireDoorDrawUtils.js';
 
 const CHAR = 0.55;
 const C = { band: 'rgba(148,163,184,0.05)', recess: 'rgba(14,165,233,0.12)', pocket: 'rgba(239,68,68,0.10)', hole: '#F59E0B' };
@@ -159,12 +160,15 @@ export default function FireDoorLeaf2D({ windowSpec, derived, projectNumber, win
   const intu = fd.intumescent;
   const notes = wrapLines([
     `${pullFaceNote(fd)}. Leaf ${fmt(W)} x ${fmt(H)} x ${fmt(T)} (${ratingWord(fd)} blank), seen from the PULL face with the hinge edge on the ${hingeSide}; the hinge, lock and top edges unfolded beside the face, the pull face side of each edge next to it. Board coordinates as the bSolid master: x down from the leaf top, y from the hinge edge, z from the pull face`,
-    `Hinges: ${fmt(hg.count)} x ${fmt(hg.length)} ${hg.product || ''} at ${(hg.positions || []).map((p) => fmt(p.top)).join(' / ')} from the top (HINGE_1..${fmt(hg.count)}, step ${fmt(hg.step)}); recess ${fmt(hg.recess?.length)} x ${fmt(hg.recess?.width)} x ${fmt(hg.recess?.depth)} R${fmt(hg.recess?.radius)} on the hinge edge, from the pull face`,
+    `Hinges: ${fmt(hg.count)} x ${fmt(hg.length)} ${hg.product || ''} at ${(hg.positions || []).map((p) => fmt(p.top)).join(' / ')} from the top (HINGE_1..${fmt(hg.count)}; the rule: ${hingeRuleWord(fd)}); recess ${fmt(hg.recess?.length)} x ${fmt(hg.recess?.width)} x ${fmt(hg.recess?.depth)} R${fmt(hg.recess?.radius)} on the hinge edge, from the pull face`,
     `Lock ${lock.type || ''}: forend ${fmt(lock.forend?.millLength)} x ${fmt(lock.forend?.millWidth)} x ${fmt(lock.forend?.depth)} (full radius ends) and case pocket ${fmt(lock.case?.pocketWidth)} x ${fmt(lock.case?.pocketHeight)} x ${fmt(lock.case?.pocketDepth)} on the lock edge centred on the thickness, forend centre ${fmt(lock.forend?.centreFromBottom)} above the bottom; spindle ${fmt(lock.spindle?.fromBottom)} above the bottom, ${fmt(lock.backset)} from the lock edge, bore ${fmt(lock.spindle?.bore)} through; ${cylC ? `${cylC.kind} bore ${fmt(cylC.bore)} at ${fmt(lock.cylinder.fromBottom)}` : 'no cylinder hole'}${lead ? '; leading edge bevel on the lock edge (LEAD_EDGE)' : ''}`,
     panes.length
       ? `Vision panel ${fd.vp?.label || fd.vp?.style}: ${panes.map((p) => `${fmt(p.paneW)} x ${fmt(p.paneH)}${p.diamond ? ' diamond' : ''}`).join(', ')} cut through, layout per bSolid macro (drawn centred, the first pane ${fmt(panes[0].x)} from the top)${(fd.vp?.warnings || []).length ? `; ${fd.vp.warnings.join('; ')}` : ''}`
       : 'No vision panel',
-    intu ? `Intumescent ${intu.label || ''}: ${fmt(intu.strips)} groove${intu.strips === 1 ? '' : 's'} per edge for ${fmt(intu.width)} x ${fmt(intu.thickness)} strip on the top, hinge and lock edges (${fmt(intu.metres)} m)` : 'No intumescent strip (non-fire door): the edges are not grooved',
+    intu
+      ? `Intumescent ${intu.label || ''}: ${fmt(intu.strips)} groove${intu.strips === 1 ? '' : 's'} ${fmt(intu.groove?.width)} x ${fmt(intu.groove?.depth)} per edge for the ${fmt(intu.width)} x ${fmt(intu.thickness)} strip on the top, hinge and lock edges (${fmt(intu.metres)} m)`
+      : 'No intumescent strip (non-fire door): the edges are not grooved',
+    closerWord(fd),
   ], svgW - 2 * 30 * ts, codeFs);
   const svgH = titleY + (44 + 18 * notes.length) * ts;
   const pts = (list) => list.map(([x, y]) => `${x},${y}`).join(' ');
@@ -271,7 +275,7 @@ export default function FireDoorLeaf2D({ windowSpec, derived, projectNumber, win
 
         <OpTable left={tableLeft} top={tableTop} rows={tableRows} ts={ts} />
         <SheetTitle x={svgW / 2} y={titleY} title={`Leaf Machining${projNum ? ` · ${projNum}` : ''} · ${winName}`}
-          subtitle={`${fmt(T)} × ${fmt(W)} × ${fmt(H)} · ${ratingWord(fd)} · ${hingeWord(fd)} · ${swingWord(fd)} · ${ops.length} operations`} notes={notes} ts={ts} vbw={svgW} />
+          subtitle={`${fmt(T)} × ${fmt(W)} × ${fmt(H)} · ${ratingWord(fd)} · ${hingeWord(fd)} · ${ops.length} operations`} notes={notes} ts={ts} vbw={svgW} />
         {windowTag ? <WindowTag tag={windowTag} vbw={svgW} /> : null}
       </svg>
     </div>

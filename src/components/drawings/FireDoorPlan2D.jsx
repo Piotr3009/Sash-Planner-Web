@@ -26,7 +26,7 @@ import { useMemo } from 'react';
 import { DimH, DimV, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
 import { NS, fmt, safely, NoSheet, SheetTitle } from './doorSheetParts.jsx';
-import { fireDoorPlanGeometry, hingeWord, swingWord, pullFaceNote, ratingWord, wrapLines } from './fireDoorDrawUtils.js';
+import { fireDoorPlanGeometry, hingeWord, pullFaceNote, ratingWord, wrapLines } from './fireDoorDrawUtils.js';
 
 export default function FireDoorPlan2D({ windowSpec, derived, projectNumber, windowTag }) {
   const g = useMemo(() => safely(() => fireDoorPlanGeometry(derived)), [derived]);
@@ -68,7 +68,7 @@ export default function FireDoorPlan2D({ windowSpec, derived, projectNumber, win
   // the notes follow the last subtitle line
   const subFs = SIZES.subtitle * ts;
   const subLines = wrapLines([
-    `${ratingWord(fd)} · leaf ${fmt(W)} × ${fmt(T)} · frame ${fmt(thk)} × ${fmt(depth)} · ${hingeWord(fd)} · ${swingWord(fd)}`,
+    `${ratingWord(fd)} · leaf ${fmt(W)} × ${fmt(T)} · frame ${fmt(thk)} × ${fmt(depth)} · ${hingeWord(fd)}`,
   ], svgW - 2 * 30 * ts, subFs, ' · ');
   const notesY = titleY + 20 * Math.max(0, subLines.length - 1) * ts;
   const notes = wrapLines([
