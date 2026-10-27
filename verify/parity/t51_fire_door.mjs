@@ -593,26 +593,31 @@ section('4 - the lists: cut list, grouped symbols, pre-cut, glass schedule, hard
   ok(!dx.skip && dx.params.units.length === 1 && dx.params.units[0].rect.width === 450 && dx.params.units[0].rect.height === 450, 'glass DXF: the vision panel exports as one 450 x 450 rectangular unit');
   ok(M.glassDxf.glassDxfParamsForWindow(R.spec, R.derived, 'x').skip === 'no glass unit', 'glass DXF: a style 0 door is skipped with "no glass unit"');
   // hardware lines
+  // v1.1: a v1 boolean closer true reads 'builtin'; the strip is one row; the frame dowels are a line
   const e = mkB({ firedoorLockType: 'euro', firedoorCloser: true });
   const hw = M.lists.buildHardwareList(e.spec, e.derived);
-  ok(hw.length === 7 && J(hw.map((x) => x.item)) === J(['Fire door hinge', 'Lock case, sashlock euro', 'Euro cylinder', 'Lever handle set', 'Keep', 'Concealed closer', 'Intumescent strip']),
-    `hardware euro + closer: 7 lines in order (${hw.map((x) => x.item).join(' | ')})`);
-  ok(J(hw.map((x) => x.partId)) === J(['fd_hinge_fire', 'fd_lock_euro', 'fd_cylinder_euro', 'fd_handle_set', 'fd_keep', 'fd_closer', 'fd_intu_15']) && hw.every((x) => x.enginePart === true),
-    'hardware partIds fd_hinge_fire / fd_lock_euro / fd_cylinder_euro / fd_handle_set / fd_keep / fd_closer / fd_intu_15, every line enginePart');
-  ok(J(hw.map((x) => x.quantity)) === J([3, 1, 1, 1, 1, 1, 4.906]) && hw[6].unit === 'm', 'hardware quantities 3 / 1 / 1 / 1 / 1 / 1 / 4.906 m');
-  ok(/150 \/ 944 \/ 1738/.test(hw[0].detail) && /Hinge left/.test(hw[0].detail), `the hinge detail carries the positions and the handing ("${hw[0].detail}")`);
+  ok(hw.length === 8 && J(hw.map((x) => x.item)) === J(['Fire door hinge', 'Lock case, sashlock euro', 'Euro cylinder', 'Lever handle set', 'Keep', 'Built in closer', 'Intumescent strip', 'Frame dowels']),
+    `hardware euro + built in closer: 8 lines in order (${hw.map((x) => x.item).join(' | ')})`);
+  ok(J(hw.map((x) => x.partId)) === J(['fd_hinge_fire', 'fd_lock_euro', 'fd_cylinder_euro', 'fd_handle_set', 'fd_keep', 'fd_closer', 'fd_intu_15', 'fd_frame_dowel']) && hw.every((x) => x.enginePart === true),
+    'hardware partIds fd_hinge_fire / fd_lock_euro / fd_cylinder_euro / fd_handle_set / fd_keep / fd_closer / fd_intu_15 / fd_frame_dowel, every line enginePart');
+  ok(J(hw.map((x) => x.quantity)) === J([3, 1, 1, 1, 1, 1, 4.906, 6]) && hw[6].unit === 'm' && (hw[7].unit ?? 'pcs') === 'pcs', 'hardware quantities 3 / 1 / 1 / 1 / 1 / 1 / 4.906 m / 6 dowels (pcs)');
+  ok(/150 \/ 769 \/ 1738/.test(hw[0].detail) && /Hinge left/.test(hw[0].detail) && !/opens/.test(hw[0].detail), `the hinge detail carries the positions and the handing, no swing ("${hw[0].detail}")`);
+  ok(/no machining yet/.test(hw[5].detail) && /1 x 15 x 4 all around/.test(hw[6].detail) && /8 x 40/.test(hw[7].detail) && /3 per mitred corner/.test(hw[7].detail), `the closer, strip and dowel details ("${hw[5].detail}" | "${hw[6].detail}" | "${hw[7].detail}")`);
+  const sf = mkB({ firedoorCloser: 'surface' });
+  const hs = M.lists.buildHardwareList(sf.spec, sf.derived);
+  ok(hs.find((x) => x.item === 'Surface closer')?.partId === 'fd_closer_surface' && !hs.some((x) => x.item === 'Built in closer'), 'a surface closer: the "Surface closer" line on fd_closer_surface');
   const b = mkB({ firedoorLockType: 'bathroom', firedoorFire: false, firedoorCloser: false }, 'DR-01');
-  ok(J(M.lists.buildHardwareList(b.spec, b.derived).map((x) => x.item)) === J(['Door hinge', 'Lock case, bathroom', 'Thumbturn and release', 'Lever handle set', 'Keep']), 'hardware non-fire bathroom: Door hinge, Lock case bathroom, Thumbturn and release, Lever handle set, Keep');
-  ok(J(M.lists.buildHardwareList(R.spec, R.derived).map((x) => x.item)) === J(['Fire door hinge', 'Lock case, latch', 'Lever handle set', 'Keep', 'Concealed closer', 'Intumescent strip']), 'hardware default latch door: 6 lines, no cylinder');
+  ok(J(M.lists.buildHardwareList(b.spec, b.derived).map((x) => x.item)) === J(['Door hinge', 'Lock case, bathroom', 'Thumbturn and release', 'Lever handle set', 'Keep', 'Frame dowels']), 'hardware non-fire bathroom: Door hinge, Lock case bathroom, Thumbturn and release, Lever handle set, Keep, Frame dowels');
+  ok(J(M.lists.buildHardwareList(R.spec, R.derived).map((x) => x.item)) === J(['Fire door hinge', 'Lock case, latch', 'Lever handle set', 'Keep', 'Surface closer', 'Intumescent strip', 'Frame dowels']), 'hardware default latch door: 7 lines (the surface closer of the fire default), no cylinder');
   const K = M.bom.HARDWARE_TO_SLOT_KEY;
-  ok(K['Lock case, latch'] === 'fireDoorLocks' && K['Lock case, sashlock euro'] === 'fireDoorLocks' && K['Lock case, bathroom'] === 'fireDoorLocks' && K['Keep'] === 'keeps' && K['Concealed closer'] === 'doorClosers' && K['Fire door hinge'] === 'doorHinges' && K['Door hinge'] === 'doorHinges' && K['Euro cylinder'] === 'cylinders' && K['Lever handle set'] === 'doorHandles',
-    'HARDWARE_TO_SLOT_KEY: locks -> fireDoorLocks, keep -> keeps, closer -> doorClosers, hinges -> doorHinges, cylinder -> cylinders, handle -> doorHandles');
+  ok(K['Lock case, latch'] === 'fireDoorLocks' && K['Lock case, sashlock euro'] === 'fireDoorLocks' && K['Lock case, bathroom'] === 'fireDoorLocks' && K['Keep'] === 'keeps' && K['Built in closer'] === 'doorClosers' && K['Surface closer'] === 'doorClosers' && K['Fire door hinge'] === 'doorHinges' && K['Door hinge'] === 'doorHinges' && K['Euro cylinder'] === 'cylinders' && K['Lever handle set'] === 'doorHandles',
+    'HARDWARE_TO_SLOT_KEY: locks -> fireDoorLocks, keep -> keeps, both closers -> doorClosers, hinges -> doorHinges, cylinder -> cylinders, handle -> doorHandles');
   const IRN = [{ id: 'irn-h', name: 'Royde & Tucker H102', category: 'doorHinges', unit: 'pcs', cost_per_unit: 4 }];
   const specH = { ...e.spec, hardware: { ...e.spec.hardware, slots: { doorHinges: 'irn-h' } } };
   const wh = M.bom.buildWindowHardware(specH, null, IRN, e.derived);
-  ok(wh.length === 7 && wh[0].product?.id === 'irn-h' && wh[1].product === null, 'buildWindowHardware accepts a firedoor and resolves the hinge slot product');
+  ok(wh.length === 8 && wh[0].product?.id === 'irn-h' && wh[1].product === null, 'buildWindowHardware accepts a firedoor and resolves the hinge slot product');
   const dr = M.bom.windowHardwareDetailRows(specH, null, IRN, e.derived);
-  ok(dr.length === 7 && dr[0].item === 'Royde & Tucker H102' && dr.every((r) => !('assigned' in r)), 'windowHardwareDetailRows: 7 rows, the product name on the hinge line, no "assigned" on engine lines');
+  ok(dr.length === 8 && dr[0].item === 'Royde & Tucker H102' && dr.every((r) => !('assigned' in r)), 'windowHardwareDetailRows: 8 rows, the product name on the hinge line, no "assigned" on engine lines');
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -626,8 +631,13 @@ section('5 - the BOM: slots per door, material lines, the merge, the Assign Mate
   ok(q.fd_frame_timber?.mm === mm && mm === 912 + 2093 * 2, `fd_frame_timber mm = the pre-cut sum ${mm} (912 + 2 x 2093)`);
   ok(q.fd_hinge_fire?.qty === 3 && !q.fd_hinge_std, 'fd_hinge_fire 3, no standard hinge');
   ok(q.fd_lock_euro?.qty === 1 && q.fd_cylinder_euro?.qty === 1 && !q.fd_lock_latch && !q.fd_lock_bathroom && !q.fd_thumbturn, 'fd_lock_euro 1, fd_cylinder_euro 1, no latch / bathroom / thumbturn');
-  ok(q.fd_handle_set?.qty === 1 && q.fd_keep?.qty === 1 && q.fd_closer?.qty === 1, 'fd_handle_set 1, fd_keep 1, fd_closer 1');
-  ok(near(q.fd_intu_15?.qty, 4.906) && q.fd_intu_15.unit === 'm' && !q.fd_intu_10 && !q.fd_intu_20, 'fd_intu_15 4.906 m, no 10 / 20 rows');
+  ok(q.fd_handle_set?.qty === 1 && q.fd_keep?.qty === 1 && q.fd_closer?.qty === 1 && !q.fd_closer_surface, 'fd_handle_set 1, fd_keep 1, fd_closer 1 (built in, the v1 boolean true), no surface closer row');
+  ok(near(q.fd_intu_15?.qty, 4.906) && q.fd_intu_15.unit === 'm' && !q.fd_intu_10 && !q.fd_intu_20, 'fd_intu_15 4.906 m, no 10 / 20 rows (v1.1: the one strip row)');
+  ok(q.fd_frame_dowel?.qty === 6 && q.fd_frame_dowel.unit === 'pcs', 'fd_frame_dowel 6 pcs (3 per corner x 2 corners)');
+  const qs = M.bom.buildWindowPartQtys(mkB({ firedoorCloser: 'surface' }).derived, mkB({ firedoorCloser: 'surface' }).spec, {}, null);
+  ok(qs.fd_closer_surface?.qty === 1 && !qs.fd_closer, 'a surface closer: fd_closer_surface 1, no built in row');
+  const q60s = M.bom.buildWindowPartQtys(mkB({ firedoorRating: 'FD60' }).derived, mkB({ firedoorRating: 'FD60' }).spec, {}, null);
+  ok(near(q60s.fd_intu_15?.qty, 9.812), `FD60: fd_intu_15 ${q60s.fd_intu_15?.qty} m (two strips)`);
   ok(q.fd_glass_fire?.qty === 0.2 && q.fd_glass_fire.unit === 'm²' && near(e.derived.firedoor.vp.glassSqm, 0.2025) && !q.fd_glass_toughened && !q.glass_double,
     `fd_glass_fire ${q.fd_glass_fire?.qty} m2 (consumables.glass.sqm rounded to 2 dp as the casement; vp.glassSqm ${e.derived.firedoor.vp.glassSqm}), no toughened / window glass rows`);
   ok(near(q.fd_glazing_bead?.qty, 3.6) && q.fd_glazing_bead.unit === 'm' && near(q.fd_glazing_intu?.qty, 1.8) && q.fd_glazing_intu.unit === 'm',
@@ -638,8 +648,8 @@ section('5 - the BOM: slots per door, material lines, the merge, the Assign Mate
   ok(Object.keys(q).every((k) => ALL.has(k)), 'every quantity the BOM writes is a row of ALL_PARTS', Object.keys(q).filter((k) => !ALL.has(k)).join(','));
   const n = mkB({ firedoorFire: false, firedoorVpStyle: 1 }, 'DR-01');
   const qn = M.bom.buildWindowPartQtys(n.derived, n.spec, {}, null);
-  ok(qn.fd_blank_std?.qty === 1 && qn.fd_hinge_std?.qty === 3 && qn.fd_lock_latch?.qty === 1 && !qn.fd_closer && !qn.fd_intu_15 && !qn.fd_intu_10 && !qn.fd_intu_20 && !qn.fd_glazing_intu && qn.fd_glass_toughened?.qty === 0.2 && !qn.fd_glass_fire,
-    'non-fire: fd_blank_std, fd_hinge_std 3, fd_lock_latch, no closer, no fd_intu_* and no fd_glazing_intu rows, toughened glass 0.2');
+  ok(qn.fd_blank_std?.qty === 1 && qn.fd_hinge_std?.qty === 3 && qn.fd_lock_latch?.qty === 1 && !qn.fd_closer && !qn.fd_closer_surface && !qn.fd_intu_15 && !qn.fd_intu_10 && !qn.fd_intu_20 && !qn.fd_glazing_intu && qn.fd_glass_toughened?.qty === 0.2 && !qn.fd_glass_fire && qn.fd_frame_dowel?.qty === 6,
+    'non-fire: fd_blank_std, fd_hinge_std 3, fd_lock_latch, no closer row, no fd_intu_* and no fd_glazing_intu rows, toughened glass 0.2, 6 dowels');
   const s60 = mkB({ firedoorRating: 'FD60' });
   const q60 = M.bom.buildWindowPartQtys(s60.derived, s60.spec, {}, null);
   ok(q60.fd_blank_fd60?.qty === 1 && !q60.fd_blank_fd30 && q60.fd_hinge_fire?.qty === 3, 'FD60: fd_blank_fd60 1, fire hinges');
@@ -663,8 +673,9 @@ section('5 - the BOM: slots per door, material lines, the merge, the Assign Mate
   ok(ordered.every((v, i) => i === 0 || v > ordered[i - 1]), 'the lines keep the Assign Materials order');
   // the Assign Materials rows, the registry, the ironmongery categories
   const ids = M.store.FIREDOOR_ALL_PARTS.map((p) => p.id);
-  const WANT = ['fd_blank_fd30', 'fd_blank_fd60', 'fd_blank_std', 'fd_frame_timber', 'fd_hinge_fire', 'fd_hinge_std', 'fd_lock_latch', 'fd_lock_euro', 'fd_lock_bathroom', 'fd_cylinder_euro', 'fd_thumbturn', 'fd_handle_set', 'fd_keep', 'fd_closer', 'fd_intu_10', 'fd_intu_15', 'fd_intu_20', 'fd_glass_fire', 'fd_glass_toughened', 'fd_glazing_bead', 'fd_glazing_intu'];
-  ok(ids.length === 21 && J(ids) === J(WANT), `FIREDOOR_ALL_PARTS: the 21 ids of the contract (${ids.length})`, J(ids));
+  // v1.1: the 10 / 20 strips are gone, the surface closer and the frame dowels are appended at the end (the stored index-based assignment sets keep the v1 rows)
+  const WANT = ['fd_blank_fd30', 'fd_blank_fd60', 'fd_blank_std', 'fd_frame_timber', 'fd_hinge_fire', 'fd_hinge_std', 'fd_lock_latch', 'fd_lock_euro', 'fd_lock_bathroom', 'fd_cylinder_euro', 'fd_thumbturn', 'fd_handle_set', 'fd_keep', 'fd_closer', 'fd_intu_15', 'fd_glass_fire', 'fd_glass_toughened', 'fd_glazing_bead', 'fd_glazing_intu', 'fd_closer_surface', 'fd_frame_dowel'];
+  ok(ids.length === 21 && J(ids) === J(WANT), `FIREDOOR_ALL_PARTS: the 21 ids of v1.1 (${ids.length}; no fd_intu_10 / fd_intu_20; fd_closer_surface and fd_frame_dowel last)`, J(ids));
   const all = M.store.ALL_PARTS.map((p) => p.id);
   ok(J(all.slice(-21)) === J(WANT) && new Set(all).size === all.length && WANT.every((id) => all.filter((x) => x === id).length === 1), 'the 21 ids are present once in ALL_PARTS and last');
   ok(all.indexOf('fd_blank_fd30') > all.indexOf(M.store.DOOR_ALL_PARTS[M.store.DOOR_ALL_PARTS.length - 1].id), 'after the last external door row');
@@ -672,8 +683,9 @@ section('5 - the BOM: slots per door, material lines, the merge, the Assign Mate
   const byId = Object.fromEntries(M.store.FIREDOOR_ALL_PARTS.map((p) => [p.id, p]));
   ok(byId.fd_blank_fd30.section === '44mm' && byId.fd_blank_fd60.section === '54mm' && byId.fd_blank_std.section === '44mm' && byId.fd_frame_timber.section === '63 x (depth + 5)' && byId.fd_intu_15.section === '15 x 4' && byId.fd_glass_fire.section === '6mm',
     'row sections from the profile: 44mm / 54mm / 44mm, 63 x (depth + 5), 15 x 4, 6mm');
-  ok(['fd_blank_fd30', 'fd_blank_fd60', 'fd_blank_std', 'fd_frame_timber'].every((id) => byId[id].unit === (id === 'fd_frame_timber' ? 'm' : 'pcs')) && ['fd_intu_10', 'fd_intu_15', 'fd_intu_20', 'fd_glazing_bead', 'fd_glazing_intu'].every((id) => byId[id].unit === 'm') && byId.fd_glass_fire.unit === 'm²' && byId.fd_glass_toughened.unit === 'm²',
-    'units: blanks pcs, frame timber m, strips and beads m, glass m²');
+  ok(['fd_blank_fd30', 'fd_blank_fd60', 'fd_blank_std', 'fd_frame_timber'].every((id) => byId[id].unit === (id === 'fd_frame_timber' ? 'm' : 'pcs')) && ['fd_intu_15', 'fd_glazing_bead', 'fd_glazing_intu'].every((id) => byId[id].unit === 'm') && byId.fd_glass_fire.unit === 'm²' && byId.fd_glass_toughened.unit === 'm²'
+    && byId.fd_frame_dowel.unit === 'pcs' && byId.fd_frame_dowel.section === '8 x 40' && byId.fd_closer_surface.unit === 'pcs' && byId.fd_closer_surface.materialType === 'ironmongery' && byId.fd_closer_surface.defaultCategory === 'doorClosers' && /Built in/.test(byId.fd_closer.name),
+    'units: blanks pcs, frame timber m, the strip and the beads m, glass m²; the dowel row pcs 8 x 40; the surface closer an ironmongery row on doorClosers; fd_closer named Built in');
   ok(!/[\u2013\u2014]/.test(J(M.store.FIREDOOR_ALL_PARTS)), 'no en / em dash in the fire door rows');
   const data = { schema: 2, base: Object.fromEntries(ids.map((id) => [id, { material_id: `m-${id}`, yield: 1 }])), overrides: {} };
   ok(ids.every((id) => M.partRegistry.legacyToCanonical(id).key === id && M.partRegistry.legacyToCanonical(id).variantKey === null), 'legacyToCanonical maps every fd_ id to itself');
@@ -736,7 +748,9 @@ section('6 - pricing with zero rates, resolvePricing, windowSpecToConfig');
   const cfg = { width: 902, height: 2083, measurementType: 'box-to-box', windowCategory: 'firedoor', firedoorFire: true, firedoorRating: 'FD30', firedoorLeafWidth: 826, firedoorLeafHeight: 2040, firedoorFrameDepth: 100, firedoorCloser: true, firedoorVpSqm: 0.2025, firedoorFrameMetres: 5.068 };
   let p = null, threw = null;
   try { p = M.pricing.calculatePrice(cfg); } catch (err) { threw = err; }
-  ok(!threw && p && p.unitPrice === 0 && p.totalPrice === 0 && p.breakdown.windowType === 'firedoor' && p.breakdown.closer === true && p.breakdown.frameMetres === '5.068', `calculatePrice at the zero default rates: 0 without throwing (windowType ${p?.breakdown?.windowType})`, String(threw));
+  ok(!threw && p && p.unitPrice === 0 && p.totalPrice === 0 && p.breakdown.windowType === 'firedoor' && p.breakdown.closer === true && p.breakdown.closerKind === 'builtin' && p.breakdown.frameMetres === '5.068', `calculatePrice at the zero default rates: 0 without throwing (windowType ${p?.breakdown?.windowType}, a v1 boolean closer true = builtin)`, String(threw));
+  const pk = M.pricing.calculatePrice({ ...cfg, firedoorCloser: 'surface' }, { firedoor: { leafPrice: 0, framePerM: 0, vpPerSqm: 0, closerPrice: 50 } });
+  ok(near(pk.unitPrice, 50) && pk.breakdown.closerKind === 'surface' && near(M.pricing.calculatePrice({ ...cfg, firedoorCloser: 'none' }, { firedoor: { leafPrice: 0, framePerM: 0, vpPerSqm: 0, closerPrice: 50 } }).unitPrice, 0), 'the one closer rate applies to a surface closer and not to none');
   const p2 = M.pricing.calculatePrice(cfg, { firedoor: { leafPrice: 100, framePerM: 10, vpPerSqm: 200, closerPrice: 50 } });
   ok(near(p2.unitPrice, 241.18), `rates 100 / 10 / 200 / 50: ${p2.unitPrice} = 100 + 50.68 + 40.5 + 50`);
   const p3 = M.pricing.calculatePrice({ ...cfg, firedoorFrameMetres: undefined, firedoorCloser: false }, { firedoor: { leafPrice: 0, framePerM: 10, vpPerSqm: 0, closerPrice: 50 } });
@@ -750,8 +764,8 @@ section('6 - pricing with zero rates, resolvePricing, windowSpecToConfig');
   const e = mkB({ firedoorVpStyle: 1, firedoorLockType: 'euro', firedoorCloser: true }, 'FDR-01', { width: 902, height: 2083 });
   const c = M.cfg.windowSpecToConfig(e.spec, e.derived);
   ok(c.windowCategory === 'firedoor' && c.width === 902 && c.height === 2083 && c.extWidth === 902 && c.extHeight === 2083, `windowSpecToConfig: category firedoor, ${c.width} x ${c.height}`);
-  ok(c.firedoorFire === true && c.firedoorRating === 'FD30' && c.firedoorLeafWidth === 826 && c.firedoorLeafHeight === 2040 && c.firedoorFrameDepth === 100 && c.firedoorCloser === true,
-    'windowSpecToConfig: the firedoor pricing fields (fire, FD30, 826 x 2040, depth 100, closer)');
+  ok(c.firedoorFire === true && c.firedoorRating === 'FD30' && c.firedoorLeafWidth === 826 && c.firedoorLeafHeight === 2040 && c.firedoorOpeningWidth === 912 && c.firedoorOpeningHeight === 2088 && c.firedoorFrameDepth === 100 && c.firedoorCloser === 'builtin' && c.firedoorSwing === undefined && c.firedoorIntuStyle === undefined,
+    'windowSpecToConfig: the firedoor pricing fields (fire, FD30, 826 x 2040, opening 912 x 2088, depth 100, closer builtin; no swing / intu style)');
   ok(near(c.firedoorVpSqm, 0.2025, 0.001) && near(c.firedoorFrameMetres, 5.068, 0.0001), `windowSpecToConfig: firedoorVpSqm ${c.firedoorVpSqm}, firedoorFrameMetres ${c.firedoorFrameMetres} (902 + 2 x 2083)`);
   ok(c.fireDoorGeo && c.fireDoorGeo.totalWidth === 902 && c.fireDoorOpen === 30 && typeof c.woodColor === 'string' && c.woodColor.startsWith('#'), 'windowSpecToConfig: fireDoorGeo, fireDoorOpen 30, a wood colour');
   ok(M.cfg.windowSpecToConfig(e.spec).fireDoorGeo?.leaf?.w === 826, 'windowSpecToConfig without derived: the bridge derives the door itself');
@@ -996,15 +1010,18 @@ const unzip = (buf) => {
   const L = rows[0];
   ok(L.vars.LPX === 2040 && L.vars.LPY === 826 && L.vars.LPZ === 44 && L.panelId === 1001 && L.panelName === 'P1001' && L.path === TGT.programs.leaf.path && L.element === 'FD_LEAF' && L.window === 'FDR-01' && /FD_LEAF 2040 x 826 x 44/.test(L.note),
     'the leaf row: panel LPX 2040 / LPY 826 / LPZ 44 on P1001, path, element FD_LEAF, window, note');
-  const ORDER = ['HAND', 'LH', 'RH', 'HINGE', 'LOCK', 'LOCK_H', 'SPINDLE', 'EURO', 'KEEP', 'KEEP_STYLE', 'INTU_STYLE', 'VP_STYLE', 'C_VP_L', 'C_VP_W', 'C_VP_NUM', 'C_VP_RAIL', 'C_VP_POS', 'D_TOP_RAIL', 'D_MID_RAIL', 'D_SIDE_MARGIN', 'LEAD_EDGE', 'REBATE', 'REBATE_STYLE', 'SPY_ON', 'SPY_H', 'LBOX', 'L_BOX_H', 'DROP_CILL', 'PREM_DOOR', 'HINGE_1', 'HINGE_2', 'HINGE_3', 'HINGE_D', 'CLOSER'];
-  ok(rows.every((r) => J(Object.keys(r.docVars)) === J(ORDER)), 'every leaf row writes the document variables in the exact 4.7 order (LPX / LPY / LPZ on the panel node)', Object.keys(L.docVars).join());
-  const E1 = { HAND: 0, LH: 1, RH: 0, HINGE: 1, LOCK: 2, LOCK_H: 1000, SPINDLE: 1, EURO: 1, KEEP: 0, KEEP_STYLE: 0, INTU_STYLE: 1, VP_STYLE: 1, C_VP_L: 600, C_VP_W: 150, C_VP_NUM: 1, C_VP_RAIL: 100, C_VP_POS: 0, D_TOP_RAIL: 150, D_MID_RAIL: 450, D_SIDE_MARGIN: 150, LEAD_EDGE: 1, REBATE: 0, REBATE_STYLE: 1, SPY_ON: 0, SPY_H: 1450, LBOX: 0, L_BOX_H: 1000, DROP_CILL: 0, PREM_DOOR: 0, HINGE_1: 150, HINGE_2: 944, HINGE_3: 1738, HINGE_D: 3, CLOSER: 1 };
-  const E2 = { ...E1, LOCK: 3, EURO: 0, VP_STYLE: 0, CLOSER: 0 };
-  const E3 = { ...E1, HAND: 1, LH: 0, RH: 1, HINGE: 0, LOCK: 1, EURO: 0, INTU_STYLE: 0, VP_STYLE: 0, CLOSER: 0 };
+  // v1.1: INTU / INTU_W / INTU_T before INTU_STYLE; HINGE_2 769; CLOSER 0 / 1 / 2 (a v1 boolean true = built in 2)
+  const ORDER = ['HAND', 'LH', 'RH', 'HINGE', 'LOCK', 'LOCK_H', 'SPINDLE', 'EURO', 'KEEP', 'KEEP_STYLE', 'INTU', 'INTU_W', 'INTU_T', 'INTU_STYLE', 'VP_STYLE', 'C_VP_L', 'C_VP_W', 'C_VP_NUM', 'C_VP_RAIL', 'C_VP_POS', 'D_TOP_RAIL', 'D_MID_RAIL', 'D_SIDE_MARGIN', 'LEAD_EDGE', 'REBATE', 'REBATE_STYLE', 'SPY_ON', 'SPY_H', 'LBOX', 'L_BOX_H', 'DROP_CILL', 'PREM_DOOR', 'HINGE_1', 'HINGE_2', 'HINGE_3', 'HINGE_D', 'CLOSER'];
+  ok(rows.every((r) => J(Object.keys(r.docVars)) === J(ORDER)), 'every leaf row writes the document variables in the exact 4.7 + v1.1 order (LPX / LPY / LPZ on the panel node)', Object.keys(L.docVars).join());
+  const E1 = { HAND: 0, LH: 1, RH: 0, HINGE: 1, LOCK: 2, LOCK_H: 1000, SPINDLE: 1, EURO: 1, KEEP: 0, KEEP_STYLE: 0, INTU: 1, INTU_W: 15, INTU_T: 4, INTU_STYLE: 1, VP_STYLE: 1, C_VP_L: 600, C_VP_W: 150, C_VP_NUM: 1, C_VP_RAIL: 100, C_VP_POS: 0, D_TOP_RAIL: 150, D_MID_RAIL: 450, D_SIDE_MARGIN: 150, LEAD_EDGE: 1, REBATE: 0, REBATE_STYLE: 1, SPY_ON: 0, SPY_H: 1450, LBOX: 0, L_BOX_H: 1000, DROP_CILL: 0, PREM_DOOR: 0, HINGE_1: 150, HINGE_2: 769, HINGE_3: 1738, HINGE_D: 3, CLOSER: 2 };
+  const E2 = { ...E1, LOCK: 3, EURO: 0, INTU: 2, INTU_STYLE: 4, VP_STYLE: 0, CLOSER: 0 };
+  const E3 = { ...E1, HAND: 1, LH: 0, RH: 1, HINGE: 0, LOCK: 1, EURO: 0, INTU: 0, INTU_W: 0, INTU_T: 0, INTU_STYLE: 0, VP_STYLE: 0, CLOSER: 0 };
   const diff = (got, want) => Object.keys(want).filter((k) => got[k] !== want[k]).map((k) => `${k}=${got[k]} (exp ${want[k]})`);
-  ok(diff(L.docVars, E1).length === 0 && J(L.docVars) === J(E1), 'FDR-01 (FD30 euro VP 1 closer): every 4.7 value', diff(L.docVars, E1).join(', '));
-  ok(diff(rows[1].docVars, E2).length === 0 && rows[1].vars.LPZ === 54, 'FDR-02 (FD60 latch): LPZ 54, LOCK 3, EURO 0, VP_STYLE 0, CLOSER 0, HINGE 1, INTU_STYLE 1', diff(rows[1].docVars, E2).join(', '));
-  ok(diff(rows[2].docVars, E3).length === 0 && rows[2].vars.LPZ === 44, 'DR-01 (non-fire bathroom hinge right): HAND 1, LH 0, RH 1, HINGE 0, LOCK 1, EURO 0, INTU_STYLE 0, CLOSER 0, LPZ 44', diff(rows[2].docVars, E3).join(', '));
+  ok(diff(L.docVars, E1).length === 0 && J(L.docVars) === J(E1), 'FDR-01 (FD30 euro VP 1, a v1 closer true = built in): every value, INTU 1 / 15 / 4, INTU_STYLE 1, HINGE_2 769, CLOSER 2', diff(L.docVars, E1).join(', '));
+  ok(diff(rows[1].docVars, E2).length === 0 && rows[1].vars.LPZ === 54, 'FDR-02 (FD60 latch no closer): LPZ 54, LOCK 3, EURO 0, INTU 2, INTU_STYLE 4, VP_STYLE 0, CLOSER 0, HINGE 1', diff(rows[1].docVars, E2).join(', '));
+  ok(diff(rows[2].docVars, E3).length === 0 && rows[2].vars.LPZ === 44, 'DR-01 (non-fire bathroom hinge right): HAND 1, LH 0, RH 1, HINGE 0, LOCK 1, EURO 0, INTU 0, INTU_STYLE 0, CLOSER 0, LPZ 44', diff(rows[2].docVars, E3).join(', '));
+  const sRow = X.buildBsuiteFireDoorRows([mkX('FDR-05', { firedoorCloser: 'surface' })], prof).rows[0];
+  ok(sRow.docVars.CLOSER === 1, 'a surface closer writes CLOSER 1');
   const twin = X.buildBsuiteFireDoorRows([d1, { ...d1, name: 'FDR-09' }], prof);
   ok(twin.rows.length === 1 && twin.rows[0].quantity === 2 && twin.rows[0].label === 'FDR-01, FDR-09', 'two identical doors collapse into one leaf row, Quantity 2, both names in the label');
   const mixed = X.buildBsuiteFireDoorRows([d1, { name: 'W1', windowSpec: {}, derived: { category: 'casement' } }, { name: 'X', derived: null }], prof);
@@ -1018,9 +1035,10 @@ const unzip = (buf) => {
     '15 entries: leaves / STOP / heads / STOP / hinge jambs / STOP / lock jambs, nothing skipped', kinds.join());
   ok(J(F.rows.filter((r) => r.kind !== 'stop').map((r) => r.program)) === J([...Array(3).fill('FD_LEAF_MASTER_PIOTR.bSolid'), ...Array(3).fill('FD_HEAD.bSolid'), ...Array(3).fill('FD_JAMB_HINGE.bSolid'), ...Array(3).fill('FD_JAMB_LOCK.bSolid')]), '12 program rows, the program names per block');
   const head = F.rows[4], jh = F.rows[8], jl = F.rows[12];
-  ok(head.vars.LPX === 902 && head.vars.LPY === 100 && head.vars.LPZ === 50 && J(head.docVars) === J({ REB_W: 15, REB_D: 47, HAND: 0, HINGE: 1, HINGE_D: 3, MITRE_TOP: 1, MITRE_BOTTOM: 1 }), `the head row FDR-01: panel 902 x 100 x 50, ${J(head.docVars)}`);
-  ok(jh.vars.LPX === 2083 && J(jh.docVars) === J({ REB_W: 15, REB_D: 47, HAND: 0, HINGE: 1, HINGE_1: 188, HINGE_2: 982, HINGE_3: 1776, HINGE_D: 3, MITRE_TOP: 1, MITRE_BOTTOM: 0 }), `the hinge jamb row FDR-01: LPX 2083, ${J(jh.docVars)}`);
-  ok(jl.vars.LPX === 2083 && J(jl.docVars) === J({ REB_W: 15, REB_D: 47, HAND: 0, HINGE: 1, HINGE_D: 3, KEEP: 2, KEEP_STYLE: 1, KEEP_Y: 990, MITRE_TOP: 1, MITRE_BOTTOM: 0 }), `the lock jamb row FDR-01: ${J(jl.docVars)}`);
+  const DOW = { DOWEL_N: 3, DOWEL_D: 8, DOWEL_L: 40, DOWEL_DEPTH: 20, DOWEL_1: 20, DOWEL_2: 50, DOWEL_3: 80 };
+  ok(head.vars.LPX === 902 && head.vars.LPY === 100 && head.vars.LPZ === 50 && J(head.docVars) === J({ REB_W: 15, REB_D: 47, HAND: 0, HINGE: 1, HINGE_D: 3, MITRE_TOP: 1, MITRE_BOTTOM: 1, ...DOW }), `the head row FDR-01: panel 902 x 100 x 50, ${J(head.docVars)} (v1.1: the DOWEL_* names)`);
+  ok(jh.vars.LPX === 2083 && J(jh.docVars) === J({ REB_W: 15, REB_D: 47, HAND: 0, HINGE: 1, HINGE_1: 188, HINGE_2: 807, HINGE_3: 1776, HINGE_D: 3, MITRE_TOP: 1, MITRE_BOTTOM: 0, ...DOW }), `the hinge jamb row FDR-01: LPX 2083, ${J(jh.docVars)}`);
+  ok(jl.vars.LPX === 2083 && J(jl.docVars) === J({ REB_W: 15, REB_D: 47, HAND: 0, HINGE: 1, HINGE_D: 3, KEEP: 2, KEEP_STYLE: 1, KEEP_Y: 990, MITRE_TOP: 1, MITRE_BOTTOM: 0, ...DOW }), `the lock jamb row FDR-01: ${J(jl.docVars)}`);
   ok(F.rows[13].docVars.KEEP === 3 && F.rows[13].docVars.REB_D === 57 && F.rows[5].docVars.REB_D === 57 && F.rows[14].docVars.KEEP === 1 && F.rows[14].docVars.HAND === 1 && F.rows[10].docVars.HAND === 1 && F.rows[10].docVars.HINGE === 0,
     'FDR-02 (FD60): KEEP 3, REB_D 57 on the head and the lock jamb; DR-01: KEEP 1, HAND 1, HINGE 0');
   ok(X.buildBsuiteFireDoorRows(windows, { ...full, bsuite: { ...full.bsuite, stopRows: false } }).rows.length === 12, 'stopRows false: the same 12 rows without STOP');
@@ -1043,9 +1061,9 @@ const unzip = (buf) => {
     'the XML item order: 3 programs, STOP, 3, STOP, 3, STOP, 3 (12 CadProgramWorklistItem)');
   ok(/Label="FDR-01" Quantity="1"/.test(xml) && /Label="DR-01" Quantity="1"/.test(xml) && xml.includes('ProgramUri="file:///C:/Users/Xp600/Desktop/Biesse Piotr/FD_LEAF_MASTER_PIOTR.bSolid"'), 'Label = the door name, Quantity 1, the leaf ProgramUri as file:///');
   ok(/<ProgramPanelNode Id="1001" Name="P1001">\r\n            <Variables>\r\n              <ParametricVariable TypeCode="Double" VariableName="LPX" Expression="2040" ExpressionValue="2040" MeasureUnit="mm" \/>/.test(xml)
-    && /TypeCode="String" VariableName="HAND" Expression="0"/.test(xml) && /TypeCode="String" VariableName="CLOSER" Expression="1"/.test(xml) && /TypeCode="String" VariableName="HINGE_3" Expression="1738"/.test(xml) && !/TypeCode="String" VariableName="LPX"/.test(xml),
-    'the leaf row: LPX / LPY / LPZ as Double on the panel node, HAND .. CLOSER as String document variables');
-  ok(/VariableName="KEEP_Y" Expression="990"/.test(xml) && /VariableName="HINGE_1" Expression="188"/.test(xml) && /VariableName="MITRE_BOTTOM" Expression="0"/.test(xml), 'the frame rows: KEEP_Y 990, HINGE_1 188, MITRE_BOTTOM 0 as document variables');
+    && /TypeCode="String" VariableName="HAND" Expression="0"/.test(xml) && /TypeCode="String" VariableName="CLOSER" Expression="2"/.test(xml) && /TypeCode="String" VariableName="HINGE_3" Expression="1738"/.test(xml) && /TypeCode="String" VariableName="INTU" Expression="1"/.test(xml) && !/TypeCode="String" VariableName="LPX"/.test(xml),
+    'the leaf row: LPX / LPY / LPZ as Double on the panel node, HAND .. CLOSER as String document variables (CLOSER 2, INTU 1)');
+  ok(/VariableName="KEEP_Y" Expression="990"/.test(xml) && /VariableName="HINGE_1" Expression="188"/.test(xml) && /VariableName="MITRE_BOTTOM" Expression="0"/.test(xml) && /VariableName="DOWEL_N" Expression="3"/.test(xml) && /VariableName="DOWEL_3" Expression="80"/.test(xml), 'the frame rows: KEEP_Y 990, HINGE_1 188, MITRE_BOTTOM 0, DOWEL_N 3, DOWEL_3 80 as document variables');
   ok(xml.startsWith('<Worklist Description="" Version="4">\r\n') && xml.endsWith('  <Variables />\r\n</Worklist>') && !xml.includes('<?xml'), 'root and tail as the sample, CRLF, no xml header');
   const ids = F.rows.map((_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`);
   ok(X.writeWorklistXml(F.rows, { now, ids }) === X.writeWorklistXml(F.rows, { now, ids }) && X.writeWorklistXml(F.rows, { now, ids }).includes('<StopWorklistItem Id="00000000-0000-4000-8000-000000000003" Label="" />'), 'deterministic with fixed ids (the STOP rows take ids from the same list)');
@@ -1063,7 +1081,10 @@ const unzip = (buf) => {
   // the machining rows, the CSV and the JSON
   const mr = M.machining.buildFireDoorMachiningRows(windows);
   const sum = windows.reduce((s, wnd) => s + ['leaf', 'head', 'jambHinge', 'jambLock'].reduce((t, k) => t + wnd.derived.firedoor.machining[k].length, 0), 0);
-  ok(mr.length === sum && sum === 12 + 3 + 5 + 4 + 10 + 3 + 5 + 4 + 8 + 3 + 5 + 4, `machining rows = the ops of the three doors (${mr.length} = 24 + 22 + 20: a 12 op leaf with the VP cut-out and the cylinder, a 10 op FD60 latch leaf, an 8 op non-fire leaf, 12 frame ops each)`);
+  // v1.1: the frame carries 12 dowel bores per door (head 6, each jamb 3): head 9, hinge jamb 8, lock jamb 7 = 24 frame ops; the FD60 leaf has 13 ops (two strips = 6 grooves)
+  ok(mr.length === sum && sum === 12 + 9 + 8 + 7 + 13 + 9 + 8 + 7 + 8 + 9 + 8 + 7, `machining rows = the ops of the three doors (${mr.length} = 36 + 37 + 32: a 12 op FD30 leaf with the VP cut-out and the cylinder, a 13 op FD60 latch leaf with six grooves, an 8 op non-fire leaf, 24 frame ops each)`);
+  ok(mr.filter((r) => r.op === 'dowelBore').length === 36 && mr.filter((r) => r.door === 'FDR-01' && r.op === 'dowelBore' && r.element === 'FD-HEAD').length === 6 && mr.filter((r) => r.door === 'FDR-01' && r.op === 'dowelBore').every((r) => r.face === 'mitre' && r.angle === 45 && r.depth === 20 && r.y === 25),
+    '36 dowelBore rows (12 per door), 6 on each head, face mitre, angle 45, 20 deep, y 25');
   ok(J([...new Set(mr.map((r) => r.element))]) === J(['FD-LEAF', 'FD-HEAD', 'FD-JAMB-H', 'FD-JAMB-L']), 'the element names FD-LEAF / FD-HEAD / FD-JAMB-H / FD-JAMB-L');
   const h1 = mr.find((r) => r.door === 'FDR-01' && r.element === 'FD-LEAF' && r.op === 'hingeRecess');
   const jr = mr.find((r) => r.door === 'FDR-01' && r.element === 'FD-JAMB-H' && r.op === 'hingeRecess');
@@ -1073,12 +1094,14 @@ const unzip = (buf) => {
   const csv = M.machining.fireDoorMachiningCsv(mr);
   const lines = csv.split('\r\n').filter((l) => l.length);
   ok(lines[0] === 'door,element,op,face,x,y,z,length,width,depth,radius,angle,value,note' && lines.length === mr.length + 1, `the CSV header and ${lines.length - 1} lines (one per op)`);
-  ok(/FDR-01,FD-LEAF,hingeRecess,hingeEdge,149\.5,0,0,103,30,3,6,,,/.test(csv) && /"vision panel 1 450 x 450, layout per bSolid macro"/.test(csv), 'the CSV: numbers to 0.1, a note with commas quoted');
+  ok(/FDR-01,FD-LEAF,hingeRecess,hingeEdge,149\.5,0,0,103,30,3,6,,,/.test(csv) && /"vision panel 1 450 x 450, layout per bSolid macro"/.test(csv) && /FDR-01,FD-HEAD,dowelBore,mitre,902,25,20,8,8,20,4,45,,/.test(csv), 'the CSV: numbers to 0.1, a note with commas quoted, a dowel bore line with the angle 45');
   const json = M.machining.fireDoorMachiningJson(windows);
   let parsed = null;
   try { parsed = JSON.parse(json); } catch { parsed = null; }
   ok(!!parsed && parsed.doors.length === 3 && parsed.doors.every((d) => d.name && d.inputs && d.leaf && d.frame?.members?.length === 3 && d.hinges && d.lock && d.keep && d.vp && 'intumescent' in d && d.bsuiteVars?.leaf && d.machining?.leaf) && parsed.coordinates?.leaf && parsed.doors[2].intumescent === null,
     'the JSON parses: 3 doors with name, inputs, leaf, frame, hinges, lock, keep, vp, intumescent, bsuiteVars, machining; the coordinate notes; DR-01 intumescent null');
+  ok(parsed.doors[0].opening?.width === 912 && parsed.doors[0].opening?.source === 'leaf' && parsed.doors[0].closer?.type === 'builtin' && parsed.doors[1].closer === null && parsed.doors[0].frameDowels?.count === 6 && parsed.doors[0].intumescent?.strips === 1 && parsed.doors[1].intumescent?.strips === 2 && !('swing' in (parsed.doors[0].inputs || {})),
+    'the JSON v1.1: the opening (912 from the leaf), the closer kind (built in / null), the frame dowels (6), the strips (1 / 2), no swing');
   const ex = M.machining.exportFireDoorMachining(windows, 'Pack 1');
   ok(ex.ok && J(ex.files) === J(['Pack_1_firedoor_machining.csv', 'Pack_1_firedoor_machining.json']) && ex.doors === 3 && ex.rows === mr.length && !!M.machining.exportFireDoorMachining([{ derived: { category: 'sash' } }], 'x').error,
     'exportFireDoorMachining: the two files, 3 doors, the row count; an error without a fire door');
@@ -1148,17 +1171,19 @@ section('11 - the pages: overview cells, glass groups, the Elements / Elevations
 // the doors and the controls as the configurator stores them (top-level firedoor* keys, width / height = the frame overall)
 const fdItem = (id, name, fc) => ({
   id, name, windowCategory: 'firedoor', window_type: 'firedoor',
-  firedoorFire: true, firedoorRating: 'FD30', firedoorLeafWidth: 826, firedoorLeafHeight: 2040, firedoorFrameDepth: 100,
-  firedoorHingeSide: 'left', firedoorSwing: 'in', firedoorLockType: 'euro', firedoorCloser: true, firedoorVpStyle: 1,
-  firedoorIntuStyle: 1, firedoorLeadEdge: true, width: 902, height: 2083,
+  // v1.1: the opening 912 x 2088 (= the leaf 826 x 2040), no leaf override, the closer a kind
+  firedoorFire: true, firedoorRating: 'FD30', firedoorOpeningWidth: 912, firedoorOpeningHeight: 2088, firedoorLeafWidth: 0, firedoorLeafHeight: 0, firedoorFrameDepth: 100,
+  firedoorHingeSide: 'left', firedoorLockType: 'euro', firedoorCloser: 'builtin', firedoorVpStyle: 1,
+  firedoorLeadEdge: true, width: 902, height: 2083,
   ironmongery: 'brass', colourMode: 'single', glassType: 'double',
   specification: JSON.stringify({ windowType: 'firedoor', fullConfig: { windowCategory: 'firedoor' } }),
   ...fc,
 });
 const ITEMS = {
   fdr01: fdItem('fdr01', 'FDR-01', {}),
-  fdr02: fdItem('fdr02', 'FDR-02', { firedoorRating: 'FD60', firedoorLockType: 'bathroom', firedoorHingeSide: 'right', firedoorSwing: 'out', firedoorVpStyle: 5, firedoorIntuStyle: 4, firedoorCloser: false, firedoorFrameDepth: 150 }),
-  dr01: fdItem('dr01', 'DR-01', { firedoorFire: false, firedoorLockType: 'latch', firedoorVpStyle: 0, firedoorCloser: false }),
+  fdr02: fdItem('fdr02', 'FDR-02', { firedoorRating: 'FD60', firedoorLockType: 'bathroom', firedoorHingeSide: 'right', firedoorSwing: 'out', firedoorVpStyle: 5, firedoorIntuStyle: 4, firedoorCloser: 'none', firedoorFrameDepth: 150 }),
+  // a v1 door as main stores it today: the leaf only, no opening, a boolean closer
+  dr01: fdItem('dr01', 'DR-01', { firedoorFire: false, firedoorLockType: 'latch', firedoorVpStyle: 0, firedoorCloser: false, firedoorOpeningWidth: undefined, firedoorOpeningHeight: undefined, firedoorLeafWidth: 826, firedoorLeafHeight: 2040, firedoorSwing: 'in', firedoorIntuStyle: 1 }),
   sash: { id: 'sash1', name: 'W1', width: 900, height: 1500, window_type: 'sash', specification: JSON.stringify({ windowType: 'sash', fullConfig: {} }) },
   cas: { id: 'cas1', name: 'C1', width: 1200, height: 1200, window_type: 'casement', windowCategory: 'casement', specification: JSON.stringify({ windowType: 'casement', fullConfig: { windowCategory: 'casement' } }) },
   door: { id: 'door1', name: 'D1', width: 900, height: 2100, window_type: 'doors', windowCategory: 'door', specification: JSON.stringify({ windowType: 'doors', fullConfig: { windowCategory: 'door', doorType: 'single-external' } }) },
@@ -1187,10 +1212,11 @@ const pageUrl = (path, pattern, Comp) => renderToStaticMarkup(h(M.MemoryRouter, 
   const mixed = [W.fdr01, W.sash, W.cas, W.door, W.wall, W.dr01];
   // overviewCells / winBarsLabel
   const c1 = M.PPP.overviewCells(W.fdr01), c2 = M.PPP.overviewCells(W.fdr02), c3 = M.PPP.overviewCells(W.dr01);
-  ok(c1.type === 'FD30' && c1.head === 'leaf 826 × 2040 × 44 · VP 450mm Square' && c1.opening === 'Hinge left · opens in · sashlock euro · closer' && c1.box === 100,
-    'overviewCells FDR-01: FD30 / leaf 826 × 2040 × 44 · VP 450mm Square / Hinge left · opens in · sashlock euro · closer / box 100', J(c1));
-  ok(c2.type === 'FD60' && c2.head === 'leaf 826 × 2040 × 54 · VP 350mm Diamond' && c2.opening === 'Hinge right · opens out · bathroom' && c2.box === 150, 'overviewCells FDR-02: FD60 / leaf 54 · diamond / Hinge right · opens out · bathroom (no closer) / box 150', J(c2));
-  ok(c3.type === 'DR' && c3.head === 'leaf 826 × 2040 × 44 · no VP' && c3.opening === 'Hinge left · opens in · latch' && c3.box === 100, 'overviewCells DR-01: DR / no VP / latch, no closer', J(c3));
+  ok(c1.type === 'FD30' && c1.head === 'leaf 826 × 2040 × 44 · VP 450mm Square' && c1.opening === 'Hinge left · sashlock euro · Built in closer' && c1.box === 100,
+    'overviewCells FDR-01: FD30 / leaf 826 × 2040 × 44 · VP 450mm Square / Hinge left · sashlock euro · Built in closer (no swing) / box 100', J(c1));
+  ok(c2.type === 'FD60' && c2.head === 'leaf 826 × 2040 × 54 · VP 350mm Diamond' && c2.opening === 'Hinge right · bathroom' && c2.box === 150, 'overviewCells FDR-02: FD60 / leaf 54 · diamond / Hinge right · bathroom (no closer, a stored swing ignored) / box 150', J(c2));
+  ok(c3.type === 'DR' && c3.head === 'leaf 826 × 2040 × 44 · no VP' && c3.opening === 'Hinge left · latch' && c3.box === 100, 'overviewCells DR-01 (a v1 record with the leaf only): DR / no VP / latch, no closer', J(c3));
+  ok(W.dr01.derived.firedoor.opening.width === 912 && W.dr01.derived.firedoor.opening.source === 'leaf' && W.fdr01.derived.firedoor.opening.source === 'opening' && W.fdr01.derived.firedoor.leaf.width === 826, 'the v1 record derives its opening from the leaf (912, source leaf); the v1.1 record its leaf from the opening (826)');
   const cs = M.PPP.overviewCells(W.sash), cd = M.PPP.overviewCells(W.door), cw = M.PPP.overviewCells(W.wall);
   ok(cs.type === 'double' && cs.head === 'flat' && cs.box === 164 && cd.type === 'single' && cd.box === 93 && String(cw.type).startsWith('wall '), 'overviewCells controls unchanged: sash double / flat / 164, door single / 93, partition "wall ..."');
   ok(M.PPP.winBarsLabel(W.fdr01) === 'none' && M.PPP.winBarsLabel(W.dr01) === 'none', 'winBarsLabel of a fire door: none');
@@ -1249,7 +1275,7 @@ const pageUrl = (path, pattern, Comp) => renderToStaticMarkup(h(M.MemoryRouter, 
     const html = pageUrl('/projects/p1/batches/b1/production-pack', '/projects/:projectId/batches/:batchId/production-pack', M.PPP.default);
     ok(has(html, 'bSuite fire doors') && has(html, 'Fire door machining (CSV)') && has(html, tgtName), `Pack page (firedoor batch): the "bSuite fire doors" and "Fire door machining (CSV)" buttons, the target "${tgtName}" named`);
     ok(!has(html, 'bSuite frames') && !has(html, 'CNC Jamb DXF'), 'Pack page (firedoor batch): no casement / sash export buttons');
-    ok(has(html, 'FD30') && has(html, 'FD60') && has(html, '>DR<') && has(html, 'Hinge left · opens in · sashlock euro · closer') && has(html, '>100 mm<') && has(html, '>150 mm<'), 'Pack page overview: the type, opening and wall depth cells of the three doors');
+    ok(has(html, 'FD30') && has(html, 'FD60') && has(html, '>DR<') && has(html, 'Hinge left · sashlock euro · Built in closer') && !has(html, 'opens in') && has(html, '>100 mm<') && has(html, '>150 mm<'), 'Pack page overview: the type, opening and wall depth cells of the three doors');
     ok(!/NaN|undefined|Infinity/.test(html), 'Pack page (firedoor batch): no NaN / undefined / Infinity');
     const sashPage = pageUrl('/projects/p1/batches/b2/production-pack', '/projects/:projectId/batches/:batchId/production-pack', M.PPP.default);
     ok(!has(sashPage, 'bSuite fire doors') && !has(sashPage, 'Fire door machining') && has(sashPage, 'CNC Jamb DXF'), 'Pack page (sash batch): no fire door buttons, the sash buttons stay');
@@ -1259,23 +1285,23 @@ const pageUrl = (path, pattern, Comp) => renderToStaticMarkup(h(M.MemoryRouter, 
   {
     const html = pageUrl('/projects/p1/batches/b1/windows/fdr01', '/projects/:projectId/batches/:batchId/windows/:windowId', M.WDP.default);
     ok(has(html, 'bSuite fire doors') && has(html, 'Fire door machining (CSV)') && !has(html, 'bSuite frames') && !has(html, 'CNC Jamb DXF') && has(html, 'Fire door</div>'), 'Window page FDR-01: the two fire door buttons, no casement / sash ones, the "Fire door" spec section');
-    const rowsW = [['Rating', 'FD30'], ['Leaf', '826 × 2040 × 44 mm'], ['Handing', 'Hinge left · opens in'], ['Wall depth', '100 mm'], ['Lock', 'sashlock euro'], ['Closer', 'concealed closer'],
-      ['Vision panel', '450mm Square'], ['Intumescent', '15mm x 4mm Intu Strip Lock Center'], ['Leading edge', 'bevelled (macro LEAD_EDGE)'],
+    const rowsW = [['Rating', 'FD30'], ['Structural opening', '912 × 2088 mm'], ['Leaf', '826 × 2040 × 44 mm'], ['Handing', 'Hinge left'], ['Wall depth', '100 mm'], ['Lock', 'sashlock euro'], ['Closer', 'Built in closer'],
+      ['Vision panel', '450mm Square'], ['Intumescent', '1 x 15 x 4 all around'], ['Leading edge', 'bevelled (macro LEAD_EDGE)'],
       ['Width', '902 mm'], ['Height', '2083 mm'], ['Depth', '100 mm'],
       ['Frame overall', '902 × 2083 mm'], ['Head', '902 mm long point · mitred both ends'], ['Jamb hinge', '2083 mm long point · mitred top'], ['Jamb lock', '2083 mm long point · mitred top'],
-      ['Member', '50 × 100 finished · 63 × 105 raw'], ['Rebate', '15 × 47 · faces 35 / 50'], ['Hinges', '3 × 102 · 150 / 944 / 1738 from the leaf top'], ['Jamb recesses', '188 / 982 / 1776 from the jamb top'],
+      ['Member', '50 × 100 finished · 63 × 105 raw'], ['Rebate', '15 × 47 · faces 35 / 50'], ['Hinges', '3 × 102 · 150 / 769 / 1738 from the leaf top'], ['Jamb recesses', '188 / 807 / 1776 from the jamb top'],
       ['Spindle', '1000 above the leaf bottom · backset 60'], ['Cylinder', '928 above the leaf bottom'], ['Keep centre', '990 above the jamb foot'], ['Intumescent', '4.906 m'], ['VP glass', '0.203 m² · beads 3.6 m'],
       ['Type', 'fire 6 mm'], ['Panes', '1 · 0.203 m²']];
     const missing = rowsW.filter(([label, value]) => !new RegExp(`${label}</span><span[^>]*>${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</span>`).test(html));
     ok(missing.length === 0, `Window page FDR-01: the ${rowsW.length} spec and calculated rows (Rating FD30 .. Panes 1 · 0.203 m²)`, missing.map(([l, v]) => `${l} = ${v}`).join(' | '));
     ok(!has(html, 'Sashes &amp; Bars') && !has(html, 'Trickle vent') && !has(html, 'Security') && !/NaN|undefined|Infinity/.test(html), 'Window page FDR-01: no Sashes & Bars section, no trickle vent / security rows, no NaN / undefined / Infinity');
     const dr = pageUrl('/projects/p1/batches/b1/windows/dr01', '/projects/:projectId/batches/:batchId/windows/:windowId', M.WDP.default);
-    ok(/Rating<\/span><span[^>]*>Non fire</.test(dr) && /Intumescent<\/span><span[^>]*>none \(non-fire door\)</.test(dr) && /Vision panel<\/span><span[^>]*>none</.test(dr) && /Lock<\/span><span[^>]*>latch \(standard\)</.test(dr) && /Closer<\/span><span[^>]*>none</.test(dr),
-      'Window page DR-01: Non fire, no intumescent, no vision panel, latch (standard), no closer');
+    ok(/Rating<\/span><span[^>]*>Non fire</.test(dr) && /Intumescent<\/span><span[^>]*>none \(non-fire\)</.test(dr) && /Vision panel<\/span><span[^>]*>none</.test(dr) && /Lock<\/span><span[^>]*>latch \(standard\)</.test(dr) && /Closer<\/span><span[^>]*>none</.test(dr) && /Structural opening<\/span><span[^>]*>912 × 2088 mm \(from the leaf\)</.test(dr),
+      'Window page DR-01 (a v1 record): Non fire, no intumescent, no vision panel, latch (standard), no closer, the opening 912 × 2088 (from the leaf)');
     ok(!/Intumescent<\/span><span[^>]*>[\d.]+ m</.test(dr) && !has(dr, 'Cylinder</span>') && !has(dr, 'VP glass</span>'), 'Window page DR-01: no intumescent metres, cylinder or VP glass row in Calculated');
     const fd60 = pageUrl('/projects/p1/batches/b1/windows/fdr02', '/projects/:projectId/batches/:batchId/windows/:windowId', M.WDP.default);
-    ok(/Rating<\/span><span[^>]*>FD60</.test(fd60) && /Leaf<\/span><span[^>]*>826 × 2040 × 54 mm</.test(fd60) && /Rebate<\/span><span[^>]*>15 × 57 · faces 35 \/ 50</.test(fd60) && /Thumbturn<\/span><span[^>]*>922 above the leaf bottom</.test(fd60) && /Handing<\/span><span[^>]*>Hinge right · opens out</.test(fd60) && /Wall depth<\/span><span[^>]*>150 mm</.test(fd60),
-      'Window page FDR-02: FD60, leaf 54, rebate 15 × 57, thumbturn 922, Hinge right · opens out, wall 150');
+    ok(/Rating<\/span><span[^>]*>FD60</.test(fd60) && /Leaf<\/span><span[^>]*>826 × 2040 × 54 mm</.test(fd60) && /Rebate<\/span><span[^>]*>15 × 57 · faces 35 \/ 50</.test(fd60) && /Thumbturn<\/span><span[^>]*>922 above the leaf bottom</.test(fd60) && /Handing<\/span><span[^>]*>Hinge right</.test(fd60) && !/opens out/.test(fd60) && /Wall depth<\/span><span[^>]*>150 mm</.test(fd60) && /Intumescent<\/span><span[^>]*>2 x 15 x 4 all around</.test(fd60),
+      'Window page FDR-02: FD60, leaf 54, rebate 15 × 57, thumbturn 922, Hinge right (no swing), wall 150, two strips');
     const sashPage = pageUrl('/projects/p1/batches/b2/windows/sash1', '/projects/:projectId/batches/:batchId/windows/:windowId', M.WDP.default);
     ok(has(sashPage, 'Sashes &amp; Bars') && has(sashPage, 'Trickle vent') && !has(sashPage, 'Fire door</div>') && !has(sashPage, 'bSuite fire doors'), 'Window page sash control: Sashes & Bars, trickle vent, no fire door section or buttons');
   }
@@ -1289,8 +1315,8 @@ const pageUrl = (path, pattern, Comp) => renderToStaticMarkup(h(M.MemoryRouter, 
     const dr = renderR(h(M.WDP.GlassPanel, { item: W.dr01.win, windowSpec: W.dr01.windowSpec, derived: W.dr01.derived, batch: batchFD, settings: {}, projectEntity: null, projectLabel: '064' }));
     ok(has(dr, 'No glass data.'), 'GlassPanel DR-01 (VP 0): "No glass data."');
     const bom = renderR(h(M.WDP.BOMPanel, { item: fd.win, windowSpec: fd.windowSpec, settings: {}, derived: fd.derived, batch: batchFD, projectLabel: '064' }));
-    ok(has(bom, 'Fire door hardware') && has(bom, 'Fire door hinge') && has(bom, '150 / 944 / 1738 from the leaf top') && has(bom, 'Lock case, sashlock euro') && has(bom, 'Euro cylinder') && has(bom, 'Keep') && has(bom, 'Concealed closer') && has(bom, 'Intumescent strip'),
-      'BOMPanel FDR-01: the "Fire door hardware" card with hinges (positions), lock, cylinder, keep, closer, intumescent');
+    ok(has(bom, 'Fire door hardware') && has(bom, 'Fire door hinge') && has(bom, '150 / 769 / 1738 from the leaf top') && has(bom, 'Lock case, sashlock euro') && has(bom, 'Euro cylinder') && has(bom, 'Keep') && has(bom, 'Built in closer') && has(bom, 'Intumescent strip') && has(bom, 'Frame dowels'),
+      'BOMPanel FDR-01: the "Fire door hardware" card with hinges (positions), lock, cylinder, keep, the built in closer, intumescent, the frame dowels');
     ok(!has(bom, 'Fixed window'), 'BOMPanel FDR-01: never the "Fixed window" copy');
   }
   // the button handlers' calls (the same expressions the pages run)
@@ -1316,13 +1342,13 @@ section('12 - the batch summary strip and the pre-cut panel label');
   const row = (l) => rowsFD.find((r) => r.label === l)?.text;
   ok(row('Rating') === 'FD30 \u00d71, FD60 \u00d71, non fire \u00d71', `Rating tallies the three doors: "${row('Rating')}"`);
   ok(row('Lock') === 'sashlock euro \u00d71, bathroom \u00d71, latch \u00d71', `Lock: "${row('Lock')}"`);
-  ok(row('Closer') === 'no \u00d72, yes \u00d71', `Closer (FDR-01 yes, FDR-02 and DR-01 no): "${row('Closer')}"`);
+  ok(row('Closer') === 'none \u00d72, built in closer \u00d71', `Closer (FDR-01 built in, FDR-02 none, DR-01 a v1 false = none): "${row('Closer')}"`);
   ok(row('Ironmongery') === 'brass' && row('Colour') === 'Single' && row('Glass') === 'double', `Ironmongery "${row('Ironmongery')}", Colour "${row('Colour')}", Glass "${row('Glass')}" as the other batches`);
   const unset = M.batchSummary.summarizeWindows([{ windowCategory: 'firedoor' }], 'firedoor');
   const u = (l) => unset.find((r) => r.label === l)?.text;
-  ok(u('Rating') === 'FD30' && u('Lock') === 'latch' && u('Closer') === 'yes', `a fire door with the fields unset reads the profile defaults: Rating "${u('Rating')}", Lock "${u('Lock')}", Closer "${u('Closer')}"`);
+  ok(u('Rating') === 'FD30' && u('Lock') === 'latch' && u('Closer') === 'surface closer', `a fire door with the fields unset reads the profile defaults: Rating "${u('Rating')}", Lock "${u('Lock')}", Closer "${u('Closer')}" (closerFire)`);
   const nf = M.batchSummary.summarizeWindows([{ windowCategory: 'firedoor', firedoorFire: false }], 'firedoor');
-  ok(nf.find((r) => r.label === 'Rating').text === 'non fire' && nf.find((r) => r.label === 'Closer').text === 'no', 'a non-fire door with the closer unset: Rating "non fire", Closer "no" (the engine rule)');
+  ok(nf.find((r) => r.label === 'Rating').text === 'non fire' && nf.find((r) => r.label === 'Closer').text === 'none', 'a non-fire door with the closer unset: Rating "non fire", Closer "none" (closerNonFire)');
   const rowsS = M.batchSummary.summarizeWindows([{ ironmongery: 'brass', colourMode: 'single', glassType: 'double', frameType: 'standard', hornType: 'none', pas24: false }], 'sash');
   ok(J(rowsS.map((r) => r.label)) === J(['Ironmongery', 'Colour', 'Glass', 'Frame', 'Horns', 'PAS24']) && rowsS[0].text === 'brass' && rowsS[3].text === 'standard' && rowsS[5].text === 'No', 'a sash batch strip unchanged (Ironmongery / Colour / Glass / Frame / Horns / PAS24)');
   const rowsC = M.batchSummary.summarizeWindows([{ ironmongery: 'chrome', colourMode: 'dual', glassType: 'double', frameType: 'standard', pas24: true }], 'casement');
