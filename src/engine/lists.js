@@ -9,7 +9,7 @@
 import { CONSTANTS, deriveWindowData, sashBarPattern } from './calculations.js';
 import { CASEMENT_HINGE_SLOTS, CASEMENT_LOCK_SLOTS, hingeWedgeMm, childRestrictorCounts } from './casementHardware.js';
 import { GLASS_MAKEUP, glassGas, glassMakeupFor } from './specification.js';
-import { profileRawForSection, getWindowProfile, getCasementProfile } from './profile.js';
+import { profileRawForSection, getWindowProfile, getCasementProfile, getFireDoorProfile } from './profile.js';
 // Pure helper (no React) — shared with the 2D drawings so panel, PDF and
 // sketch all read the frosted scope the same way.
 import { casementPaneFinish } from '../components/drawings/casementDrawUtils.js';
@@ -78,6 +78,9 @@ export function buildCutListForWindow(derived, windowSpec) {
   const out = [];
   // Partition walls (25.10.2026) are solid oak throughout, frame and leaf.
   const isWall = derived.category === 'partition';
+  // Fire doors (27.10.2026, internal door sets): the three frame members are
+  // hardwood (the raw 63 section), the leaf is a bought blank (its own row).
+  const isFireDoor = derived.category === 'firedoor';
   // Box (frame) components
   derived.components.box.forEach((c) => {
     out.push({
@@ -85,7 +88,7 @@ export function buildCutListForWindow(derived, windowSpec) {
       section: c.section,
       length: c.length,
       quantity: c.quantity,
-      material: isWall ? 'Oak (solid)' : 'Sapele / Engineered timber',
+      material: isWall ? 'Oak (solid)' : isFireDoor ? 'Hardwood (door frame)' : 'Sapele / Engineered timber',
       notes: c.notes || ''
     });
   });
@@ -96,7 +99,7 @@ export function buildCutListForWindow(derived, windowSpec) {
       section: c.section,
       length: c.length,
       quantity: c.quantity,
-      material: isWall ? 'Oak (solid)' : 'Hardwood (sash)',
+      material: isWall ? 'Oak (solid)' : isFireDoor ? 'Door blank (bought)' : 'Hardwood (sash)',
       notes: c.notes || ''
     });
   });
@@ -243,11 +246,18 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg, resolveRa
   // second number as a sash face, so 94x57, 100x57 and 180x57 would all fall
   // into the sash 63x63 stock.
   // Partition oak (W-*, 25.10.2026) follows the door rule.
-  const rawFor = (c) => (/^[DW]-/.test(String(c.elementName || ''))
-    ? (resolveRaw?.(c.elementName) || settings?.sectionMap?.[c.section] || c.section)
+  // Fire door frame members (FD-*, 27.10.2026) too, with one more step: the
+  // record carries its RAW section (63 x (depth + 5), e.g. 63x105) from the
+  // engine, so without an assigned material or a section map entry the
+  // pre-cut shows the raw stock, never the finished 50 x depth.
+  const rawFor = (c) => (/^(FD|[DW])-/.test(String(c.elementName || ''))
+    ? (resolveRaw?.(c.elementName) || settings?.sectionMap?.[c.section] || c.rawSection || c.section)
     : (resolveRaw?.(c.elementName) || settings?.sectionMap?.[c.section] || profileRawForSection(c.section) || c.section));
   derived.components.sash.forEach((c) => {
     if (pushBlanks(c)) return;
+    // The fire door leaf (FD-LEAF) is a bought blank, not stock to pre-cut:
+    // the BOM counts it as one blank by rating (bom.js), the pre-cut skips it.
+    if (String(c.elementName || '').startsWith('FD-LEAF')) return;
     const raw = rawFor(c);
     if (!raw) return;
     if (!bySection.has(raw)) bySection.set(raw, []);
@@ -278,7 +288,9 @@ export function buildPrecutForWindow(derived, windowSpec, settingsArg, resolveRa
     // Door frame members (D-*, owner box item 17, 08.10.2026) the same way:
     // they take their assigned material and merge with every door member of it.
     // Partition members (W-*, 25.10.2026) too: one oak stock across the wall.
-    if (c.elementName?.startsWith('C-') || c.elementName?.startsWith('D-') || c.elementName?.startsWith('W-')) {
+    // Fire door frame members (FD-HEAD / FD-JAMB-H / FD-JAMB-L, 27.10.2026):
+    // the same rule, one raw 63 stock across head and jambs.
+    if (c.elementName?.startsWith('C-') || c.elementName?.startsWith('D-') || c.elementName?.startsWith('W-') || c.elementName?.startsWith('FD-')) {
       const raw = rawFor(c);
       if (!bySection.has(raw)) bySection.set(raw, []);
       bySection.get(raw).push({
@@ -334,6 +346,35 @@ function buildGlassRow(windowSpec, width, height, location, qty, finishOverride,
 
 export function buildGlassListForWindow(derived, windowSpec) {
   if (!derived || derived.unsupported) return [];
+
+  // Fire doors (27.10.2026): one row per vision panel pane from the engine
+  // units (derived.customGlassUnits, placed by fireDoor.js). Single glass, no
+  // sealed unit: fire glass on a fire door, toughened otherwise; the thickness
+  // from the spec glazing block (profile vp.glassThickness), no spacer, no gas.
+  // No bars on a vision panel: the row label reads 'none' as the engine row.
+  // A door with vision panel style 0 has no units and no rows.
+  if (derived.category === 'firedoor') {
+    const units = Array.isArray(derived.customGlassUnits) ? derived.customGlassUnits : [];
+    const fire = !!derived.firedoor?.fire;
+    const thickness = Number(windowSpec?.glazing?.thickness) || Number(getFireDoorProfile()?.vp?.glassThickness) || 0;
+    const type = fire ? 'fire' : 'toughened';
+    return units.map((u, i) => {
+      const row = buildGlassRow(windowSpec, u.width, u.height, u.location || `vision panel ${i + 1}`, u.qty || 1, undefined, u.role || 'vp');
+      row.type = type;
+      row.spec = type;
+      row.thickness = thickness;
+      row.makeup = windowSpec?.glazing?.makeup || (thickness ? `${thickness}mm ${type}` : type);
+      row.spacer = 'none';
+      row.spacerType = 'none';
+      row.gas = 'none';
+      row.coating = 'none';
+      row.bars = 'none';
+      row.barsV = 0;
+      row.barsH = 0;
+      if (u.note) row.note = u.note;
+      return row;
+    });
+  }
 
   // Non-double-hung sources (casement, triple sections) supply units directly
   if (Array.isArray(derived.customGlassUnits) && derived.customGlassUnits.length > 0) {
@@ -505,6 +546,36 @@ export function buildVentGrilles(windowSpec) {
   }
 }
 
+/**
+ * Fire door hardware (27.10.2026, internal door sets FDR / DR): the hardware
+ * LINE of each item (lists.buildHardwareList), its Assign Materials row
+ * (materialAssignmentStore FIREDOOR_PARTS, counted by bom.buildWindowPartQtys)
+ * and the ironmongery slot whose product the line shows (bom.HARDWARE_TO_SLOT_KEY
+ * and the row's product in bom.buildWindowMaterialLines). One table so the
+ * three never drift. The intumescent strip has a row per strip width
+ * (fireDoorIntumescentPartId) and no slot.
+ */
+export const FIREDOOR_HARDWARE = Object.freeze({
+  hingeFire: { item: 'Fire door hinge', partId: 'fd_hinge_fire', slot: 'doorHinges' },
+  hingeStd: { item: 'Door hinge', partId: 'fd_hinge_std', slot: 'doorHinges' },
+  lockLatch: { item: 'Lock case, latch', partId: 'fd_lock_latch', slot: 'fireDoorLocks' },
+  lockEuro: { item: 'Lock case, sashlock euro', partId: 'fd_lock_euro', slot: 'fireDoorLocks' },
+  lockBathroom: { item: 'Lock case, bathroom', partId: 'fd_lock_bathroom', slot: 'fireDoorLocks' },
+  cylinder: { item: 'Euro cylinder', partId: 'fd_cylinder_euro', slot: 'cylinders' },
+  thumbturn: { item: 'Thumbturn and release', partId: 'fd_thumbturn', slot: 'cylinders' },
+  handle: { item: 'Lever handle set', partId: 'fd_handle_set', slot: 'doorHandles' },
+  keep: { item: 'Keep', partId: 'fd_keep', slot: 'keeps' },
+  closer: { item: 'Concealed closer', partId: 'fd_closer', slot: 'doorClosers' },
+  intumescent: { item: 'Intumescent strip', partId: null, slot: null },
+});
+
+/** The intumescent strip row of a strip width (10 / 15 / 20 mm): fd_intu_10 / fd_intu_15 / fd_intu_20; null for any other width. */
+export const FIREDOOR_INTUMESCENT_WIDTHS = Object.freeze([10, 15, 20]);
+export function fireDoorIntumescentPartId(width) {
+  const w = Number(width);
+  return FIREDOOR_INTUMESCENT_WIDTHS.includes(w) ? `fd_intu_${w}` : null;
+}
+
 export function buildHardwareList(windowSpec, derived = null) {
   const cat = windowSpec?.category || 'sash';
   if (cat === 'casement') {
@@ -612,6 +683,49 @@ export function buildHardwareList(windowSpec, derived = null) {
     }
     if (pw.dowels?.count > 0) {
       list.push({ item: 'Dowels', detail: `${pw.dowels.dia} x ${pw.dowels.length} hardwood · ${pw.dowels.perJoint} per joint`, quantity: pw.dowels.count });
+    }
+    return list;
+  }
+  if (cat === 'firedoor') {
+    // Fire doors (27.10.2026, internal door sets): every line is an Assign
+    // Materials row (fd_*, materialAssignmentStore FIREDOOR_PARTS), so each one
+    // is `enginePart` with its partId: the BOM carries the count, the line is
+    // the window's hardware detail (and shows the product of the window's
+    // ironmongery slot through bom.HARDWARE_TO_SLOT_KEY). Lines, in order: the
+    // hinges (fire or standard, the count and positions of the macro rule),
+    // the lock case by type, the euro cylinder or the bathroom thumbturn, the
+    // lever handle set, the keep on the lock jamb, the concealed closer when
+    // ticked, and the intumescent strip metres on a fire door.
+    const fd = derived?.firedoor;
+    if (!fd) return [];
+    const list = [];
+    const H = FIREDOOR_HARDWARE;
+    const hinges = fd.hinges || {};
+    const lock = fd.lock || {};
+    const keep = fd.keep || {};
+    const hingeCount = Number(hinges.count) || 0;
+    const tops = (hinges.positions || []).map((p) => p.top).join(' / ');
+    if (hingeCount > 0) {
+      const h = fd.fire ? H.hingeFire : H.hingeStd;
+      list.push({ item: h.item, detail: `${hinges.length} long · ${tops} from the leaf top · ${fd.handing?.label || ''}`.trim(), quantity: hingeCount, enginePart: true, partId: h.partId });
+    }
+    const lockLine = lock.type === 'euro' ? H.lockEuro : lock.type === 'bathroom' ? H.lockBathroom : H.lockLatch;
+    const rating = fd.fire ? (fd.rating || 'FD30') : 'standard';
+    list.push({ item: lockLine.item, detail: `${rating} · backset ${lock.backset} · spindle ${lock.spindleHeight} from the leaf bottom`, quantity: 1, enginePart: true, partId: lockLine.partId });
+    if (lock.type === 'euro') {
+      list.push({ item: H.cylinder.item, detail: `${lock.cylinder?.fromBottom ?? ''} from the leaf bottom (euro centres)`.trim(), quantity: 1, enginePart: true, partId: H.cylinder.partId });
+    }
+    if (lock.type === 'bathroom') {
+      list.push({ item: H.thumbturn.item, detail: `${lock.cylinder?.fromBottom ?? ''} from the leaf bottom (bathroom centres)`.trim(), quantity: 1, enginePart: true, partId: H.thumbturn.partId });
+    }
+    list.push({ item: H.handle.item, detail: `on rose, ${windowSpec?.hardware?.finish || 'stainless'} · spindle ${lock.spindleHeight} from the leaf bottom`, quantity: 1, enginePart: true, partId: H.handle.partId });
+    list.push({ item: H.keep.item, detail: `${rating} · ${keep.plate?.length ?? ''} x ${keep.plate?.width ?? ''} on the lock jamb · centre ${keep.centreFromFoot ?? ''} from the jamb foot`, quantity: 1, enginePart: true, partId: H.keep.partId });
+    if (fd.closer) {
+      list.push({ item: H.closer.item, detail: 'concealed, in the leaf top and the head · no machining yet', quantity: 1, enginePart: true, partId: H.closer.partId });
+    }
+    const intu = fd.intumescent;
+    if (fd.fire && intu && Number(intu.metres) > 0) {
+      list.push({ item: H.intumescent.item, detail: `${intu.label || `${intu.width} x ${intu.thickness}`} · ${intu.strips} per edge, top and both sides of the leaf`, quantity: Number(intu.metres), unit: 'm', enginePart: true, partId: fireDoorIntumescentPartId(intu.width) });
     }
     return list;
   }
@@ -773,6 +887,12 @@ export const CUT_LIST_ORDER = [
   { match: 'W-DOOR BAR',                symbol: 'DGB',   label: 'Door Applied Glazing Bars' },
   { match: 'W-BEAD',                    symbol: 'BD',    label: 'Screen Beads' },
   { match: 'W-DOOR BEAD',               symbol: 'DBD',   label: 'Door Beads' },
+  // ── FIRE DOOR (FD-*, 27.10.2026: the leaf blank, then the three frame members;
+  //    symbols as partSymbols.js, clear of the casement / door jamb pair) ──
+  { match: 'FD-LEAF',                   symbol: 'LEAF',  label: 'Door Leaf (blank)' },
+  { match: 'FD-HEAD',                   symbol: 'FH',    label: 'Door Frame Head' },
+  { match: 'FD-JAMB-H',                 symbol: 'HJ',    label: 'Hinge Jamb' },
+  { match: 'FD-JAMB-L',                 symbol: 'LJ',    label: 'Lock Jamb' },
 ];
 
 /**
@@ -824,7 +944,7 @@ export function buildGroupedCutList(rawCutList) {
     }));
     return [...merged, ...(keepNotes ? passthrough.map((r) => ({ ...r, notes: (r.notes || []).filter(Boolean).join(' / ') })) : passthrough)];
   };
-  const isDoorGroup = (name) => /^[DW]-/.test(String(name || ''));   // doors and partition walls keep their notes
+  const isDoorGroup = (name) => /^(FD|[DW])-/.test(String(name || ''));   // doors, partition walls and fire doors keep their notes
   const notesOf = (...rs) => rs.map((r) => r?.notes).filter(Boolean);
 
   // Bucket rows by engine element name.

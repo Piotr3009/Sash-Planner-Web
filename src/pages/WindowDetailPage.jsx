@@ -9,7 +9,7 @@ import { useIronmongeryStore } from '../stores/ironmongeryStore.js';
 import { SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, isCottageProportion } from '../engine/specification.js';
 import { deriveWindowData, sashBarPattern } from '../engine/calculations.js';
 import { deriveWindowBounded, sashBarsLabel } from '../utils/windowBoundary.js';
-import { withProfiles, getCasementProfile, bsuiteActiveTarget } from '../engine/profile.js';
+import { withProfiles, getCasementProfile, getFireDoorProfile, bsuiteActiveTarget } from '../engine/profile.js';
 import { buildGlassListForWindow, buildVentGrilles } from '../engine/lists.js';
 import { formatQty, buildWindowMaterialLines, windowBomCards, windowHardwareDetailRows } from '../engine/bom.js';
 import { liveSectionsFor } from '../engine/partRegistry.js';
@@ -22,6 +22,8 @@ import { groupCasementGlass } from '../components/drawings/casementDrawUtils.js'
 import DoorGlassDrawing2D from '../components/drawings/DoorGlassDrawing2D.jsx';
 import { groupDoorGlass } from '../components/drawings/doorDrawUtils.js';
 import { groupPartitionGlass } from '../components/drawings/partitionDrawUtils.js';
+// Fire doors (27.10.2026): the vision panel glass groups of the Glass tab and the glass drawings PDF
+import { groupFireDoorGlass } from '../components/drawings/fireDoorDrawUtils.js';
 // Triple sash (Piotr 13.10.2026): one glass drawing per section and sash (FIX L / C / FIX R)
 import { tripleSections } from '../components/drawings/tripleDrawUtils.js';
 import CutListPanel from '../components/dashboard/CutListPanel.jsx';
@@ -32,7 +34,9 @@ import { exportGlassPDF } from '../utils/glassPdfExport.js';
 import { exportGlassDxfForWindow, glassDxfParamsForWindow } from '../utils/glassDxfExport.js';
 import { exportBomPDF } from '../utils/bomPdfExport.js';
 import { exportCncJambsForWindow, canExportCncJambs, exportArchDxfForWindow, archParamsForWindow, traceryParamsForWindow, exportTraceryDxfForWindow } from '../utils/cncExport.js';
-import { exportBsuiteFramesMerged } from '../utils/bsuiteExport.js';
+import { exportBsuiteFramesMerged, exportBsuiteFireDoorsMerged } from '../utils/bsuiteExport.js';
+// Fire doors (27.10.2026): the machine-neutral machining list (CSV + JSON) of one door
+import { exportFireDoorMachining } from '../utils/fireDoorMachiningExport.js';
 import { downloadBsuiteProgram } from '../services/bsuitePrograms.js';
 
 
@@ -44,6 +48,9 @@ const TABS = [
   { id: 'glass', label: 'Glass', icon: '🪟' },
   { id: 'bom', label: 'BOM', icon: '📋' },
 ];
+
+// Fire doors (27.10.2026): the lock as the configurator names it, for the spec aside
+const FIREDOOR_LOCK_LABELS = { latch: 'latch (standard)', euro: 'sashlock euro', bathroom: 'bathroom' };
 
 export default function WindowDetailPage() {
   const { projectId, batchId, windowId } = useParams();
@@ -85,7 +92,7 @@ export default function WindowDetailPage() {
   // an unknown sash proportion or bar pattern, or an arch the engine refuses,
   // shows its message on this page instead of a blank one.
   const bounded = useMemo(() => (item
-    ? deriveWindowBounded(item, (ws) => withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition, () => deriveWindowData(ws, settings)))
+    ? deriveWindowBounded(item, (ws) => withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition, currentBatch?.defaults?._profileSnapshot?.firedoor, () => deriveWindowData(ws, settings)))
     : null), [item, settings, currentBatch]);
   const windowSpec = bounded?.windowSpec || null;
   const derived = bounded?.derived || null;
@@ -94,7 +101,7 @@ export default function WindowDetailPage() {
   // exactly like `derived` above; `skip` doubles as the button tooltip.
   const archExport = useMemo(() => {
     if (!windowSpec) return { skip: 'no data' };
-    return withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition, () => archParamsForWindow(windowSpec, item?.name));
+    return withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition, currentBatch?.defaults?._profileSnapshot?.firedoor, () => archParamsForWindow(windowSpec, item?.name));
   }, [windowSpec, item?.name, currentBatch]);
 
   const [tab, setTab] = useState('3d');
@@ -175,7 +182,7 @@ export default function WindowDetailPage() {
           {((windowSpec?.category || 'sash') === 'casement' || !!windowSpec?.arch?.shape) && (
             <button
               onClick={() => {
-                const r = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition, () => exportArchDxfForWindow(windowSpec, item.name));
+                const r = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition, currentBatch?.defaults?._profileSnapshot?.firedoor, () => exportArchDxfForWindow(windowSpec, item.name));
                 if (r.error) alert(`Arch DXF unavailable: ${r.error}`);
               }}
               disabled={!!archExport.skip}
@@ -189,10 +196,10 @@ export default function WindowDetailPage() {
           )}
           {((windowSpec?.category || 'sash') === 'casement' || !!windowSpec?.arch?.shape) && (() => {
             // v3 0.4: tracery board (DXF for VCarve + LSP for AutoCAD) — only with a bar pattern in the arch
-            const tr = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition, () => traceryParamsForWindow(windowSpec, derived, item?.name));
+            const tr = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition, currentBatch?.defaults?._profileSnapshot?.firedoor, () => traceryParamsForWindow(windowSpec, derived, item?.name));
             const cls = `btn text-sm bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 ${tr.skip ? 'opacity-40 cursor-not-allowed' : ''}`;
             const run = (fn, label) => {
-              const r = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition, () => fn(windowSpec, derived, item?.name));
+              const r = withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition, currentBatch?.defaults?._profileSnapshot?.firedoor, () => fn(windowSpec, derived, item?.name));
               if (r.error) alert(`${label} unavailable: ${r.error}`);
               else if (r.warnings?.length) alert(`${label}: ${r.warnings.join('; ')}`);
             };
@@ -206,7 +213,7 @@ export default function WindowDetailPage() {
             // 12.09: bSuite worklist for ONE window (Piotr: single window first, the pack is built from them)
             <button
               onClick={async () => {
-                const r = await withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition,
+                const r = await withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition, currentBatch?.defaults?._profileSnapshot?.firedoor,
                   () => exportBsuiteFramesMerged([{ windowSpec, derived, name: item?.name }], item?.name || 'window', undefined, null, downloadBsuiteProgram));
                 if (r.error) { alert(`bSuite frames unavailable: ${r.error}`); return; }
                 const sk = r.skipped?.length ? `\nSkipped: ${r.skipped.map((x) => `${x.element} (${x.reason})`).join(', ')}` : '';
@@ -218,6 +225,40 @@ export default function WindowDetailPage() {
               🏭 bSuite frames → {bsuiteActiveTarget(getCasementProfile().bsuite).name}
             </button>
           )}
+          {windowSpec?.category === 'firedoor' && (() => {
+            // Fire doors (27.10.2026): the bSolid worklist of THIS door (the FD_LEAF row,
+            // then the head, hinge jamb and lock jamb rows when their programs are
+            // set) and the machine-neutral machining list (CSV + JSON); both read
+            // derived.firedoor under the batch's profile snapshot, like the derive.
+            const doors = [{ windowSpec, derived, name: item?.name }];
+            const label = item?.name || 'door';
+            const inSnapshot = (fn) => withProfiles(currentBatch?.defaults?._profileSnapshot?.sash, currentBatch?.defaults?._profileSnapshot?.casement, currentBatch?.defaults?._profileSnapshot?.door, currentBatch?.defaults?._profileSnapshot?.partition, currentBatch?.defaults?._profileSnapshot?.firedoor, fn);
+            return (<>
+              <button
+                onClick={async () => {
+                  const r = await inSnapshot(() => exportBsuiteFireDoorsMerged(doors, label, undefined, downloadBsuiteProgram));
+                  if (r.error) { alert(`bSuite fire doors unavailable: ${r.error}`); return; }
+                  const sk = r.skipped?.length ? `\nSkipped ${r.skipped.length} row${r.skipped.length === 1 ? '' : 's'}.` : '';
+                  const msgs = r.messages?.length ? `\n${r.messages.join('\n')}` : '';
+                  alert(`${r.filename} for ${r.target}: ${r.rows} rows, ${r.pieces} pieces, ${r.embedded} programs embedded${r.stops ? `, ${r.stops} stop rows` : ''}.${sk}${msgs}`);
+                }}
+                title="bSolid worklist (.ewlist) for this door: the FD_LEAF row (the leaf master, LPX = height, LPY = width, LPZ = thickness, the macro variables), then the head, hinge jamb and lock jamb rows when their programs are set in Window Settings · Fire Doors"
+                className="btn text-sm bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50"
+              >
+                🏭 bSuite fire doors → {bsuiteActiveTarget(getFireDoorProfile().bsuite).name}
+              </button>
+              <button
+                onClick={() => {
+                  const r = inSnapshot(() => exportFireDoorMachining(doors, label));
+                  if (r.error) alert(`Fire door machining unavailable: ${r.error}`);
+                }}
+                title="Machine-neutral machining list of this door (CSV + JSON): every operation of the leaf, head, hinge jamb and lock jamb with its position, for the 5-axis frame programs"
+                className="btn text-sm bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50"
+              >
+                🛠 Fire door machining (CSV)
+              </button>
+            </>);
+          })()}
           <Link to={editUrl} className="btn btn-primary text-sm">✏️ Edit Configuration</Link>
         </div>
       </div>
@@ -267,12 +308,35 @@ export default function WindowDetailPage() {
         {/* RIGHT: Spec panel */}
         <aside className="card p-5 space-y-4 self-start">
           <SpecSection title="Frame">
-            <SpecRow label="Width" value={`${windowSpec?.frame.width} mm`} />
-            <SpecRow label="Height" value={`${windowSpec?.frame.height} mm`} />
-            {/* a door: the door profile depth (93) from the engine, never the sash box default */}
-            <SpecRow label="Depth" value={`${(derived?.category === 'door' && derived.door?.frameDepth) || windowSpec?.frame.depth || 164} mm`} />
+            {/* a fire door (27.10.2026): the overall frame the engine built from the leaf (leaf + 76 / + 43), never the stored size */}
+            <SpecRow label="Width" value={`${(derived?.category === 'firedoor' && derived.firedoor?.frame?.overall?.width) || windowSpec?.frame.width} mm`} />
+            <SpecRow label="Height" value={`${(derived?.category === 'firedoor' && derived.firedoor?.frame?.overall?.height) || windowSpec?.frame.height} mm`} />
+            {/* a door: the door profile depth (93) from the engine, never the sash box default; a fire door: the wall depth */}
+            <SpecRow label="Depth" value={`${(derived?.category === 'door' && derived.door?.frameDepth) || (derived?.category === 'firedoor' && derived.firedoor?.frame?.depth) || windowSpec?.frame.depth || 164} mm`} />
           </SpecSection>
-          {windowSpec?.category === 'partition' ? (
+          {windowSpec?.category === 'firedoor' ? (
+            // Fire doors (27.10.2026): the door as configured, every value from derived.firedoor
+            // (the inputs of the spec block when the engine has not run), the handing in
+            // the PSW wording ('Hinge left / Hinge right')
+            (() => {
+              const fd = derived?.category === 'firedoor' ? derived.firedoor : null;
+              const inp = fd?.inputs || windowSpec.firedoor || {};
+              const fire = fd ? fd.fire : !!windowSpec.firedoor?.fire;
+              return (
+                <SpecSection title="Fire door">
+                  <SpecRow label="Rating" value={fire ? (fd?.rating || windowSpec.firedoor?.rating || 'FD30') : 'Non fire'} />
+                  <SpecRow label="Leaf" value={fd ? `${fd.leaf.width} × ${fd.leaf.height} × ${fd.leaf.thickness} mm` : `${inp.leafWidth} × ${inp.leafHeight} mm`} />
+                  <SpecRow label="Handing" value={fd?.handing?.label || `Hinge ${inp.hingeSide || 'left'} · opens ${inp.swing || 'in'}`} />
+                  <SpecRow label="Wall depth" value={`${fd?.frame?.depth ?? inp.frameDepth} mm`} />
+                  <SpecRow label="Lock" value={FIREDOOR_LOCK_LABELS[fd?.lock?.type || inp.lockType] || inp.lockType} />
+                  <SpecRow label="Closer" value={(fd ? fd.closer : inp.closer) ? 'concealed closer' : 'none'} />
+                  <SpecRow label="Vision panel" value={fd ? (fd.vp?.panes?.length ? fd.vp.label : 'none') : `style ${inp.vpStyle}`} />
+                  <SpecRow label="Intumescent" value={fd ? (fd.intumescent ? fd.intumescent.label : 'none (non-fire door)') : `style ${inp.intuStyle}`} />
+                  <SpecRow label="Leading edge" value={inp.leadEdge ? 'bevelled (macro LEAD_EDGE)' : 'square'} />
+                </SpecSection>
+              );
+            })()
+          ) : windowSpec?.category === 'partition' ? (
             // Partition walls (25.10.2026): the layout as typed and the wall numbers the engine built from it
             <SpecSection title="Partition wall">
               <SpecRow label="Layout" value={`${windowSpec.partition?.layout || 'S'} (S = screen, D = door)`} />
@@ -313,12 +377,31 @@ export default function WindowDetailPage() {
             <SpecRow label="Horns" value={windowSpec?.sash.hornType || 'none'} />
           </SpecSection>
           )}
+          {windowSpec?.category === 'firedoor' ? (
+            // Fire doors (27.10.2026): the vision panel glass as the glass schedule rows
+            // carry it (fire glass or toughened, the profile thickness, no sealed unit);
+            // 'none' on a door without a vision panel
+            <SpecSection title="Glass">
+              {(() => {
+                const rows = derived ? buildGlassListForWindow(derived, windowSpec) : [];
+                if (!rows.length) return <SpecRow label="Vision panel" value="none" />;
+                const r0 = rows[0];
+                const panes = rows.reduce((a, g) => a + (Number(g.quantity) || 0), 0);
+                return (<>
+                  <SpecRow label="Type" value={`${r0.type}${r0.thickness ? ` ${r0.thickness} mm` : ''}`} />
+                  <SpecRow label="Panes" value={`${panes} · ${derived.firedoor?.vp?.glassSqm ?? ''} m²`} />
+                  <SpecRow label="Finish" value={r0.finish} />
+                </>);
+              })()}
+            </SpecSection>
+          ) : (
           <SpecSection title="Glass">
             <SpecRow label="Type" value={windowSpec?.glazing.type} />
             <SpecRow label="Spec" value={windowSpec?.glazing.spec} />
             <SpecRow label="Finish" value={windowSpec?.glazing.finish} />
             <SpecRow label="Spacer" value={windowSpec?.glazing.spacerColour} />
           </SpecSection>
+          )}
           <SpecSection title="Colour">
             <SpecRow label="Mode" value={windowSpec?.color.type} />
             {windowSpec?.color.type === 'dual' ? <>
@@ -330,10 +413,38 @@ export default function WindowDetailPage() {
           </SpecSection>
           <SpecSection title="Hardware">
             <SpecRow label="Finish" value={windowSpec?.hardware.finish} />
-            {windowSpec?.category !== 'partition' && <SpecRow label="Security" value={windowSpec?.hardware.catches} />}
-            {windowSpec?.category !== 'partition' && <SpecRow label="Trickle vent" value={`${buildVentGrilles(windowSpec)} · ${windowSpec?.vent?.roomType || 'habitable'}`} />}
+            {windowSpec?.category !== 'partition' && windowSpec?.category !== 'firedoor' && <SpecRow label="Security" value={windowSpec?.hardware.catches} />}
+            {windowSpec?.category !== 'partition' && windowSpec?.category !== 'firedoor' && <SpecRow label="Trickle vent" value={`${buildVentGrilles(windowSpec)} · ${windowSpec?.vent?.roomType || 'habitable'}`} />}
           </SpecSection>
-          {derived && derived.category === 'partition' && derived.partition ? (
+          {derived && derived.category === 'firedoor' && derived.firedoor ? (
+            // Fire doors (27.10.2026): the frame, its members, the macro hinge heights,
+            // the lock and the keep, every number from derived.firedoor
+            (() => {
+              const fd = derived.firedoor;
+              const member = (role) => (fd.frame?.members || []).find((x) => x.role === role);
+              const tops = (fd.hinges?.positions || []).map((p) => p.top).join(' / ');
+              const jambTops = (fd.hinges?.positions || []).map((p) => p.jambTop).join(' / ');
+              return (
+                <SpecSection title="Calculated">
+                  <SpecRow label="Frame overall" value={`${fd.frame.overall.width} × ${fd.frame.overall.height} mm`} />
+                  <SpecRow label="Head" value={`${member('head')?.length} mm long point · mitred both ends`} />
+                  <SpecRow label="Jamb hinge" value={`${member('jambHinge')?.length} mm long point · mitred top`} />
+                  <SpecRow label="Jamb lock" value={`${member('jambLock')?.length} mm long point · mitred top`} />
+                  <SpecRow label="Member" value={`${fd.frame.thickness} × ${fd.frame.depth} finished · ${fd.frame.rawThickness} × ${fd.frame.rawWidth} raw`} />
+                  <SpecRow label="Rebate" value={`${fd.frame.rebate.width} × ${fd.frame.rebate.depth} · faces ${fd.frame.faces.outside} / ${fd.frame.faces.inside}`} />
+                  <SpecRow label="Hinges" value={`${fd.hinges.count} × ${fd.hinges.length} · ${tops} from the leaf top`} />
+                  <SpecRow label="Jamb recesses" value={`${jambTops} from the jamb top`} />
+                  <SpecRow label="Spindle" value={`${fd.lock.spindleHeight} above the leaf bottom · backset ${fd.lock.backset}`} />
+                  {fd.lock.cylinder && <SpecRow label={fd.lock.cylinder.kind === 'bathroom' ? 'Thumbturn' : 'Cylinder'} value={`${fd.lock.cylinder.fromBottom} above the leaf bottom`} />}
+                  <SpecRow label="Keep centre" value={`${fd.keep.centreFromFoot} above the jamb foot`} />
+                  {fd.intumescent && <SpecRow label="Intumescent" value={`${fd.intumescent.metres} m`} />}
+                  {fd.vp?.panes?.length > 0 && <SpecRow label="VP glass" value={`${fd.vp.glassSqm} m² · beads ${fd.vp.beadM} m`} />}
+                  <SpecRow label="Paint area" value={`${derived.paint?.areaSqm ?? ''} m²`} />
+                  <SpecRow label="Weight" value={`${derived.weights?.total} kg`} />
+                </SpecSection>
+              );
+            })()
+          ) : derived && derived.category === 'partition' && derived.partition ? (
             <SpecSection title="Calculated">
               <SpecRow label="Wall" value={`${derived.partition.totalWidth} × ${derived.partition.totalHeight} mm`} />
               <SpecRow label="Members" value={`${derived.partition.depth} deep · ${derived.partition.finish}`} />
@@ -377,8 +488,8 @@ export default function WindowDetailPage() {
 // ─── Glass Panel — same source as Production Pack ───
 function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity, projectLabel }) {
   const barsText = (spec, g) => {
-    if ((spec?.category || 'sash') === 'casement' || spec?.category === 'door' || spec?.category === 'partition') {
-      // Single source: the engine row carries the label (barsV/barsH + type); doors too (08.10.2026), partitions (25.10.2026).
+    if ((spec?.category || 'sash') === 'casement' || spec?.category === 'door' || spec?.category === 'partition' || spec?.category === 'firedoor') {
+      // Single source: the engine row carries the label (barsV/barsH + type); doors too (08.10.2026), partitions (25.10.2026), fire doors (27.10.2026).
       return g.bars || '—';
     }
     // sash rows carry their own sash's pattern (lists.js, 09.10.2026); this read
@@ -419,7 +530,8 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
     if (glassBusy || !derived) return;
     setGlassBusy(true);
     try {
-      const groups = windowSpec?.category === 'partition' ? groupPartitionGlass(derived)
+      const groups = windowSpec?.category === 'firedoor' ? groupFireDoorGlass(derived, windowSpec)
+        : windowSpec?.category === 'partition' ? groupPartitionGlass(derived)
         : windowSpec?.category === 'door' ? groupDoorGlass(derived, windowSpec) : groupCasementGlass(derived, windowSpec);
       const drawings = [];
       for (const gp of groups) {
@@ -457,7 +569,7 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
                 (night 7 stage 1: the glazier gets ONE file with all the glass).
                 Same row and style as the PDF export; disabled with the reason on
                 a window that carries no glass. */}
-            {(['casement', 'sash'].includes(windowSpec?.category || 'sash') || windowSpec?.category === 'door' || windowSpec?.category === 'partition') && (() => {
+            {(['casement', 'sash'].includes(windowSpec?.category || 'sash') || windowSpec?.category === 'door' || windowSpec?.category === 'partition' || windowSpec?.category === 'firedoor') && (() => {
               const r = glassDxfParamsForWindow(windowSpec, derived, item?.name);
               return (
                 <button
@@ -529,8 +641,29 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
       </div>
 
 
-      {/* Glass drawings: per sash (upper/lower), per unique casement unit, per unique door unit, or per unique partition unit */}
-      {windowSpec?.category === 'partition' ? (
+      {/* Glass drawings: per sash (upper/lower), per unique casement unit, per unique door unit, per unique partition unit, or per unique vision panel pane */}
+      {windowSpec?.category === 'firedoor' ? (
+        // Fire doors (27.10.2026): one drawing per unique vision panel pane size (the
+        // door unit sheet); a door without a vision panel never reaches here (no rows)
+        <div>
+          <div className="flex items-center justify-end mb-2">
+            <button onClick={handleExportGlassDrawings} disabled={glassBusy}
+              className="px-3 py-1 text-xs rounded bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+              📐 Glass Drawings PDF
+            </button>
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {groupFireDoorGlass(derived, windowSpec).map((gp) => (
+            <div key={gp.key} className="card p-4" ref={(el) => { glassDrawRefs.current[gp.key] = el; }}>
+              <div className="text-xs font-semibold text-ink-200 mb-2">
+                Vision panel glass {gp.w} × {gp.h} · ×{gp.panes.length}
+              </div>
+              <DoorGlassDrawing2D windowSpec={windowSpec} derived={derived} group={gp} />
+            </div>
+          ))}
+          </div>
+        </div>
+      ) : windowSpec?.category === 'partition' ? (
         <div>
           <div className="flex items-center justify-end mb-2">
             <button onClick={handleExportGlassDrawings} disabled={glassBusy}
@@ -782,12 +915,14 @@ function BOMPanel({ item, windowSpec, settings, derived, batch, projectLabel }) 
       {/* Doors (08.10.2026): the door hardware is engine-counted on the door Assign
           Materials rows (cards above); this card prints the detail the buyer
           selects on the supplier page (handing, kit variants, FGTE band, leaf weight). */}
-      {(windowSpec?.category === 'door' || windowSpec?.category === 'partition') && (() => {
+      {/* Fire doors (27.10.2026): the hinges, lock case, cylinder or thumbturn, handle set,
+          keep, closer and intumescent the macro rule picks, with their positions */}
+      {(windowSpec?.category === 'door' || windowSpec?.category === 'partition' || windowSpec?.category === 'firedoor') && (() => {
         const rows = windowHardwareDetailRows(windowSpec, batch, ironmongeryItems, derived);
         return rows.length > 0 && (
           <div className="card p-4">
-            <div className="text-sm font-semibold text-ink-50 mb-1">{windowSpec?.category === 'partition' ? 'Partition hardware' : 'Door hardware'}</div>
-            <div className="text-[10px] text-ink-400 mb-3">{windowSpec?.category === 'partition' ? 'The door hinges, latch and handles by the profile rules, and the dowels of the whole wall' : 'Counted on the Assign Materials rows above · the detail to select on the supplier page'}</div>
+            <div className="text-sm font-semibold text-ink-50 mb-1">{windowSpec?.category === 'partition' ? 'Partition hardware' : windowSpec?.category === 'firedoor' ? 'Fire door hardware' : 'Door hardware'}</div>
+            <div className="text-[10px] text-ink-400 mb-3">{windowSpec?.category === 'partition' ? 'The door hinges, latch and handles by the profile rules, and the dowels of the whole wall' : windowSpec?.category === 'firedoor' ? 'The hinges, lock case, keep, handle set, closer and intumescent strip by the macro rule · counted on the Assign Materials rows above' : 'Counted on the Assign Materials rows above · the detail to select on the supplier page'}</div>
             <table className="w-full text-xs">
               <tbody>
                 {rows.map((r, i) => (
@@ -802,7 +937,9 @@ function BOMPanel({ item, windowSpec, settings, derived, batch, projectLabel }) 
           </div>
         );
       })()}
-      {hardwareGroups.length === 0 ? (
+      {hardwareGroups.length === 0 && windowSpec?.category === 'firedoor' ? (
+        <div className="card p-4 text-xs text-ink-500 italic">No client-chosen products (the fire door hardware is counted above)</div>
+      ) : hardwareGroups.length === 0 ? (
         <div className="card p-4 text-xs text-ink-500 italic">{windowSpec?.category === 'door' ? 'No client-chosen products (the door hardware is counted above)' : windowSpec?.category === 'partition' ? 'No client-chosen products (the partition hardware is listed above)' : 'Fixed window — no hardware'}</div>
       ) : (
         hardwareGroups.map((g, gi) => (

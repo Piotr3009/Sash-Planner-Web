@@ -25,6 +25,7 @@ import { Canvas, useThree } from '@react-three/fiber';
 import ParametricSashWindow from '../../3d/components/ParametricSashWindow.jsx';
 import CasementWindow from '../../3d/components/casement/CasementWindow.jsx';
 import DoorWindow from '../../3d/components/door/DoorWindow.jsx';
+import FireDoor from '../../3d/components/firedoor/FireDoor.jsx';
 import { windowSpecToConfig, windowSpecToCasementProps } from '../../utils/windowSpecToConfig.js';
 
 const FOV = 45;          // vertical field of view (deg)
@@ -46,7 +47,8 @@ function fitDistance(config, box = null) {
 // the box centre sits at (W / 2 - origin.x, origin.y - H / 2) = (0, 0); the
 // interior view mirrors x (group rotated by PI).
 function doorFraming(config, side) {
-  const g = config.doorGeo;
+  // a fire door (fire doors v1, 27.10.2026) frames the same way from fireDoorGeo
+  const g = config.doorGeo || config.fireDoorGeo;
   if (!g || !(g.totalWidth > 0) || !(g.totalHeight > 0)) return null;
   const o = g.origin || { x: g.totalWidth / 2, y: g.totalHeight / 2 };
   const cx = (g.totalWidth / 2 - o.x) / 1000;
@@ -54,7 +56,9 @@ function doorFraming(config, side) {
   return { x: side === 'interior' ? -cx : cx, y: cy, w: g.totalWidth / 1000, h: g.totalHeight / 1000 };
 }
 
-function CaptureScene({ config, side, onCaptured }) {
+// fireDoorOpen (fire doors v1): the leaf open angle in degrees for the capture
+// when the caller sets one; otherwise the config default (30).
+function CaptureScene({ config, side, onCaptured, fireDoorOpen = null }) {
   const { gl, scene, camera } = useThree();
   const groupRotation = side === 'interior' ? [0, Math.PI, 0] : [0, 0, 0];
 
@@ -100,6 +104,15 @@ function CaptureScene({ config, side, onCaptured }) {
           null
         ) : config.windowCategory === 'casement' ? (
           <CasementWindow {...config.casementProps} />
+        ) : config.windowCategory === 'firedoor' ? (
+          // Fire doors v1 (27.10.2026): the internal door set from the engine geometry
+          <FireDoor
+            geo={config.fireDoorGeo || null}
+            woodColor={config.woodColor}
+            openAngle={Number.isFinite(Number(fireDoorOpen)) ? Number(fireDoorOpen) : config.fireDoorOpen}
+            ironmongery={config.ironmongery || 'brass'}
+            glassFinish={config.glassFinish || 'clear'}
+          />
         ) : config.windowCategory === 'door' ? (
           <DoorWindow
             width={config.width}
@@ -200,7 +213,7 @@ export default function Window3DCaptureRig({ windows, side = 'exterior', size = 
         camera={{ position: [0, 0, 3], fov: FOV }}
         style={{ width: `${size}px`, height: `${size}px` }}
       >
-        <CaptureScene config={config} side={side} onCaptured={handleCaptured} />
+        <CaptureScene config={config} side={side} onCaptured={handleCaptured} fireDoorOpen={list[idx]?.fireDoorOpen ?? null} />
       </Canvas>
     </div>
   );

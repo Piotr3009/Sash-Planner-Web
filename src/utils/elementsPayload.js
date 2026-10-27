@@ -24,6 +24,7 @@
 import { groupCasementLeaves, paneTitle } from '../components/drawings/casementDrawUtils.js';
 import { doorSheetPlan } from '../components/drawings/doorDrawUtils.js';
 import { partitionSheetPlan } from '../components/drawings/partitionDrawUtils.js';
+import { fireDoorSheetPlan, fireDoorHeroSheet } from '../components/drawings/fireDoorDrawUtils.js';
 import { tripleSections, tripleSheetKey, tripleSheetLabel } from '../components/drawings/tripleDrawUtils.js';
 import { svgNodeToPng } from './svgRaster.js';
 
@@ -113,6 +114,28 @@ export function elementsPlan(windowSpec, derived) {
       rig: ['elevation', ...sheets.map((x) => x.key)],
       hero: { key: 'elevation', label: 'Front Elevation' },
       drawings: sheets.map((x) => ({ key: x.key, label: x.label })),
+      cill: null,
+    };
+  }
+
+  // Fire doors (27.10.2026): the outside elevation (the LSP kit's pull side
+  // view) is the hero sheet, then the inside elevation, the plan, the leaf and
+  // the frame machining sheets in the grid. One plan
+  // (fireDoorDrawUtils.fireDoorSheetPlan) for the Drawings panel, its PDF rig
+  // and the production pack; the panels mount every sheet under its own key
+  // (the hero included). No cill page.
+  if (category === 'firedoor') {
+    const sheets = fireDoorSheetPlan(derived);
+    const hero = fireDoorHeroSheet(sheets);
+    if (!sheets.length || !hero) return { category, supported: false, leafGroups: [], fireDoorSheets: [], rig: [], hero: null, drawings: [], cill: null };
+    return {
+      category,
+      supported: true,
+      leafGroups: [],
+      fireDoorSheets: sheets,
+      rig: sheets.map((x) => x.key),
+      hero,
+      drawings: sheets.filter((x) => x.key !== hero.key).map((x) => ({ key: x.key, label: x.label })),
       cill: null,
     };
   }

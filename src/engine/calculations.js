@@ -10,6 +10,7 @@ import { leafWidthInField, leafHeightInTier, leafOrigin, fieldLandX, mullionLeng
 import { isAcousticUnit, SASH_PROPORTIONS, SashProportionError } from './specification.js';
 import { round, createComponentRecord } from './records.js';
 import { derivePartitionWindow } from './partition.js';
+import { deriveFireDoorWindow } from './fireDoor.js';
 
 /**
  * calculations.js - ETAP 3
@@ -1907,6 +1908,8 @@ export function deriveWindowData(windowSpec, settings = {}) {
     if (category === 'door' || category === 'doors') return deriveDoorWindow(windowSpec, frameWidth, frameHeight, settings);
     // meeting room partition walls (25.10.2026): engine/partition.js
     if (category === 'partition') return derivePartitionWindow(windowSpec, frameWidth, frameHeight, settings);
+    // internal fire / non-fire door sets (27.10.2026): engine/fireDoor.js
+    if (category === 'firedoor') return deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settings);
     if (category !== 'sash') return emptyDerived(category, frameWidth, frameHeight);
     const isTripleSash = windowSpec.sash?.type === 'triple';
     const gridMode = windowSpec.sash?.grid?.mode ?? 'none';

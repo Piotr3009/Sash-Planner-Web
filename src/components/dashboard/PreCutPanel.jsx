@@ -49,9 +49,12 @@ export default function PreCutPanel({ item, windowSpec, settings, derived, batch
 
   (precut.sashEngineering || []).forEach((g) => {
     const finished = g.items[0]?.finishedSection || g.section;
+    // 'Timber' for a group of casement (C-), partition (W-) or fire door (FD-) members, 'Sash Timber' otherwise
+    // (the dash is the U+2014 escape so the source line carries no long dash: the house rule of fire doors v1)
+    const timberWord = (g.items || []).every((it) => /^(FD|[CW])-/.test(String(it.elementName || ''))) ? 'Timber' : 'Sash Timber';
     allGroups.push({
       key: `sash-${g.section}`,
-      label: `${(g.items || []).every((it) => String(it.elementName || '').startsWith('C-')) ? 'Timber' : 'Sash Timber'} — ${finished}`,
+      label: `${timberWord} \u2014 ${finished}`,
       precutSection: g.section,
       section: g.section,
       type: 'sash',

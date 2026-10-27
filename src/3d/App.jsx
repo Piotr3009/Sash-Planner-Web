@@ -11,6 +11,7 @@ import CasementWindow from './components/casement/CasementWindow';
 import ArchedCasementWindow from './components/casement/ArchedCasementWindow';
 import FixFrameWindow from './components/fix-frame/FixFrameWindow';
 import DoorWindow from './components/door/DoorWindow';
+import FireDoor from './components/firedoor/FireDoor';   // fire doors v1 (27.10.2026): internal door set from the engine geometry
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -294,7 +295,7 @@ function ScreenshotHelper({ config }) {
       return new Promise((resolve) => {
         const target = new THREE.Vector3(0, 0.18, 0);
         // Timber doors: exterior view + closer; windows: interior view
-        const isDoor = config?.windowCategory === 'door';
+        const isDoor = config?.windowCategory === 'door' || config?.windowCategory === 'firedoor';
         const distMult = isDoor ? 0.62 : 0.75;
         const distance = fitDistance(config?.width, config?.height, 45, 1) * distMult;
 
@@ -538,6 +539,16 @@ function Scene({ config, isMobile }) {
               // Partition walls (25.10.2026): no 3D model yet. Nothing is drawn so the
               // sash renderer never receives partition data (it renders NaN on it).
               null
+            ) : config.windowCategory === 'firedoor' ? (
+              // Fire doors v1 (27.10.2026): the internal door set drawn from the engine
+              // geometry the configurator sends (fireDoorGeo); nothing without it.
+              <FireDoor
+                geo={config.fireDoorGeo || null}
+                woodColor={config.woodColor}
+                openAngle={config.fireDoorOpen}
+                ironmongery={config.ironmongery}
+                glassFinish={config.glassFinish || 'clear'}
+              />
             ) : config.windowCategory === 'door' ? (
               <DoorWindow
                 width={config.extWidth}
@@ -755,6 +766,11 @@ export default function App() {
   // Doors to production (brief 5.1): the engine door geometry (utils/windowSpecToConfig.js
   // doorGeometryFromSpec), sent by the configurator; DoorWindow draws from it when present.
   const [doorGeo, setDoorGeo] = useState(null);
+  // Fire doors v1 (27.10.2026): the engine geometry (utils/windowSpecToConfig.js
+  // fireDoorGeometryFromSpec) sent by the configurator, and the leaf open angle
+  // in degrees (0..90) of the slider below; FireDoor draws from them.
+  const [fireDoorGeo, setFireDoorGeo] = useState(null);
+  const [fireDoorOpen, setFireDoorOpen] = useState(30);
   const [glassWidth, setGlassWidth] = useState(0);
   const [panelDepth, setPanelDepth] = useState(57);
   const [frameDepth, setFrameDepth] = useState(93);
@@ -768,11 +784,14 @@ export default function App() {
     casement: { extWidth: 800, extHeight: 1500, glassFinish: 'clear', frostedLocation: 'bottom', trickleVent: 'none', trickleColour: 'white', sillExtension: 0, sillWider: false, sealColour: 'black', woodColor: '#F6F6F6', woodColorExt: '#F6F6F6', woodColorInt: '#F6F6F6', sameColor: true, spacerColor: 'silver', opening: 0, upperOpening: 0, openingType: 'both', boxType: 'standard', showHorns: false, hornType: 'A', ironmongery: 'brass', upperGlass: 'clear', lowerGlass: 'clear', upperBars: 'none', lowerBars: 'none', sameBars: true, upperCustomBars: [], lowerCustomBars: [], sashType: 'double', splitRatio: '1/4-1/2-1/4', sashProportion: 'standard', meetingFraction: 0.5, headType: 'flat', fixUpperBars: 'none', fixLowerBars: 'none', fixUpperCustomBars: [], fixLowerCustomBars: [], casementLayout: '040L', casementOpening: 0, fanlightRatio: 0.3, casementHBars: 0, casementVBars: 0, casementMiddleWidth: 0, casementHinges: null, casementFan2Ratio: 0.3, casementFanHBars: 0, casementFanVBars: 0, casementFan2HBars: 0, casementFan2VBars: 0 },
     'fix-only': { extWidth: 1000, extHeight: 1500, glassFinish: 'clear', woodColor: '#F6F6F6', woodColorExt: '#F6F6F6', woodColorInt: '#F6F6F6', sameColor: true, spacerColor: 'silver', opening: 0, upperOpening: 0, openingType: 'fixed', boxType: 'standard', showHorns: false, hornType: 'A', ironmongery: 'brass', upperGlass: 'clear', lowerGlass: 'clear', upperBars: 'none', lowerBars: 'none', sameBars: true, upperCustomBars: [], lowerCustomBars: [], sashType: 'double', splitRatio: '1/4-1/2-1/4', sashProportion: 'standard', meetingFraction: 0.5, headType: 'flat', fixUpperBars: 'none', fixLowerBars: 'none', fixUpperCustomBars: [], fixLowerCustomBars: [], casementLayout: '010', casementOpening: 0, fanlightRatio: 0.3, casementHBars: 0, casementVBars: 0, casementMiddleWidth: 0, casementHinges: null, casementFan2Ratio: 0.3, casementFanHBars: 0, casementFanVBars: 0, casementFan2HBars: 0, casementFan2VBars: 0 },
     door: { extWidth: 900, extHeight: 2100, glassFinish: 'clear', woodColor: '#F6F6F6', woodColorExt: '#F6F6F6', woodColorInt: '#F6F6F6', sameColor: true, spacerColor: 'silver', doorType: 'single-external', doorShape: 'standard', doorStyle: 'full-glass', doorHinge: 'left', doorHBars: 0, doorVBars: 0, centerMullion: false, paneling: 'flat', sidePanels: 'none', sideLeftWidth: 500, sideRightWidth: 500, sideHBars: 0, sideVBars: 0, sideStyle: 'full-glass', thresholdType: 'standard', thresholdExtension: 0, transomType: 'none', transomHeight: 450, transomBars: 'none', doorOpening: 0, doorOpenDirection: 'outward', panelCount: 2, slideDirection: 'left-to-right', extraWidth: false, glassWidth: 0, panelDepth: 57, frameDepth: 93, foldDirection: 'left', trafficDoor: 'no', bifoldOpenDirection: 'outward', doorGeo: null },
+    // Fire doors v1 (27.10.2026): the overall frame of the default door (leaf 826 x 2040 + 76 / + 43)
+    // until the configurator sends the engine geometry; the leaf open angle 30 degrees.
+    firedoor: { extWidth: 902, extHeight: 2083, glassFinish: 'clear', woodColor: '#F6F6F6', woodColorExt: '#F6F6F6', woodColorInt: '#F6F6F6', sameColor: true, spacerColor: 'silver', ironmongery: 'brass', fireDoorGeo: null, fireDoorOpen: 30 },
   };
 
   // Capture current state snapshot
   function captureState() {
-    return { extWidth, extHeight, woodColor, woodColorExt, woodColorInt, sameColor, spacerColor, opening, upperOpening, openingType, boxType, showHorns, hornType, ironmongery, upperGlass, lowerGlass, upperBars, lowerBars, sameBars, upperCustomBars, lowerCustomBars, sashType, splitRatio, sashProportion, meetingFraction, headType, fixUpperBars, fixLowerBars, fixUpperCustomBars, fixLowerCustomBars, casementLayout, casementOpening, fanlightRatio, casementHBars, casementVBars, casementMiddleWidth, casementHinges, casementFan2Ratio, casementFanHBars, casementFanVBars, casementFan2HBars, casementFan2VBars, glassFinish, frostedLocation, trickleVent, trickleColour, sillExtension, sillWider, sealColour, fixShape, fixType, fixArchRise, fixGothicBars, fixCircleBarPattern, fixCircleBarOffset, fixSemiBarPattern, casementType, casArchShape, casArchHinge, archRise, archProfile, barPattern, archMinHaunchRadius, archPatterns, frameDims, archSpokes, archRings, archHBars, archVBars, lowerHBars, doorType, doorShape, doorStyle, doorHinge, doorHBars, doorVBars, centerMullion, paneling, sidePanels, sideLeftWidth, sideRightWidth, sideHBars, sideVBars, sideStyle, thresholdType, thresholdExtension, transomType, transomHeight, transomBars, doorOpening, doorOpenDirection, panelCount, slideDirection, extraWidth, glassWidth, panelDepth, frameDepth, foldDirection, trafficDoor, bifoldOpenDirection, doorGeo };
+    return { extWidth, extHeight, woodColor, woodColorExt, woodColorInt, sameColor, spacerColor, opening, upperOpening, openingType, boxType, showHorns, hornType, ironmongery, upperGlass, lowerGlass, upperBars, lowerBars, sameBars, upperCustomBars, lowerCustomBars, sashType, splitRatio, sashProportion, meetingFraction, headType, fixUpperBars, fixLowerBars, fixUpperCustomBars, fixLowerCustomBars, casementLayout, casementOpening, fanlightRatio, casementHBars, casementVBars, casementMiddleWidth, casementHinges, casementFan2Ratio, casementFanHBars, casementFanVBars, casementFan2HBars, casementFan2VBars, glassFinish, frostedLocation, trickleVent, trickleColour, sillExtension, sillWider, sealColour, fixShape, fixType, fixArchRise, fixGothicBars, fixCircleBarPattern, fixCircleBarOffset, fixSemiBarPattern, casementType, casArchShape, casArchHinge, archRise, archProfile, barPattern, archMinHaunchRadius, archPatterns, frameDims, archSpokes, archRings, archHBars, archVBars, lowerHBars, doorType, doorShape, doorStyle, doorHinge, doorHBars, doorVBars, centerMullion, paneling, sidePanels, sideLeftWidth, sideRightWidth, sideHBars, sideVBars, sideStyle, thresholdType, thresholdExtension, transomType, transomHeight, transomBars, doorOpening, doorOpenDirection, panelCount, slideDirection, extraWidth, glassWidth, panelDepth, frameDepth, foldDirection, trafficDoor, bifoldOpenDirection, doorGeo, fireDoorGeo, fireDoorOpen };
   }
 
   // Restore state from bucket
@@ -876,6 +895,8 @@ export default function App() {
     if (s.trafficDoor !== undefined) setTrafficDoor(s.trafficDoor);
     if (s.bifoldOpenDirection !== undefined) setBifoldOpenDirection(s.bifoldOpenDirection);
     if (s.doorGeo !== undefined) setDoorGeo(s.doorGeo);
+    if (s.fireDoorGeo !== undefined) setFireDoorGeo(s.fireDoorGeo);
+    if (s.fireDoorOpen !== undefined) setFireDoorOpen(s.fireDoorOpen);
   }
 
   // Two slider limits (cottage, Piotr 09.10.2026): the component's own clamps for
@@ -1017,6 +1038,9 @@ export default function App() {
       if (cfg.trafficDoor !== undefined) setTrafficDoor(cfg.trafficDoor);
       if (cfg.bifoldOpenDirection !== undefined) setBifoldOpenDirection(cfg.bifoldOpenDirection);
       if (cfg.doorGeo !== undefined) setDoorGeo(cfg.doorGeo);
+      // Fire doors v1: the engine geometry and the leaf open angle (degrees)
+      if (cfg.fireDoorGeo !== undefined) setFireDoorGeo(cfg.fireDoorGeo);
+      if (cfg.fireDoorOpen !== undefined) setFireDoorOpen(cfg.fireDoorOpen);
     };
     // B4: Signal that 3D viewer is ready — ConfiguratorPage listens for this
     window.dispatchEvent(new Event('3d-ready'));
@@ -1133,8 +1157,10 @@ export default function App() {
       trafficDoor,
       bifoldOpenDirection,
       doorGeo,
+      fireDoorGeo,
+      fireDoorOpen,
     }),
-    [width, height, extWidth, extHeight, opening, upperOpening, autoRotate, showGuides, showHorns, hornType, ironmongery, upperGlass, lowerGlass, doubleGlazing, spacerColor, brightness, boxType, boxDepthOverride, upperBars, lowerBars, upperCustomBars, lowerCustomBars, woodColor, woodColorExt, woodColorInt, sameColor, sashType, splitRatio, sashProportion, meetingFraction, headType, fixUpperBars, fixLowerBars, fixUpperCustomBars, fixLowerCustomBars, windowCategory, casementLayout, casementOpening, fanlightRatio, casementHBars, casementVBars, casementMiddleWidth, casementHinges, casementFan2Ratio, casementFanHBars, casementFanVBars, casementFan2HBars, casementFan2VBars, glassFinish, frostedLocation, trickleVent, trickleColour, sillExtension, sillWider, sealColour, fixShape, fixType, fixArchRise, fixGothicBars, fixCircleBarPattern, fixCircleBarOffset, fixSemiBarPattern, casementType, casArchShape, casArchHinge, archRise, archProfile, barPattern, archMinHaunchRadius, archPatterns, frameDims, archSpokes, archRings, archHBars, archVBars, lowerHBars, doorType, doorShape, doorStyle, doorHinge, doorHBars, doorVBars, centerMullion, paneling, sidePanels, sideLeftWidth, sideRightWidth, sideHBars, sideVBars, sideStyle, thresholdType, thresholdExtension, transomType, transomHeight, transomBars, doorOpening, doorOpenDirection, panelCount, slideDirection, extraWidth, glassWidth, panelDepth, frameDepth, foldDirection, trafficDoor, bifoldOpenDirection, doorGeo],
+    [width, height, extWidth, extHeight, opening, upperOpening, autoRotate, showGuides, showHorns, hornType, ironmongery, upperGlass, lowerGlass, doubleGlazing, spacerColor, brightness, boxType, boxDepthOverride, upperBars, lowerBars, upperCustomBars, lowerCustomBars, woodColor, woodColorExt, woodColorInt, sameColor, sashType, splitRatio, sashProportion, meetingFraction, headType, fixUpperBars, fixLowerBars, fixUpperCustomBars, fixLowerCustomBars, windowCategory, casementLayout, casementOpening, fanlightRatio, casementHBars, casementVBars, casementMiddleWidth, casementHinges, casementFan2Ratio, casementFanHBars, casementFanVBars, casementFan2HBars, casementFan2VBars, glassFinish, frostedLocation, trickleVent, trickleColour, sillExtension, sillWider, sealColour, fixShape, fixType, fixArchRise, fixGothicBars, fixCircleBarPattern, fixCircleBarOffset, fixSemiBarPattern, casementType, casArchShape, casArchHinge, archRise, archProfile, barPattern, archMinHaunchRadius, archPatterns, frameDims, archSpokes, archRings, archHBars, archVBars, lowerHBars, doorType, doorShape, doorStyle, doorHinge, doorHBars, doorVBars, centerMullion, paneling, sidePanels, sideLeftWidth, sideRightWidth, sideHBars, sideVBars, sideStyle, thresholdType, thresholdExtension, transomType, transomHeight, transomBars, doorOpening, doorOpenDirection, panelCount, slideDirection, extraWidth, glassWidth, panelDepth, frameDepth, foldDirection, trafficDoor, bifoldOpenDirection, doorGeo, fireDoorGeo, fireDoorOpen],
   );
 
   return (
@@ -1185,7 +1211,18 @@ export default function App() {
                 />
               </div>
             </>
-          ) : (windowCategory === 'fix-only' || windowCategory === 'partition') ? null : windowCategory === 'door' ? (
+          ) : (windowCategory === 'fix-only' || windowCategory === 'partition') ? null : windowCategory === 'firedoor' ? (
+            // Fire doors v1: the leaf open angle in degrees (0 closed, 90 full), default 30
+            <Slider
+              label="Opening"
+              value={fireDoorOpen}
+              min={0}
+              max={90}
+              step={1}
+              suffix=" deg"
+              onChange={setFireDoorOpen}
+            />
+          ) : windowCategory === 'door' ? (
             <Slider
               label="Opening"
               value={Math.round(doorOpening * 100)}

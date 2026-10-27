@@ -4,6 +4,348 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-10-27 · FIRE DOORS v1 (branch `claude/fire-doors-v1`, from main 623b282)
+
+### Stage 0: baseline and sweep (no code changes)
+
+**Baseline on the starting commit 623b282** (`npm ci`, `pip install ezdxf`, every `verify/arch/t*.mjs` except the `*baseline*` generators, every `verify/parity/*.mjs`, then `git checkout -- docs/handover/samples/`, then `npm run build`): 37 test files, 4,795 PASS, 0 FAIL; build OK (vite 17 s, only the usual chunk size notice). Two files are not tests: `psw-casement-layouts.mjs` needs a PSW clone (exit 2, not run), `render_door_samples.mjs` renders the door sample PNGs in Chromium (restored by the checkout).
+
+| File | PASS | File | PASS |
+|---|---|---|---|
+| arch/t16 | 369 | parity/t37_single_window_bom | 50 |
+| arch/t17_edges | 70 | parity/t38_leaf_64_seat_85 | 472 |
+| arch/t18 | 179 | parity/t39_settings_leaf_cards | 23 |
+| arch/t19 | 280 | parity/t40_bottom_rail_3d | 96 |
+| arch/t20 | 117 | parity/t41_doors_production | 683 |
+| arch/t20_bars | 31 | parity/t42_precut_colours_labels | 32 |
+| arch/t21 | 120 | parity/t43_sash_proportions | 239 |
+| arch/t22 | 118 | parity/t43_window_tag | 98 |
+| arch/t23 | 81 | parity/t44_doors_v3 | 127 |
+| arch/t24_stage4 | 26 | parity/t45_sash_bars_per_sash | 124 |
+| arch/t25 | 226 | parity/t46_settings_save | 40 |
+| arch/t26 | 38 | parity/t47_triple_sash | 124 |
+| arch/t27 | 97 | parity/t48_opening_marks | 27 |
+| arch/t28 | 51 | parity/t49_door_meeting_machining | 80 |
+| arch/t29 | 34 | parity/t50_partition | 139 |
+| arch/t30_preview | 30 | parity/t31_bars_8x8 | 18 |
+| arch/t33_bar_grid | 43 | parity/t32_bsuite | 54 |
+| parity/t34_glass_minus1 | 46 | parity/t35_locks | 51 |
+| parity/t36_hinges | 110 | | |
+
+Control dumps for the Stage 4 byte identical check (a 1200 x 1200 casement, a 900 x 1500 sash, a 900 x 2100 single door, the t50 partition bay 2525 x 2165 SDS, default profiles, `normaliseToWindowSpec` + `deriveWindowData`) were written on the starting commit; two consecutive runs were byte identical (no timestamp, random or uuid keys in the engine output).
+
+**STOP row source** (owner decision 27.10.2026): the form `<StopWorklistItem Id="GUID" Label="" />` as a sibling of `CadProgramWorklistItem` inside `<Items>`, a new GUID per STOP, from the Biesse UK sample list `docs/handover/workshop/JOINERY_NETWORK_EVENT.ewlist` (read by the owner on 05.09.2026). `docs/handover/samples/sample_frames_052L_040L.ewlist` has no STOP row.
+
+**Sweep (read only agents, baseline line numbers): every place a category is registered, grouped by file; [GAP] = partition is NOT registered there and firedoor must be.** 145 sites in 46 files, plus 9 found by the completeness critic (marked critic).
+
+- `src/stores/projectStore.js`: 2 import { profileBoxDepth, getWindowProfile, getCasementProfile, getDoo; 107 BATCH_DEFAULTS.partition; 142 batchTypeKey / batchDefaultsFor; 314 createBatch (label from windowType); 398 updateBatchStatus _profileSnapshot; 576 addWindowToBatch (window name and window_type); 698 addWindowToBatch partition* whitelist + specification fullConfig; 761 updateWindowInBatch (edit-mode whitelist; NO partition fields) [GAP]
+- `src/stores/windowProfileStore.js`: 3 import from ../engine/profile.js; 23 KINDS / DEFAULTS_BY_KIND / migrateKind; 112 PARTITION_PATH_ROOTS / STRING_LEAVES / BOOLEAN_LEAVES; 117 useWindowProfileStore initial state; 320 setPartitionPath / resetPartitionToDefaults; 362 _sync (engine push); 376 saveToCloud local copy / loadFromCloud guard; 441 persist onRehydrateStorage partition migration; 258 setCasementBsuiteTargets (and setCasementPath roots at 235-242: the bs [GAP] (critic)
+- `src/stores/ironmongeryStore.js`: 21 IRONMONGERY_CATEGORIES (windowType / alsoFor / slot); 23 IRONMONGERY_CATEGORIES (the configurator / batch ironmongery slots: ke
+- `src/stores/materialAssignmentStore.js`: 281 DOOR_ALL_PARTS / ALL_PARTS [GAP]; 207 DOOR_PARTS / DOOR_ALL_PARTS / ALL_PARTS (the Assign Materials row cata [GAP]
+- `src/pages/DashboardPage.jsx`: 8 TYPE_COLORS / typeLabel; 398 NewPPForm type <select> (new production pack) [GAP]
+- `src/pages/ProjectDetailPage.jsx`: 16 TYPE_LABELS; 68 boundedWindows withProfiles(...) snapshot call; 194 Add Batch picker buttons; 264 window card subtitle (partition branch)
+- `src/pages/ConfiguratorPage.jsx`: 14 profile imports; 98 PARTITION_CONSTRAINTS / option constants; 296 partition useState block; 419 applyWindow prefill (partition fields); 471 first window in an empty batch (type branches); 513 isCasementBatch / isPartition flags; 558 dimConstraints (size clamp by type) + Dimensions inputs; 644 frameDepth by batch type; 729 sync() update3D partition branch; 879 save() config (windowCategory + partition spread); 973 isSash / slotType / slotCategories; 1035 window name <input> (header); 1325 <Sec t="Partition Wall"> form section; 1496 right panel summary (SG Partition Wall / Members / Ventilation / PAS24; 728 sync() -> window.update3D partition branch (the configurator feeds src
+- `src/pages/WindowDetailPage.jsx`: 88 bounded derive withProfiles(...) (6 call sites: 88, 97, 178, 192, 195,; 206 header export buttons (bSuite frames, casement only); 275 spec aside: partition / door branch + Hardware rows + Calculated; 380 GlassPanel barsText / glass drawings / DXF gating (380, 422, 460, 533); 785 HardwarePanel door / partition hardware detail card; 243 <ThreeDPanel> / <DrawingsPanel> tabs; 206 window page header: bSuite frames button (casement only); Edit button [GAP]; 275 Specification tab: partition SpecSection, hidden sash rows, hardware r; 380 GlassPanel barsText + glass drawing groups + Glass DXF button + drawin; 785 Hardware sidebar: door / partition detail card and the no-products not
+- `src/pages/ProductionPackPage.jsx`: 527 header export buttons by pp.type / batch.type; 254 windowsData derive withProfiles + hardware list (254, 311); 690 winBarsLabel / overviewCells (partition branch); 998 ElevationsTab / ElementsTab by plan.category (998, 1207-1243); 1565 GlassTab drawings (partition / door / casement / sash); 2440 SprayingTab (partition exclusion + element rows by category); 57 imports (PartitionElevation2D, PartitionSheet, groupPartitionGlass); 254 windowsData: deriveWindowBounded under withProfiles(sash, casement, do [GAP]; 311 merged lists: buildHardwareList with derived for door / partition; 581 header export buttons: bSuite frames gated on batch/pp type casement [GAP]; 690 winBarsLabel (overview bars column); 722 overviewCells (Type / Head / Opening / Box columns) partition branch; 998 ElevationsTab card dispatch (refs.current[win.id]); 1221 ElementsTab partition branch (cards + refs `${win.id}-${key}`); 1365 ElementsTab expandedDrawing modal types; 1565 GlassTab glass drawings per window (partition / door / casement / sash; 2438 SprayingTab: partitions excluded as oiled oak; elements per category [GAP]; 2390 SPRAY_BEADINGS (SprayingTab Part B bead map keyed by derived.component [GAP] (critic)
+- `src/pages/WindowSettingsPage.jsx`: 150 typeId dispatch (route /window-settings/:typeId); 1701 PartitionSettings (card pattern: store, setPath, reset, live sample); 1110 CasementSettings bSuite export card (targets, program paths, LABEL map [GAP] (critic)
+- `src/components/layout/AppSidebar.jsx`: 232 Window Settings nav links; 174 Materials > Assignments nav links (sash, casement, fix-frame, doors, o [GAP]
+- `src/pages/MaterialAssignmentsPage.jsx`: 20 TYPE_LABELS (no partition) [GAP]; 525 isCasement / isDoors / typeParts and the coming-soon branch [GAP]
+- `src/pages/BatchDefaultsPage.jsx`: 113 Ironmongery slot filter + frame/horns sections
+- `src/utils/moveToProduction.js`: 9 CATEGORY_TO_BATCH [GAP]; 9 CATEGORY_TO_BATCH (estimate window category -> production batch type) [GAP]
+- `src/App.jsx`: 94 routes (materials/assignments/:typeId, window-settings/:typeId)
+- `src/services/cloudSync.js`: 162 dbWindowToMem / memWindowToDb (windows table columns vs config jsonb)
+- `src/pages/SettingsPage.jsx`: 502 Pricing: 'Other window types - base rate' cards (casement, fix, door) [GAP]
+- `src/engine/specification.js`: 444 normaliseToWindowSpec category resolution + partition block (how the s; 147 import from './profile.js'; 447 normaliseToWindowSpec: const isPartition / frameDepth; 611 normaliseToWindowSpec return: partition block (spread only on that cat; 655 normaliseToWindowSpec return: glazing.thickness / glazing.makeup parti
+- `src/engine/profile.js`: 897 DEFAULT_PARTITION_PROFILE / migratePartitionProfile / setActivePartiti; 1080 withProfiles(sashProfile, casementProfile, doorProfile, partitionProfi; 386 BSUITE_KEYS / mergeTargetPrograms / migrateBsuite (casement bsuite pro [GAP]; 285 DEFAULT_CASEMENT_PROFILE.bsuite (targets / programs shape)
+- `src/engine/calculations.js`: 12 import { derivePartitionWindow } from './partition.js'; 1902 deriveWindowData dispatch; 484 calculatePaint / paintFromAreaSqm (the timber face paint rule, module-
+- `src/engine/records.js`: 10 records.js header + createComponentRecord(windowSpec, group, elementNa
+- `src/engine/partition.js`: 365 derivePartitionWindow return shape (the derived contract lists / bom /
+- `src/engine/lists.js`: 75 buildCutListForWindow(derived, windowSpec): material string per catego; 245 buildPrecutForWindow: rawFor prefix regex (D-/W- rule); 274 buildPrecutForWindow: box prefix branch (C-/D-/W- members grouped by r; 335 buildGlassListForWindow(derived, windowSpec): customGlassUnits path, p; 508 buildHardwareList(windowSpec, derived = null): partition branch and th; 758 CUT_LIST_ORDER partition block (W-*); 827 buildGroupedCutList: isDoorGroup (notes kept for D-/W- groups)
+- `src/engine/bom.js`: 58 ELEMENT_TO_PART_ID (engine element name -> Assign Materials part id) [GAP]; 206 HARDWARE_TO_SLOT_KEY (hardware line item -> ironmongery slot key); 294 buildWindowPartQtys: glass sqm routing by category; 305 buildWindowPartQtys: counterweight exclusion by category; 313 buildWindowPartQtys: paint rows (partition skipped, doors on the casem; 396 buildWindowPartQtys: door hardware / panel / clips block (pattern to c [GAP]; 473 buildWindowHardware(windowSpec, batch, ironmongeryItems = [], derived ; 549 buildWindowMaterialLines: doorSlots / DOOR_PART_SLOT (per-window slot ; 288 buildWindowPartQtys consumables block: the sash silicone / cord / seal [GAP] (critic)
+- `src/engine/pricing.js`: 163 DEFAULT_PRICING.partition; 316 calculatePrice(config, pricingConfig) dispatch; 635 calculatePartition(pricing, config, frameWidth, frameHeight)
+- `src/engine/partSymbols.js`: 194 getPartSymbol fallback + displayElementName + displayCode (the ^[CDSW]
+- `src/engine/partColours.js`: 45 PART_COLOUR_GROUPS partition families (wall_frame / wall_leaf); 84 ELEMENT_TO_GROUP W- entries; 118 CUT_SYMBOL_TO_GROUP partition symbols
+- `src/utils/elementsPayload.js`: 101 elementsPlan(windowSpec, derived): partition branch (+ import at line ; 105 elementsPlan() partition branch (+ import at line 26)
+- `src/utils/glassDxfExport.js`: 409 glassDxfParamsForWindow(windowSpec, derived, name): category guard; 413 glassDxfParamsForWindow category guard
+- `src/utils/precutPdfExport.js`: 499 KEY_WALL_FRAME / KEY_WALL_LEAF / KEY_SHEETS (colour key page per type); 820 labelForPiece(detail, opts): symbol-name prefix regex [GAP]; 503 KEY_WALL_FRAME / KEY_WALL_LEAF / KEY_SHEETS colour key pages; 791 colour key page emission per family
+- `src/utils/windowBoundary.js`: 24 isWindowDataError(e) (import of PartitionGeometryError at line 24); 24 isKnownWindowError: PartitionGeometryError (the per-window boundary) [GAP]
+- `src/utils/windowSpecToConfig.js`: 141 windowSpecToConfig(windowSpec, derived = null): partition branch; 141 windowSpecToConfig() partition branch
+- `src/utils/bsuiteExport.js`: 76 buildBsuiteFrameRows(windowSpec, derived, name, profile = getCasementP [GAP]; 36 import { getCasementProfile, bsuiteActiveTarget } from '../engine/prof; 76 buildBsuiteFrameRows (casement only) and exportBsuiteFramesMerged - th [GAP]
+- `src/engine/doorHardware.js`: 116 DOOR_HARDWARE_PARTS / DOOR_PART_SLOT / DOOR_HARDWARE_ITEMS / DOOR_ITEM
+- `src/components/drawings/DrawingsPanel.jsx`: 15 imports (PartitionElevation2D, PartitionSheet, partitionSheetPlan); 54 isPartition / partitionSheets / renderPartitionSheet / triple guard; 62 visibleTabs; 187 drawing area: partition sheet tabs and the elevation dispatch; 231 hidden capture rig (refs.current[key]) for the PDF buttons
+- `src/components/drawings/PartitionSheet.jsx`: 20 PartitionSheet (SHEETS map) - the pattern for FireDoorSheet.jsx [GAP]
+- `src/components/drawings/partitionDrawUtils.js`: 51 partitionSheetPlan (the ONE plan for tabs, rig, Elements PDF, pack) -  [GAP]
+- `src/components/drawings/DoorGlassDrawing2D.jsx`: 39 DoorGlassDrawing2D category guard (door || partition)
+- `src/components/viewer/WindowPreview3D.jsx`: 160 WindowPreview3D placeholder for partition (and Scene dispatch at lines
+- `src/components/viewer/Window3DCaptureRig.jsx`: 97 CaptureScene partition null (plus doorFraming at lines 48-55)
+- `src/3d/App.jsx`: 537 Scene model dispatch (configurator 3D); 1188 floating controls: the opening slider per category; 766 BUCKET_DEFAULTS (per-category 3D state buckets restored on window.upda [GAP] (critic)
+- `src/components/dashboard/ThreeDPanel.jsx`: 19 ThreeDPanel isPartition (Export PDF disabled)
+- `src/components/dashboard/PreCutPanel.jsx`: 54 PreCutPanel allGroups label ('Timber' vs 'Sash Timber' by the C- prefi [GAP] (critic)
+- `src/services/bsuitePrograms.js`: 17 uploadBsuiteProgram(targetId, key, file) storage path <tenant>/<target [GAP] (critic)
+- `src/engine/partRegistry.js`: 27 PART_DEFAULT_FROM (Assign Materials row fallback map used by bom.effec [GAP] (critic)
+- `src/utils/batchSummary.js`: 25 summarizeWindows(windows, batchType) - the batch specification strip o [GAP] (critic)
+
+### Stage 1: type, profile, spec, configurator form (db35159 engine side, 114563d UI)
+
+**What changed**
+- `engine/profile.js`: `DEFAULT_FIREDOOR_PROFILE` (schema 1: leaf, frame, hinges, lock, keep, vp with the macro
+  VP_STYLE table ids 1:1, intumescent with the INTU_STYLE table, bsuite with the target 'fd-machine' and the macro
+  defaults, defaults), `migrateFireDoorProfile` (block by block over the default; `migrateFireDoorBsuite` keeps the
+  uploaded programs and a stored target still called 'machine'; `mergeStylesById` for the two tables),
+  `setActiveFireDoorProfile` / `getFireDoorProfile`, `withProfiles(sash, casement, door, partition, firedoor, fn)`
+  with every older form kept. Every ZAŁOŻENIE of the box is a key with a comment (BLOCKERS 35.1 to 35.9).
+- `engine/specification.js`: category 'firedoor': the `firedoor` block (`fireDoorBlockFromSpec`: each key from the
+  item's firedoorX, then the fullConfig, then the profile default; a null vpCustom number reads as the default),
+  the frame depth = the wall depth, glazing thickness 6; no `firedoor` key on any other category.
+- `stores/windowProfileStore.js`: the 'firedoor' kind (hydration, migration, the cloud load / save and merge),
+  `setFireDoorPath` (`FIREDOOR_PATH_ROOTS`, the string, boolean and number leaves), `setFireDoorList` (the comma
+  lists of suggestions), `setFireDoorBsuiteTargets` (the four program keys validated), `resetFireDoorToDefaults`,
+  the engine sync.
+- `stores/projectStore.js`: `BATCH_DEFAULTS.firedoor` (painted, stainless, single glass, no PAS24), the batch label
+  'Fire doors' (`BATCH_TYPE_LABELS`), `fireDoorItemFields` copied by name in `addWindowToBatch` AND
+  `updateWindowInBatch` (the partition gap not repeated), the batch `_profileSnapshot.firedoor`.
+- `utils/moveToProduction.js`: `CATEGORY_TO_BATCH.firedoor`. `utils/windowBoundary.js`: `FireDoorGeometryError`
+  known to the per-window boundary.
+- `engine/partSymbols.js`: `TYPE_PREFIX_RE` `^(FD|[CDSW])-` (the one regex of `displayElementName` / `displayCode`),
+  the fd- registry rows (LEAF, FH, HJ, LJ, clear of the casement jamb pair). `engine/partColours.js`: the `fire_door`
+  family (head, jambs, leaf).
+- `pages/ConfiguratorPage.jsx`: the "Fire door" section (Fire / Non-fire, FD30 / FD60, leaf width with the
+  suggestion chips, leaf height with the 2040 chip, Hinge left / right, opens in / out, wall thickness with the
+  depth chips, lock, closer, vision panel style and the custom fields, intumescent style, leading edge), number
+  inputs without spinners, the auto name FDR-nn / DR-nn (`nextFireDoorName`, editable, the prefix follows the
+  switch on an unsaved door), the live derive on the fields exactly as the save stores them, the summary (frame
+  overall, hinge positions, rebate, rating), a refused door blocks the save with its message, the 3D fed from the
+  same derive, the save of the `firedoor*` keys and width / height = the overall frame.
+- `pages/WindowSettingsPage.jsx`: `FireDoorSettings` at `/window-settings/firedoor`: one card per block with a lock
+  toggle, the reset, the live sample door (size, rating and depth editable) printing the leaf, the frame overall,
+  the hinges, the spindle, the keep and the strip metres; the bSuite card (targets, the four paths, the .bSolid
+  upload per key under 'fd-machine', the STOP rows switch, the HAND values, the execution block).
+- `pages/ProjectDetailPage.jsx` (`TYPE_LABELS`, the add batch button, the card subtitle, the 5th snapshot
+  argument), `pages/DashboardPage.jsx` (a red of its own, the label, the new pack select), `components/layout/
+  AppSidebar.jsx` (Materials > Assignments > Fire doors, Window Settings > Fire doors),
+  `pages/MaterialAssignmentsPage.jsx` (`TYPE_LABELS.firedoor`, the fire door rows, the ironmongery tabs a fire door
+  row may pick, no "coming soon"), `pages/BatchDefaultsPage.jsx` (no Security / Frame / PAS24 rows, the fire door
+  ironmongery slots), `pages/SettingsPage.jsx` (the Fire doors pricing card: the four rates).
+
+### Stage 2: engine (db35159)
+
+- `engine/fireDoor.js` (new): `deriveFireDoorWindow(windowSpec, W, H, settings)`: the inputs with their defaults,
+  the hard sanity limits (the only errors, never a clamp), the leaf and its blank, the frame section (rebate 15 x
+  (T + 3), faces 35 / 50, raw 63 x (depth + 5)), the overall (leaf + 76 / + 43) and the three members with their
+  mitres, the hinges by the macro rule from the leaf top and on the jamb, the DIN lock (forend, case pocket,
+  spindle, euro / bathroom hole), the keep on the lock jamb, the vision panel placement (`placeVisionPanel`: the
+  ZAŁOŻENIE of the brief, a pane turned 90 when the stack does not fit, the diamond's box), the intumescent strips
+  and their grooves, the closer flag, the machining ops of the leaf and the three members in the board coordinate
+  systems documented in the header (the holes give their centre), the bSuite variable table of 4.7 in write order
+  (`bsuiteVars.leaf / head / jambHinge / jambLock`), the FD- records (the frame records carry `rawSection`,
+  `mitreTop`, `mitreBottom`, `role`), the glass units per pane, weights, paint (the casement / door rule mirrored,
+  no import of calculations.js), consumables. `nextFireDoorName`, `fireDoorLeafThickness`,
+  `FireDoorGeometryError`. Deviations from the contract, in the header: `pane.box`, the hole centres,
+  `twoStripOffset 11` (not 2.75: the macro's lpz / 2 +- 2.75 samples are the two saw passes of ONE groove).
+- `engine/calculations.js`: `deriveWindowData` dispatches `category === 'firedoor'` to `deriveFireDoorWindow`.
+
+### Stage 3: lists, BOM, Assign Materials, glass, pricing (4b3583e)
+
+- `engine/lists.js`: the FD- material words ('Hardwood (door frame)', 'Door blank (bought)'), the pre-cut raw rule
+  with the record's `rawSection` (63x105, never the finished 50 x depth) and the leaf skipped (a bought blank), the
+  vision panel glass rows (single fire / toughened, thickness 6, no spacer, no bars), `FIREDOOR_HARDWARE` (the one
+  table line / row id / slot), `fireDoorIntumescentPartId`, the fire door hardware list (hinges, lock case by type,
+  cylinder or thumbturn, handle, keep, closer, the intumescent strip in metres), `CUT_LIST_ORDER` LEAF / FH / HJ /
+  LJ, the notes kept for FD- groups.
+- `engine/bom.js`: `ELEMENT_TO_PART_ID` FD- members to `fd_frame_timber`, `FIREDOOR_BLANK_PART_ID` (one blank by
+  rating, pcs), `FIREDOOR_GLASS_PART_ID` (fire / toughened m2, rounded to 2 dp), `FIREDOOR_PART_SLOT` /
+  `FIREDOOR_ITEM_SLOT` from the lists table, the firedoor branch of `buildWindowPartQtys` (hinges, lock, cylinder /
+  thumbturn on the cylinders slot, handle, keep, closer, intumescent metres by width, beads, glazing intumescent; no
+  counterweights, no sash consumables), the door slot rule in `buildWindowMaterialLines`. Paint: on the casement
+  rows (`c_paint_*`) as the external doors, with the casement / door rule of `calculations.js paintFromAreaSqm`
+  (per 1.5 m2 2 L primer + 1 L topcoat) mirrored in `fireDoor.js`, on the leaf both faces + the 35 and 50 faces of
+  the three members (3.8 m2 on the reference door: 5.07 L primer, 2.53 L topcoat).
+- `stores/materialAssignmentStore.js`: `FIREDOOR_PARTS` / `FIREDOOR_ALL_PARTS` (`windowType 'firedoor'`: Door Blank
+  FD30 / FD60 / non-fire, Frame Timber 63 x (depth + 5), Fire Door Hinge, Door Hinge, Lock Case Latch / Sashlock
+  Euro / Bathroom, Euro Cylinder, Thumbturn and Release, Lever Handle Set, Keep, Concealed Closer, Intumescent Strip
+  10 / 15 / 20, Fire Glass, Toughened Glass, Vision Panel Beads, Glazing Intumescent; the hints from the profile),
+  appended LAST to `ALL_PARTS`.
+- `stores/ironmongeryStore.js`: `fireDoorLocks`, `keeps`, `doorClosers` (`windowType 'firedoor'`); `alsoFor
+  'firedoor'` on the door handles, hinges and cylinders.
+- `engine/pricing.js`: `DEFAULT_PRICING.firedoor { leafPrice 0, framePerM 0, vpPerSqm 0, closerPrice 0 }`,
+  `calculateFireDoor`, the `calculatePrice` dispatch. `utils/precutPdfExport.js`: the fire door colour key page.
+  `utils/glassDxfExport.js`: the category allowed.
+
+### Stage 4: tests (`verify/parity/t51_fire_door.mjs`, sections 1 to 3b by the engine agent, 4 to 12 by the test agent)
+
+- Sections 1 to 3b import the live engine: the profile and its migration, the store, `withProfiles`, the spec block,
+  every number of 3.10 (the table of Stage 8 below), the variable table of 4.7 for the leaf, the head, the hinge
+  jamb and the lock jamb, FD60, the non-fire door, the 762 x 1981 leaf, hinge right, euro / bathroom, the vision
+  panels (style 1, custom 14), the numbering, the free width 803, the hard limits (one door fails with its message,
+  the next derives), the machining ops and their coordinates, the records, weights, paint, consumables.
+- Sections 4 to 12 bundle the JSX sheets, the pages and the 3D with esbuild (`build('t51-live', ...)`, the t50
+  pattern): the lists (cut list, grouped symbols, pre-cut 63x105, glass rows, hardware lines and slots, DXF params),
+  the BOM (the slots per door for FD30 / FD60 / non-fire, the material lines, the merge of two doors, the Assign
+  Materials rows, the ironmongery categories, the registry, the PDFs), pricing with zero rates and
+  `windowSpecToConfig`, the sheets (six doors x five sheets: no NaN / undefined / Infinity / long dash, no text
+  collisions, the dimension rule on the inside elevation and the leaf sheet, the reference strings, `elementsPlan`,
+  the Drawings panel tabs), the 3D mounted headless, the export (the rows, the variables of 4.7, the STOP rows in
+  the sample's form, the ZIP round trip, the machining rows, CSV and JSON), the controls (a casement 1200 x 1200, a
+  sash 900 x 1500, a single door 900 x 2100 and the t50 partition bay byte identical to the Stage 0 dumps, compared
+  file by file and by a typed hash; t32 unchanged, 54 passed, 0 failed), the pages (overview cells, glass groups,
+  the Elements / Elevations / Glass / Spraying tabs, the pack and window pages through the router), the batch
+  summary strip and the pre-cut panel label.
+- `verify/parity/t52_fire_door_ui.mjs` (new, the UI agent): the pages a user clicks in a real Chromium (the t39
+  pattern, one esbuild iife bundle per part, nothing on the network; exit 2 without the global Playwright, not a
+  failure): A Window Settings · Fire Doors (the sample readout 902 x 2083, 150 / 944 / 1738, 188 / 982 / 1776, 990,
+  4.906 m, 15 x 47; the sample chips; a typed top offset 145; the width list; the defaults, bSuite and head joint
+  cards; the reset), B the configurator on a fire door batch (FDR-01 proposed, the section, the summary, the slots,
+  DR-01 on fire OFF, the free width 803, the 926 chip, width 200 disables Save with the message, the controls, the
+  save and its stored keys, FDR-02 prefilled, edit mode never renames), C the project page, the batch defaults, the
+  Material Assignments page and the dashboard.
+- Found by the harness and fixed (the fix agent, committed by the integrator): the fire door bSuite target id
+  'fd-machine' (the uploads never share a folder with the casement 'machine'; a stored 'machine' target migrates
+  and stays active); `groupFireDoorGlass` moved to `fireDoorDrawUtils.js` (one copy for the pack page, the window
+  page and the harness); `DoorGlassDrawing2D` draws a single pane (fire / toughened, the thickness, no edge seal, no
+  spacer); the Plan sheet subtitle wrapped at its separators (`wrapLines` with a separator) so a long handing never
+  runs off the sheet; `PreCutPanel` labels an FD- group 'Timber'; `batchSummary` prints Rating / Lock / Closer rows
+  for a fire door batch (no Frame / PAS24).
+- `verify/parity/t38_leaf_64_seat_85.mjs` (pre-existing, EDITED; declared here per the Stage 9 review): its Assign
+  Materials comparison of `ALL_PARTS` with the baseline goes through a `windowRows` helper that set aside the door
+  rows appended by the doors tura (`/^d_/`). The 21 fire door rows (`fd_*`) are appended after the door rows for the
+  same reason (an index-based assignment set keeps every earlier row), so that ONE filter is relaxed to
+  `/^(d|fd)_/` and ONE `ok()` is added: the fd_ rows sit contiguous after the last door row with nothing after them.
+  No assertion deleted or weakened; t38 473 passed (was 472). The alternative (keeping `FIREDOOR_ALL_PARTS` out of
+  the shared `ALL_PARTS`) would take the fire door rows off the Material Assignments page, so it was not taken.
+
+### Stage 5: drawings and PDFs (853cacd)
+
+- `components/drawings/fireDoorDrawUtils.js` (new): `fireDoorSheetPlan` (the one plan: fdoutside, fdinside, fdplan,
+  fdleaf, fdframe), `fireDoorHeroSheet`, `fireDoorElevationGeometry` (the LSP's B and C), `fireDoorPlanGeometry`
+  (the LSP's D), `groupFireDoorGlass`, `fireDoorFrameMembers`, `leafOpsByKind`, `opTableRows`, `IRON` (the LSP
+  symbol sizes, drawn never printed), `hingeWord` / `swingWord` / `pullFaceNote` / `ratingWord`, `wrapLines`; the
+  handing convention in its header (the engine's "Hinge left" = the LSP's "open way R"; the sheets print only the
+  engine's wording).
+- `FireDoorElevation2D.jsx` (new: the outside view with the 35 face, the hinges interrupting the edge line, the
+  rose and lever, the euro / bathroom symbol, the panes, the LSP dimensions with the heights on the left; the
+  inside view with the 50 face and the leaf dashed), `FireDoorPlan2D.jsx` (new: closed and open 30, the rebated
+  jambs, the knuckle, the handle both faces, the arc), `FireDoorLeaf2D.jsx` (new: the leaf 1:1 with its three
+  edges unfolded, every op of `machining.leaf`, the hinge chain, the VP chain, the spindle and cylinder heights,
+  the op table), `FireDoorFrame2D.jsx` (new: the three members with their faces unfolded, the mitres, the hinge
+  recesses and the keep on the cheek, the enlarged rebate section, the op table), `FireDoorSheet.jsx` (new, the
+  PartitionSheet pattern), `DrawingsPanel.jsx` (one tab per sheet; a fire door never reaches the sash sheets),
+  `utils/elementsPayload.js` (the plan for the Elements PDF and the pack, the hero sheet, no cill page).
+
+### Stage 6: 3D (df56519)
+
+- `3d/components/firedoor/FireDoor.jsx` (new): the frame as L sections with the rebate, the leaf with a hole per
+  pane and glass with beads, a forend plate, three knuckles at the engine positions, the lever on a rose both faces
+  (euro escutcheon or bathroom turn below), a keep plate, one `woodColor`, the open angle 0 to 90 (default 30),
+  swing 'in' shows the push face to the exterior camera and swing 'out' the pull face.
+- `utils/windowSpecToConfig.js`: `fireDoorGeometryFromSpec(windowSpec, derived)` (the plain numbers the model
+  needs), the firedoor config (`windowCategory`, `fireDoorGeo`, `fireDoorOpen`, the flat pricing numbers).
+  `3d/App.jsx` (the model dispatch, the open angle slider), `components/viewer/WindowPreview3D.jsx` and
+  `Window3DCaptureRig.jsx` (the model and its framing from `fireDoorGeo`), `components/dashboard/ThreeDPanel.jsx`
+  (the open angle control of the window page, passed to the preview and the capture).
+
+### Stage 7: machine export (04a3f74, fec2228)
+
+- `utils/bsuiteExport.js`: `FIREDOOR_ROW_KEYS` (FD_LEAF, FD_HEAD, FD_JAMB_HINGE, FD_JAMB_LOCK), `bsuiteStopRow`,
+  `buildBsuiteFireDoorRows(windows, profile, target)` (four rows per door, Label = the door name, LPX / LPY / LPZ on
+  the panel node as Double, every other entry of `bsuiteVars` a document variable in the engine's order, the list
+  ordered leaves / heads / hinge jambs / lock jambs with one STOP row between non-empty blocks, identical rows
+  grouped as the casement rows, a key without a path skipped with one message per key naming the doors, never a
+  throw), `exportBsuiteFireDoorsMerged` (the same writer, ZIP, embedding and targets as the casement frames),
+  the STOP line `<StopWorklistItem Id="GUID" Label="" />` in `writeWorklistXml` (the Biesse UK sample's form); the
+  casement rows byte identical (t32).
+- `utils/fireDoorMachiningExport.js` (new): `buildFireDoorMachiningRows` (one row per op: door, element, op, face,
+  x, y, z, length, width, depth, radius, angle, value, note), `fireDoorMachiningCsv` (CRLF, UTF-8, numbers to 0.1),
+  `fireDoorMachiningJson` (the format header, the coordinate notes, one object per door copied from
+  `derived.firedoor`), `exportFireDoorMachining` (`{label}_firedoor_machining.csv` and `.json`).
+- `pages/ProductionPackPage.jsx`: the header buttons "bSuite fire doors -> <target>" and "Fire door machining
+  (CSV)" (on a fire door pack / batch or whenever the pack holds a fire door, under the batch's profile snapshot),
+  the overview cells (rating, leaf and VP style, handing, lock and closer, wall depth), the Elevations tab (the
+  outside elevation), the Elements tab (one card per sheet), the Glass tab (the pane groups), the Spraying tab
+  (the members by role). `pages/WindowDetailPage.jsx`: the same two buttons for one door, the Fire door spec
+  section (every value from `derived.firedoor`, "Hinge left / right"), the overall frame and the wall depth from
+  the engine, the glass groups, the 5th snapshot argument on every `withProfiles` call.
+
+### Stage 8: full suite, build, docs
+
+**Reference table from the live engine** (`node` on `src/engine/specification.js` + `calculations.js`, default
+profile, 27.10.2026; the script `scratchpad/D3/ref.mjs`):
+
+| door | frame overall | members (long point) | rebate / faces | hinges (step) | jamb recesses | lock / keep | intumescent | macro |
+|---|---|---|---|---|---|---|---|---|
+| FD30 826 x 2040, depth 100, hinge left, latch | 902 x 2083 | head 902 (mitre / mitre), jambs 2083 (mitre / square), raw 63x105, finished 50x100 | 15 x 47; 35 / 50 | 150 / 944 / 1738 (794) | 188 / 982 / 1776 | spindle 1000 from the bottom; forend centre 985; case top 1046.5; keep 990 from the foot | style 1, 15 x 4, 4.906 m | HAND 0, LH 1, HINGE 1, LOCK 2, LOCK_H 1000, EURO 0, INTU_STYLE 1, CLOSER 1; jamb lock KEEP 2, KEEP_Y 990 |
+| the same, FD60 | 902 x 2083 | the same | 15 x 57; 35 / 50 | the same | the same | the same | 4.906 m | LPZ 54, REB_D 57, LOCK 3, KEEP 3 |
+| the same, non-fire DR | 902 x 2083 | the same | 15 x 47 | the same | the same | the same | none | HINGE 0, LOCK 1, KEEP 1, INTU_STYLE 0, CLOSER 0 |
+| FD30 762 x 1981 | 838 x 2024 | head 838, jambs 2024 | 15 x 47 | 150 / 914.5 / 1679 (764.5) | 188 / 952.5 / 1717 | spindle 1000; keep 990 | 4.724 m | HINGE_2 914.5, HINGE_3 1679 |
+| FD30 826 x 2040 euro, VP style 1, hinge right | 902 x 2083 | the same | 15 x 47 | the same | the same | cylinder 928 from the bottom (bore 18); pane 450 x 450 at x 150 y 188, 0.203 m2, beads 3.6 m, glazing intu 1.8 m | 4.906 m | HAND 1, RH 1, EURO 1, VP_STYLE 1 |
+| FD30 826 x 2040 bathroom, intu style 4 | 902 x 2083 | the same | 15 x 47 | the same | the same | hole 922 from the bottom (bore 10) | 2 strips, 9.812 m, grooves z 3.3 / 25.3 | INTU_STYLE 4 |
+| FD30 803 x 2040 (free width) | 879 x 2083 | head 879 | 15 x 47 | the same | the same | the same | 4.883 m | LPY 803 |
+| width 200 | fails that door: "FDR-01: leaf width 200 is outside 300 to 1500" (`FireDoorGeometryError.details`) | | | | | | | |
+
+Numbering: `nextFireDoorName(['FDR-01', 'FDR-02', 'DR-01'], true)` = FDR-03, `(..., false)` = DR-02, `([], true)` =
+FDR-01. Paint on the reference door 3.8 m2: 5.07 L primer, 2.53 L topcoat; weights: timber 60.68 kg, the leaf
+47.49 kg (margin 5 %).
+
+- Docs: `docs/handover/FIRE-DOORS.md` (new: the model in one page, where it lives, the configurator and settings,
+  the sheets and the handing convention, the lists, the 3D, the export with the variable table, the STOP row, the
+  CSV columns and the coordinate systems, verification, assumptions, next steps), `BLOCKERS.md` 35.1 to 35.19,
+  this entry.
+- **Suite** (`verify/arch/t*.mjs` except the `*baseline*` generators + `verify/parity/*.mjs`, one full run on the
+  final tree after the Stage 9 fixes, `docs/handover/samples/` to be restored before the commit): 39 files, 5015 PASS,
+  0 FAIL; every pre-existing file at its Stage 0 count except t38 (473 = 472 + 1, Stage 4), plus t51 387 and
+  t52 84. The run before the Stage 9 fixes (D4): 39 files, 5008 PASS, 0 FAIL (t51 380).
+- **t51** (`node verify/parity/t51_fire_door.mjs`): 387 passed, 0 failed (380 before the Stage 9 fixes, +7).
+  **t52** (`node verify/parity/t52_fire_door_ui.mjs`, Chromium present): 84 passed, 0 failed. **t32**: 54 passed,
+  0 failed (the casement rows byte identical). **Build** (`npm run build`): OK, 17.8 s, the chunk size notice only.
+
+### Stage 9: independent review
+
+- The review agent (rule 10: re-derives the 3.10 numbers by hand, confirms no existing assertion was weakened or
+  deleted, opens the rendered sheets): **PASS**. Its verdict, condensed: the live engine reproduces every reference
+  number of CLAUDE.md 3.10 and the full variable table of 4.7 for the leaf and the three frame rows exactly as
+  derived by hand from `DEFAULT_FIREDOOR_PROFILE`; the control suites give the Stage 0 counts (t50 139 / 0, t41
+  683 / 0, t32 54 / 0, t37 50 / 0) and no pre-existing `ok()` was deleted or weakened (the one touched file, t38, is
+  declared in Stage 4); t51 and t52 pass; the build passes; the rendered sheets follow KIT_DOOR_SINGLE.lsp (35 / 50
+  faces, hinge-interrupted edge lines, mitres, rose and lever at the spindle, euro keyhole and bathroom turn
+  symbols, the LSP dimension placement, the hinge chains from the leaf top, the keep 990 from the jamb foot, all
+  text inside the sheet, no overlaps); no U+2013 / U+2014 in any added line or new file; the category string is
+  always 'firedoor'; the STOP row form matches the Biesse UK sample and the .ewlist blocks are ordered leaves /
+  STOP / heads / STOP / hinge jambs / STOP / lock jambs; fire OFF gives DR-nn, HINGE 0, LOCK 1, INTU_STYLE 0,
+  KEEP 1, no intumescent row, toughened glass; 803 derives unclamped (frame 879); 200 throws
+  `FireDoorGeometryError` naming the door. Findings: two rule 7 literals in sheet notes, the undeclared t38 edit,
+  the unfilled Stage 8 / 9 placeholders, and three notes (the pricing breakdown size, the grouped bSuite rows, the
+  PreCutPanel escape); none changes a number the workshop uses.
+- Applied after the review (D6), before the commit:
+  1. `engine/fireDoor.js`: `derived.firedoor.hinges` carries `topOffset` / `bottomOffset` (the rule's two profile
+     numbers); `drawings/FireDoorElevation2D.jsx` prints the hinge note from them (the outside and inside
+     elevations said "150 from the top, 200 from the bottom" as literals).
+  2. `drawings/fireDoorDrawUtils.js` `pullFaceNote`: the two frame faces from `derived.firedoor.frame.faces` (the
+     note on all five sheets said "the 35 frame face" and "the 50 face" as literals).
+  3. `engine/pricing.js` `calculateFireDoor`: the breakdown's `frameWidth` / `frameHeight` and the metres fallback
+     use the door's stored overall (`config.width` / `height`, which the configurator stores from
+     `derived.firedoor.frame.overall`), never the +150 / +75 brick-to-brick allowance `calculatePrice` computes for
+     the window types (the bridged reference door printed 1052 x 2158 for a 902 x 2083 door; the money was already
+     right through `firedoorFrameMetres`).
+  4. t51 +7 assertions (387 passed, was 380): the offsets on the hinges object; the bridged breakdown 902 x 2083 and
+     the fallback metres without a measurement type; the rule and faces strings on the five reference sheets;
+     `pullFaceNote` on faces 40 / 55; an outside and an inside elevation rendered from a derived with offsets
+     145 / 210 and faces 40 / 55 print those numbers and no 150 / 200 / 35 / 50.
+  5. The t38 edit declared in Stage 4; BLOCKERS 35.20 (identical doors grouped in one bSuite row); the Stage 8
+     counts filled from the final runs.
+  Not changed: the grouping of identical doors into one row (the casement behaviour, documented in FIRE-DOORS.md
+  section 7; the owner decides, 35.20); the PreCutPanel group label (below).
+- For the PR description (besides the owner box numbers, the summary, the files and the suite counts):
+  (a) t38 is edited: one helper filter relaxed from `/^d_/` to `/^(d|fd)_/` and one assertion added (473 passed,
+  was 472); no assertion deleted or weakened. (b) `components/dashboard/PreCutPanel.jsx`: the pre-existing long
+  dash of the pre-cut group label (shared by the sash, casement, partition and fire door groups) is written as the
+  JS string escape of U+2014 (backslash, u, 2014) in the template literal so the source line carries no long dash character; the rendered
+  label is unchanged for every type (a
+  hyphen would have changed the existing types' label). (c) bSuite: identical doors collapse into one row with
+  Quantity n and the labels joined (the casement grouping); the brief says four rows per door with Label = the
+  door number; one line to change if the owner wants a row per door (BLOCKERS 35.20). (d) the pricing breakdown
+  fix and the two rule 7 note fixes above (no workshop number changes).
+
+---
+
 ## 2026-10-25 · MEETING ROOM PARTITION WALLS v1 (chat change, main f4b0e47)
 
 ### Verdict: the 'partition' category derives the Windmill Street bay (2525 x 2165 SDS) to the owner numbers (screens 742.5, lights 387, unit 769.5 x 1232, leaf 794 x 2087, daylight 554, hinges 200 / 943.5 / 1937, 54 dowels in 18 joints), with the W- cut list, pre-cut, glass rows with applied bars, hardware lines, a placeholder price, the front elevation, the door leaf, the member (CNC) sheets with the dowel holes and the glass drawings; t50 engine, lists, pricing, variants and controls green; the member sheets still fail the text collision and dimension rule checks (in progress, see Verification); t27 flags one bare 40 in partitionJoints.js

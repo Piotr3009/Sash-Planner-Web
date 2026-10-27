@@ -34,8 +34,16 @@
  *  - identical rows (same program, same variables) collapse into one row with Quantity = n;
  *  - the ZIP writer below is dependency-free (STORED entries + CRC32) so the browser bundle
  *    does not grow; readers (bSolid uses .NET ZipArchive) accept stored entries.
+ *
+ * Fire doors (FIRE DOORS v1, 27.10.2026): one door set = four rows (FD_LEAF, FD_HEAD,
+ * FD_JAMB_HINGE, FD_JAMB_LOCK), Label = the door name, the document variables copied 1:1
+ * from derived.firedoor.bsuiteVars (names of the owner's macro Master_Door_PIOTR), the list
+ * ordered all leaves, then heads, then hinge jambs, then lock jambs with a STOP row
+ * (<StopWorklistItem Id="GUID" Label="" />, as the Biesse UK sample writes it) between the
+ * blocks so the table can be re-tooled. See buildBsuiteFireDoorRows. The casement rows and
+ * their XML are untouched (verify/parity/t32_bsuite.mjs keeps them byte identical).
  */
-import { getCasementProfile, bsuiteActiveTarget } from '../engine/profile.js';
+import { getCasementProfile, getFireDoorProfile, bsuiteActiveTarget } from '../engine/profile.js';
 import { buildVentGrilles } from '../engine/lists.js';
 import { zipSync, strToU8 } from 'fflate';
 
@@ -212,6 +220,114 @@ export function groupBsuiteRows(rows) {
   return [...out.values()].map((g) => ({ ...g, label: g.labels.length > 1 ? `${g.labels[0]} +${g.labels.length - 1}` : g.labels[0] }));
 }
 
+/* ─────────────────────────────── fire doors (27.10.2026) ─────────────────────────────── */
+
+/**
+ * The four rows of a door set, in the order the list is written: `key` is the program key of
+ * profile.bsuite.targets[].programs and of derived.firedoor.bsuiteVars, `element` the owner's
+ * master name (the row's Description and the skip messages).
+ */
+export const FIREDOOR_ROW_KEYS = Object.freeze([
+  { key: 'leaf', element: 'FD_LEAF', label: 'leaf' },
+  { key: 'head', element: 'FD_HEAD', label: 'head' },
+  { key: 'jambHinge', element: 'FD_JAMB_HINGE', label: 'hinge jamb' },
+  { key: 'jambLock', element: 'FD_JAMB_LOCK', label: 'lock jamb' },
+]);
+
+/**
+ * The STOP marker row between two blocks: the writer emits it as
+ * `<StopWorklistItem Id="GUID" Label="" />` (a sibling of the program items inside <Items>,
+ * exactly as the Biesse UK sample JOINERY_NETWORK_EVENT.ewlist has it; the owner's line of
+ * 27.10.2026 is the same form). No program, no variables, quantity 0 so the piece count
+ * ignores it; a new GUID per STOP comes from the writer like every other Id.
+ */
+export function bsuiteStopRow(label = '') {
+  return { kind: 'stop', program: '', path: '', quantity: 0, label, vars: {}, docVars: {}, element: 'STOP', window: '' };
+}
+
+/**
+ * Build the bSuite rows of fire door sets.
+ * windows: [{ windowSpec, derived, name }] (any window that is not a fire door is reported
+ * in `skipped`, never thrown). Returns { rows, skipped: [{ door, key, reason }], messages }.
+ *
+ * Per door four rows (FD_LEAF, FD_HEAD, FD_JAMB_HINGE, FD_JAMB_LOCK), Label = the door name,
+ * Quantity 1; identical rows across doors (same program, same variables) collapse into one
+ * row with Quantity n and the door names joined in the label, as the casement rows do. The
+ * list is ORDERED all leaves, then all heads, then all hinge jambs, then all lock jambs, with
+ * ONE STOP row between consecutive non-empty blocks when profile.bsuite.stopRows.
+ *
+ * Variables: LPX / LPY / LPZ go in the ProgramPanelNode as Double (the way the casement frame
+ * rows and the list bSolid itself saved, Worklist_5 of 14.09.2026, write the board), and
+ * EVERY other entry of derived.firedoor.bsuiteVars.<key> is a document variable (String),
+ * copied in the engine's key order (table 4.7 of the brief, names 1:1 with the macro). Why
+ * this split: the owner's leaf master FD_LEAF_MASTER_PIOTR has only LPX / LPY / LPZ at the
+ * document level today, so the board size MUST reach the panel node to take effect, while
+ * the macro parameters (HAND, HINGE, LOCK, ...) can only be driven from a worklist once the
+ * owner adds document variables with these names and binds them in the macro; writing them
+ * as document variables now is what that binding will read.
+ *
+ * A program key without a path on the target (the 5-axis frame masters do not exist yet, the
+ * default profile has empty head / jamb paths) skips that row for every door, with one
+ * message per key listing the doors and one `skipped` entry per door and key; the other rows
+ * still go.
+ */
+export function buildBsuiteFireDoorRows(windows, profile = getFireDoorProfile(), target = bsuiteActiveTarget(profile.bsuite)) {
+  const B = profile.bsuite;
+  const P = target?.programs || {};
+  const targetName = target?.name || 'the active target';
+  const blocks = Object.fromEntries(FIREDOOR_ROW_KEYS.map((k) => [k.key, []]));
+  const noPath = Object.fromEntries(FIREDOOR_ROW_KEYS.map((k) => [k.key, []]));   // door names per key without a program
+  const skipped = [];
+  const messages = [];
+  let doors = 0;
+  for (const w of windows || []) {
+    const derived = w?.derived;
+    const door = String(w?.name || w?.windowSpec?.name || derived?.firedoor?.name || '').trim() || 'FDR';
+    if (!derived) { skipped.push({ door, key: 'window', reason: 'no derived data (the door did not derive)' }); continue; }
+    if (derived.category !== 'firedoor' || !derived.firedoor?.bsuiteVars) { skipped.push({ door, key: 'window', reason: 'not a fire door: no fire door programs for this window type' }); continue; }
+    doors += 1;
+    const FD = derived.firedoor;
+    const handing = FD.handing?.label || '';
+    for (const k of FIREDOOR_ROW_KEYS) {
+      const vars = FD.bsuiteVars[k.key];
+      if (!vars) { skipped.push({ door, key: k.key, reason: `${k.element}: no variable table in the derived data` }); continue; }
+      const prog = P[k.key];
+      if (!prog || !fileNameOf(prog.path)) {
+        noPath[k.key].push(door);
+        skipped.push({ door, key: k.key, reason: `${k.element}: no program path on target ${targetName}` });
+        continue;
+      }
+      // the board goes to the panel node, everything else stays a document variable in the engine's order
+      const { LPX, LPY, LPZ, ...docVars } = vars;
+      const note = k.key === 'leaf'
+        ? `${k.element} ${fmt(LPX)} x ${fmt(LPY)} x ${fmt(LPZ)}, ${FD.fire ? FD.rating : 'non-fire'}, ${handing}, lock ${FD.lock?.type || ''}`.trim()
+        : `${k.element} ${fmt(LPX)} x ${fmt(LPY)} x ${fmt(LPZ)}, rebate ${fmt(vars.REB_W)} x ${fmt(vars.REB_D)}, ${handing}`.trim();
+      blocks[k.key].push({
+        program: fileNameOf(prog.path), path: prog.path, panelId: prog.panelId, panelName: prog.panelName,
+        quantity: 1, label: door,
+        vars: { LPX: r1(LPX), LPY: r1(LPY), LPZ: r1(LPZ) },
+        docVars,
+        element: k.element, member: k.key, window: door, note,
+      });
+    }
+  }
+  // blocks in order, each grouped on its own (a STOP row must never be grouped), one STOP between non-empty blocks
+  const rows = [];
+  let written = 0;
+  for (const k of FIREDOOR_ROW_KEYS) {
+    const grouped = groupBsuiteRows(blocks[k.key]).map((g) => ({ ...g, label: g.labels.join(', ') }));
+    if (!grouped.length) continue;
+    if (written && B?.stopRows !== false) rows.push(bsuiteStopRow());
+    rows.push(...grouped);
+    written += 1;
+  }
+  for (const k of FIREDOOR_ROW_KEYS) {
+    if (noPath[k.key].length) messages.push(`${k.element}: no program path on target ${targetName} (Window Settings · Fire Doors · bSuite), rows skipped for ${noPath[k.key].join(', ')}`);
+  }
+  if (!doors) messages.push('no fire doors in this selection');
+  return { rows, skipped, messages };
+}
+
 /* ─────────────────────────────── XML ─────────────────────────────── */
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -253,6 +369,11 @@ export function writeWorklistXml(rows, opts = {}) {
   L.push('  <Items>');
   rows.forEach((r, i) => {
     const id = opts.ids?.[i] || guid();
+    if (r.kind === 'stop') {
+      // fire doors: the STOP between two blocks, the line of the Biesse UK sample (Id then Label, self closing)
+      L.push(`    <StopWorklistItem Id="${id}" Label="${esc(r.label || '')}" />`);
+      return;
+    }
     L.push(`    <CadProgramWorklistItem Id="${id}" Name="${esc(r.program)}" Counter="0" Label="${esc(r.label || '')}" Quantity="${r.quantity}" Description="${esc(r.note || '')}" UsingDefaultOrigins="true" LastAccess="${now}" ProgramUri="${esc(programUri(r.path || r.program))}">`);
     L.push('      <ExecutionTimeData ExecutionTime="00:00:00" DateTime="01/01/0001 00:00:00" Quantity="0" />');
     L.push('      <Origins />');
@@ -350,6 +471,7 @@ export function buildEwlist(rows, opts = {}) {
   ];
   const seen = new Set();
   for (const r of rows) {
+    if (r.kind === 'stop') continue;   // a STOP row has no program
     const bytes = opts.programs?.[r.program];
     if (!bytes || seen.has(r.program)) continue;
     seen.add(r.program);
@@ -406,4 +528,50 @@ export async function exportBsuiteFramesMerged(windows, fileLabel, profile = get
   const filename = `${safeName(fileLabel)}_frames_${safeName(target.name).toLowerCase()}.ewlist`;
   downloadBytes(filename, buildEwlist(rows, { executionParameters: target.writeExecutionParameters ? target.executionParameters : null, programs }));
   return { ok: true, rows: rows.length, pieces: rows.reduce((s, r) => s + r.quantity, 0), skipped, filename, target: target.name, embedded: Object.keys(programs).length };
+}
+
+/**
+ * Fire doors: many door sets (a pack, a batch or one window) → one {label}_firedoors.ewlist.
+ * windows: [{ windowSpec, derived, name }]. Mirrors exportBsuiteFramesMerged: the same writer,
+ * ZIP, program embedding and targets, the rows from buildBsuiteFireDoorRows (already grouped
+ * and ordered, STOP rows included). The contract names the call
+ * (windows, label, profile, downloadProgram); the casement form (windows, label, profile,
+ * targetId, loadProgram) is accepted too (a function in fourth place is the loader).
+ * Returns { ok, filename, target, rows, stops, pieces, embedded, skipped, messages } or
+ * { error, skipped, messages }. A row whose program file is not uploaded for the target is
+ * still written (bSolid shows it red) and reported; no uploaded program at all = error, no file.
+ */
+export async function exportBsuiteFireDoorsMerged(windows, fileLabel, profile = getFireDoorProfile(), loadProgram = null, targetId = null) {
+  if (typeof loadProgram !== 'function' && typeof targetId === 'function') { const t = loadProgram; loadProgram = targetId; targetId = t; }
+  const prof = profile || getFireDoorProfile();
+  const target = (targetId && prof.bsuite.targets.find((t) => t.id === targetId)) || bsuiteActiveTarget(prof.bsuite);
+  const { rows, skipped, messages } = buildBsuiteFireDoorRows(windows, prof, target);
+  const items = rows.filter((r) => r.kind !== 'stop');
+  if (!items.length) return { error: `no fire door rows to export${messages.length ? `: ${messages.join('; ')}` : ''}`, skipped, messages };
+  // the programs to embed: every distinct program of the rows, from the target's uploaded files
+  const programs = {};
+  const missing = [];
+  for (const r of items) {
+    if (programs[r.program]) continue;
+    const key = Object.keys(target.programs).find((k) => fileNameOf(target.programs[k].path) === r.program);
+    const stored = key ? target.programs[key].stored : null;
+    if (!stored?.storagePath) { missing.push(r.program); continue; }
+    if (typeof loadProgram !== 'function') { missing.push(`${r.program} (no program loader)`); continue; }
+    try { programs[r.program] = await loadProgram(stored.storagePath); }
+    catch (e) { missing.push(`${r.program} (${e?.message || 'download failed'})`); }
+  }
+  if (missing.length && !Object.keys(programs).length) {
+    return { error: `no program files for ${target.name}: upload the .bSolid files in Window Settings · Fire Doors · bSuite (${[...new Set(missing)].join(', ')})`, skipped, messages };
+  }
+  for (const m of new Set(missing)) {
+    skipped.push({ door: '', key: m, reason: 'program file not uploaded for this target: its rows will show red in bSolid' });
+    messages.push(`${m}: program file not uploaded for ${target.name}, its rows will show red in bSolid`);
+  }
+  const filename = `${safeName(fileLabel)}_firedoors.ewlist`;
+  downloadBytes(filename, buildEwlist(rows, { executionParameters: target.writeExecutionParameters ? target.executionParameters : null, programs }));
+  return {
+    ok: true, filename, target: target.name,
+    rows: items.length, stops: rows.length - items.length, pieces: items.reduce((sum, r) => sum + r.quantity, 0),
+    embedded: Object.keys(programs).length, skipped, messages,
+  };
 }

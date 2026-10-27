@@ -721,8 +721,18 @@ section('11 - raw stock, Pre-Cut groups, hinge picks');
   // other part and field is compared as before.
   const DOOR_HINTS = new Set(['glass_acoustic', 'paint_preserver', 'c_silicone', 'c_bead_tape_1mm', 'c_bead_tape_2mm', 'c_seal_frame_black', 'c_seal_frame_white', 'c_seal_hj_black', 'c_seal_hj_white',
     'c_paint_primer', 'c_paint_preserver', 'c_paint_white_9016', 'c_paint_bespoke', 'c_triangle_beading_ext', 'c_georgian_middle_beading', 'c_glass_clips_double', 'c_glass_clips_triple', 'c_glass_clips_laminated', 'c_glazing_packer']);
-  const windowRows = (M) => (M.materials.ALL_PARTS || []).filter((p) => !/^d_/.test(p.id));
+  // 27.10.2026, fire doors tura: the fire door rows (fd_*) are appended after the door rows, for the same
+  // reason (index-based assignment sets keep every earlier row); set aside like the door rows, and checked
+  // to sit after the last door row, so the window rows are compared exactly as before.
+  const windowRows = (M) => (M.materials.ALL_PARTS || []).filter((p) => !/^(d|fd)_/.test(p.id));
   const noDoorHint = (p) => (DOOR_HINTS.has(p.id) ? { ...p, hint: '' } : p);
+  {
+    const ids = (LIVE.materials.ALL_PARTS || []).map((p) => p.id);
+    const lastDoor = ids.map((id, i) => (/^d_/.test(id) ? i : -1)).filter((i) => i >= 0).pop();
+    const fdIdx = ids.map((id, i) => (/^fd_/.test(id) ? i : -1)).filter((i) => i >= 0);
+    ok(fdIdx.length > 0 && fdIdx[0] === lastDoor + 1 && fdIdx[fdIdx.length - 1] === ids.length - 1 && fdIdx.length === ids.length - fdIdx[0],
+      `Assign Materials (fire doors tura): the ${fdIdx.length} fire door rows come after the last door row, contiguous, and nothing follows them`);
+  }
   ok(windowRows(LIVE).filter((p) => DOOR_HINTS.has(p.id)).every((p) => /door/i.test(p.hint)) && (LIVE.materials.ALL_PARTS || []).findIndex((p) => /^d_/.test(p.id)) === windowRows(LIVE).length,
     'Assign Materials (doors tura): the door rows come after every window row; the set-aside hints all mention doors');
   const strip = (arr) => JSON.stringify((arr || []).map(noDoorHint).map((p) => (p.id === 'c_sash_bottom_rail' ? { ...p, section: '' } : p)));

@@ -144,7 +144,7 @@ export class SashProportionError extends Error {
   constructor(message) { super(message); this.name = 'SashProportionError'; }
 }
 import { FAN_AXIS_OFFSET_TOP, FAN_AXIS_OFFSET_BOTTOM } from './casementLayouts.js';
-import { profileBoxDepth, getDoorProfile, DEFAULT_DOOR_PROFILE, getPartitionProfile } from './profile.js';
+import { profileBoxDepth, getDoorProfile, DEFAULT_DOOR_PROFILE, getPartitionProfile, getFireDoorProfile } from './profile.js';
 import {
   PSW_ARCH_SHAPE, PSW_ARCH_RISE_RATIO, PSW_SASH_RADIO_SHAPE, LEGACY_ARCH_SHAPES, ARCH_RISE_RATIO, GOTHIC_PROFILE_RATIO,
   ARCH_BAR_PATTERNS, isArchShape, isRoundShape, resolveRoundShape, ArchError, CIRCLE_SHAPE, patternsForShape,
@@ -392,6 +392,53 @@ function archFieldsFromSpec(item, fc, width, height, { pcShapeRaw, pswShape, cat
   return { shape, profile, rise, start, riseSource, hinge, bars };
 }
 
+// Fire doors (internal door sets, 27.10.2026): the `firedoor` block of the
+// windowSpec, built only on that category. Each key reads the window item's
+// firedoorX field, then the fullConfig's, then the fire door profile default.
+// The leaf size is never clamped here (the engine's hard sanity limits fail
+// one door with a message); `rating` stays stored while fire is off (the
+// engine reports 'none'), `closer` defaults to fire ? true : false.
+const FIREDOOR_LOCK_TYPES = ['latch', 'euro', 'bathroom'];
+const boolField = (v, def) => {
+  if (v === undefined || v === null || v === '') return def;
+  if (v === 'false' || v === '0' || v === 0) return false;
+  return !!v;
+};
+function fireDoorBlockFromSpec(item, fc) {
+  const P = getFireDoorProfile();
+  const D = P.defaults;
+  const pick = (key) => (item?.[key] !== undefined && item?.[key] !== null ? item[key] : fc[key]);
+  const fire = boolField(pick('firedoorFire'), D.fire);
+  const rating = pick('firedoorRating') === 'FD60' ? 'FD60' : (pick('firedoorRating') === 'FD30' ? 'FD30' : (D.rating === 'FD60' ? 'FD60' : 'FD30'));
+  const lockRaw = pick('firedoorLockType');
+  const customRaw = pick('firedoorVpCustom') || {};
+  // null / undefined = not set (the ?? rule of the contract): the default applies.
+  // projectStore stores a vpCustom number that did not parse as null, and
+  // Number(null) is 0, so without this a null length would read as 0, not 600.
+  const num = (v, def) => { if (v === undefined || v === null) return def; const n = Number(v); return Number.isFinite(n) ? n : def; };
+  return {
+    fire,
+    rating,
+    leafWidth: num(pick('firedoorLeafWidth'), 0) || Number(P.leaf.defaultWidth),
+    leafHeight: num(pick('firedoorLeafHeight'), 0) || Number(P.leaf.defaultHeight),
+    hingeSide: (pick('firedoorHingeSide') || D.hingeSide) === 'right' ? 'right' : 'left',
+    swing: (pick('firedoorSwing') || D.swing) === 'out' ? 'out' : 'in',
+    frameDepth: num(pick('firedoorFrameDepth'), 0) || Number(P.frame.defaultDepth),
+    lockType: FIREDOOR_LOCK_TYPES.includes(lockRaw) ? lockRaw : (FIREDOOR_LOCK_TYPES.includes(D.lockType) ? D.lockType : 'latch'),
+    closer: boolField(pick('firedoorCloser'), fire),
+    vpStyle: Math.max(0, Math.round(num(pick('firedoorVpStyle'), D.vpStyle))),
+    vpCustom: {
+      length: num(customRaw.length, D.vpCustom.length),
+      width: num(customRaw.width, D.vpCustom.width),
+      count: Math.max(0, Math.round(num(customRaw.count, D.vpCustom.count))),
+      rail: num(customRaw.rail, D.vpCustom.rail),
+      pos: Number(customRaw.pos) === 90 ? 90 : 0,
+    },
+    intuStyle: Math.max(0, Math.round(num(pick('firedoorIntuStyle'), D.intuStyle))),
+    leadEdge: boolField(pick('firedoorLeadEdge'), D.leadEdge),
+  };
+}
+
 /**
  * Build a windowSpec object for the calculation engine.
  * Reads from both old (underscore) and new (camelCase) field names.
@@ -445,6 +492,10 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
   const category = rawCategory === 'doors' ? 'door' : rawCategory;
   const isDoorCategory = category === 'door';
   const isPartition = category === 'partition';
+  // Fire doors (27.10.2026): the block is built once here, the frame depth is
+  // the wall thickness it carries (the item's firedoorFrameDepth).
+  const isFireDoor = category === 'firedoor';
+  const fireDoorBlock = isFireDoor ? fireDoorBlockFromSpec(item, fc) : null;
   // Frame depth — stored on the window; legacy windows fall back to the profile
   // Doors: always the door profile's frame depth (93). The configurator saved
   // the SASH box depth (164) on doors until 08.10.2026, so a stored value is
@@ -452,6 +503,7 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
   const frameDepth = isDoorCategory
     ? (Number(getDoorProfile().frameDepth) || DOOR_FRAME_DEPTH)
     : isPartition ? (Number(getPartitionProfile().depth) || 54)
+    : isFireDoor ? fireDoorBlock.frameDepth
     : (item?.frameDepth || profileBoxDepth(glassType === 'triple' ? 'triple' : frameType));
 
   // Opening type — new: item.openingType
@@ -622,6 +674,9 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
         swing: (item?.partitionSwing || fc.partitionSwing || getPartitionProfile().defaults.swing) === 'in' ? 'in' : 'out',
       },
     } : {}),
+    // ── Fire doors (internal door sets, 27.10.2026), only on that category so
+    // every other windowSpec stays as it was (t41 / t50 / t51 controls).
+    ...(isFireDoor ? { firedoor: fireDoorBlock } : {}),
     color: {
       ral: fc.ralCode || '',
       inside: colorInside,
@@ -656,6 +711,7 @@ export function normaliseToWindowSpec(item, parsedSpec = null) {
       thickness: isAcousticUnit({ spec: glassSpec, type: glassType }) ? ACOUSTIC_THICKNESS
         : isDoorCategory ? (DOOR_GLASS_THICKNESS[glassType] ?? GLASS_THICKNESS[glassType] ?? 24)
         : isPartition ? (Number(getPartitionProfile().glazing.unit) || 28)
+        : isFireDoor ? (Number(getFireDoorProfile().vp.glassThickness) || 6)
         : (GLASS_THICKNESS[glassType] ?? 24),
       // Explicit per-window override only; otherwise undefined so consumers
       // fall back to the workshop profile's glassMakeup (live, snapshot-aware).

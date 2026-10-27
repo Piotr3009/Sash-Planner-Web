@@ -12,6 +12,7 @@ const CATEGORY_TO_BATCH = {
   door: 'door',
   fix: 'fix-frame',
   'fix-frame': 'fix-frame',
+  firedoor: 'firedoor',   // internal door sets (27.10.2026): category and batch type share the one word
 };
 
 // Pure helper that plans the batches (used for the confirm summary).

@@ -172,6 +172,16 @@ const ENGINE_NAME_MAP = {
   // Arched sash members (the S- prefix dropped the same way)
   's-arch head':                 { partId: 'head', symbol: 'AH', name: 'Arched Box Head', group: 'box', mirror: false },
   's-arch top rail':             { partId: 'top_rail', symbol: 'ATR', name: 'Arched Top Rail', group: 'sash', mirror: false },
+  // Fire doors (27.10.2026, internal door sets FDR / DR): the leaf blank and the
+  // three frame members. The FD- prefix is dropped the same way. partId = the
+  // Assign Materials row: the frame timber for the members; the leaf blank row
+  // depends on the rating (fd_blank_fd30 / fd_blank_fd60 / fd_blank_std), the
+  // BOM picks it from the derived door, so the FD30 row stands here as the default.
+  // The symbols are chosen clear of the casement / door jamb pair (J-L / J-R).
+  'fd-leaf':                     { partId: 'fd_blank_fd30', symbol: 'LEAF', name: 'Door Leaf', group: 'firedoor', mirror: false },
+  'fd-head':                     { partId: 'fd_frame_timber', symbol: 'FH', name: 'Frame Head', group: 'firedoor', mirror: false },
+  'fd-jamb-h':                   { partId: 'fd_frame_timber', symbol: 'HJ', name: 'Hinge Jamb', group: 'firedoor', mirror: false },
+  'fd-jamb-l':                   { partId: 'fd_frame_timber', symbol: 'LJ', name: 'Lock Jamb', group: 'firedoor', mirror: false },
 };
 
 /**
@@ -191,7 +201,7 @@ export function getPartSymbol(elementName) {
   const byId = PART_SYMBOLS[lower.replace(/\s+/g, '_')];
   if (byId) return byId;
 
-  // Fallback: the window type prefix (C- / D- / S- / W-) says nothing inside a pack
+  // Fallback: the window type prefix (C- / D- / S- / W- / FD-) says nothing inside a pack
   // of one type (Piotr 08.10.2026), so it never reaches a symbol.
   return {
     symbol: displayElementName(elementName).replace(/[^A-Za-z]/g, '').slice(0, 4).toUpperCase(),
@@ -203,12 +213,15 @@ export function getPartSymbol(elementName) {
 
 /**
  * An engine element name as the screens, PDFs and labels print it: without
- * the window type prefix (C- casement, D- door, S- sash arch, W- partition wall), which says
- * nothing inside a pack of one type (Piotr 08.10.2026). The engine names
- * themselves never change: they key the Assign Materials and colour maps.
+ * the window type prefix (C- casement, D- door, S- sash arch, W- partition wall,
+ * FD- fire door), which says nothing inside a pack of one type (Piotr
+ * 08.10.2026). The engine names themselves never change: they key the Assign
+ * Materials and colour maps. The rule is one regex (TYPE_PREFIX_RE) shared with
+ * displayCode and, by copy, with the pre-cut raw rule in lists.js.
  */
+export const TYPE_PREFIX_RE = /^(FD|[CDSW])-/;
 export function displayElementName(elementName) {
-  return String(elementName || '').replace(/^[CDSW]-/, '');
+  return String(elementName || '').replace(TYPE_PREFIX_RE, '');
 }
 
 /**
@@ -218,5 +231,5 @@ export function displayElementName(elementName) {
  * records never change: the sheets look members up by them.
  */
 export function displayCode(code) {
-  return String(code || '').replace(/^[CDSW]-/, '');
+  return String(code || '').replace(TYPE_PREFIX_RE, '');
 }

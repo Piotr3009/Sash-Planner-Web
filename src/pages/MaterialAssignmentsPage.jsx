@@ -4,7 +4,7 @@ import MaterialPicker from '../components/MaterialPicker.jsx';
 import { useParams } from 'react-router-dom';
 import { useMaterialStore } from '../stores/materialStore.js';
 import { useIronmongeryStore, IRONMONGERY_CATEGORIES } from '../stores/ironmongeryStore.js';
-import { useMaterialAssignmentStore, SASH_WINDOW_PARTS, ALL_PARTS, CASEMENT_PARTS, CASEMENT_ALL_PARTS, DOOR_PARTS, DOOR_ALL_PARTS, DOOR_SHARED_GLASS_IDS } from '../stores/materialAssignmentStore.js';
+import { useMaterialAssignmentStore, SASH_WINDOW_PARTS, ALL_PARTS, CASEMENT_PARTS, CASEMENT_ALL_PARTS, DOOR_PARTS, DOOR_ALL_PARTS, DOOR_SHARED_GLASS_IDS, FIREDOOR_ALL_PARTS } from '../stores/materialAssignmentStore.js';
 import { liveSectionsFor, PART_REGISTRY, REGISTRY_VARIANTS } from '../engine/partRegistry.js';
 import { deriveWindowData } from '../engine/calculations.js';
 import { normaliseToWindowSpec } from '../engine/specification.js';
@@ -22,8 +22,18 @@ const TYPE_LABELS = {
   casement: 'Casement',
   'fix-frame': 'Fix Frame',
   doors: 'Doors',
+  firedoor: 'Fire doors',
   other: 'Other',
 };
+
+// Fire doors (27.10.2026): the slot rows of FIREDOOR_ALL_PARTS grouped for the
+// page by their id / material type (blanks and frame timber, ironmongery from
+// the Ironmongery catalogue, glass, the consumables: intumescent and beads).
+const FD_PARTS = Array.isArray(FIREDOOR_ALL_PARTS) ? FIREDOOR_ALL_PARTS : [];
+const FD_TIMBER_PARTS = FD_PARTS.filter((p) => String(p.id).startsWith('fd_blank') || p.id === 'fd_frame_timber');
+const FD_IRON_PARTS = FD_PARTS.filter((p) => p.materialType === 'ironmongery');
+const FD_GLASS_PARTS = FD_PARTS.filter((p) => p.materialType === 'glass' || String(p.id).startsWith('fd_glass'));
+const FD_CONSUMABLE_PARTS = FD_PARTS.filter((p) => !FD_TIMBER_PARTS.includes(p) && !FD_IRON_PARTS.includes(p) && !FD_GLASS_PARTS.includes(p));
 
 // ─── Part Row ───
 // Base part lists generated from the registry — variant families collapse to
@@ -524,14 +534,23 @@ export default function MaterialAssignmentsPage() {
   // Stats — only for current type
   const isCasement = typeId === 'casement';
   const isDoors = typeId === 'doors' || typeId === 'door';
+  // Fire doors (27.10.2026): the internal door set rows (FIREDOOR_ALL_PARTS)
+  const isFireDoor = typeId === 'firedoor';
   const typeParts = isSash
     ? [...REG_BOX_PARTS, ...REG_SASH_PARTS, ...SASH_WINDOW_PARTS.beading, ...SASH_WINDOW_PARTS.glass, ...SASH_WINDOW_PARTS.paint, ...SASH_WINDOW_PARTS.consumables, ...customPartRows]
-    : isCasement ? CASEMENT_ALL_PARTS : isDoors ? DOOR_ALL_PARTS : [];
+    : isCasement ? CASEMENT_ALL_PARTS : isDoors ? DOOR_ALL_PARTS : isFireDoor ? FD_PARTS : [];
   // Doors (08.10.2026): the ironmongery tabs a door row may pick from, the
   // door categories (cylinders included) and the shared ones.
   const doorIronCategories = useMemo(() => {
     const doorKeys = new Set(IRONMONGERY_CATEGORIES.filter((c) => c.windowType === 'door' || c.windowType === 'all').map((c) => c.key));
     return ironCategories.filter((k) => doorKeys.has(k));
+  }, [ironCategories]);
+  // Fire doors: the tabs a fire door row may pick from (the fire door
+  // categories plus the door hinge / handle / cylinder tabs that list firedoor
+  // in alsoFor); no trickle vents on an internal door.
+  const fireDoorIronCategories = useMemo(() => {
+    const keys = new Set(IRONMONGERY_CATEGORIES.filter((c) => c.windowType === 'firedoor' || (c.alsoFor || []).includes('firedoor')).map((c) => c.key));
+    return ironCategories.filter((k) => keys.has(k));
   }, [ironCategories]);
   // Counter counts EVERY unit (part × variant), not families — the base
   // assignment still fills all four variants in one click via inheritance,
@@ -554,8 +573,8 @@ export default function MaterialAssignmentsPage() {
   const totalParts = unitCounts.total;
   const assignedCount = unitCounts.assigned;
 
-  // Coming soon for the remaining types (sash, casement and doors are live)
-  if (!isSash && !isCasement && !isDoors) {
+  // Coming soon for the remaining types (sash, casement, doors and fire doors are live)
+  if (!isSash && !isCasement && !isDoors && !isFireDoor) {
     return (
       <div className="p-6">
         <div className="mb-5">
@@ -863,6 +882,45 @@ export default function MaterialAssignmentsPage() {
                 (triangle ext / georgian middle), paint (primer, preserver, topcoat) and the sill extension boards of a door
                 count on the Casement rows, whose hints say "also doors". The opening fanlight is a casement leaf: its timber,
                 hinges and lock count on the Casement leaf, hinge and lock rows.
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ══ Fire doors (27.10.2026): the door blank per rating and the frame
+             timber, the ironmongery from the Ironmongery catalogue (fire / standard
+             hinges, the three lock cases, cylinder, thumbturn, handle set, keep,
+             closer), the intumescent strips and glazing beads, the vision panel
+             glass. Paint counts on the casement rows (as the external doors). ══ */}
+        {isFireDoor && (() => {
+          const common = {
+            assignments, onAssign: setAssignment, onFilter: setFilter, onYieldChange: setYield,
+            onRemove: removeAssignment, selectedPart, onSelect: toggleSelect,
+          };
+          const timber = { ...common, materials, categories, subcategoriesByCategory, disabled: locked };
+          return (
+            <div className="max-w-5xl">
+              {FD_PARTS.length === 0 && (
+                <div className="card p-4 mb-3 text-[11px] text-amber-400">The fire door slot rows are not registered yet (FIREDOOR_ALL_PARTS is empty).</div>
+              )}
+              <PartGroupSection defaultOpen title="🪵 Blanks and frame timber"
+                subtitle={`${FD_TIMBER_PARTS.length} rows · one door blank per leaf by rating (FD30 44, FD60 54, non-fire 44) · frame timber 63 thick, width = wall depth + allowance, metres of head and jambs`}
+                parts={FD_TIMBER_PARTS} {...timber} />
+              <PartGroupSection defaultOpen title="🔩 Ironmongery"
+                subtitle={`${FD_IRON_PARTS.length} rows · counts from the engine · hinges by fire / standard, the lock case by type, cylinder (euro) or thumbturn (bathroom), handle set, keep, concealed closer · products from the Ironmongery catalogue`}
+                parts={FD_IRON_PARTS}
+                {...common} materials={ironItems} categories={fireDoorIronCategories}
+                subcategoriesByCategory={ironSubcategoriesByCategory} categoryLabels={ironCategoryLabels}
+                disabled={locked} />
+              <PartGroupSection title="🧴 Intumescent and beads"
+                subtitle={`${FD_CONSUMABLE_PARTS.length} rows · intumescent strips 10 / 15 / 20 by INTU_STYLE (metres = strips x (2 x H + W)), glazing beads and glazing intumescent per vision panel perimeter`}
+                parts={FD_CONSUMABLE_PARTS} {...timber} />
+              <PartGroupSection title="🧊 Vision panel glass"
+                subtitle={`${FD_GLASS_PARTS.length} rows · fire glass on a fire door, toughened on a non-fire door · m² of every pane`}
+                parts={FD_GLASS_PARTS} {...timber} />
+              <div className="card p-4 mb-3 text-[11px] text-ink-300">
+                <div className="text-xs font-semibold text-ink-100 mb-1">Paint: fire doors use the casement rows</div>
+                Primer and topcoat of a fire door (leaf both faces and the frame visible faces) count on the Casement paint rows, as the external doors do.
               </div>
             </div>
           );

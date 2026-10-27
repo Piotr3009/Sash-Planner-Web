@@ -11,10 +11,12 @@ import {
   GOTHIC_PROFILE_RATIO, ROUND_AUTO_RATIO, LEGACY_ARCH_SHAPES, PATTERNS_FOR_SHAPE, ARCH_BAR_PATTERN_LABELS,
   isHubPattern, isGothicShape, resolveRoundShape, buildArchPlan, buildSashArchGeometry, planArchSegments, buildCirclePlan,
 } from '../engine/arch.js';
-import { DEFAULT_DOOR_PROFILE, DEFAULT_PARTITION_PROFILE, getCasementProfile, getDoorProfile, getPartitionProfile, getWindowProfile } from '../engine/profile.js';
-import { casementFrameDims, doorFrameDims, doorGeometryFromSpec } from '../utils/windowSpecToConfig.js';
+import { DEFAULT_DOOR_PROFILE, DEFAULT_PARTITION_PROFILE, DEFAULT_FIREDOOR_PROFILE, getCasementProfile, getDoorProfile, getPartitionProfile, getFireDoorProfile, getWindowProfile } from '../engine/profile.js';
+import { casementFrameDims, doorFrameDims, doorGeometryFromSpec, fireDoorGeometryFromSpec } from '../utils/windowSpecToConfig.js';
+// Fire doors (27.10.2026): the door numbering helper and the engine's own error class
+import { nextFireDoorName, FireDoorGeometryError } from '../engine/fireDoor.js';
 import { normaliseToWindowSpec, SASH_PROPORTIONS, SASH_PROPORTION_OPTIONS, SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, effectiveSashProportion, TRIPLE_OPENING_LABEL } from '../engine/specification.js';
-import { CONSTANTS, meetingFractionFor } from '../engine/calculations.js';
+import { CONSTANTS, meetingFractionFor, deriveWindowData } from '../engine/calculations.js';
 import CasementLayoutPicker from '../components/configurator/CasementLayoutPicker.jsx';
 import NumInput from '../components/NumInput.jsx';
 import {
@@ -103,6 +105,21 @@ const PARTITION_LIGHTS = [1, 2, 3, 4, 5, 6].map((n) => ({ value: n, label: Strin
 const PARTITION_HINGE_SIDES = [{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }];
 const PARTITION_SWINGS = [{ value: 'out', label: 'Out (to the corridor)' }, { value: 'in', label: 'In (into the room)' }];
 const cleanPartitionLayout = (v) => String(v || '').toUpperCase().replace(/[^SD]/g, '');
+// Fire doors (27.10.2026): internal door sets (leaf + frame, CLAUDE.md fire
+// doors v1). The option vocabularies of the spec block (brief 3.1); the sizes,
+// the suggestion chips and the style tables come from the fire door profile
+// (Window Settings · Fire Doors), never from a literal here.
+const FD_FIRE = [{ value: true, label: 'Fire door' }, { value: false, label: 'Non-fire' }];
+const FD_RATINGS = [{ value: 'FD30', label: 'FD30' }, { value: 'FD60', label: 'FD60' }];
+// Hinge side seen from the PULL side (the side the knuckles show); printed "Hinge left / Hinge right" (the PSW wording rule)
+const FD_HINGE_SIDES = [{ value: 'left', label: 'Hinge left' }, { value: 'right', label: 'Hinge right' }];
+const FD_SWINGS = [{ value: 'in', label: 'Opens in (into the room)' }, { value: 'out', label: 'Opens out (to the corridor)' }];
+const FD_LOCKS = [{ value: 'latch', label: 'Latch' }, { value: 'euro', label: 'Sashlock euro' }, { value: 'bathroom', label: 'Bathroom' }];
+const FD_LOCK_LABEL = Object.fromEntries(FD_LOCKS.map((o) => [o.value, o.label]));
+const FD_YES_NO = [{ value: true, label: 'Yes' }, { value: false, label: 'No' }];
+const FD_VP_POS = [{ value: 0, label: '0 (vertical)' }, { value: 90, label: '90 (horizontal)' }];
+// the 3D opens the leaf this far by default (FIREDOOR-CONTRACT section 7: fireDoorOpen, degrees)
+const FD_3D_OPEN_DEG = 30;
 
 // ─── Frame drives the glass type (box depth + glazing are one decision) ───
 // Depths come from the workshop Window Settings profile (live).
@@ -303,6 +320,28 @@ export default function ConfiguratorPage() {
   const [partitionHingeSide, setPartitionHingeSide] = useState(partitionDefaults.hingeSide || 'left');
   const [partitionSwing, setPartitionSwing] = useState(partitionDefaults.swing || 'out');
 
+  // Fire door state (27.10.2026): the firedoor* keys the window record stores
+  // (FIREDOOR-CONTRACT section 2) and specification.js reads, seeded from the
+  // fire door profile defaults. The closer starts null = "follows fire" until
+  // the user picks one. The leaf size and the wall depth are free numbers: the
+  // chips insert a value, nothing clamps (the engine's sanity limits fail the
+  // one door with a message in the summary).
+  const fdProfile = getFireDoorProfile() || DEFAULT_FIREDOOR_PROFILE;
+  const fdDefaults = fdProfile.defaults || DEFAULT_FIREDOOR_PROFILE.defaults;
+  const [fdFire, setFdFire] = useState(fdDefaults.fire !== false);
+  const [fdRating, setFdRating] = useState(fdDefaults.rating === 'FD60' ? 'FD60' : 'FD30');
+  const [fdLeafWidth, setFdLeafWidth] = useState(Number(fdProfile.leaf?.defaultWidth) || DEFAULT_FIREDOOR_PROFILE.leaf.defaultWidth);
+  const [fdLeafHeight, setFdLeafHeight] = useState(Number(fdProfile.leaf?.defaultHeight) || DEFAULT_FIREDOOR_PROFILE.leaf.defaultHeight);
+  const [fdHingeSide, setFdHingeSide] = useState(fdDefaults.hingeSide === 'right' ? 'right' : 'left');
+  const [fdSwing, setFdSwing] = useState(fdDefaults.swing === 'out' ? 'out' : 'in');
+  const [fdFrameDepth, setFdFrameDepth] = useState(Number(fdProfile.frame?.defaultDepth) || DEFAULT_FIREDOOR_PROFILE.frame.defaultDepth);
+  const [fdLockType, setFdLockType] = useState(FD_LOCK_LABEL[fdDefaults.lockType] ? fdDefaults.lockType : 'latch');
+  const [fdCloser, setFdCloser] = useState(null);
+  const [fdVpStyle, setFdVpStyle] = useState(Number(fdDefaults.vpStyle) || 0);
+  const [fdVpCustom, setFdVpCustom] = useState({ ...DEFAULT_FIREDOOR_PROFILE.defaults.vpCustom, ...(fdDefaults.vpCustom || {}) });
+  const [fdIntuStyle, setFdIntuStyle] = useState(Number(fdDefaults.intuStyle) || DEFAULT_FIREDOOR_PROFILE.defaults.intuStyle);
+  const [fdLeadEdge, setFdLeadEdge] = useState(fdDefaults.leadEdge !== false);
+
   // Frame choice drives glass type; heritage opens a passive/single choice instead.
   const changeFrame = (v) => {
     setFrameType(v);
@@ -425,6 +464,28 @@ export default function ConfiguratorPage() {
     setPartitionPanelHeight(w.partitionPanelHeight != null && w.partitionPanelHeight !== '' ? Math.max(0, Number(w.partitionPanelHeight) || 0) : (pd.panelHeight ?? 790));
     setPartitionHingeSide(w.partitionHingeSide === 'right' ? 'right' : (w.partitionHingeSide === 'left' ? 'left' : (pd.hingeSide || 'left')));
     setPartitionSwing(w.partitionSwing === 'in' ? 'in' : (w.partitionSwing === 'out' ? 'out' : (pd.swing || 'out')));
+    // Fire door fields (harmless no-ops for the other categories): the stored
+    // firedoor* keys (top level of the window record), else the profile
+    // defaults; a stored closer counts as "touched" (it no longer follows fire).
+    const fdp = getFireDoorProfile() || DEFAULT_FIREDOOR_PROFILE;
+    const fdd = fdp.defaults || DEFAULT_FIREDOOR_PROFILE.defaults;
+    const fdNum = (v, fb) => (v != null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : fb);
+    setFdFire(typeof w.firedoorFire === 'boolean' ? w.firedoorFire : (fdd.fire !== false));
+    setFdRating(w.firedoorRating === 'FD60' ? 'FD60' : (w.firedoorRating === 'FD30' ? 'FD30' : (fdd.rating === 'FD60' ? 'FD60' : 'FD30')));
+    setFdLeafWidth(Number(w.firedoorLeafWidth) || Number(fdp.leaf?.defaultWidth) || DEFAULT_FIREDOOR_PROFILE.leaf.defaultWidth);
+    setFdLeafHeight(Number(w.firedoorLeafHeight) || Number(fdp.leaf?.defaultHeight) || DEFAULT_FIREDOOR_PROFILE.leaf.defaultHeight);
+    setFdHingeSide(w.firedoorHingeSide === 'right' ? 'right' : (w.firedoorHingeSide === 'left' ? 'left' : (fdd.hingeSide === 'right' ? 'right' : 'left')));
+    setFdSwing(w.firedoorSwing === 'out' ? 'out' : (w.firedoorSwing === 'in' ? 'in' : (fdd.swing === 'out' ? 'out' : 'in')));
+    setFdFrameDepth(Number(w.firedoorFrameDepth) || Number(fdp.frame?.defaultDepth) || DEFAULT_FIREDOOR_PROFILE.frame.defaultDepth);
+    setFdLockType(FD_LOCK_LABEL[w.firedoorLockType] ? w.firedoorLockType : (FD_LOCK_LABEL[fdd.lockType] ? fdd.lockType : 'latch'));
+    setFdCloser(typeof w.firedoorCloser === 'boolean' ? w.firedoorCloser : null);
+    setFdVpStyle(fdNum(w.firedoorVpStyle, Number(fdd.vpStyle) || 0));
+    const vpc = w.firedoorVpCustom && typeof w.firedoorVpCustom === 'object' ? w.firedoorVpCustom : {};
+    const vpd = { ...DEFAULT_FIREDOOR_PROFILE.defaults.vpCustom, ...(fdd.vpCustom || {}) };
+    setFdVpCustom(Object.fromEntries(Object.keys(vpd).map((k) => [k, fdNum(vpc[k], vpd[k])])));
+    // a non-fire door stores INTU_STYLE 0: the form shows the default style again when fire comes back on
+    setFdIntuStyle(Number(w.firedoorIntuStyle) || Number(fdd.intuStyle) || DEFAULT_FIREDOOR_PROFILE.defaults.intuStyle);
+    setFdLeadEdge(typeof w.firedoorLeadEdge === 'boolean' ? w.firedoorLeadEdge : (fdd.leadEdge !== false));
   }, [def]);
 
   // Prefill form when editing an existing window
@@ -513,6 +574,8 @@ export default function ConfiguratorPage() {
   const isCasementBatch = batch?.type === 'casement';
   // Partition walls (25.10.2026): one flag for the form, the 3D sync, the save and the size clamp.
   const isPartition = batch?.type === 'partition';
+  // Fire doors (27.10.2026): one flag for the form, the live derive, the 3D sync, the save and the numbering.
+  const isFireDoor = batch?.type === 'firedoor';
   // batch.type read directly: `isSash` is declared much later in this component (TDZ crash on render, 06.09)
   const isArchedSash = batch?.type === 'sash' && sashType !== 'triple' && sashFrameShape === 'arched';
   const isArched = (isCasementBatch && casFrameShape === 'arched') || isArchedSash;
@@ -646,6 +709,9 @@ export default function ConfiguratorPage() {
     // a partition wall: the member depth of the partition profile (54)
     : batch?.type === 'partition'
     ? (Number(getPartitionProfile().depth) || DEFAULT_PARTITION_PROFILE.depth)
+    // a fire door (27.10.2026): the wall thickness the user typed is the frame depth; the profile default when blank
+    : batch?.type === 'firedoor'
+    ? (Number(fdFrameDepth) || Number(getFireDoorProfile().frame?.defaultDepth) || DEFAULT_FIREDOOR_PROFILE.frame.defaultDepth)
     : (FRAME_DEPTHS[frameType] || 164);
   const effectiveLBars = sameBars ? uBars : lBars;
   const isCasement = batch?.type === 'casement';
@@ -677,6 +743,66 @@ export default function ConfiguratorPage() {
   const doorSideW = (sidePanels === 'left' || sidePanels === 'both' ? Number(sideLeftW) || 0 : 0)
     + (sidePanels === 'right' || sidePanels === 'both' ? Number(sideRightW) || 0 : 0);
   const doorFieldW = extW - doorSideW;
+
+  // ── Fire door live derive (27.10.2026): the engine on the fields exactly as
+  // the save stores them. Every number the form, the summary and the 3D print
+  // comes from here or the profile (rule 7). A FireDoorGeometryError (a leaf
+  // outside the sanity limits, a head joint the engine does not cut) blocks
+  // the Save with its message in the summary; nothing is ever clamped.
+  const fdCloserEff = fdCloser == null ? fdFire : fdCloser;
+  const fdVpStyles = fdProfile.vp?.styles || DEFAULT_FIREDOOR_PROFILE.vp.styles;
+  const fdVpStyleDef = fdVpStyles.find((s) => Number(s.id) === Number(fdVpStyle)) || null;
+  const fdVpIsCustom = fdVpStyleDef?.arrange === 'custom';
+  const fdItem = useMemo(() => (isFireDoor ? {
+    windowCategory: 'firedoor',
+    firedoorFire: fdFire, firedoorRating: fdRating,
+    firedoorLeafWidth: Number(fdLeafWidth), firedoorLeafHeight: Number(fdLeafHeight),
+    firedoorHingeSide: fdHingeSide, firedoorSwing: fdSwing, firedoorFrameDepth: Number(fdFrameDepth),
+    firedoorLockType: fdLockType, firedoorCloser: fdCloserEff,
+    firedoorVpStyle: Number(fdVpStyle), firedoorVpCustom: { ...fdVpCustom },
+    // fire OFF: no intumescent (INTU_STYLE 0), whatever the hidden select still holds
+    firedoorIntuStyle: fdFire ? Number(fdIntuStyle) : 0, firedoorLeadEdge: fdLeadEdge,
+    ventRoomType: 'other', pas24: false, childRestrictor: false,
+  } : null), [isFireDoor, fdFire, fdRating, fdLeafWidth, fdLeafHeight, fdHingeSide, fdSwing, fdFrameDepth, fdLockType, fdCloserEff, fdVpStyle, fdVpCustom, fdIntuStyle, fdLeadEdge]);
+  const fdLive = useMemo(() => {
+    if (!fdItem) return null;
+    try {
+      // the stored width / height are the frame overall the engine derives from the leaf; the leaf stands in until it has
+      const ws = normaliseToWindowSpec({
+        id: 'configurator', name: winName || 'FD', width: fdItem.firedoorLeafWidth, height: fdItem.firedoorLeafHeight,
+        ...fdItem,
+        glassType, glassSpec, glassCoating, glassGas, glassFinish: gFin, frostedLocation: frostLoc,
+        woodColor, woodColorExt: isSingle ? woodColor : woodColorExt, woodColorInt: isSingle ? woodColor : woodColorInt,
+        colourMode, ironmongery: iron, ironmongerySlots: ironSlots,
+      });
+      const derived = deriveWindowData(ws, tenantSettings);
+      if (!derived?.firedoor?.frame?.overall) throw new Error('The engine returned no fire door data');
+      return { ws, derived, error: null, geometry: false };
+    } catch (e) {
+      return { ws: null, derived: null, error: e?.message || String(e), geometry: e instanceof FireDoorGeometryError };
+    }
+  }, [fdItem, winName, glassType, glassSpec, glassCoating, glassGas, gFin, frostLoc, woodColor, woodColorExt, woodColorInt, isSingle, colourMode, iron, ironSlots, tenantSettings]);
+  const fd = fdLive?.derived?.firedoor || null;
+  const fdOverall = fd?.frame?.overall || null;
+  const fdBlocked = isFireDoor && !fdOverall;
+
+  // ── Fire door numbering (brief 3.2): FDR-01 / DR-01, counted per prefix over
+  // every window of every batch of the project. Proposed on a NEW door while
+  // the name is empty or still the last proposal, re-proposed when `fire` flips
+  // (the prefix changes), never on a saved door (edit mode), always overwritable.
+  const fdAutoName = useMemo(() => {
+    if (!isFireDoor) return '';
+    const names = (project?.batches || []).flatMap((b) => b.windows || []).map((w) => w?.name).filter(Boolean);
+    try { return nextFireDoorName(names, fdFire) || ''; } catch { return ''; }
+  }, [isFireDoor, project, fdFire]);
+  const fdAutoNameRef = useRef('');
+  useEffect(() => {
+    if (!isFireDoor || isEditMode || !prefilled || !fdAutoName) return;
+    // the updater runs at the next render: compare against the proposal captured now, not the ref after the swap
+    const prevProposal = fdAutoNameRef.current;
+    fdAutoNameRef.current = fdAutoName;
+    setWinName((cur) => (String(cur || '').trim() === '' || cur === prevProposal ? fdAutoName : cur));
+  }, [isFireDoor, isEditMode, prefilled, fdAutoName]);
 
   // Casement effective values — PSW clamps 1:1: fanlight 15–50% innerH step 10,
   // fan2 shares a 70% guard with fanlight, middle 300..(W-600) step 10.
@@ -726,6 +852,22 @@ export default function ConfiguratorPage() {
   // ─── 3D sync ───
   const sync = useCallback(() => {
     if (typeof window.update3D !== 'function') return;
+    if (isFireDoor) {
+      // Fire doors (27.10.2026): the 3D draws the door set from the engine's
+      // geometry (fireDoorGeometryFromSpec, FIREDOOR-CONTRACT section 7); the
+      // category alone keeps the sash model off the door data.
+      let fireDoorGeo = null;
+      try { fireDoorGeo = fdLive?.derived ? fireDoorGeometryFromSpec(fdLive.ws, fdLive.derived) : null; } catch { fireDoorGeo = null; }
+      window.update3D({
+        windowCategory: 'firedoor',
+        extWidth: fdOverall?.width ?? Number(fdLeafWidth), extHeight: fdOverall?.height ?? Number(fdLeafHeight),
+        woodColor, woodColorExt: isSingle ? woodColor : woodColorExt,
+        woodColorInt: isSingle ? woodColor : woodColorInt, sameColor: isSingle,
+        doubleGlazing: false, spacerColor, glassFinish: gFin, ironmongery: iron,
+        fireDoorGeo, fireDoorOpen: FD_3D_OPEN_DEG,
+      });
+      return;
+    }
     if (isPartition) {
       // Partition walls (25.10.2026): no 3D model yet. The category alone makes
       // the 3D App draw nothing (never the sash model on wall data).
@@ -865,7 +1007,7 @@ export default function ConfiguratorPage() {
       sashProportion: sashProp, meetingFraction: proportionError ? undefined : meetingFractionFor(extH, sashProp),
       boxType: frameType === 'slim' ? 'slim' : 'standard', boxDepth: frameDepth,
     });
-  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, sashProp, proportionError, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, isArched, isFixedCas, isCircle, pcArchShape, isGothicUi, casArchProfile, casArchRiseSource, archStartNum, archRiseNum, casArchHinge, casArchPattern, isCustomHub, casArchSpokes, casArchRings, isArchedSash, sashArchHB, sashArchVB, sashLowerHB, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType, glassSpec, glassCoating, glassGas, spacerType, isPartition]);
+  }, [extW, extH, uBars, effectiveLBars, sameBars, uCustom, lCustom, horn, woodColor, woodColorExt, woodColorInt, isSingle, iron, gFin, frostLoc, glassType, spacerColor, sashType, splitRatio, sashProp, proportionError, headType, opening, frameType, frameDepth, batch?.type, isCasement, casLayout, casHinges, isArched, isFixedCas, isCircle, pcArchShape, isGothicUi, casArchProfile, casArchRiseSource, archStartNum, archRiseNum, casArchHinge, casArchPattern, isCustomHub, casArchSpokes, casArchRings, isArchedSash, sashArchHB, sashArchVB, sashLowerHB, casCalc, casHB, casVB, casFanHB, casFanVB, casFan2HB, casFan2VB, sillExt, sillWider, sealColour, ventRoomType, ventSoleWindow, isDoor, isFrench, doorType, doorShape, doorStyle, doorPaneling, doorHB, doorVB, sidePanels, sideLeftW, sideRightW, sideStyle, sideHB, sideVB, transomType, transomHeight, transomBars, hingeSide, openDirection, threshold, thresholdExt, lockType, doorBarType, glassSpec, glassCoating, glassGas, spacerType, isPartition, isFireDoor, fdLive, fdOverall, fdLeafWidth, fdLeafHeight]);
   useEffect(() => { sync(); }, [sync]);
 
   // ─── B4: Listen for 3D ready event and re-sync ───
@@ -878,6 +1020,7 @@ export default function ConfiguratorPage() {
   // ─── Save ───
   const save = () => {
     if (isSash && proportionError) return;   // an unknown stored proportion: said next to the control, never saved
+    if (fdBlocked) return;                   // a fire door the engine refused: its message sits in the summary, nothing is saved
     const config = {
       windowName: winName, windowCategory: batch?.type || 'sash',
       extWidth: extW, extHeight: extH, inputWidth: inW, inputHeight: inH, measurementType: 'box-to-box',
@@ -940,6 +1083,14 @@ export default function ConfiguratorPage() {
         partitionDoorWidth, partitionLights, partitionPanelHeight, partitionHingeSide, partitionSwing,
         ventRoomType: 'other', pas24: false, childRestrictor: false,
       } : {}),
+      // Fire doors (27.10.2026): the firedoor* keys of the contract (fdItem, the
+      // same object the live derive ran on) and the stored width / height = the
+      // FRAME OVERALL the engine derived from the leaf. No trickle vents, no
+      // PAS24, no restrictor on an internal door.
+      ...(isFireDoor && fdItem && fdOverall ? {
+        ...fdItem,
+        extWidth: fdOverall.width, extHeight: fdOverall.height, inputWidth: fdOverall.width, inputHeight: fdOverall.height,
+      } : {}),
     };
 
     if (isEditMode) {
@@ -975,7 +1126,8 @@ export default function ConfiguratorPage() {
   // normalise so door slots surface either way.
   const slotType = (batch.type === 'doors' ? 'door' : (batch.type || 'sash'));
   // alsoFor: a partition wall takes the door hinge / handle slots (ironmongeryStore); an internal wall has no trickle vents
-  const slotCategories = IRONMONGERY_CATEGORIES.filter(c => (c.windowType === slotType || (c.windowType === 'all' && slotType !== 'partition') || (c.alsoFor || []).includes(slotType)) && c.slot !== false);
+  // a fire door (27.10.2026) takes its own slots (windowType 'firedoor') and the door hinge / handle / cylinder slots that list it in alsoFor; no trickle vents on an internal door
+  const slotCategories = IRONMONGERY_CATEGORIES.filter(c => (c.windowType === slotType || (c.windowType === 'all' && slotType !== 'partition' && slotType !== 'firedoor') || (c.alsoFor || []).includes(slotType)) && c.slot !== false);
   const getSlotItem = (key) => ironItems.find(m => m.id === ironSlots[key]) || null;
 
   // Format custom bars for spec panel
@@ -1039,6 +1191,17 @@ export default function ConfiguratorPage() {
         <div className="flex items-center gap-3">
           <input type="text" placeholder="Window name (max 7)" maxLength={7} value={winName} onChange={e => setWinName(e.target.value)}
             className={`px-3 py-2 border-2 rounded-lg text-sm w-56 bg-surface-800 ${winName.trim() ? 'border-accent-500 text-ink-50' : 'border-status-danger/50 text-ink-200'}`} />
+          {isFireDoor ? (
+            // fire door: Save waits for the engine (a refused size keeps its message in the summary, nothing is saved)
+            <button
+              onClick={save}
+              disabled={fdBlocked}
+              title={fdBlocked ? `Fire door: ${fdLive?.error || 'not derived'}` : undefined}
+              className={`btn ${isEditMode ? 'bg-green-600 hover:bg-green-500 text-white' : 'btn-primary'} ${fdBlocked ? 'opacity-40 cursor-not-allowed' : ''}`}
+            >
+              {isEditMode ? '✓ Update Window' : '✓ Save to Batch'}
+            </button>
+          ) : (
           <button
             onClick={save}
             disabled={shapeBlocked}
@@ -1047,6 +1210,7 @@ export default function ConfiguratorPage() {
           >
             {isEditMode ? '✓ Update Window' : '✓ Save to Batch'}
           </button>
+          )}
         </div>
       </div>
 
@@ -1128,7 +1292,8 @@ export default function ConfiguratorPage() {
             </div>
           </Sec>}
 
-          <Sec t={isPartition ? 'Dimensions (Wall)' : 'Dimensions (Frame)'}>
+          {/* a fire door (27.10.2026) has no typed frame size: the leaf is typed in its own section and the frame overall is derived */}
+          {!isFireDoor && <Sec t={isPartition ? 'Dimensions (Wall)' : 'Dimensions (Frame)'}>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Lbl>Width (mm)</Lbl>
@@ -1176,7 +1341,7 @@ export default function ConfiguratorPage() {
                 </span>
               </div>
             </>}
-          </Sec>
+          </Sec>}
 
           {isCasement && <Sec t="Glazing Bars">
             <Lbl>Main — horizontal{isArched ? ' (below the springing)' : ''}</Lbl><HChips o={CAS_BAR_COUNTS} v={casHB} c={setCasHB} />
@@ -1350,7 +1515,68 @@ export default function ConfiguratorPage() {
             </div>
           </Sec>}
 
-          {!isPartition && <Sec t="Ventilation">
+          {/* Fire doors (27.10.2026): the inputs of the spec block (brief 3.1). The leaf
+               size and the wall depth are free numbers (the chips insert a value, nothing
+               clamps); the frame overall, the rebate and the member sizes are derived. */}
+          {isFireDoor && <Sec t="Fire Door">
+            <HChips o={FD_FIRE} v={fdFire} c={setFdFire} />
+            {fdFire && <><Lbl>Rating</Lbl><HChips o={FD_RATINGS} v={fdRating} c={setFdRating} /></>}
+            <Lbl>Leaf width (mm)</Lbl>
+            <NumInput value={fdLeafWidth} onCommit={(v) => setFdLeafWidth(Number(v))}
+              className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm mb-1" />
+            <HChips o={(fdProfile.leaf?.widthSuggestions || DEFAULT_FIREDOOR_PROFILE.leaf.widthSuggestions).map((n) => ({ value: n, label: String(n) }))} v={Number(fdLeafWidth)} c={setFdLeafWidth} />
+            <Lbl>Leaf height (mm)</Lbl>
+            <NumInput value={fdLeafHeight} onCommit={(v) => setFdLeafHeight(Number(v))}
+              className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm mb-1" />
+            <HChips o={[fdProfile.leaf?.heightSuggestion || DEFAULT_FIREDOOR_PROFILE.leaf.heightSuggestion].map((n) => ({ value: n, label: String(n) }))} v={Number(fdLeafHeight)} c={setFdLeafHeight} />
+            <div className="text-[11px] text-ink-300 mb-1">Leaf thickness <span className="text-accent-400 font-medium">{fd ? `${fd.leaf?.thickness} mm` : 'n/a'}</span> <span className="text-ink-500">(by rating)</span></div>
+            <Lbl>Hinge side (seen from the pull side, where the knuckles show)</Lbl>
+            <HChips o={FD_HINGE_SIDES} v={fdHingeSide} c={setFdHingeSide} />
+            <Lbl>Swing</Lbl>
+            <HChips o={FD_SWINGS} v={fdSwing} c={setFdSwing} />
+            <Lbl>Wall thickness = frame depth (mm)</Lbl>
+            <NumInput value={fdFrameDepth} onCommit={(v) => setFdFrameDepth(Number(v))}
+              className="w-24 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm mb-1" />
+            <HChips o={(fdProfile.frame?.depthSuggestions || DEFAULT_FIREDOOR_PROFILE.frame.depthSuggestions).map((n) => ({ value: n, label: String(n) }))} v={Number(fdFrameDepth)} c={setFdFrameDepth} />
+            <Lbl>Lock</Lbl>
+            <HChips o={FD_LOCKS} v={fdLockType} c={setFdLockType} />
+            <Lbl>Concealed closer {fdCloser == null && <span className="text-ink-500">(follows fire: {fdFire ? 'yes' : 'no'})</span>}</Lbl>
+            <HChips o={FD_YES_NO} v={fdCloserEff} c={setFdCloser} />
+            <Lbl>Vision panel (VP_STYLE of the bSolid macro)</Lbl>
+            <select value={fdVpStyle} onChange={(e) => setFdVpStyle(Number(e.target.value))}
+              className="w-full px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm mb-2">
+              {fdVpStyles.map((s) => <option key={s.id} value={s.id}>{s.id} · {s.label}</option>)}
+            </select>
+            {fdVpIsCustom && <div className="grid grid-cols-2 gap-2 mb-1">
+              {[['length', 'Pane length (mm)'], ['width', 'Pane width (mm)'], ['count', 'Panes'], ['rail', 'Rail between (mm)']].map(([k, l]) => (
+                <div key={k}>
+                  <Lbl>{l}</Lbl>
+                  <NumInput value={fdVpCustom[k]} onCommit={(v) => setFdVpCustom((c) => ({ ...c, [k]: Number(v) }))}
+                    className="w-full px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
+                </div>
+              ))}
+              <div className="col-span-2">
+                <Lbl>Position (C_VP_POS)</Lbl>
+                <HChips o={FD_VP_POS} v={Number(fdVpCustom.pos)} c={(v) => setFdVpCustom((c) => ({ ...c, pos: v }))} />
+              </div>
+            </div>}
+            {fdFire && <>
+              <Lbl>Intumescent (INTU_STYLE of the macro)</Lbl>
+              <select value={fdIntuStyle} onChange={(e) => setFdIntuStyle(Number(e.target.value))}
+                className="w-full px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm mb-2">
+                {(fdProfile.intumescent?.styles || DEFAULT_FIREDOOR_PROFILE.intumescent.styles).map((s) => <option key={s.id} value={s.id}>{s.id} · {s.label}</option>)}
+              </select>
+            </>}
+            <Lbl>Leading edge bevel (lock edge)</Lbl>
+            <HChips o={FD_YES_NO} v={fdLeadEdge} c={setFdLeadEdge} />
+            <div className="text-[11px] text-ink-300 bg-surface-700/50 border border-surface-500 rounded-lg px-3 py-2 mt-1" data-firedoor-live>
+              {fdOverall
+                ? <>Frame overall <span className="text-accent-400 font-medium">{fdOverall.width} x {fdOverall.height}</span> · rebate {fd.frame?.rebate?.width} x {fd.frame?.rebate?.depth} · members {fd.frame?.thickness} x {fd.frame?.depth} finished, {fd.frame?.rawThickness} x {fd.frame?.rawWidth} raw</>
+                : <span className="text-amber-400">{fdLive?.error || 'Fire door not derived'}</span>}
+            </div>
+          </Sec>}
+
+          {!isPartition && !isFireDoor && <Sec t="Ventilation">
             <Lbl>Room type</Lbl>
             <HChips o={ROOM_TYPES} v={ventRoomType} c={setVentRoomType} />
             {(ventRoomType === 'habitable' || ventRoomType === 'kitchen') && (
@@ -1360,7 +1586,9 @@ export default function ConfiguratorPage() {
           </Sec>}
 
           <Sec t="Glass">
-            {isCasement ? (
+            {isFireDoor ? (
+              <div className="text-[11px] text-ink-300 mb-2">Vision panel glass: <span className="text-accent-400 font-medium">{fd ? `${fd.fire ? 'fire glass' : 'toughened'} ${fdProfile.vp?.glassThickness ?? DEFAULT_FIREDOOR_PROFILE.vp.glassThickness} mm` : 'n/a'}</span> <span className="text-ink-500">(by fire)</span></div>
+            ) : isCasement ? (
               <><Lbl>Type</Lbl><HChips o={GLASS_TYPES.filter(g => g.value === 'double' || g.value === 'triple')} v={glassType} c={setGlassType} /></>
             ) : !isSash ? (
               <><Lbl>Type</Lbl><HChips o={GLASS_TYPES.filter(g => g.value === 'double' || g.value === 'double_slim' || g.value === 'triple')} v={glassType} c={setGlassType} /></>
@@ -1380,7 +1608,7 @@ export default function ConfiguratorPage() {
             ) : (hasGasFill && <div className="text-[11px] text-ink-300 mt-1">Gas: <span className="text-accent-400 font-medium">Argon</span> <span className="text-ink-500">— fixed</span></div>)}
           </Sec>
 
-          {!isPartition && <Sec t={isCasement ? 'Security & External Cill' : 'Horns & Security'}>
+          {!isPartition && !isFireDoor && <Sec t={isCasement ? 'Security & External Cill' : 'Horns & Security'}>
             {isSash && <><Lbl>Horns</Lbl><HChips o={HORN_OPTIONS} v={horn} c={setHorn} /></>}
             {isCasement && <>
               <Lbl>Cill projection</Lbl><HChips o={SILL_OPTIONS} v={sillExt} c={setSillExt} />
@@ -1458,7 +1686,7 @@ export default function ConfiguratorPage() {
         {/* RIGHT: Spec panel */}
         <div className="w-64 shrink-0 border-l border-surface-500 bg-surface-900 overflow-y-auto text-xs">
           <div className="px-4 py-2 bg-surface-700 border-b border-surface-500 text-[10px] font-semibold text-ink-400 uppercase tracking-wider">Specification</div>
-          <SG t="Dimensions"><SR l="Frame" v={`${extW} × ${extH}`} /><SR l="Depth" v={`${frameDepth}mm`} /></SG>
+          <SG t="Dimensions"><SR l="Frame" v={isFireDoor ? (fdOverall ? `${fdOverall.width} × ${fdOverall.height}` : 'n/a') : `${extW} × ${extH}`} /><SR l="Depth" v={`${frameDepth}mm`} /></SG>
           {isSash && <SG t="Product"><SR l="Sash" v={sashType} />{!isArchedSash && <SR l="Proportions" v={SASH_PROPORTION_LABELS[sashProp] || sashProp} />}<SR l="Head" v={headType} />{isArchedSash && <SR l="Frame" v={`arched · ${pcArchShape || '—'} · rise ${archRiseNum}`} />}</SG>}
           {isCasement && isArched && <SG t="Layout">
             <SR l="Type" v={`Arched · ${isGothicUi ? `Gothic (${casArchProfile})` : `Round (${pcArchShape || '?'})`}`} />
@@ -1501,8 +1729,30 @@ export default function ConfiguratorPage() {
             <SR l="Panel" v={partitionPanelHeight > 0 ? `${partitionPanelHeight} mm` : 'none'} />
             {partitionHasDoor && <SR l="Hinge" v={`${partitionHingeSide} · opens ${partitionSwing}`} />}
           </SG>}
+          {/* Fire doors (27.10.2026): the live summary, every number from the engine's derived.firedoor */}
+          {isFireDoor && <SG t="Fire Door">
+            {fdLive?.error && <div className="px-4 py-1 text-[11px] text-amber-400" data-firedoor-error>{fdLive.geometry ? 'Geometry' : 'Error'}: {fdLive.error}</div>}
+            {fd && <>
+              <SR l="Name" v={winName || fdAutoName || 'n/a'} />
+              <SR l="Rating" v={fd.fire ? fd.rating : 'Non-fire'} />
+              <SR l="Leaf" v={`${fd.leaf?.width} × ${fd.leaf?.height} × ${fd.leaf?.thickness}`} />
+              <SR l="Frame overall" v={`${fdOverall.width} × ${fdOverall.height}`} />
+              <SR l="Rebate" v={`${fd.frame?.rebate?.width} × ${fd.frame?.rebate?.depth} · faces ${fd.frame?.faces?.outside} / ${fd.frame?.faces?.inside}`} />
+              {(fd.frame?.members || []).map((m) => <SR key={m.id} l={m.id} v={`${m.length}${m.rawSection ? ` · raw ${m.rawSection}` : ''}`} />)}
+              <SR l="Hand" v={fd.handing?.label || `Hinge ${fdHingeSide} · opens ${fdSwing}`} />
+              <SR l="Hinges (leaf top)" v={(fd.hinges?.positions || []).map((h) => h.top).join(' / ')} />
+              <SR l="Hinges (jamb top)" v={(fd.hinges?.positions || []).map((h) => h.jambTop).join(' / ')} />
+              <SR l="Lock" v={`${FD_LOCK_LABEL[fd.lock?.type] || fd.lock?.type} · spindle ${fd.lock?.spindle?.fromBottom} up`} />
+              <SR l="Keep centre" v={`${fd.keep?.centreFromFoot} from the jamb foot`} />
+              <SR l="Closer" v={fd.closer ? 'Yes' : 'No'} />
+              <SR l="Vision panel" v={fd.vp?.label || 'None'} />
+              {fd.intumescent && <SR l="Intumescent" v={`${fd.intumescent.width} × ${fd.intumescent.thickness} · ${fd.intumescent.metres} m`} />}
+            </>}
+          </SG>}
           {isPartition
             ? <SG t="Members"><SR l="Timber" v="solid oak, oiled" /><SR l="Depth" v={`${frameDepth}mm`} /></SG>
+            : isFireDoor
+            ? <SG t="Frame members"><SR l="Finished" v={fd ? `${fd.frame?.thickness} × ${fd.frame?.depth}` : 'n/a'} /><SR l="Raw" v={fd ? `${fd.frame?.rawThickness} × ${fd.frame?.rawWidth}` : 'n/a'} /></SG>
             : <SG t="Frame & Horns">
               <SR l="Frame" v={`${frameType} · ${frameDepth}mm`} />
               {isSash && <SR l="Horns" v={horn} />}
@@ -1527,7 +1777,7 @@ export default function ConfiguratorPage() {
             <SR l="Spacer" v={spacerColor} />
             <SR l="Spacer Type" v={(SPACER_TYPES.find(t => t.value === spacerType) || {}).label || 'Warm Edge'} />
           </SG>
-          {!isPartition && <SG t="Ventilation">
+          {!isPartition && !isFireDoor && <SG t="Ventilation">
             <SR l="Room" v={ventRoomType} />
             <SR l="Sole window" v={ventSoleWindow ? 'Yes' : 'No'} />
             <SR l="Trickle vents" v={String(buildVentGrilles({ vent: { roomType: ventRoomType, soleWindow: ventSoleWindow } }))} />
@@ -1539,7 +1789,7 @@ export default function ConfiguratorPage() {
           </SG>}
           {isSash && <SG t="Opening"><SR l="Type" v={sashType === 'triple' ? TRIPLE_OPENING_LABEL : opening} /></SG>}
           <SG t="Hardware">
-            {!isPartition && <SR l="PAS24" v={pas24 ? 'Yes' : 'No'} />}
+            {!isPartition && !isFireDoor && <SR l="PAS24" v={pas24 ? 'Yes' : 'No'} />}
             <SR l="Ironmongery" v={iron} />
             {slotCategories.map(cat => {
               const item = getSlotItem(cat.key);

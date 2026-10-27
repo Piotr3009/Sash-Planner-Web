@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { profileBoxDepth, getWindowProfile, getCasementProfile, getDoorProfile, getPartitionProfile } from '../engine/profile.js';
+import { profileBoxDepth, getWindowProfile, getCasementProfile, getDoorProfile, getPartitionProfile, getFireDoorProfile } from '../engine/profile.js';
 import * as cloud from '../services/cloudSync.js';
 
 // ─── Production settings (preserved from original — used by calculations engine) ───
@@ -119,9 +119,53 @@ const BATCH_DEFAULTS = {
     frameType: 'standard',
     hornType: 'none',
   },
+  // Fire doors (27.10.2026, internal door sets FDR / DR): a painted leaf and
+  // frame, stainless ironmongery, no PAS24 (internal). glassType 'single': a
+  // vision panel is ONE pane of fire glass or toughened glass, never a sealed
+  // unit, so the double unit of the windows is wrong here; the spacer keys stay
+  // only because every batch carries them.
+  firedoor: {
+    ironmongery: 'stainless',
+    colourMode: 'single',
+    woodColor: '#F6F6F6',
+    woodColorExt: '#F6F6F6',
+    woodColorInt: '#F6F6F6',
+    glassType: 'single',
+    glassSpec: 'toughened',
+    spacerColor: 'white',
+    spacerType: 'warm',
+    pas24: false,
+    frameType: 'standard',
+    hornType: 'none',
+  },
 };
 
+// Batch type to the label of a new batch ("Batch 1 - Fix Frame"); a type not
+// listed here prints capitalised ('Sash', 'Casement', 'Doors', 'Partition').
+const BATCH_TYPE_LABELS = { 'fix-frame': 'Fix Frame', firedoor: 'Fire doors' };
+
 const BATCH_STATUSES = ['preparation', 'in-production', 'complete'];
+
+// The fire door keys of a window record (FIREDOOR-CONTRACT section 2), read
+// from the configurator config by name. A number that does not parse and a
+// missing key are stored as null (the profile default applies downstream);
+// booleans keep false; vpCustom is a plain copy of its five numbers.
+const FIREDOOR_ITEM_BOOLS = ['firedoorFire', 'firedoorCloser', 'firedoorLeadEdge'];
+const FIREDOOR_ITEM_NUMBERS = ['firedoorLeafWidth', 'firedoorLeafHeight', 'firedoorFrameDepth', 'firedoorVpStyle', 'firedoorIntuStyle'];
+const FIREDOOR_ITEM_STRINGS = ['firedoorRating', 'firedoorHingeSide', 'firedoorSwing', 'firedoorLockType'];
+const FIREDOOR_VP_CUSTOM_KEYS = ['length', 'width', 'count', 'rail', 'pos'];
+export function fireDoorItemFields(windowConfig) {
+  const c = windowConfig || {};
+  const out = {};
+  for (const k of FIREDOOR_ITEM_BOOLS) out[k] = c[k] == null ? null : (c[k] === true || c[k] === 'true' || c[k] === 'yes');
+  for (const k of FIREDOOR_ITEM_NUMBERS) out[k] = c[k] == null || c[k] === '' || !Number.isFinite(Number(c[k])) ? null : Number(c[k]);
+  for (const k of FIREDOOR_ITEM_STRINGS) out[k] = c[k] == null || c[k] === '' ? null : String(c[k]);
+  const vp = c.firedoorVpCustom;
+  out.firedoorVpCustom = vp && typeof vp === 'object'
+    ? Object.fromEntries(FIREDOOR_VP_CUSTOM_KEYS.map((k) => [k, Number.isFinite(Number(vp[k])) ? Number(vp[k]) : null]))
+    : null;
+  return out;
+}
 
 const uid = () =>
   (typeof crypto !== 'undefined' && crypto.randomUUID)
@@ -315,7 +359,7 @@ export const useProjectStore = create((set, get) => ({
   createBatch: (projectId, windowType) => {
     const id = uid();
     const batchNum = (get().projects.find(p => p.id === projectId)?.batches?.length || 0) + 1;
-    const typeLabel = windowType === 'fix-frame' ? 'Fix Frame' : windowType.charAt(0).toUpperCase() + windowType.slice(1);
+    const typeLabel = BATCH_TYPE_LABELS[windowType] || windowType.charAt(0).toUpperCase() + windowType.slice(1);
     const batch = {
       id,
       project_id: projectId,
@@ -407,6 +451,7 @@ export const useProjectStore = create((set, get) => ({
                 casement: JSON.parse(JSON.stringify(getCasementProfile())),
                 door: JSON.parse(JSON.stringify(getDoorProfile())),
                 partition: JSON.parse(JSON.stringify(getPartitionProfile())),
+                firedoor: JSON.parse(JSON.stringify(getFireDoorProfile())),
               },
             }
           : b.defaults;
@@ -705,6 +750,12 @@ export const useProjectStore = create((set, get) => ({
       partitionPanelHeight: windowConfig.partitionPanelHeight ?? null,
       partitionHingeSide: windowConfig.partitionHingeSide || 'left',
       partitionSwing: windowConfig.partitionSwing || 'out',
+      // ── Fire door fields (internal door sets, 27.10.2026): copied BY NAME like
+      // every other type, so a saved door keeps them. null = not set, so
+      // specification.js falls through to fullConfig and then the profile
+      // defaults (item.firedoorX ?? fullConfig.firedoorX ?? profile.defaults.X);
+      // a false boolean is kept (?? keeps false).
+      ...fireDoorItemFields(windowConfig),
       // Full specification JSON for calculations engine
       specification: JSON.stringify({
         windowType: batch.type,
@@ -877,6 +928,10 @@ export const useProjectStore = create((set, get) => ({
       transomBars: windowConfig.transomBars || 'none',
       thresholdType: windowConfig.thresholdType || 'standard',
       thresholdExtension: windowConfig.thresholdExtension || 0,
+      // Fire door fields (27.10.2026): the update must write them too, or the
+      // spread of `existing` above would keep the OLD values on the item and
+      // specification.js (item first, then fullConfig) would never see the edit.
+      ...fireDoorItemFields(windowConfig),
       specification: JSON.stringify({
         windowType: batch.type,
         width: (windowConfig.extWidth || existing.width) - 104,

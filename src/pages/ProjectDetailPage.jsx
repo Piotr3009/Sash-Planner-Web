@@ -13,7 +13,7 @@ import { deriveWindowBounded, splitBounded, excludedWindowsNote, sashBarsLabel }
 import ImageLightbox from '../components/ImageLightbox.jsx';
 
 
-const TYPE_LABELS = { sash: 'Sash Windows', casement: 'Casement Windows', 'fix-frame': 'Fix Frame', doors: 'Doors', partition: 'Partition walls', special: 'Special / Other' };
+const TYPE_LABELS = { sash: 'Sash Windows', casement: 'Casement Windows', 'fix-frame': 'Fix Frame', doors: 'Doors', partition: 'Partition walls', firedoor: 'Fire doors', special: 'Special / Other' };
 const STATUS_STYLES = {
   'preparation': { cls: 'badge-prep', icon: '📋' },
   'in-production': { cls: 'badge-active', icon: '🔧' },
@@ -65,7 +65,8 @@ export default function ProjectDetailPage() {
     const rows = [];
     batches.forEach((b) => {
       (b.windows || []).forEach((win) => {
-        const row = deriveWindowBounded(win, (windowSpec) => withProfiles(b?.defaults?._profileSnapshot?.sash, b?.defaults?._profileSnapshot?.casement, b?.defaults?._profileSnapshot?.door, b?.defaults?._profileSnapshot?.partition, () => deriveWindowData(windowSpec, settings)));
+        // fire doors (27.10.2026): the batch snapshot of the fire door profile is the 5th positional profile
+        const row = deriveWindowBounded(win, (windowSpec) => withProfiles(b?.defaults?._profileSnapshot?.sash, b?.defaults?._profileSnapshot?.casement, b?.defaults?._profileSnapshot?.door, b?.defaults?._profileSnapshot?.partition, b?.defaults?._profileSnapshot?.firedoor, () => deriveWindowData(windowSpec, settings)));
         rows.push({ ...row, batch: b });
       });
     });
@@ -196,6 +197,7 @@ export default function ProjectDetailPage() {
               { type: 'casement', icon: '🔲', label: 'Casement' },
               { type: 'doors', icon: '🚪', label: 'Doors' },
               { type: 'partition', icon: '▦', label: 'Partition walls' },
+              { type: 'firedoor', icon: '▯', label: 'Fire doors' },
               { type: 'special', icon: '✦', label: 'Special / Other' },
             ].map(({ type, icon, label }) => (
               <button key={type} onClick={() => handleAddBatch(type)}
@@ -261,7 +263,10 @@ export default function ProjectDetailPage() {
                         <div className="font-semibold text-sm text-ink-50">{win.name}</div>
                         <div className="text-xs text-ink-400 mt-0.5">{win.width} × {win.height} mm</div>
                         <div className="text-[10px] text-ink-400 mt-1">
-                          {bounded?.windowSpec?.category === 'partition'
+                          {bounded?.windowSpec?.category === 'firedoor'
+                            /* fire doors (27.10.2026): the rating, the leaf and the hand (PSW wording: Hinge left / right); the card size above is the frame overall */
+                            ? `${bounded.windowSpec.firedoor?.fire ? (bounded.windowSpec.firedoor?.rating || 'Fire') : 'Non-fire'} · leaf ${bounded.windowSpec.firedoor?.leafWidth} x ${bounded.windowSpec.firedoor?.leafHeight} · Hinge ${bounded.windowSpec.firedoor?.hingeSide === 'right' ? 'right' : 'left'}`
+                            : bounded?.windowSpec?.category === 'partition'
                             /* partition walls (25.10.2026): the layout and the lights, no bars field */
                             ? `Layout ${bounded.windowSpec.partition?.layout || 'S'} · ${bounded.windowSpec.partition?.lights || 1} lights`
                             : sashBars != null
