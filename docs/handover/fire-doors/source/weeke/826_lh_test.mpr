@@ -1,0 +1,106 @@
+[H
+VERSION="4.0 Alpha"
+HP="1"
+IN="0"
+GX="0"
+BFS="1"
+GY="1"
+GXY="0"
+UP="0"
+FM="3"
+FW="1200"
+ZS="20"
+HS="0"
+OP="0"
+MAT="WEEKE"
+INCH="0"
+VIEW="NOMIRROR"
+ANZ="1"
+_BSX=2001.000000
+_BSY=832.000000
+_BSZ=44.000000
+_FNX=0.000000
+_FNY=0.000000
+_RNX=0.000000
+_RNY=0.000000
+_RNZ=0.000000
+_RX=2001.000000
+_RY=832.000000
+
+[001
+L="2001"
+KM="length"
+W="832"
+KM="width"
+T="44"
+KM="thickness"
+
+<100 \WerkStck\
+LA="L"
+BR="W"
+DI="T"
+FNX="0"
+FNY="0"
+AX="0"
+AY="0"
+
+<139 \Komponente\
+IN="ASkyloonJoinery/r8hinge.mpr"
+XA="L-147"
+YA="0.0"
+ZA="0.0"
+EM="0"
+VA="L L"
+VA="W W"
+VA="T T"
+VA="H1 0"
+VA="H2 516"
+VA="HINGE2 1"
+VA="H3 915"
+VA="HINGE4 0"
+VA="H4 355"
+VA="DS 1"
+VA="HD -4"
+EN="0"
+
+<139 \Komponente\
+IN="ASkyloonJoinery/r8hinge.mpr"
+XA="L-802"
+YA="0.0"
+ZA="0.0"
+EM="0"
+VA="L L"
+VA="W W"
+VA="T T"
+VA="H1 0"
+VA="H2 516"
+VA="HINGE2 1"
+VA="H3 915"
+VA="HINGE4 0"
+VA="H4 355"
+VA="DS 1"
+VA="HD -4"
+
+<139 \Komponente\
+IN="ASkyloonJoinery/r8hinge.mpr"
+XA="L-1824"
+YA="0.0"
+ZA="0.0"
+EM="0"
+VA="L L"
+VA="W W"
+VA="T T"
+VA="H1 0"
+VA="H2 516"
+VA="HINGE2 1"
+VA="H3 915"
+VA="HINGE4 0"
+VA="H4 355"
+VA="DS 1"
+VA="HD -4"
+EN="0"
+
+<101 \Kommentar\
+KM="WEEKE BHC"
+??="0"
+!

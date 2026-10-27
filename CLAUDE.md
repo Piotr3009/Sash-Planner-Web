@@ -1,40 +1,47 @@
-# CLAUDE.md: TURA PC · DOORS v3 (casement rules inside the door frame), SASH BARS PER SASH, SETTINGS SAVE
+# CLAUDE.md: TURA PC · FIRE DOORS v1 (internal door sets FDR / DR, leaf + frame, machining, bSuite rows)
 
 This file is the brief for ONE tura in this repo (`Piotr3009/Sash-Planner-Web`, Production Core, "PC"). If your session was started for a different task, ignore this file.
+
+Workshop sources for this tura are in `docs/handover/fire-doors/`. Read `docs/handover/fire-doors/WORKSHOP-NOTES.md` first: it holds every number the owner gave, the reading of his bSolid master and the old Weeke programs.
 
 ---
 
 ## RAMKA DLA PIOTRA (owner box, binding)
 
-Piotr czyta tylko tę ramkę przed startem. Reszta pliku mówi to samo po angielsku, ze szczegółami. Decyzje Piotra z 09.10.2026 (odpowiedzi 1 do 23). Punkty oznaczone ZAŁOŻENIE to moje domyślne odczytanie tam, gdzie zabrakło odpowiedzi: tura zapisuje je jako klucze profilu w Window Settings · Doors, więc rano zmiana to liczba, nie przeróbka.
+Piotr czyta tylko tę ramkę przed startem. Reszta pliku mówi to samo po angielsku, ze szczegółami. Ustalenia z rozmowy 27.10.2026. Punkty ZAŁOŻENIE to moje domyślne odczytanie tam, gdzie nie było odpowiedzi: tura zapisuje je jako klucze profilu w Window Settings · Fire Doors, więc rano zmiana to liczba, nie przeróbka.
 
-**Drzwi: jedna zasada, zasada casement**
-1. Rama drzwi to rama casement 68 x 93 (land 47, rebate 21, gap 4). Słupek łączący 136 znika. Między drzwiami a panelem bocznym stoi mullion casement 68 x 93 na wylot, skrzydło 17 od osi mullionu (13 + 4), dokładnie jak w oknie casement.
-2. Transom fanlightu = transom casement, te same obliczenia: fan 65 od osi (51 + 6 + 8), skrzydło pod transomem 17 od osi (13 + 4), rygiel cięty na segmenty jak w casement (seat 8.5), land 8 nad osią i 13 pod osią. Mullion przechodzi na wylot, transom w segmentach.
-3. ZAŁOŻENIE: `transomHeight` z formularza (450) to odległość od góry ramy do OSI transomu, jak T w casement. Dziś 450 było dołem rygla. Przy 450: fan 385 wysoki, skrzydło drzwi zaczyna się 467 od góry.
-4. Wysokość skrzydła: liczymy od podłogi, na dole 51 na próg i akcesoria, w KAŻDYCH drzwiach (próg drewniany, do środka, alu, low profile). Skrzydło = H - 51 - 51 = H - 102. Rama 2100: skrzydło 1998 (było 2002 z progiem drewnianym, 2043 z alu). Szerokość bez zmian: W - 102 (jamb 51 z każdej strony), french połowa + lip 6, meeting stile 100.
-5. Panel boczny = casement fixed za mullionem: ślepe skrzydło, stile 64, górny ramiak 64, DOLNY RAMIAK 180 (jak w drzwiach, żeby linie się zgadzały), głębokość 57. Szerokość = strefa panelu - 51 (jamb) - 17 (oś mullionu). Wysokość jak skrzydło drzwi (H - 102, pod transomem H - T - 17 - 51). Szyba regułą casement: W - 105, H - (64 - 11.5) - (180 - 11.5).
-6. ZAŁOŻENIE: `sideLeftWidth` / `sideRightWidth` (500) to strefa panelu od zewnętrznej krawędzi ramy do osi mullionu.
-7. Fanlight stały = ślepe skrzydło casement 64 / 64 / 67 (ZAŁOŻENIE: dolny ramiak 67 jak casement fixed, nie 64), tych samych wymiarów co fan otwierany (W strefy - 2 x odjęcie, T - 65). Fan otwierany bez zmian: skrzydło casement 64 / 64 / 67, okucia casement.
-8. Panel (half glazed, three quarter): 2 x 18 Tricoya + rdzeń 18 = 54. Krawędź zebrana do 24 i siedzi w felcu szyby (18 głęboki) na 17 mm. Panel = światło + 2 x 17 (szyba ma + 2 x 11.5). Beading dookoła jak przy szybie. Rama 2100 half glazed: szyba 633 x 881, panel 644 x 806. ZAŁOŻENIE do rysunku: język 24 gruby, skos 40 szeroki od 24 do 54, płaski pasek 15 przy listwie. ZAŁOŻENIE do BOM: obie płyty i rdzeń w pełnym wymiarze panelu.
-9. Próg: alu albo low profile = kupujemy threshold (jest) PLUS wiersz uszczelki progu (nowy). Próg drewniany = nic nie kupujemy, cill jest w drewnie. Drzwi do środka = ZAWSZE próg drewniany (cill 40 / 35 jak dziś); ZAŁOŻENIE: wybór alu / low profile przy drzwiach do środka jest ignorowany, z notatką na arkuszu i w konfiguratorze.
-10. Nawiewniki w drzwiach liczymy w BOM tą samą regułą co w oknach (room type).
-11. Handing: zostaje oznaczenie z konfiguratora, jak w PSW: „Hinge left” = zawiasy po lewej patrząc od środka. Drukujemy „Hinge left / Hinge right” i „opens outward / inward”. Słowa Winkhaus LH / RH, anti-clockwise, clockwise znikają z wydruków.
-12. Zawiasy: bez limitu nośności (minimum 3). Ciężarki: bez zmian. Wycena drzwi: bez zmian (jak PSW). bSuite drzwi: nie teraz. French clearance: nie teraz.
-13. Meeting stiles (french): ZAŁOŻENIE: zostaje jak narysowano, rebated joint na 12 mm zakładki, połowa grubości każdy. Tura nic tu nie zmienia, tylko wpisuje do BLOCKERS.
-14. Arkusz skrzydła: wymiary zawiasów H1 do H4 mniejszą czcionką i rozsunięte, nic nie może na siebie nachodzić. Test sprawdza kolizje tekstu.
-15. Partia typu `door` dostaje domyślne drzwi (dziś sash).
+**Co budujemy**
+1. Nowy typ w PC: `firedoor` (drzwi wewnętrzne, zestaw skrzydło + futryna). Osobny od `door` (drzwi zewnętrzne zostają nietknięte). Nowe repo NIE.
+2. ZAŁOŻENIE: jeden typ z przełącznikiem Fire. Fire ON = numer `FDR-01`, `FDR-02`…; Fire OFF = `DR-01`… Numer podpowiadany, do nadpisania.
+3. Fire ON: ocena FD30 albo FD60. FD30 = skrzydło 44, FD60 = skrzydło 54 (makro ma warunki na 44 i 54). Fire ON włącza: zawiasy Fire, zamek FD30/FD60, zaczep FD30/FD60, intumescent, szybę ogniową w VP, zamykacz domyślnie TAK. Fire OFF: zawiasy standard, zamek standard, bez intumescent, zamykacz domyślnie NIE.
 
-**Sash**
-16. Szprosy osobno góra i dół: PSW przysyła `upperBars` i `lowerBars`, PC ma je wczytać także z fullConfig estymaty, i każdy arkusz, wiersz szkła, beading, DXF, canvas i 3D ma brać wzór swojej sashki. „6 over 1” ma wychodzić.
-17. Martwy kod `glazingItems` (`calculateGlazingSummaryForWindow`, `aggregateComponents`) do usunięcia, jeśli naprawdę nic go nie czyta; jeśli coś czyta, poprawić.
-18. Pricing Settings: pole „Cottage sash” obok „Arched head”, domyślnie 5 %.
-19. Nieznana wartość `sashProportion` nie wywala strony: błąd per okno, komunikat na karcie tego okna.
+**Co wpisuje użytkownik (konfigurator)**
+4. Szerokość skrzydła: podpowiedzi 626 / 686 / 726 / 762 / 826 / 838 / 926 / 1056 (klik wstawia), pole wolne, BEZ blokady. Wysokość skrzydła: podpowiedź 2040, pole wolne.
+5. Strona zawiasów Left / Right, kierunek otwarcia, grubość ściany = głębokość futryny (podpowiedzi 100 do 200, domyślnie 100, pole wolne).
+6. Zamek: Latch (standard) / Sashlock euro / Bathroom. Zamykacz (concealed closer) tak / nie. Vision panel: lista stylów z makra bSolid albo Custom. Kolor / wykończenie jak w innych typach. Podgląd 3D.
+7. Reszta jak przy oknach: listy, zamówienia (Assign Materials, BOM), Pre-Cut, Cut List, rysunki, pack, wycena, eksport na maszynę.
 
-**Ustawienia**
-20. Zapis Window Settings nie nadpisuje chmury całym blobem ze starej karty: zapis łączy tylko zmienione gałęzie z tym, co jest w chmurze, a strona ustawień odświeża się z chmury przy wejściu i po powrocie do karty.
+**Futryna (rama)**
+8. Drewno 63 grube, obrabiane na 50. Szerokość drewna = głębokość futryny (100 do 200). ZAŁOŻENIE: naddatek na szerokość 5 mm (klucz profilu).
+9. Przylga frezowana z litego (bez listwy przyklejanej): 15 szeroka (12 zakładki + 3 luzu) x (grubość skrzydła + 3) głęboka, czyli 47 przy 44. Od zewnątrz widać 35, od wewnątrz 50 (jak w LSP).
+10. Luz skrzydło do futryny: 3 z boków i u góry. ZAŁOŻENIE: 5 nad podłogą (jak w LSP), klucz profilu.
+11. Wymiary zewnętrzne futryny: szerokość = skrzydło + 76, wysokość = skrzydło + 43. ZAŁOŻENIE: narożniki górne na ucios 45 (jak rysuje LSP).
+12. Elementy futryny: HEAD, JAMB HINGE (zawiasowy), JAMB LOCK (zamkowy). Na jambie zawiasowym gniazda zawiasów na tych samych wysokościach co w skrzydle (+3 luzu u góry). Na jambie zamkowym zaczep (keep) naprzeciw zamka.
 
-**Nie ruszamy**: tytuły arkuszy (myślniki zostają), bSuite, wycena, French clearance, ciężarki.
+**Zawiasy, zamek, zaczep: PC liczy dokładnie tak jak makro Master_Door_PIOTR**
+13. Zawiasy 3 na skrzydło, długość 102. Reguła makra: górny 150 od góry skrzydła, dolny kończy się 200 od dołu, środkowy równo pomiędzy. Skrzydło 2040: 150 / 944 / 1738 od góry (do górnej krawędzi zawiasu). ZAŁOŻENIE: górny koniec deski w makrze = góra drzwi; sprawdzisz w bSolidzie.
+14. Gniazdo zawiasu: ZAŁOŻENIE 103 x 30 (płyty +1 mm, Twoja zasada), głębokość 3, rogi R6 (frez 12). W starych programach Weeke głębokość była 3.2 / 4 / 4.2: to jest klucz profilu.
+15. Zamek DIN (z Petrosa): czoło 235 x 24 frezowane 236 x 25, końce pełny promień; kaseta 85 w głąb x 150 wys., wpust 17 szeroki; backset 60; klamka (spindle) 1000 od dołu skrzydła; euro 72 pod klamką, bathroom 78. Latch = ta sama kieszeń, bez otworu na wkładkę.
+16. Zaczep w jambie zamkowym: 175 x 39 frezowany 176 x 40, środek ZAŁOŻENIE 15 pod klamką (z wyrażeń makra), plus kieszeń na zapadkę i rygiel.
+17. Zamykacz: wiersz w zamówieniu i flaga do eksportu. Wymiarów kieszeni nie mamy (makra Weeke `concealed_closer_*.mpr` nie ma w plikach): tura NIE frezuje zamykacza, wpisuje do BLOCKERS.
+18. Intumescent: w skrzydle (robi go makro, styl INTU_STYLE jak w makrze, domyślnie 1 = 15 x 4). W zamówieniu w metrach: 2 x wysokość + szerokość na pasek.
+
+**Eksport na maszynę**
+19. bSuite: na każde drzwi 4 wiersze `.ewlist`: FD_LEAF, FD_HEAD, FD_JAMB_HINGE, FD_JAMB_LOCK, Label = numer drzwi. Zmienne mają NAZWY Z MAKRA 1:1 (HAND, HINGE, LOCK, LOCK_H, EURO, KEEP, INTU_STYLE, VP_STYLE, C_VP_*...). Lista sortowana: skrzydła, potem nadproża, potem stojaki.
+20. Programów futryny (5-osiowe) jeszcze nie ma: brak ścieżki = wiersz pominięty z komunikatem, nie błąd. Do tego plik obróbki neutralny (CSV + JSON): każdy element i każda operacja z pozycją, dla programisty ramy na 5 osi.
+21. Uwaga: master skrzydła ma dziś tylko LPX / LPY / LPZ jako zmienne dokumentu. Reszta to parametry wewnątrz makra. Żeby wiersz z PC sterował zawiasami i zamkiem, w masterze trzeba dodać zmienne dokumentu o tych samych nazwach i podpiąć je w makrze. To robisz Ty w bSolidzie; tura tylko pisze listę.
+
+**Nie ruszamy**: typ `door`, partition, casement, sash, eksport bSuite ram casement, PSW. Drzwi podwójne (KIT_DOOR_DOUBLE) = następna tura.
 
 If anything below seems to conflict with this box, the box wins. If the box itself is unclear for a case you meet, do not guess: skip that case and write it in `BLOCKERS.md`.
 
@@ -42,137 +49,142 @@ If anything below seems to conflict with this box, the box wins. If the box itse
 
 ## 0. Why this tura exists
 
-The doors tura of 08.10.2026 (PR #13, `docs/handover/DOORS-PRODUCTION.md`) built the door engine with its own frame rules (coupling post 136, side panels of 57 x 57 members, a transom band of 94 / 115, a cill-dependent leaf height). The owner reviewed it on 09.10.2026 and decided: the door frame follows the casement rules everywhere (mullion, transom, fixed lights), every leaf stands 51 above the floor, the panel sits 17 deep in the glass rebate, the handing keeps the PSW wording. Two sash items from PR #14 (bars per sash, the explicit error per window), one pricing field and the settings save bug come along because they are small and decided.
+The owner makes internal timber door sets (FD30 / FD60 fire doors and non-fire internal doors). The leaf is machined on the Biesse Rover by his bSolid master `FD_LEAF_MASTER_PIOTR.bSolid` (macro `Master_Door_PIOTR`); the frame will be machined on a 5-axis CNC. PC must take the order (size, handing, wall, lock, closer, vision panel, colour) and produce everything the windows already get: element lists, purchasing, pre-cut, drawings, pack, price, and the machine list with the same hinge, lock and keep positions the bSolid macro cuts. PC has no internal door today: the `door` type is an external casement-rule door (68 x 93 frame, stile and rail leaf, multipoint locks), see `src/engine/profile.js` `DEFAULT_DOOR_PROFILE`. The nearest pattern for a new type is the `partition` type (commit 088d447, 44 files, `docs/handover/PARTITION-WALLS.md`), which also has hinge recesses and a latch keep.
 
 ---
 
 ## 1. How to run this tura
 
-1. Run autonomously. No questions. If something is unclear or outside the scope below, skip it and write it in `BLOCKERS.md`.
-2. Start from the current `main`. Work on a branch named `claude/doors-v3`. Commit per stage. Open a PR to `main`. Do not merge. Do not push to `main`. No force push.
+1. Run autonomously. No questions. If something is unclear or outside the scope below, skip it and write it in `BLOCKERS.md` section 35.
+2. Start from the current `main`. Work on a branch named `claude/fire-doors-v1`. Commit per stage. Open a PR to `main`. Do not merge. Do not push to `main`. No force push.
 3. Code, comments and UI copy in English.
 4. Every NEW file starts with the Skylon Development Ltd header. Copy it from `src/engine/partColours.js`.
 5. In text you write (comments, logs, UI copy, PR text, BLOCKERS, BUILD-LOG) do not use the em dash or en dash characters. Hyphens are fine.
-6. No new dependencies. Do not remove or rename existing functions or UI the owner uses. If you believe one of these is needed, do not do it: write it in `BLOCKERS.md`. The one removal allowed is item 17 of the box (dead glazing summary code), under its conditions.
-7. `deriveWindowData()` is the single source of truth. Components never calculate per-window data on their own. Every number a sheet, the 3D or a PDF prints must come from the derived data or from the profile, never from a literal in the component.
+6. No new dependencies. Do not remove or rename existing functions or UI. If you believe one of these is needed, do not do it: write it in `BLOCKERS.md`.
+7. `deriveWindowData()` is the single source of truth. Components never calculate per-door data on their own. Every number a sheet, the 3D, a list, a PDF or an export prints comes from the derived data or the profile, never from a literal in a component.
 8. Zustand stores: no ES6 getter properties.
-9. A grep is not proof. Prove every claim with the harness on derived data, and test the component that reaches the screen, not only the geometry under it.
-10. Subagents: read-only agents for the Stage 0 sweep; at most one agent per independent area later, only on disjoint files; at the end one independent review agent that has not seen your work. It re-derives the box numbers by hand, confirms that no assertion was weakened or deleted, reads the fixture diffs and opens the rendered sheets. Fix what it finds and record its verdict in `BUILD-LOG.md`.
-11. Order of value if the time runs short: Stages 1, 2, 3 and 8 are the product (door engine, lists, BOM, tests). Then 4 (sheets), 5 (3D), 6 (sash), 7 (settings save). Never leave a stage half applied: finish it or revert it and report.
+9. A grep is not proof. Prove every claim with the harness on derived data, and test the component that reaches the screen, not only the geometry under it. esbuild and vite do not catch undefined identifiers: after adding any import, hook or variable, grep that it is defined.
+10. Subagents: run several in parallel from the start (the owner wants this). Read-only agents for the Stage 0 sweep; after that one agent per independent area on DISJOINT files (engine + lists; drawings; 3D; export). At the end one independent review agent that has not seen the work: it re-derives the reference numbers of 3.10 by hand, confirms no existing assertion was weakened or deleted, opens the rendered sheets. Fix what it finds and record its verdict in `BUILD-LOG.md`.
+11. Order of value if time runs short: Stages 1, 2, 3, 4 are the product (type, profile, engine, lists, BOM, tests). Then 7 (export), 5 (sheets), 6 (3D). Never leave a stage half applied: finish it or revert it and report.
 12. Do not edit this file.
-13. Whatever the box calls ZAŁOŻENIE (assumption) becomes a profile key or a documented constant, listed in `BLOCKERS.md` under "owner check" with the number the tura used. Never bury an assumption in a literal.
+13. Every ZAŁOŻENIE of the box becomes a profile key of `DEFAULT_FIREDOOR_PROFILE`, editable in Window Settings · Fire Doors, listed in `BLOCKERS.md` 35 under "owner check" with the value used. Never bury an assumption in a literal.
+14. Verification proportionate: the new harness, one full suite run, one build. No hour of extra checks.
 
 ---
 
 ## 2. Scope
 
-**In scope**: the door engine (`deriveDoorWindow` in `src/engine/calculations.js`, `DEFAULT_DOOR_PROFILE` in `src/engine/profile.js`, `doorHardware.js`), door lists, BOM, assign materials rows, door sheets, door PDFs, door 3D, the Window Settings Doors card, the configurators' door form where a rule changes what they show; sash bars per sash across engine, lists, sheets, glass, beading, DXF, canvas renderer and 3D; the sash proportion error handling and the pricing field; the window profile cloud save; batch creation defaults for `door`; tests, logs, handover docs.
+**In scope**: a new category `firedoor` registered everywhere a category is registered (list in Stage 1); `DEFAULT_FIREDOOR_PROFILE`, its migration and the Window Settings card; the spec block; the configurator form; `deriveFireDoorWindow`; cut list, pre-cut, Assign Materials slots, BOM, ironmongery slots, glass schedule rows for vision panels, pricing with zero default rates; drawings and PDFs; a simple 3D model; bSuite rows and a machine-neutral machining export; dashboard, project page, batch creation, move to production; tests, logs, handover doc.
 
-**Out of scope, do not touch**: casement and sash engine numbers (they are the reference: the door now REUSES them); arched windows; bSuite export; pricing other than the one new field; the French centre clearance; counterweights; sheet title punctuation; PSW.
+**Out of scope, do not touch**: the `door` type and every door number; partition; casement; sash; arched; the casement bSuite frame export behaviour (you may extract shared helpers from `bsuiteExport.js` but the casement output must stay byte identical, prove it with `verify/parity/t32_bsuite.mjs`); PSW; double doors (write the KIT_DOOR_DOUBLE rules into BLOCKERS as the next tura); the concealed closer machining; Weeke MPR export.
 
 ---
 
 ## 3. The model (binding)
 
-Every number below is the default of the door profile (`DEFAULT_DOOR_PROFILE`, schema 3) and editable in Window Settings · Doors. `deriveDoorWindow` is the only place that turns it into sizes. Where this section says "casement rule", the door engine calls the SAME helper the casement engine uses (extract it into a shared function if it is inline today); never a second copy of a casement formula inside the door code.
+All numbers are defaults of `DEFAULT_FIREDOOR_PROFILE` (new, in `src/engine/profile.js`, schema 1) and editable in Window Settings · Fire Doors. `deriveFireDoorWindow` (new file `src/engine/fireDoor.js`, dispatched from `deriveWindowData` on `category === 'firedoor'`) is the only place that turns them into sizes and positions.
 
-### 3.1 Frame
+### 3.1 Inputs (spec block `firedoor`)
 
-- Head, jambs, cill 68 x 93 as today (land 47, rebate 21, gap 4, cill visible 41). Unchanged.
-- Mullion 68 x 93, casement rule: face `elements.mullion 68`, land 26 (13 per side), leaf at the mullion axis 17 (`deductions.leafAtMullionAxis`), the mullion runs the full height through the transom (`lengths.mullion` as casement: frame height less 77 with a timber cill). It replaces the coupling post wherever a side panel meets the door. `couplingPost` stays in the profile for stored copies only and is no longer used by the engine; the migration maps it away (3.9).
-- Transom rail 68 x 93, casement rule: axis at `transom.height` from the frame top (3.3), land 8 above and 13 below the axis, fan from the axis 65 (= 51 + 6 + 8, `deductions.fanFromAxis`), the leaf below the transom 17 from the axis (= 13 + 4, `deductions.leafBelowAxis`), the rail cut in segments between the jambs and the mullions the way the casement cuts `C-T` (seat `lengths.transomSeat 8.5`, use the casement helper). The mullion runs through, the transom does not.
-- Without a timber cill (aluminium or low-profile threshold) the mullion and the jambs run to the floor line: mullion length = frame height less the head seat part of the casement rule (the casement helper with the cill part set to 0). Record the number in `BLOCKERS.md` for the owner.
+| Key | Default | Notes |
+|---|---|---|
+| `fire` | true | Fire ON / OFF |
+| `rating` | `'FD30'` | `'FD30'` / `'FD60'`; ignored when `fire` false |
+| `leafWidth` | 826 | free number; suggestions `profile.leaf.widthSuggestions` = [626, 686, 726, 762, 826, 838, 926, 1056] |
+| `leafHeight` | 2040 | free number; suggestion 2040 |
+| `leafThickness` | derived | FD30 and non-fire 44, FD60 54 (`profile.leaf.thicknessByRating`) |
+| `hingeSide` | `'left'` | `'left'` / `'right'` seen from the PULL side (the side the hinge knuckles show). Same wording rule as PSW: print "Hinge left / Hinge right". |
+| `swing` | `'in'` | `'in'` / `'out'` (into the room or into the corridor); only flips drawings, labels and which frame face carries the stop |
+| `frameDepth` | 100 | free number = finished wall thickness; suggestions 100, 125, 150, 175, 200 |
+| `lockType` | `'latch'` | `'latch'` / `'euro'` / `'bathroom'` |
+| `closer` | fire ? true : false | concealed closer yes / no |
+| `vpStyle` | 0 | vision panel style id, table 3.7 |
+| `vpCustom` | `{ length: 600, width: 150, count: 1, rail: 100, pos: 0 }` | used when `vpStyle` 14 |
+| `intuStyle` | 1 | table 3.8; forced 0 when `fire` false |
+| `leadEdge` | true | leading edge bevel on the lock edge (macro LEAD_EDGE) |
+| `finish` / colour | batch default | as other types |
 
-### 3.2 Leaf heights, one rule for every door
+Width and height are never clamped. Only a hard sanity error (width < 300 or > 1500, height < 1500 or > 3000, depth < 50 or > 400) fails that ONE door with a message on its card; it never blanks the page.
 
-- `deductions.leafAtFloor 51` (new): every leaf bottom (door leaf, side panel light, lower leaf under a transom) stands 51 above the floor line, whatever the threshold (timber cill, inward cill 40 / 35, aluminium, low-profile) and whatever the direction.
-- No transom: leaf H = H - leafAtJamb 51 - leafAtFloor 51 = H - 102. Frame 2100: 1998.
-- Under a transom at axis T: leaf H = H - T - leafBelowAxis 17 - leafAtFloor 51.
-- `leafFullHeight` and `leafNoThreshold` are no longer read by the engine; keep them in the profile object for stored copies, migrate them to the derived values (102 and 102) and show them read-only or drop them from the Doors card.
-- Widths unchanged: single leaf W - 2 x leafAtJamb; french half = (W_zone - 2 x 51 - clearance) / 2, leaf = half + lip 6, meeting stile 100; a door zone bounded by a mullion uses 17 on that side instead of 51.
+### 3.2 Numbering
 
-### 3.3 Fanlight (transom zone)
+New doors in a project get the next free name `FDR-01`, `FDR-02` (fire) or `DR-01` (non-fire), two digits, counted per prefix inside the project. The user can overwrite the name. Changing `fire` on an unsaved door updates the prefix; on a saved door it does not rename.
 
-- `transom.height` T = frame top to the transom AXIS (owner box 3, an assumption: flag it). Opening fan leaf: casement leaf 64 / 64 / 67 x 57, W = zone width less the casement edge deductions (51 at a jamb, 17 at a mullion axis), H = T - 65. One fan leaf per frame zone (over the door, over each side panel), as today.
-- Fixed fanlight: a casement fixed light = a non-opening casement leaf 64 / 64 / 67 x 57 of the same size as the opening fan leaf would be (no hardware, the casement `fix.construction 'fixedLeaf'` rule). Glass by the casement rule: W - 105, H - 108. Replaces today's "glazed into the frame" fanlight. Profile key `fixedFan: { stile: 64, top: 64, bottom: 67 }` (bottom 67 is an assumption: flag).
-- Opening fan leaf hardware, seals, consumables: as today (casement picks).
+### 3.3 Leaf
 
-### 3.4 Side panels
+- Blank: one leaf = one board `leafHeight x leafWidth x leafThickness` (bSolid LPX x LPY x LPZ: LPX = height, LPY = width, LPZ = thickness, table orientation fixed by the owner on 09.10.2026).
+- BOM: a "Door blank" row per leaf, size of the leaf plus `profile.leaf.blankAllowance` (ZAŁOŻENIE 0, the owner buys blanks oversize and the CNC cuts the size; a fire blank and a non-fire blank are separate Assign Materials slots, and FD60 has its own slot).
 
-- A side panel is a casement fixed light behind a mullion: a non-opening leaf with stiles 64, top rail 64, bottom rail 180 (`elements.leafBottom` of the door, so its line meets the door bottom rail), depth 57. Profile key `sidePanel: { stile: 64, top: 64, bottom: 180, depth: 57 }` (replaces `sidePanel.member 57`).
-- Zone: `sideLeftWidth` / `sideRightWidth` = from the outer frame edge to the mullion axis (assumption: flag). Light W = zone - 51 - 17; light H as 3.2 (H - 102, or under the transom H - T - 17 - 51).
-- Glass by the casement rule: W - 2 x (64 - 11.5) = W - 105; H - (64 - 11.5) - (180 - 11.5) = H - 221.
-- No hardware. Seals, beading, bars and consumables as a casement fixed light. Bars: `sideHBars` / `sideVBars` as today.
-- Side panels never open, so they never need a threshold of their own; without a timber cill nothing is bought under them (owner answer 15).
+### 3.4 Frame
 
-### 3.5 Panel (half-glazed and three-quarter leaves)
+Profile `frame`: `rawThickness 63`, `thickness 50`, `rawWidthAllowance 5` (ZAŁOŻENIE), `overlap 12`, `gapSide 3`, `gapHead 3`, `floorGap 5` (ZAŁOŻENIE, from the LSP), `rebateClearance 3`, `headJoint 'mitre'` (ZAŁOŻENIE; only `'mitre'` is implemented, any other value fails the door with a message).
 
-- Build 2 x 18 Tricoya MDF + MDF core 18 = 54 (`panel.boardThickness`, `panel.boards`, `panel.coreThickness`, unchanged).
-- The panel edge is machined down to a tongue 24 thick that sits in the leaf glazing rebate (18 deep) 17 mm in: `panel.inset 17` (new; the glass uses `geometry.glassInset 11.5`). Panel outer size = daylight + 2 x 17 in both directions. Frame 2100 single half-glazed (leaf 798 x 1998, mid rail axis at 999): daylight 610 x 772, glass 633 x 881, panel 644 x 806.
-- Edge profile for the drawings and the 3D: `panel.edge: { tongue: 24, slope: 40, flat: 15 }` (assumption: flag): a 24 tongue, a 40 wide slope up to 54, a 15 flat next to the bead. BOM: both boards and the core at the full panel outer size (assumption: flag), beading around the panel perimeter as around a pane (as today).
+- Rebate from solid on every member: width `rebateW = overlap + gapSide = 15` (across the 50 thickness), depth `rebateD = leafThickness + rebateClearance = 47` (along the frame depth). Visible faces: 35 outside (`thickness - rebateW`), 50 inside.
+- Overall frame: width `leafWidth + 2 x (gapSide + thickness - rebateW) = leafWidth + 76`; height `floorGap + leafHeight + gapHead + (thickness - rebateW) = leafHeight + 43`. These must equal the LSP formulas (`KIT_DOOR_SINGLE.lsp`, `KIT_DOOR_DOUBLE.lsp`: single frame outer = leaf + 76, height = leaf + 43).
+- Members (finished `50 x frameDepth`, raw `63 x (frameDepth + rawWidthAllowance)`):
+  - `FD-HEAD`: long point length = overall frame width, both ends mitred 45.
+  - `FD-JAMB-H` (hinge jamb) and `FD-JAMB-L` (lock jamb): long point length = overall frame height, top end mitred 45, bottom end square (stands on the floor).
+- Cut List and Pre-Cut rows as for partition members (raw section, length, quantity, door name). Element names use the prefix `FD-` (`FD-LEAF`, `FD-HEAD`, `FD-JAMB-H`, `FD-JAMB-L`); extend the prefix rule in `partSymbols.js` (today `^[CDSW]-`) to also accept `FD-`, and the pre-cut regex in `lists.js` the same way, so the display drops the prefix as for the other types.
 
-### 3.6 Thresholds
+### 3.5 Hinges (copy of the macro rule, do not invent another)
 
-- `thresholdType 'standard'` (timber): the cill 68 x 93 is timber in the lists; nothing bought.
-- `'aluminium'` or `'low-profile'`: the threshold product as today PLUS a new BOM row "Threshold seal" (one length per door opening, in metres, on the door Ironmongery or Consumables list: pick the list the threshold product is on). Add the Assign Materials row.
-- Inward door: ALWAYS the timber inward cill 40 / 35 as today. A stored or chosen aluminium / low-profile value on an inward door is ignored by the engine; the sheets print "inward door: timber threshold" in the notes and the configurators show the same note and disable the aluminium / low-profile choices when the direction is inward (assumption on disabling: flag).
-- Leaf heights do not depend on the threshold any more (3.2).
+Profile `hinges`: `count 3`, `length 102`, `topOffset 150`, `bottomOffset 200`, `recessLength 103`, `recessWidth 30`, `recessDepth 3`, `cornerRadius 6` (all ZAŁOŻENIE except the macro rule), `fireProduct` and `standardProduct` as Assign Materials slots.
 
-### 3.7 Trickle vents on doors
+- Position of hinge i (0 based), measured from the leaf TOP to the hinge top edge: `top_i = topOffset + i x step`, `step = (leafHeight - topOffset - bottomOffset - length) / (count - 1)`. This is the macro expression `(lpx - 150 - 200 - w) / (repn - 1)` with `w = 102`, `repn = 3`. Reference: leaf 2040 gives step 794 (the number stored in the owner's file), hinges at 150 / 944 / 1738, the last one ending 200 above the leaf bottom.
+- Leaf recess: on the hinge edge, `recessLength` centred on the hinge, `recessWidth` into the face from the pull side, `recessDepth` deep, corners `cornerRadius`.
+- Frame recess on `FD-JAMB-H`: same size, same heights shifted by the head: position from the jamb top long point = `(thickness - rebateW) + gapHead + top_i`, on the rebate face that meets the leaf edge.
+- Fire ON uses macro HINGE = 1 (Fire), Fire OFF HINGE = 0 (Standard).
+- Count stays 3. Write in BLOCKERS whether a 4th hinge rule is wanted (macro supports REPN).
 
-- Count vents for a door assembly with the same rule as a window (`buildVentGrilles` by room type, the `trickleVents` slot), on the BOM and the hardware list. The configurator already shows the vent slot for doors.
+### 3.6 Lock and keep
 
-### 3.8 Handing
+Profile `lock`: `spindleHeight 1000` (from the leaf bottom, macro LOCK_H), `backset 60`, `forend { length 235, width 24, millOversize 1, depth 4 }`, `case { depth 85, height 150, pocketWidth 17, pocketDepth 87, pocketHeight 153 }` (pocket 87 x 153 = owner proposal, ZAŁOŻENIE), `euroCentres 72`, `bathroomCentres 78`, `caseTopAboveSpindle` (ZAŁOŻENIE 46.5, from the macro expression `lock_h + 46.5`), `forendCentreBelowSpindle` (ZAŁOŻENIE 15, from the macro expressions `lock_h - 15`).
+- Leaf: forend recess `236 x 25` with full radius ends, case pocket `17 x pocketDepth x pocketHeight`, both on the lock edge centred on the leaf thickness; spindle hole on both faces at `spindleHeight`, `backset` from the lock edge; euro hole at `spindleHeight - 72` or bathroom hole at `spindleHeight - 78`; latch has no second hole.
+- Macro values: Fire FD30 LOCK = 2, FD60 LOCK = 3, non-fire LOCK = 1; EURO = 1 only for `euro`; SPINDLE = 1.
+- Keep on `FD-JAMB-L`: plate `176 x 40` (175 x 39 + 1), depth `profile.keep.plateDepth` (ZAŁOŻENIE 3), one bolt pocket `profile.keep.pocket { length 120, width 18, depth 15 }` (ZAŁOŻENIE), centred at the forend centre height mapped onto the jamb (`floorGap + spindleHeight - forendCentreBelowSpindle` from the jamb foot). Macro KEEP for the leaf row = 0 (the keep of a single door is in the frame); the frame row carries `KEEP_STYLE`, `KEEP` (FD30 2, FD60 3, standard 1).
 
-- The configurator value is the handing, PSW convention: `doorHinge 'left'` = hinges on the left seen from INSIDE (right from outside) for an outward door; the inward door keeps the same inside-view meaning. PC prints exactly "Hinge left" / "Hinge right" plus "opens outward" / "opens inward" on the leaf sheet, the hardware list, the BOM detail and the pack. Remove the Winkhaus LH / RH words and "anti-clockwise closing" / "clockwise closing" from every printout (`doorHardware.js` `HANDING_WORDS` and its callers). If the ThunderBolt or FGTE kit itself needs a handed variant for the order, keep the mapping internal and report in `BLOCKERS.md` which variant the engine would pick; do not print it.
+### 3.7 Vision panel (styles of the macro, ids 1:1)
 
-### 3.9 Profile schema 3 and migration
+| id | macro label | panes (w x h, count) |
+|---|---|---|
+| 0 | None | none |
+| 1 | 450mm Square | 450 x 450 x 1 |
+| 2 | 150mm x 760mm/150mm x 450mm | 150 x 760 + 150 x 450, stacked |
+| 4 | 150mm x 1410mm | 150 x 1410 x 1 |
+| 5 | 350mm Diamond | 350 x 350 x 1 rotated 45 |
+| 6 | 2No. 150mm 800mm | 150 x 800 x 2 |
+| 7 | 3No 200mm 450mm | 200 x 450 x 3 |
+| 8 | 5No 200mm 500mm | 200 x 500 x 5 |
+| 9 | 450mm x 700mm | 450 x 700 x 1 |
+| 10 | 150mm x 760mm | 150 x 760 x 1 |
+| 11 | 508mm x 1500mm | 508 x 1500 x 1 |
+| 12 | 150mm x 700mm/150mm x 700mm | 150 x 700 x 2, stacked |
+| 13 | 5No 200mm 200mm | 200 x 200 x 5 |
+| 14 | Custom | `vpCustom.width x vpCustom.length x count`, rail between, `pos` 0 vertical / 90 horizontal |
 
-- Bump `DEFAULT_DOOR_PROFILE.schema` to 3. New keys: `deductions.leafAtFloor 51`, `deductions.fanFromAxis 65`, `deductions.leafBelowAxis 17`, `geometry.transomLandAbove 8`, `geometry.transomLandBelow 13`, `geometry.gapFanTransom 6`, `geometry.gapBelowTransom 4`, `lengths.transomSeat 8.5`, `panel.inset 17`, `panel.edge {24, 40, 15}`, `sidePanel {64, 64, 180, 57}`, `fixedFan {64, 64, 67}`. Keys no longer read: `couplingPost`, `deductions.fanAtHead`, `deductions.fanAtRail`, `deductions.leafFullHeight`, `deductions.leafNoThreshold`, `lengths.transomDeduct`, `sidePanel.member`.
-- `migrateDoorProfile`: a stored schema-2 copy takes the schema-3 defaults for the new keys; a value equal to the old default moves, a hand-edited one is kept (as the schema 1 to 2 migration does). Batch snapshots (`_profileSnapshot.door`) migrate the same way when read.
-- `windowProfileStore.js` `DOOR_PATH_ROOTS` and the Window Settings Doors card expose every new key; nothing a tenant could type can grow the profile (keep the existing guard).
+- Exact macro placement is NOT decoded. Drawings and 3D place the panes centred across the leaf, the first pane top at `profile.vp.topRail 150` from the leaf top, multiple panes stacked with `profile.vp.midRail 450` gap for vertical styles (ZAŁOŻENIE, macro defaults D_TOP_RAIL 150, D_MID_RAIL 450, D_SIDE_MARGIN 150). Label each VP sheet "layout per bSolid macro". The export only sends the style id and the custom values; the macro places the cut.
+- BOM per door: glass sqm (fire glass slot when `fire`, plain toughened slot otherwise), glazing beads metres (perimeter of every pane x 2 faces), glazing intumescent metres when `fire` (perimeter of every pane). Glass Schedule rows for each pane.
 
-### 3.10 Reference numbers (default profile)
+### 3.8 Intumescent
 
-| case | leaf W x H | glass W x H | notes |
-|---|---|---|---|
-| single 900 x 2100, timber cill, outward | 798 x 1998 | 633 x 1747 | was 798 x 2002, glass 633 x 1751 |
-| single 900 x 2100, aluminium threshold | 798 x 1998 | 633 x 1747 | was 798 x 2043; threshold product + threshold seal |
-| single 900 x 2100, inward | 798 x 1998 | 633 x 1747 | timber inward cill 40 / 35 always |
-| single 900 x 2100, half-glazed | 798 x 1998 | 633 x 881 | mid rail axis 999; panel 644 x 806 (daylight 610 x 772 + 2 x 17) |
-| french 1600 x 2100 | 2 x 755 x 1998 | 584 x 1747 each | half 749, lip 6, meeting stile 100 |
-| french 2400 x 2400, side panels 400 + 400, opening fan T 450 | door leaves 2 x 789 x 1882 | 618 x 1631 each | door zone 1600 between mullion axes: half (1600 - 34) / 2 = 783 |
-| the same, side panel light | 332 x 1882 | 227 x 1661 | 400 - 51 - 17 wide; H - T - 17 - 51 |
-| the same, fan leaves | over the door 1566 x 385, over each side 332 x 385 | casement rule | 1600 - 34; 400 - 68; 450 - 65 |
-| the same with a fixed fan | the same three sizes, no hardware | W - 105, H - 108 | 64 / 64 / 67 non-opening leaves |
+Table of macro `INTU_STYLE` ids exposed in the form: 1 "15mm x 4mm Intu Strip Lock Center", 2 "20mm x 4mm Intu Strip Lock Center", 3 "2No 10mm x 4mm", 4 "2No 15mm x 4mm", 5 "15mm x 4mm Central 2L Top", 6 "20mm x 4mm Central 2L Top", 7 "2No 15mm x 4mm 2L Top". Strips per edge: 1 for ids 1, 2, 5, 6; 2 for ids 3, 4, 7 (ZAŁOŻENIE). BOM metres = strips x (2 x leafHeight + leafWidth), one Assign Materials slot per strip size (10, 15, 20 mm). Fire OFF: no intumescent rows, `INTU_STYLE` 0.
 
-The tura derives every row with the live engine and writes the table into `BUILD-LOG.md`; a row that disagrees with this table is a finding to resolve (fix the engine or explain in `BLOCKERS.md`), never a silent re-typing of the table. The transom rail segment lengths, the mullion lengths and the transom visible band come from the casement helper: print them in the table as well.
+### 3.9 Ironmongery and materials (Assign Materials slots, all new, `windowType: 'firedoor'`)
 
-### 3.11 Sash: bars per sash (owner box 16)
+Fire hinge (pcs, 3 per leaf), standard hinge, lock case latch, lock case sashlock euro, lock case bathroom, euro cylinder (euro only), thumbturn and release (bathroom only), lever handle set on rose (1 per door), keep (1 per door), concealed closer (when `closer`), intumescent 10 / 15 / 20 (m), door blank FD30 44, door blank FD60 54, door blank non-fire 44, frame timber 63 (m, by raw section), fire glass (sqm), toughened glass (sqm), glazing beads (m), glazing intumescent (m), paint as the batch finish (by leaf and frame area, same rule as partition or casement, whichever already exists for a timber face area; write which in BUILD-LOG). Ironmongery rows are picked from the Ironmongery catalogue, materials from Materials, item numbers as for every other slot. Purchase list from the single doors under the client, never from the batch.
 
-- Today the window record carries `upperBars` and `lowerBars` but `detectGridMode` keeps one pattern (the lower wins) and the sheets, glass rows, beading runs, the glass DXF, the canvas renderer and the 3D put it on both sashes. PSW sends both fields (sometimes only inside the estimate `fullConfig`).
-- Required: each sash keeps its own pattern end to end. `normaliseToWindowSpec` reads `upperBars` / `lowerBars` from the item, then from `fullConfig`, then `'none'`. `deriveWindowData` exposes the upper and lower pattern separately (and the bar positions per sash computed over THAT sash's pane). Cut list and pre-cut bar rows, glass rows (bar spacings per unit), beading (Georgian and triangle runs per sash), the glass DXF, `canvas-renderer.js` (h bars spaced over each pane), the sash sheets (`SashDetail2D`, `FrontElevation2D`, `GlassDrawing2D`), the estimate / window PDFs and the 3D (`ParametricSashWindow`, `windowSpecToConfig`) all read the per-sash pattern. Custom bar lists stay per sash and are checked against that sash's own glass (a bar outside its pane is an explicit per-window warning, not a crash).
-- A window with the same pattern on both sashes derives byte-identical to today (any key that only reorganises data is listed in `BUILD-LOG.md`). "6 over 1" (upper 2x3 or the PSW six-pane pattern, lower none) must come out on every surface.
+### 3.10 Reference numbers (default profile, assert all of them in the harness)
 
-### 3.12 Sash: proportion error per window (box 19), pricing field (box 18), dead glazing summary (box 17)
+Single FD30, leaf 826 x 2040, depth 100, hinge left, latch:
+- frame overall 902 x 2083; head 902 long point; jambs 2083 long point; raw section 63 x 105; finished 50 x 100; rebate 15 x 47; faces 35 / 50.
+- hinges from the leaf top 150 / 944 / 1738, step 794; jamb hinge recess tops from the jamb top 188 / 982 / 1776 (35 + 3 + top_i).
+- spindle 1000 above the leaf bottom; keep centre on the lock jamb 990 above the jamb foot (5 + 1000 - 15).
+- intumescent 15 x 4: 4.906 m.
+Same door FD60: leaf 54, rebate depth 57. Non-fire DR: HINGE 0, LOCK 1, no intumescent rows. Leaf 762 x 1981: step 764.5, hinges 150 / 914.5 / 1679.
 
-- `SashProportionError` (and `ArchError` where it is caught the same way) is caught per window in `ProjectDetailPage`, `ProductionPackPage` and `WindowDetailPage`: the failing window shows its message on its own card or row and is excluded from the pack lists and PDFs with a visible note; every other window renders. The pack header shows a count of excluded windows.
-- Pricing Settings: a field "Cottage sash surcharge" next to "Arched head" bound to `pricing.cottageSash` (default 0.05, stored price lists fall back to it), with the same save path as the arched head field.
-- `calculateGlazingSummaryForWindow` and `aggregateComponents`: prove with a repo-wide search (src, verify, docs scripts) and with the harness that no reader exists for `glazingItems`; if so delete them and the `glazingItems` key from `deriveWindowData` output, and re-baseline the fixtures that carried the key (list the diff: the removed key only). If a reader exists, fix the row (one pane height per sash from its daylight) instead of deleting.
+### 3.11 Profile, store and settings
 
-### 3.13 Settings save (box 20)
-
-- Today `windowProfileStore.scheduleCloudSave` writes `{ sash, casement, door }` from the tab's memory and `saveWindowProfiles` stores it whole under `settings.constants.windowProfiles`: a tab opened before a change on another computer overwrites that change with its stale copy (this removed the owner's bSuite target on 07.10.2026).
-- Required: the store records the paths it changed since its last cloud load at the granularity "profile.firstKey" (for example `casement.bsuite`, `casement.elements`, `door.deductions`, `sash`); the save loads the current cloud copy, overlays ONLY the dirty paths from local memory, writes the merged object, replaces the local copy with the merged result and clears the dirty list. Loading from the cloud happens on app start (as today), on entering the Window Settings page and when the tab regains focus (`visibilitychange`), without clobbering unsaved local edits (dirty paths win locally until saved). `saveWindowProfiles` keeps merging into the other `constants` keys as it does today. No DB change; if a true per-key atomic write needs a migration, write the SQL to `docs/handover/sql/` and say so, but ship the client merge regardless.
-- Harness: simulate two tabs (two store instances over a fake cloud object): tab A changes the bSuite target, tab B (loaded earlier) changes a casement face; both save; the cloud holds both changes. A third case: the same path changed in both tabs, the later save wins and `BLOCKERS.md` says so.
-
-### 3.14 Batch type `door` (box 15)
-
-- `createBatch` (and `moveToProduction` if it builds defaults itself) maps type `'door'` to the `doors` defaults of `BATCH_DEFAULTS`; the Batch Defaults page treats both spellings as doors. One mapping, no second copy of the defaults.
-
-### 3.15 Door leaf sheet (box 14)
-
-- The hinge dimensions H1 to H4 on `DoorLeafDetail2D` (stacked on one line today) move to a smaller font and are spread so that no two texts overlap on any leaf height from 1900 to 2400 with 3 or 4 hinges. Add a text-collision check to the door sheet test (approximate each `<text>` by font size x 0.55 x character count, rotated texts by their transform) and apply it to every door sheet in the t41 §18 set.
+`DEFAULT_FIREDOOR_PROFILE` with `migrateFireDoorProfile`, `setActiveFireDoorProfile`, `getFireDoorProfile` exactly in the pattern of the partition profile; `KINDS` gets `'firedoor'`; editable roots whitelisted; Window Settings page `/window-settings/firedoor` with a card per block (leaf, frame, hinges, lock, keep, vp, intumescent, bsuite); sidebar link; batch profile snapshot includes it.
 
 ---
 
@@ -180,72 +192,64 @@ The tura derives every row with the live engine and writes the table into `BUILD
 
 ### Stage 0: baseline and sweep (no code changes)
 
-1. Run every harness in `verify/arch/t*.mjs` (not the `*baseline*` generators) and `verify/parity/*.mjs` on the starting commit, `npm ci` and `pip install ezdxf` first; restore `docs/handover/samples/` with `git checkout` after the run. Record the pass count per file. `npm run build`.
-2. Derive the BEFORE table for the cases of 3.10 with the live engine and keep it.
-3. Sweep (read-only agents, disjoint areas): every reader of `couplingPost`, `sidePanel.member`, `fanAtHead`, `fanAtRail`, `leafFullHeight`, `leafNoThreshold`, `transomDeduct`, `zones.transom.band`, `HANDING_WORDS`, `doorHanding`; every place that draws or counts the side panel members, the coupling post, the fanlight; the bars trail for sash (`upperBars`, `lowerBars`, `detectGridMode`, `gridMode`, bar positions, `canvas-renderer`, `glassDxfExport`, beading, 3D); `glazingItems` readers; the window profile save path; `createBatch` / `BATCH_DEFAULTS`. Write the list into the new `BUILD-LOG.md` entry.
+1. `npm ci`, `pip install ezdxf`, run every `verify/arch/t*.mjs` (not the `*baseline*` generators) and `verify/parity/*.mjs` on the starting commit; restore `docs/handover/samples/` with `git checkout` after the run. Record the pass count per file. `npm run build`.
+2. Sweep with read-only agents: every place the `partition` category is registered (start from `git show --stat 088d447` and grep `partition`), plus the known gaps where partition is NOT registered (`DashboardPage.jsx` new batch select, `MaterialAssignmentsPage.jsx` `TYPE_LABELS` and the "coming soon" branch, sidebar materials link, `moveToProduction.js` `CATEGORY_TO_BATCH`, `bom.js` `ELEMENT_TO_PART_ID`). `firedoor` must be registered in ALL of them, including the gaps. Write the list in `BUILD-LOG.md`.
 
-### Stage 1: door profile and engine
+### Stage 1: type, profile, spec, configurator form
 
-1. Profile schema 3, keys and migration (3.9); `DOOR_PATH_ROOTS`; Window Settings Doors card.
-2. `deriveDoorWindow`: frame per 3.1 (mullions, transom per casement helpers), leaf heights per 3.2, fanlight per 3.3, side panels per 3.4, panel per 3.5, thresholds per 3.6, handing data per 3.8. `derived.door` keeps its shape where nothing changed and gains: `mullions[]` (axis, length, segments), `transom` (axis, rail segments, band from the casement rule), `sidePanels[]` as fixed lights (members 64 / 64 / 180, glass), `fanLeaves[]` for fixed and opening fans with `fixed: true | false`, `panel` with outer size, daylight and edge profile, `threshold` with `{ type, effectiveType, seal }`.
-3. The 3.10 table from the live engine: write it into `BUILD-LOG.md` and compare row by row.
+Register `firedoor` everywhere from the Stage 0 list (`projectStore` BATCH_DEFAULTS and labels, `windowProfileStore`, `profile.js`, `specification.js` block 3.1, `calculations.js` dispatch, `ConfiguratorPage` form, `ProjectDetailPage` TYPE_LABELS and add batch button, `DashboardPage` colour, label and new batch select, `WindowSettingsPage`, `AppSidebar`, `partSymbols`, `partColours`, `lists` CUT_LIST_ORDER, `bom`, `ironmongeryStore`, `BatchDefaultsPage`, `MaterialAssignmentsPage`, `moveToProduction`, `pricing` with `DEFAULT_PRICING.firedoor { leafPrice 0, framePerM 0, vpPerSqm 0, closerPrice 0 }`). Configurator: inputs of 3.1 with suggestion chips, the name field with the auto number, and a live summary (frame overall, hinge positions, rebate). Number inputs without spinners.
 
-### Stage 2: lists, BOM, assign materials
+### Stage 2: engine
 
-1. Cut list, pre-cut, grouped cut list: mullion rows (casement mullion symbol `M`), transom segments (`T`), side panel light members (stiles and top rail on the casement leaf 64 x 57 rows, bottom rail on the door bottom rail 180 x 57 row), fixed fan members (casement 64 / 64 / 67), panel sizes with the 17 inset. Symbols without a prefix (08.10.2026 rule). Part colours: side panel and fixed fan members join the existing door colour groups (`door_side_panel`, `door_fan`).
-2. BOM: timber per the new members; panel boards and core at the outer size; threshold seal row (3.6); trickle vents (3.7); nothing for the coupling post any more.
-3. Assign Materials (Doors branch): rows for the mullion, the side panel members (64 x 57 and 180 x 57), the fixed fan members, the threshold seal; defaults equal to the casement counterparts; the pre-cut merges by material as today.
-4. Hardware list: handing wording per 3.8; the fixed fan has no hardware; vents per 3.7.
+`src/engine/fireDoor.js` `deriveFireDoorWindow`: everything of 3.3 to 3.8. Output `derived.firedoor = { leaf, frame: { overall, members[] }, hinges[], lock, keep, vp, intumescent, machining: { leaf: ops[], head: ops[], jambHinge: ops[], jambLock: ops[] }, bsuiteVars: { leaf, head, jambHinge, jambLock } }`. Every machining op: `{ id, kind, face, x, y, z, length, width, depth, radius }` in the coordinate system of its own board, documented at the top of the file (origin, axis, which end is the top). `bsuiteVars` holds the variable table of 4.7, already resolved, so the export only copies it.
 
-### Stage 3: tests for Stages 1 and 2
+### Stage 3: lists, BOM, assign materials, glass, pricing
 
-1. New `verify/parity/t44_doors_v3.mjs`: every row of 3.10 (leaf, glass, panel, fan, side light, mullion and transom lengths) to 0.01; thresholds (standard, aluminium, low-profile, inward with each) all give leaf H 1998 at 2100; inward ignores aluminium; the threshold seal row appears only for aluminium / low-profile; vents per room type; handing strings; the schema 2 to 3 migration (defaults move, hand edits stay); casement and sash controls deep-equal to the starting commit; the door BOM part quantities for the reference set (write them as the expected values after reading them once, with the reasoning in the test).
-2. Update `t41_doors_production.mjs` to the new rules with the reason at every changed assertion; never weaken a check that still holds. `t38` and `t42` door controls likewise.
+Cut list, pre-cut (members, applied colours rule as partition), Assign Materials slots 3.9, BOM rows, ironmongery list, glass schedule for VP panes, glazing beads, pricing. Single door first, batch is the sum ("nasza świętość").
 
-### Stage 4: sheets and PDFs
+### Stage 4: tests
 
-1. `DoorFrameDetail2D`: mullions `M` instead of the coupling post, the transom per the casement rule, dimensions from derived. `DoorSidePanelDetail2D`: the fixed light as a casement leaf (64 / 64 / 180). `DoorFanlightDetail2D`: fixed and opening fans. `DoorLeafDetail2D`: the panel edge note and the hinge dimensions per 3.15. `DoorSection2D`: the panel edge profile (tongue, slope, flat) in the plan section, the inward threshold note. `DoorElevation2D`: the new frame.
-2. The Elements and Elevations PDFs and the pack mount the same components (no change needed beyond the components themselves): prove it with the t41 §18 render set plus the collision check of 3.15.
-3. Samples: regenerate `docs/handover/samples/doors/` renders.
+`verify/parity/t51_fire_door.mjs`: every number of 3.10; prefix numbering; fire OFF rows; free widths (e.g. 803) pass without clamp; a bad size fails only its door; macro variable values of 4.7 for the reference doors; controls: a casement, a sash, a door and a partition derive byte identical to Stage 0; `t32_bsuite.mjs` unchanged.
 
-### Stage 5: 3D
+### Stage 5: drawings and PDFs
 
-1. `doorGeometryFromSpec` and `DoorAssembly.jsx`: mullions instead of the coupling post, side panels as 64 / 64 / 180 lights, fixed fans as 64 / 64 / 67 lights, the transom band from derived, the panel edge profile (a bevelled panel; if the geometry is not done, the flat 54 panel stays and `BLOCKERS.md` says so). The preview and the pack capture rig need no change if they read derived; prove it.
-2. `t40_bottom_rail_3d.mjs` section 6 (door meshes): update the pins with the reason.
+Port the three views of `docs/handover/fire-doors/source/KIT_DOOR_SINGLE.lsp` as React SVG sheets (`src/components/drawings/fireDoor*`): outside elevation (frame 35 face, hinges interrupting the edge line, handle rose at the spindle, lock symbol euro / bathroom as the LSP draws them), inside elevation (frame 50 face, leaf dashed), plan closed and open 30 degrees with the rebated jambs; dimensions as the LSP places them. Plus a leaf machining sheet (hinge recesses, lock, spindle, VP cut-outs, every dimension from the leaf top and bottom) and a frame machining sheet (three members, hinge recesses, keep, mitres). Use `drawingTheme.js` and the dimension helpers; `sc` never on font size or stroke. Sheets appear in the window page drawings and in the pack, and in the pack PDF.
 
-### Stage 6: sash items
+### Stage 6: 3D
 
-1. Bars per sash (3.11) with a new `verify/parity/t45_sash_bars_per_sash.mjs`: a 1000 x 1400 window upper 2x3 / lower none and upper none / lower 2x2: bar rows, glass rows, beading runs, DXF entities, canvas bar count per pane, sheet texts and the 3D bar meshes per sash; a same-pattern window byte-identical to today; a PSW-style item with bars only in `fullConfig` derives with them.
-2. Error per window (3.12) with a harness that mounts the three pages' window lists the way t41 §18 mounts the sheets, or, if a page cannot be mounted in node, the extracted per-window boundary function with a test on it.
-3. Pricing field (3.12) and the dead glazing summary (3.12).
+`src/3d/components/firedoor/FireDoor.jsx`: frame with the rebate, leaf with VP holes and glass, three hinges, handle on rose, colour from the finish, an open angle control (0 to 90, default 30). Wire it in `App.jsx`, `WindowPreview3D.jsx`, `Window3DCaptureRig.jsx`, `windowSpecToConfig.js`, `ThreeDPanel.jsx`. Look only, no dimensions in 3D.
 
-### Stage 7: settings save and batch type
+### Stage 7: machine export
 
-1. 3.13 with its harness. 2. 3.14 with a test in the project store harness (`t39` or a new section).
+1. `buildBsuiteFireDoorRows` next to `buildBsuiteFrameRows` in `src/utils/bsuiteExport.js`, reusing the same writer, embedding and targets. Program keys `firedoor.bsuite`: `leaf`, `head`, `jambHinge`, `jambLock` with paths per target, uploaded programs from the same bucket. Default leaf path `C:/Users/Xp600/Desktop/Biesse Piotr/FD_LEAF_MASTER_PIOTR.bSolid` (ZAŁOŻENIE, editable), frame paths empty.
+2. Rows per door in this order over the whole export: all leaves, then all heads, then all hinge jambs, then all lock jambs. Label = door name. A key without a path or program = rows skipped and a message listing the doors, never a throw. The STOP row between blocks: if its XML form is not in `docs/handover/workshop/` samples, do not invent it; write it in BLOCKERS.
+3. Variables per row are DOCUMENT variables named 1:1 like the macro parameters (table 4.7). Panel LPX / LPY / LPZ written as in the casement frame rows.
+4. Machine-neutral export `{label}_firedoor_machining.json` and `.csv` (one line per op: door, element, op, face, x, y, z, length, width, depth, radius) from `derived.firedoor.machining`.
+5. Buttons: Production Pack header "bSuite fire doors" and "Fire door machining (CSV)", window page header the same for one door, shown only for `firedoor`.
+
+#### 4.7 Variable contract (names exactly as in the macro)
+
+Leaf row (FD_LEAF): `LPX` leafHeight, `LPY` leafWidth, `LPZ` thickness, `HAND` 0 left / 1 right (ZAŁOŻENIE that macro hand 0 = "Hinge left" of 3.1, owner checks in bSolid), `LH` / `RH` 1 on the matching side, `HINGE` 1 fire / 0 standard, `LOCK` 1 / 2 / 3, `LOCK_H` spindleHeight, `SPINDLE` 1, `EURO` 1 / 0, `KEEP` 0, `KEEP_STYLE` 0, `INTU_STYLE`, `VP_STYLE`, `C_VP_L`, `C_VP_W`, `C_VP_NUM`, `C_VP_RAIL`, `C_VP_POS`, `D_TOP_RAIL` 150, `D_MID_RAIL` 450, `D_SIDE_MARGIN` 150, `LEAD_EDGE` 1 / 0, `REBATE` 0 (single door), `REBATE_STYLE` 1, `SPY_ON` 0, `SPY_H` 1450, `LBOX` 0, `L_BOX_H` 1000, `DROP_CILL` 0, `PREM_DOOR` 0. New names the master does not have yet (the owner adds them): `HINGE_1`, `HINGE_2`, `HINGE_3` (top_i), `HINGE_D` recessDepth, `CLOSER` 0 / 1.
+Frame rows: `LPX` member long point length, `LPY` frameDepth, `LPZ` 50, `REB_W` 15, `REB_D` rebate depth, `HAND`, `HINGE`, `HINGE_1..3` (jamb positions of 3.5, hinge jamb row only), `HINGE_D`, `KEEP` / `KEEP_STYLE` and `KEEP_Y` (keep centre from the jamb foot, lock jamb row only), `MITRE_TOP` 1, `MITRE_BOTTOM` 0 for jambs, 1 / 1 for the head.
 
 ### Stage 8: full suite, build, docs
 
-1. Full suite twice on the final tree, then `npm run build`. Record the pass counts per file. Never weaken or delete an assertion to get a pass; fixtures regenerate only after reading the diff, with the diff summary in `BUILD-LOG.md`.
-2. `docs/handover/DOORS-PRODUCTION.md`: rewrite the model table for v3 (one page, the way it is now), `BLOCKERS.md` section 31 with every owner check, `BUILD-LOG.md` entry with the verdict, the before / after tables, the suite counts.
+One full suite run, one build. `docs/handover/FIRE-DOORS.md` in the style of `PARTITION-WALLS.md` (model in one page, where it lives, sheets, lists, verification, assumptions and next steps). `BUILD-LOG.md` entry with the reference table from the live engine.
 
 ### Stage 9: review and PR
 
-1. Independent review agent per rule 10. Fix findings; record the verdict.
-2. PR description: the owner box numbers first, then summary, files changed, suite counts, the items for Piotr.
+Independent review agent per rule 10. PR description: the owner box numbers first, then summary, files changed, suite counts, the items for Piotr.
 
 ---
 
-## 5. Items to report to Piotr in `BLOCKERS.md` (short, numbered, section 31)
+## 5. Items to report to Piotr in `BLOCKERS.md` (section 35, short, numbered)
 
-1. Every ZAŁOŻENIE of the owner box with the number used and where it lives (profile key or constant): transom axis convention, side panel zone convention, fixed fan bottom rail 67, panel edge 24 / 40 / 15, panel boards at the outer size, inward door ignoring aluminium, meeting stile joint unchanged.
-2. The casement helper numbers the door now prints: mullion length with and without a timber cill, transom segment lengths, the visible transom band.
-3. The kit variant the handing would have picked (ThunderBolt / FGTE), if any handed variant exists.
-4. Bars per sash: anything the 3D or a sheet could not do per sash, and the custom bar warning cases.
-5. Settings save: the remaining race (same path in two tabs) and whether a DB migration would close it.
-6. Anything skipped, with the reason.
-
----
-
-## 6. Comparison table for the owner (write it in `BUILD-LOG.md`)
-
-Every row of 3.10 plus: single 900 x 2100 three-quarter (glass and panel), french 1600 x 2100 with a fixed fan T 450 (fan light size and glass), a single 1000 x 2100 with one side panel 450 on the right (door leaf, light, mullion length), and the sash 1000 x 1400 "6 over 1" bar rows per sash. Every number from the live engine, not copied from this file.
+1. Every ZAŁOŻENIE with the value used and the profile key.
+2. The variables the owner must add to `FD_LEAF_MASTER_PIOTR` as document variables and bind inside `Master_Door_PIOTR` (all of 4.7; today the file has only LPX, LPY, LPZ at document level), and the frame masters that do not exist yet.
+3. Values in the owner's saved master that look wrong for a single door: `REBATE 1` with `REBATE_STYLE 1` (meeting rebate for pairs), `EURO 1` fixed on.
+4. Concealed closer: no machining (no `concealed_closer_*.mpr` source); what is needed (model, recess sizes on leaf and head).
+5. Hinge positions: three sources disagree (macro 150 / 200 rule used; old Weeke 145 / 700 / 1722 from the top; LSP 145 / 700 from the top and 200 from the bottom). Whether a 4th hinge is wanted.
+6. Smoke seals (FD30S), architraves, door signs, drop seal: not modelled; ask.
+7. Double doors: the KIT_DOOR_DOUBLE rules (frame outer = leaves + 79, height + 43, centre gap 3, active leaf 12 rebate, handle leaf chosen from inside) for the next tura.
+8. The STOP row format, if not found.
+9. Anything skipped, with the reason.
