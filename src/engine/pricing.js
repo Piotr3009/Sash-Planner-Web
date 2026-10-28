@@ -14,7 +14,7 @@
 // here are the REAL Prime Sash Windows rates (sash double = £850/m², triple =
 // £950/m², etc.) so a new tenant starts from a sane, working price list.
 
-import { isCottageProportion } from './specification.js';
+import { isCottageProportion, fireDoorCloserKind } from './specification.js';
 
 // ─────────────────────────────────────────────────────────────
 // DEFAULT_PRICING — real PSW rates (frozen so callers can't mutate them).
@@ -169,7 +169,8 @@ export const DEFAULT_PRICING = Object.freeze({
 
   // ── Fire door (27.10.2026, internal door sets FDR / DR): a price per leaf,
   //    a rate per metre of frame (head + both jambs), a rate per m2 of vision
-  //    panel glass and a price per concealed closer. All 0 until PSW sets them
+  //    panel glass and a price per closer (v1.1: one rate, applied when the
+  //    closer kind is 'surface' or 'builtin'). All 0 until PSW sets them
   //    (BLOCKERS 35), so a door prices at 0 rather than at a sash rate.
   firedoor: {
     leafPrice: 0,
@@ -676,9 +677,11 @@ export function calculatePartition(pricing, config, frameWidth, frameHeight) {
  * Fire door (27.10.2026): leaf price + frame metres x the metre rate + vision
  * panel m2 x the m2 rate + the closer price when the door has one. The config
  * is the flat one windowSpecToConfig builds for windowCategory 'firedoor':
- * firedoorFire, firedoorRating, firedoorLeafWidth, firedoorLeafHeight,
- * firedoorFrameDepth, firedoorCloser, firedoorVpSqm (the pane m2 of the
- * engine) and firedoorFrameMetres (the three member long points in m). Without
+ * firedoorFire, firedoorRating, firedoorOpeningWidth, firedoorOpeningHeight,
+ * firedoorLeafWidth, firedoorLeafHeight, firedoorFrameDepth, firedoorCloser
+ * (v1.1: the kind 'none' | 'surface' | 'builtin'; a v1 boolean true reads as
+ * a closer), firedoorVpSqm (the pane m2 of the engine) and
+ * firedoorFrameMetres (the three member long points in m). Without
  * firedoorFrameMetres the frame metres are the overall frame (config width =
  * head, height = each jamb), which is the same number at the long points. The
  * rates default to 0 (BLOCKERS 35), so a door prices at 0 until PSW sets them.
@@ -697,7 +700,10 @@ export function calculateFireDoor(pricing, config, frameWidth, frameHeight) {
     ? Number(config.firedoorFrameMetres)
     : (overallWidth + 2 * overallHeight) / 1000;
   const vpSqm = Number(config.firedoorVpSqm) || 0;
-  const closer = config.firedoorCloser === true || config.firedoorCloser === 'true' || config.firedoorCloser === 'yes';
+  // the closer kind (v1.1): priced at the single closerPrice when not 'none';
+  // a v1 boolean true / 'yes' still counts as a closer
+  const closerKind = fireDoorCloserKind(config.firedoorCloser, 'none');
+  const closer = closerKind !== 'none';
   const fire = config.firedoorFire === true || config.firedoorFire === 'true' || config.firedoorFire === 'yes';
   const leafPrice = Number(fp.leafPrice) || 0;
   const framePrice = (Number(fp.framePerM) || 0) * frameMetres;
@@ -714,9 +720,10 @@ export function calculateFireDoor(pricing, config, frameWidth, frameHeight) {
     total: round2(unitPrice),
     breakdown: {
       windowType: 'firedoor', fire, rating: fire ? (config.firedoorRating || 'FD30') : 'none',
+      openingWidth: Number(config.firedoorOpeningWidth) || null, openingHeight: Number(config.firedoorOpeningHeight) || null,
       leafWidth: Number(config.firedoorLeafWidth) || null, leafHeight: Number(config.firedoorLeafHeight) || null,
       frameDepth: Number(config.firedoorFrameDepth) || null, frameWidth: overallWidth, frameHeight: overallHeight,
-      frameMetres: frameMetres.toFixed(3), vpSqm: vpSqm.toFixed(4), closer,
+      frameMetres: frameMetres.toFixed(3), vpSqm: vpSqm.toFixed(4), closer, closerKind,
       leafPrice: leafPrice.toFixed(2), framePrice: framePrice.toFixed(2), vpPrice: vpPrice.toFixed(2), closerPrice: closerPrice.toFixed(2),
       subtotal: subtotal.toFixed(2), quantity,
       unitPrice: unitPrice.toFixed(2), totalPrice: totalPrice.toFixed(2),

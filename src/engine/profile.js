@@ -1008,14 +1008,19 @@ export function getPartitionProfile() {
 // stock to 50, as wide as the wall (frameDepth 100 to 200). The rebate is cut
 // from solid on every member: 15 wide (12 overlap + 3 gap) across the 50 and
 // (leaf + 3) deep along the depth, so the frame shows 35 outside and 50 inside.
-// Hinges, lock and keep are the macro's rule (hinges 150 from the top, the
-// last one ending 200 above the bottom, equal spacing; the DIN lock spindle at
-// 1000 from the leaf bottom, backset 60). Fire ON (FD30 leaf 44, FD60 leaf
-// 54) switches fire hinges, the FD lock and keep, intumescent and fire glass;
-// Fire OFF the standard set. Every number below is a workshop default edited
-// in Window Settings, Fire Doors; the ones marked ZAŁOŻENIE are the
-// programmer's reading where the owner gave no number (BLOCKERS 35).
-// fireDoor.js is the only reader that turns them into sizes and positions.
+// v1.1 (27.10.2026 evening): the STRUCTURAL OPENING is the input (frame =
+// opening - 5 a side and - 5 at the head, leaf = frame - 76 / - 43), the leaf
+// can still be typed to override. Hinges: the top one 150 from the top, the
+// bottom one ending 200 above the bottom, the middle one 200 ABOVE the leaf
+// centre (owner); the DIN lock spindle at 1000 from the leaf bottom, backset
+// 60; the mitred corners dowelled 8 x 40 x 3. Fire ON (FD30 leaf 44, FD60
+// leaf 54) switches fire hinges, the FD lock and keep, the 15 x 4 intumescent
+// (FD30 one strip, FD60 two) and fire glass; Fire OFF the standard set. No
+// swing: an internal door is handed by its hinge side only. Every number
+// below is a workshop default edited in Window Settings, Fire Doors; the ones
+// marked ZAŁOŻENIE are the programmer's reading where the owner gave no
+// number (BLOCKERS 35). fireDoor.js is the only reader that turns them into
+// sizes and positions.
 // ═════════════════════════════════════════════════════════════════════════════
 export const DEFAULT_FIREDOOR_PROFILE = Object.freeze({
   schema: 1,
@@ -1032,13 +1037,27 @@ export const DEFAULT_FIREDOOR_PROFILE = Object.freeze({
     rawThickness: 63, thickness: 50,
     rawWidthAllowance: 5,              // ZAŁOŻENIE: raw board width = frame depth + 5
     overlap: 12, gapSide: 3, gapHead: 3,
-    floorGap: 5,                       // ZAŁOŻENIE (the LSP): leaf bottom above the floor
+    floorGap: 5,                       // the frame stands 5 longer than the leaf (owner 27.10, the LSP): leaf bottom above the floor
     rebateClearance: 3,                // rebate depth = leaf thickness + this
     headJoint: 'mitre',                // ZAŁOŻENIE: the head meets the jambs on a 45 mitre (the LSP); only 'mitre' is implemented
+    // v1.1 (owner 27.10.2026 evening): the structural opening is the input. The
+    // frame overall = opening - 2 x wallGapSide wide and opening - wallGapHead
+    // high (the frame foot stands on the floor); the leaf = overall - 76 / - 43.
+    // Example: opening 1000 -> frame 990 -> leaf 914; opening 2100 -> 2095 -> 2052.
+    wallGapSide: 5, wallGapHead: 5,
+    // v1.1: the mitred corners are dowelled: `perJoint` dowels `dia` x `length`
+    // per corner, bored square to the mitre face (45 to the member), half the
+    // length into each piece, spread along the frame depth `margin` in from
+    // each face, on the centre of the 50 thickness (margin ZAŁOŻENIE; 8 x 40 x 3 = owner)
+    dowels: { dia: 8, length: 40, perJoint: 3, margin: 20 },
     depthSuggestions: [100, 125, 150, 175, 200], defaultDepth: 100,
   },
   hinges: {
-    count: 3, length: 102, topOffset: 150, bottomOffset: 200,     // the macro rule (lpx - 150 - 200 - w) / (repn - 1)
+    count: 3, length: 102, topOffset: 150, bottomOffset: 200,     // top hinge 150 from the leaf top, bottom hinge ending 200 above the leaf bottom
+    // v1.1 (owner 27.10.2026): the middle hinge is never on the centre: its
+    // CENTRE sits midAboveCentre above the leaf centre (2040: top edge at 769,
+    // not 944). With more than 3 hinges the inner ones spread equally.
+    midAboveCentre: 200,
     recessLength: 103, recessWidth: 30, recessDepth: 3, cornerRadius: 6,   // ZAŁOŻENIE: plate + 1, R6 (12 cutter); old Weeke depths were 3.2 / 4 / 4.2
   },
   lock: {
@@ -1082,22 +1101,19 @@ export const DEFAULT_FIREDOOR_PROFILE = Object.freeze({
     ],
   },
   intumescent: {
-    // the macro INTU_STYLE table, ids 1:1; strips per edge ZAŁOŻENIE (1 for the
-    // single-strip labels, 2 for the 2No labels); thickness 4 everywhere
-    styles: [
-      { id: 1, label: '15mm x 4mm Intu Strip Lock Center', width: 15, thickness: 4, strips: 1 },
-      { id: 2, label: '20mm x 4mm Intu Strip Lock Center', width: 20, thickness: 4, strips: 1 },
-      { id: 3, label: '2No 10mm x 4mm', width: 10, thickness: 4, strips: 2 },
-      { id: 4, label: '2No 15mm x 4mm', width: 15, thickness: 4, strips: 2 },
-      { id: 5, label: '15mm x 4mm Central 2L Top', width: 15, thickness: 4, strips: 1 },
-      { id: 6, label: '20mm x 4mm Central 2L Top', width: 20, thickness: 4, strips: 1 },
-      { id: 7, label: '2No 15mm x 4mm 2L Top', width: 15, thickness: 4, strips: 2 },
-    ],
-    grooveOversize: 0.5,               // ZAŁOŻENIE: groove = strip + 0.5 (the macro cuts 15.5 for a 15 strip)
-    // ZAŁOŻENIE: two strips sit LPZ / 2 +- this (centres 11 and 33 on a 44 leaf, the
-    // 15.5 grooves 6.5 apart). The macro's lpz / 2 +- 2.75 samples are the two
-    // passes of the 10 saw that make ONE 15.5 groove, not two strips: at 2.75
-    // two grooves would overlap, so the contract value is not used here.
+    // v1.1 (owner 27.10.2026 evening): ONE strip size, 15 x 4, all around (top
+    // and both edges); the 15.5 x 4 groove is two passes of the 10 disk. FD30
+    // takes one strip, FD60 two; a non-fire door none. The macro INTU_STYLE
+    // table (styles 1 to 7, 10 / 20 strips) is gone from PC; the export still
+    // writes INTU_STYLE for the Master_Door macro (macroStyleByStrips) next to
+    // the plain INTU strip count.
+    width: 15, thickness: 4,
+    grooveWidth: 15.5, grooveDepth: 4,
+    stripsByRating: { FD30: 1, FD60: 2 },
+    macroStyleByStrips: { 1: 1, 2: 4 },   // Master_Door: 1 = "15mm x 4mm Intu Strip Lock Center", 4 = "2No 15mm x 4mm"
+    // ZAŁOŻENIE: two strips sit LPZ / 2 +- this (centres 16 and 38 on a 54 FD60
+    // leaf, the 15.5 grooves 6.5 apart). The macro's lpz / 2 +- 2.75 samples are
+    // the two passes of the 10 saw that make ONE 15.5 groove, not two strips.
     twoStripOffset: 11,
   },
   // paint: the casement / door rule of calculations.js paintFromAreaSqm (per
@@ -1125,8 +1141,17 @@ export const DEFAULT_FIREDOOR_PROFILE = Object.freeze({
     // (one source for the sheets and the export), these copies are the macro's own defaults
     macroDefaults: { SPINDLE: 1, KEEP_LEAF: 0, KEEP_STYLE_LEAF: 0, REBATE: 0, REBATE_STYLE: 1, SPY_ON: 0, SPY_H: 1450, LBOX: 0, L_BOX_H: 1000, DROP_CILL: 0, PREM_DOOR: 0, D_TOP_RAIL: 150, D_MID_RAIL: 450, D_SIDE_MARGIN: 150 },
   },
-  defaults: { fire: true, rating: 'FD30', hingeSide: 'left', swing: 'in', lockType: 'latch', vpStyle: 0, intuStyle: 1, leadEdge: true, vpCustom: { length: 600, width: 150, count: 1, rail: 100, pos: 0 } },
+  // v1.1: no swing (an internal door is handed by its hinge side only; in / out
+  // belongs to external doors) and no intumescent style; the closer is a kind:
+  // 'none' | 'surface' (overhead, the standard fire door set) | 'builtin'
+  // (concealed in the leaf top and the head; no machining until the owner's
+  // component files arrive, BLOCKERS 35). closerFire applies to fire doors,
+  // closerNonFire to DR doors, until the user picks one on the door.
+  defaults: { fire: true, rating: 'FD30', hingeSide: 'left', lockType: 'latch', closerFire: 'surface', closerNonFire: 'none', vpStyle: 0, leadEdge: true, vpCustom: { length: 600, width: 150, count: 1, rail: 100, pos: 0 } },
 });
+
+export const FIREDOOR_CLOSER_KINDS = ['none', 'surface', 'builtin'];
+export const FIREDOOR_CLOSER_LABELS = { none: 'None', surface: 'Surface closer', builtin: 'Built in closer' };
 
 const FIREDOOR_BSUITE_KEYS = ['leaf', 'head', 'jambHinge', 'jambLock'];
 
@@ -1186,7 +1211,7 @@ export function migrateFireDoorProfile(profile) {
       thicknessByRating: { ...D.leaf.thicknessByRating, ...(P.leaf?.thicknessByRating || {}) },
       limits: { ...D.leaf.limits, ...(P.leaf?.limits || {}) },
     },
-    frame: { ...D.frame, ...(P.frame || {}), depthSuggestions: list(P.frame?.depthSuggestions, D.frame.depthSuggestions) },
+    frame: { ...D.frame, ...(P.frame || {}), dowels: { ...D.frame.dowels, ...(P.frame?.dowels || {}) }, depthSuggestions: list(P.frame?.depthSuggestions, D.frame.depthSuggestions) },
     hinges: { ...D.hinges, ...(P.hinges || {}) },
     lock: {
       ...D.lock, ...(P.lock || {}),
@@ -1195,10 +1220,39 @@ export function migrateFireDoorProfile(profile) {
     },
     keep: { ...D.keep, ...(P.keep || {}), pocket: { ...D.keep.pocket, ...(P.keep?.pocket || {}) } },
     vp: { ...D.vp, ...(P.vp || {}), styles: mergeStylesById(D.vp.styles, P.vp?.styles) },
-    intumescent: { ...D.intumescent, ...(P.intumescent || {}), styles: mergeStylesById(D.intumescent.styles, P.intumescent?.styles) },
+    intumescent: migrateFireDoorIntumescent(P.intumescent, D.intumescent),
     bsuite: migrateFireDoorBsuite(P.bsuite, D.bsuite),
-    defaults: { ...D.defaults, ...(P.defaults || {}), vpCustom: { ...D.defaults.vpCustom, ...(P.defaults?.vpCustom || {}) } },
+    defaults: migrateFireDoorDefaults(P.defaults, D.defaults),
   };
+}
+
+/**
+ * v1.1: the stored intumescent block loses the v1 `styles` table and
+ * `grooveOversize` (one 15 x 4 strip all around, groove 15.5 x 4); the width,
+ * thickness, groove and strips per rating merge over the default.
+ */
+function migrateFireDoorIntumescent(stored, D) {
+  const { styles: _styles, grooveOversize: _oversize, ...rest } = stored || {};
+  void _styles; void _oversize;
+  return {
+    ...D, ...rest,
+    stripsByRating: { ...D.stripsByRating, ...(stored?.stripsByRating || {}) },
+    macroStyleByStrips: { ...D.macroStyleByStrips, ...(stored?.macroStyleByStrips || {}) },
+  };
+}
+
+/**
+ * v1.1: the stored defaults lose `swing` and `intuStyle`; a v1 boolean-style
+ * `closer` default (true = the old concealed closer) becomes closerFire.
+ */
+function migrateFireDoorDefaults(stored, D) {
+  const { swing: _swing, intuStyle: _intu, closer: legacyCloser, ...rest } = stored || {};
+  void _swing; void _intu;
+  const out = { ...D, ...rest, vpCustom: { ...D.vpCustom, ...(stored?.vpCustom || {}) } };
+  const storedFire = FIREDOOR_CLOSER_KINDS.includes(rest.closerFire) ? rest.closerFire : null;
+  out.closerFire = storedFire || (legacyCloser === true ? 'builtin' : (legacyCloser === false ? 'none' : D.closerFire));
+  if (!FIREDOOR_CLOSER_KINDS.includes(out.closerNonFire)) out.closerNonFire = D.closerNonFire;
+  return out;
 }
 
 let activeFireDoorProfile = null;

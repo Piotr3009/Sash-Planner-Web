@@ -395,15 +395,26 @@ function archFieldsFromSpec(item, fc, width, height, { pcShapeRaw, pswShape, cat
 // Fire doors (internal door sets, 27.10.2026): the `firedoor` block of the
 // windowSpec, built only on that category. Each key reads the window item's
 // firedoorX field, then the fullConfig's, then the fire door profile default.
-// The leaf size is never clamped here (the engine's hard sanity limits fail
-// one door with a message); `rating` stays stored while fire is off (the
-// engine reports 'none'), `closer` defaults to fire ? true : false.
+// v1.1: the STRUCTURAL OPENING (firedoorOpeningWidth / Height) is the size
+// input; firedoorLeafWidth / Height are an optional override (0 / null = the
+// leaf is derived from the opening by the engine). Nothing is clamped here
+// (the engine's hard sanity limits fail one door with a message); `rating`
+// stays stored while fire is off (the engine reports 'none'); `closer` is a
+// kind 'none' | 'surface' | 'builtin' (a v1 boolean true = 'builtin', false =
+// 'none'), defaulting to the profile's closerFire / closerNonFire. No swing.
 const FIREDOOR_LOCK_TYPES = ['latch', 'euro', 'bathroom'];
+const FIREDOOR_CLOSERS = ['none', 'surface', 'builtin'];
 const boolField = (v, def) => {
   if (v === undefined || v === null || v === '') return def;
   if (v === 'false' || v === '0' || v === 0) return false;
   return !!v;
 };
+/** The closer kind of a stored value: a kind string, a v1 boolean (true = builtin), else the default. */
+export function fireDoorCloserKind(v, def) {
+  if (v === true || v === 'true' || v === 'yes' || v === 1 || v === '1') return 'builtin';
+  if (v === false || v === 'false' || v === 'no' || v === 0 || v === '0') return 'none';
+  return FIREDOOR_CLOSERS.includes(v) ? v : (FIREDOOR_CLOSERS.includes(def) ? def : 'none');
+}
 function fireDoorBlockFromSpec(item, fc) {
   const P = getFireDoorProfile();
   const D = P.defaults;
@@ -419,13 +430,16 @@ function fireDoorBlockFromSpec(item, fc) {
   return {
     fire,
     rating,
-    leafWidth: num(pick('firedoorLeafWidth'), 0) || Number(P.leaf.defaultWidth),
-    leafHeight: num(pick('firedoorLeafHeight'), 0) || Number(P.leaf.defaultHeight),
+    // the opening and the leaf override stay 0 when not given: the engine
+    // derives the missing one (leaf from the opening, else the profile default leaf)
+    openingWidth: Math.max(0, num(pick('firedoorOpeningWidth'), 0)),
+    openingHeight: Math.max(0, num(pick('firedoorOpeningHeight'), 0)),
+    leafWidth: Math.max(0, num(pick('firedoorLeafWidth'), 0)),
+    leafHeight: Math.max(0, num(pick('firedoorLeafHeight'), 0)),
     hingeSide: (pick('firedoorHingeSide') || D.hingeSide) === 'right' ? 'right' : 'left',
-    swing: (pick('firedoorSwing') || D.swing) === 'out' ? 'out' : 'in',
     frameDepth: num(pick('firedoorFrameDepth'), 0) || Number(P.frame.defaultDepth),
     lockType: FIREDOOR_LOCK_TYPES.includes(lockRaw) ? lockRaw : (FIREDOOR_LOCK_TYPES.includes(D.lockType) ? D.lockType : 'latch'),
-    closer: boolField(pick('firedoorCloser'), fire),
+    closer: fireDoorCloserKind(pick('firedoorCloser'), fire ? D.closerFire : D.closerNonFire),
     vpStyle: Math.max(0, Math.round(num(pick('firedoorVpStyle'), D.vpStyle))),
     vpCustom: {
       length: num(customRaw.length, D.vpCustom.length),
@@ -434,7 +448,6 @@ function fireDoorBlockFromSpec(item, fc) {
       rail: num(customRaw.rail, D.vpCustom.rail),
       pos: Number(customRaw.pos) === 90 ? 90 : 0,
     },
-    intuStyle: Math.max(0, Math.round(num(pick('firedoorIntuStyle'), D.intuStyle))),
     leadEdge: boolField(pick('firedoorLeadEdge'), D.leadEdge),
   };
 }

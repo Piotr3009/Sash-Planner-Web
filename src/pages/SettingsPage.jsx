@@ -516,7 +516,7 @@ function PricingTab() {
             <NumF label="Leaf (per door)" value={p.firedoor.leafPrice} onChange={(v) => setIn('firedoor', 'leafPrice', v)} />
             <NumF label="Frame (per m)" value={p.firedoor.framePerM} onChange={(v) => setIn('firedoor', 'framePerM', v)} hint="head + two jambs" />
             <NumF label="Vision panel (per m²)" value={p.firedoor.vpPerSqm} onChange={(v) => setIn('firedoor', 'vpPerSqm', v)} />
-            <NumF label="Concealed closer" value={p.firedoor.closerPrice} onChange={(v) => setIn('firedoor', 'closerPrice', v)} />
+            <NumF label="Closer (surface or built in)" value={p.firedoor.closerPrice} onChange={(v) => setIn('firedoor', 'closerPrice', v)} />
           </div>
         </Section>
       )}

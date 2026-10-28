@@ -4,9 +4,9 @@ import { normalizeAssignments, expandAssignments, legacyToCanonical } from '../e
 import { CASEMENT_HINGE_PARTS, CASEMENT_LOCK_PARTS } from '../engine/casementHardware.js';
 import { DOOR_HARDWARE_PARTS } from '../engine/doorHardware.js';
 import { DEFAULT_DOOR_PROFILE, DEFAULT_FIREDOOR_PROFILE } from '../engine/profile.js';
-// Fire doors (27.10.2026): the one hardware table (line, row id, slot) and the
-// intumescent strip widths live with the lists; the rows here mirror them.
-import { FIREDOOR_HARDWARE, FIREDOOR_INTUMESCENT_WIDTHS, fireDoorIntumescentPartId } from '../engine/lists.js';
+// Fire doors (27.10.2026): the one hardware table (line, row id, slot) lives
+// with the lists; the rows here mirror it.
+import { FIREDOOR_HARDWARE } from '../engine/lists.js';
 
 // ─── Sash Window Parts (hardcoded — structural, used by calculations engine) ───
 // section = pre-cut (raw) section that needs to be matched to a stock material
@@ -296,18 +296,21 @@ export const DOOR_SHARED_GLASS_IDS = ['glass_double_slim', 'glass_triple', 'glas
 // Own rows for the leaf blanks (bought, one per door by rating), the frame
 // timber (one raw section across head and jambs, metres from the pre-cut), the
 // ironmongery (one row per hardware line of lists.FIREDOOR_HARDWARE; the row
-// opens on the ironmongery tab of its slot, defaultCategory), the intumescent
-// strip by width, the vision panel glass (single fire glass or toughened), its
-// beads and its glazing intumescent. Paint counts on the casement rows as the
-// external doors do. Section labels from the default fire door profile (one
-// source for the numbers). windowType marks the rows as the brief asks (3.9).
+// opens on the ironmongery tab of its slot, defaultCategory), the one
+// intumescent strip (v1.1: 15 x 4 all around, FD30 one strip, FD60 two), the
+// frame corner dowels (v1.1: 8 x 40, three per mitred corner, six per door),
+// the vision panel glass (single fire glass or toughened), its beads and its
+// glazing intumescent. Paint counts on the casement rows as the external doors
+// do. Section labels from the default fire door profile (one source for the
+// numbers). windowType marks the rows as the brief asks (3.9).
+// v1.1 rows are appended at the END of their group so an index-based
+// assignment set keeps every earlier row (the door rule of 09.10.2026); the
+// 10 / 20 mm strip rows of v1 are gone.
 const FP = DEFAULT_FIREDOOR_PROFILE;
 const FH = FIREDOOR_HARDWARE;
 const fdRow = (row) => ({ section: '-', pcs: 1, windowType: 'firedoor', ...row });
-const fdIntuSection = (w) => {
-  const style = (FP.intumescent?.styles || []).find((s) => Number(s.width) === w);
-  return style ? `${w} x ${style.thickness}` : `${w}mm`;
-};
+const fdIntuSection = `${FP.intumescent.width} x ${FP.intumescent.thickness}`;
+const fdDowelSection = `${FP.frame.dowels.dia} x ${FP.frame.dowels.length}`;
 export const FIREDOOR_PARTS = {
   timber: [
     fdRow({ id: 'fd_blank_fd30', name: 'Door Blank FD30', section: `${FP.leaf.thicknessByRating.FD30}mm`, materialType: 'board', unit: 'pcs',
@@ -338,12 +341,14 @@ export const FIREDOOR_PARTS = {
       hint: `One set on roses per door, spindle ${FP.lock.spindleHeight} from the leaf bottom. Pieces.` }),
     fdRow({ id: FH.keep.partId, name: 'Keep', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.keep.slot,
       hint: `One per door on the lock jamb: ${FP.keep.length} x ${FP.keep.width} plate, FD30 / FD60 / standard by the door. Pieces.` }),
-    fdRow({ id: FH.closer.partId, name: 'Concealed Closer', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.closer.slot,
-      hint: 'One per door with the closer ticked (on by default for a fire door, off for a non-fire door). No machining yet (BLOCKERS 35). Pieces.' }),
+    fdRow({ id: FH.closerBuiltin.partId, name: 'Built in closer (concealed)', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.closerBuiltin.slot,
+      hint: 'One per door with the closer kind "Built in" (concealed in the leaf top and the head). No machining yet (BLOCKERS 35). Pieces.' }),
+    fdRow({ id: FH.closerSurface.partId, name: 'Surface closer (overhead)', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.closerSurface.slot,
+      hint: `One per door with the closer kind "Surface" (the overhead closer of the standard fire door set; the default on a fire door is "${FP.defaults.closerFire}", on a non-fire door "${FP.defaults.closerNonFire}"). Pieces.` }),
   ],
   consumables: [
-    ...FIREDOOR_INTUMESCENT_WIDTHS.map((w) => fdRow({ id: fireDoorIntumescentPartId(w), name: `Intumescent Strip ${w}mm`, section: fdIntuSection(w), materialType: 'consumable', unit: 'm',
-      hint: `Fire doors with a ${w} wide strip style (Window Settings, Fire Doors: the macro INTU_STYLE table): strips per edge x (2 x leaf height + leaf width) per door, in metres. No row on a non-fire door.` })),
+    fdRow({ id: FH.intumescent.partId, name: `Intumescent Strip ${FP.intumescent.width}mm`, section: fdIntuSection, materialType: 'consumable', unit: 'm',
+      hint: `Fire doors: the one strip size ${FP.intumescent.width} x ${FP.intumescent.thickness} all around the leaf (top and both edges), FD30 ${FP.intumescent.stripsByRating.FD30} strip, FD60 ${FP.intumescent.stripsByRating.FD60} strips (Window Settings, Fire Doors): strips x (2 x leaf height + leaf width) per door, in metres. No row on a non-fire door.` }),
     fdRow({ id: 'fd_glass_fire', name: 'Fire Glass', section: `${FP.vp.glassThickness}mm`, materialType: 'glass', unit: 'm²',
       hint: `Vision panel glass of a fire door: single fire rated pane, ${FP.vp.glassThickness} thick, the m² of every pane. Nothing on vision panel style 0.` }),
     fdRow({ id: 'fd_glass_toughened', name: 'Toughened Glass (vision panel)', section: `${FP.vp.glassThickness}mm`, materialType: 'glass', unit: 'm²',
@@ -352,9 +357,22 @@ export const FIREDOOR_PARTS = {
       hint: `Vision panel glazing beads: the pane perimeters x ${FP.vp.beadFaces} faces per door, in metres.` }),
     fdRow({ id: 'fd_glazing_intu', name: 'Glazing Intumescent', materialType: 'consumable', unit: 'm',
       hint: 'Fire doors with a vision panel: the glazing intumescent round every pane, the pane perimeters in metres. No row on a non-fire door.' }),
+    // v1.1: the frame corner dowels, a bought hardwood dowel in pieces (the
+    // partition dowels print as a plain hardware line with no row; this row is
+    // the first dowel row of PC, a material, not an ironmongery product)
+    fdRow({ id: FH.dowels.partId, name: 'Frame Dowels', section: fdDowelSection, materialType: 'consumable', unit: 'pcs',
+      hint: `Every door set: hardwood dowels ${FP.frame.dowels.dia} x ${FP.frame.dowels.length}, ${FP.frame.dowels.perJoint} per mitred corner of the frame (head to each jamb), ${FP.frame.dowels.perJoint * 2} per door, bored square to the mitre face (Window Settings, Fire Doors). Pieces.` }),
   ],
 };
-export const FIREDOOR_ALL_PARTS = [...FIREDOOR_PARTS.timber, ...FIREDOOR_PARTS.ironmongery, ...FIREDOOR_PARTS.consumables];
+// The v1.1 rows (the surface closer, the frame dowels) go to the END of the
+// flat list, the DOOR_V3_IDS pattern: the v1 rows keep their order and index
+// (the removed 10 / 20 mm strip rows aside), the page still groups each row
+// by its materialType.
+const FIREDOOR_V11_IDS = [FH.closerSurface.partId, FH.dowels.partId];
+export const FIREDOOR_ALL_PARTS = [
+  ...[...FIREDOOR_PARTS.timber, ...FIREDOOR_PARTS.ironmongery, ...FIREDOOR_PARTS.consumables].filter((p) => !FIREDOOR_V11_IDS.includes(p.id)),
+  ...FIREDOOR_V11_IDS.map((id) => [...FIREDOOR_PARTS.ironmongery, ...FIREDOOR_PARTS.consumables].find((p) => p.id === id)),
+];
 
 // Flat list for lookups — includes casement parts: mergeWindowMaterials and
 // the per-window material table iterate THIS list, so anything missing here

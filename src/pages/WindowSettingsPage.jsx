@@ -2,11 +2,13 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { uploadBsuiteProgram, removeBsuiteProgram } from '../services/bsuitePrograms.js';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
-import { kgPerM, VARIANT_ORDER, casementGlassDeductions, DEFAULT_DOOR_PROFILE, DEFAULT_PARTITION_PROFILE, DEFAULT_FIREDOOR_PROFILE } from '../engine/profile.js';
+import { kgPerM, VARIANT_ORDER, casementGlassDeductions, DEFAULT_DOOR_PROFILE, DEFAULT_PARTITION_PROFILE, DEFAULT_FIREDOOR_PROFILE, FIREDOOR_CLOSER_KINDS, FIREDOOR_CLOSER_LABELS } from '../engine/profile.js';
 import NumInput from '../components/NumInput.jsx';
 import { CONSTANTS, deriveWindowData } from '../engine/calculations.js';
 import { buildArchPlan, ArchError } from '../engine/arch.js';
 import { normaliseToWindowSpec } from '../engine/specification.js';
+// Fire doors (v1.1): the opening <-> leaf size rule of the engine (the Frame card prints it)
+import { fireDoorSizeRule, fireDoorLeafForOpening } from '../engine/fireDoor.js';
 import BoxDetail2D from '../components/drawings/BoxDetail2D.jsx';
 import SashDetail2D from '../components/drawings/SashDetail2D.jsx';
 import JambDetail2D from '../components/drawings/JambDetail2D.jsx';
@@ -1931,8 +1933,9 @@ function PartitionSettings() {
 const FD_PROGRAM_LABEL = { leaf: 'LEAF', head: 'HEAD', jambHinge: 'JAMB HINGE', jambLock: 'JAMB LOCK' };
 const FD_SET_RATINGS = [['FD30', 'FD30'], ['FD60', 'FD60']];
 const FD_SET_HANDS = [['left', 'Hinge left'], ['right', 'Hinge right']];
-const FD_SET_SWINGS = [['in', 'Opens in'], ['out', 'Opens out']];
 const FD_SET_LOCKS = [['latch', 'Latch'], ['euro', 'Sashlock euro'], ['bathroom', 'Bathroom']];
+// v1.1: the closer is a kind (none / surface / built in), one default for fire doors and one for non-fire doors; no swing
+const FD_SET_CLOSERS = FIREDOOR_CLOSER_KINDS.map((k) => [k, FIREDOOR_CLOSER_LABELS[k] || k]);
 
 function FireDoorSettings() {
   const firedoor = useWindowProfileStore((s) => s.firedoor) || DEFAULT_FIREDOOR_PROFILE;
@@ -1947,7 +1950,8 @@ function FireDoorSettings() {
   const IN = p.intumescent || DEFAULT_FIREDOOR_PROFILE.intumescent, BS = p.bsuite || DEFAULT_FIREDOOR_PROFILE.bsuite;
   const DF = p.defaults || DEFAULT_FIREDOOR_PROFILE.defaults;
   const FO = LK.forend || {}, CS = LK.case || {}, KPK = KP.pocket || {}, LIM = L.limits || {}, TBR = L.thicknessByRating || {};
-  // the sample door: the reference door of brief 3.10 (the profile defaults), its size and rating editable here
+  const DW = FR.dowels || DEFAULT_FIREDOOR_PROFILE.frame.dowels, SBR = IN.stripsByRating || DEFAULT_FIREDOOR_PROFILE.intumescent.stripsByRating;
+  // the sample door: the reference door of brief 3.10 (the profile defaults), its leaf size typed as the override and its rating editable here
   const [sampleW, setSampleW] = useState(() => Number(DEFAULT_FIREDOOR_PROFILE.leaf.defaultWidth));
   const [sampleH, setSampleH] = useState(() => Number(DEFAULT_FIREDOOR_PROFILE.leaf.defaultHeight));
   const [sampleDepth, setSampleDepth] = useState(() => Number(DEFAULT_FIREDOOR_PROFILE.frame.defaultDepth));
@@ -1984,11 +1988,14 @@ function FireDoorSettings() {
   // agent's; this column prints the numbers only.
   const sample = useMemo(() => {
     try {
+      // v1.1: the sample leaf is typed as the override (the engine reports the
+      // opening it needs); the closer, the intumescent and the handing follow
+      // the profile defaults (no swing, no intumescent style)
       const ws = normaliseToWindowSpec({
         name: 'SAMPLE', width: W, height: Hh, windowCategory: 'firedoor',
         firedoorFire: sampleFire, firedoorRating: sampleRating, firedoorLeafWidth: W, firedoorLeafHeight: Hh, firedoorFrameDepth: Dd,
-        firedoorHingeSide: DF.hingeSide, firedoorSwing: DF.swing, firedoorLockType: DF.lockType,
-        firedoorVpStyle: DF.vpStyle, firedoorIntuStyle: DF.intuStyle, firedoorLeadEdge: DF.leadEdge, glassType: 'double',
+        firedoorHingeSide: DF.hingeSide, firedoorLockType: DF.lockType,
+        firedoorVpStyle: DF.vpStyle, firedoorLeadEdge: DF.leadEdge, glassType: 'double',
       });
       const derived = deriveWindowData(ws);
       if (!derived?.firedoor) throw new Error('The engine returned no fire door data');
@@ -2005,6 +2012,14 @@ function FireDoorSettings() {
   // profile-side arithmetic shown as hints (the engine does the same sums)
   const rebateW = (Number(FR.overlap) || 0) + (Number(FR.gapSide) || 0);
   const faceOutside = (Number(FR.thickness) || 0) - rebateW;
+  // the v1.1 size rule from the engine helper on THIS profile (the Frame card prints it with a worked example)
+  const sizeRule = useMemo(() => {
+    try {
+      const r = fireDoorSizeRule(p);
+      const ex = fireDoorLeafForOpening(p, 1000, 2100);
+      return { ...r, exampleFrameW: 1000 - 2 * r.wallGapSide, exampleFrameH: 2100 - r.wallGapHead, exampleLeafW: ex.width, exampleLeafH: ex.height };
+    } catch { return null; }
+  }, [p]);
 
   return (
     <div className="p-6" data-firedoor-settings>
@@ -2091,7 +2106,7 @@ function FireDoorSettings() {
           <div className={`card p-4 mb-4 ${frameLock ? '' : 'ring-1 ring-amber-500/40'}`}>
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs font-semibold text-ink-200">Frame
-                <span className="text-ink-500 font-normal"> · 63 raw machined to 50, the rebate from solid, the gaps, the overall = leaf + 2 x (gap + 35) wide, floor gap + leaf + gap + 35 high</span>
+                <span className="text-ink-500 font-normal"> · 63 raw machined to 50, the rebate from solid, the gaps, the wall gaps of the structural opening, the overall = leaf + 2 x (gap + 35) wide, floor gap + leaf + gap + 35 high, the corner dowels</span>
               </div>
               <LockToggle locked={frameLock} onToggle={() => setFrameLock((x) => !x)} />
             </div>
@@ -2117,10 +2132,28 @@ function FireDoorSettings() {
                 </div>
                 <PathField label="Default depth" value={FR.defaultDepth} onCommit={(v) => setPath(['frame', 'defaultDepth'], v)} hint="a new door starts here" />
               </div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Structural opening (v1.1: the opening is the input; the frame sits this far inside it)</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-1">
+                <PathField label="Wall gap side" value={FR.wallGapSide} onCommit={(v) => setPath(['frame', 'wallGapSide'], v)} hint="each side: frame width = opening - 2 x this" />
+                <PathField label="Wall gap head" value={FR.wallGapHead} onCommit={(v) => setPath(['frame', 'wallGapHead'], v)} hint="frame height = opening - this (the foot stands on the floor)" />
+              </div>
+              <div className="text-[11px] text-ink-500 mb-3">
+                {sizeRule
+                  ? <>Rule: opening - {sizeRule.wallGapSide} a side / - {sizeRule.wallGapHead} at the head = frame; leaf = frame - {sizeRule.addWidth} / - {sizeRule.addHeight}. With this profile an opening 1000 x 2100 gives a frame {sizeRule.exampleFrameW} x {sizeRule.exampleFrameH} and a leaf {sizeRule.exampleLeafW} x {sizeRule.exampleLeafH}. A typed leaf overrides the derived one.</>
+                  : 'Rule: opening - wall gap a side / - wall gap at the head = frame; leaf = frame - 2 x (gap + outside face) / - (floor gap + gap + outside face).'}
+              </div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Corner dowels (each mitred corner, bored square to the mitre face, half the length into each piece)</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <PathField label="Diameter" value={DW.dia} onCommit={(v) => setPath(['frame', 'dowels', 'dia'], v)} hint="DOWEL_D" />
+                <PathField label="Length" value={DW.length} onCommit={(v) => setPath(['frame', 'dowels', 'length'], v)} hint="DOWEL_L; bore depth = half" />
+                <PathField label="Per joint" value={DW.perJoint} onCommit={(v) => setPath(['frame', 'dowels', 'perJoint'], v)} hint="DOWEL_N per corner; 0 = none" />
+                <PathField label="Margin" value={DW.margin} onCommit={(v) => setPath(['frame', 'dowels', 'margin'], v)} hint="ASSUMPTION: in from each face along the depth" />
+              </div>
               <div className="text-ink-300 text-[11px]">
                 {fdFrame ? (<>sample frame overall <span className="text-accent-400 font-medium">{fdFrame.overall?.width} × {fdFrame.overall?.height}</span>
-                  <span className="text-ink-500"> · rebate {fdFrame.rebate?.width} × {fdFrame.rebate?.depth} · faces {fdFrame.faces?.outside} / {fdFrame.faces?.inside} · finished {fdFrame.thickness} × {fdFrame.depth} · raw {fdFrame.rawThickness} × {fdFrame.rawWidth}</span>
-                  <span className="text-ink-500"> · visible outside face {faceOutside} from the profile</span></>) : 'n/a'}
+                  <span className="text-ink-500"> · opening {fd?.opening?.width} × {fd?.opening?.height} · rebate {fdFrame.rebate?.width} × {fdFrame.rebate?.depth} · faces {fdFrame.faces?.outside} / {fdFrame.faces?.inside} · finished {fdFrame.thickness} × {fdFrame.depth} · raw {fdFrame.rawThickness} × {fdFrame.rawWidth}</span>
+                  <span className="text-ink-500"> · visible outside face {faceOutside} from the profile</span>
+                  {fdFrame.dowels?.count > 0 && <span className="text-ink-500"> · dowels {fdFrame.dowels.perJoint} × {fdFrame.dowels.dia} × {fdFrame.dowels.length} per corner at {(fdFrame.dowels.positionsAlongDepth || []).join(' / ')} along the depth</span>}</>) : 'n/a'}
               </div>
             </fieldset>
           </div>
@@ -2129,7 +2162,7 @@ function FireDoorSettings() {
           <div className={`card p-4 mb-4 ${hingesLock ? '' : 'ring-1 ring-amber-500/40'}`}>
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs font-semibold text-ink-200">Hinges
-                <span className="text-ink-500 font-normal"> · the macro rule: top 150 from the leaf top, bottom ending 200 above the leaf bottom, the middle equal (step = (H - top - bottom - length) / (count - 1))</span>
+                <span className="text-ink-500 font-normal"> · top 150 from the leaf top, bottom ending 200 above the leaf bottom, the middle hinge centre 200 above the leaf centre (v1.1, owner); with more than three the inner ones spread equally</span>
               </div>
               <LockToggle locked={hingesLock} onToggle={() => setHingesLock((x) => !x)} />
             </div>
@@ -2139,6 +2172,7 @@ function FireDoorSettings() {
                 <PathField label="Hinge length" value={HG.length} onCommit={(v) => setPath(['hinges', 'length'], v)} />
                 <PathField label="Top offset" value={HG.topOffset} onCommit={(v) => setPath(['hinges', 'topOffset'], v)} hint="leaf top to the top hinge" />
                 <PathField label="Bottom offset" value={HG.bottomOffset} onCommit={(v) => setPath(['hinges', 'bottomOffset'], v)} hint="bottom hinge end to the leaf bottom" />
+                <PathField label="Middle above centre" value={HG.midAboveCentre} onCommit={(v) => setPath(['hinges', 'midAboveCentre'], v)} hint="the middle hinge CENTRE this far above the leaf centre (3 hinges); 0 = on the centre" />
                 <PathField label="Recess length" value={HG.recessLength} onCommit={(v) => setPath(['hinges', 'recessLength'], v)} hint="ASSUMPTION: plate + 1" />
                 <PathField label="Recess width" value={HG.recessWidth} onCommit={(v) => setPath(['hinges', 'recessWidth'], v)} hint="ASSUMPTION" />
                 <PathField label="Recess depth" value={HG.recessDepth} onCommit={(v) => setPath(['hinges', 'recessDepth'], v)} hint="ASSUMPTION (Weeke had 3.2 / 4 / 4.2)" />
@@ -2146,7 +2180,8 @@ function FireDoorSettings() {
               </div>
               <div className="text-ink-300 text-[11px]" data-fd-sample-hinges>
                 {fd ? (<>sample hinges from the leaf top <span className="text-accent-400 font-medium">{fdHinges.map((h) => h.top).join(' / ')}</span>
-                  <span className="text-ink-500"> · step {fd.hinges?.step} · on the jamb from the top long point {fdHinges.map((h) => h.jambTop).join(' / ')} · recess {fd.hinges?.recess?.length} × {fd.hinges?.recess?.width} × {fd.hinges?.recess?.depth} R{fd.hinges?.recess?.radius}</span></>) : 'n/a'}
+                  {fd.hinges?.midCentreAboveLeafCentre != null && <span className="text-ink-500"> · middle hinge centre {fd.hinges.midCentreAboveLeafCentre} above the leaf centre</span>}
+                  <span className="text-ink-500"> · on the jamb from the top long point {fdHinges.map((h) => h.jambTop).join(' / ')} · recess {fd.hinges?.recess?.length} × {fd.hinges?.recess?.width} × {fd.hinges?.recess?.depth} R{fd.hinges?.recess?.radius}</span></>) : 'n/a'}
               </div>
             </fieldset>
           </div>
@@ -2259,32 +2294,29 @@ function FireDoorSettings() {
           <div className={`card p-4 mb-4 ${intuLock ? '' : 'ring-1 ring-amber-500/40'}`}>
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs font-semibold text-ink-200">Intumescent
-                <span className="text-ink-500 font-normal"> · the groove the macro cuts (strip + oversize) and the two-strip spacing; metres = strips x (2 x H + W); the INTU_STYLE table is the macro's, read only</span>
+                <span className="text-ink-500 font-normal"> · v1.1: one strip size all around (top and both edges), FD30 one strip, FD60 two, a non-fire door none; the groove the macro cuts; metres = strips x (2 x H + W)</span>
               </div>
               <LockToggle locked={intuLock} onToggle={() => setIntuLock((x) => !x)} />
             </div>
             <fieldset disabled={intuLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${intuLock ? 'opacity-60' : ''}`}>
-              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-2">
-                <PathField label="Groove oversize" value={IN.grooveOversize} onCommit={(v) => setPath(['intumescent', 'grooveOversize'], v)} hint="ASSUMPTION: 15.5 for a 15 strip" />
-                <PathField label="Two-strip offset" value={IN.twoStripOffset} onCommit={(v) => setPath(['intumescent', 'twoStripOffset'], v)} hint="ASSUMPTION: LPZ / 2 +- this" />
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <PathField label="Strip width" value={IN.width} onCommit={(v) => setPath(['intumescent', 'width'], v)} hint="INTU_W" />
+                <PathField label="Strip thickness" value={IN.thickness} onCommit={(v) => setPath(['intumescent', 'thickness'], v)} hint="INTU_T" />
+                <PathField label="Groove width" value={IN.grooveWidth} onCommit={(v) => setPath(['intumescent', 'grooveWidth'], v)} hint="two passes of the 10 disk" />
+                <PathField label="Groove depth" value={IN.grooveDepth} onCommit={(v) => setPath(['intumescent', 'grooveDepth'], v)} />
               </div>
-              <div className="text-ink-300 text-[11px] mb-2" data-fd-sample-intu>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Strips by rating (INTU = the count; a non-fire door is always 0)</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-2">
+                <PathField label="FD30" value={SBR.FD30} onCommit={(v) => setPath(['intumescent', 'stripsByRating', 'FD30'], v)} />
+                <PathField label="FD60" value={SBR.FD60} onCommit={(v) => setPath(['intumescent', 'stripsByRating', 'FD60'], v)} />
+                <PathField label="Two-strip offset" value={IN.twoStripOffset} onCommit={(v) => setPath(['intumescent', 'twoStripOffset'], v)} hint="ASSUMPTION: the two grooves at LPZ / 2 +- this" />
+              </div>
+              <div className="text-ink-300 text-[11px] mb-1" data-fd-sample-intu>
                 {fd ? (fd.intumescent
-                  ? (<>sample strip <span className="text-accent-400 font-medium">{fd.intumescent.width} × {fd.intumescent.thickness}</span> × {fd.intumescent.strips} = <span className="text-accent-400 font-medium">{fd.intumescent.metres} m</span></>)
+                  ? (<>sample <span className="text-accent-400 font-medium">{fd.intumescent.label}</span> · groove {fd.intumescent.groove?.width} × {fd.intumescent.groove?.depth} = <span className="text-accent-400 font-medium">{fd.intumescent.metres} m</span> · INTU_STYLE {fd.intumescent.macroStyle}</>)
                   : 'sample door: non-fire, no intumescent') : 'n/a'}
               </div>
             </fieldset>
-            <table className="w-full text-[11px]">
-              <thead><tr className="text-ink-500 text-left"><th className="pr-2 font-medium">id</th><th className="pr-2 font-medium">label</th><th className="pr-2 font-medium">strip</th><th className="font-medium">strips per edge</th></tr></thead>
-              <tbody>
-                {(IN.styles || []).map((s) => (
-                  <tr key={s.id} className="text-ink-300 border-t border-surface-500/40">
-                    <td className="pr-2 py-0.5 font-mono">{s.id}</td><td className="pr-2 py-0.5">{s.label}</td>
-                    <td className="pr-2 py-0.5">{s.width} × {s.thickness}</td><td className="py-0.5">{s.strips}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
 
           {/* ══ bSuite ══ */}
@@ -2420,8 +2452,15 @@ function FireDoorSettings() {
                       </div>
                     ))}
                   </div>
+                  <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Intumescent variables (v1.1, read only)</div>
+                  <div className="text-[11px] text-ink-500 mb-2">
+                    INTU = the strip count (0 none / 1 FD30 / 2 FD60), INTU_W and INTU_T = the strip size of the Intumescent card, INTU_STYLE = the Master_Door style the count maps to: {Object.entries(IN.macroStyleByStrips || {}).map(([n, s]) => `${n} strip${Number(n) === 1 ? '' : 's'} -> style ${s}`).join(', ') || 'n/a'}.
+                  </div>
+                  <div className="text-[11px] text-ink-500 mb-2">
+                    CLOSER = 0 none / 1 surface / 2 built in (v1.1). The frame rows carry the corner dowels: DOWEL_N (per mitred end), DOWEL_D, DOWEL_L, DOWEL_DEPTH (half the length) and DOWEL_1..n (the positions along the depth from the outside face).
+                  </div>
                   <div className="text-[11px] text-ink-500">
-                    Today the leaf master has only LPX / LPY / LPZ as document variables; the rest (HAND, HINGE, LOCK, LOCK_H, EURO, KEEP, INTU_STYLE, VP_STYLE, C_VP_*, HINGE_1..3, HINGE_D, CLOSER) must be added as document variables in bSolid and bound inside Master_Door_PIOTR before a row from PC steers the hinges and the lock (BLOCKERS 35).
+                    Today the leaf master has only LPX / LPY / LPZ as document variables; the rest (HAND, HINGE, LOCK, LOCK_H, EURO, KEEP, INTU, INTU_W, INTU_T, INTU_STYLE, VP_STYLE, C_VP_*, HINGE_1..3, HINGE_D, CLOSER) must be added as document variables in bSolid and bound inside Master_Door_PIOTR before a row from PC steers the hinges and the lock (BLOCKERS 35).
                   </div>
                 </fieldset>
               </div>
@@ -2449,10 +2488,6 @@ function FireDoorSettings() {
                   <StringChips value={DF.hingeSide} options={FD_SET_HANDS} onPick={(v) => setPath(['defaults', 'hingeSide'], v)} />
                 </div>
                 <div>
-                  <div className="text-ink-400 mb-1">Swing</div>
-                  <StringChips value={DF.swing} options={FD_SET_SWINGS} onPick={(v) => setPath(['defaults', 'swing'], v)} />
-                </div>
-                <div>
                   <div className="text-ink-400 mb-1">Lock</div>
                   <StringChips value={DF.lockType} options={FD_SET_LOCKS} onPick={(v) => setPath(['defaults', 'lockType'], v)} />
                 </div>
@@ -2461,17 +2496,27 @@ function FireDoorSettings() {
                   <BoolChips value={DF.leadEdge !== false} onPick={(v) => setPath(['defaults', 'leadEdge'], v)} />
                 </div>
               </div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Closer (v1.1: a kind; the door's closer follows fire until picked on the door)</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <div>
+                  <div className="text-ink-400 mb-1">Fire door closer</div>
+                  <select value={FIREDOOR_CLOSER_KINDS.includes(DF.closerFire) ? DF.closerFire : 'none'} onChange={(e) => setPath(['defaults', 'closerFire'], e.target.value)} className={selectCls}>
+                    {FD_SET_CLOSERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div className="text-ink-400 mb-1">Non-fire door closer</div>
+                  <select value={FIREDOOR_CLOSER_KINDS.includes(DF.closerNonFire) ? DF.closerNonFire : 'none'} onChange={(e) => setPath(['defaults', 'closerNonFire'], e.target.value)} className={selectCls}>
+                    {FD_SET_CLOSERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                </div>
+                <div className="text-[10px] text-ink-500">The built in closer is not machined until the owner's component files arrive (BLOCKERS 35).</div>
+              </div>
               <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
                 <div>
                   <div className="text-ink-400 mb-1">Vision panel style</div>
                   <select value={DF.vpStyle ?? 0} onChange={(e) => setPath(['defaults', 'vpStyle'], e.target.value)} className={selectCls}>
                     {(VP.styles || []).map((s) => <option key={s.id} value={s.id}>{s.id} · {s.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div className="text-ink-400 mb-1">Intumescent style</div>
-                  <select value={DF.intuStyle ?? 1} onChange={(e) => setPath(['defaults', 'intuStyle'], e.target.value)} className={selectCls}>
-                    {(IN.styles || []).map((s) => <option key={s.id} value={s.id}>{s.id} · {s.label}</option>)}
                   </select>
                 </div>
               </div>
@@ -2501,22 +2546,24 @@ function FireDoorSettings() {
                 ['Name', fmt(fd.name)],
                 ['Rating', fd.fire ? fmt(fd.rating) : 'non-fire'],
                 ['Hand', fmt(fd.handing?.label)],
+                ['Structural opening', `${fmt(fd.opening?.width)} × ${fmt(fd.opening?.height)}${fd.opening?.source === 'leaf' ? ' (from the leaf)' : ''}`],
                 ['Leaf', `${fmt(fd.leaf?.width)} × ${fmt(fd.leaf?.height)} × ${fmt(fd.leaf?.thickness)}`],
                 ['Frame overall', `${fmt(fdFrame?.overall?.width)} × ${fmt(fdFrame?.overall?.height)}`],
                 ['Rebate', `${fmt(fdFrame?.rebate?.width)} × ${fmt(fdFrame?.rebate?.depth)} · faces ${fmt(fdFrame?.faces?.outside)} / ${fmt(fdFrame?.faces?.inside)}`],
                 ['Members', `${fmt(fdFrame?.thickness)} × ${fmt(fdFrame?.depth)} finished · ${fmt(fdFrame?.rawThickness)} × ${fmt(fdFrame?.rawWidth)} raw`],
                 ...(fdFrame?.members || []).map((m) => [m.id, `${fmt(m.length)} long point · ${m.rawSection || ''}${m.mitreTop ? ' · mitre top' : ''}${m.mitreBottom ? ' · mitre bottom' : ''}`]),
                 ['Hinges (leaf top)', fdHinges.map((h) => h.top).join(' / ') || 'n/a'],
-                ['Hinge step', fmt(fd.hinges?.step)],
+                ...(fd.hinges?.midCentreAboveLeafCentre != null ? [['Middle hinge', `centre ${fmt(fd.hinges.midCentreAboveLeafCentre)} above the leaf centre`]] : []),
                 ['Hinges (jamb top)', fdHinges.map((h) => h.jambTop).join(' / ') || 'n/a'],
+                ...(fdFrame?.dowels?.count > 0 ? [['Corner dowels', `${fmt(fdFrame.dowels.perJoint)} × ${fmt(fdFrame.dowels.dia)} × ${fmt(fdFrame.dowels.length)} per corner`]] : []),
                 ['Hinge macro', `HINGE ${fmt(fd.hinges?.macroHinge)} · ${fmt(fd.hinges?.product)}`],
                 ['Lock', `${fmt(fd.lock?.type)} · LOCK ${fmt(fd.lock?.macroLock)} · EURO ${fd.lock?.euro ? 1 : 0}`],
                 ['Spindle', `${fmt(fd.lock?.spindle?.fromBottom)} above the leaf bottom · backset ${fmt(fd.lock?.backset)}`],
                 ['Forend', `centre ${fmt(fd.lock?.forend?.centreFromBottom)} up · ${fmt(fd.lock?.forend?.millLength)} × ${fmt(fd.lock?.forend?.millWidth)}`],
                 ['Keep centre', `${fmt(fd.keep?.centreFromFoot)} above the jamb foot · KEEP ${fmt(fd.keep?.macroKeep)}`],
-                ['Closer', fd.closer ? 'yes' : 'no'],
+                ['Closer', fd.closer ? fmt(fd.closer.label) : 'none'],
                 ['Vision panel', `${fmt(fd.vp?.label)}${fd.vp?.panes?.length ? ` · ${fd.vp.panes.length} pane(s) · ${fmt(fd.vp?.glassSqm)} m²` : ''}`],
-                ['Intumescent', fd.intumescent ? `${fmt(fd.intumescent.width)} × ${fmt(fd.intumescent.thickness)} × ${fmt(fd.intumescent.strips)} · ${fmt(fd.intumescent.metres)} m` : 'none'],
+                ['Intumescent', fd.intumescent ? `${fmt(fd.intumescent.label)} · ${fmt(fd.intumescent.metres)} m` : 'none (non-fire)'],
                 ['Paint area', `${fmt(fd.paintAreaSqm)} m²`],
               ].map(([l, v]) => (
                 <div key={l} className="flex justify-between gap-3 py-0.5 border-b border-surface-500/30 last:border-0">

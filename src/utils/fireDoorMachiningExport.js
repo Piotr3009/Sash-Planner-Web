@@ -18,8 +18,17 @@
  * documented at the top of src/engine/fireDoor.js). Two files per export:
  *   {label}_firedoor_machining.csv   one line per op: door, element, op, face, x, y, z,
  *                                    length, width, depth, radius, angle, value, note
- *   {label}_firedoor_machining.json  per door: name, inputs, leaf, frame members, hinges,
- *                                    lock, keep, vp, intumescent, bsuiteVars, machining
+ *                                    (angle: the mitres and the dowel bores, 45; blank
+ *                                    when an op has none)
+ *   {label}_firedoor_machining.json  per door: name, opening (v1.1), handing, inputs, leaf,
+ *                                    frame (overall, sections, rebate, dowels, members),
+ *                                    hinges, lock, keep, vp, intumescent, closer (the kind
+ *                                    object or null, v1.1), bsuiteVars, machining
+ * v1.1 (27.10.2026 evening): the frame corner dowels are ops of kind `dowelBore` on face
+ * `mitre` (x y z = the bore centre, angle 45 = square to the mitre face) on the head (both
+ * ends) and each jamb (the top end); the JSON carries the structural opening the sizes came
+ * from and the frame dowel rule; no swing anywhere (an internal door is handed by its hinge
+ * side only).
  * Rules: every number comes from `derived` (never recomputed here), numbers to 0.1, the
  * element names are the cut list names (FD-LEAF, FD-HEAD, FD-JAMB-H, FD-JAMB-L) read from
  * the derived records. The browser download stays inside exportFireDoorMachining so node
@@ -30,7 +39,11 @@ import { downloadDxf, safeName } from './cncExport.js';
 const r1 = (v) => Math.round(Number(v) * 10) / 10;
 const fmtNum = (v) => String(r1(v));
 
-/** The CSV columns, in this order (the optional angle / value / note are blank when an op has none). */
+/**
+ * The CSV columns, in this order: the eleven of the brief (door .. radius), then `angle`
+ * right after `radius` (the mitres and the dowel bores carry 45; blank otherwise), then the
+ * optional value / note (blank when an op has none).
+ */
 export const FIREDOOR_MACHINING_COLUMNS = Object.freeze(['door', 'element', 'op', 'face', 'x', 'y', 'z', 'length', 'width', 'depth', 'radius', 'angle', 'value', 'note']);
 
 /** The machining groups of derived.firedoor.machining, in the order the list is written (leaf, head, hinge jamb, lock jamb). */
@@ -41,7 +54,8 @@ export const FIREDOOR_COORDINATE_NOTES = Object.freeze({
   units: 'mm, rounded to 0.1',
   op: 'x, y, z = the reference corner (minimum x, y, z of the bounding box) in the board system; length along x, width along the other in-face axis, depth into the face, radius = corner or end radius; holes (spindleHole, cylinderHole) give their centre in x, y and the bore in length and width',
   leaf: 'x along the height from the leaf top (0 = top, LPX = bottom); y across the width from the hinge edge (0 = hinge edge, LPY = lock edge); z through the thickness from the pull face (0 = pull face, LPZ = push face); faces pull, push, hingeEdge, lockEdge, top, bottom',
-  frame: 'x along the length from the top long point (jambs) or the left long point (head); y across the 50 thickness from the wall face (0 = wall, 50 = opening); z along the frame depth from the outside face (0 = the face that shows 35, depth = the inside face that shows 50); faces opening, rebateCheek, end',
+  frame: 'x along the length from the top long point (jambs) or the left long point (head); y across the 50 thickness from the wall face (0 = wall, 50 = opening); z along the frame depth from the outside face (0 = the face that shows 35, depth = the inside face that shows 50); faces opening, rebateCheek, end, mitre',
+  dowelBore: 'face mitre: x, y, z = the bore CENTRE on the mitre face (x = the end long point, y = the thickness centre, z along the depth), length and width = the dowel diameter, depth = half the dowel length into the piece, angle 45 = the bore axis is square to the mitre face (45 to the member axis)',
 });
 
 /** The fire doors of a window list as [{ name, derived }], every other window left out. */
@@ -66,7 +80,8 @@ function elementNameOf(derived, key) {
 /**
  * One row per op of every fire door, doors in the given order, groups leaf / head / hinge
  * jamb / lock jamb, ops in the engine's order. Row: { door, element, op, face, x, y, z,
- * length, width, depth, radius } plus angle / value / note when the op carries them.
+ * length, width, depth, radius } plus angle / value / note when the op carries them
+ * (angle: the mitres and the v1.1 dowel bores).
  */
 export function buildFireDoorMachiningRows(windows) {
   const rows = [];
@@ -107,21 +122,27 @@ export function fireDoorMachiningCsv(rows) {
 
 /**
  * The JSON text (2-space indent): the format header, the coordinate notes and one object per
- * door with name, fire, rating, handing, inputs, leaf, frame (overall, sections, rebate,
- * members), hinges, lock, keep, vp, intumescent, closer, bsuiteVars and machining, all copied
- * from derived.firedoor.
+ * door with name, fire, rating, opening (v1.1: { width, height, wallGapSide, wallGapHead,
+ * source } the sizes came from), handing ({ hingeSide, label }, no swing), inputs, leaf,
+ * frame (overall, sections, rebate, the dowel rule, members), frameDowels (the frame dowel
+ * block on its own for the 5-axis programmer), hinges, lock, keep, vp, intumescent (the
+ * strip object or null), closer (v1.1: { type, label, machined } or null), bsuiteVars and
+ * machining, all copied from derived.firedoor.
  */
 export function fireDoorMachiningJson(windows) {
   const doors = fireDoorsOf(windows).map(({ name, derived }) => {
     const FD = derived.firedoor;
+    const O = FD.opening || null;
+    const opening = O ? { width: O.width, height: O.height, wallGapSide: O.wallGapSide, wallGapHead: O.wallGapHead, source: O.source } : null;
     return {
-      name, fire: FD.fire, rating: FD.rating, handing: FD.handing, inputs: FD.inputs,
-      leaf: FD.leaf, frame: FD.frame, hinges: FD.hinges, lock: FD.lock, keep: FD.keep,
-      vp: FD.vp, intumescent: FD.intumescent, closer: FD.closer,
+      name, fire: FD.fire, rating: FD.rating, opening, handing: FD.handing, inputs: FD.inputs,
+      leaf: FD.leaf, frame: FD.frame, frameDowels: FD.frame?.dowels ?? null,
+      hinges: FD.hinges, lock: FD.lock, keep: FD.keep,
+      vp: FD.vp, intumescent: FD.intumescent ?? null, closer: FD.closer ?? null,
       bsuiteVars: FD.bsuiteVars, machining: FD.machining,
     };
   });
-  return JSON.stringify({ format: 'production-core-firedoor-machining', version: 1, coordinates: FIREDOOR_COORDINATE_NOTES, doors }, null, 2);
+  return JSON.stringify({ format: 'production-core-firedoor-machining', version: 2, coordinates: FIREDOOR_COORDINATE_NOTES, doors }, null, 2);
 }
 
 /**

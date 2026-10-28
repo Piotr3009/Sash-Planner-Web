@@ -107,14 +107,15 @@ const PARTITION_BOOLEAN_LEAVES = ['radius'];
 // Fire door profile keys the Window Settings Fire Doors card may write
 // (setFireDoorPath, 27.10.2026): the same rule (root whitelisted, the leaf must
 // exist, numbers finite, an empty field commits nothing). String leaves: the
-// head joint, the configurator defaults (rating, hand, swing, lock), the bSuite
-// target names / program paths / panel names / active target, the vp and
-// intumescent style labels and the vp arrangement. Boolean leaves: the fire
-// default, the leading edge default, the STOP rows and the execution block.
-// The comma lists (leaf.widthSuggestions, frame.depthSuggestions) go through
-// setFireDoorList; the bSuite targets are replaced whole by setFireDoorBsuiteTargets.
+// head joint, the configurator defaults (rating, hand, lock, the closer kind
+// of a fire door and of a non-fire door: v1.1, no swing), the bSuite target
+// names / program paths / panel names / active target, the vp style labels
+// and the vp arrangement. Boolean leaves: the fire default, the leading edge
+// default, the STOP rows and the execution block. The comma lists
+// (leaf.widthSuggestions, frame.depthSuggestions) go through setFireDoorList;
+// the bSuite targets are replaced whole by setFireDoorBsuiteTargets.
 const FIREDOOR_PATH_ROOTS = ['leaf', 'frame', 'hinges', 'lock', 'keep', 'vp', 'intumescent', 'bsuite', 'defaults'];
-const FIREDOOR_STRING_LEAVES = ['headJoint', 'rating', 'hingeSide', 'swing', 'lockType', 'path', 'name', 'activeTarget', 'panelName', 'label', 'arrange'];
+const FIREDOOR_STRING_LEAVES = ['headJoint', 'rating', 'hingeSide', 'lockType', 'closerFire', 'closerNonFire', 'path', 'name', 'activeTarget', 'panelName', 'label', 'arrange'];
 const FIREDOOR_BOOLEAN_LEAVES = ['fire', 'leadEdge', 'stopRows', 'writeExecutionParameters'];
 const FIREDOOR_PROGRAM_KEYS = ['leaf', 'head', 'jambHinge', 'jambLock'];
 

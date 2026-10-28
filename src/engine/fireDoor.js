@@ -18,7 +18,11 @@
  * into sizes, positions, records, machining ops and the bSuite variable table.
  * It never imports calculations.js (calculations imports this module).
  *
- * THE MODEL (CLAUDE.md section 3, the owner box)
+ * THE MODEL (CLAUDE.md section 3, the owner box, plus the v1.1 changes of 27.10.2026 evening)
+ *   opening     the structural opening W x H is the input (v1.1): frame
+ *               overall = opening - 2 x wallGapSide / - wallGapHead (the foot
+ *               stands on the floor), leaf = overall - 76 / - 43. A typed leaf
+ *               overrides the derived one and the opening is reported from it.
  *   leaf        W x H x T (T 44 for FD30 and non-fire, 54 for FD60), LPX = H,
  *               LPY = W, LPZ = T in the bSolid master.
  *   rebate      width = overlap + gapSide (15, across the 50 thickness), depth =
@@ -27,11 +31,19 @@
  *   frame       overall W = leaf + 2 x (gapSide + thickness - rebateW) (+ 76),
  *               overall H = floorGap + leaf + gapHead + (thickness - rebateW) (+ 43);
  *               head = overall W long point, both ends mitred 45; jambs =
- *               overall H long point, top mitred, bottom square on the floor.
- *   hinges      the macro rule: top_i = topOffset + i x step from the leaf top
- *               to the hinge top edge, step = (H - topOffset - bottomOffset -
- *               length) / (count - 1); on the hinge jamb the same heights
- *               shifted by (thickness - rebateW) + gapHead.
+ *               overall H long point, top mitred, bottom square on the floor;
+ *               each mitred corner dowelled (frame.dowels: 8 x 40, 3 per corner,
+ *               bored square to the mitre face, half the length into each piece).
+ *   hinges      (v1.1) the top hinge's top edge topOffset below the leaf top,
+ *               the bottom hinge's bottom edge bottomOffset above the leaf
+ *               bottom, the middle hinge's CENTRE midAboveCentre above the
+ *               leaf centre (2040: tops 150 / 769 / 1738); on the hinge jamb
+ *               the same heights shifted by (thickness - rebateW) + gapHead.
+ *   handing     hinge left / right only (v1.1): no swing on an internal door.
+ *   intumescent (v1.1) one strip size 15 x 4 all around, groove 15.5 x 4;
+ *               FD30 one strip, FD60 two, a non-fire door none.
+ *   closer      (v1.1) none / surface / built in; a row in the order and the
+ *               CLOSER flag (0 / 1 / 2); the built in closer is not machined.
  *   lock        DIN lock: spindle spindleHeight above the leaf bottom, backset
  *               from the lock edge; forend centre forendCentreBelowSpindle under
  *               the spindle, case top caseTopAboveSpindle over it; euro / bathroom
@@ -61,7 +73,8 @@
  *   spindleHole and cylinderHole (pull, through), vpCutout per pane (pull,
  *   through, radius vp.cornerRadius; the diamond carries rotated true, angle
  *   45 and its bounding box), intuGroove per strip per edge (top, hingeEdge,
- *   lockEdge; fire only), leadEdge (lockEdge, depth 0, value = the macro value).
+ *   lockEdge; fire only; groove 15.5 x 4), leadEdge (lockEdge, depth 0, value =
+ *   the macro value).
  *
  * FRAME members (FD-HEAD, FD-JAMB-H, FD-JAMB-L):
  *   x along the LENGTH from the TOP long point (jambs) or the LEFT long point
@@ -75,7 +88,11 @@
  *   face `rebateCheek`, the face at y = thickness - rebateW that meets the leaf
  *   edge, x from the top long point, z from the outside face. Mitres: op
  *   `mitre` on face `end`, x = 0 (top / left) or x = length (the head's right
- *   end), angle 45, width = thickness, depth = frame depth.
+ *   end), angle 45, width = thickness, depth = frame depth. Dowels (v1.1): op
+ *   `dowelBore` on face `mitre` per dowel per mitred end, x y z = the bore
+ *   CENTRE on the mitre face (x = the end's long point, y = thickness / 2, z
+ *   along the depth), length = width = the dowel diameter, depth = half the
+ *   dowel length, angle 45 = the bore axis is square to the mitre face.
  */
 import { getFireDoorProfile, kgPerM } from './profile.js';
 import { round, createComponentRecord } from './records.js';
@@ -108,6 +125,44 @@ function paintFromAreaSqm(areaSqm) {
 const LOCK_TYPES = ['latch', 'euro', 'bathroom'];
 const RATINGS = ['FD30', 'FD60'];
 const NAME_RE = /^(FDR|DR)-(\d+)$/i;
+const CLOSER_KINDS = ['none', 'surface', 'builtin'];
+const CLOSER_LABELS = { none: 'None', surface: 'Surface closer', builtin: 'Built in closer' };
+
+/** The closer kind of a value: 'none' | 'surface' | 'builtin'; a v1 boolean true = 'builtin', false = 'none'; else the default. */
+function closerKindOf(v, def) {
+  if (v === true || v === 'true' || v === 'yes' || v === 1 || v === '1') return 'builtin';
+  if (v === false || v === 'false' || v === 'no' || v === 0 || v === '0') return 'none';
+  return CLOSER_KINDS.includes(v) ? v : (CLOSER_KINDS.includes(def) ? def : 'none');
+}
+
+/**
+ * The frame's two additions over the leaf and the wall gaps, from the profile:
+ * overall W = leaf + addWidth (76), overall H = leaf + addHeight (43); the
+ * opening = overall + 2 x wallGapSide / + wallGapHead. The form uses these to
+ * show the opening of a leaf chip and the leaf a typed opening gives, with the
+ * same arithmetic as the engine.
+ */
+export function fireDoorSizeRule(profile) {
+  const P = profile || getFireDoorProfile();
+  const F = P.frame;
+  const faceOut = Number(F.thickness) - (Number(F.overlap) + Number(F.gapSide));
+  return {
+    addWidth: R(2 * (Number(F.gapSide) + faceOut)),
+    addHeight: R(Number(F.floorGap) + Number(F.gapHead) + faceOut),
+    wallGapSide: Number(F.wallGapSide) || 0,
+    wallGapHead: Number(F.wallGapHead) || 0,
+  };
+}
+/** The structural opening a leaf W x H needs: { width, height }. */
+export function fireDoorOpeningForLeaf(profile, leafW, leafH) {
+  const r = fireDoorSizeRule(profile);
+  return { width: R(Number(leafW) + r.addWidth + 2 * r.wallGapSide), height: R(Number(leafH) + r.addHeight + r.wallGapHead) };
+}
+/** The leaf a structural opening W x H gives: { width, height }. */
+export function fireDoorLeafForOpening(profile, openingW, openingH) {
+  const r = fireDoorSizeRule(profile);
+  return { width: R(Number(openingW) - 2 * r.wallGapSide - r.addWidth), height: R(Number(openingH) - r.wallGapHead - r.addHeight) };
+}
 
 /**
  * The next free door name of a project: 'FDR-nn' (fire) or 'DR-nn' (non-fire),
@@ -223,17 +278,42 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
   const fire = boolOf(spec.fire, D.fire);
   const storedRating = RATINGS.includes(spec.rating) ? spec.rating : (RATINGS.includes(D.rating) ? D.rating : 'FD30');
   const rating = fire ? storedRating : 'none';
-  const W = Number(spec.leafWidth ?? L.defaultWidth);
-  const H = Number(spec.leafHeight ?? L.defaultHeight);
   const depth = Number(spec.frameDepth ?? F.defaultDepth);
   const hingeSide = (spec.hingeSide ?? D.hingeSide) === 'right' ? 'right' : 'left';
-  const swing = (spec.swing ?? D.swing) === 'out' ? 'out' : 'in';
   const lockType = LOCK_TYPES.includes(spec.lockType) ? spec.lockType : (LOCK_TYPES.includes(D.lockType) ? D.lockType : 'latch');
-  const closer = boolOf(spec.closer, fire);
+  const closerKind = closerKindOf(spec.closer, fire ? D.closerFire : D.closerNonFire);
   const vpStyle = Math.max(0, Math.round(Number(spec.vpStyle ?? D.vpStyle) || 0));
   const vpCustom = { ...D.vpCustom, ...(spec.vpCustom || {}) };
-  const intuStyleIn = Math.max(0, Math.round(Number(spec.intuStyle ?? D.intuStyle) || 0));
   const leadEdge = boolOf(spec.leadEdge, D.leadEdge);
+
+  // ── the frame section (the fixed numbers the sizes are made of) ──
+  const thickness = Number(F.thickness), rawThickness = Number(F.rawThickness);
+  const rebateW = R(Number(F.overlap) + Number(F.gapSide));
+  const faceOut = R(thickness - rebateW), faceIn = thickness;
+  const gapSide = Number(F.gapSide), gapHead = Number(F.gapHead), floorGap = Number(F.floorGap);
+  const wallGapSide = Number(F.wallGapSide) || 0, wallGapHead = Number(F.wallGapHead) || 0;
+  const frameAddW = 2 * (gapSide + faceOut);          // overall W = leaf + 76
+  const frameAddH = floorGap + gapHead + faceOut;     // overall H = leaf + 43
+
+  // ── the sizes (v1.1): the structural opening is the input, the leaf an optional override ──
+  // leaf typed: the leaf wins and the opening is reported from it; opening
+  // typed: frame = opening - 2 x wallGapSide / - wallGapHead, leaf = frame - 76 /
+  // - 43; neither: the profile's default leaf. Each axis is decided on its own.
+  const sizeAxis = (leafIn, openingIn, defLeaf, addFrame, wallGap) => {
+    const leafV = Number(leafIn) || 0, openV = Number(openingIn) || 0;
+    if (leafV > 0) return { leaf: R(leafV), opening: R(leafV + addFrame + wallGap), source: 'leaf' };
+    if (openV > 0) return { leaf: R(openV - wallGap - addFrame), opening: R(openV), source: 'opening' };
+    return { leaf: R(Number(defLeaf)), opening: R(Number(defLeaf) + addFrame + wallGap), source: 'default' };
+  };
+  const axW = sizeAxis(spec.leafWidth, spec.openingWidth, L.defaultWidth, frameAddW, 2 * wallGapSide);
+  const axH = sizeAxis(spec.leafHeight, spec.openingHeight, L.defaultHeight, frameAddH, wallGapHead);
+  const W = axW.leaf, H = axH.leaf;
+  const opening = {
+    width: axW.opening, height: axH.opening,
+    wallGapSide, wallGapHead,
+    source: axW.source === axH.source ? axW.source : 'mixed',
+    sourceWidth: axW.source, sourceHeight: axH.source,
+  };
 
   // ── the hard sanity limits (the only errors of this engine; never a clamp) ──
   const lim = L.limits || {};
@@ -251,14 +331,9 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
     blank: { width: R(W + blankAllowance), height: R(H + blankAllowance), thickness: T, allowance: blankAllowance },
   };
 
-  // ── the frame section ──
-  const thickness = Number(F.thickness), rawThickness = Number(F.rawThickness);
-  const rebateW = R(Number(F.overlap) + Number(F.gapSide));
   const rebateD = R(T + Number(F.rebateClearance));
-  const faceOut = R(thickness - rebateW), faceIn = thickness;
-  const gapSide = Number(F.gapSide), gapHead = Number(F.gapHead), floorGap = Number(F.floorGap);
-  const overallW = R(W + 2 * (gapSide + faceOut));
-  const overallH = R(floorGap + H + gapHead + faceOut);
+  const overallW = R(W + frameAddW);
+  const overallH = R(H + frameAddH);
   const rawWidth = R(depth + Number(F.rawWidthAllowance));
   const section = `${thickness}x${depth}`;
   const rawSection = `${rawThickness}x${rawWidth}`;
@@ -274,20 +349,34 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
   ];
   const jambLength = overallH;
 
-  // ── the hinges (the macro rule, 3.5) ──
+  // ── the hinges (v1.1, the owner's rule of 27.10.2026) ──
+  // top hinge: its top edge topOffset below the leaf top; bottom hinge: its
+  // bottom edge bottomOffset above the leaf bottom; with three hinges the
+  // middle one has its CENTRE midAboveCentre above the leaf centre (2040:
+  // 150 / 769 / 1738); with more than three the inner ones spread equally.
   const hCount = Math.max(2, Math.round(Number(HG.count) || 3));
   const hLen = Number(HG.length);
-  const step = (H - Number(HG.topOffset) - Number(HG.bottomOffset) - hLen) / (hCount - 1);
+  const topOffset = Number(HG.topOffset), bottomOffset = Number(HG.bottomOffset);
+  const midAboveCentre = Number(HG.midAboveCentre) || 0;
+  const lastTop = H - bottomOffset - hLen;
+  const step = (lastTop - topOffset) / (hCount - 1);   // the equal spacing (the old macro rule), kept for the sheets and count != 3
+  const hingeTops = Array.from({ length: hCount }, (_, i) => {
+    if (i === 0) return topOffset;
+    if (i === hCount - 1) return lastTop;
+    if (hCount === 3) return H / 2 - midAboveCentre - hLen / 2;
+    return topOffset + i * step;
+  });
   const hingeJambShift = faceOut + gapHead;
-  const hingePositions = Array.from({ length: hCount }, (_, i) => {
-    const top = R(Number(HG.topOffset) + i * step);
+  const hingePositions = hingeTops.map((t, i) => {
+    const top = R(t);
     return { i, top, bottom: R(top + hLen), centre: R(top + hLen / 2), jambTop: R(hingeJambShift + top) };
   });
   const recess = { length: Number(HG.recessLength), width: Number(HG.recessWidth), depth: Number(HG.recessDepth), radius: Number(HG.cornerRadius) };
   const hinges = {
     count: hCount, length: hLen, step: R(step), macroHinge: fire ? 1 : 0, product: fire ? 'fire' : 'standard',
-    // the rule's two offsets travel with the positions so a sheet can print the rule it was cut by
-    topOffset: Number(HG.topOffset), bottomOffset: Number(HG.bottomOffset),
+    // the rule's numbers travel with the positions so a sheet can print the rule it was cut by
+    topOffset, bottomOffset, midAboveCentre,
+    midCentreAboveLeafCentre: hCount === 3 ? R(H / 2 - hingePositions[1].centre) : null,
     recess, positions: hingePositions,
   };
 
@@ -340,14 +429,33 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
     glassThickness, warnings: vpPlaced.warnings,
   };
 
-  // ── the intumescent strips (fire only; the macro cuts the grooves, PC orders the metres) ──
-  const intuEntry = fire && intuStyleIn ? (IN.styles || []).find((s) => Number(s.id) === intuStyleIn) : null;
-  const intuStyle = intuEntry ? intuStyleIn : 0;
-  const intumescent = intuEntry ? {
-    style: intuStyle, label: intuEntry.label, width: Number(intuEntry.width), thickness: Number(intuEntry.thickness), strips: Number(intuEntry.strips) || 1,
-    metres: Math.round((Number(intuEntry.strips) || 1) * (2 * H + W)) / 1000,
+  // ── the intumescent strips (v1.1: one size, 15 x 4 all around; FD30 one strip, FD60 two; none on a DR door) ──
+  const intuStrips = fire ? Math.max(0, Math.round(Number(IN.stripsByRating?.[rating] ?? 1))) : 0;
+  const intuStyle = intuStrips ? Number(IN.macroStyleByStrips?.[intuStrips] ?? IN.macroStyleByStrips?.[1] ?? 1) : 0;
+  const intumescent = intuStrips ? {
+    strips: intuStrips, width: Number(IN.width), thickness: Number(IN.thickness),
+    groove: { width: Number(IN.grooveWidth), depth: Number(IN.grooveDepth) },
+    label: `${intuStrips} x ${Number(IN.width)} x ${Number(IN.thickness)} all around`,
+    macroStyle: intuStyle,
+    metres: Math.round(intuStrips * (2 * H + W)) / 1000,
   } : null;
-  if (fire && intuStyleIn && !intuEntry) vp.warnings.push(`unknown intumescent style ${intuStyleIn}: no strips ordered`);
+
+  // ── the closer (v1.1: a kind; the built in closer has no machining until the owner's component files arrive) ──
+  const closer = closerKind === 'none' ? null : { type: closerKind, label: CLOSER_LABELS[closerKind], machined: false };
+  const closerFlag = closerKind === 'builtin' ? 2 : closerKind === 'surface' ? 1 : 0;
+
+  // ── the corner dowels (v1.1): perJoint dowels per mitred corner, square to the mitre face ──
+  const DW = F.dowels || {};
+  const dowelDia = Number(DW.dia) || 0, dowelLen = Number(DW.length) || 0, dowelPerJoint = dowelDia > 0 ? Math.max(0, Math.round(Number(DW.perJoint) || 0)) : 0;
+  const dowelMargin = Number(DW.margin) || 0;
+  // positions along the frame depth (z, from the outside face), equal spacing between the margins
+  const dowelZ = dowelPerJoint ? Array.from({ length: dowelPerJoint }, (_, k) => R(dowelPerJoint === 1 ? depth / 2 : dowelMargin + k * ((depth - 2 * dowelMargin) / (dowelPerJoint - 1)))) : [];
+  const dowelJoints = 2;   // head to hinge jamb, head to lock jamb
+  const dowels = {
+    dia: dowelDia, length: dowelLen, perJoint: dowelPerJoint, margin: dowelMargin, joints: dowelJoints,
+    count: dowelPerJoint * dowelJoints,
+    angle: 45, boreDepth: R(dowelLen / 2), yCentre: R(thickness / 2), positionsAlongDepth: dowelZ,
+  };
 
   // ── the machining ops ──
   let opN = 0;
@@ -362,13 +470,15 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
   if (lock.cylinder) leafOps.push(op('cylinderHole', 'pull', H - lock.cylinder.fromBottom, W - backset, 0, lock.cylinder.bore, lock.cylinder.bore, T, lock.cylinder.bore / 2, { note: `${lockType} cylinder, through, x y = centre` }));
   vp.panes.forEach((p) => leafOps.push(op('vpCutout', 'pull', p.x, p.y, 0, p.box.h, p.box.w, T, Number(V.cornerRadius) || 0, { rotated: p.rotated, angle: p.angle, pane: p.i, note: `vision panel ${p.i} ${p.w} x ${p.h}, layout per bSolid macro` })));
   if (intumescent) {
-    const gw = R(intumescent.width + (Number(IN.grooveOversize) || 0));
-    const centres = intumescent.strips >= 2 ? [T / 2 - Number(IN.twoStripOffset), T / 2 + Number(IN.twoStripOffset)] : [T / 2];
+    const gw = intumescent.groove.width, gd = intumescent.groove.depth;
+    const off = Number(IN.twoStripOffset) || 0;
+    const centres = intumescent.strips >= 2 ? [T / 2 - off, T / 2 + off] : [T / 2];
     centres.forEach((cz, k) => {
       const z0 = cz - gw / 2;
-      leafOps.push(op('intuGroove', 'top', 0, 0, z0, W, gw, intumescent.thickness, 0, { strip: k + 1, note: `intumescent ${intumescent.width} x ${intumescent.thickness}, groove ${gw}` }));
-      leafOps.push(op('intuGroove', 'hingeEdge', 0, 0, z0, H, gw, intumescent.thickness, 0, { strip: k + 1, note: `intumescent ${intumescent.width} x ${intumescent.thickness}, groove ${gw}` }));
-      leafOps.push(op('intuGroove', 'lockEdge', 0, W, z0, H, gw, intumescent.thickness, 0, { strip: k + 1, note: `intumescent ${intumescent.width} x ${intumescent.thickness}, groove ${gw}` }));
+      const note = `intumescent ${intumescent.width} x ${intumescent.thickness}, groove ${gw} x ${gd}`;
+      leafOps.push(op('intuGroove', 'top', 0, 0, z0, W, gw, gd, 0, { strip: k + 1, note }));
+      leafOps.push(op('intuGroove', 'hingeEdge', 0, 0, z0, H, gw, gd, 0, { strip: k + 1, note }));
+      leafOps.push(op('intuGroove', 'lockEdge', 0, W, z0, H, gw, gd, 0, { strip: k + 1, note }));
     });
   }
   if (leadEdge) leafOps.push(op('leadEdge', 'lockEdge', 0, W, 0, H, T, 0, 0, { value: Number(L.leadEdgeMacroValue), note: 'leading edge bevel, macro LEAD_EDGE' }));
@@ -385,6 +495,16 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
     }
     if (m.mitreTop) ops.push(op('mitre', 'end', 0, 0, 0, 0, thickness, depth, 0, { angle: 45, note: m.role === 'head' ? 'left end' : 'top end' }));
     if (m.mitreBottom) ops.push(op('mitre', 'end', m.length, 0, 0, 0, thickness, depth, 0, { angle: 45, note: 'right end' }));
+    // the corner dowels: one bore per dowel on each mitred end, on face `mitre`,
+    // x = the end's long point (0 or length), y = the thickness centre, z along
+    // the depth; bored square to the mitre face (angle 45 to the member axis),
+    // dowelLen / 2 deep so the dowel sits half in each piece; x y = the bore centre
+    if (dowels.count) {
+      const ends = [];
+      if (m.mitreTop) ends.push({ x: 0, label: m.role === 'head' ? 'left end' : 'top end' });
+      if (m.mitreBottom) ends.push({ x: m.length, label: 'right end' });
+      ends.forEach((e) => dowelZ.forEach((z, k) => ops.push(op('dowelBore', 'mitre', e.x, dowels.yCentre, z, dowels.dia, dowels.dia, dowels.boreDepth, dowels.dia / 2, { angle: 45, dowel: k + 1, note: `dowel ${dowels.dia} x ${dowels.length}, ${e.label}, bore square to the mitre, x y z = centre` }))));
+    }
     return ops;
   };
   const machining = {
@@ -404,27 +524,33 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
     HAND: hand, LH: hingeSide === 'left' ? 1 : 0, RH: hingeSide === 'right' ? 1 : 0,
     HINGE: hinges.macroHinge, LOCK: macroLock, LOCK_H: spindleHeight, SPINDLE: Number(MD.SPINDLE ?? 1), EURO: lock.euro ? 1 : 0,
     KEEP: Number(MD.KEEP_LEAF ?? 0), KEEP_STYLE: Number(MD.KEEP_STYLE_LEAF ?? 0),
-    INTU_STYLE: intuStyle, VP_STYLE: vp.style,
+    // INTU = the strip count (0 / 1 / 2, v1.1); INTU_STYLE = the Master_Door style the count maps to
+    INTU: intuStrips, INTU_W: intumescent ? intumescent.width : 0, INTU_T: intumescent ? intumescent.thickness : 0, INTU_STYLE: intuStyle,
+    VP_STYLE: vp.style,
     C_VP_L: Number(vpCustom.length) || 0, C_VP_W: Number(vpCustom.width) || 0, C_VP_NUM: Math.round(Number(vpCustom.count) || 0), C_VP_RAIL: Number(vpCustom.rail) || 0, C_VP_POS: Number(vpCustom.pos) === 90 ? 90 : 0,
     D_TOP_RAIL: Number(V.topRail), D_MID_RAIL: Number(V.midRail), D_SIDE_MARGIN: Number(V.sideMargin),
     LEAD_EDGE: leadEdge ? 1 : 0,
     REBATE: Number(MD.REBATE ?? 0), REBATE_STYLE: Number(MD.REBATE_STYLE ?? 1),
     SPY_ON: Number(MD.SPY_ON ?? 0), SPY_H: Number(MD.SPY_H ?? 1450), LBOX: Number(MD.LBOX ?? 0), L_BOX_H: Number(MD.L_BOX_H ?? 1000),
     DROP_CILL: Number(MD.DROP_CILL ?? 0), PREM_DOOR: Number(MD.PREM_DOOR ?? 0),
-    ...hingeVars, HINGE_D: recess.depth, CLOSER: closer ? 1 : 0,
+    // CLOSER (v1.1): 0 none, 1 surface, 2 built in
+    ...hingeVars, HINGE_D: recess.depth, CLOSER: closerFlag,
   };
   const frameBase = (m) => ({ LPX: m.length, LPY: depth, LPZ: thickness, REB_W: rebateW, REB_D: rebateD, HAND: hand, HINGE: hinges.macroHinge });
+  // the corner dowels (v1.1): count per mitred end, size, bore depth and the positions along the depth
+  const dowelVars = (m) => ({ DOWEL_N: dowels.perJoint, DOWEL_D: dowels.dia, DOWEL_L: dowels.length, DOWEL_DEPTH: dowels.boreDepth, ...Object.fromEntries(dowelZ.map((z, k) => [`DOWEL_${k + 1}`, z])) });
   const bsuiteVars = {
     leaf: leafVars,
-    head: { ...frameBase(members[0]), HINGE_D: recess.depth, MITRE_TOP: 1, MITRE_BOTTOM: 1 },
-    jambHinge: { ...frameBase(members[1]), ...jambHingeVars, HINGE_D: recess.depth, MITRE_TOP: 1, MITRE_BOTTOM: 0 },
-    jambLock: { ...frameBase(members[2]), HINGE_D: recess.depth, KEEP: keep.macroKeep, KEEP_STYLE: keep.keepStyle, KEEP_Y: keep.centreFromFoot, MITRE_TOP: 1, MITRE_BOTTOM: 0 },
+    head: { ...frameBase(members[0]), HINGE_D: recess.depth, MITRE_TOP: 1, MITRE_BOTTOM: 1, ...dowelVars(members[0]) },
+    jambHinge: { ...frameBase(members[1]), ...jambHingeVars, HINGE_D: recess.depth, MITRE_TOP: 1, MITRE_BOTTOM: 0, ...dowelVars(members[1]) },
+    jambLock: { ...frameBase(members[2]), HINGE_D: recess.depth, KEEP: keep.macroKeep, KEEP_STYLE: keep.keepStyle, KEEP_Y: keep.centreFromFoot, MITRE_TOP: 1, MITRE_BOTTOM: 0, ...dowelVars(members[2]) },
   };
 
   // ── the cut list records ──
   const blankNote = fire ? `door blank ${rating}` : 'door blank non-fire';
+  const dowelNote = dowels.count ? `, ${dowels.perJoint} dowels ${dowels.dia} x ${dowels.length} per corner` : '';
   const box = members.map((m) => {
-    const rec = createComponentRecord(windowSpec, 'box', m.id, section, m.length, 1, `${m.role === 'head' ? 'head, both ends mitred 45' : m.role === 'jambHinge' ? `hinge jamb, top mitred 45, ${hCount} hinge recesses` : 'lock jamb, top mitred 45, keep'} · rebate ${rebateW} x ${rebateD} from solid`);
+    const rec = createComponentRecord(windowSpec, 'box', m.id, section, m.length, 1, `${m.role === 'head' ? 'head, both ends mitred 45' : m.role === 'jambHinge' ? `hinge jamb, top mitred 45, ${hCount} hinge recesses` : 'lock jamb, top mitred 45, keep'}${dowelNote} · rebate ${rebateW} x ${rebateD} from solid`);
     rec.rawSection = rawSection;
     rec.mitreTop = m.mitreTop;
     rec.mitreBottom = m.mitreBottom;
@@ -457,14 +583,20 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
     category: 'firedoor',
     firedoor: {
       name, fire, rating,
-      inputs: { leafWidth: W, leafHeight: H, frameDepth: depth, hingeSide, swing, lockType, closer, vpStyle, vpCustom, intuStyle: intuStyleIn, leadEdge },
-      handing: { hingeSide, swing, label: `Hinge ${hingeSide} · opens ${swing}` },
+      inputs: {
+        openingWidth: opening.width, openingHeight: opening.height,
+        leafWidth: W, leafHeight: H, leafOverride: { width: axW.source === 'leaf', height: axH.source === 'leaf' },
+        frameDepth: depth, hingeSide, lockType, closer: closerKind, vpStyle, vpCustom, leadEdge,
+      },
+      opening,
+      handing: { hingeSide, label: `Hinge ${hingeSide}` },
       leaf,
       frame: {
         overall: { width: overallW, height: overallH },
         depth, thickness, rawThickness, rawWidth,
         rebate: { width: rebateW, depth: rebateD }, faces: { outside: faceOut, inside: faceIn },
-        gaps: { side: gapSide, head: gapHead, floor: floorGap }, headJoint: F.headJoint,
+        gaps: { side: gapSide, head: gapHead, floor: floorGap, wallSide: wallGapSide, wallHead: wallGapHead }, headJoint: F.headJoint,
+        dowels,
         members,
       },
       hinges, lock, keep, vp, intumescent, closer,
@@ -485,8 +617,9 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
       hinges: { count: hCount, product: hinges.product },
       lock: { type: lockType },
       keep: 1,
-      closer: closer ? 1 : 0,
-      intumescent: intumescent ? { metres: intumescent.metres, width: intumescent.width, thickness: intumescent.thickness } : null,
+      closer: closer ? { type: closerKind, count: 1 } : null,
+      dowels: dowels.count ? { count: dowels.count, dia: dowels.dia, length: dowels.length } : null,
+      intumescent: intumescent ? { metres: intumescent.metres, width: intumescent.width, thickness: intumescent.thickness, strips: intumescent.strips } : null,
       glazingBeads: { metres: vp.beadM },
       glazingIntumescent: { metres: vp.intuM },
     },

@@ -552,8 +552,15 @@ export function buildVentGrilles(windowSpec) {
  * (materialAssignmentStore FIREDOOR_PARTS, counted by bom.buildWindowPartQtys)
  * and the ironmongery slot whose product the line shows (bom.HARDWARE_TO_SLOT_KEY
  * and the row's product in bom.buildWindowMaterialLines). One table so the
- * three never drift. The intumescent strip has a row per strip width
- * (fireDoorIntumescentPartId) and no slot.
+ * three never drift.
+ * v1.1 (owner 27.10.2026 evening): the closer is a KIND, surface (overhead,
+ * the standard fire door set) or built in (concealed), each on its own row
+ * and both buying the doorClosers slot product; the item of each closer row
+ * is the engine's closer label (fireDoor.js CLOSER_LABELS), so the line the
+ * engine prints is the line the slot table maps. The intumescent strip is ONE
+ * size (profile.intumescent, 15 x 4 all around): one row, no slot (a
+ * material). The frame corner dowels (profile.frame.dowels, 8 x 40, three per
+ * mitred corner) have a row and no slot, as the strip.
  */
 export const FIREDOOR_HARDWARE = Object.freeze({
   hingeFire: { item: 'Fire door hinge', partId: 'fd_hinge_fire', slot: 'doorHinges' },
@@ -565,15 +572,24 @@ export const FIREDOOR_HARDWARE = Object.freeze({
   thumbturn: { item: 'Thumbturn and release', partId: 'fd_thumbturn', slot: 'cylinders' },
   handle: { item: 'Lever handle set', partId: 'fd_handle_set', slot: 'doorHandles' },
   keep: { item: 'Keep', partId: 'fd_keep', slot: 'keeps' },
-  closer: { item: 'Concealed closer', partId: 'fd_closer', slot: 'doorClosers' },
-  intumescent: { item: 'Intumescent strip', partId: null, slot: null },
+  // the built in (concealed) closer keeps the v1 row id fd_closer so a saved assignment survives
+  closerSurface: { item: 'Surface closer', partId: 'fd_closer_surface', slot: 'doorClosers' },
+  closerBuiltin: { item: 'Built in closer', partId: 'fd_closer', slot: 'doorClosers' },
+  // the one strip row keeps the v1 id of the 15 mm row for the same reason
+  intumescent: { item: 'Intumescent strip', partId: 'fd_intu_15', slot: null },
+  dowels: { item: 'Frame dowels', partId: 'fd_frame_dowel', slot: null },
 });
 
-/** The intumescent strip row of a strip width (10 / 15 / 20 mm): fd_intu_10 / fd_intu_15 / fd_intu_20; null for any other width. */
-export const FIREDOOR_INTUMESCENT_WIDTHS = Object.freeze([10, 15, 20]);
+/**
+ * v1.1: one intumescent strip size, one row (FIREDOOR_HARDWARE.intumescent).
+ * The v1 rows per strip width (10 / 20 mm) are gone; these two names stay for
+ * v1 callers: the width list holds the one width of the row and the helper
+ * returns the one row id (the width no longer selects a row).
+ */
+export const FIREDOOR_INTUMESCENT_WIDTHS = Object.freeze([15]);
 export function fireDoorIntumescentPartId(width) {
-  const w = Number(width);
-  return FIREDOOR_INTUMESCENT_WIDTHS.includes(w) ? `fd_intu_${w}` : null;
+  void width;
+  return FIREDOOR_HARDWARE.intumescent.partId;
 }
 
 export function buildHardwareList(windowSpec, derived = null) {
@@ -692,14 +708,18 @@ export function buildHardwareList(windowSpec, derived = null) {
     // is `enginePart` with its partId: the BOM carries the count, the line is
     // the window's hardware detail (and shows the product of the window's
     // ironmongery slot through bom.HARDWARE_TO_SLOT_KEY). Lines, in order: the
-    // hinges (fire or standard, the count and positions of the macro rule),
+    // hinges (fire or standard, the count and positions of the engine rule),
     // the lock case by type, the euro cylinder or the bathroom thumbturn, the
-    // lever handle set, the keep on the lock jamb, the concealed closer when
-    // ticked, and the intumescent strip metres on a fire door.
+    // lever handle set, the keep on the lock jamb, the closer by its kind
+    // (v1.1: surface or built in; the engine's label is the line), the
+    // intumescent strip metres on a fire door (v1.1: one size, the strips of
+    // the rating) and the frame corner dowels (v1.1, the count of the
+    // consumables). Handing is the hinge side only: no swing word (v1.1).
     const fd = derived?.firedoor;
     if (!fd) return [];
     const list = [];
     const H = FIREDOOR_HARDWARE;
+    const C = derived?.consumables || {};
     const hinges = fd.hinges || {};
     const lock = fd.lock || {};
     const keep = fd.keep || {};
@@ -720,12 +740,26 @@ export function buildHardwareList(windowSpec, derived = null) {
     }
     list.push({ item: H.handle.item, detail: `on rose, ${windowSpec?.hardware?.finish || 'stainless'} · spindle ${lock.spindleHeight} from the leaf bottom`, quantity: 1, enginePart: true, partId: H.handle.partId });
     list.push({ item: H.keep.item, detail: `${rating} · ${keep.plate?.length ?? ''} x ${keep.plate?.width ?? ''} on the lock jamb · centre ${keep.centreFromFoot ?? ''} from the jamb foot`, quantity: 1, enginePart: true, partId: H.keep.partId });
-    if (fd.closer) {
-      list.push({ item: H.closer.item, detail: 'concealed, in the leaf top and the head · no machining yet', quantity: 1, enginePart: true, partId: H.closer.partId });
+    const closer = fd.closer;
+    if (closer && closer.type) {
+      // the line prints the engine's label (fireDoor.js CLOSER_LABELS); the
+      // table item of each closer row is that same string so
+      // HARDWARE_TO_SLOT_KEY finds the doorClosers slot by the printed name
+      const c = closer.type === 'builtin' ? H.closerBuiltin : H.closerSurface;
+      const closerCount = Number(C.closer?.count) || 1;
+      const detail = closer.type === 'builtin'
+        ? `concealed, in the leaf top and the head · ${closer.machined ? 'machined' : 'no machining yet'}`
+        : 'overhead, on the push face of the leaf and the head';
+      list.push({ item: closer.label || c.item, detail, quantity: closerCount, enginePart: true, partId: c.partId });
     }
     const intu = fd.intumescent;
     if (fd.fire && intu && Number(intu.metres) > 0) {
       list.push({ item: H.intumescent.item, detail: `${intu.label || `${intu.width} x ${intu.thickness}`} · ${intu.strips} per edge, top and both sides of the leaf`, quantity: Number(intu.metres), unit: 'm', enginePart: true, partId: fireDoorIntumescentPartId(intu.width) });
+    }
+    const dw = C.dowels;
+    const dowelRule = fd.frame?.dowels || {};
+    if (dw && Number(dw.count) > 0) {
+      list.push({ item: H.dowels.item, detail: `${dw.dia} x ${dw.length} hardwood · ${dowelRule.perJoint ?? ''} per mitred corner, ${dowelRule.joints ?? ''} corners`.trim(), quantity: Number(dw.count), enginePart: true, partId: H.dowels.partId });
     }
     return list;
   }
