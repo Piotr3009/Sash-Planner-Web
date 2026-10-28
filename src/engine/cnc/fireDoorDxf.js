@@ -47,7 +47,7 @@ const SQ2 = Math.SQRT2;
 const BULGE_QUARTER = Math.tan(Math.PI / 8);   // the bulge of a 90 degree arc
 
 // ── drawing sizes (text, spacing, symbols); never a door number ──
-const HEADER_H = 40;          // the door header over the row
+const HEADER_H = 42;          // the door header over the row
 const TITLE_H = 20;           // a view title
 const SUB_H = 10;             // the line under a view title
 const DIM_H = 12;             // dimension text
@@ -56,7 +56,7 @@ const LABEL_H = 8;            // PULL / PUSH face labels
 const BLOCK_TEXT_H = 16;      // the title block lines
 const VIEW_GAP = 160;         // between neighbouring views of one element (outside their dimensions)
 const BLOCK_GAP = 500;        // between the elements of the row
-const DIM_FIRST = 40;         // the first dimension lane from a view
+const DIM_FIRST = 42;         // the first dimension lane from a view
 const DIM_LANE = 30;          // between dimension lanes
 const EXT_GAP = 3;            // extension line gap from the feature
 const EXT_OVER = 4;           // extension line past the dimension line
@@ -64,7 +64,7 @@ const TICK = 3;               // half the 45 degree tick
 const TEXT_OFF = 3;           // dimension text off its line
 const CHAR_W = 0.8;           // text width estimate per character per height
 const CENTRE_MARK = 6;        // half a centre cross
-const TITLE_GAP = 40;         // a view title off the view
+const TITLE_GAP = 42;         // a view title off the view
 // the drawn butt hinge over each recess (a symbol: the plate, its countersunk screws, the knuckle)
 const HINGE_KNUCKLE_DIA = 13;
 const HINGE_KNUCKLES = 5;
@@ -84,7 +84,7 @@ export const FIREDOOR_DXF_COLOURS = Object.freeze({
   HOLE: 6, VP: 5, INTU: 2,
   KEEP_PLATE: 110, KEEP_POCKET: 170,
   DOWEL: 210, DOWEL_HIDDEN: 9,
-  CLOSER: 40, CLOSER_HIDDEN: 41,
+  CLOSER: 42, CLOSER_HIDDEN: 41,
   CENTRE: 253, DIM: 140, TEXT: 150,
 });
 const C = FIREDOOR_DXF_COLOURS;
