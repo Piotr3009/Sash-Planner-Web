@@ -4,6 +4,32 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-10-28 afternoon · FIRE DOORS v1.3: hinges from the leaf bottom (the Weeke rule), the handle from the floor
+
+Read with the owner from his old Weeke program `farrington_d01.mpr` (WoodWOP, 2040 x 726 x 45): the hinge
+component `r8hinge.mpr` sits on the hinge's lower edge at `L-247` / `L-802` / `L-1824` with X = 0 at the leaf
+bottom, so the hinges are 145 / 700 / 1722 from the top; the owner: "liczymy od dołu skrzydła, łatwiej liczyć",
+numbering from the top, the handle 1000 from the floor, the recess as Weeke (3.2). BLOCKERS 37.10 to 37.13.
+
+- Profile: `hinges.topOffset 145`, `bottomOffset 216`, `midAboveCentre 269`, `recessDepth 3.2`; new
+  `lock.spindleFromFloor 1000` (LOCK_H = 1000 - floorGap = 995; `lock.spindleHeight` only a fallback).
+- Engine: `positions[i].fromBottom` (the lower edge above the leaf bottom, 1793 / 1238 / 216 on 2040) and
+  `jambFromFoot` (1798 / 1243 / 221), `hinges.positionRef 'bottom'`; HINGE_1..3 carry them (HINGE_1 = the top
+  hinge); `lock.spindle.fromFloor`, `lock.spindleFromFloor`. The ops keep the board system from the top (recess
+  tops 144.5 / 699.5 / 1721.5); forend centre 980, case top 1041.5, euro 923, bathroom 917 above the leaf bottom,
+  keep 985 above the jamb foot.
+- Sheets: H1 1793 / H2 1238 / H3 216 at each hinge, the jamb H1 1798 / H2 1243 / H3 221, the rule and the position
+  note, the spindle "995 (1000 from the floor)"; the fire door sheets now print numbers to 0.1 (`fdNum`; the door
+  sheets' `fmt` rounds to 0.5 and printed the 3.2 recess as 3). DXF: the hinge and recess dimensions from the leaf
+  bottom / the jamb foot, the title block and the notes say so, the recess layer `FD_HINGE_RECESS_D3P2`.
+- Pages and lists: the configurator, Window Settings (a "Spindle from the floor" field), the window page and the
+  hardware lines print the positions from the bottom and the spindle from the floor.
+- The two agents (sheets / DXF; pages / t52) stopped on a usage limit before reporting; the lead finished from
+  their trees: t53 brought to the new numbers (88 PASS), t51 sections 1 to 9 and the sheet, page, 3D checks (453
+  PASS), t52 as the pages agent left it (146 PASS), the 0.1 sheet format.
+
+---
+
 ## 2026-10-28 night · FIRE DOORS v1.2 (branch `claude/fire-doors-v1-2`, from `claude/fire-doors-v1-1` 65a4d79)
 
 The owner's list of 00:53 ("o nic nie pytaj poprostu koduj ... pozniej bedziemy poprawiac"), coded unattended by the lead with

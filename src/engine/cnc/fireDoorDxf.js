@@ -41,6 +41,12 @@
  * *_HIDDEN layer (set a dashed linetype on those in CAD); the writer has no DIMENSION
  * entity, so the dimensions are drawn (extension lines, dimension line, 45 ticks, text)
  * on FD_DIM.
+ * v1.3 (owner 28.10.2026, the Weeke rule): every hinge position is dimensioned FROM THE
+ * LEAF BOTTOM to the hinge LOWER edge (the pull face: the drawn hinge, positions[i].
+ * fromBottom; the hinge edge: the recess lower edge, from the ops) and on the hinge jamb
+ * from the JAMB FOOT (positions[i].jambFromFoot; the recess lower edge); H1 is the top
+ * hinge. The spindle dimension reads '995 (1000 from the floor)' (lock.spindle.fromBottom /
+ * fromFloor). The title block and the view notes say so.
  */
 
 const SQ2 = Math.SQRT2;
@@ -106,6 +112,16 @@ const ascii = (s) => String(s ?? '')
   .replace(/[^\x20-\x7e]/g, '')
   .replace(/%%/g, '%');
 const textW = (str, h) => String(str).length * h * CHAR_W;
+/** The hinge positions as printed (v1.3): '1793 / 1238 / 216 from the leaf bottom to the hinge lower edge (H1 = the top hinge)'. */
+const hingePosNote = (fd) => `${(fd.hinges?.positions || []).map((p) => fmt(p.fromBottom)).join(' / ')} from the leaf bottom to the hinge lower edge (H1 = the top hinge)`;
+/** The same on the hinge jamb: '1798 / 1243 / 221 from the jamb foot to the hinge lower edge (H1 = the top hinge)'. */
+const jambHingePosNote = (fd) => `${(fd.hinges?.positions || []).map((p) => fmt(p.jambFromFoot)).join(' / ')} from the jamb foot to the hinge lower edge (H1 = the top hinge)`;
+/** The handle height (v1.3): 'spindle 1000 above the floor (995 above the leaf bottom)' from lock.spindle.fromFloor / fromBottom. */
+const spindleNote = (fd) => {
+  const sp = fd.lock?.spindle || {};
+  const a = Number(sp.fromFloor), b = Number(sp.fromBottom);
+  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) > 0.05 ? `spindle ${fmt(a)} above the floor (${fmt(b)} above the leaf bottom)` : `spindle ${fmt(b)} above the leaf bottom`;
+};
 
 // ── entities (the dxfWriter.js model; `tag` and `view` ride along for the harness, the writer ignores them) ──
 function poly(E, layer, pts, closed, tag) {
@@ -399,11 +415,13 @@ function leafViews(fd, LY, leafName) {
       labelLines(V.E, layerOf.text, P(V, bd.x + bd.depth / 2, bd.y + bd.length / 2), [{ s: 'built in closer (symbol)', h: LABEL_H }], bd.length, bd.depth);
     }
 
-    // dimensions: the hinge tops from the leaf top, then the leaf height (hinge side)
+    // dimensions (hinge side): the hinge LOWER edges from the LEAF BOTTOM (v1.3, the Weeke
+    // position: the bottom hinge nearest the view, then up), then the leaf height
     let k = 0;
-    hingePos.forEach((hp) => dim(V.E, LY, P(V, 0, 0), [hingeX + hingeDir * (K / 2), H - hp.top], 'y', lane(hingeX, hingeDir, k++)));
+    [...hingePos].sort((p, q) => q.bottom - p.bottom).forEach((hp) => dim(V.E, LY, P(V, H, 0), [hingeX + hingeDir * (K / 2), H - hp.bottom], 'y', lane(hingeX, hingeDir, k++)));
     dim(V.E, LY, P(V, H, 0), P(V, 0, 0), 'y', lane(hingeX, hingeDir, k++));
-    // lock side: the vision panel down the leaf (top -> panes -> bottom), the holes from the leaf bottom
+    // lock side: the vision panel down the leaf (top -> panes -> bottom), the holes from the
+    // leaf bottom (the spindle with its height from the floor in brackets, v1.3)
     k = 0;
     if (vpOps.length) {
       const ivs = uniqIntervals(vpOps.map((o) => [o.x, o.x + o.length, o]));
@@ -419,7 +437,9 @@ function leafViews(fd, LY, leafName) {
       pts.push(P(V, H, W));
       chain(V.E, LY, pts, labels, 'y', lane(lockX, lockDir, k++));
     }
-    [...holes].sort((p, q) => q.x - p.x).forEach((o) => dim(V.E, LY, P(V, H, W), P(V, o.x, o.y), 'y', lane(lockX, lockDir, k++)));
+    const spFloor = Number(fd.lock?.spindle?.fromFloor), spBottom = Number(fd.lock?.spindle?.fromBottom);
+    const spindleText = Number.isFinite(spFloor) && Number.isFinite(spBottom) && Math.abs(spFloor - spBottom) > 0.05 ? `${fmt(spBottom)} (${fmt(spFloor)} from the floor)` : null;
+    [...holes].sort((p, q) => q.x - p.x).forEach((o) => dim(V.E, LY, P(V, H, W), P(V, o.x, o.y), 'y', lane(lockX, lockDir, k++), o.kind === 'spindleHole' && spindleText && Math.abs(H - o.x - spBottom) < 0.05 ? { text: spindleText } : {}));
     // the backset: lock edge to the hole centres, under the lowest hole
     if (holes.length) {
       const low = holes.reduce((p, q) => (q.x > p.x ? q : p));
@@ -447,7 +467,8 @@ function leafViews(fd, LY, leafName) {
     addTitle(V, LY, `${leafName}  PULL FACE`, [
       `seen from the pull side (the hinge knuckles), ${hand}: the hinge edge on the ${hl ? 'left' : 'right'}`,
       `leaf ${fmt(W)} x ${fmt(H)} x ${fmt(T)}; ${vpLine}`,
-      `${LOCK_LABELS[fd.lock?.type] || fd.lock?.type || ''} lock: spindle ${fmt(fd.lock?.spindle?.fromBottom)} above the leaf bottom, backset ${fmt(fd.lock?.backset)}${fd.lock?.cylinder ? `, ${fd.lock.cylinder.kind === 'bathroom' ? 'thumbturn' : 'cylinder'} ${fmt(fd.lock.cylinder.fromBottom)}` : ''}`,
+      `${LOCK_LABELS[fd.lock?.type] || fd.lock?.type || ''} lock: ${spindleNote(fd)}, backset ${fmt(fd.lock?.backset)}${fd.lock?.cylinder ? `, ${fd.lock.cylinder.kind === 'bathroom' ? 'thumbturn' : 'cylinder'} ${fmt(fd.lock.cylinder.fromBottom)} above the leaf bottom` : ''}`,
+      `hinges ${hingePosNote(fd)}`,
     ], 'below', 'centre');
   }
 
@@ -466,10 +487,12 @@ function leafViews(fd, LY, leafName) {
     faceLabels(V, LY, 0, T);
     const farX = P(V, 0, T)[0], farDir = hingeOnLeft ? -1 : 1;
     let k = 0;
-    rec.forEach((o) => dim(V.E, LY, P(V, 0, T), P(V, o.x, o.z + o.width), 'y', lane(farX, farDir, k++)));
-    if (rec[0]) dim(V.E, LY, P(V, rec[0].x, rec[0].z + rec[0].width), P(V, rec[0].x + rec[0].length, rec[0].z + rec[0].width), 'y', lane(farX, farDir, k++));
+    // the recess LOWER edges from the LEAF BOTTOM (v1.3, the Weeke position; the lowest recess nearest the view), then one recess length
+    const recUp = [...rec].sort((p, q) => (q.x + q.length) - (p.x + p.length));
+    recUp.forEach((o) => dim(V.E, LY, P(V, H, T), P(V, o.x + o.length, o.z + o.width), 'y', lane(farX, farDir, k++)));
+    const last = recUp[0];
+    if (last) dim(V.E, LY, P(V, last.x, last.z + last.width), P(V, last.x + last.length, last.z + last.width), 'y', lane(farX, farDir, k++));
     k = 0;
-    const last = rec[rec.length - 1];
     if (last) {
       const aE = last.x + last.length;
       dim(V.E, LY, P(V, aE, last.z), P(V, aE, last.z + last.width), 'x', lane(0, -1, k++));
@@ -480,9 +503,11 @@ function leafViews(fd, LY, leafName) {
     });
     dim(V.E, LY, P(V, H, 0), P(V, H, T), 'x', lane(0, -1, k++));
     const r0 = rec[0];
+    // the recess lower edges above the leaf bottom (the dimensions of this view), top recess first like the hinges
+    const recFromBottom = [...rec].sort((p, q) => p.x - q.x).map((o) => fmt(H - o.x - o.length)).join(' / ');
     addTitle(V, LY, `${leafName}  HINGE EDGE`, [
-      r0 ? `${rec.length} hinge recesses ${fmt(r0.length)} x ${fmt(r0.width)} x ${fmt(r0.depth)} deep R${fmt(r0.radius)}, from the pull face` : 'no hinge recess',
-      `hinges ${fmt(hingeLen)} drawn (tops ${hingePos.map((hp) => fmt(hp.top)).join(' / ')} from the leaf top)`,
+      r0 ? `${rec.length} hinge recesses ${fmt(r0.length)} x ${fmt(r0.width)} x ${fmt(r0.depth)} deep R${fmt(r0.radius)}, from the pull face; lower edges ${recFromBottom} from the leaf bottom` : 'no hinge recess',
+      `hinges ${fmt(hingeLen)} drawn at ${hingePosNote(fd)}`,
       grooves.length ? `intumescent groove ${fmt(grooves[0].width)} x ${fmt(grooves[0].depth)} deep, ${grooves.length} per edge` : '',
     ], 'below', hingeOnLeft ? 'right' : 'left');
   }
@@ -682,8 +707,10 @@ function memberBlock(fd, LY, role) {
     } else {
       const farX = P(V, 0, D)[0], farDir = wallLeft ? 1 : -1;
       let k = 0;
-      rec.forEach((o) => dim(V.E, LY, P(V, 0, D), P(V, o.x, o.z + o.width), 'y', lane(farX, farDir, k++)));
-      if (rec[0]) dim(V.E, LY, P(V, rec[0].x, rec[0].z + rec[0].width), P(V, rec[0].x + rec[0].length, rec[0].z + rec[0].width), 'y', lane(farX, farDir, k++));
+      // the recess LOWER edges from the JAMB FOOT (v1.3, the Weeke position; the lowest recess nearest the view), then one recess length
+      const recUp = [...rec].sort((p, q) => (q.x + q.length) - (p.x + p.length));
+      recUp.forEach((o) => dim(V.E, LY, P(V, L, D), P(V, o.x + o.length, o.z + o.width), 'y', lane(farX, farDir, k++)));
+      if (recUp[0]) dim(V.E, LY, P(V, recUp[0].x, recUp[0].z + recUp[0].width), P(V, recUp[0].x + recUp[0].length, recUp[0].z + recUp[0].width), 'y', lane(farX, farDir, k++));
       if (pl) {
         const kc = pl.x + pl.length / 2, zc = pl.z + pl.width / 2;
         lineL(V, LYR.centre, kc, pl.z - CENTRE_MARK, kc, D);
@@ -704,9 +731,11 @@ function memberBlock(fd, LY, role) {
       dim(V.E, LY, P(V, L, 0), P(V, L, D), 'x', lane(0, -1, k++));
     }
     const r0 = rec[0];
+    // the recess lower edges above the jamb foot (the dimensions of this view), top recess first like the hinges
+    const recFromFoot = [...rec].sort((p, q) => p.x - q.x).map((o) => fmt(L - o.x - o.length)).join(' / ');
     addTitle(V, LY, `${name}  ${isHead ? 'SOFFIT (OPENING FACE)' : 'OPENING FACE'}`, [
       `the rebate cheek (z 0 to ${fmt(rd)}) and the opening face, seen from the opening; z from the outside face (shows ${fmt(fd.frame?.faces?.outside)})`,
-      r0 ? `${rec.length} hinge recesses ${fmt(r0.length)} x ${fmt(r0.width)} x ${fmt(r0.depth)} deep R${fmt(r0.radius)} (tops ${(fd.hinges?.positions || []).map((hp) => fmt(hp.jambTop)).join(' / ')} from the top long point), hinges drawn` : '',
+      r0 ? `${rec.length} hinge recesses ${fmt(r0.length)} x ${fmt(r0.width)} x ${fmt(r0.depth)} deep R${fmt(r0.radius)}, lower edges ${recFromFoot} from the jamb foot; hinges drawn at ${jambHingePosNote(fd)}` : '',
       pl ? `keep plate ${fmt(pl.length)} x ${fmt(pl.width)} x ${fmt(pl.depth)} deep full radius, centre ${fmt(fd.keep?.centreFromFoot)} above the jamb foot` : '',
       pk ? `keep pocket ${fmt(pk.length)} x ${fmt(pk.width)} x ${fmt(pk.depth)} deep (latch and bolt)` : '',
     ], 'below', isHead ? 'left' : (wallLeft ? 'left' : 'right'));
@@ -789,8 +818,10 @@ export function fireDoorDxfTitleLines(derived, element) {
     `Frame overall ${fmt(fr.overall?.width)} x ${fmt(fr.overall?.height)}, depth ${fmt(fr.depth)}, members ${fmt(fr.thickness)} x ${fmt(fr.depth)} (raw ${fmt(fr.rawThickness)} x ${fmt(fr.rawWidth)})`,
     `Structural opening ${fmt(op.width)} x ${fmt(op.height)}`,
     `Rebate ${fmt(fr.rebate?.width)} x ${fmt(fr.rebate?.depth)} from solid, faces ${fmt(fr.faces?.outside)} outside / ${fmt(fr.faces?.inside)} inside`,
-    `${fd.handing?.label || ''} (seen from the pull side); ${hinges.count || 0} hinges ${fmt(hinges.length)}, tops ${(hinges.positions || []).map((p) => fmt(p.top)).join(' / ')} from the leaf top`,
-    `Lock: ${LOCK_LABELS[lock.type] || lock.type || ''}, spindle ${fmt(lock.spindle?.fromBottom)} above the leaf bottom, backset ${fmt(lock.backset)}, forend centre ${fmt(lock.forend?.centreFromTop)} from the leaf top`,
+    // v1.3: the hinge positions from the leaf bottom to the hinge lower edge (the Weeke rule), the spindle from the floor
+    `${fd.handing?.label || ''} (seen from the pull side); ${hinges.count || 0} hinges ${fmt(hinges.length)} at ${(hinges.positions || []).map((p) => fmt(p.fromBottom)).join(' / ')} (hinge jamb ${(hinges.positions || []).map((p) => fmt(p.jambFromFoot)).join(' / ')} from the foot)`,
+    'Hinge positions from the leaf bottom to the hinge lower edge (H1 = the top hinge)',
+    `Lock: ${LOCK_LABELS[lock.type] || lock.type || ''}, ${spindleNote(fd)}, backset ${fmt(lock.backset)}, forend centre ${fmt(lock.forend?.centreFromTop)} from the leaf top`,
     `Keep centre ${fmt(fd.keep?.centreFromFoot)} above the lock jamb foot`,
     `Closer: ${fd.closer ? `${fd.closer.label} (symbol, not machined)` : 'none'}`,
     `Vision panel: ${vp}`,

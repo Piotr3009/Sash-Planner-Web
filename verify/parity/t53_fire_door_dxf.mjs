@@ -155,9 +155,13 @@ for (const [k, d] of Object.entries(doors)) {
 section('1 - the file: R12 header, EOF, layers, texts');
 {
   const fd = REF.derived.firedoor;
+  // v1.3 (the Weeke rule, 28.10.2026): tops 145 / 700 / 1722 from the leaf top; the POSITION = the hinge lower edge above the leaf bottom
   ok(REF.derived.category === 'firedoor' && fd.leaf.width === 826 && fd.leaf.height === 2040 && fd.leaf.thickness === 44 && fd.frame.overall.width === 902 && fd.frame.overall.height === 2083
-    && J(fd.hinges.positions.map((p) => p.top)) === J([150, 769, 1738]) && J(fd.hinges.positions.map((p) => p.jambTop)) === J([188, 807, 1776]) && fd.closer?.type === 'surface' && fd.lock.type === 'latch' && fd.handing.hingeSide === 'left',
-    'the reference door derives: FD30 leaf 826 x 2040 x 44, frame 902 x 2083, hinges 150 / 769 / 1738 (jamb 188 / 807 / 1776), latch, surface closer, Hinge left');
+    && J(fd.hinges.positions.map((p) => p.top)) === J([145, 700, 1722]) && J(fd.hinges.positions.map((p) => p.jambTop)) === J([183, 738, 1760]) && fd.closer?.type === 'surface' && fd.lock.type === 'latch' && fd.handing.hingeSide === 'left',
+    'the reference door derives: FD30 leaf 826 x 2040 x 44, frame 902 x 2083, hinge tops 145 / 700 / 1722 (jamb 183 / 738 / 1760), latch, surface closer, Hinge left');
+  ok(fd.hinges.positionRef === 'bottom' && J(fd.hinges.positions.map((p) => p.fromBottom)) === J([1793, 1238, 216]) && J(fd.hinges.positions.map((p) => p.jambFromFoot)) === J([1798, 1243, 221]) && fd.hinges.recess.depth === 3.2
+    && fd.lock.spindle.fromBottom === 995 && fd.lock.spindle.fromFloor === 1000 && fd.keep.centreFromFoot === 985,
+    'v1.3: the positions counted from the bottom (positionRef bottom): hinge lower edges 1793 / 1238 / 216 above the leaf bottom, 1798 / 1243 / 221 above the jamb foot; recess 3.2 deep; spindle 1000 above the floor = 995 above the leaf bottom; keep 985 above the foot');
   for (const [k, d] of Object.entries(doors)) {
     const t = TXT[k];
     ok(t.startsWith('0\r\nSECTION\r\n2\r\nHEADER\r\n9\r\n$ACADVER\r\n1\r\nAC1009\r\n0\r\nENDSEC\r\n') && t.endsWith('0\r\nENDSEC\r\n0\r\nEOF\r\n'), `${d.name}: DXF R12 (AC1009) header, CRLF, ends with EOF`);
@@ -173,21 +177,25 @@ section('1 - the file: R12 header, EOF, layers, texts');
     ok(!/[\u2013\u2014]/.test(t) && !/NaN|undefined|Infinity/.test(t), `${d.name}: no en / em dash and no NaN / undefined / Infinity anywhere in the file`);
     ok(M.fexp.fireDoorDxfText(d.derived) === t, `${d.name}: the text is deterministic (a second build is byte identical)`);
   }
+  // v1.3: the hinge recess is 3.2 deep, so its layer reads FD_HINGE_RECESS_D3P2 (the dot written as P, from the op depth)
   const want = ['FD_OUTLINE', 'FD_DIM', 'FD_TEXT', 'FD_CENTRE', 'FD_HOLE_THROUGH', 'FD_LOCK_FOREND_D4', 'FD_LOCK_FOREND_D4_HIDDEN', 'FD_LOCK_CASE_D87', 'FD_LOCK_CASE_D87_HIDDEN',
-    'FD_HINGE_RECESS_D3', 'FD_HINGE_DRAWING', 'FD_INTU_GROOVE_D4', 'FD_CLOSER_SYMBOL', 'FD_MITRE', 'FD_REBATE_15x47', 'FD_DOWEL_8_D20', 'FD_DOWEL_8_D20_HIDDEN', 'FD_KEEP_PLATE_D3', 'FD_KEEP_POCKET_D15'];
+    'FD_HINGE_RECESS_D3P2', 'FD_HINGE_DRAWING', 'FD_INTU_GROOVE_D4', 'FD_CLOSER_SYMBOL', 'FD_MITRE', 'FD_REBATE_15x47', 'FD_DOWEL_8_D20', 'FD_DOWEL_8_D20_HIDDEN', 'FD_KEEP_PLATE_D3', 'FD_KEEP_POCKET_D15'];
   const names = PD.REF.layers.map((l) => l.name).filter((n) => n !== '0');
   ok(J([...names].sort()) === J([...want].sort()), `FDR-01: the layer table is exactly the ${want.length} reference layers (${want.join(', ')})`, names.join(' '));
+  ok(names.includes('FD_HINGE_RECESS_D3P2') && !names.includes('FD_HINGE_RECESS_D3') && REF.derived.firedoor.machining.leaf.filter((o) => o.kind === 'hingeRecess').every((o) => o.depth === 3.2),
+    'the hinge recess layer follows the op depth 3.2: FD_HINGE_RECESS_D3P2, no D3 layer');
   const n60 = PD.F60.layers.map((l) => l.name);
   ok(['FD_REBATE_15x57', 'FD_VP_CUTOUT_THROUGH', 'FD_CLOSER_SYMBOL', 'FD_CLOSER_SYMBOL_HIDDEN', 'FD_INTU_GROOVE_D4'].every((n) => n60.includes(n)) && !n60.includes('FD_REBATE_15x47'),
     'FDR-02 (FD60): the rebate layer FD_REBATE_15x57 (leaf 54 + 3), the VP cut-out, the built in closer pocket and its hidden track');
   const nDr = PD.DR.layers.map((l) => l.name);
-  ok(!nDr.some((n) => /INTU|CLOSER|VP_CUTOUT/.test(n)) && nDr.includes('FD_HINGE_RECESS_D3'), 'DR-01 (non-fire, no closer, no VP): no intumescent, closer or VP layer');
+  ok(!nDr.some((n) => /INTU|CLOSER|VP_CUTOUT/.test(n)) && nDr.includes('FD_HINGE_RECESS_D3P2'), 'DR-01 (non-fire, no closer, no VP): no intumescent, closer or VP layer');
   const lt = PD.REF.layers.every((l) => l.ltype === 'CONTINUOUS');
   ok(lt && names.filter((n) => /_HIDDEN$/.test(n)).length === 3, 'hidden geometry on its own *_HIDDEN layers (forend, case, dowel bores on FDR-01; the writer sets CONTINUOUS, the user sets a dashed linetype)');
   const tb = tagged(R.REF, null, 'titleBlock').map((e) => e.str);
   const tbWant = ['FDR-01  FD30 fire door set', 'Leaf 826 x 2040 x 44', 'Frame overall 902 x 2083, depth 100, members 50 x 100 (raw 63 x 105)', 'Structural opening 912 x 2088',
-    'Rebate 15 x 47 from solid, faces 35 outside / 50 inside', 'Hinge left (seen from the pull side); 3 hinges 102, tops 150 / 769 / 1738 from the leaf top',
-    'Lock: Latch, spindle 1000 above the leaf bottom, backset 60, forend centre 1055 from the leaf top', 'Keep centre 990 above the lock jamb foot', 'Closer: Surface closer (symbol, not machined)',
+    'Rebate 15 x 47 from solid, faces 35 outside / 50 inside', 'Hinge left (seen from the pull side); 3 hinges 102 at 1793 / 1238 / 216 (hinge jamb 1798 / 1243 / 221 from the foot)',
+    'Hinge positions from the leaf bottom to the hinge lower edge (H1 = the top hinge)',
+    'Lock: Latch, spindle 1000 above the floor (995 above the leaf bottom), backset 60, forend centre 1060 from the leaf top', 'Keep centre 985 above the lock jamb foot', 'Closer: Surface closer (symbol, not machined)',
     'Vision panel: none', 'Intumescent: 1 x 15 x 4 all around, groove 15.5 x 4, colour White', 'Corner dowels: 3 x dia 8 x 40 per corner, bored 20 square to the mitre',
     'DXF R12, opens in AutoCAD and bSolid (a true .dwg needs a converter)', 'Production Core, Skylon'];
   ok(tbWant.every((s) => tb.includes(s)), 'FDR-01 title block: name, rating, leaf, frame overall, opening, rebate, hinge side and positions, lock, keep, closer, vision panel, intumescent with colour, dowels, DXF note, "Production Core, Skylon"', tbWant.filter((s) => !tb.includes(s)).join(' | '));
@@ -204,7 +212,7 @@ section('1 - the file: R12 header, EOF, layers, texts');
 section('2 - the counts');
 {
   const P = PD.REF;
-  const rec = onLayer(P, 'POLYLINE', 'FD_HINGE_RECESS_D3');
+  const rec = onLayer(P, 'POLYLINE', 'FD_HINGE_RECESS_D3P2');
   ok(rec.length === 6 && rec.every((e) => e.closed && e.v.length === 8 && bulges(e).length === 4 && bulges(e).every((b) => near(b, QB, 1e-6))), '6 hinge recesses (3 on the leaf hinge edge, 3 on the hinge jamb), each a closed rounded rectangle with 4 R6 bulges (tan 22.5)', `${rec.length}`);
   ok(tagged(R.REF, 'leafHingeEdge', 'hingeRecessLeaf').length === 3 && tagged(R.REF, 'jambHingeOpening', 'hingeRecessJamb').length === 3, 'the recesses: 3 in the leaf hinge edge view, 3 in the hinge jamb opening face view');
   const plates = (v, t) => tagged(R.REF, v, t).length;
@@ -249,26 +257,26 @@ section('3 - the geometry against the reference numbers');
   const r = R.REF;
   const edgeTop = box(tagged(r, 'leafHingeEdge', 'leafEdgeOutline')).y1;
   const recTops = tagged(r, 'leafHingeEdge', 'hingeRecessLeaf').map((e) => box([e])).sort((a, b) => b.y1 - a.y1);
-  ok(J(recTops.map((b) => Math.round((edgeTop - b.y1) * 10) / 10)) === J([149.5, 768.5, 1737.5]) && recTops.every((b) => near(b.h, 103) && near(b.w, 30)),
-    'leaf hinge edge: the recesses 103 x 30 at 149.5 / 768.5 / 1737.5 from the leaf top (the ops: hinge top - 0.5)', J(recTops));
+  ok(J(recTops.map((b) => Math.round((edgeTop - b.y1) * 10) / 10)) === J([144.5, 699.5, 1721.5]) && recTops.every((b) => near(b.h, 103) && near(b.w, 30)),
+    'leaf hinge edge: the recesses 103 x 30 at 144.5 / 699.5 / 1721.5 from the leaf top (the ops: hinge top - 0.5; v1.3 the Weeke rule), lower edges 1792.5 / 1237.5 / 215.5 above the leaf bottom', J(recTops));
   const jTop = box(tagged(r, 'jambHingeOpening', 'memberFaceOutline')).y1;
   const jRec = tagged(r, 'jambHingeOpening', 'hingeRecessJamb').map((e) => box([e])).sort((a, b) => b.y1 - a.y1);
-  ok(J(jRec.map((b) => Math.round((jTop - b.y1) * 10) / 10)) === J([187.5, 806.5, 1775.5]) && jRec.every((b) => near(b.h, 103) && near(b.w, 30)),
-    'hinge jamb: the recesses 103 x 30 at 187.5 / 806.5 / 1775.5 from the top long point (35 + 3 + hinge top - 0.5)', J(jRec));
+  ok(J(jRec.map((b) => Math.round((jTop - b.y1) * 10) / 10)) === J([182.5, 737.5, 1759.5]) && jRec.every((b) => near(b.h, 103) && near(b.w, 30)),
+    'hinge jamb: the recesses 103 x 30 at 182.5 / 737.5 / 1759.5 from the top long point (35 + 3 + hinge top - 0.5)', J(jRec));
   const kn = tagged(r, 'leafPull', 'knuckleFace').map((e) => box([e]).y1).sort((a, b) => b - a);
   const jp = tagged(r, 'jambHingeOpening', 'hingeJambPlate').map((e) => box([e]).y1).sort((a, b) => b - a);
-  ok(kn.length === 3 && kn.every((y, i) => near(y, jp[i], 0.01)) && near(kn[0], 5 + 2040 - 150, 0.01), `true heights: each leaf hinge stands level with its jamb hinge across the sheet (top hinge at Y ${kn[0]} = floor gap 5 + 2040 - 150)`, `${kn} vs ${jp}`);
+  ok(kn.length === 3 && kn.every((y, i) => near(y, jp[i], 0.01)) && near(kn[0], 5 + 2040 - 145, 0.01), `true heights: each leaf hinge stands level with its jamb hinge across the sheet (top hinge at Y ${kn[0]} = floor gap 5 + 2040 - 145)`, `${kn} vs ${jp}`);
   const leaf = box(tagged(r, 'leafPull', 'leafOutline'));
   const sp = tagged(r, 'leafPull', 'spindleHole')[0];
-  ok(near(leaf.w, 826, 0.01) && near(leaf.h, 2040, 0.01) && near(leaf.y0, 5, 0.01) && sp && near(sp.cy - leaf.y0, 1000) && near(leaf.x1 - sp.cx, 60) && near(sp.r, 5),
-    'pull face: the leaf 826 x 2040 standing 5 above the jamb foot; the spindle 1000 above the leaf bottom, 60 in from the lock edge (on the right for Hinge left)');
+  ok(near(leaf.w, 826, 0.01) && near(leaf.h, 2040, 0.01) && near(leaf.y0, 5, 0.01) && sp && near(sp.cy - leaf.y0, 995) && near(sp.cy, 1000) && near(leaf.x1 - sp.cx, 60) && near(sp.r, 5),
+    'pull face: the leaf 826 x 2040 standing 5 above the jamb foot; the spindle 995 above the leaf bottom = 1000 above the floor (v1.3), 60 in from the lock edge (on the right for Hinge left)');
   const lockTop = box(tagged(r, 'leafLockEdge', 'leafEdgeOutline')).y1;
   const slot = box(tagged(r, 'leafLockEdge', 'forendSlot'));
-  ok(near(slot.h, 236) && near(slot.w, 25) && near(lockTop - slot.cy, 1055), 'lock edge: the forend slot 236 x 25, its centre 1055 from the leaf top (2040 - (1000 - 15))');
+  ok(near(slot.h, 236) && near(slot.w, 25) && near(lockTop - slot.cy, 1060), 'lock edge: the forend slot 236 x 25, its centre 1060 from the leaf top (2040 - (995 - 15))');
   const keepO = box(tagged(r, 'jambLockOpening', 'memberFaceOutline'));
   const kp = box(tagged(r, 'jambLockOpening', 'keepPlate')), kk = box(tagged(r, 'jambLockOpening', 'keepPocket'));
-  ok(near(kp.h, 176) && near(kp.w, 40) && near(kp.cy - keepO.y0, 990) && near(kk.h, 120) && near(kk.w, 18) && near(kk.cy, kp.cy) && near(keepO.h, 2083) && near(keepO.w, 100),
-    'lock jamb: the keep plate 176 x 40 and pocket 120 x 18 centred 990 above the jamb foot (5 + 1000 - 15), the face 2083 x 100');
+  ok(near(kp.h, 176) && near(kp.w, 40) && near(kp.cy - keepO.y0, 985) && near(kk.h, 120) && near(kk.w, 18) && near(kk.cy, kp.cy) && near(keepO.h, 2083) && near(keepO.w, 100),
+    'lock jamb: the keep plate 176 x 40 and pocket 120 x 18 centred 985 above the jamb foot (5 + 995 - 15), the face 2083 x 100');
   const he = box(tagged(r, 'headElevation', 'memberOutline'));
   ok(near(he.w, 902) && near(he.h, 50) && near(he.y1, 2083), 'head elevation 902 x 50, its wall face level with the jamb top long point (2083)');
   const mf = R.REF.views.filter((v) => /Mitre/.test(v.id)).map((v) => {
@@ -284,30 +292,30 @@ section('3 - the geometry against the reference numbers');
   const kn6 = tagged(r6, 'leafPull', 'knuckleFace').map((e) => box([e]));
   const vp6 = tagged(r6, 'leafPull', 'vpRound')[0];
   const cy6 = tagged(r6, 'leafPull', 'cylinderHole')[0];
-  ok(kn6.every((b) => near(b.cx, l6.x1, 0.01)) && vp6 && near(vp6.r, 150) && near(l6.y1 - vp6.cy, 300) && near(vp6.cx - l6.x0, 250) && cy6 && near(cy6.cy - l6.y0, 928) && near(cy6.cx - l6.x0, 60) && near(cy6.r, 9),
-    'FDR-02 (Hinge right, mirrored): the knuckles on the right edge, the round VP r 150 centred 300 below the top and 250 in from the lock edge (on the left), the euro cylinder dia 18 at 928, 60 from the lock edge');
+  ok(kn6.every((b) => near(b.cx, l6.x1, 0.01)) && vp6 && near(vp6.r, 150) && near(l6.y1 - vp6.cy, 300) && near(vp6.cx - l6.x0, 250) && cy6 && near(cy6.cy - l6.y0, 923) && near(cy6.cx - l6.x0, 60) && near(cy6.r, 9),
+    'FDR-02 (Hinge right, mirrored): the knuckles on the right edge, the round VP r 150 centred 300 below the top and 250 in from the lock edge (on the left), the euro cylinder dia 18 at 923 (995 - 72), 60 from the lock edge');
   const rp = tagged(R.DBL, 'leafPull', 'vpRect').map((e) => box([e])).sort((a, b) => a.x0 - b.x0);
   const ld = box(tagged(R.DBL, 'leafPull', 'leafOutline'));
   ok(rp.length === 2 && rp.every((b) => near(b.w, 150) && near(b.h, 800) && near(ld.y1 - b.y1, 150)) && near(rp[1].x0 - rp[0].x1, 100) && near(rp[0].x0 - ld.x0, ld.x1 - rp[1].x1),
     'FDR-03: two panes 150 x 800 side by side, 100 apart, centred, top 150 below the leaf top');
   // the dimension texts of each view (the numbers a machinist needs)
   const want = {
-    leafPull: ['150', '769', '1738', '2040', '826', '1000', '60'],
-    leafHingeEdge: ['149.5', '768.5', '1737.5', '103', '30', '44', '14.3', '15.5'],
-    leafLockEdge: ['1055', '236', '153', '25', '17', '44'],
+    leafPull: ['216', '1238', '1793', '2040', '826', '995 (1000 from the floor)', '60'],
+    leafHingeEdge: ['215.5', '1237.5', '1792.5', '103', '30', '44', '14.3', '15.5'],
+    leafLockEdge: ['1060', '236', '997', '153', '25', '17', '44'],
     leafTopEdge: ['14.3', '15.5', '44'],
     headElevation: ['902', '15', '50'],
     headOpening: ['47', '100', '802'],
     headMitreStart: ['20', '50', '80', '100', '35.4', '70.7'],
     jambHingeElevation: ['2083', '15', '50'],
-    jambHingeOpening: ['187.5', '806.5', '1775.5', '103', '30', '47', '100'],
+    jambHingeOpening: ['220.5', '1242.5', '1797.5', '103', '30', '47', '100'],
     jambHingeMitreStart: ['20', '50', '80', '100', '35.4', '70.7'],
-    jambLockOpening: ['990', '1005', '176', '120', '2', '40', '13', '18', '47', '100'],
+    jambLockOpening: ['985', '1010', '176', '120', '2', '40', '13', '18', '47', '100'],
   };
   const missing = Object.entries(want).flatMap(([v, l]) => hasDims(r, v, l).map((s) => `${v}:${s}`));
-  ok(missing.length === 0, `dimension texts: hinge tops (150 / 769 / 1738), recess tops (leaf 149.5 / 768.5 / 1737.5, jamb 187.5 / 806.5 / 1775.5), spindle 1000, backset 60, forend centre 1055, keep 990 from the foot, dowels 20 / 50 / 80 and 35.4, rebate 15 / 47, overall 826 / 2040 / 902 / 2083`, missing.join(' '));
-  const vpd = hasDims(R.F60, 'leafPull', ['150', 'dia 300', '928', '1000']).concat(hasDims(R.DBL, 'leafPull', ['150', '800', '100', '263', '922']));
-  ok(vpd.length === 0, 'VP dimensions: FDR-02 top 150 and "dia 300", the cylinder 928; FDR-03 the panes 800 high, 263 / 150 / 100 / 150 / 263 across, the thumbturn 922', vpd.join(' '));
+  ok(missing.length === 0, `dimension texts (v1.3 from the bottom): hinge lower edges 216 / 1238 / 1793 above the leaf bottom, recess lower edges (leaf 215.5 / 1237.5 / 1792.5, jamb 220.5 / 1242.5 / 1797.5 above the foot), spindle 995 (1000 from the floor), backset 60, forend centre 1060, keep 985 from the foot, dowels 20 / 50 / 80 and 35.4, rebate 15 / 47, overall 826 / 2040 / 902 / 2083`, missing.join(' '));
+  const vpd = hasDims(R.F60, 'leafPull', ['150', 'dia 300', '923', '995 (1000 from the floor)']).concat(hasDims(R.DBL, 'leafPull', ['150', '800', '100', '263', '917']));
+  ok(vpd.length === 0, 'VP dimensions: FDR-02 top 150 and "dia 300", the cylinder 923; FDR-03 the panes 800 high, 263 / 150 / 100 / 150 / 263 across, the thumbturn 917', vpd.join(' '));
   // no two views overlap, nor the title block
   for (const [k, rr] of Object.entries(R)) {
     const boxes = rr.views.map((v) => ({ id: v.id, ...v.bbox }));
@@ -331,7 +339,7 @@ section('4 - the drawing follows the ops; errors; the element files');
   kp0.x -= 20;
   const rm = M.fdxf.fireDoorDxfEntities(moved);
   const topOf = (rr, v, o, t) => box(tagged(rr, v, o)).y1 - Math.max(...tagged(rr, v, t).map((e) => box([e]).y1));
-  ok(near(topOf(rm, 'leafHingeEdge', 'leafEdgeOutline', 'hingeRecessLeaf'), 159.5) && near(box(tagged(rm, 'jambLockOpening', 'keepPlate')).cy - box(tagged(R.REF, 'jambLockOpening', 'keepPlate')).cy, 20),
+  ok(near(topOf(rm, 'leafHingeEdge', 'leafEdgeOutline', 'hingeRecessLeaf'), 154.5) && near(box(tagged(rm, 'jambLockOpening', 'keepPlate')).cy - box(tagged(R.REF, 'jambLockOpening', 'keepPlate')).cy, 20),
     'the drawing reads the machining ops: a hinge recess op moved 10 down moves its recess 10, a keep plate op moved 20 up moves the plate 20');
   const bad = M.fdxf.fireDoorDxfEntities(SASH.derived);
   ok(bad.error && bad.entities.length === 0 && M.fexp.downloadFireDoorDxf({ name: 'W1', derived: SASH.derived }).error, 'a sash window: fireDoorDxfEntities returns { error }, downloadFireDoorDxf returns { error } (no download)');
@@ -347,12 +355,12 @@ section('4 - the drawing follows the ops; errors; the element files');
   ok(J(M.fexp.FIREDOOR_DXF_ELEMENTS) === J(['leaf', 'head', 'jambHinge', 'jambLock']) && Object.values(el).every((x, i) => x.r.views.every((v) => v.element === M.fexp.FIREDOOR_DXF_ELEMENTS[i]) && x.t.endsWith('0\r\nEOF\r\n')),
     'each element file holds only the views of its element and is a whole DXF');
   const c = (e, type, layer) => onLayer(el[e].p, type, layer).length;
-  ok(c('leaf', 'POLYLINE', 'FD_HINGE_RECESS_D3') === 3 && c('leaf', 'CIRCLE', 'FD_DOWEL_8_D20') === 0 && c('leaf', 'POLYLINE', 'FD_LOCK_FOREND_D4') === 1 && c('leaf', 'CIRCLE', 'FD_HINGE_DRAWING') === 19,
+  ok(c('leaf', 'POLYLINE', 'FD_HINGE_RECESS_D3P2') === 3 && c('leaf', 'CIRCLE', 'FD_DOWEL_8_D20') === 0 && c('leaf', 'POLYLINE', 'FD_LOCK_FOREND_D4') === 1 && c('leaf', 'CIRCLE', 'FD_HINGE_DRAWING') === 19,
     'leaf file: 3 hinge recesses, 3 drawn hinges (18 screw circles + the barrel), the forend, no dowel');
-  ok(c('head', 'CIRCLE', 'FD_DOWEL_8_D20') === 6 && c('head', 'POLYLINE', 'FD_HINGE_RECESS_D3') === 0 && el.head.r.views.length === 4, 'head file: elevation, soffit, two mitre faces with 6 dowel circles, no hinge recess');
-  ok(c('jambHinge', 'POLYLINE', 'FD_HINGE_RECESS_D3') === 3 && c('jambHinge', 'CIRCLE', 'FD_DOWEL_8_D20') === 3 && c('jambHinge', 'CIRCLE', 'FD_HINGE_DRAWING') === 18 && el.jambHinge.r.views.length === 3,
+  ok(c('head', 'CIRCLE', 'FD_DOWEL_8_D20') === 6 && c('head', 'POLYLINE', 'FD_HINGE_RECESS_D3P2') === 0 && el.head.r.views.length === 4, 'head file: elevation, soffit, two mitre faces with 6 dowel circles, no hinge recess');
+  ok(c('jambHinge', 'POLYLINE', 'FD_HINGE_RECESS_D3P2') === 3 && c('jambHinge', 'CIRCLE', 'FD_DOWEL_8_D20') === 3 && c('jambHinge', 'CIRCLE', 'FD_HINGE_DRAWING') === 18 && el.jambHinge.r.views.length === 3,
     'hinge jamb file: 3 recesses with 3 drawn hinges, the top mitre with 3 dowels');
-  ok(c('jambLock', 'POLYLINE', 'FD_KEEP_PLATE_D3') === 1 && c('jambLock', 'POLYLINE', 'FD_KEEP_POCKET_D15') === 1 && c('jambLock', 'CIRCLE', 'FD_DOWEL_8_D20') === 3 && c('jambLock', 'POLYLINE', 'FD_HINGE_RECESS_D3') === 0,
+  ok(c('jambLock', 'POLYLINE', 'FD_KEEP_PLATE_D3') === 1 && c('jambLock', 'POLYLINE', 'FD_KEEP_POCKET_D15') === 1 && c('jambLock', 'CIRCLE', 'FD_DOWEL_8_D20') === 3 && c('jambLock', 'POLYLINE', 'FD_HINGE_RECESS_D3P2') === 0,
     'lock jamb file: the keep plate and pocket, 3 dowels, no hinge recess');
   ok(tagged(el.head.r, null, 'titleBlock')[0]?.str === 'FDR-01  FD30 fire door set  (FD-HEAD)' && tagged(el.leaf.r, null, 'header')[0]?.str.includes('FD-LEAF (leaf)'), 'an element file names its element in the header and the title block');
 }

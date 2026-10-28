@@ -75,8 +75,8 @@ section('1 - the fire door profile, its migration and withProfiles');
   // v1.1 (owner 27.10.2026 evening): the wall gaps and the corner dowels
   ok(FP.frame.wallGapSide === 5 && FP.frame.wallGapHead === 5 && J(FP.frame.dowels) === J({ dia: 8, length: 40, perJoint: 3, margin: 20 }),
     'frame v1.1: wall gap 5 a side / 5 at the head (opening 1000 -> frame 990 -> leaf 914), dowels 8 x 40, 3 per corner, 20 in from the faces');
-  ok(J(FP.hinges) === J({ count: 3, length: 102, topOffset: 150, bottomOffset: 200, midAboveCentre: 200, recessLength: 103, recessWidth: 30, recessDepth: 3, cornerRadius: 6 }),
-    'hinges: 3 x 102, 150 from the top, 200 from the bottom, the middle one 200 above the leaf centre (v1.1), recess 103 x 30 x 3 R6');
+  ok(J(FP.hinges) === J({ count: 3, length: 102, topOffset: 145, bottomOffset: 216, midAboveCentre: 269, recessLength: 103, recessWidth: 30, recessDepth: 3.2, cornerRadius: 6 }),
+    'hinges v1.3 (the Weeke rule, owner 28.10.2026): 3 x 102, 145 from the top, ending 216 above the bottom, the middle centre 269 above the leaf centre, recess 103 x 30 x 3.2 R6');
   ok(FP.lock.spindleFromFloor === 1000 && FP.lock.spindleHeight === 995 && FP.lock.backset === 60 && J(FP.lock.forend) === J({ length: 235, width: 24, millOversize: 1, depth: 4 })
     && J(FP.lock.case) === J({ depth: 85, height: 150, pocketWidth: 17, pocketDepth: 87, pocketHeight: 153 }) && FP.lock.euroCentres === 72 && FP.lock.bathroomCentres === 78
     && FP.lock.caseTopAboveSpindle === 46.5 && FP.lock.forendCentreBelowSpindle === 15 && FP.lock.spindleBore === 10 && FP.lock.euroBore === 18 && FP.lock.bathroomBore === 10,
@@ -246,8 +246,8 @@ const f = REF.derived.firedoor;
     'D_TOP_RAIL', 'D_MID_RAIL', 'D_SIDE_MARGIN', 'VP_SHAPE', 'VP_N', 'VP_W', 'VP_H', 'VP_GAP', 'VP_ARR', 'VP_X', 'VP_Y', 'VP_R', 'LEAD_EDGE', 'REBATE', 'REBATE_STYLE', 'SPY_ON', 'SPY_H', 'LBOX', 'L_BOX_H', 'DROP_CILL', 'PREM_DOOR', 'HINGE_1', 'HINGE_2', 'HINGE_3', 'HINGE_D', 'CLOSER']),
     'leaf row: the variable names of 4.7 plus INTU / INTU_W / INTU_T (v1.1) and VP_SHAPE / VP_N / VP_W / VP_H / VP_GAP / VP_ARR / VP_X / VP_Y / VP_R (v1.2) in the write order');
   ok(LV.VP_SHAPE === 0 && LV.VP_N === 0 && LV.VP_W === 0 && LV.VP_H === 0 && LV.VP_GAP === 0 && LV.VP_ARR === 0 && LV.VP_X === 0 && LV.VP_Y === 0 && LV.VP_R === 0, 'leaf row v1.2: no panel, every VP_* 0');
-  ok(LV.LPX === 2040 && LV.LPY === 826 && LV.LPZ === 44 && LV.HAND === 0 && LV.LH === 1 && LV.RH === 0 && LV.HINGE === 1 && LV.LOCK === 2 && LV.LOCK_H === 1000 && LV.SPINDLE === 1 && LV.EURO === 0 && LV.KEEP === 0 && LV.KEEP_STYLE === 0,
-    'leaf row: LPX 2040 LPY 826 LPZ 44, HAND 0 LH 1 RH 0, HINGE 1, LOCK 2, LOCK_H 1000, SPINDLE 1, EURO 0, KEEP 0, KEEP_STYLE 0');
+  ok(LV.LPX === 2040 && LV.LPY === 826 && LV.LPZ === 44 && LV.HAND === 0 && LV.LH === 1 && LV.RH === 0 && LV.HINGE === 1 && LV.LOCK === 2 && LV.LOCK_H === 995 && LV.SPINDLE === 1 && LV.EURO === 0 && LV.KEEP === 0 && LV.KEEP_STYLE === 0,
+    'leaf row: LPX 2040 LPY 826 LPZ 44, HAND 0 LH 1 RH 0, HINGE 1, LOCK 2, LOCK_H 995 (the handle 1000 above the floor, v1.3), SPINDLE 1, EURO 0, KEEP 0, KEEP_STYLE 0');
   ok(LV.INTU === 1 && LV.INTU_W === 15 && LV.INTU_T === 4 && LV.INTU_STYLE === 1 && LV.VP_STYLE === 0 && LV.C_VP_L === 600 && LV.C_VP_W === 150 && LV.C_VP_NUM === 1 && LV.C_VP_RAIL === 100 && LV.C_VP_POS === 0 && LV.D_TOP_RAIL === 150 && LV.D_MID_RAIL === 450 && LV.D_SIDE_MARGIN === 150,
     'leaf row: INTU 1 (15 x 4), INTU_STYLE 1, VP_STYLE 0, C_VP 600 / 150 / 1 / 100 / 0, D_TOP_RAIL 150, D_MID_RAIL 450, D_SIDE_MARGIN 150');
   ok(LV.LEAD_EDGE === 1 && LV.REBATE === 0 && LV.REBATE_STYLE === 1 && LV.SPY_ON === 0 && LV.SPY_H === 1450 && LV.LBOX === 0 && LV.L_BOX_H === 1000 && LV.DROP_CILL === 0 && LV.PREM_DOOR === 0,
@@ -949,10 +949,10 @@ section('7 - the sheets: six doors x five sheets, collisions, the dimension rule
   ok(['902', '2083', '826', '2040', 'Hinge left - Outside', 'FDR-01', 'VP 450 × 450', 'opening 912 x 2088', '912', '2088'].every((t) => has(S('ref-fdoutside'), t)), 'ref outside: 902 / 2083 / 826 / 2040, "Hinge left - Outside", FDR-01, the VP label, the opening 912 x 2088 in the subtitle and its dimensions');
   ok(['Hinge left - Inside', '902', '2083'].every((t) => has(S('ref-fdinside'), t)) && !/VP 450/.test(S('ref-fdinside')), 'ref inside: "Hinge left - Inside", 902 / 2083, no VP label');
   // rule 7 on the notes: the hinge rule and the two frame faces are printed from derived.firedoor, never a literal (v1.1 wording, no swing)
-  const RULE = 'the rule: top 150 from the top, bottom 200 from the bottom, middle centre 200 above the leaf centre', FACES = ['shows the 35 frame face', 'the 50 face with the stop'];
+  const RULE = 'the rule: top 145 from the top, bottom 216 from the bottom, middle centre 269 above the leaf centre; positions = the hinge lower edge above the leaf bottom', FACES = ['shows the 35 frame face', 'the 50 face with the stop'];
   // the notes wrap over several text lines on the sheet, so a long phrase is checked on the joined text
   const joined = (m) => m.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-  ok(has(joined(S('ref-fdoutside')), RULE) && has(joined(S('ref-fdinside')), RULE) && has(joined(S('ref-fdleaf')), RULE), 'ref outside, inside and leaf: the hinge note prints the v1.1 rule 150 / 200 / 200 from derived.firedoor.hinges');
+  ok(has(joined(S('ref-fdoutside')), RULE) && has(joined(S('ref-fdinside')), RULE) && has(joined(S('ref-fdleaf')), RULE), 'ref outside, inside and leaf: the hinge note prints the v1.3 rule 145 / 216 / 269 and the from-the-bottom positions, from derived.firedoor.hinges');
   ok(['ref-fdoutside', 'ref-fdinside', 'ref-fdplan', 'ref-fdleaf', 'ref-fdframe'].every((k) => FACES.every((t) => has(S(k), t))), 'every ref sheet: the pull face note prints the 35 / 50 faces from derived.firedoor.frame.faces');
   ok(M.fdu.pullFaceNote({ frame: { faces: { outside: 40, inside: 55 } } }) === 'Pull face shows the 40 frame face and the knuckles, push face the 55 face with the stop' && typeof M.fdu.swingWord === 'undefined',
     'pullFaceNote follows the derived faces (40 / 55) and needs no swing; swingWord is gone');
@@ -970,22 +970,22 @@ section('7 - the sheets: six doors x five sheets, collisions, the dimension rule
       'a derived with offsets 145 / 210 / 180 and faces 40 / 55 renders those numbers in the notes (no 150 / 200 / 35 / 50 literal survives)');
   }
   ok(['Closed', 'Open 30', '826', '100'].every((t) => has(S('ref-fdplan'), t)), 'ref plan: Closed / Open 30 / 826 / 100');
-  ok(['150', '102', '517', '867', '200', 'H1 150', 'H2 769', 'H3 1738', 'spindle 1000', 'euro 928', 'FOREND 236 × 25', 'CASE 17 × 153 × 87', '60', 'hinge recess', 'intumescent groove', 'leading edge'].every((t) => has(S('ref-fdleaf'), t)),
-    'ref leaf: the hinge chain 150 / 102 / 517 / 102 / 867 / 102 / 200, H1 150 / H2 769 / H3 1738, spindle 1000, euro 928, FOREND 236 × 25, CASE 17 × 153 × 87, backset 60, the op kinds');
-  ok(['H1 188', 'H2 807', 'H3 1776', '188', '205', 'KEEP 990 from the foot', '902', '2083', 'depth 100', 'SECTION 4:1', 'rebate 15 × 47', 'mitre', 'keep plate', 'keep pocket', 'dowel bore', 'MITRE FACE 4:1', '8 x 40', '3 per corner', '20 deep'].every((t) => has(S('ref-fdframe'), t)),
-    'ref frame: H1 188 / H2 807 / H3 1776, the chain 188 / 205, KEEP 990 from the foot, 902 / 2083, depth 100, SECTION 4:1, rebate 15 × 47, the op kinds, the dowel bores with the MITRE FACE 4:1 detail and the dowel note');
+  ok(['145', '102', '453', '920', '216', 'H1 1793', 'H2 1238', 'H3 216', 'spindle 995 (1000 from the floor)', 'euro 923', '>3.2<', 'FOREND 236 × 25', 'CASE 17 × 153 × 87', '60', 'hinge recess', 'intumescent groove', 'leading edge'].every((t) => has(S('ref-fdleaf'), t)),
+    'ref leaf (v1.3): the hinge chain 145 / 102 / 453 / 102 / 920 / 102 / 216, H1 1793 / H2 1238 / H3 216 (the lower edge above the leaf bottom), spindle 995 (1000 from the floor), euro 923, the recess depth 3.2 in the table (0.1, not rounded to 0.5), FOREND 236 × 25, CASE 17 × 153 × 87, backset 60, the op kinds');
+  ok(['H1 1798', 'H2 1243', 'H3 221', '183', '453', '920', '221', 'KEEP 985 from the foot', '1010', '>3.2<', '902', '2083', 'depth 100', 'SECTION 4:1', 'rebate 15 × 47', 'mitre', 'keep plate', 'keep pocket', 'dowel bore', 'MITRE FACE 4:1', '8 x 40', '3 per corner', '20 deep'].every((t) => has(S('ref-fdframe'), t)),
+    'ref frame (v1.3): H1 1798 / H2 1243 / H3 221 (the lower edge above the jamb foot), the chain 183 / 102 / 453 / 102 / 920 / 102 / 221, KEEP 985 from the foot, the recess depth 3.2, 902 / 2083, depth 100, SECTION 4:1, rebate 15 × 47, the op kinds, the dowel bores with the MITRE FACE 4:1 detail and the dowel note');
   ok(count(S('ref-fdframe'), /dowel bore/g) === 12 && count(S('ref-fdframe'), /45 deg/g) === 16, `ref frame: 12 "dowel bore" op rows with 45 deg (${count(S('ref-fdframe'), /dowel bore/g)}; 16 "45 deg" = 4 mitres + 12 bores: ${count(S('ref-fdframe'), /45 deg/g)})`);
   ok(/along the cut \(25 across the thickness\)/.test(S('ref-fdframe')) && /35\.4/.test(S('ref-fdframe')), 'ref frame: the mitre face detail dimensions the bore centre 35.4 along the cut (25 across the thickness)');
   ok(/\(4\.906 m\)/.test(S('ref-fdleaf')) && /\(4\.906 m\)/.test(S('ref-fdoutside')) && /\(9\.812 m\)/.test(S('fd60-bathroom-fdleaf')), 'the strip metres print unrounded (4.906 / 9.812 m) on the leaf and outside sheets');
-  ok(['1000', '2100', 'opening 1000 x 2100', '990', '2095', '914', '2052', 'Surface closer', 'FDR-06'].every((t) => has(S('opening-1000-fdoutside'), t)) && ['H1 150', 'H2 775', 'H3 1750'].every((t) => has(S('opening-1000-fdleaf'), t)),
-    'opening 1000 x 2100: the outside elevation prints the opening, the frame 990 x 2095 and the leaf 914 x 2052, the surface closer; the leaf sheet H1 150 / H2 775 / H3 1750');
+  ok(['1000', '2100', 'opening 1000 x 2100', '990', '2095', '914', '2052', 'Surface closer', 'FDR-06'].every((t) => has(S('opening-1000-fdoutside'), t)) && ['H1 1805', 'H2 1244', 'H3 216'].every((t) => has(S('opening-1000-fdleaf'), t)),
+    'opening 1000 x 2100: the outside elevation prints the opening, the frame 990 x 2095 and the leaf 914 x 2052, the surface closer; the leaf sheet H1 1805 / H2 1244 / H3 216');
   ok(/Hinge right - Outside/.test(S('right-fdoutside')) && /Hinge right - Inside/.test(S('right-fdinside')), 'hinge right: "Hinge right - Outside" / "Hinge right - Inside"');
   ok(/non-fire/.test(S('nonfire-latch-fdoutside')) && /DR-01/.test(S('nonfire-latch-fdoutside')) && count(S('nonfire-latch-fdleaf'), /intumescent groove/g) === 0 && /No intumescent strip/.test(S('nonfire-latch-fdleaf'))
     && count(S('nonfire-latch-fdleaf'), /cylinder hole/g) === 1 && /no cylinder hole/.test(S('nonfire-latch-fdleaf')) && count(S('ref-fdleaf'), /intumescent groove/g) === 3 && count(S('ref-fdleaf'), /cylinder hole/g) === 1 && !/no cylinder hole/.test(S('ref-fdleaf')),
     'non-fire latch: "non-fire", DR-01, no groove rows, "No intumescent strip", "no cylinder hole" (the ref leaf lists 3 grooves and a cylinder hole)');
-  ok(/FD60/.test(S('fd60-bathroom-fdoutside')) && /bathroom 922/.test(S('fd60-bathroom-fdleaf')) && /rebate 15 × 57/.test(S('fd60-bathroom-fdframe')) && /diamond/.test(S('fd60-bathroom-fdleaf')) && /2 x 15 x 4 all around/.test(S('fd60-bathroom-fdleaf')) && count(S('fd60-bathroom-fdleaf'), /intumescent groove/g) === 6,
-    'FD60 bathroom diamond: FD60, bathroom 922, rebate 15 × 57, diamond, two strips (6 groove rows)');
-  ok(['150', '102', '487.5', '837.5', '200', 'H2 739.5', 'H3 1679'].every((t) => has(S('762x1981-fdleaf'), t)) && /838/.test(S('762x1981-fdoutside')) && /2024/.test(S('762x1981-fdoutside')), '762 x 1981: the chain 150 / 102 / 487.5 / 102 / 837.5 / 102 / 200, H2 739.5, H3 1679, frame 838 x 2024');
+  ok(/FD60/.test(S('fd60-bathroom-fdoutside')) && /bathroom 917/.test(S('fd60-bathroom-fdleaf')) && /rebate 15 × 57/.test(S('fd60-bathroom-fdframe')) && /diamond/.test(S('fd60-bathroom-fdleaf')) && /2 x 15 x 4 all around/.test(S('fd60-bathroom-fdleaf')) && count(S('fd60-bathroom-fdleaf'), /intumescent groove/g) === 6,
+    'FD60 bathroom diamond: FD60, bathroom 917, rebate 15 × 57, diamond, two strips (6 groove rows)');
+  ok(['145', '102', '423.5', '890.5', '216', 'H1 1734', 'H2 1208.5', 'H3 216'].every((t) => has(S('762x1981-fdleaf'), t)) && /838/.test(S('762x1981-fdoutside')) && /2024/.test(S('762x1981-fdoutside')), '762 x 1981: the chain 145 / 102 / 423.5 / 102 / 890.5 / 102 / 216, H1 1734 / H2 1208.5 / H3 216, frame 838 x 2024');
   ok(/1056/.test(S('custom-vp-pos90-fdoutside')) && /1132/.test(S('custom-vp-pos90-fdoutside')) && /depth 150/.test(S('custom-vp-pos90-fdframe')) && count(S('custom-vp-pos90-fdleaf'), /vision panel/g) >= 3, 'custom VP pos 90 on a 1056 leaf: 1056 / 1132 on the outside, depth 150 on the frame sheet, three vision panel rows');
   // the Drawings panel for a fire door: the five tabs, never a sash / casement / door sheet
   {
@@ -1011,9 +1011,9 @@ section('8 - the 3D: fireDoorGeometryFromSpec and the model mounted headless');
   ok(geo.frame.depth === 100 && geo.frame.thickness === 50 && geo.frame.rebate.w === 15 && geo.frame.rebate.d === 47 && geo.frame.faces.outside === 35 && geo.frame.faces.inside === 50 && geo.frame.gaps.floor === 5,
     'geo frame depth 100, thickness 50, rebate 15 x 47, faces 35 / 50, floor gap 5');
   ok(J(geo.hinges.positions.map((p) => p.top)) === J([145, 700, 1722]) && J(geo.hinges.positions.map((p) => p.fromBottom)) === J([1793, 1238, 216]) && geo.hinges.length === 102, 'geo hinges tops 145 / 700 / 1722, from the bottom 1793 / 1238 / 216 (v1.3), 102 long');
-  ok(geo.lock.spindle.fromBottom === 1000 && geo.lock.spindle.fromLockEdge === 60 && geo.lock.cylinder?.kind === 'euro' && geo.lock.cylinder.fromBottom === 928, 'geo spindle 1000 / 60, euro cylinder 928');
+  ok(geo.lock.spindle.fromBottom === 995 && geo.lock.spindle.fromFloor === 1000 && geo.lock.spindle.fromLockEdge === 60 && geo.lock.cylinder?.kind === 'euro' && geo.lock.cylinder.fromBottom === 923, 'geo spindle 995 above the leaf bottom (1000 above the floor) / 60, euro cylinder 923');
   ok(geo.vp.panes.length === 1 && geo.vp.panes[0].w === 450 && geo.vp.panes[0].h === 450 && !geo.vp.panes[0].rotated && geo.vp.glassThickness === 6, 'geo one VP pane 450 x 450, glass 6');
-  ok(geo.handing.hingeSide === 'left' && geo.handing.label === 'Hinge left' && !('swing' in geo.handing) && geo.closer?.type === 'builtin' && geo.keep?.centreFromFoot === 990 && geo.keep.plate.length === 176 && geo.keep.plate.width === 40, 'geo handing left (no swing), closer built in, keep 990 from the foot, plate 176 x 40');
+  ok(geo.handing.hingeSide === 'left' && geo.handing.label === 'Hinge left' && !('swing' in geo.handing) && geo.closer?.type === 'builtin' && geo.keep?.centreFromFoot === 985 && geo.keep.plate.length === 176 && geo.keep.plate.width === 40, 'geo handing left (no swing), closer built in, keep 985 from the foot, plate 176 x 40');
   ok(geo.frame.members.length === 3 && J(geo.frame.members.map((m) => m.length)) === J([902, 2083, 2083]), 'geo members 902 / 2083 / 2083');
   // the model mounted with R3F on a stub renderer (the t40 / C2 mechanics): the bundle carries react, three and fiber
   const OUT3D = resolve(AUDIT, 't51-3d');
@@ -1076,15 +1076,15 @@ section('8 - the 3D: fireDoorGeometryFromSpec and the model mounted headless');
     ok(!!leaf && near(leaf.min[1], -1036.5, 0.02) && near(leaf.max[1], 1003.5, 0.02), `the leaf stands 5 above the feet (${leaf?.min[1]}) and 38 under the frame top (${leaf?.max[1]})`);
     const hinges = ms.filter((m) => hasN(m, 'fd-hinge'));
     const hy = hinges.map(cy).sort((a, b) => b - a);
-    ok(hinges.length === 3 && near(hy[0], 802.5, 0.02) && near(hy[1], 183.5, 0.02) && near(hy[2], -785.5, 0.02) && hinges.every((m) => near(hh(m), 102, 0.02)),
-      `3 hinge knuckles 102 long centred at y ${hy.join(' / ')} (leaf top 1003.5 - 201 / 820 / 1789)`);
+    ok(hinges.length === 3 && near(hy[0], 807.5, 0.02) && near(hy[1], 252.5, 0.02) && near(hy[2], -769.5, 0.02) && hinges.every((m) => near(hh(m), 102, 0.02)),
+      `3 hinge knuckles 102 long centred at y ${hy.join(' / ')} (leaf top 1003.5 - 196 / 751 / 1773, v1.3)`);
     const glass = ms.filter((m) => hasN(m, 'vp-glass'));
     ok(glass.length === 1 && near(w(glass[0]), 450, 0.02) && near(hh(glass[0]), 450, 0.02) && near(dd(glass[0]), 6, 0.02) && near(cx(glass[0]), 0, 0.02) && near(glass[0].max[1], 1003.5 - 150, 0.02),
       `the VP glass 450 x 450 x 6 centred across the leaf, its top 150 under the leaf top (${glass[0] ? `${w(glass[0])} x ${hh(glass[0])} x ${dd(glass[0])}, top ${glass[0].max[1]}` : 'missing'})`);
     const keep = ms.find((m) => hasN(m, 'keep-plate'));
     ok(!!keep && near(hh(keep), 176, 0.02) && near(dd(keep), 40, 0.02) && near(cy(keep), -1041.5 + 985, 0.02), `the keep plate 176 x 40 centred 985 above the feet (y ${keep && cy(keep)})`);
     const roses = ms.filter((m) => hasN(m, 'fd-handle') && m.kind === 'CylinderGeometry' && near(w(m), 52, 0.02));
-    ok(roses.length === 2 && roses.every((m) => near(cy(m), -36.5, 0.02) && near(Math.abs(cx(m)), 353, 0.02)), `2 handle roses at the spindle (y -36.5 = feet + 5 + 1000, |x| 353 = lock edge - 60)`);
+    ok(roses.length === 2 && roses.every((m) => near(cy(m), -41.5, 0.02) && near(Math.abs(cx(m)), 353, 0.02)), `2 handle roses at the spindle (y -41.5 = feet + 1000 above the floor, v1.3; |x| 353 = lock edge - 60)`);
     ok(ms.filter((m) => hasN(m, 'fd-euro')).length === 4 && ms.filter((m) => hasN(m, 'vp-beads')).length === 8, 'four euro escutcheons, eight glazing beads');
     const open = await meshes({ geo, openAngle: 30 });
     const lo = open.find((m) => hasN(m, 'leaf-body'));
@@ -1420,8 +1420,8 @@ const pageUrl = (path, pattern, Comp) => renderToStaticMarkup(h(M.MemoryRouter, 
       ['Vision panel', 'Square: 450 x 450 · centred, top 150 below the leaf top'], ['Intumescent', '1 x 15 x 4 all around'], ['Leading edge', 'bevelled (macro LEAD_EDGE)'],
       ['Width', '902 mm'], ['Height', '2083 mm'], ['Depth', '100 mm'],
       ['Frame overall', '902 × 2083 mm'], ['Head', '902 mm long point · mitred both ends'], ['Jamb hinge', '2083 mm long point · mitred top'], ['Jamb lock', '2083 mm long point · mitred top'],
-      ['Member', '50 × 100 finished · 63 × 105 raw'], ['Rebate', '15 × 47 · faces 35 / 50'], ['Hinges', '3 × 102 · 150 / 769 / 1738 from the leaf top'], ['Jamb recesses', '188 / 807 / 1776 from the jamb top'],
-      ['Spindle', '1000 above the leaf bottom · backset 60'], ['Cylinder', '928 above the leaf bottom'], ['Keep centre', '990 above the jamb foot'], ['Intumescent', '4.906 m'], ['VP glass', '0.203 m² · beads 3.6 m'],
+      ['Member', '50 × 100 finished · 63 × 105 raw'], ['Rebate', '15 × 47 · faces 35 / 50'], ['Hinges', '3 × 102 · 1793 / 1238 / 216 above the leaf bottom (lower edge, H1 = top)'], ['Jamb recesses', '1798 / 1243 / 221 above the jamb foot'],
+      ['Spindle', '1000 above the floor (995 above the leaf bottom) · backset 60'], ['Cylinder', '923 above the leaf bottom'], ['Keep centre', '985 above the jamb foot'], ['Intumescent', '4.906 m'], ['VP glass', '0.203 m² · beads 3.6 m'],
       ['Type', 'FD30 standard 6 mm'], ['Panes', '1 · 0.203 m²']];
     const missing = rowsW.filter(([label, value]) => !new RegExp(`${label}</span><span[^>]*>${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</span>`).test(html));
     ok(missing.length === 0, `Window page FDR-01: the ${rowsW.length} spec and calculated rows (Rating FD30 .. Panes 1 · 0.203 m²)`, missing.map(([l, v]) => `${l} = ${v}`).join(' | '));
@@ -1431,8 +1431,8 @@ const pageUrl = (path, pattern, Comp) => renderToStaticMarkup(h(M.MemoryRouter, 
       'Window page DR-01 (a v1 record): Non fire, no intumescent, no vision panel, latch (standard), no closer, the opening 912 × 2088 (from the leaf)');
     ok(!/Intumescent<\/span><span[^>]*>[\d.]+ m</.test(dr) && !has(dr, 'Cylinder</span>') && !has(dr, 'VP glass</span>'), 'Window page DR-01: no intumescent metres, cylinder or VP glass row in Calculated');
     const fd60 = pageUrl('/projects/p1/batches/b1/windows/fdr02', '/projects/:projectId/batches/:batchId/windows/:windowId', M.WDP.default);
-    ok(/Rating<\/span><span[^>]*>FD60</.test(fd60) && /Leaf<\/span><span[^>]*>826 × 2040 × 54 mm</.test(fd60) && /Rebate<\/span><span[^>]*>15 × 57 · faces 35 \/ 50</.test(fd60) && /Thumbturn<\/span><span[^>]*>922 above the leaf bottom</.test(fd60) && /Handing<\/span><span[^>]*>Hinge right</.test(fd60) && !/opens out/.test(fd60) && /Wall depth<\/span><span[^>]*>150 mm</.test(fd60) && /Intumescent<\/span><span[^>]*>2 x 15 x 4 all around</.test(fd60),
-      'Window page FDR-02: FD60, leaf 54, rebate 15 × 57, thumbturn 922, Hinge right (no swing), wall 150, two strips');
+    ok(/Rating<\/span><span[^>]*>FD60</.test(fd60) && /Leaf<\/span><span[^>]*>826 × 2040 × 54 mm</.test(fd60) && /Rebate<\/span><span[^>]*>15 × 57 · faces 35 \/ 50</.test(fd60) && /Thumbturn<\/span><span[^>]*>917 above the leaf bottom</.test(fd60) && /Handing<\/span><span[^>]*>Hinge right</.test(fd60) && !/opens out/.test(fd60) && /Wall depth<\/span><span[^>]*>150 mm</.test(fd60) && /Intumescent<\/span><span[^>]*>2 x 15 x 4 all around</.test(fd60),
+      'Window page FDR-02: FD60, leaf 54, rebate 15 × 57, thumbturn 917, Hinge right (no swing), wall 150, two strips');
     const sashPage = pageUrl('/projects/p1/batches/b2/windows/sash1', '/projects/:projectId/batches/:batchId/windows/:windowId', M.WDP.default);
     ok(has(sashPage, 'Sashes &amp; Bars') && has(sashPage, 'Trickle vent') && !has(sashPage, 'Fire door</div>') && !has(sashPage, 'bSuite fire doors'), 'Window page sash control: Sashes & Bars, trickle vent, no fire door section or buttons');
   }
@@ -1446,7 +1446,7 @@ const pageUrl = (path, pattern, Comp) => renderToStaticMarkup(h(M.MemoryRouter, 
     const dr = renderR(h(M.WDP.GlassPanel, { item: W.dr01.win, windowSpec: W.dr01.windowSpec, derived: W.dr01.derived, batch: batchFD, settings: {}, projectEntity: null, projectLabel: '064' }));
     ok(has(dr, 'No glass data.'), 'GlassPanel DR-01 (VP 0): "No glass data."');
     const bom = renderR(h(M.WDP.BOMPanel, { item: fd.win, windowSpec: fd.windowSpec, settings: {}, derived: fd.derived, batch: batchFD, projectLabel: '064' }));
-    ok(has(bom, 'Fire door hardware') && has(bom, 'Fire door hinge') && has(bom, '150 / 769 / 1738 from the leaf top') && has(bom, 'Lock case, sashlock euro') && has(bom, 'Euro cylinder') && has(bom, 'Keep') && has(bom, 'Built in closer') && has(bom, 'Intumescent strip') && has(bom, 'Frame dowels'),
+    ok(has(bom, 'Fire door hardware') && has(bom, 'Fire door hinge') && has(bom, '1793 / 1238 / 216 above the leaf bottom') && has(bom, 'Lock case, sashlock euro') && has(bom, 'Euro cylinder') && has(bom, 'Keep') && has(bom, 'Built in closer') && has(bom, 'Intumescent strip') && has(bom, 'Frame dowels'),
       'BOMPanel FDR-01: the "Fire door hardware" card with hinges (positions), lock, cylinder, keep, the built in closer, intumescent, the frame dowels');
     ok(!has(bom, 'Fixed window'), 'BOMPanel FDR-01: never the "Fixed window" copy');
   }

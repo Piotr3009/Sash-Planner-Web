@@ -20,12 +20,17 @@
  * the face, the vision panel cut-outs (the diamond rotated), the intumescent
  * grooves along the edge bands and the leading edge on the lock edge.
  * Dimensions: the leaf width at the top, the height on the right, the hinge
- * chain (the v1.1 rule: top offset, hinge, gap, hinge, gap, hinge, bottom
- * offset, the middle hinge centred above the leaf centre by the engine's
- * midAboveCentre) beside the hinge edge, the vision panel chain on the left, the
- * spindle and cylinder heights from the leaf bottom on the right, the chain
- * of the panes, the spindle (its backset) along the bottom. The op table
- * (kind, face, x, y, z, length, width, depth, radius) follows, then the notes.
+ * chain beside the hinge edge, read FROM THE LEAF BOTTOM (v1.3, the Weeke
+ * rule: bottom offset, hinge, gap, hinge, gap, hinge, top offset, 216 / 102 /
+ * 920 / 102 / 453 / 102 / 145 on a 2040 leaf; the middle hinge centred above
+ * the leaf centre by the engine's midAboveCentre), the vision panel chain on
+ * the left, the spindle and cylinder heights from the leaf bottom on the
+ * right (the spindle labelled with its height from the floor in brackets),
+ * the chain of the panes, the spindle (its backset) along the bottom. The
+ * hinge labels on the face ('H1 1793', H1 = the top hinge) are the hinge
+ * LOWER edge above the leaf bottom (positions[i].fromBottom), the number the
+ * macro and the Weeke program take. The op table (kind, face, x, y, z,
+ * length, width, depth, radius) follows, then the notes.
  * v1.2 (28.10.2026): the vision panel cut-outs by their shape (a rect with
  * its corner radius, a circle, the diamond), 'VP dia 300' on a round pane,
  * the panel's across chain as a second row along the bottom (from the edge
@@ -43,8 +48,8 @@
 import { useMemo } from 'react';
 import { DimH, DimV, DimChainH, DimChainV, Label, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
-import { NS, fmt, safely, NoSheet, SheetTitle } from './doorSheetParts.jsx';
-import { num, leafOpsByKind, opTableRows, fireDoorRecord, diamondPoints, paneBox, paneShape, paneLabel, vpAcrossChain, hingeWord, closerWord, closerSymbolWord, closerSymbolDetail, hingeRuleWord, intuWord, pullFaceNote, ratingWord, vpGlassWord, wrapLines } from './fireDoorDrawUtils.js';
+import { NS, safely, NoSheet, SheetTitle } from './doorSheetParts.jsx';
+import { fdNum as fmt, num, leafOpsByKind, opTableRows, fireDoorRecord, diamondPoints, paneBox, paneShape, paneLabel, vpAcrossChain, hingeWord, closerWord, closerSymbolWord, closerSymbolDetail, hingeRuleWord, hingePositionsWord, hingeChainFromBottom, spindleWord, spindleDimLabel, intuWord, pullFaceNote, ratingWord, vpGlassWord, wrapLines } from './fireDoorDrawUtils.js';
 
 const CHAR = 0.55;
 const C = { band: 'rgba(148,163,184,0.05)', recess: 'rgba(14,165,233,0.12)', pocket: 'rgba(239,68,68,0.10)', hole: '#F59E0B' };
@@ -186,8 +191,8 @@ export default function FireDoorLeaf2D({ windowSpec, derived, projectNumber, win
   const intu = fd.intumescent;
   const notes = wrapLines([
     `${pullFaceNote(fd)}. Leaf ${fmt(W)} x ${fmt(H)} x ${fmt(T)} (${ratingWord(fd)} blank), seen from the PULL face with the hinge edge on the ${hingeSide}; the hinge, lock and top edges unfolded beside the face, the pull face side of each edge next to it. Board coordinates as the bSolid master: x down from the leaf top, y from the hinge edge, z from the pull face`,
-    `Hinges: ${fmt(hg.count)} x ${fmt(hg.length)} ${hg.product || ''} at ${(hg.positions || []).map((p) => fmt(p.top)).join(' / ')} from the top (HINGE_1..${fmt(hg.count)}; the rule: ${hingeRuleWord(fd)}); recess ${fmt(hg.recess?.length)} x ${fmt(hg.recess?.width)} x ${fmt(hg.recess?.depth)} R${fmt(hg.recess?.radius)} on the hinge edge, from the pull face`,
-    `Lock ${lock.type || ''}: forend ${fmt(lock.forend?.millLength)} x ${fmt(lock.forend?.millWidth)} x ${fmt(lock.forend?.depth)} R${fmt(lock.forend?.radius)} (full radius ends) and case pocket ${fmt(lock.case?.pocketWidth)} x ${fmt(lock.case?.pocketHeight)} x ${fmt(lock.case?.pocketDepth)}${casePocket ? ` R${fmt(casePocket.radius)}` : ''} on the lock edge centred on the thickness, forend centre ${fmt(lock.forend?.centreFromBottom)} above the bottom; spindle ${fmt(lock.spindle?.fromBottom)} above the bottom, ${fmt(lock.backset)} from the lock edge, bore ${fmt(lock.spindle?.bore)} through; ${cylC ? `${cylC.kind} bore ${fmt(cylC.bore)} at ${fmt(lock.cylinder.fromBottom)}` : 'no cylinder hole'}${lead ? '; leading edge bevel on the lock edge (LEAD_EDGE)' : ''}`,
+    `Hinges: ${fmt(hg.count)} x ${fmt(hg.length)} ${hg.product || ''} at ${hingePositionsWord(fd)}; HINGE_1..${fmt(hg.count)}; the chain from the bottom ${hingeChainFromBottom(fd).map(fmt).join(' / ')}; the rule: ${hingeRuleWord(fd)}; recess ${fmt(hg.recess?.length)} x ${fmt(hg.recess?.width)} x ${fmt(hg.recess?.depth)} R${fmt(hg.recess?.radius)} on the hinge edge, from the pull face`,
+    `Lock ${lock.type || ''}: forend ${fmt(lock.forend?.millLength)} x ${fmt(lock.forend?.millWidth)} x ${fmt(lock.forend?.depth)} R${fmt(lock.forend?.radius)} (full radius ends) and case pocket ${fmt(lock.case?.pocketWidth)} x ${fmt(lock.case?.pocketHeight)} x ${fmt(lock.case?.pocketDepth)}${casePocket ? ` R${fmt(casePocket.radius)}` : ''} on the lock edge centred on the thickness, forend centre ${fmt(lock.forend?.centreFromBottom)} above the bottom; ${spindleWord(fd)}, ${fmt(lock.backset)} from the lock edge, bore ${fmt(lock.spindle?.bore)} through; ${cylC ? `${cylC.kind} bore ${fmt(cylC.bore)} at ${fmt(lock.cylinder.fromBottom)} above the leaf bottom` : 'no cylinder hole'}${lead ? '; leading edge bevel on the lock edge (LEAD_EDGE)' : ''}`,
     panes.length
       ? `Vision panel ${fd.vp?.label || fd.vp?.style}${fd.vp?.positionLabel ? `; ${fd.vp.positionLabel}` : ''}${fd.vp?.group ? ` (the panel ${fmt(fd.vp.group.w)} x ${fmt(fd.vp.group.h)} at x ${fmt(fd.vp.group.x)}, y ${fmt(fd.vp.group.y)})` : ''}; cut through (${panes[0].shape === 'round' ? 'round' : panes[0].shape === 'diamond' ? 'diamond, the square turned 45' : (panes[0].radius > 0 ? `corners R${fmt(panes[0].radius)}` : 'square corners')})${vpGlassWord(fd) ? `, glass ${vpGlassWord(fd)}` : ''}${(fd.vp?.warnings || []).length ? `; ${fd.vp.warnings.join('; ')}` : ''}`
       : 'No vision panel',
@@ -272,9 +277,10 @@ export default function FireDoorLeaf2D({ windowSpec, derived, projectNumber, win
             </g>
           );
         })}
+        {/* the hinge labels: H1 = the top hinge, the value = its lower edge above the leaf bottom (v1.3, positions[i].fromBottom) */}
         {(hg.positions || []).map((p, k) => (
           <Label key={`hl${k}`} x={hingesLeft ? faceL + 14 * ts : faceR - 14 * ts} y={SY(num(p.top, 0) + num(hg.length, 0) / 2) + 5 * ts}
-            text={`H${k + 1} ${fmt(p.top)}`} anchor={hingesLeft ? 'start' : 'end'} vbw={svgW} />
+            text={`H${k + 1} ${fmt(p.fromBottom)}`} anchor={hingesLeft ? 'start' : 'end'} vbw={svgW} />
         ))}
 
         {/* ── the lock: forend and case pocket on the lock edge band, the pocket's reach hidden on the face ── */}
@@ -341,7 +347,8 @@ export default function FireDoorLeaf2D({ windowSpec, derived, projectNumber, win
           : <DimChainV key={c} x={leftX(k)} cuts={vpCuts.map(SY)} labels={vpCutLabels} extFrom={ox - 4 * ts} vbw={svgW} fmt={fmt} />))}
         {rightCols.map((c, k) => {
           if (c === 'hinge') return <DimChainV key={c} x={rightX(k)} cuts={hingeCuts.map(SY)} extFrom={bandRight + 4 * ts} vbw={svgW} fmt={fmt} />;
-          if (c === 'spindle') return <DimV key={c} x={rightX(k)} y1={SY(spindleC.x)} y2={faceB} extFrom={faceR} label={`spindle ${fmt(lock.spindle.fromBottom)}`} small vbw={svgW} />;
+          // the spindle measured from the leaf bottom, its height from the floor in brackets (v1.3: 'spindle 995 (1000 from the floor)')
+          if (c === 'spindle') return <DimV key={c} x={rightX(k)} y1={SY(spindleC.x)} y2={faceB} extFrom={faceR} label={`spindle ${spindleDimLabel(fd)}`} small vbw={svgW} />;
           if (c === 'cyl') return <DimV key={c} x={rightX(k)} y1={SY(cylC.x)} y2={faceB} extFrom={faceR} label={`${cylC.kind} ${fmt(lock.cylinder.fromBottom)}`} small vbw={svgW} />;
           return <DimV key={c} x={rightX(k)} y1={faceT} y2={faceB} extFrom={bandRight} label={fmt(H)} vbw={svgW} />;
         })}

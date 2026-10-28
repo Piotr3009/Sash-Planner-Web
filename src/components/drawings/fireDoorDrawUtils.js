@@ -231,17 +231,123 @@ export function vpGlassWord(fd) {
   return `${g.label || g.type || ''}${t != null ? `, ${f(t)} thick` : ''}`;
 }
 
+/** A sheet number: to 0.5, integers without decimals (the doorSheetParts fmt rule), '' for a non-number. */
+function sheetNum(v) {
+  return fdNum(v);
+}
+
+/**
+ * The number format of the fire door sheets (v1.3, 28.10.2026): to 0.1, an
+ * integer without decimals. The door sheets' `fmt` rounds to 0.5 (fine for
+ * joinery), which printed a 3.2 hinge recess as 3 and a 14.3 groove as 14.5:
+ * a machining sheet prints the engine's 0.1 numbers as they are.
+ */
+export function fdNum(v) {
+  if (v === null || v === undefined || v === '') return '';
+  const r = Math.round(Number(v) * 10) / 10;
+  if (!Number.isFinite(r)) return '';
+  return Number.isInteger(r) ? String(r) : r.toFixed(1);
+}
+
 /**
  * The hinge rule in words (v1.1): the top hinge topOffset from the top, the
  * bottom hinge bottomOffset from the bottom, the middle hinge's centre
  * midAboveCentre above the leaf centre; every number from derived.firedoor.hinges.
+ * v1.3: when the engine counts the positions from the bottom (positionRef
+ * 'bottom') the rule ends with '; positions = the hinge lower edge above the
+ * leaf bottom', so a sheet says what its hinge numbers are.
  */
 export function hingeRuleWord(fd) {
   const hg = fd?.hinges || {};
-  const f = (v) => { const r = Math.round(Number(v) * 2) / 2; return Number.isFinite(r) ? (Number.isInteger(r) ? String(r) : r.toFixed(1)) : ''; };
+  const f = sheetNum;
   const mid = num(hg.midAboveCentre, num(hg.midCentreAboveLeafCentre));
   const midWord = mid != null ? `, middle centre ${f(mid)} above the leaf centre` : '';
-  return `top ${f(hg.topOffset)} from the top, bottom ${f(hg.bottomOffset)} from the bottom${midWord}`;
+  const refWord = hg.positionRef === 'bottom' ? '; positions = the hinge lower edge above the leaf bottom' : '';
+  return `top ${f(hg.topOffset)} from the top, bottom ${f(hg.bottomOffset)} from the bottom${midWord}${refWord}`;
+}
+
+/**
+ * The hinge positions of the leaf as the sheets print them (v1.3): the lower
+ * edge of each hinge above the leaf bottom, H1 (the top hinge) first:
+ * '1793 / 1238 / 216'. From positions[i].fromBottom; '' without positions.
+ */
+export function hingePositionsFromBottom(fd) {
+  return (fd?.hinges?.positions || []).map((p) => sheetNum(p.fromBottom)).join(' / ');
+}
+
+/** The same on the hinge jamb: the hinge lower edge above the jamb foot (positions[i].jambFromFoot): '1798 / 1243 / 221'. */
+export function jambHingePositionsFromFoot(fd) {
+  return (fd?.hinges?.positions || []).map((p) => sheetNum(p.jambFromFoot)).join(' / ');
+}
+
+/**
+ * The hinge positions in words for a note (v1.3): '1793 / 1238 / 216 above
+ * the leaf bottom to the hinge lower edge (H1 = the top hinge)'.
+ */
+export function hingePositionsWord(fd) {
+  return `${hingePositionsFromBottom(fd)} above the leaf bottom to the hinge lower edge (H1 = the top hinge)`;
+}
+
+/** The hinge jamb positions in words: '1798 / 1243 / 221 above the jamb foot to the hinge lower edge (the leaf positions + the floor gap 5)'. */
+export function jambHingePositionsWord(fd) {
+  const floor = num(fd?.frame?.gaps?.floor);
+  return `${jambHingePositionsFromFoot(fd)} above the jamb foot to the hinge lower edge${floor != null ? ` (the leaf positions + the floor gap ${sheetNum(floor)})` : ''}`;
+}
+
+/**
+ * The hinge chain of the leaf read FROM THE BOTTOM (v1.3): the segments along
+ * the hinge edge from the leaf bottom to the leaf top through every hinge,
+ * [216, 102, 920, 102, 453, 102, 145] on a 2040 leaf with the default rule.
+ * Built from positions[i].fromBottom and the hinge length against the leaf
+ * height; [] without the data. The drawn chain (DimChainV on the leaf sheet)
+ * has the same segments; this list is the note and the harness reading.
+ */
+export function hingeChainFromBottom(fd) {
+  const H = num(fd?.leaf?.height), len = num(fd?.hinges?.length, 0);
+  const pos = (fd?.hinges?.positions || []).map((p) => num(p.fromBottom)).filter((v) => v != null).sort((a, b) => a - b);
+  if (H == null || !pos.length) return [];
+  const out = [];
+  let at = 0;
+  for (const p of pos) { out.push(R1(p - at)); out.push(R1(len)); at = p + len; }
+  out.push(R1(H - at));
+  return out;
+}
+
+/** The same on the hinge jamb from the jamb foot to the top long point: [221, 102, 920, 102, 453, 102, 183] on the reference door. */
+export function jambHingeChainFromFoot(fd) {
+  const m = (fd?.frame?.members || []).find((x) => x.role === 'jambHinge');
+  const L = num(m?.length, num(fd?.frame?.overall?.height)), len = num(fd?.hinges?.length, 0);
+  const pos = (fd?.hinges?.positions || []).map((p) => num(p.jambFromFoot)).filter((v) => v != null).sort((a, b) => a - b);
+  if (L == null || !pos.length) return [];
+  const out = [];
+  let at = 0;
+  for (const p of pos) { out.push(R1(p - at)); out.push(R1(len)); at = p + len; }
+  out.push(R1(L - at));
+  return out;
+}
+
+/**
+ * The handle height in words (v1.3): 'spindle 1000 above the floor (995 above
+ * the leaf bottom)' from lock.spindle.fromFloor / fromBottom; without a floor
+ * value 'spindle 995 above the leaf bottom'; '' without a spindle.
+ */
+export function spindleWord(fd) {
+  const sp = fd?.lock?.spindle;
+  if (!sp) return '';
+  const fromBottom = num(sp.fromBottom), fromFloor = num(sp.fromFloor);
+  if (fromFloor != null && fromBottom != null && Math.abs(fromFloor - fromBottom) > 0.05) return `spindle ${sheetNum(fromFloor)} above the floor (${sheetNum(fromBottom)} above the leaf bottom)`;
+  return `spindle ${sheetNum(fromBottom != null ? fromBottom : fromFloor)} above the leaf bottom`;
+}
+
+/**
+ * The label of the spindle dimension measured from the leaf bottom (v1.3):
+ * '995 (1000 from the floor)' when the floor value differs, else the number.
+ */
+export function spindleDimLabel(fd) {
+  const sp = fd?.lock?.spindle;
+  const fromBottom = num(sp?.fromBottom), fromFloor = num(sp?.fromFloor);
+  if (fromBottom == null) return '';
+  return fromFloor != null && Math.abs(fromFloor - fromBottom) > 0.05 ? `${sheetNum(fromBottom)} (${sheetNum(fromFloor)} from the floor)` : sheetNum(fromBottom);
 }
 
 /** The rating word of a door: FD30 / FD60 / non-fire. */
@@ -291,7 +397,9 @@ export function fireDoorRecord(derived, code) {
  * dashed behind the frame lip). Returns null without the engine data.
  *   frame    { w, h, face }: the overall frame and the visible face of this view
  *   leaf     { x, y, w, h } in the view's coordinates
- *   hinges   [{ i, top, bottom, x0, x1 }] the LSP hinge rectangles (outside view only)
+ *   hinges   [{ i, top, bottom, x0, x1, fromTop, fromBottom, jambFromFoot }] the
+ *            LSP hinge rectangles (outside view only); fromBottom = the hinge
+ *            lower edge above the leaf bottom (v1.3, the printed position)
  *   spindle  { x, y } the handle rose centre; cylinder { kind, x, y } or null
  *   panes    [{ i, x, y, w, h, paneW, paneH, diamond, shape, r }] the vision
  *            panel panes: x y w h = the bounding box in this view, shape
@@ -334,7 +442,8 @@ export function fireDoorElevationGeometry(derived, view = 'outside') {
   const hinges = (fd.hinges?.positions || []).map((p, k) => {
     const top = leaf.y + num(p.top, 0);
     const x0 = hingesOnLeft ? hingeEdgeX + IRON.hinge.inset - IRON.hinge.w : hingeEdgeX - IRON.hinge.inset;
-    return { i: num(p.i, k), top, bottom: top + hingeLen, x0, x1: x0 + IRON.hinge.w, fromTop: num(p.top, 0) };
+    // v1.3: fromBottom / jambFromFoot = the hinge lower edge above the leaf bottom / the jamb foot (the printed position)
+    return { i: num(p.i, k), top, bottom: top + hingeLen, x0, x1: x0 + IRON.hinge.w, fromTop: num(p.top, 0), fromBottom: num(p.fromBottom), jambFromFoot: num(p.jambFromFoot) };
   });
   const lock = fd.lock || {};
   const backset = num(lock.backset, 0);
