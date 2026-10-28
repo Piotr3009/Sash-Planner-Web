@@ -627,6 +627,11 @@ export function windowSpecToCasementProps(windowSpec) {
 // closer symbol (surface: body, arm, shoe; built in: body, track) and the
 // forend / keep radii (full radius ends) travel to the 3D as the engine gives
 // them.
+// v1.3 (28.10.2026, the Weeke rule): hinges.positionRef and each position's
+// fromBottom / jambFromFoot (the hinge lower edge above the leaf bottom / the
+// jamb foot, the printed position) and lock.spindle.fromFloor (the handle
+// 1000 above the floor, 995 above the leaf bottom) pass through; the 3D still
+// places a hinge by `top` and the handle by spindle.fromBottom.
 //
 // `derived` is the page's own deriveWindowData result (batch profile
 // snapshot applied there); the door is derived again, with the active
@@ -688,14 +693,21 @@ export function fireDoorGeometryFromSpec(windowSpec, derivedIn = null) {
     hinges: {
       count: n(f.hinges?.count), length: n(f.hinges?.length),
       recess: f.hinges?.recess ? { ...f.hinges.recess } : null,
+      // v1.3 (the Weeke rule): positionRef 'bottom' = a hinge position is its
+      // LOWER edge above the leaf bottom (fromBottom; on the jamb above the jamb
+      // foot, jambFromFoot), the number the sheets and the macro take; the 3D
+      // keeps placing the hinge by `top` (from the leaf top, the board system)
+      positionRef: f.hinges?.positionRef ?? 'top',
       positions: (f.hinges?.positions || []).map((p, i) => ({
         i: p.i ?? i, top: n(p.top), bottom: n(p.bottom), centre: n(p.centre), jambTop: n(p.jambTop),
+        fromBottom: n(p.fromBottom, lh - n(p.bottom)), jambFromFoot: n(p.jambFromFoot, lh - n(p.bottom) + gaps.floor),
       })),
     },
     lock: {
       type: lk.type ?? null,
       spindle: {
-        fromBottom: n(sp.fromBottom), fromTop: n(sp.fromTop),
+        // v1.3: fromFloor = the handle above the FLOOR (1000), fromBottom above the leaf bottom (995)
+        fromBottom: n(sp.fromBottom), fromTop: n(sp.fromTop), fromFloor: n(sp.fromFloor, n(sp.fromBottom) + gaps.floor),
         fromLockEdge: n(sp.fromLockEdge ?? lk.backset), bore: n(sp.bore),
       },
       cylinder: cyl ? {

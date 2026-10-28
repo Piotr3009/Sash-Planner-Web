@@ -1053,15 +1053,25 @@ export const DEFAULT_FIREDOOR_PROFILE = Object.freeze({
     depthSuggestions: [100, 125, 150, 175, 200], defaultDepth: 100,
   },
   hinges: {
-    count: 3, length: 102, topOffset: 150, bottomOffset: 200,     // top hinge 150 from the leaf top, bottom hinge ending 200 above the leaf bottom
-    // v1.1 (owner 27.10.2026): the middle hinge is never on the centre: its
-    // CENTRE sits midAboveCentre above the leaf centre (2040: top edge at 769,
-    // not 944). With more than 3 hinges the inner ones spread equally.
-    midAboveCentre: 200,
-    recessLength: 103, recessWidth: 30, recessDepth: 3, cornerRadius: 6,   // ZAŁOŻENIE: plate + 1, R6 (12 cutter); old Weeke depths were 3.2 / 4 / 4.2
+    // v1.3 (owner 28.10.2026, read from his Weeke program farrington_d01.mpr
+    // with him): the top hinge 145 from the leaf top, the bottom hinge ending
+    // 216 above the leaf bottom, the middle hinge CENTRE 269 above the leaf
+    // centre (2040: tops 145 / 700 / 1722 from the top = the old Weeke
+    // numbers). Positions are COUNTED FROM THE LEAF BOTTOM to the hinge's
+    // lower edge (the Weeke way, X = 0 at the bottom): 216 / 1238 / 1793 on
+    // 2040; HINGE_1 is the top hinge. With more than 3 hinges the inner ones
+    // spread equally.
+    count: 3, length: 102, topOffset: 145, bottomOffset: 216,
+    midAboveCentre: 269,
+    recessLength: 103, recessWidth: 30, recessDepth: 3.2, cornerRadius: 6,   // ZAŁOŻENIE: plate + 1, R6 (12 cutter); depth 3.2 = the Weeke HD -3.2 (owner 28.10.2026)
   },
   lock: {
-    spindleHeight: 1000, backset: 60,  // LOCK_H from the leaf bottom; DIN lock backset
+    // v1.3 (owner 28.10.2026): the handle is 1000 FROM THE FLOOR; the leaf
+    // hangs floorGap above the floor, so LOCK_H (from the leaf bottom) = 995.
+    // spindleHeight is derived from spindleFromFloor by the engine; a stored
+    // spindleHeight is used only when spindleFromFloor is 0 / missing.
+    spindleFromFloor: 1000,
+    spindleHeight: 995, backset: 60,   // LOCK_H from the leaf bottom (= spindleFromFloor - floorGap); DIN lock backset
     forend: { length: 235, width: 24, millOversize: 1, depth: 4 },
     case: { depth: 85, height: 150, pocketWidth: 17, pocketDepth: 87, pocketHeight: 153 },   // pocket 87 x 153 = owner proposal, ZAŁOŻENIE
     euroCentres: 72, bathroomCentres: 78,

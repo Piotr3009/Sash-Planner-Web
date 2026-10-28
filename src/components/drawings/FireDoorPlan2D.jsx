@@ -25,8 +25,8 @@
 import { useMemo } from 'react';
 import { DimH, DimV, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
-import { NS, fmt, safely, NoSheet, SheetTitle } from './doorSheetParts.jsx';
-import { fireDoorPlanGeometry, hingeWord, pullFaceNote, ratingWord, wrapLines } from './fireDoorDrawUtils.js';
+import { NS, safely, NoSheet, SheetTitle } from './doorSheetParts.jsx';
+import { fdNum as fmt, fireDoorPlanGeometry, hingeWord, pullFaceNote, ratingWord, wrapLines } from './fireDoorDrawUtils.js';
 
 export default function FireDoorPlan2D({ windowSpec, derived, projectNumber, windowTag }) {
   const g = useMemo(() => safely(() => fireDoorPlanGeometry(derived)), [derived]);

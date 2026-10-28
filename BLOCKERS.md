@@ -76,6 +76,32 @@ with full radius ends on the sheets, in the 3D and in the DXF, as the machining 
 **37.8 3D: the rebate runs clean round the head corners (applied).** The head's outer part now runs over the jamb
 rebate (35 face to 35 face), so there is no notch at the top corners.
 
+**37.10 Hinges counted from the leaf bottom, the Weeke rule (applied, 28.10.2026 afternoon; replaces 36.6 and the
+rule of 35.4 / 35.13).** Read with you from `farrington_d01.mpr` (your old Weeke program, 2040 x 726 x 45): the hinge
+component sits on the hinge's LOWER edge and X = 0 is the leaf bottom, so the hinges are 145 / 700 / 1722 from the
+top (the Weeke numbers of the notes, now confirmed) = the lower edge 216 / 1238 / 1793 above the leaf bottom.
+Profile: `hinges.topOffset 145`, `bottomOffset 216`, `midAboveCentre 269` (the middle hinge centre 269 above the
+leaf centre, = 700 on 2040 and 670.5 on 1981), `recessDepth 3.2` (the Weeke `HD -3.2`). PC now prints and exports
+every hinge position as the LOWER edge above the LEAF BOTTOM (on the jamb above the jamb foot, + 5): HINGE_1 =
+the top hinge (numbering from the top, your choice) = 1793, HINGE_2 1238, HINGE_3 216; the hinge jamb row 1798 /
+1243 / 221. The machining ops keep the board system from the top (x = the recess top edge from the leaf top: 144.5
+/ 699.5 / 1721.5), the CSV / JSON / DXF geometry is unchanged in convention, only the printed positions moved.
+
+**37.11 The handle 1000 above the FLOOR (applied).** `lock.spindleFromFloor 1000` (new key); the engine derives
+LOCK_H = 1000 - floorGap 5 = 995 above the leaf bottom (`lock.spindleHeight` is only a fallback when the new key is
+0). Consequences: forend centre 980 above the leaf bottom, case top 1041.5, euro cylinder 923, bathroom 917, the
+keep centre 985 above the jamb foot (KEEP_Y 985). OWNER CHECK: 90 % of your locks, you said; a lock with another
+handle height gets the number in Window Settings.
+
+**37.12 The Farrington lock pocket (noted, not applied).** The Weeke program cut a case pocket 185 high x 21 wide x
+105 deep with square corners (tool 200, 5 mm steps) with the forend 236 x 25 x 4 R12.2 (tool 220), both centred on
+the thickness, the case top level with the forend top. PC keeps the Petros DIN lock (forend the same; case pocket
+153 x 17 x 87, top 46.5 above the spindle). Say which lock you buy and the pocket follows its data sheet.
+
+**37.13 Files still wanted from the ASkyloonJoinery folder:** `r8hinge.mpr` (the hinge recess as the Weeke cut it;
+its variables H1..H4, HINGE2, HINGE4, DS, HD) and `concealed_closer_lhits11.mpr` (36.4). Then the macro / CIX
+for the new master follows the same cuts.
+
 **37.9 Skipped, with the reason.** The real .dwg (37.1). The built in closer machining (the component files,
 36.4). Turning a v1.2 panel that does not fit (only a door saved before v1.2 turns its stacked panes as the old
 placement did; a new panel that does not fit gets a warning and you change it). The pack overview cell shows the

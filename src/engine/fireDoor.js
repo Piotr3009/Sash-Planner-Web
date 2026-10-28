@@ -37,8 +37,16 @@
  *   hinges      (v1.1) the top hinge's top edge topOffset below the leaf top,
  *               the bottom hinge's bottom edge bottomOffset above the leaf
  *               bottom, the middle hinge's CENTRE midAboveCentre above the
- *               leaf centre (2040: tops 150 / 769 / 1738); on the hinge jamb
- *               the same heights shifted by (thickness - rebateW) + gapHead.
+ *               leaf centre; on the hinge jamb the same heights shifted by
+ *               (thickness - rebateW) + gapHead. (v1.3, owner 28.10.2026, the
+ *               Weeke rule) 145 / 216 / 269: tops 145 / 700 / 1722 on 2040.
+ *               The POSITION of a hinge is its LOWER edge from the LEAF BOTTOM
+ *               (`fromBottom`, 216 / 1238 / 1793 on 2040; on the jamb
+ *               `jambFromFoot` = + floorGap), the number the sheets print and
+ *               HINGE_1..3 carry (HINGE_1 = the top hinge). `top` (from the
+ *               leaf top) stays for the board system of the ops.
+ *   lock        (v1.3) the handle spindleFromFloor 1000 above the FLOOR =
+ *               spindleHeight 995 above the leaf bottom (LOCK_H).
  *   handing     hinge left / right only (v1.1): no swing on an internal door.
  *   intumescent (v1.1) one strip size 15 x 4 all around, groove 15.5 x 4;
  *               FD30 one strip, FD60 two, a non-fire door none.
@@ -575,19 +583,25 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
   const hingeJambShift = faceOut + gapHead;
   const hingePositions = hingeTops.map((t, i) => {
     const top = R(t);
-    return { i, top, bottom: R(top + hLen), centre: R(top + hLen / 2), jambTop: R(hingeJambShift + top) };
+    // fromBottom = the hinge's LOWER edge above the leaf bottom (the Weeke
+    // position, v1.3); jambFromFoot = the same above the jamb foot
+    return { i, top, bottom: R(top + hLen), centre: R(top + hLen / 2), jambTop: R(hingeJambShift + top), fromBottom: R(H - top - hLen), jambFromFoot: R(H - top - hLen + floorGap) };
   });
   const recess = { length: Number(HG.recessLength), width: Number(HG.recessWidth), depth: Number(HG.recessDepth), radius: Number(HG.cornerRadius) };
   const hinges = {
     count: hCount, length: hLen, step: R(step), macroHinge: fire ? 1 : 0, product: fire ? 'fire' : 'standard',
     // the rule's numbers travel with the positions so a sheet can print the rule it was cut by (step = the old equal spacing, informational)
     topOffset, bottomOffset, midAboveCentre,
+    // v1.3: where a position is counted from (the sheets, the exports, the macro): the hinge lower edge above the leaf bottom
+    positionRef: 'bottom',
     midCentreAboveLeafCentre: hCount === 3 ? R(H / 2 - hingePositions[1].centre) : null,
     recess, positions: hingePositions,
   };
 
-  // ── the lock (3.6) ──
-  const spindleHeight = Number(LK.spindleHeight), backset = Number(LK.backset);
+  // ── the lock (3.6; v1.3: the handle from the floor) ──
+  const spindleFromFloor = Number(LK.spindleFromFloor) || 0;
+  const spindleHeight = spindleFromFloor > 0 ? R(spindleFromFloor - floorGap) : Number(LK.spindleHeight);
+  const backset = Number(LK.backset);
   const fo = LK.forend, ca = LK.case;
   const forendCentreFromBottom = R(spindleHeight - Number(LK.forendCentreBelowSpindle));
   const caseTopFromBottom = R(spindleHeight + Number(LK.caseTopAboveSpindle));
@@ -596,7 +610,7 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
   const cylinderOffset = lockType === 'euro' ? Number(LK.euroCentres) : lockType === 'bathroom' ? Number(LK.bathroomCentres) : null;
   const cylinderBore = lockType === 'euro' ? Number(LK.euroBore) : Number(LK.bathroomBore);
   const lock = {
-    type: lockType, macroLock, euro: lockType === 'euro', spindleHeight, backset,
+    type: lockType, macroLock, euro: lockType === 'euro', spindleHeight, spindleFromFloor: R(spindleHeight + floorGap), backset,
     forend: {
       length: Number(fo.length), width: Number(fo.width), millLength, millWidth, depth: Number(fo.depth),
       centreFromBottom: forendCentreFromBottom, centreFromTop: R(H - forendCentreFromBottom), radius: R(millWidth / 2),
@@ -605,7 +619,7 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
       depth: Number(ca.depth), height: Number(ca.height), pocketWidth: Number(ca.pocketWidth), pocketDepth: Number(ca.pocketDepth), pocketHeight: Number(ca.pocketHeight),
       topFromBottom: caseTopFromBottom, topFromTop: R(H - caseTopFromBottom),
     },
-    spindle: { fromBottom: spindleHeight, fromTop: R(H - spindleHeight), fromLockEdge: backset, bore: Number(LK.spindleBore) },
+    spindle: { fromBottom: spindleHeight, fromFloor: R(spindleHeight + floorGap), fromTop: R(H - spindleHeight), fromLockEdge: backset, bore: Number(LK.spindleBore) },
     cylinder: cylinderOffset === null ? null : {
       kind: lockType, fromBottom: R(spindleHeight - cylinderOffset), fromTop: R(H - (spindleHeight - cylinderOffset)), fromLockEdge: backset, bore: cylinderBore,
     },
@@ -807,8 +821,10 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
   // ── the bSuite document variables (table 4.7 of the brief, names 1:1, key order = write order) ──
   const hand = Number(BS.hand?.[hingeSide] ?? (hingeSide === 'right' ? 1 : 0));
   const MD = BS.macroDefaults || {};
-  const hingeVars = Object.fromEntries(hingePositions.map((h) => [`HINGE_${h.i + 1}`, h.top]));
-  const jambHingeVars = Object.fromEntries(hingePositions.map((h) => [`HINGE_${h.i + 1}`, h.jambTop]));
+  // v1.3: HINGE_n = the hinge's lower edge above the LEAF BOTTOM (the Weeke way); HINGE_1 = the top hinge.
+  // On the hinge jamb row: above the jamb foot (+ floorGap).
+  const hingeVars = Object.fromEntries(hingePositions.map((h) => [`HINGE_${h.i + 1}`, h.fromBottom]));
+  const jambHingeVars = Object.fromEntries(hingePositions.map((h) => [`HINGE_${h.i + 1}`, h.jambFromFoot]));
   const leafVars = {
     LPX: H, LPY: W, LPZ: T,
     HAND: hand, LH: hingeSide === 'left' ? 1 : 0, RH: hingeSide === 'right' ? 1 : 0,

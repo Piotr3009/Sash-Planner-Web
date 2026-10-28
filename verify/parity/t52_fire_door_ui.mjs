@@ -16,11 +16,15 @@
  * page with the stores (the Supabase client reads an empty import.meta.env, so
  * nothing touches the network):
  *   A  Window Settings · Fire Doors: the sample door readout (902 x 2083, the
- *      opening 912 x 2088, the hinges 150 / 769 / 1738 and 188 / 807 / 1776, the
- *      middle hinge rule, the keep 990, the intumescent 1 x 15 x 4 all around
- *      4.906 m, the dowels, the closer, the rebate 15 x 47, the members), the
- *      FD60 (two strips) / non-fire sample chips, the hinges card (a typed top
- *      offset 145 moves the sample to 145 / 769 / 1738), the leaf width list
+ *      opening 912 x 2088, the hinges 1793 / 1238 / 216 above the leaf bottom
+ *      and 1798 / 1243 / 221 above the jamb foot (v1.3: the Weeke way, the hinge
+ *      lower edge, H1 = the top hinge), the middle hinge rule 269, the spindle
+ *      1000 above the floor (LOCK_H 995), the keep 985, the intumescent 1 x 15
+ *      x 4 all around 4.906 m, the dowels, the closer, the rebate 15 x 47, the
+ *      members), the FD60 (two strips) / non-fire sample chips, the hinges card
+ *      (a typed top offset 150 moves the sample to 1788 / 1238 / 216), the lock
+ *      card (a typed spindle from the floor 1050 moves LOCK_H to 1045 and the
+ *      keep to 1035), the leaf width list
  *      (sorted, unique, junk dropped), the defaults card (rating, fire, the
  *      closer and VP selects, a custom VP number), the bSuite card (STOP rows,
  *      the leaf path with quotes stripped, add / fill / remove target, a macro
@@ -135,19 +139,28 @@ section('A - Window Settings · Fire Doors');
   const sampleText = async () => (await page.locator('[data-fd-sample]').innerText()).replace(/\s+/g, ' ');
   const st = () => page.evaluate(() => {
     const f = window.__store.getState().firedoor;
-    return { top: f.hinges.topOffset, widths: f.leaf.widthSuggestions, rating: f.defaults.rating, stop: f.bsuite.stopRows, fire: f.defaults.fire, joint: f.frame.headJoint, leafPath: f.bsuite.targets[0].programs.leaf.path, active: f.bsuite.activeTarget };
+    return { top: f.hinges.topOffset, bottom: f.hinges.bottomOffset, mid: f.hinges.midAboveCentre, recessDepth: f.hinges.recessDepth, spindleFloor: f.lock.spindleFromFloor, spindleH: f.lock.spindleHeight, widths: f.leaf.widthSuggestions, rating: f.defaults.rating, stop: f.bsuite.stopRows, fire: f.defaults.fire, joint: f.frame.headJoint, leafPath: f.bsuite.targets[0].programs.leaf.path, active: f.bsuite.activeTarget };
   });
   const defaultTarget = await page.evaluate(() => window.__fdDefault.bsuite.activeTarget);
   ok(typeof defaultTarget === 'string' && defaultTarget.length > 0 && (await st()).active === defaultTarget, `the store's fire door bsuite activeTarget is the profile default "${defaultTarget}"`);
 
-  // the sample door readout (the brief's 3.10 numbers)
+  // the sample door readout (the brief's 3.10 numbers; v1.3: the hinge positions from the leaf bottom, the spindle from the floor)
   let t = await sampleText();
   ok(/Frame overall\s*902 × 2083/.test(t), 'sample: frame overall 902 × 2083', t);
-  ok(/Hinges \(leaf top\)\s*150 \/ 769 \/ 1738/.test(t), 'sample: hinges 150 / 769 / 1738 from the leaf top (v1.1: the middle one 200 above the centre)', t);
-  ok(/Hinges \(jamb top\)\s*188 \/ 807 \/ 1776/.test(t), 'sample: jamb hinges 188 / 807 / 1776', t);
-  ok(/Structural opening\s*912 × 2088/.test(t) && /Middle hinge\s*centre 200 above the leaf centre/.test(t) && /Corner dowels\s*3 × 8 × 40 per corner/.test(t) && /Closer\s*Surface closer/.test(t),
-    'sample v1.1: structural opening 912 × 2088, middle hinge centre 200 above the leaf centre, corner dowels 3 × 8 × 40, closer Surface closer', t);
-  ok(/Keep centre\s*990 above the jamb foot/.test(t), 'sample: keep centre 990 above the jamb foot', t);
+  ok(/Hinges \(above the leaf bottom\)\s*1793 \/ 1238 \/ 216/.test(t) && !/leaf top\)/.test(t), 'sample: hinges 1793 / 1238 / 216 above the leaf bottom (v1.3: the Weeke way, the hinge lower edge, H1 = the top hinge; no "leaf top" row)', t);
+  ok(/Hinges \(above the jamb foot\)\s*1798 \/ 1243 \/ 221/.test(t) && !/jamb top\)/.test(t), 'sample: jamb hinges 1798 / 1243 / 221 above the jamb foot (no "jamb top" row)', t);
+  ok(/Structural opening\s*912 × 2088/.test(t) && /Middle hinge\s*centre 269 above the leaf centre/.test(t) && /Corner dowels\s*3 × 8 × 40 per corner/.test(t) && /Closer\s*Surface closer/.test(t),
+    'sample v1.1 / v1.3: structural opening 912 × 2088, middle hinge centre 269 above the leaf centre, corner dowels 3 × 8 × 40, closer Surface closer', t);
+  ok(/Spindle\s*1000 above the floor \(995 above the leaf bottom\) · backset 60/.test(t), 'sample: spindle 1000 above the floor (995 above the leaf bottom, LOCK_H) · backset 60', t);
+  ok(/Keep centre\s*985 above the jamb foot/.test(t), 'sample: keep centre 985 above the jamb foot (5 + 995 - 15)', t);
+  const hingesLine = (await page.locator('[data-fd-sample-hinges]').innerText()).replace(/\s+/g, ' ');
+  ok(/^sample hinges 1793 \/ 1238 \/ 216 above the leaf bottom \(lower edge, H1 = top\) · on the jamb 1798 \/ 1243 \/ 221 above the jamb foot · middle hinge centre 269 above the leaf centre · tops 145 \/ 700 \/ 1722 from the leaf top · recess 103 × 30 × 3\.2 R6/.test(hingesLine),
+    `the hinges card readout: "${hingesLine}"`);
+  const lockLine = (await page.locator('[data-fd-sample-lock]').innerText()).replace(/\s+/g, ' ');
+  ok(/^sample spindle 1000 above the floor \(995 above the leaf bottom, LOCK_H\) · forend centre 980 up/.test(lockLine) && /LOCK_H 995 from the leaf bottom/.test((await page.locator('[data-fd-sample-lock-h]').innerText()).replace(/\s+/g, ' ')),
+    `the lock card readout: "${lockLine}" and the derived LOCK_H 995`);
+  const s0 = await st();
+  ok(s0.top === 145 && s0.bottom === 216 && s0.mid === 269 && s0.recessDepth === 3.2 && s0.spindleFloor === 1000 && s0.spindleH === 995, `the store's v1.3 profile defaults: top ${s0.top}, bottom ${s0.bottom}, middle ${s0.mid}, recess depth ${s0.recessDepth}, spindle from the floor ${s0.spindleFloor} (fallback ${s0.spindleH})`);
   ok(/Intumescent\s*1 x 15 x 4 all around · 4\.906 m/.test(t), 'sample: intumescent 1 x 15 x 4 all around · 4.906 m', t);
   ok(/Rebate\s*15 × 47 · faces 35 \/ 50/.test(t), 'sample: rebate 15 × 47, faces 35 / 50', t);
   ok(/FD-HEAD\s*902 long point · 63x105 · mitre top · mitre bottom/.test(t), 'sample: FD-HEAD 902 long point, 63x105, mitred both ends', t);
@@ -162,16 +175,29 @@ section('A - Window Settings · Fire Doors');
   ok(/Intumescent\s*none/.test(t) && /Hinge macro\s*HINGE 0 · standard/.test(t) && /Lock\s*latch · LOCK 1/.test(t), 'sample non-fire: no intumescent, HINGE 0 · standard, latch · LOCK 1', t);
   await page.locator('button', { hasText: /^Fire$/ }).first().click();
 
-  // the hinges card: unlock, type Top offset 145, the store and the sample follow
+  // the hinges card: unlock, type Top offset 150, the store and the sample follow (the top hinge's lower edge drops to 2040 - 150 - 102 = 1788)
   const hingesCard = page.locator('div.card').filter({ hasText: /^Hinges/ }).first();
   await hingesCard.locator('button[title="Unlock to edit"]').click();
   const topInput = hingesCard.locator('input[type="number"]').nth(2);   // count, length, topOffset
-  ok(await topInput.inputValue() === '150', `hinges card: the top offset input shows ${await topInput.inputValue()}`);
-  await topInput.fill('145'); await topInput.blur(); await page.waitForTimeout(80);
+  ok(await topInput.inputValue() === '145', `hinges card: the top offset input shows ${await topInput.inputValue()}`);
+  await topInput.fill('150'); await topInput.blur(); await page.waitForTimeout(80);
   let s = await st();
-  ok(s.top === 145, `store hinges.topOffset ${s.top} after typing 145`);
+  ok(s.top === 150, `store hinges.topOffset ${s.top} after typing 150`);
   t = await sampleText();
-  ok(/Hinges \(leaf top\)\s*145 \/ 769 \/ 1738/.test(t), 'the sample follows: hinges 145 / 769 / 1738 (the middle one stays 200 above the centre)', t);
+  ok(/Hinges \(above the leaf bottom\)\s*1788 \/ 1238 \/ 216/.test(t) && /Hinges \(above the jamb foot\)\s*1793 \/ 1243 \/ 221/.test(t), 'the sample follows: hinges 1788 / 1238 / 216 above the leaf bottom, 1793 / 1243 / 221 above the jamb foot (the middle one stays 269 above the centre, the bottom one 216)', t);
+
+  // the lock card: unlock, type Spindle from the floor 1050; LOCK_H (from the leaf bottom) follows to 1045, the keep to 1035
+  const lockCard = page.locator('div.card').filter({ hasText: /^Lock\b/ }).first();
+  await lockCard.locator('button[title="Unlock to edit"]').click();
+  const spindleFloorInput = lockCard.locator('div', { hasText: /^Spindle from the floor$/ }).locator('..').locator('input[type="number"]').first();
+  ok(await spindleFloorInput.inputValue() === '1000' && /LOCK_H = this - the floor gap/.test(await lockCard.innerText()), `lock card: the "Spindle from the floor" input shows ${await spindleFloorInput.inputValue()} with its hint`);
+  await spindleFloorInput.fill('1050'); await spindleFloorInput.blur(); await page.waitForTimeout(80);
+  s = await st();
+  ok(s.spindleFloor === 1050 && s.spindleH === 995, `store lock.spindleFromFloor ${s.spindleFloor} after typing 1050 (the fallback spindleHeight untouched: ${s.spindleH})`);
+  t = await sampleText();
+  ok(/Spindle\s*1050 above the floor \(1045 above the leaf bottom\) · backset 60/.test(t) && /Keep centre\s*1035 above the jamb foot/.test(t) && /Forend\s*centre 1030 up/.test(t), 'the sample follows: spindle 1050 above the floor (1045 above the leaf bottom), keep 1035, forend centre 1030', t);
+  ok(/LOCK_H 1045 from the leaf bottom/.test((await page.locator('[data-fd-sample-lock-h]').innerText()).replace(/\s+/g, ' ')) && /^sample spindle 1050 above the floor \(1045 above the leaf bottom, LOCK_H\)/.test((await page.locator('[data-fd-sample-lock]').innerText()).replace(/\s+/g, ' ')),
+    'the lock card readouts move to LOCK_H 1045');
 
   // the leaf card: the width suggestions comma list
   const leafCard = page.locator('div.card').filter({ hasText: /^Leaf/ }).first();
@@ -322,12 +348,12 @@ section('A - Window Settings · Fire Doors');
   await page.locator('button', { hasText: 'Reset fire doors to defaults' }).first().click();
   await page.waitForTimeout(80);
   s = await st();
-  ok(s.top === 150 && s.rating === 'FD30' && s.stop === true && s.fire === true && J(s.widths) === '[626,686,726,762,826,838,926,1056]' && s.active === defaultTarget, `reset: top ${s.top}, rating ${s.rating}, stop ${s.stop}, fire ${s.fire}, the width list and the target back`);
+  ok(s.top === 145 && s.spindleFloor === 1000 && s.rating === 'FD30' && s.stop === true && s.fire === true && J(s.widths) === '[626,686,726,762,826,838,926,1056]' && s.active === defaultTarget, `reset: top ${s.top}, spindle from the floor ${s.spindleFloor}, rating ${s.rating}, stop ${s.stop}, fire ${s.fire}, the width list and the target back`);
   x12 = await v12();
   ok(x12.types[1].width === 450 && x12.types[4].label === 'Round (porthole)' && x12.pos.across === 'centre' && x12.glass.defaultByRating.FD30 === 'fd30' && x12.colours.length === 5 && x12.intuDefault === 'white' && x12.closer.surface.face === 'pull',
     'reset v1.2: the types, the position, the glass default, the colours and the closer symbols back');
   t = await sampleText();
-  ok(/Hinges \(leaf top\)\s*150 \/ 769 \/ 1738/.test(t), 'the sample is back to 150 / 769 / 1738');
+  ok(/Hinges \(above the leaf bottom\)\s*1793 \/ 1238 \/ 216/.test(t) && /Spindle\s*1000 above the floor \(995 above the leaf bottom\)/.test(t) && /Keep centre\s*985 above the jamb foot/.test(t), 'the sample is back to 1793 / 1238 / 216, the spindle 1000 above the floor (995), the keep 985');
   ok(errors.length === 0, 'settings: no page errors', errors.join(' | ').slice(0, 600));
   await page.close();
 }
@@ -381,11 +407,13 @@ createRoot(document.getElementById('root')).render(
   let lp = await leftPanel();
   ok(/Fire Door/.test(lp) && !/Dimensions \(Frame\)/.test(lp) && !/Ventilation/.test(lp) && !/Horns & Security/.test(lp), 'the form: a Fire Door section, no Dimensions / Ventilation / Horns sections');
   let lb = await liveBox();
-  ok(/^Opening 912 x 2088 · frame overall 902 x 2083 · leaf 826 x 2040 · rebate 15 x 47 · members 50 x 100 finished, 63 x 105 raw · hinges 150 \/ 769 \/ 1738 from the leaf top/.test(lb), `the live box (v1.1: the opening first, the leaf, the hinges): "${lb}"`);
+  ok(/^Opening 912 x 2088 · frame overall 902 x 2083 · leaf 826 x 2040 · rebate 15 x 47 · members 50 x 100 finished, 63 x 105 raw · hinges 1793 \/ 1238 \/ 216 above the leaf bottom \(lower edge, H1 = top\)$/.test(lb), `the live box (v1.1: the opening first, the leaf; v1.3: the three hinge positions above the leaf bottom): "${lb}"`);
   let rp = await rightPanel();
   ok(/Frame\s*902 × 2083/.test(rp) && /Depth\s*100mm/.test(rp), 'the summary: frame overall 902 × 2083, depth 100', rp);
-  ok(/Hinges \(leaf top\)\s*150 \/ 769 \/ 1738/.test(rp) && /Hinges \(jamb top\)\s*188 \/ 807 \/ 1776/.test(rp) && /Middle hinge\s*centre 200 above the leaf centre/.test(rp), 'the summary: hinges 150 / 769 / 1738 and 188 / 807 / 1776, the middle hinge rule', rp);
-  ok(/Keep centre\s*990 from the jamb foot/.test(rp) && /Intumescent\s*1 x 15 x 4 all around · 4\.906 m/.test(rp) && /Corner dowels\s*3 × 8 × 40 per corner/.test(rp), 'the summary: keep 990, intumescent 1 x 15 x 4 all around 4.906 m, corner dowels', rp);
+  ok(/Hinges \(above the leaf bottom\)\s*1793 \/ 1238 \/ 216/.test(rp) && /Hinges \(above the jamb foot\)\s*1798 \/ 1243 \/ 221/.test(rp) && /Middle hinge\s*centre 269 above the leaf centre/.test(rp) && !/leaf top\)/.test(rp) && !/jamb top\)/.test(rp),
+    'the summary: hinges 1793 / 1238 / 216 above the leaf bottom and 1798 / 1243 / 221 above the jamb foot, the middle hinge 269 above the centre (no "leaf top" / "jamb top" rows)', rp);
+  ok(/Lock\s*Latch · spindle 1000 above the floor \(995 above the leaf bottom\)/.test(rp), 'the summary: Latch · spindle 1000 above the floor (995 above the leaf bottom)', rp);
+  ok(/Keep centre\s*985 from the jamb foot/.test(rp) && /Intumescent\s*1 x 15 x 4 all around · 4\.906 m/.test(rp) && /Corner dowels\s*3 × 8 × 40 per corner/.test(rp), 'the summary: keep 985, intumescent 1 x 15 x 4 all around 4.906 m, corner dowels', rp);
   ok(/Hand\s*Hinge left(?! · opens)/.test(rp) && !/opens (in|out)/.test(rp) && /Rating\s*FD30/.test(rp) && /Leaf\s*826 × 2040 × 44/.test(rp) && /Structural opening\s*912 × 2088/.test(rp) && /Closer\s*Surface closer/.test(rp), 'the summary: Hinge left (no swing), FD30, leaf 826 × 2040 × 44, structural opening 912 × 2088, closer Surface closer', rp);
   ok(await openingWidthInput().inputValue() === '912' && await leafWidthInput().inputValue() === '' && await leafWidthInput().getAttribute('placeholder') === '826', `the form: opening width ${await openingWidthInput().inputValue()}, the leaf override empty with the derived 826 as placeholder`);
   ok(!/opens in/.test(lp) && !/opens out/.test(lp) && !/INTU_STYLE/.test(lp) && /Intumescent 1 x 15 x 4 all around/.test(lp) && (await fdSec().locator('button', { hasText: /^Surface closer$/ }).count()) === 1 && (await fdSec().locator('button', { hasText: /^Built in closer$/ }).count()) === 1, 'the form: no swing chips, no intumescent select (a read only line), the three closer chips');
@@ -434,7 +462,7 @@ createRoot(document.getElementById('root')).render(
   ok(await isOn(vpChip('none')) && (await vpField('width').count()) === 0 && (await fdSec().locator('select').count()) === 0 && !/VP_STYLE/.test(await leftPanel()), 'a new door: the None chip on, no size fields, the old VP_STYLE select and its Custom block gone');
   await vpChip('square').click(); await page.waitForTimeout(100);
   rp = await rightPanel();
-  ok(/Closer\s*None/.test(rp) && /Lock\s*Sashlock euro · spindle 1000 up/.test(rp) && /Vision panel\s*Square: 450 x 450/.test(rp) && /centred, top 150 below the leaf top/.test(rp), 'closer None, Sashlock euro · spindle 1000 up, VP Square: 450 x 450 centred, top 150 below the leaf top in the summary', rp);
+  ok(/Closer\s*None/.test(rp) && /Lock\s*Sashlock euro · spindle 1000 above the floor \(995 above the leaf bottom\)/.test(rp) && /Vision panel\s*Square: 450 x 450/.test(rp) && /centred, top 150 below the leaf top/.test(rp), 'closer None, Sashlock euro · spindle 1000 above the floor (995 above the leaf bottom), VP Square: 450 x 450 centred, top 150 below the leaf top in the summary', rp);
   ok((await vpField('width').inputValue()) === '450' && (await vpField('height').inputValue()) === '450' && (await fdSec().locator('[data-firedoor-vp-preview] rect[data-vp-pane]').count()) === 1, 'Square: the width and height fields 450, one pane in the preview');
   // Double: two panes, the arrangement chips and the gap; side by side
   await vpChip('double').click(); await page.waitForTimeout(100);

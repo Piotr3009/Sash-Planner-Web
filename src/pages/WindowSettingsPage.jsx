@@ -2218,7 +2218,7 @@ function FireDoorSettings() {
           <div className={`card p-4 mb-4 ${hingesLock ? '' : 'ring-1 ring-amber-500/40'}`}>
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs font-semibold text-ink-200">Hinges
-                <span className="text-ink-500 font-normal"> · top 150 from the leaf top, bottom ending 200 above the leaf bottom, the middle hinge centre 200 above the leaf centre (v1.1, owner); with more than three the inner ones spread equally</span>
+                <span className="text-ink-500 font-normal"> · the Weeke rule (owner 28.10.2026): the top hinge {HG.topOffset} from the leaf top, the bottom hinge ending {HG.bottomOffset} above the leaf bottom, the middle hinge centre {HG.midAboveCentre} above the leaf centre; with more than three the inner ones spread equally. A position is the hinge LOWER edge counted from the LEAF BOTTOM (H1 = the top hinge); on the jamb from the jamb foot</span>
               </div>
               <LockToggle locked={hingesLock} onToggle={() => setHingesLock((x) => !x)} />
             </div>
@@ -2226,18 +2226,20 @@ function FireDoorSettings() {
               <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-2">
                 <PathField label="Count" value={HG.count} onCommit={(v) => setPath(['hinges', 'count'], v)} hint="3 (a 4th is a BLOCKERS question)" />
                 <PathField label="Hinge length" value={HG.length} onCommit={(v) => setPath(['hinges', 'length'], v)} />
-                <PathField label="Top offset" value={HG.topOffset} onCommit={(v) => setPath(['hinges', 'topOffset'], v)} hint="leaf top to the top hinge" />
-                <PathField label="Bottom offset" value={HG.bottomOffset} onCommit={(v) => setPath(['hinges', 'bottomOffset'], v)} hint="bottom hinge end to the leaf bottom" />
-                <PathField label="Middle above centre" value={HG.midAboveCentre} onCommit={(v) => setPath(['hinges', 'midAboveCentre'], v)} hint="the middle hinge CENTRE this far above the leaf centre (3 hinges); 0 = on the centre" />
+                <PathField label="Top offset" value={HG.topOffset} onCommit={(v) => setPath(['hinges', 'topOffset'], v)} hint="leaf top to the top hinge's upper edge (Weeke 145)" />
+                <PathField label="Bottom offset" value={HG.bottomOffset} onCommit={(v) => setPath(['hinges', 'bottomOffset'], v)} hint="bottom hinge lower edge above the leaf bottom (Weeke 216)" />
+                <PathField label="Middle above centre" value={HG.midAboveCentre} onCommit={(v) => setPath(['hinges', 'midAboveCentre'], v)} hint="the middle hinge CENTRE this far above the leaf centre (3 hinges; Weeke 269); 0 = on the centre" />
                 <PathField label="Recess length" value={HG.recessLength} onCommit={(v) => setPath(['hinges', 'recessLength'], v)} hint="ASSUMPTION: plate + 1" />
                 <PathField label="Recess width" value={HG.recessWidth} onCommit={(v) => setPath(['hinges', 'recessWidth'], v)} hint="ASSUMPTION" />
-                <PathField label="Recess depth" value={HG.recessDepth} onCommit={(v) => setPath(['hinges', 'recessDepth'], v)} hint="ASSUMPTION (Weeke had 3.2 / 4 / 4.2)" />
+                <PathField label="Recess depth" value={HG.recessDepth} onCommit={(v) => setPath(['hinges', 'recessDepth'], v)} hint="HINGE_D; the Weeke HD -3.2 (owner 28.10.2026)" />
                 <PathField label="Corner radius" value={HG.cornerRadius} onCommit={(v) => setPath(['hinges', 'cornerRadius'], v)} hint="ASSUMPTION: R6 (12 cutter)" />
               </div>
               <div className="text-ink-300 text-[11px]" data-fd-sample-hinges>
-                {fd ? (<>sample hinges from the leaf top <span className="text-accent-400 font-medium">{fdHinges.map((h) => h.top).join(' / ')}</span>
+                {/* v1.3: the positions as the Weeke program counts them (the hinge lower edge above the leaf bottom, H1 = the top hinge); the tops from the leaf top stay in brackets for the geometry */}
+                {fd ? (<>sample hinges <span className="text-accent-400 font-medium">{fdHinges.map((h) => h.fromBottom).join(' / ')}</span> above the leaf bottom (lower edge, H1 = top)
+                  <span className="text-ink-500"> · on the jamb {fdHinges.map((h) => h.jambFromFoot).join(' / ')} above the jamb foot</span>
                   {fd.hinges?.midCentreAboveLeafCentre != null && <span className="text-ink-500"> · middle hinge centre {fd.hinges.midCentreAboveLeafCentre} above the leaf centre</span>}
-                  <span className="text-ink-500"> · on the jamb from the top long point {fdHinges.map((h) => h.jambTop).join(' / ')} · recess {fd.hinges?.recess?.length} × {fd.hinges?.recess?.width} × {fd.hinges?.recess?.depth} R{fd.hinges?.recess?.radius}</span></>) : 'n/a'}
+                  <span className="text-ink-500"> · tops {fdHinges.map((h) => h.top).join(' / ')} from the leaf top · recess {fd.hinges?.recess?.length} × {fd.hinges?.recess?.width} × {fd.hinges?.recess?.depth} R{fd.hinges?.recess?.radius}</span></>) : 'n/a'}
               </div>
             </fieldset>
           </div>
@@ -2246,13 +2248,22 @@ function FireDoorSettings() {
           <div className={`card p-4 mb-4 ${lockLock ? '' : 'ring-1 ring-amber-500/40'}`}>
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs font-semibold text-ink-200">Lock
-                <span className="text-ink-500 font-normal"> · DIN lock case: forend, case pocket, spindle (LOCK_H from the leaf bottom), euro / bathroom centres below the spindle</span>
+                <span className="text-ink-500 font-normal"> · DIN lock case: forend, case pocket, the handle spindle from the FLOOR (owner 28.10.2026; LOCK_H = that minus the floor gap, from the leaf bottom), euro / bathroom centres below the spindle</span>
               </div>
               <LockToggle locked={lockLock} onToggle={() => setLockLock((x) => !x)} />
             </div>
             <fieldset disabled={lockLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${lockLock ? 'opacity-60' : ''}`}>
               <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
-                <PathField label="Spindle height" value={LK.spindleHeight} onCommit={(v) => setPath(['lock', 'spindleHeight'], v)} hint="LOCK_H, from the leaf bottom" />
+                {/* v1.3: the handle height is typed from the floor; the engine derives LOCK_H (from the leaf bottom) = this - the floor gap. The old spindleHeight key stays as the fallback used only when this is 0 */}
+                <PathField label="Spindle from the floor" value={LK.spindleFromFloor} onCommit={(v) => setPath(['lock', 'spindleFromFloor'], v)} hint="the handle height above the floor; LOCK_H = this - the floor gap" />
+                <div data-fd-sample-lock-h>
+                  <div className="text-ink-400 mb-1">Spindle height (derived)</div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-20 px-2 py-1.5 bg-surface-700 border border-surface-500 text-accent-400 rounded-lg text-sm font-medium inline-block">{fd ? fmt(fd.lock?.spindle?.fromBottom) : 'n/a'}</span>
+                    <span className="text-[10px] text-ink-500">LOCK_H {fd ? fmt(fd.lock?.spindle?.fromBottom) : 'n/a'} from the leaf bottom (the sample door, read only)</span>
+                  </div>
+                </div>
+                <PathField label="Spindle height (fallback)" value={LK.spindleHeight} onCommit={(v) => setPath(['lock', 'spindleHeight'], v)} hint="from the leaf bottom; used only when the floor value is 0" />
                 <PathField label="Backset" value={LK.backset} onCommit={(v) => setPath(['lock', 'backset'], v)} />
                 <PathField label="Euro centres" value={LK.euroCentres} onCommit={(v) => setPath(['lock', 'euroCentres'], v)} hint="cylinder below the spindle" />
                 <PathField label="Bathroom centres" value={LK.bathroomCentres} onCommit={(v) => setPath(['lock', 'bathroomCentres'], v)} />
@@ -2280,8 +2291,8 @@ function FireDoorSettings() {
                 <PathField label="Euro bore" value={LK.euroBore} onCommit={(v) => setPath(['lock', 'euroBore'], v)} />
                 <PathField label="Bathroom bore" value={LK.bathroomBore} onCommit={(v) => setPath(['lock', 'bathroomBore'], v)} />
               </div>
-              <div className="text-ink-300 text-[11px]">
-                {fd ? (<>sample spindle <span className="text-accent-400 font-medium">{fd.lock?.spindle?.fromBottom}</span> above the leaf bottom
+              <div className="text-ink-300 text-[11px]" data-fd-sample-lock>
+                {fd ? (<>sample spindle <span className="text-accent-400 font-medium">{fd.lock?.spindle?.fromFloor}</span> above the floor (<span className="text-accent-400 font-medium">{fd.lock?.spindle?.fromBottom}</span> above the leaf bottom, LOCK_H)
                   <span className="text-ink-500"> · forend centre {fd.lock?.forend?.centreFromBottom} up, milled {fd.lock?.forend?.millLength} × {fd.lock?.forend?.millWidth} · case pocket top {fd.lock?.case?.topFromBottom} up</span></>) : 'n/a'}
               </div>
             </fieldset>
@@ -2808,13 +2819,14 @@ function FireDoorSettings() {
                 ['Rebate', `${fmt(fdFrame?.rebate?.width)} × ${fmt(fdFrame?.rebate?.depth)} · faces ${fmt(fdFrame?.faces?.outside)} / ${fmt(fdFrame?.faces?.inside)}`],
                 ['Members', `${fmt(fdFrame?.thickness)} × ${fmt(fdFrame?.depth)} finished · ${fmt(fdFrame?.rawThickness)} × ${fmt(fdFrame?.rawWidth)} raw`],
                 ...(fdFrame?.members || []).map((m) => [m.id, `${fmt(m.length)} long point · ${m.rawSection || ''}${m.mitreTop ? ' · mitre top' : ''}${m.mitreBottom ? ' · mitre bottom' : ''}`]),
-                ['Hinges (leaf top)', fdHinges.map((h) => h.top).join(' / ') || 'n/a'],
+                // v1.3: a hinge position is its lower edge above the leaf bottom (H1 = the top hinge); on the jamb above the jamb foot
+                ['Hinges (above the leaf bottom)', fdHinges.map((h) => h.fromBottom).join(' / ') || 'n/a'],
                 ...(fd.hinges?.midCentreAboveLeafCentre != null ? [['Middle hinge', `centre ${fmt(fd.hinges.midCentreAboveLeafCentre)} above the leaf centre`]] : []),
-                ['Hinges (jamb top)', fdHinges.map((h) => h.jambTop).join(' / ') || 'n/a'],
+                ['Hinges (above the jamb foot)', fdHinges.map((h) => h.jambFromFoot).join(' / ') || 'n/a'],
                 ...(fdFrame?.dowels?.count > 0 ? [['Corner dowels', `${fmt(fdFrame.dowels.perJoint)} × ${fmt(fdFrame.dowels.dia)} × ${fmt(fdFrame.dowels.length)} per corner`]] : []),
                 ['Hinge macro', `HINGE ${fmt(fd.hinges?.macroHinge)} · ${fmt(fd.hinges?.product)}`],
                 ['Lock', `${fmt(fd.lock?.type)} · LOCK ${fmt(fd.lock?.macroLock)} · EURO ${fd.lock?.euro ? 1 : 0}`],
-                ['Spindle', `${fmt(fd.lock?.spindle?.fromBottom)} above the leaf bottom · backset ${fmt(fd.lock?.backset)}`],
+                ['Spindle', `${fmt(fd.lock?.spindle?.fromFloor)} above the floor (${fmt(fd.lock?.spindle?.fromBottom)} above the leaf bottom) · backset ${fmt(fd.lock?.backset)}`],
                 ['Forend', `centre ${fmt(fd.lock?.forend?.centreFromBottom)} up · ${fmt(fd.lock?.forend?.millLength)} × ${fmt(fd.lock?.forend?.millWidth)}`],
                 ['Keep centre', `${fmt(fd.keep?.centreFromFoot)} above the jamb foot · KEEP ${fmt(fd.keep?.macroKeep)}`],
                 ['Closer', fd.closer ? fmt(fd.closer.label) : 'none'],

@@ -1658,7 +1658,7 @@ export default function ConfiguratorPage() {
             <HChips o={FD_YES_NO} v={fdLeadEdge} c={setFdLeadEdge} />
             <div className="text-[11px] text-ink-300 bg-surface-700/50 border border-surface-500 rounded-lg px-3 py-2 mt-1" data-firedoor-live>
               {fdOverall
-                ? <>Opening <span className="text-accent-400 font-medium">{fd.opening?.width} x {fd.opening?.height}</span> · frame overall <span className="text-accent-400 font-medium">{fdOverall.width} x {fdOverall.height}</span> · leaf <span className="text-accent-400 font-medium">{fd.leaf?.width} x {fd.leaf?.height}</span> · rebate {fd.frame?.rebate?.width} x {fd.frame?.rebate?.depth} · members {fd.frame?.thickness} x {fd.frame?.depth} finished, {fd.frame?.rawThickness} x {fd.frame?.rawWidth} raw · hinges {(fd.hinges?.positions || []).map((h) => h.top).join(' / ')} from the leaf top</>
+                ? <>Opening <span className="text-accent-400 font-medium">{fd.opening?.width} x {fd.opening?.height}</span> · frame overall <span className="text-accent-400 font-medium">{fdOverall.width} x {fdOverall.height}</span> · leaf <span className="text-accent-400 font-medium">{fd.leaf?.width} x {fd.leaf?.height}</span> · rebate {fd.frame?.rebate?.width} x {fd.frame?.rebate?.depth} · members {fd.frame?.thickness} x {fd.frame?.depth} finished, {fd.frame?.rawThickness} x {fd.frame?.rawWidth} raw · hinges {(fd.hinges?.positions || []).map((h) => h.fromBottom).join(' / ')} above the leaf bottom (lower edge, H1 = top)</>
                 : <span className="text-amber-400">{fdLive?.error || 'Fire door not derived'}</span>}
             </div>
           </Sec>}
@@ -1849,10 +1849,12 @@ export default function ConfiguratorPage() {
               {(fd.frame?.members || []).map((m) => <SR key={m.id} l={m.id} v={`${m.length}${m.rawSection ? ` · raw ${m.rawSection}` : ''}`} />)}
               {fd.frame?.dowels?.count > 0 && <SR l="Corner dowels" v={`${fd.frame.dowels.perJoint} × ${fd.frame.dowels.dia} × ${fd.frame.dowels.length} per corner`} />}
               <SR l="Hand" v={fd.handing?.label || `Hinge ${fdHingeSide}`} />
-              <SR l="Hinges (leaf top)" v={(fd.hinges?.positions || []).map((h) => h.top).join(' / ')} />
+              {/* v1.3 (owner 28.10.2026): a hinge position is its LOWER edge above the leaf bottom (the Weeke way), H1 = the top hinge; on the jamb above the jamb foot */}
+              <SR l="Hinges (above the leaf bottom)" v={(fd.hinges?.positions || []).map((h) => h.fromBottom).join(' / ')} />
               {fd.hinges?.midAboveCentre != null && (fd.hinges?.positions || []).length === 3 && <SR l="Middle hinge" v={`centre ${fd.hinges.midAboveCentre} above the leaf centre`} />}
-              <SR l="Hinges (jamb top)" v={(fd.hinges?.positions || []).map((h) => h.jambTop).join(' / ')} />
-              <SR l="Lock" v={`${FD_LOCK_LABEL[fd.lock?.type] || fd.lock?.type} · spindle ${fd.lock?.spindle?.fromBottom} up`} />
+              <SR l="Hinges (above the jamb foot)" v={(fd.hinges?.positions || []).map((h) => h.jambFromFoot).join(' / ')} />
+              {/* v1.3: the handle from the FLOOR; LOCK_H (from the leaf bottom) in brackets */}
+              <SR l="Lock" v={`${FD_LOCK_LABEL[fd.lock?.type] || fd.lock?.type} · spindle ${fd.lock?.spindle?.fromFloor} above the floor (${fd.lock?.spindle?.fromBottom} above the leaf bottom)`} />
               <SR l="Keep centre" v={`${fd.keep?.centreFromFoot} from the jamb foot`} />
               <SR l="Closer" v={fd.closer ? fd.closer.label : 'None'} />
               <SR l="Vision panel" v={fd.vp?.label || 'None'} />

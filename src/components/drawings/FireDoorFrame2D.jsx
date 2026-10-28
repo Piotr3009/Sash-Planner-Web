@@ -18,8 +18,10 @@
  * mitres show as the 45 lines in both bands (the long point at the wall edge)
  * and as the stepped end of the opening view (the cheek 35 and the lip 50
  * short of the long point). On the cheek: the hinge recesses of the hinge jamb
- * (dimensioned from the jamb top long point by the macro chain) and the keep
- * plate and pocket of the lock jamb (from the top and from the foot). The
+ * (the chain along the jamb, read FROM THE FOOT (v1.3, the Weeke rule): 221 /
+ * 102 / 920 / 102 / 453 / 102 / 183 on the reference door; the labels 'H1
+ * 1798' = the hinge lower edge above the jamb foot, H1 the top hinge) and the
+ * keep plate and pocket of the lock jamb (from the top and from the foot). The
  * corner dowels (v1.1, derived.firedoor.frame.dowels and the dowelBore ops):
  * at each mitred end the perJoint dowel circles sit on the mitre line of the
  * opening view (the stepped end: the cheek and the lip short of the long
@@ -42,8 +44,8 @@
 import { useMemo } from 'react';
 import { DimH, DimV, DimChainH, DimChainV, Label, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
-import { NS, fmt, fmtGlass, safely, NoSheet, SheetTitle } from './doorSheetParts.jsx';
-import { num, fireDoorFrameMembers, opTableRows, closerWord, hingeWord, pullFaceNote, ratingWord, wrapLines } from './fireDoorDrawUtils.js';
+import { NS, fmtGlass, safely, NoSheet, SheetTitle } from './doorSheetParts.jsx';
+import { fdNum as fmt, num, fireDoorFrameMembers, opTableRows, closerWord, hingeWord, hingePositionsFromBottom, jambHingePositionsWord, jambHingeChainFromFoot, pullFaceNote, ratingWord, wrapLines } from './fireDoorDrawUtils.js';
 import { OpTable, opTableMetrics } from './FireDoorLeaf2D.jsx';
 
 const C = { band: 'rgba(148,163,184,0.05)', cheek: 'rgba(14,165,233,0.07)', recess: 'rgba(14,165,233,0.14)', pocket: 'rgba(239,68,68,0.10)', cut: 'rgba(239,68,68,0.10)', dowel: '#F59E0B' };
@@ -212,7 +214,7 @@ export default function FireDoorFrame2D({ windowSpec, derived, projectNumber, wi
     pullFaceNote(fd),
     `Frame ${fmt(thk)} x ${fmt(D)} finished from ${fmt(fr.rawThickness)} x ${fmt(fr.rawWidth)} raw; rebate ${fmt(rebW)} x ${fmt(rebD)} from solid along every member on the opening side (${fmt(faceOut)} face outside, ${fmt(thk)} inside); overall ${fmt(fr.overall?.width)} x ${fmt(fr.overall?.height)} (leaf + ${fmt(fr.overall?.width - fd.leaf?.width)} / + ${fmt(fr.overall?.height - fd.leaf?.height)})`,
     `Each member seen from the opening with its outside face unfolded above and its inside face below (the wall edge at the far side of each band); x from the top long point (the left long point of the head), the head mitred 45 both ends, the jambs mitred at the top and square at the foot: the cheek ends ${fmt(faceOut)} and the lip ${fmt(thk)} short of the long point`,
-    `Hinge jamb: recesses ${fmt(hg.recess?.length)} x ${fmt(hg.recess?.width)} x ${fmt(hg.recess?.depth)} R${fmt(hg.recess?.radius)} on the rebate cheek from the outside face, hinge tops at ${(hg.positions || []).map((p) => fmt(p.jambTop)).join(' / ')} from the top long point (${fmt(faceOut)} + ${fmt(fr.gaps?.head)} + the leaf positions ${(hg.positions || []).map((p) => fmt(p.top)).join(' / ')})`,
+    `Hinge jamb: recesses ${fmt(hg.recess?.length)} x ${fmt(hg.recess?.width)} x ${fmt(hg.recess?.depth)} R${fmt(hg.recess?.radius)} on the rebate cheek from the outside face; hinges at ${jambHingePositionsWord(fd)}, H1 = the top hinge (the leaf positions ${hingePositionsFromBottom(fd)} above the leaf bottom); the chain from the foot ${jambHingeChainFromFoot(fd).map(fmt).join(' / ')}`,
     `Lock jamb: keep plate ${fmt(keep.plate?.millLength)} x ${fmt(keep.plate?.millWidth)} x ${fmt(keep.plate?.depth)} R${fmt(keep.plate?.radius)} (full radius ends) centred ${fmt(keep.centreFromFoot)} above the foot (${fmt(keep.centreFromTop)} from the top long point) on the cheek, centred on the leaf thickness; bolt pocket ${fmt(keep.pocket?.length)} x ${fmt(keep.pocket?.width)} x ${fmt(keep.pocket?.depth)} ${keepPocketOp ? ` R${fmt(keepPocketOp.radius)}` : ''} centred on the plate`,
     track ? `Head: ${closerWord(fd)}: its track ${fmt(track.len)} x ${fmt(track.wid)} x ${fmt(track.depth)} in the soffit over the leaf, ${fmt(sym.track.y)} from the hinge edge of the leaf, centred ${fmt(track.z0 + track.wid / 2)} from the outside face; concealed, not machined yet (drawn dashed)` : '',
     hasDowels
@@ -279,8 +281,9 @@ export default function FireDoorFrame2D({ windowSpec, derived, projectNumber, wi
                 }
                 return null;
               })}
+              {/* the hinge labels: H1 = the top hinge, the value = its lower edge above the jamb foot (v1.3, positions[i].jambFromFoot) */}
               {m.role === 'jambHinge' && (hg.positions || []).map((p, k) => (
-                <Label key={`hl${k}`} x={X(num(p.jambTop, 0) + hingeLen / 2)} y={b.labelsY} text={`H${k + 1} ${fmt(p.jambTop)}`} vbw={svgW} />
+                <Label key={`hl${k}`} x={X(num(p.jambTop, 0) + hingeLen / 2)} y={b.labelsY} text={`H${k + 1} ${fmt(p.jambFromFoot)}`} vbw={svgW} />
               ))}
               {m.role === 'jambLock' && plate && (
                 <Label x={X(num(plate.x, 0) + num(plate.length, 0) / 2)} y={b.labelsY} text={`KEEP ${fmt(keep.centreFromFoot)} from the foot`} vbw={svgW} />

@@ -45,6 +45,11 @@
  * the view of its face, the built in closer's body in the leaf top and track
  * in the head dashed on both views, each with its short note.
  *
+ * v1.3 (owner 28.10.2026, the Weeke rule): the hinge note prints the hinge
+ * positions as the hinge LOWER edge above the LEAF BOTTOM (positions[i].
+ * fromBottom, H1 = the top hinge) and the lock note the spindle above the
+ * floor with its height above the leaf bottom in brackets (spindleWord).
+ *
  * Every number comes from derived.firedoor through fireDoorElevationGeometry;
  * the literals here are drawing layout in text units (ts) and the LSP's
  * ironmongery symbol sizes (IRON).
@@ -52,8 +57,8 @@
 import { useMemo } from 'react';
 import { DimH, DimV, DimChainH, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
-import { NS, fmt, safely, NoSheet, SheetTitle } from './doorSheetParts.jsx';
-import { fireDoorElevationGeometry, IRON, OUTSIDE_HEIGHT_DIMS_SIDE, diamondPoints, leverPoints, hingeWord, openingWord, closerWord, closerSymbolWord, hingeRuleWord, intuWord, paneLabel, pullFaceNote, ratingWord, vpAcrossChain, vpGlassWord, wrapLines } from './fireDoorDrawUtils.js';
+import { NS, safely, NoSheet, SheetTitle } from './doorSheetParts.jsx';
+import { fdNum as fmt, fireDoorElevationGeometry, IRON, OUTSIDE_HEIGHT_DIMS_SIDE, diamondPoints, leverPoints, hingeWord, openingWord, closerWord, closerSymbolWord, hingeRuleWord, hingePositionsWord, spindleWord, intuWord, paneLabel, pullFaceNote, ratingWord, vpAcrossChain, vpGlassWord, wrapLines } from './fireDoorDrawUtils.js';
 
 /** The pieces of [from, to] left after cutting out every [a, b] of `cuts`. */
 function segments(from, to, cuts) {
@@ -122,7 +127,6 @@ export default function FireDoorElevation2D({ windowSpec, derived, projectNumber
   const projNum = projectNumber || '';
   const vp = fd.vp || {};
   const lock = fd.lock || {};
-  const hp = (fd.hinges?.positions || []).map((p) => fmt(p.top)).join(' / ');
   const intu = fd.intumescent;
   // v1.2: the closer note says which face carries the symbol (the surface closer is drawn on its face's view)
   const closerNote = closer?.kind === 'surface'
@@ -135,8 +139,9 @@ export default function FireDoorElevation2D({ windowSpec, derived, projectNumber
       ? `Push side: the ${fmt(faceIn)} face laps the leaf edge by ${fmt(faceIn - faceOut - gapSide)} at the sides and the head (the leaf shown dashed behind it); no hinges on this face; the handle and the cylinder mirrored from the outside view`
       : `Pull side: frame ${fmt(fr.thickness)} x ${fmt(fr.depth)} rebated from solid ${fmt(fr.rebate?.width)} x ${fmt(fr.rebate?.depth)}, ${fmt(faceOut)} face on this side and ${fmt(faceIn)} on the push side; gaps ${fmt(gapSide)} at the sides and ${fmt(gapHead)} at the head, the jambs stand ${fmt(floorGap)} below the leaf; head corners mitred 45`,
     op ? `Structural opening ${fmt(op.w)} x ${fmt(op.h)} (dashed): the frame ${fmt(op.gapSide)} in from each side and ${fmt(op.gapHead)} below the opening top, its foot on the floor line` : '',
-    `Hinges: ${fmt(fd.hinges?.count)} x ${fmt(fd.hinges?.length)} ${fd.hinges?.product || ''} at ${hp} from the leaf top to the hinge top (the rule: ${hingeRuleWord(fd)})`,
-    `Lock: ${lock.type || ''}, spindle ${fmt(lock.spindle?.fromBottom)} above the leaf bottom, backset ${fmt(lock.backset)}; ${cylinder ? `${cylinder.kind} cylinder ${fmt(cylinder.fromBottom)} above the leaf bottom` : 'no cylinder hole'}; the lever points to the hinge side`,
+    // v1.3: the hinge positions are the hinge lower edge above the leaf bottom; the spindle from the floor with the leaf bottom value in brackets
+    `Hinges: ${fmt(fd.hinges?.count)} x ${fmt(fd.hinges?.length)} ${fd.hinges?.product || ''} at ${hingePositionsWord(fd)} (the rule: ${hingeRuleWord(fd)})`,
+    `Lock: ${lock.type || ''}, ${spindleWord(fd)}, backset ${fmt(lock.backset)}; ${cylinder ? `${cylinder.kind} cylinder ${fmt(cylinder.fromBottom)} above the leaf bottom` : 'no cylinder hole'}; the lever points to the hinge side`,
     panes.length
       ? `Vision panel ${vp.label || vp.style}${vp.positionLabel ? `; ${vp.positionLabel}` : ''}${glassWord ? `; glass ${glassWord}` : ''}${(vp.warnings || []).length ? `; ${vp.warnings.join('; ')}` : ''}`
       : 'No vision panel',
