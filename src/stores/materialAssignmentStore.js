@@ -311,6 +311,7 @@ const FH = FIREDOOR_HARDWARE;
 const fdRow = (row) => ({ section: '-', pcs: 1, windowType: 'firedoor', ...row });
 const fdIntuSection = `${FP.intumescent.width} x ${FP.intumescent.thickness}`;
 const fdDowelSection = `${FP.frame.dowels.dia} x ${FP.frame.dowels.length}`;
+const fdGlass = (id) => FP.vp.glass.types.find((t) => t.id === id) || { thickness: FP.vp.glassThickness };
 export const FIREDOOR_PARTS = {
   timber: [
     fdRow({ id: 'fd_blank_fd30', name: 'Door Blank FD30', section: `${FP.leaf.thicknessByRating.FD30}mm`, materialType: 'board', unit: 'pcs',
@@ -349,10 +350,15 @@ export const FIREDOOR_PARTS = {
   consumables: [
     fdRow({ id: FH.intumescent.partId, name: `Intumescent Strip ${FP.intumescent.width}mm`, section: fdIntuSection, materialType: 'consumable', unit: 'm',
       hint: `Fire doors: the one strip size ${FP.intumescent.width} x ${FP.intumescent.thickness} all around the leaf (top and both edges), FD30 ${FP.intumescent.stripsByRating.FD30} strip, FD60 ${FP.intumescent.stripsByRating.FD60} strips (Window Settings, Fire Doors): strips x (2 x leaf height + leaf width) per door, in metres. No row on a non-fire door.` }),
-    fdRow({ id: 'fd_glass_fire', name: 'Fire Glass', section: `${FP.vp.glassThickness}mm`, materialType: 'glass', unit: 'm²',
-      hint: `Vision panel glass of a fire door: single fire rated pane, ${FP.vp.glassThickness} thick, the m² of every pane. Nothing on vision panel style 0.` }),
-    fdRow({ id: 'fd_glass_toughened', name: 'Toughened Glass (vision panel)', section: `${FP.vp.glassThickness}mm`, materialType: 'glass', unit: 'm²',
-      hint: `Vision panel glass of a non-fire door: single toughened pane, ${FP.vp.glassThickness} thick, the m² of every pane.` }),
+    // v1.2 (owner 28.10.2026): three glasses only, FD30 standard (this row, the
+    // v1 fire glass row), FD insulated and Frosted (appended at the end below);
+    // the v1 toughened row is gone (no other glass is offered)
+    fdRow({ id: 'fd_glass_fire', name: 'Glass FD30 standard', section: `${fdGlass('fd30').thickness}mm`, materialType: 'glass', unit: 'm²',
+      hint: `Vision panel glass "FD30 standard" (the default on an FD30 and a non-fire door): ${fdGlass('fd30').thickness} thick, the m² of every pane (a round pane its circle). Nothing without a vision panel.` }),
+    fdRow({ id: 'fd_glass_insulated', name: 'Glass FD insulated', section: `${fdGlass('insulated').thickness}mm`, materialType: 'glass', unit: 'm²',
+      hint: `Vision panel glass "FD insulated" (the default on an FD60 door): ${fdGlass('insulated').thickness} thick, the m² of every pane.` }),
+    fdRow({ id: 'fd_glass_frosted', name: 'Glass Frosted', section: `${fdGlass('frosted').thickness}mm`, materialType: 'glass', unit: 'm²',
+      hint: `Vision panel glass "Frosted" (picked on the door): ${fdGlass('frosted').thickness} thick, the m² of every pane.` }),
     fdRow({ id: 'fd_glazing_bead', name: 'Vision Panel Beads', section: 'profile', materialType: 'beading', unit: 'm',
       hint: `Vision panel glazing beads: the pane perimeters x ${FP.vp.beadFaces} faces per door, in metres.` }),
     fdRow({ id: 'fd_glazing_intu', name: 'Glazing Intumescent', materialType: 'consumable', unit: 'm',
@@ -364,11 +370,12 @@ export const FIREDOOR_PARTS = {
       hint: `Every door set: hardwood dowels ${FP.frame.dowels.dia} x ${FP.frame.dowels.length}, ${FP.frame.dowels.perJoint} per mitred corner of the frame (head to each jamb), ${FP.frame.dowels.perJoint * 2} per door, bored square to the mitre face (Window Settings, Fire Doors). Pieces.` }),
   ],
 };
-// The v1.1 rows (the surface closer, the frame dowels) go to the END of the
+// The v1.1 rows (the surface closer, the frame dowels) and the v1.2 glass rows
+// (FD insulated, Frosted) go to the END of the
 // flat list, the DOOR_V3_IDS pattern: the v1 rows keep their order and index
 // (the removed 10 / 20 mm strip rows aside), the page still groups each row
 // by its materialType.
-const FIREDOOR_V11_IDS = [FH.closerSurface.partId, FH.dowels.partId];
+const FIREDOOR_V11_IDS = [FH.closerSurface.partId, FH.dowels.partId, 'fd_glass_insulated', 'fd_glass_frosted'];
 export const FIREDOOR_ALL_PARTS = [
   ...[...FIREDOOR_PARTS.timber, ...FIREDOOR_PARTS.ironmongery, ...FIREDOOR_PARTS.consumables].filter((p) => !FIREDOOR_V11_IDS.includes(p.id)),
   ...FIREDOOR_V11_IDS.map((id) => [...FIREDOOR_PARTS.ironmongery, ...FIREDOOR_PARTS.consumables].find((p) => p.id === id)),

@@ -32,15 +32,28 @@
  * mirrored; the frame width at the top and the frame height on the right
  * (the LSP draws no dimensions on this view, the house rule places them).
  *
+ * v1.2 (28.10.2026): the vision panel panes drawn by their shape (a rect with
+ * its corner radius, a circle, the diamond), on the outside view labelled
+ * ('VP dia 300' for a round pane; turned up the pane when the label is wider
+ * than a narrow pane) and dimensioned from the panel group: the across chain
+ * from the edge the position mode measures from (centred: both edges)
+ * through every pane and gap, under the group (over it for a panel measured
+ * from the bottom), and the down dimension in the right margin (the group top
+ * from the leaf top; the group bottom or centre above the leaf bottom for
+ * those modes). The closer symbol (derived.firedoor.closer.symbol, never
+ * machined): the surface closer (body, arm, shoe on the head face) solid on
+ * the view of its face, the built in closer's body in the leaf top and track
+ * in the head dashed on both views, each with its short note.
+ *
  * Every number comes from derived.firedoor through fireDoorElevationGeometry;
  * the literals here are drawing layout in text units (ts) and the LSP's
  * ironmongery symbol sizes (IRON).
  */
 import { useMemo } from 'react';
-import { DimH, DimV, Label, WindowTag } from './drawingUtils.jsx';
+import { DimH, DimV, DimChainH, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
 import { NS, fmt, safely, NoSheet, SheetTitle } from './doorSheetParts.jsx';
-import { fireDoorElevationGeometry, IRON, OUTSIDE_HEIGHT_DIMS_SIDE, diamondPoints, leverPoints, hingeWord, openingWord, closerWord, hingeRuleWord, pullFaceNote, ratingWord, wrapLines } from './fireDoorDrawUtils.js';
+import { fireDoorElevationGeometry, IRON, OUTSIDE_HEIGHT_DIMS_SIDE, diamondPoints, leverPoints, hingeWord, openingWord, closerWord, closerSymbolWord, hingeRuleWord, intuWord, paneLabel, pullFaceNote, ratingWord, vpAcrossChain, vpGlassWord, wrapLines } from './fireDoorDrawUtils.js';
 
 /** The pieces of [from, to] left after cutting out every [a, b] of `cuts`. */
 function segments(from, to, cuts) {
@@ -58,22 +71,26 @@ function segments(from, to, cuts) {
 export default function FireDoorElevation2D({ windowSpec, derived, projectNumber, windowTag, view = 'outside' }) {
   const g = useMemo(() => safely(() => fireDoorElevationGeometry(derived, view)), [derived, view]);
   if (!g) return <NoSheet text="No fire door data." />;
-  const { fd, frame, leaf, inside, hinges, spindle, cylinder, panes, label, dirToHinge, hingeEdgeX, lockEdgeX, hingesOnLeft, floorGap, gapSide, gapHead, faceOut, faceIn } = g;
+  const { fd, frame, leaf, inside, hinges, spindle, cylinder, panes, label, dirToHinge, hingeEdgeX, lockEdgeX, hingesOnLeft, floorGap, gapSide, gapHead, faceOut, faceIn, vpGroup, closer } = g;
   const FW = frame.w, FH = frame.h, face = frame.face;
   const W = leaf.w, H = leaf.h;
   const fr = fd.frame || {};
   // the structural opening (v1.1) is drawn and dimensioned on the outside view only
   const op = !inside ? g.opening : null;
+  // v1.2: the vision panel position is dimensioned on the outside view only (the
+  // inside view keeps the house dimension rule: the overall sizes only)
+  const vpDims = !inside && vpGroup ? vpGroup : null;
 
   // margins in text units: the outside view carries two height dims on the
   // LSP side (three with the opening, one step further out), the inside view
   // the frame height on the right (house rule); the top carries the leaf and
-  // frame widths (and the opening width above them on the outside view)
+  // frame widths (and the opening width above them on the outside view); the
+  // outside view's right margin carries the vision panel's down dimension
   const leftDims = !inside && OUTSIDE_HEIGHT_DIMS_SIDE === 'left';
   const DIM_STEP = 38;                       // one more dimension column / row, text units
   const opExtra = op ? DIM_STEP : 0;
   const mL = leftDims ? 92 + opExtra : 24;
-  const mR = inside ? 64 : (leftDims ? 24 : 92 + opExtra);
+  const mR = inside ? 64 : (leftDims ? (vpDims ? 64 : 24) : 92 + opExtra + (vpDims ? DIM_STEP : 0));
   const mT = 92 + opExtra, mB = 80;
   // the margins frame the widest thing drawn: the opening when there is one, else the frame
   const drawW = op ? op.w : FW;
@@ -107,6 +124,11 @@ export default function FireDoorElevation2D({ windowSpec, derived, projectNumber
   const lock = fd.lock || {};
   const hp = (fd.hinges?.positions || []).map((p) => fmt(p.top)).join(' / ');
   const intu = fd.intumescent;
+  // v1.2: the closer note says which face carries the symbol (the surface closer is drawn on its face's view)
+  const closerNote = closer?.kind === 'surface'
+    ? `${closerWord(fd)} on the ${closer.face} face (drawn on the ${closer.face === 'push' ? 'inside' : 'outside'} elevation)`
+    : closer?.kind === 'builtin' ? `${closerWord(fd)}: concealed in the leaf top and the head (dashed on both elevations)` : closerWord(fd);
+  const glassWord = vpGlassWord(fd);
   const notes = wrapLines([
     pullFaceNote(fd),
     inside
@@ -116,9 +138,9 @@ export default function FireDoorElevation2D({ windowSpec, derived, projectNumber
     `Hinges: ${fmt(fd.hinges?.count)} x ${fmt(fd.hinges?.length)} ${fd.hinges?.product || ''} at ${hp} from the leaf top to the hinge top (the rule: ${hingeRuleWord(fd)})`,
     `Lock: ${lock.type || ''}, spindle ${fmt(lock.spindle?.fromBottom)} above the leaf bottom, backset ${fmt(lock.backset)}; ${cylinder ? `${cylinder.kind} cylinder ${fmt(cylinder.fromBottom)} above the leaf bottom` : 'no cylinder hole'}; the lever points to the hinge side`,
     panes.length
-      ? `Vision panel ${vp.label || vp.style}: ${panes.map((p) => `${fmt(p.paneW)} x ${fmt(p.paneH)}${p.diamond ? ' diamond' : ''}`).join(', ')}, layout per bSolid macro (drawn centred across the leaf, the first pane ${fmt(panes[0].y - leaf.y)} from the leaf top)${(vp.warnings || []).length ? `; ${vp.warnings.join('; ')}` : ''}`
+      ? `Vision panel ${vp.label || vp.style}${vp.positionLabel ? `; ${vp.positionLabel}` : ''}${glassWord ? `; glass ${glassWord}` : ''}${(vp.warnings || []).length ? `; ${vp.warnings.join('; ')}` : ''}`
       : 'No vision panel',
-    `${closerWord(fd)}; ${intu ? `intumescent ${intu.label || ''}, groove ${fmt(intu.groove?.width)} x ${fmt(intu.groove?.depth)} (${Number(intu.metres).toFixed(3)} m)` : 'no intumescent strip'}; door blank ${fmt(leaf.t)} thick (${ratingWord(fd)})`,
+    `${closerNote}; ${intu ? `intumescent ${intuWord(fd)}, groove ${fmt(intu.groove?.width)} x ${fmt(intu.groove?.depth)} (${Number(intu.metres).toFixed(3)} m)` : 'no intumescent strip'}; door blank ${fmt(leaf.t)} thick (${ratingWord(fd)})`,
   ], svgW - 2 * 30 * ts, codeFs);
   const titleY = Y(FH) + mB * ts;
   // the subtitle wrapped at its own font size to the sheet width (30 text
@@ -131,6 +153,45 @@ export default function FireDoorElevation2D({ windowSpec, derived, projectNumber
   ], svgW - 2 * 30 * ts, subFs, ' · ');
   const notesY = titleY + 20 * Math.max(0, subLines.length - 1) * ts;
   const svgH = notesY + (44 + 18 * notes.length) * ts;
+
+  // ── v1.2: the pane labels (turned up a pane narrower than its label) ──
+  const paneFs = SIZES.label * ts;
+  const paneTexts = panes.map((p) => {
+    const text = paneLabel(p, fmt);
+    const turned = text.length * 0.55 * paneFs > 0.92 * p.w && p.h > p.w;
+    return { p, text, turned, x: X(p.x + p.w / 2), y: Y(p.y + p.h / 2) + 5 * ts };
+  });
+  // ── v1.2: the vision panel position (outside view): the across chain under the
+  // group (over it for a panel measured from the bottom), its extension lines from
+  // the panes' sides (the tangent points of a round pane, the tips of a diamond);
+  // the down dimension in the right margin ──
+  let across = null, down = null;
+  if (vpDims) {
+    const below = vpDims.down !== 'bottom';
+    const curved = panes.some((p) => p.shape !== 'rect');
+    const centres = panes.map((p) => p.y + p.h / 2);
+    const extY = curved ? (below ? Math.max(...centres) : Math.min(...centres)) : (below ? vpDims.y1 : vpDims.y0);
+    const ch = vpAcrossChain(panes.map((p) => ({ a: p.x, b: p.x + p.w, shape: p.shape, paneW: p.paneW })), hingeEdgeX, lockEdgeX, vpDims.across, fmt);
+    across = { y: Y(below ? vpDims.y1 : vpDims.y0) + (below ? 30 : -30) * ts, extFrom: Y(extY), cuts: ch.cuts.map(X), labels: ch.labels };
+    const right = panes.reduce((a, p) => (p.x + p.w > a.x + a.w ? p : a), panes[0]);
+    const extX = vpDims.down === 'centre' || right.shape === 'rect' ? vpDims.x1 : right.x + right.w / 2;
+    const midY = (vpDims.y0 + vpDims.y1) / 2;
+    const dimX = leftDims ? X(FW) + 36 * ts : X(FW) + (70 + DIM_STEP + opExtra) * ts;
+    down = vpDims.down === 'top'
+      ? { x: dimX, y1: Y(leaf.y), y2: Y(vpDims.y0), label: fmt(vpDims.fromTop), extFrom: X(extX) }
+      : vpDims.down === 'bottom'
+        ? { x: dimX, y1: Y(vpDims.y1), y2: Y(leaf.y + H), label: fmt(vpDims.fromBottom), extFrom: X(extX) }
+        : { x: dimX, y1: Y(midY), y2: Y(leaf.y + H), label: fmt(leaf.y + H - midY), extFrom: X(extX) };
+  }
+  // ── v1.2: the closer symbol: the surface closer solid on its face's view, the built in one dashed on both ──
+  const showCloser = !!closer && (closer.kind === 'builtin' || closer.visible);
+  const closerText = showCloser ? closerSymbolWord(fd) : '';
+  const closerTextY = showCloser ? Y(closer.body.y1) + 1.4 * codeFs : 0;
+  const armBar = (a) => {
+    const dx = a.x2 - a.x1, dy = a.y2 - a.y1, len = Math.hypot(dx, dy) || 1;
+    const nx = (-dy / len) * (a.width / 2), ny = (dx / len) * (a.width / 2);
+    return [[a.x1 + nx, a.y1 + ny], [a.x2 + nx, a.y2 + ny], [a.x2 - nx, a.y2 - ny], [a.x1 - nx, a.y1 - ny]];
+  };
 
   return (
     <div className="w-full">
@@ -159,15 +220,40 @@ export default function FireDoorElevation2D({ windowSpec, derived, projectNumber
         {leafLine('ll', lockEdgeX, leaf.y, lockEdgeX, leaf.y + H)}
         {segments(leaf.y, leaf.y + H, hingeCuts).map(([a, b], k) => leafLine(`lh${k}`, hingeEdgeX, a, hingeEdgeX, b))}
 
-        {/* ── the vision panel panes ── */}
-        {panes.map((p) => (
-          <g key={`vp${p.i}`}>
-            {p.diamond
-              ? <polygon points={pts(diamondPoints(p))} fill={COLORS.glass} fillOpacity={COLORS.glassOpacity} stroke={COLORS.glass} strokeWidth={STROKES.glass} {...NS} />
-              : <rect x={X(p.x)} y={Y(p.y)} width={p.w} height={p.h} fill={COLORS.glass} fillOpacity={COLORS.glassOpacity} stroke={COLORS.glass} strokeWidth={STROKES.glass} {...NS} />}
-            {!inside && <Label x={X(p.x + p.w / 2)} y={Y(p.y + p.h / 2) + 5 * ts} text={`VP ${fmt(p.paneW)} × ${fmt(p.paneH)}`} vbw={svgW} />}
-          </g>
+        {/* ── the vision panel panes, each by its shape (v1.2): rect with its corner radius, circle, diamond ── */}
+        {panes.map((p) => {
+          const glass = { fill: COLORS.glass, fillOpacity: COLORS.glassOpacity, stroke: COLORS.glass, strokeWidth: STROKES.glass, ...NS };
+          return (
+            <g key={`vp${p.i}`}>
+              {p.shape === 'diamond' ? <polygon points={pts(diamondPoints(p))} {...glass} />
+                : p.shape === 'round' ? <circle cx={X(p.x + p.w / 2)} cy={Y(p.y + p.h / 2)} r={p.r || p.w / 2} {...glass} />
+                  : <rect x={X(p.x)} y={Y(p.y)} width={p.w} height={p.h} rx={p.r || 0} {...glass} />}
+            </g>
+          );
+        })}
+        {!inside && paneTexts.map((t) => (
+          <text key={`vpl${t.p.i}`} x={t.x} y={t.y} fill={COLORS.label} fontSize={paneFs} fontFamily={FONT_FAMILY} textAnchor="middle" fillOpacity={0.8} fontWeight={WEIGHTS.label}
+            transform={t.turned ? `rotate(-90, ${t.x}, ${t.y - 5 * ts})` : undefined}>{t.text}</text>
         ))}
+
+        {/* ── the closer symbol (v1.2, never machined) ── */}
+        {showCloser && closer.kind === 'surface' && (
+          <g>
+            <rect x={X(closer.body.x0)} y={Y(closer.body.y0)} width={closer.body.x1 - closer.body.x0} height={closer.body.y1 - closer.body.y0} fill={COLORS.sillDetail} fillOpacity={0.3} stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} />
+            <rect x={X(closer.shoe.x0)} y={Y(closer.shoe.y0)} width={closer.shoe.x1 - closer.shoe.x0} height={closer.shoe.y1 - closer.shoe.y0} fill={COLORS.sillDetail} fillOpacity={0.3} stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} />
+            <polygon points={pts(armBar(closer.arm))} fill={COLORS.sillDetail} fillOpacity={0.5} stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} strokeLinejoin="round" />
+            <circle cx={X(closer.arm.x1)} cy={Y(closer.arm.y1)} r={closer.arm.width / 2} {...iron} />
+          </g>
+        )}
+        {showCloser && closer.kind === 'builtin' && (
+          <g>
+            <rect x={X(closer.body.x0)} y={Y(closer.body.y0)} width={closer.body.x1 - closer.body.x0} height={closer.body.y1 - closer.body.y0} fill="none" stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} strokeDasharray={dash} />
+            <rect x={X(closer.track.x0)} y={Y(closer.track.y0)} width={closer.track.x1 - closer.track.x0} height={closer.track.y1 - closer.track.y0} fill="none" stroke={COLORS.sillDetail} strokeWidth={STROKES.sash} {...NS} strokeDasharray={dash} />
+          </g>
+        )}
+        {showCloser && closerText && (
+          <text x={X(closer.hingeX)} y={closerTextY} fill={COLORS.label} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor={hingesOnLeft ? 'start' : 'end'} fillOpacity={0.8} fontWeight={WEIGHTS.label}>{closerText}</text>
+        )}
 
         {/* ── the hinges (outside view): the rectangle over the leaf edge with three bearing lines ── */}
         {!inside && hinges.map((h) => (
@@ -218,6 +304,9 @@ export default function FireDoorElevation2D({ windowSpec, derived, projectNumber
             <DimH y={Y(0) - 60 * ts} x1={X(0)} x2={X(FW)} extFrom={Y(0)} label={fmt(FW)} vbw={svgW} />
             {/* the structural opening: its width one row above the frame width, its height one column outside the frame height */}
             {op && <DimH y={Y(0) - (60 + DIM_STEP) * ts} x1={X(op.x0)} x2={X(op.x1)} extFrom={Y(op.y0)} label={fmt(op.w)} vbw={svgW} />}
+            {/* v1.2: the vision panel position: the across chain at the group, the down dimension in the right margin */}
+            {across && <DimChainH y={across.y} cuts={across.cuts} extFrom={across.extFrom} labels={across.labels} vbw={svgW} fmt={fmt} />}
+            {down && <DimV x={down.x} y1={down.y1} y2={down.y2} extFrom={down.extFrom} label={down.label} small vbw={svgW} />}
             {leftDims ? (
               <>
                 <DimV x={X(0) - 70 * ts} y1={Y(0)} y2={Y(FH)} extFrom={X(0)} label={fmt(FH)} vbw={svgW} />

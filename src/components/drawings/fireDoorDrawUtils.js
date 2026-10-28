@@ -45,6 +45,17 @@
  * is the page's left), z through the frame depth from the pull face (0, the
  * 35 face) to the push face (depth, the 50 face). The sheets put the pull
  * face at the BOTTOM of the page, so the open leaf swings down the page.
+ *
+ * v1.2 (owner 28.10.2026): the vision panel panes carry their shape (rect
+ * with its corner radius, round, diamond; paneShape / paneBox) and the
+ * elevation geometry the panel group (vpGroup) and the closer symbol
+ * (closer: the surface closer's body, arm and shoe, the built in closer's
+ * body and head track, from derived.firedoor.closer.symbol) in the view's
+ * coordinates; vpAcrossChain builds the panel's across chain from the edge
+ * its position mode measures from; closerSymbolWord / closerSymbolDetail,
+ * intuWord (the strip with its colour) and vpGlassWord (the glass type and
+ * thickness) are the note words. groupFireDoorGlass keys a group by the pane
+ * shape and the glass type too.
  */
 
 const R1 = (v) => Math.round(v * 10) / 10;
@@ -144,6 +155,69 @@ export function closerWord(fd) {
 }
 
 /**
+ * The short note written beside the closer SYMBOL on a sheet (v1.2), from the
+ * engine's label: 'surface closer, pull face' / 'surface closer, push face' /
+ * 'built in closer, concealed, not machined yet'; '' without a closer.
+ */
+export function closerSymbolWord(fd) {
+  const c = fd?.closer;
+  if (!c) return '';
+  const label = String(c.label || (c.type === 'builtin' ? 'Built in closer' : c.type === 'surface' ? 'Surface closer' : 'Closer')).toLowerCase();
+  if (c.type === 'surface') return `${label}, ${c.symbol?.face === 'push' ? 'push' : 'pull'} face`;
+  if (c.type === 'builtin') return c.machined ? `${label}, concealed` : `${label}, concealed, not machined yet`;
+  return label;
+}
+
+/**
+ * The closer symbol in words with its sizes for the notes (v1.2), every
+ * number from derived.firedoor.closer.symbol; '' without a symbol.
+ *   surface: 'body 250 x 55 x 45 on the pull face, 15 below the leaf top and
+ *            60 from the hinge edge; arm 230 to a shoe 70 x 25 on the head
+ *            face; fixed on site, not machined'
+ *   builtin: 'body 300 x 26 x 40 deep in the leaf top, 80 from the hinge
+ *            edge, centred on the thickness; track 420 x 20 x 30 in the head
+ *            soffit; concealed, not machined yet (drawn dashed)'
+ */
+export function closerSymbolDetail(fd) {
+  const s = fd?.closer?.symbol;
+  if (!s) return '';
+  const f = (v) => { const r = Math.round(Number(v) * 2) / 2; return Number.isFinite(r) ? (Number.isInteger(r) ? String(r) : r.toFixed(1)) : ''; };
+  if (s.kind === 'surface') {
+    const b = s.body || {}, a = s.arm || {}, sh = s.shoe || {};
+    return `body ${f(b.length)} x ${f(b.height)} x ${f(b.depth)} on the ${s.face === 'push' ? 'push' : 'pull'} face, ${f(b.x)} below the leaf top and ${f(b.y)} from the hinge edge; arm ${f(a.length)} to a shoe ${f(sh.length)} x ${f(sh.height)} on the head face; fixed on site, not machined`;
+  }
+  if (s.kind === 'builtin') {
+    const b = s.body || {}, t = s.track || {};
+    return `body ${f(b.length)} x ${f(b.width)} x ${f(b.depth)} deep in the leaf top, ${f(b.y)} from the hinge edge, ${f(b.z)} from the pull face; track ${f(t.length)} x ${f(t.width)} x ${f(t.depth)} in the head soffit; concealed, not machined yet (drawn dashed)`;
+  }
+  return '';
+}
+
+/**
+ * The intumescent strip in words (v1.2, the owner's wording): '1 x 15 x 4 all
+ * around, white' from derived.firedoor.intumescent (label + colour); '' on a
+ * non-fire door.
+ */
+export function intuWord(fd) {
+  const i = fd?.intumescent;
+  if (!i) return '';
+  const colour = String(i.colour?.label || '').toLowerCase();
+  return `${i.label || ''}${colour ? `, ${colour}` : ''}`;
+}
+
+/**
+ * The vision panel glass in words (v1.2): 'FD30 standard, 6 thick' from
+ * derived.firedoor.vp.glass (label + thickness); '' without a glass.
+ */
+export function vpGlassWord(fd) {
+  const g = fd?.vp?.glass;
+  if (!g) return '';
+  const t = num(g.thickness, num(fd?.vp?.glassThickness));
+  const f = (v) => { const r = Math.round(Number(v) * 2) / 2; return Number.isInteger(r) ? String(r) : r.toFixed(1); };
+  return `${g.label || g.type || ''}${t != null ? `, ${f(t)} thick` : ''}`;
+}
+
+/**
  * The hinge rule in words (v1.1): the top hinge topOffset from the top, the
  * bottom hinge bottomOffset from the bottom, the middle hinge's centre
  * midAboveCentre above the leaf centre; every number from derived.firedoor.hinges.
@@ -169,7 +243,11 @@ export function ratingWord(fd) {
  * groups a door's: { key, w, h, finish, rep, units, panes } with rep = the
  * index of the first unit of the group and panes = the unit locations. The
  * finish is the window's glazing finish (the glass schedule row carries the
- * same). Empty for any other category and for a door without a vision panel.
+ * same), 'frosted' for a Frosted vision panel glass (v1.2). v1.2: the key
+ * also carries the pane shape (rect / round / diamond) and the glass type
+ * (fd30 / insulated / frosted; a unit without one keeps fire / toughened), so
+ * a round pane never groups with a square one of the same size. Empty for
+ * any other category and for a door without a vision panel.
  */
 export function groupFireDoorGlass(derived, windowSpec) {
   if (derived?.category !== 'firedoor') return [];
@@ -177,8 +255,8 @@ export function groupFireDoorGlass(derived, windowSpec) {
   (derived.customGlassUnits || []).forEach((u, i) => {
     const w = u?.width, h = u?.height;
     if (!w || !h) return;
-    const finish = windowSpec?.glazing?.finish || 'clear';
-    const key = `${w}x${h}|${u.fire ? 'fire' : 'toughened'}|${finish}`;
+    const finish = u.glassType === 'frosted' ? 'frosted' : (windowSpec?.glazing?.finish || 'clear');
+    const key = `${w}x${h}|${u.shape || 'rect'}|${u.glassType || (u.fire ? 'fire' : 'toughened')}|${finish}`;
     let g = groups.find((x) => x.key === key);
     if (!g) { g = { key, w, h, finish, rep: i, units: [], panes: [] }; groups.push(g); }
     g.units.push(i);
@@ -201,7 +279,20 @@ export function fireDoorRecord(derived, code) {
  *   leaf     { x, y, w, h } in the view's coordinates
  *   hinges   [{ i, top, bottom, x0, x1 }] the LSP hinge rectangles (outside view only)
  *   spindle  { x, y } the handle rose centre; cylinder { kind, x, y } or null
- *   panes    [{ i, x, y, w, h, rotated }] the vision panel panes
+ *   panes    [{ i, x, y, w, h, paneW, paneH, diamond, shape, r }] the vision
+ *            panel panes: x y w h = the bounding box in this view, shape
+ *            'rect' (r = the corner radius) / 'round' (r = half the diameter)
+ *            / 'diamond' (the w x w square turned 45 in its box)
+ *   vpGroup  (v1.2) the bounding box of all panes in this view { x0, x1, y0,
+ *            y1 } with the engine's group distances (fromTop, fromBottom,
+ *            fromHingeEdge, fromLockEdge) and position { across, down,
+ *            acrossOffset, downOffset }; null without a panel
+ *   closer   (v1.2) the closer symbol of derived.firedoor.closer.symbol in
+ *            this view: surface { kind, face, visible (drawn solid on its
+ *            face's view), body, arm { x1, y1, x2, y2, width }, shoe } /
+ *            builtin { kind, visible: false (concealed: dashed on both views),
+ *            body (in the leaf top), track (in the head over the soffit) };
+ *            boxes as { x0, x1, y0, y1 }; null without a closer
  *   opening  { w, h, x0, y0, x1, y1, gapSide, gapHead } the structural opening
  *            (v1.1) in the view's coordinates: wallGapSide outside each jamb,
  *            wallGapHead above the head, its sill on the frame foot; null when
@@ -242,8 +333,48 @@ export function fireDoorElevationGeometry(derived, view = 'outside') {
   const panes = (fd.vp?.panes || []).map((p, k) => {
     const b = paneBox(p);
     const px = hingesOnLeft ? leaf.x + b.y : leaf.x + W - b.y - b.w;
-    return { i: num(p.i, k), x: px, y: leaf.y + b.x, w: b.w, h: b.h, paneW: b.paneW, paneH: b.paneH, diamond: b.diamond };
+    return { i: num(p.i, k), x: px, y: leaf.y + b.x, w: b.w, h: b.h, paneW: b.paneW, paneH: b.paneH, diamond: b.diamond, shape: b.shape, r: b.radius };
   });
+  // v1.2: board x (from the leaf top) and y (from the hinge edge) into this view
+  const vx = (y) => hingeEdgeX - dirToHinge * y;
+  const vy = (x) => leaf.y + x;
+  const spanX = (y0, len) => { const a = vx(y0), b = vx(y0 + len); return [Math.min(a, b), Math.max(a, b)]; };
+  const grp = fd.vp?.group;
+  const vpGroup = grp && panes.length ? (() => {
+    const [x0, x1] = spanX(num(grp.y, 0), num(grp.w, 0));
+    const pos = fd.vp?.position || {};
+    return {
+      x0, x1, y0: vy(num(grp.x, 0)), y1: vy(num(grp.x, 0) + num(grp.h, 0)),
+      fromTop: num(grp.fromTop, num(grp.x, 0)), fromBottom: num(grp.fromBottom, 0), fromHingeEdge: num(grp.fromHingeEdge, num(grp.y, 0)), fromLockEdge: num(grp.fromLockEdge, 0),
+      across: ['hinge', 'lock'].includes(pos.across) ? pos.across : 'centre', down: ['centre', 'bottom'].includes(pos.down) ? pos.down : 'top',
+      acrossOffset: num(pos.acrossOffset, 0), downOffset: num(pos.downOffset, 0),
+    };
+  })() : null;
+  // v1.2: the closer symbol (never machined): the surface closer on its face, the built in closer concealed
+  const sym = fd.closer?.symbol || null;
+  let closer = null;
+  if (sym?.kind === 'surface') {
+    const b = sym.body || {}, a = sym.arm || {}, s = sym.shoe || {};
+    const face = sym.face === 'push' ? 'push' : 'pull';
+    const [bx0, bx1] = spanX(num(b.y, 0), num(b.length, 0));
+    const [sx0, sx1] = spanX(num(s.y, 0) - num(s.length, 0) / 2, num(s.length, 0));
+    closer = {
+      kind: 'surface', face, visible: (face === 'push') === inside, hingeX: vx(num(b.y, 0)),
+      body: { x0: bx0, x1: bx1, y0: vy(num(b.x, 0)), y1: vy(num(b.x, 0) + num(b.height, 0)) },
+      arm: { x1: vx(num(a.from?.y, 0)), y1: vy(num(a.from?.x, 0)), x2: vx(num(a.to?.y, 0)), y2: vy(num(a.to?.x, 0)), width: num(a.width, 0) },
+      shoe: { x0: sx0, x1: sx1, y0: vy(num(s.x, 0) - num(s.height, 0) / 2), y1: vy(num(s.x, 0) + num(s.height, 0) / 2) },
+    };
+  } else if (sym?.kind === 'builtin') {
+    const b = sym.body || {}, t = sym.track || {};
+    const [bx0, bx1] = spanX(num(b.y, 0), num(b.length, 0));
+    const [tx0, tx1] = spanX(num(t.y, 0), num(t.length, 0));
+    const soffit = leaf.y - gapHead;   // the head's rebate face over the leaf top
+    closer = {
+      kind: 'builtin', visible: false, hingeX: vx(num(b.y, 0)),
+      body: { x0: bx0, x1: bx1, y0: vy(0), y1: vy(num(b.depth, 0)) },
+      track: { x0: tx0, x1: tx1, y0: soffit - num(t.depth, 0), y1: soffit },
+    };
+  }
   // the structural opening (v1.1): the frame sits wallGapSide in from each
   // side and wallGapHead below the opening top, its foot on the floor line;
   // the rectangle is the engine's opening W x H centred on the frame width
@@ -254,7 +385,7 @@ export function fireDoorElevationGeometry(derived, view = 'outside') {
   const viewWord = inside ? 'Inside' : 'Outside';
   return {
     fd, frame: { w: FW, h: FH, face }, faceOut, faceIn, floorGap, gapSide, gapHead, leaf, inside, view: inside ? 'inside' : 'outside',
-    hingesOnLeft, hingeEdgeX, lockEdgeX, dirToHinge, hinges, hingeLen, spindle, cylinder, panes, opening,
+    hingesOnLeft, hingeEdgeX, lockEdgeX, dirToHinge, hinges, hingeLen, spindle, cylinder, panes, opening, vpGroup, closer,
     label: `${hingeWord(fd)} - ${viewWord}`, viewWord,
   };
 }
@@ -269,15 +400,56 @@ export function isDiamond(p) {
 }
 
 /**
+ * The shape of a pane or a vpCutout op (v1.2): 'rect' | 'round' | 'diamond'
+ * from the engine's `shape`; a record without one reads 'diamond' when it is
+ * turned by an angle that is not a multiple of 90, else 'rect'.
+ */
+export function paneShape(p) {
+  const s = p?.shape;
+  if (s === 'rect' || s === 'round' || s === 'diamond') return s;
+  return isDiamond(p) ? 'diamond' : 'rect';
+}
+
+/**
  * The drawn box of a pane of derived.firedoor.vp.panes in BOARD coordinates:
  * x from the leaf top, y from the hinge edge (the engine's x / y are the
  * bounding box corner), w / h the bounding box (`box`, the pane itself for an
- * unturned pane), paneW / paneH the glass size, diamond for the 45 turn.
+ * unturned pane), paneW / paneH the glass size, diamond for the 45 turn;
+ * v1.2: shape (paneShape) and radius (the rect corner radius, half the
+ * diameter of a round pane; the engine's).
  */
 export function paneBox(p) {
   const box = p?.box || p?.bbox || { w: p?.w, h: p?.h };
   const w = num(box.w, num(p?.w, 0)), h = num(box.h, num(p?.h, 0));
-  return { x: num(p?.x, 0), y: num(p?.y, 0), w, h, paneW: num(p?.w, w), paneH: num(p?.h, h), diamond: isDiamond(p) };
+  const shape = paneShape(p);
+  return { x: num(p?.x, 0), y: num(p?.y, 0), w, h, paneW: num(p?.w, w), paneH: num(p?.h, h), diamond: shape === 'diamond', shape, radius: num(p?.radius, shape === 'round' ? w / 2 : 0) };
+}
+
+/** The label of a pane on a sheet (v1.2): 'VP dia 300' for a round pane, else 'VP 450 × 450' (the glass size). */
+export function paneLabel(p, fmtN = (v) => String(v)) {
+  return p?.shape === 'round' ? `VP dia ${fmtN(p.paneW)}` : `VP ${fmtN(p.paneW)} × ${fmtN(p.paneH)}`;
+}
+
+/**
+ * The cuts of the vision panel ACROSS chain (v1.2) on a drawing axis: from
+ * the edge the position mode measures from ('hinge': the hinge edge to the
+ * panes; 'lock': the panes to the lock edge; 'centre': both edges) through
+ * every pane edge. `panes` are [{ a, b, shape, paneW }] with a < b the pane's
+ * extent on the axis; hingeAt / lockAt the two leaf edges on it. Returns {
+ * cuts (ascending), labels (one per segment: 'dia 300' over a round pane,
+ * else the length by fmtN) }.
+ */
+export function vpAcrossChain(panes, hingeAt, lockAt, mode, fmtN = (v) => String(v)) {
+  const r = (v) => Math.round(v * 10) / 10;
+  const edges = (panes || []).flatMap((p) => [p.a, p.b]);
+  const ends = mode === 'hinge' ? [hingeAt] : mode === 'lock' ? [lockAt] : [hingeAt, lockAt];
+  const cuts = [...new Set([...ends, ...edges].map(r))].sort((x, y) => x - y);
+  const labels = cuts.slice(0, -1).map((c, k) => {
+    const d = cuts[k + 1];
+    const pane = (panes || []).find((p) => Math.abs(r(p.a) - c) < 0.05 && Math.abs(r(p.b) - d) < 0.05);
+    return pane && pane.shape === 'round' ? `dia ${fmtN(pane.paneW)}` : fmtN(d - c);
+  });
+  return { cuts, labels };
 }
 
 /** The diamond of a turned pane: the four edge midpoints of its bounding box. */

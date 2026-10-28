@@ -114,8 +114,16 @@ const PARTITION_BOOLEAN_LEAVES = ['radius'];
 // default, the STOP rows and the execution block. The comma lists
 // (leaf.widthSuggestions, frame.depthSuggestions) go through setFireDoorList;
 // the bSuite targets are replaced whole by setFireDoorBsuiteTargets.
-const FIREDOOR_PATH_ROOTS = ['leaf', 'frame', 'hinges', 'lock', 'keep', 'vp', 'intumescent', 'bsuite', 'defaults'];
-const FIREDOOR_STRING_LEAVES = ['headJoint', 'rating', 'hingeSide', 'lockType', 'closerFire', 'closerNonFire', 'path', 'name', 'activeTarget', 'panelName', 'label', 'arrange'];
+// v1.2 (28.10.2026): the closer drawing symbols join the roots; the vision
+// panel types (vp.types[i].label / shape / arrange and the numbers), the
+// position default (vp.position.across / down), the glass labels and the
+// default glass by rating (every leaf under vp.glass.defaultByRating is a
+// glass id string), the strip colours (intumescent.colours[i].label / hex),
+// the default strip colour and the surface closer face are string leaves; the
+// strip colour list grows / shrinks through setFireDoorColours.
+const FIREDOOR_PATH_ROOTS = ['leaf', 'frame', 'hinges', 'lock', 'keep', 'vp', 'intumescent', 'closer', 'bsuite', 'defaults'];
+const FIREDOOR_STRING_LEAVES = ['headJoint', 'rating', 'hingeSide', 'lockType', 'closerFire', 'closerNonFire', 'path', 'name', 'activeTarget', 'panelName', 'label', 'arrange', 'shape', 'across', 'down', 'hex', 'face', 'intuColour'];
+const FIREDOOR_STRING_PARENTS = ['defaultByRating'];
 const FIREDOOR_BOOLEAN_LEAVES = ['fire', 'leadEdge', 'stopRows', 'writeExecutionParameters'];
 const FIREDOOR_PROGRAM_KEYS = ['leaf', 'head', 'jambHinge', 'jambLock'];
 
@@ -363,7 +371,7 @@ export const useWindowProfileStore = create(
       setFireDoorPath: (path, value) => {
         if (!Array.isArray(path) || path.length < 2 || !FIREDOOR_PATH_ROOTS.includes(path[0])) return;
         const leaf = path[path.length - 1];
-        const isString = FIREDOOR_STRING_LEAVES.includes(leaf);
+        const isString = FIREDOOR_STRING_LEAVES.includes(leaf) || FIREDOOR_STRING_PARENTS.includes(path[path.length - 2]);
         const isBool = FIREDOOR_BOOLEAN_LEAVES.includes(leaf);
         const v = isString ? String(value ?? '') : isBool ? (value === true || value === 'true' || value === 'yes') : Number(value);
         if (!isString && !isBool && (value === '' || value == null || !Number.isFinite(v))) return;
@@ -417,6 +425,26 @@ export const useWindowProfileStore = create(
         get()._edit(['firedoor.bsuite'], (s) => {
           const firedoor = clone(s.firedoor || DEFAULT_FIREDOOR_PROFILE);
           firedoor.bsuite = { ...firedoor.bsuite, targets: clone(targets), activeTarget: ids.has(activeTarget) ? activeTarget : targets[0].id };
+          return { firedoor };
+        });
+      },
+
+      // v1.2: the intumescent strip colours, replaced whole and validated: ids
+      // unique non-empty strings, labels non-empty, hex '#rrggbb'. Every default
+      // colour id must stay (the profile migration merges the defaults back by
+      // id, so a removed default would come back in the engine's copy): only an
+      // added colour can be removed.
+      setFireDoorColours: (colours) => {
+        if (!Array.isArray(colours) || !colours.length) return;
+        const ids = new Set();
+        for (const c of colours) {
+          if (!c || typeof c.id !== 'string' || !c.id || ids.has(c.id) || typeof c.label !== 'string' || !c.label.trim() || !/^#[0-9a-f]{6}$/i.test(String(c.hex || ''))) return;
+          ids.add(c.id);
+        }
+        if (!(DEFAULT_FIREDOOR_PROFILE.intumescent.colours || []).every((d) => ids.has(d.id))) return;
+        get()._edit(['firedoor.intumescent'], (s) => {
+          const firedoor = clone(s.firedoor || DEFAULT_FIREDOOR_PROFILE);
+          firedoor.intumescent = { ...firedoor.intumescent, colours: colours.map((c) => ({ id: c.id, label: c.label.trim(), hex: String(c.hex).toLowerCase() })) };
           return { firedoor };
         });
       },

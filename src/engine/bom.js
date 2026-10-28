@@ -171,9 +171,12 @@ Object.assign(ELEMENT_TO_PART_ID, {
   'FD-JAMB-H': 'fd_frame_timber',
   'FD-JAMB-L': 'fd_frame_timber',
 });
-// The fire door glass rows: fire glass on a fire door, toughened otherwise
-// (derived.consumables.glass.type from fireDoor.js).
-export const FIREDOOR_GLASS_PART_ID = Object.freeze({ fire: 'fd_glass_fire', toughened: 'fd_glass_toughened' });
+// The fire door glass rows (v1.2, owner 28.10.2026: three glasses only): the
+// row of the door's glass type, derived.consumables.glass.slot from fireDoor.js
+// (profile vp.glass.types[].slot). fire / toughened = the v1 keys, kept.
+// toughened (the v1 non-fire key) resolves to the FD30 standard row: the
+// toughened row is gone in v1.2.
+export const FIREDOOR_GLASS_PART_ID = Object.freeze({ fire: 'fd_glass_fire', toughened: 'fd_glass_fire', fd30: 'fd_glass_fire', insulated: 'fd_glass_insulated', frosted: 'fd_glass_frosted' });
 // The fire door blank row by rating (FD30 44, FD60 54, non-fire 44).
 export const FIREDOOR_BLANK_PART_ID = Object.freeze({ FD30: 'fd_blank_fd30', FD60: 'fd_blank_fd60', none: 'fd_blank_std' });
 // Assign Materials row -> the ironmongery slot whose product that row buys on a
@@ -325,7 +328,7 @@ export function buildWindowPartQtys(derived, windowSpec, settings, resolveRaw) {
   // single toughened, on its own rows (never a sealed unit row).
   const g = derived.consumables?.glass;
   if (g?.sqm && derived.category === 'firedoor') {
-    setQty(FIREDOOR_GLASS_PART_ID[g.type === 'fire' ? 'fire' : 'toughened'], g.sqm, 'm²');
+    setQty(g.slot || FIREDOOR_GLASS_PART_ID[g.type] || FIREDOOR_GLASS_PART_ID.fd30, g.sqm, 'm²');
   } else if (g?.sqm) {
     const acoustic = isAcousticUnit(windowSpec.glazing);
     const doorDouble = derived.category === 'door' && (g.type || 'double') === 'double';

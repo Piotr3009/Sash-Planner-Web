@@ -7,6 +7,7 @@
  */
 
 import { CONSTANTS } from '../engine/calculations.js';
+import { downloadFireDoorDxf } from './fireDoorDxfExport.js';
 
 function lwpolyline(points, layer) {
   // 4 vertices for a closed rectangle, polyline flag 1 = closed
@@ -28,6 +29,14 @@ function rectPoints(x, y, w, h) {
 }
 
 export async function exportWindowToDXF({ item, windowSpec, derived }) {
+  // Fire doors (v1.2, 28.10.2026): a fire door set goes out as the drawing of every
+  // element (fireDoorDxfExport.js: DXF R12, opens in AutoCAD and bSolid; a true .dwg
+  // needs a converter). Every other window keeps the outline below unchanged.
+  if (derived?.category === 'firedoor') {
+    const r = downloadFireDoorDxf({ name: item?.name || item?.window_number || windowSpec?.name, derived });
+    if (r.error) throw new Error(r.error);
+    return;
+  }
   // The sash outlines come from the derived data (deriveWindowData, under the
   // batch profile): no formula of its own, so a cottage window is drawn with
   // its real top and bottom sash (Piotr 09.10.2026).

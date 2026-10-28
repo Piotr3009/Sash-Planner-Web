@@ -75,6 +75,8 @@ import { exportCncJambsMerged, exportArchDxfMerged, exportTraceryMerged } from '
 import { exportBsuiteFramesMerged, exportBsuiteFireDoorsMerged } from '../utils/bsuiteExport.js';
 // Fire doors (27.10.2026): the machine-neutral machining list (CSV + JSON) of the pack's doors
 import { exportFireDoorMachining } from '../utils/fireDoorMachiningExport.js';
+// Fire doors v1.2 (28.10.2026): a zip of DXFs, every element of every fire door of the pack
+import { downloadFireDoorDxfZip, FIREDOOR_DXF_TOOLTIP } from '../utils/fireDoorDxfExport.js';
 import { downloadBsuiteProgram } from '../services/bsuitePrograms.js';
 import { exportGlassDxfMerged } from '../utils/glassDxfExport.js';
 
@@ -649,6 +651,22 @@ export default function ProductionPackPage() {
                   className="btn btn-secondary text-xs px-4"
                 >
                   🛠 Fire door machining (CSV)
+                </button>
+                {/* v1.2 (28.10.2026): one zip, per door an all-elements DXF and a folder of
+                    the leaf, head, hinge jamb and lock jamb DXFs, from derived.firedoor */}
+                <button
+                  onClick={() => {
+                    try {
+                      const r = downloadFireDoorDxfZip(doors, label);
+                      if (r.error) alert(`Fire door DXF: ${r.error}`);
+                    } catch (e) {
+                      alert(`Fire door DXF failed: ${e.message}`);
+                    }
+                  }}
+                  title={FIREDOOR_DXF_TOOLTIP}
+                  className="btn btn-secondary text-xs px-4"
+                >
+                  📐 Fire door DXF (zip)
                 </button>
               </>);
             })()}

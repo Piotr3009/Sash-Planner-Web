@@ -918,7 +918,7 @@ export default function MaterialAssignmentsPage() {
                 subtitle={`${FD_CONSUMABLE_PARTS.length} rows · one intumescent strip size all around (FD30 one strip, FD60 two; metres = strips x (2 x H + W)), glazing beads and glazing intumescent per vision panel perimeter, the frame corner dowels in pieces`}
                 parts={FD_CONSUMABLE_PARTS} {...timber} />
               <PartGroupSection title="🧊 Vision panel glass"
-                subtitle={`${FD_GLASS_PARTS.length} rows · fire glass on a fire door, toughened on a non-fire door · m² of every pane`}
+                subtitle={`${FD_GLASS_PARTS.length} rows · the glass picked on the door: FD30 standard (the default on FD30 and non-fire), FD insulated (the default on FD60) or Frosted · m² of every pane`}
                 parts={FD_GLASS_PARTS} {...timber} />
               <div className="card p-4 mb-3 text-[11px] text-ink-300">
                 <div className="text-xs font-semibold text-ink-100 mb-1">Paint: fire doors use the casement rows</div>

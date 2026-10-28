@@ -52,8 +52,11 @@ function buildGlass(windowSpec, derived, group) {
   // Fire door vision panels (27.10.2026): a single pane, so no edge seal and
   // no spacer (both 0); the glass kind from the unit (fire / toughened), the
   // thickness from the spec glazing block (the glass schedule row's number).
+  // v1.2 (28.10.2026): the glass is one of three (the unit's glassLabel, e.g.
+  // "FD30 standard"), its thickness the engine's (vp.glassThickness), and a
+  // round pane (unit.shape 'round') is drawn as its circle.
   const G = derived.category === 'firedoor'
-    ? { edgeCover: 0, barWidth: 0, single: { fire: !!unit?.fire, thickness: num(windowSpec.glazing?.thickness) } }
+    ? { edgeCover: 0, barWidth: 0, single: { fire: !!unit?.fire, thickness: num(derived.firedoor?.vp?.glassThickness, num(windowSpec.glazing?.thickness)), label: unit?.glassLabel || null, shape: unit?.shape || 'rect' } }
     : derived.category === 'partition'
     ? safely(() => { const g = getPartitionProfile().glazing; return { edgeCover: Number(g.spacer), barWidth: Number(g.dummySpacer) }; })
     : (safely(() => readGlassProfile(getCasementProfile(), type))
@@ -90,7 +93,8 @@ export default function DoorGlassDrawing2D({ windowSpec, derived, group , window
   // a fire door pane: the count, the single glass (thickness and kind as the
   // glass schedule row prints them) and the finish; no spec word, no spacer
   const single = geom.single;
-  const singleText = single ? `${single.thickness != null ? `${fmtGlass(single.thickness)}mm ` : ''}${single.fire ? 'fire' : 'toughened'}` : '';
+  const singleText = single ? `${single.thickness != null ? `${fmtGlass(single.thickness)}mm ` : ''}${single.label || (single.fire ? 'fire' : 'toughened')}` : '';
+  const round = single?.shape === 'round';
   const spec = (single ? [
     `×${panes.length || 1}`,
     singleText,
@@ -116,7 +120,7 @@ export default function DoorGlassDrawing2D({ windowSpec, derived, group , window
   const notes = [
     ...paneLines,
     single
-      ? `Single ${singleText} glass, no spacer and no bars (a vision panel pane, the cut-out per bSolid macro)`
+      ? `Single ${singleText} glass, no spacer and no bars (a vision panel pane${round ? `, round dia ${fmtGlass(w)}` : ''})`
       : isWall
       ? `Spacer ${fmtGlass(edge)} · dummy spacer ${fmtGlass(geom.spacer)} on the applied bar lines${geom.hBars.length || geom.vBars.length ? ` (${geom.hBars.length} H, ${geom.vBars.length} V)` : ''} · bars on the faces, not in the unit`
       : `Edge seal ${fmtGlass(edge)} · spacer bars ${fmtGlass(geom.spacer)} on the wood bar centre lines${geom.vBars.length || geom.hBars.length ? ` (${geom.vBars.length} vertical, ${geom.hBars.length} horizontal)` : ''}`,
@@ -138,15 +142,21 @@ export default function DoorGlassDrawing2D({ windowSpec, derived, group , window
           </pattern>
         </defs>
 
-        {/* Sealed unit and its edge seal */}
-        <rect x={X(0)} y={Y(0)} width={w} height={h} fill={COLORS.glass} fillOpacity={COLORS.glassOpacity}
-          stroke={COLORS.glass} strokeWidth={STROKES.glass} {...NS} />
+        {/* Sealed unit and its edge seal (v1.2: a round fire door pane is its circle) */}
+        {round ? (
+          <circle cx={X(w / 2)} cy={Y(h / 2)} r={w / 2} fill={COLORS.glass} fillOpacity={COLORS.glassOpacity}
+            stroke={COLORS.glass} strokeWidth={STROKES.glass} {...NS} />
+        ) : (
+          <rect x={X(0)} y={Y(0)} width={w} height={h} fill={COLORS.glass} fillOpacity={COLORS.glassOpacity}
+            stroke={COLORS.glass} strokeWidth={STROKES.glass} {...NS} />
+        )}
         {!single && (
           <rect x={X(edge)} y={Y(edge)} width={w - 2 * edge} height={h - 2 * edge} fill="none"
             stroke={COLORS.glass} strokeWidth={STROKES.glassLight} {...NS} strokeOpacity={0.6} strokeDasharray={`${sw(5)},${sw(4)}`} />
         )}
-        {isFrosted && (
-          <rect x={X(edge)} y={Y(edge)} width={w - 2 * edge} height={h - 2 * edge} fill={`url(#${patternId})`} stroke="none" />
+        {isFrosted && (round
+          ? <circle cx={X(w / 2)} cy={Y(h / 2)} r={w / 2} fill={`url(#${patternId})`} stroke="none" />
+          : <rect x={X(edge)} y={Y(edge)} width={w - 2 * edge} height={h - 2 * edge} fill={`url(#${patternId})`} stroke="none" />
         )}
 
         {/* Spacer bars on the wood bar centre lines */}
@@ -175,7 +185,7 @@ export default function DoorGlassDrawing2D({ windowSpec, derived, group , window
         <DimH y={oy - 30 * ts} x1={X(0)} x2={X(w)} extFrom={Y(0)} label={fmtGlass(w)} vbw={svgW} />
         <DimV x={ox + w + 34 * ts} y1={Y(0)} y2={Y(h)} extFrom={X(w)} label={fmtGlass(h)} vbw={svgW} />
 
-        <SheetTitle x={svgW / 2} y={titleY} title={`${fmtGlass(w)} × ${fmtGlass(h)} mm`} subtitle={spec} notes={notes} ts={ts} vbw={svgW} />
+        <SheetTitle x={svgW / 2} y={titleY} title={round ? `dia ${fmtGlass(w)} mm` : `${fmtGlass(w)} × ${fmtGlass(h)} mm`} subtitle={spec} notes={notes} ts={ts} vbw={svgW} />
         {windowTag ? <WindowTag tag={windowTag} vbw={svgW} /> : null}
       </svg>
     </div>

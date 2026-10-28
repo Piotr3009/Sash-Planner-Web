@@ -618,7 +618,15 @@ export function windowSpecToCasementProps(windowSpec) {
 // origin the same way for both. The vision panel panes keep the engine's
 // own fields: x from the leaf TOP to the pane top, y from the HINGE edge to
 // the pane left. The only profile number read here is the vision panel glass
-// thickness (the windowSpec glazing thickness when the spec carries it).
+// thickness, and only when the engine gives none (v1.2: the engine's
+// vp.glassThickness of the chosen glass first, then the windowSpec glazing
+// thickness, then the profile).
+// v1.2 (28.10.2026): the pane shape and radius, the vision panel glass (type
+// fd30 / insulated / frosted, label, thickness), the intumescent strips (count,
+// size, the centres across the thickness from the pull face, the colour), the
+// closer symbol (surface: body, arm, shoe; built in: body, track) and the
+// forend / keep radii (full radius ends) travel to the 3D as the engine gives
+// them.
 //
 // `derived` is the page's own deriveWindowData result (batch profile
 // snapshot applied there); the door is derived again, with the active
@@ -648,7 +656,14 @@ export function fireDoorGeometryFromSpec(windowSpec, derivedIn = null) {
   const hingeSide = f.handing?.hingeSide === 'right' ? 'right' : 'left';
   const op = f.opening || null;
   const specGlass = n(windowSpec.glazing?.thickness);
-  const glassThickness = specGlass > 0 ? specGlass : n(getFireDoorProfile()?.vp?.glassThickness);
+  const engineGlass = n(f.vp?.glassThickness);
+  const glassThickness = engineGlass > 0 ? engineGlass : (specGlass > 0 ? specGlass : n(getFireDoorProfile()?.vp?.glassThickness));
+  const vg = f.vp?.glass || null;
+  const intu = f.intumescent || null;
+  // a plain copy of the closer symbol (numbers and the two words kind / face), so the 3D never holds the engine object
+  const symbolCopy = (o) => (o && typeof o === 'object'
+    ? Object.fromEntries(Object.entries(o).map(([k, v]) => [k, typeof v === 'number' ? v : (typeof v === 'string' ? v : symbolCopy(v))]))
+    : null);
   const lk = f.lock || {};
   const sp = lk.spindle || {};
   const cyl = lk.cylinder || null;
@@ -690,28 +705,54 @@ export function fireDoorGeometryFromSpec(windowSpec, derivedIn = null) {
       forend: fo ? {
         length: n(fo.millLength ?? fo.length), width: n(fo.millWidth ?? fo.width),
         centreFromTop: n(fo.centreFromTop), centreFromBottom: n(fo.centreFromBottom),
+        // v1.2: the full radius ends (the engine's radius = half the milled width)
+        radius: n(fo.radius, n(fo.millWidth ?? fo.width) / 2),
       } : null,
     },
     keep: kp ? {
       centreFromFoot: n(kp.centreFromFoot), centreFromTop: n(kp.centreFromTop),
-      plate: { length: n(kp.plate?.millLength ?? kp.plate?.length), width: n(kp.plate?.millWidth ?? kp.plate?.width) },
+      plate: {
+        length: n(kp.plate?.millLength ?? kp.plate?.length), width: n(kp.plate?.millWidth ?? kp.plate?.width),
+        // v1.2: the full radius ends (the engine's radius = half the milled width)
+        radius: n(kp.plate?.radius, n(kp.plate?.millWidth ?? kp.plate?.width) / 2),
+      },
     } : null,
     vp: {
       style: f.vp?.style ?? 0, label: f.vp?.label ?? '',
       glassThickness, glassSqm: n(f.vp?.glassSqm),
+      // v1.2: the panel's shape, count and arrangement, and its glass (type fd30 /
+      // insulated / frosted: the 3D draws a frosted glass white and rough)
+      shape: f.vp?.shape ?? 'none', count: n(f.vp?.count), arrange: f.vp?.arrange ?? 'stack',
+      glass: vg ? { type: vg.type ?? null, label: vg.label ?? '', thickness: n(vg.thickness, glassThickness) } : null,
       // angle: 45 the diamond (drawn turned), 90 a pane the engine turned to
       // fit (w / h already swapped, axis aligned), 0 upright; box = the
-      // axis-aligned bounding box the leaf is cut to
+      // axis-aligned bounding box the leaf is cut to (x / y its corner);
+      // v1.2: shape 'rect' (radius = the corner radius) / 'round' (w = h = the
+      // diameter, radius = w / 2) / 'diamond'
       panes: (f.vp?.panes || []).map((p, i) => ({
         i: p.i ?? i, w: n(p.w), h: n(p.h), x: n(p.x), y: n(p.y),
         rotated: !!p.rotated, angle: n(p.angle),
+        shape: p.shape ?? (p.rotated && n(p.angle) % 90 !== 0 ? 'diamond' : 'rect'), radius: n(p.radius),
         box: { w: n(p.box?.w ?? p.w), h: n(p.box?.h ?? p.h) },
       })),
     },
+    // v1.2: the intumescent strips (null on a non-fire door): count, size, the
+    // centre of each strip across the leaf thickness from the pull face, colour
+    intumescent: intu ? {
+      strips: n(intu.strips), width: n(intu.width), thickness: n(intu.thickness),
+      groove: { width: n(intu.groove?.width), depth: n(intu.groove?.depth) },
+      centresZ: (intu.centresZ || []).map((z) => n(z)),
+      colour: { id: intu.colour?.id ?? null, label: intu.colour?.label ?? '', hex: intu.colour?.hex ?? null },
+      label: intu.label ?? '',
+    } : null,
     handing: { hingeSide, label: f.handing?.label ?? '' },
     // v1.1: the closer as the engine reports it (null = none) and the
     // structural opening the frame sits in (informational for the 3D)
-    closer: f.closer ? { type: f.closer.type ?? null, label: f.closer.label ?? '', machined: !!f.closer.machined } : null,
+    // v1.2: + the drawing symbol (surface: body / arm / shoe on the pull or push
+    // face; built in: body in the leaf top and the track in the head soffit), in
+    // the leaf board system (x from the leaf top, negative above it; y from the
+    // hinge edge)
+    closer: f.closer ? { type: f.closer.type ?? null, label: f.closer.label ?? '', machined: !!f.closer.machined, symbol: symbolCopy(f.closer.symbol) } : null,
     opening: op ? { w: n(op.width), h: n(op.height), source: op.source ?? null } : null,
     // the overall frame W x H and the point the 3D group is centred on
     totalWidth: W,
