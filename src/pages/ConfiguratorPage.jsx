@@ -15,8 +15,8 @@ import { DEFAULT_DOOR_PROFILE, DEFAULT_PARTITION_PROFILE, DEFAULT_FIREDOOR_PROFI
 import { casementFrameDims, doorFrameDims, doorGeometryFromSpec, fireDoorGeometryFromSpec } from '../utils/windowSpecToConfig.js';
 // Fire doors (27.10.2026): the door numbering helper, the engine's own error class
 // and (v1.1) the opening <-> leaf size rule the chips and the v1 load use
-import { nextFireDoorName, FireDoorGeometryError, fireDoorOpeningForLeaf } from '../engine/fireDoor.js';
-import { normaliseToWindowSpec, SASH_PROPORTIONS, SASH_PROPORTION_OPTIONS, SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, effectiveSashProportion, TRIPLE_OPENING_LABEL, fireDoorCloserKind } from '../engine/specification.js';
+import { nextFireDoorName, FireDoorGeometryError, fireDoorOpeningForLeaf, fireDoorVpInput } from '../engine/fireDoor.js';
+import { normaliseToWindowSpec, SASH_PROPORTIONS, SASH_PROPORTION_OPTIONS, SASH_PROPORTION_LABELS, COTTAGE_MIN_FRAME_HEIGHT, effectiveSashProportion, TRIPLE_OPENING_LABEL, fireDoorCloserKind, fireDoorVpField } from '../engine/specification.js';
 import { CONSTANTS, meetingFractionFor, deriveWindowData } from '../engine/calculations.js';
 import CasementLayoutPicker from '../components/configurator/CasementLayoutPicker.jsx';
 import NumInput from '../components/NumInput.jsx';
@@ -121,7 +121,17 @@ const FD_LOCKS = [{ value: 'latch', label: 'Latch' }, { value: 'euro', label: 'S
 const FD_LOCK_LABEL = Object.fromEntries(FD_LOCKS.map((o) => [o.value, o.label]));
 const FD_CLOSERS = FIREDOOR_CLOSER_KINDS.map((k) => ({ value: k, label: FIREDOOR_CLOSER_LABELS[k] || k }));
 const FD_YES_NO = [{ value: true, label: 'Yes' }, { value: false, label: 'No' }];
-const FD_VP_POS = [{ value: 0, label: '0 (vertical)' }, { value: 90, label: '90 (horizontal)' }];
+// v1.2 (owner 28.10.2026): the vision panel is a TYPE (the chips come from the
+// profile's vp.types) with its size, panes and a position. The eleven keys of
+// the stored firedoorVp block, the arrangement and the two position modes with
+// the label of their one mm field (the engine's words, fireDoor.js).
+const FD_VP_KEYS = ['type', 'shape', 'width', 'height', 'count', 'arrange', 'gap', 'across', 'acrossOffset', 'down', 'downOffset'];
+const FD_VP_COUNTS = [1, 2, 3, 4, 5];
+const FD_VP_ARRANGE = [{ value: 'stack', label: 'One above another' }, { value: 'side', label: 'Side by side' }];
+const FD_VP_ACROSS = [{ value: 'centre', label: 'Centred', field: 'Shift (+ towards the lock edge)' }, { value: 'hinge', label: 'From hinge edge', field: 'From the hinge edge' }, { value: 'lock', label: 'From lock edge', field: 'From the lock edge' }];
+const FD_VP_DOWN = [{ value: 'top', label: 'Top from the leaf top', field: 'Top below the leaf top' }, { value: 'centre', label: 'Centre above the leaf bottom', field: 'Centre above the leaf bottom' }, { value: 'bottom', label: 'Bottom above the leaf bottom', field: 'Bottom above the leaf bottom' }];
+// the chip look of HChips, for the fire door chips that carry an icon, a swatch or a data attribute
+const fdChipCls = (on) => `px-2.5 py-1 text-[11px] rounded-lg border transition-all ${on ? 'border-accent-500 bg-accent-500/15 text-accent-400 font-medium' : 'border-surface-500 text-ink-200 bg-surface-600 hover:bg-surface-500'}`;
 // a leaf override field: '' (empty, the engine derives the leaf from the opening) or a number; stored as 0 when empty
 const fdLeafStore = (v) => (v === '' || v == null || !Number.isFinite(Number(v)) || Number(v) <= 0 ? 0 : Number(v));
 // the 3D opens the leaf this far by default (FIREDOOR-CONTRACT section 7: fireDoorOpen, degrees)
@@ -352,6 +362,13 @@ export default function ConfiguratorPage() {
   const [fdVpStyle, setFdVpStyle] = useState(Number(fdDefaults.vpStyle) || 0);
   const [fdVpCustom, setFdVpCustom] = useState({ ...DEFAULT_FIREDOOR_PROFILE.defaults.vpCustom, ...(fdDefaults.vpCustom || {}) });
   const [fdLeadEdge, setFdLeadEdge] = useState(fdDefaults.leadEdge !== false);
+  // v1.2 (owner 28.10.2026): the vision panel block (firedoorVp: null = not
+  // touched, the engine reads the stored / default Master_Door style above into
+  // the type model), the glass (null = by rating) and the strip colour (null =
+  // the profile default). The legacy style and custom block stay as stored.
+  const [fdVp, setFdVp] = useState(null);
+  const [fdGlass, setFdGlass] = useState(null);
+  const [fdIntuColour, setFdIntuColour] = useState(null);
 
   // Frame choice drives glass type; heritage opens a passive/single choice instead.
   const changeFrame = (v) => {
@@ -508,6 +525,10 @@ export default function ConfiguratorPage() {
     const vpd = { ...DEFAULT_FIREDOOR_PROFILE.defaults.vpCustom, ...(fdd.vpCustom || {}) };
     setFdVpCustom(Object.fromEntries(Object.keys(vpd).map((k) => [k, fdNum(vpc[k], vpd[k])])));
     setFdLeadEdge(typeof w.firedoorLeadEdge === 'boolean' ? w.firedoorLeadEdge : (fdd.leadEdge !== false));
+    // v1.2: the stored panel block (plain keys; null on a v1 / v1.1 door), the glass and the strip colour
+    setFdVp(fireDoorVpField(w.firedoorVp));
+    setFdGlass(w.firedoorGlass ? String(w.firedoorGlass) : null);
+    setFdIntuColour(w.firedoorIntuColour ? String(w.firedoorIntuColour) : null);
   }, [def]);
 
   // Prefill form when editing an existing window
@@ -789,9 +810,10 @@ export default function ConfiguratorPage() {
       heights: [{ value: hOpen, label: `${hOpen} (leaf ${hSug})` }],
     };
   }, [fdProfile]);
-  const fdVpStyles = fdProfile.vp?.styles || DEFAULT_FIREDOOR_PROFILE.vp.styles;
-  const fdVpStyleDef = fdVpStyles.find((s) => Number(s.id) === Number(fdVpStyle)) || null;
-  const fdVpIsCustom = fdVpStyleDef?.arrange === 'custom';
+  // v1.2: the vision panel types (the chips), the three glasses and the strip colours, all from the profile
+  const fdVpTypes = fdProfile.vp?.types || DEFAULT_FIREDOOR_PROFILE.vp.types;
+  const fdGlassTypes = fdProfile.vp?.glass?.types || DEFAULT_FIREDOOR_PROFILE.vp.glass.types;
+  const fdIntuColours = fdProfile.intumescent?.colours || DEFAULT_FIREDOOR_PROFILE.intumescent.colours;
   const fdItem = useMemo(() => (isFireDoor ? {
     windowCategory: 'firedoor',
     firedoorFire: fdFire, firedoorRating: fdRating,
@@ -801,8 +823,10 @@ export default function ConfiguratorPage() {
     firedoorLockType: fdLockType, firedoorCloser: fdCloserEff,
     firedoorVpStyle: Number(fdVpStyle), firedoorVpCustom: { ...fdVpCustom },
     firedoorLeadEdge: fdLeadEdge,
+    // v1.2: null = not set (the engine reads the legacy style / the rating / the profile default)
+    firedoorVp: fdVp ? { ...fdVp } : null, firedoorGlass: fdGlass, firedoorIntuColour: fdIntuColour,
     ventRoomType: 'other', pas24: false, childRestrictor: false,
-  } : null), [isFireDoor, fdFire, fdRating, fdOpeningWidth, fdOpeningHeight, fdLeafWidth, fdLeafHeight, fdHingeSide, fdFrameDepth, fdLockType, fdCloserEff, fdVpStyle, fdVpCustom, fdLeadEdge]);
+  } : null), [isFireDoor, fdFire, fdRating, fdOpeningWidth, fdOpeningHeight, fdLeafWidth, fdLeafHeight, fdHingeSide, fdFrameDepth, fdLockType, fdCloserEff, fdVpStyle, fdVpCustom, fdLeadEdge, fdVp, fdGlass, fdIntuColour]);
   const fdLive = useMemo(() => {
     if (!fdItem) return null;
     try {
@@ -824,6 +848,20 @@ export default function ConfiguratorPage() {
   const fd = fdLive?.derived?.firedoor || null;
   const fdOverall = fd?.frame?.overall || null;
   const fdBlocked = isFireDoor && !fdOverall;
+  // v1.2: the vision panel the editor shows = the door's own block, else the
+  // engine's reading of the door (fd.inputs.vp: a v1 / v1.1 door's style read
+  // into the type model); without a derive the engine helper reads the same.
+  // Every edit writes the WHOLE block (the eleven keys, from what is shown).
+  const fdVpView = useMemo(() => {
+    if (!isFireDoor) return null;
+    if (fdVp) return fdVp;
+    if (fd?.inputs?.vp) return fd.inputs.vp;
+    try { return fireDoorVpInput(fdProfile.vp || DEFAULT_FIREDOOR_PROFILE.vp, null, fdVpStyle, fdVpCustom); } catch { return null; }
+  }, [isFireDoor, fdVp, fd, fdProfile, fdVpStyle, fdVpCustom]);
+  const patchFdVp = (patch) => {
+    const base = fdVpView || {};
+    setFdVp(Object.fromEntries(FD_VP_KEYS.map((k) => [k, k in patch ? patch[k] : (base[k] ?? null)])));
+  };
 
   // ── Fire door numbering (brief 3.2): FDR-01 / DR-01, counted per prefix over
   // every window of every batch of the project. Proposed on a NEW door while
@@ -1596,26 +1634,23 @@ export default function ConfiguratorPage() {
             <HChips o={FD_LOCKS} v={fdLockType} c={setFdLockType} />
             <Lbl>Closer {fdCloser == null && <span className="text-ink-500">(follows fire: {FIREDOOR_CLOSER_LABELS[fdCloserEff] || fdCloserEff})</span>}</Lbl>
             <HChips o={FD_CLOSERS} v={fdCloserEff} c={setFdCloser} />
-            <Lbl>Vision panel (VP_STYLE of the bSolid macro)</Lbl>
-            <select value={fdVpStyle} onChange={(e) => setFdVpStyle(Number(e.target.value))}
-              className="w-full px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm mb-2">
-              {fdVpStyles.map((s) => <option key={s.id} value={s.id}>{s.id} · {s.label}</option>)}
-            </select>
-            {fdVpIsCustom && <div className="grid grid-cols-2 gap-2 mb-1">
-              {[['length', 'Pane length (mm)'], ['width', 'Pane width (mm)'], ['count', 'Panes'], ['rail', 'Rail between (mm)']].map(([k, l]) => (
-                <div key={k}>
-                  <Lbl>{l}</Lbl>
-                  <NumInput value={fdVpCustom[k]} onCommit={(v) => setFdVpCustom((c) => ({ ...c, [k]: Number(v) }))}
-                    className="w-full px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm" />
-                </div>
-              ))}
-              <div className="col-span-2">
-                <Lbl>Position (C_VP_POS)</Lbl>
-                <HChips o={FD_VP_POS} v={Number(fdVpCustom.pos)} c={(v) => setFdVpCustom((c) => ({ ...c, pos: v }))} />
-              </div>
-            </div>}
+            {/* v1.2 (owner 28.10.2026): the vision panel as a type with its size, panes and position (FdVisionPanel below) */}
+            <FdVisionPanel types={fdVpTypes} view={fdVpView} fd={fd} hingeSide={fdHingeSide} onPatch={patchFdVp}
+              legacyStyle={!fdVp && fd?.inputs?.vp?.source === 'legacy' ? fd.inputs.vp.legacyStyle : null} />
             {/* v1.1: one strip size by rating (FD30 one, FD60 two, non-fire none), read only from the engine */}
             <div className="text-[11px] text-ink-300 mb-1" data-firedoor-intu>Intumescent <span className="text-accent-400 font-medium">{fd ? (fd.intumescent ? fd.intumescent.label : 'none (non-fire)') : 'n/a'}</span> <span className="text-ink-500">(by rating{fd?.intumescent ? `, ${fd.intumescent.metres} m` : ''})</span></div>
+            {/* v1.2: the strip colour (the profile's colours; null = the profile default) */}
+            {fd?.intumescent && <>
+              <Lbl>Intumescent colour {fdIntuColour == null && <span className="text-ink-500">(default: {fd.intumescent.colour?.label})</span>}</Lbl>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {fdIntuColours.map((c) => (
+                  <button key={c.id} type="button" onClick={() => setFdIntuColour(c.id)} data-firedoor-intu-colour={c.id}
+                    className={fdChipCls((fdIntuColour ?? fd.intumescent.colour?.id) === c.id)}>
+                    <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm border border-surface-400 inline-block" style={{ backgroundColor: c.hex }} />{c.label}</span>
+                  </button>
+                ))}
+              </div>
+            </>}
             <Lbl>Leading edge bevel (lock edge)</Lbl>
             <HChips o={FD_YES_NO} v={fdLeadEdge} c={setFdLeadEdge} />
             <div className="text-[11px] text-ink-300 bg-surface-700/50 border border-surface-500 rounded-lg px-3 py-2 mt-1" data-firedoor-live>
@@ -1634,10 +1669,28 @@ export default function ConfiguratorPage() {
             <div className="text-[11px] text-ink-300 mt-1.5">Trickle vents: <span className="text-accent-400 font-medium">{buildVentGrilles({ vent: { roomType: ventRoomType, soleWindow: ventSoleWindow } })}</span></div>
           </Sec>}
 
-          <Sec t="Glass">
-            {isFireDoor ? (
-              <div className="text-[11px] text-ink-300 mb-2">Vision panel glass: <span className="text-accent-400 font-medium">{fd ? `${fd.fire ? 'fire glass' : 'toughened'} ${fdProfile.vp?.glassThickness ?? DEFAULT_FIREDOOR_PROFILE.vp.glassThickness} mm` : 'n/a'}</span> <span className="text-ink-500">(by fire)</span></div>
-            ) : isCasement ? (
+          {/* Fire doors v1.2 (owner 28.10.2026): the vision panel glass is one of three (FD30 standard,
+               FD insulated, Frosted) and nothing else: no type / spec / coating / finish / spacer choice */}
+          {isFireDoor && <Sec t="Glass">
+            <Lbl>Vision panel glass {fdGlass == null && fd?.vp?.glass && <span className="text-ink-500">(default for {fd.fire ? fd.rating : 'a non-fire door'})</span>}</Lbl>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {fdGlassTypes.map((g) => (
+                <button key={g.id} type="button" onClick={() => setFdGlass(g.id)} data-firedoor-glass={g.id}
+                  className={fdChipCls((fdGlass ?? fd?.vp?.glass?.type) === g.id)}>{g.label}</button>
+              ))}
+              {fdGlass != null && (
+                <button type="button" onClick={() => setFdGlass(null)} data-firedoor-glass-reset
+                  className="px-2 py-1 text-[11px] rounded-lg border border-surface-500 text-ink-300 bg-surface-600 hover:bg-surface-500">by rating</button>
+              )}
+            </div>
+            <div className="text-[11px] text-ink-300 mb-1" data-firedoor-glass-line>
+              {fd?.vp?.glass
+                ? <><span className="text-accent-400 font-medium">{fd.vp.glass.label} {fd.vp.glass.thickness} mm</span> <span className="text-ink-500">{fd.vp.panes?.length ? `· ${fd.vp.glassSqm} m² in ${fd.vp.panes.length} pane${fd.vp.panes.length === 1 ? '' : 's'}` : '· no vision panel: the glass applies when one is set'}</span></>
+                : 'n/a'}
+            </div>
+          </Sec>}
+          {!isFireDoor && <Sec t="Glass">
+            {isCasement ? (
               <><Lbl>Type</Lbl><HChips o={GLASS_TYPES.filter(g => g.value === 'double' || g.value === 'triple')} v={glassType} c={setGlassType} /></>
             ) : !isSash ? (
               <><Lbl>Type</Lbl><HChips o={GLASS_TYPES.filter(g => g.value === 'double' || g.value === 'double_slim' || g.value === 'triple')} v={glassType} c={setGlassType} /></>
@@ -1655,7 +1708,7 @@ export default function ConfiguratorPage() {
             {isCasement ? (
               <><Lbl>Gas</Lbl><HChips o={GAS_OPTIONS} v={glassGas} c={setGlassGas} /></>
             ) : (hasGasFill && <div className="text-[11px] text-ink-300 mt-1">Gas: <span className="text-accent-400 font-medium">Argon</span> <span className="text-ink-500">— fixed</span></div>)}
-          </Sec>
+          </Sec>}
 
           {!isPartition && !isFireDoor && <Sec t={isCasement ? 'Security & External Cill' : 'Horns & Security'}>
             {isSash && <><Lbl>Horns</Lbl><HChips o={HORN_OPTIONS} v={horn} c={setHorn} /></>}
@@ -1800,7 +1853,10 @@ export default function ConfiguratorPage() {
               <SR l="Keep centre" v={`${fd.keep?.centreFromFoot} from the jamb foot`} />
               <SR l="Closer" v={fd.closer ? fd.closer.label : 'None'} />
               <SR l="Vision panel" v={fd.vp?.label || 'None'} />
-              <SR l="Intumescent" v={fd.intumescent ? `${fd.intumescent.label} · ${fd.intumescent.metres} m` : 'none (non-fire)'} />
+              {/* v1.2: the panel's place in words, the glass of three, the strip colour */}
+              {fd.vp?.positionLabel && <div className="px-4 pb-0.5 text-right text-[10px] text-ink-300" data-firedoor-vp-position-summary>{fd.vp.positionLabel}</div>}
+              {fd.vp?.panes?.length > 0 && <SR l="Glass" v={`${fd.vp.glass?.label} · ${fd.vp.glass?.thickness} mm`} />}
+              <SR l="Intumescent" v={fd.intumescent ? `${fd.intumescent.label} · ${fd.intumescent.metres} m${fd.intumescent.colour ? ` · ${fd.intumescent.colour.label}` : ''}` : 'none (non-fire)'} />
             </>}
           </SG>}
           {isPartition
@@ -1822,7 +1878,12 @@ export default function ConfiguratorPage() {
               <span className="text-ink-200">Int: {hexToName(woodColorInt)}</span>
             </div>}
           </SG>
-          <SG t="Glass">
+          {/* fire doors v1.2: the vision panel glass only (one of three) */}
+          {isFireDoor && <SG t="Glass">
+            <SR l="Vision panel" v={fd?.vp?.glass ? `${fd.vp.glass.label} · ${fd.vp.glass.thickness} mm` : 'n/a'} />
+            {fd?.vp?.panes?.length > 0 && <SR l="Area" v={`${fd.vp.glassSqm} m²`} />}
+          </SG>}
+          {!isFireDoor && <SG t="Glass">
             <SR l="Type" v={glassLabel(glassType)} />
             <SR l="Spec" v={glassSpec} />
             <SR l="Coating" v={(GLASS_COATINGS.find(c => c.value === glassCoating) || {}).label || 'Standard'} />
@@ -1830,7 +1891,7 @@ export default function ConfiguratorPage() {
             {(isCasement || hasGasFill) && <SR l="Gas" v={isCasement ? (glassGas === 'argon' ? 'Argon' : 'Air') : 'Argon'} />}
             <SR l="Spacer" v={spacerColor} />
             <SR l="Spacer Type" v={(SPACER_TYPES.find(t => t.value === spacerType) || {}).label || 'Warm Edge'} />
-          </SG>
+          </SG>}
           {!isPartition && !isFireDoor && <SG t="Ventilation">
             <SR l="Room" v={ventRoomType} />
             <SR l="Sole window" v={ventSoleWindow ? 'Yes' : 'No'} />
@@ -1863,6 +1924,180 @@ export default function ConfiguratorPage() {
         />
       )}
     </div>
+  );
+}
+
+// ─── Fire doors v1.2 (owner 28.10.2026): the vision panel editor ───
+// The owner: "many choices but not my way of positioning (centre, shift right,
+// 100 from the edge); describe them better: round, square, standard, double".
+// A row of TYPE chips (the profile's vp.types, each with a small icon of its
+// shape), the size fields of the shape, the panes with their arrangement and
+// gap, the position across (centred with a shift, or a distance from the hinge
+// / lock edge) and up / down (the top from the leaf top, the centre or the
+// bottom above the leaf bottom), and a preview of the engine's panes. `view` =
+// the panel shown (the door's block, else the engine's reading of the door);
+// onPatch(changed keys) and the parent writes the whole block. Nothing here
+// sizes or places a pane: the preview draws fd.vp.panes and fd.hinges.
+function FdVisionPanel({ types, view, fd, hingeSide, onPatch, legacyStyle }) {
+  const v = view || {};
+  const shape = v.shape || 'none';
+  const has = shape !== 'none' && Number(v.count) > 0;
+  const group = fd?.vp?.group || null;
+  const numCls = 'w-20 px-2 py-1.5 bg-surface-800 border border-surface-500 text-ink-50 rounded-lg text-sm';
+  const num = (k) => (val) => onPatch({ [k]: Number(val) });
+  const pickType = (t) => onPatch({ type: t.id, shape: t.shape, width: t.width, height: t.height, count: t.count, arrange: t.arrange, gap: t.gap });
+  // a mode switch keeps the panel where it is: its distance from that edge as the engine placed it (fd.vp.group)
+  const pickAcross = (mode) => {
+    if (mode === v.across) return;
+    const off = mode === 'centre' ? 0 : group ? (mode === 'hinge' ? group.fromHingeEdge : group.fromLockEdge) : v.acrossOffset;
+    onPatch({ across: mode, acrossOffset: off });
+  };
+  const pickDown = (mode) => {
+    if (mode === v.down) return;
+    const off = !group ? v.downOffset : mode === 'top' ? group.fromTop : mode === 'bottom' ? group.fromBottom : Math.round(group.fromBottom + group.h / 2);
+    onPatch({ down: mode, downOffset: off });
+  };
+  const sizeFields = shape === 'round' ? [['width', 'Diameter (mm)']] : shape === 'diamond' ? [['width', 'Size (mm, turned 45)']] : [['width', 'Width (mm)'], ['height', 'Height (mm)']];
+  const across = FD_VP_ACROSS.find((o) => o.value === v.across) || FD_VP_ACROSS[0];
+  const down = FD_VP_DOWN.find((o) => o.value === v.down) || FD_VP_DOWN[0];
+  return (
+    <div data-firedoor-vp>
+      <Lbl>Vision panel</Lbl>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {types.map((t) => (
+          <button key={t.id} type="button" onClick={() => pickType(t)} data-firedoor-vp-type={t.id} className={fdChipCls(v.type === t.id)} title={t.shape === 'none' ? 'No vision panel' : `${t.label}: ${t.shape === 'round' ? `dia ${t.width}` : t.shape === 'diamond' ? `${t.width} x ${t.width} turned 45` : `${t.width} x ${t.height}`}${Number(t.count) > 1 ? `, ${t.count} panes` : ''}`}>
+            <span className="inline-flex items-center gap-1.5"><FdVpTypeIcon t={t} />{t.label}</span>
+          </button>
+        ))}
+      </div>
+      {legacyStyle != null && legacyStyle !== 0 && <div className="text-[10px] text-ink-500 mb-1" data-firedoor-vp-legacy>Read from the saved Master_Door style {legacyStyle}; any change here stores the new vision panel.</div>}
+      {has && <>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 mb-1">
+          {sizeFields.map(([k, l]) => (
+            <div key={k}>
+              <Lbl>{l}</Lbl>
+              <NumInput value={v[k]} onCommit={num(k)} data-firedoor-vp-field={k} className={numCls} />
+            </div>
+          ))}
+        </div>
+        <Lbl>Panes</Lbl>
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {FD_VP_COUNTS.map((n) => (
+            <button key={n} type="button" onClick={() => onPatch({ count: n })} data-firedoor-vp-count={n} className={fdChipCls(Number(v.count) === n)}>{n}</button>
+          ))}
+        </div>
+        {Number(v.count) > 1 && <>
+          <div className="flex flex-wrap gap-1.5 mb-1">
+            {FD_VP_ARRANGE.map((o) => (
+              <button key={o.value} type="button" onClick={() => onPatch({ arrange: o.value })} data-firedoor-vp-arrange={o.value} className={fdChipCls((v.arrange === 'side' ? 'side' : 'stack') === o.value)}>{o.label}</button>
+            ))}
+          </div>
+          <Lbl>Gap between the panes (mm)</Lbl>
+          <NumInput value={v.gap} onCommit={num('gap')} data-firedoor-vp-field="gap" className={numCls + ' mb-1'} />
+        </>}
+        <Lbl>Position across</Lbl>
+        <div className="flex flex-wrap gap-1.5 mb-1">
+          {FD_VP_ACROSS.map((o) => (
+            <button key={o.value} type="button" onClick={() => pickAcross(o.value)} data-firedoor-vp-across={o.value} className={fdChipCls(across.value === o.value)}>{o.label}</button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 mb-1">
+          <NumInput value={v.acrossOffset} onCommit={num('acrossOffset')} data-firedoor-vp-field="acrossOffset" className={numCls} />
+          <span className="text-[11px] text-ink-400" data-firedoor-vp-across-label>{across.field} (mm)</span>
+        </div>
+        <Lbl>Position up / down</Lbl>
+        <div className="flex flex-wrap gap-1.5 mb-1">
+          {FD_VP_DOWN.map((o) => (
+            <button key={o.value} type="button" onClick={() => pickDown(o.value)} data-firedoor-vp-down={o.value} className={fdChipCls(down.value === o.value)}>{o.label}</button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 mb-2">
+          <NumInput value={v.downOffset} onCommit={num('downOffset')} data-firedoor-vp-field="downOffset" className={numCls} />
+          <span className="text-[11px] text-ink-400" data-firedoor-vp-down-label>{down.field} (mm)</span>
+        </div>
+      </>}
+      {fd && <div className="flex items-start gap-3 bg-surface-700/50 border border-surface-500 rounded-lg px-2 py-2 mb-2">
+        <FdVpPreview fd={fd} hingeSide={hingeSide} />
+        <div className="text-[11px] min-w-0">
+          <div className="text-accent-400 font-medium" data-firedoor-vp-label>{fd.vp?.label || 'None'}</div>
+          {fd.vp?.positionLabel && <div className="text-ink-300 mt-0.5" data-firedoor-vp-position-label>{fd.vp.positionLabel}</div>}
+          <div className="text-ink-500 mt-1">Seen from the pull side; the hinge edge is the thick line.</div>
+          {(fd.vp?.warnings || []).map((w, i) => <div key={i} className="text-amber-400 mt-1" data-firedoor-vp-warning>{w}</div>)}
+        </div>
+      </div>}
+    </div>
+  );
+}
+
+// A type chip's icon: the preset's panes in a 14 x 18 box (a rectangle, a
+// square, a slot, a circle, a diamond, panes one above another / side by
+// side); none = a crossed box. A schematic: each pane keeps its proportion,
+// the panes sit a fixed 2 px apart and never thinner than 3 px, so two tall
+// slots still read as two. Drawing only: the sizes are the preset's own.
+function FdVpTypeIcon({ t }) {
+  const n = Math.max(0, Math.min(5, Math.round(Number(t?.count) || 0)));
+  const w0 = Number(t?.width) || 0, h0 = t?.shape === 'rect' ? (Number(t?.height) || 0) : w0;
+  const side = t?.arrange === 'side';
+  const svgProps = { width: 14, height: 18, viewBox: '0 0 14 18', className: 'shrink-0', 'aria-hidden': true };
+  if (!t || t.shape === 'none' || !n || !(w0 > 0) || !(h0 > 0)) {
+    return <svg {...svgProps}><rect x="1.5" y="1.5" width="11" height="15" rx="1" fill="none" stroke="currentColor" strokeWidth="1" /><path d="M1.5 1.5 L12.5 16.5 M12.5 1.5 L1.5 16.5" stroke="currentColor" strokeWidth="1" /></svg>;
+  }
+  const G = 2, MIN = 3;
+  const availW = 12 - (side ? (n - 1) * G : 0), availH = 16 - (side ? 0 : (n - 1) * G);
+  const k = Math.min(availW / (side ? n * w0 : w0), availH / (side ? h0 : n * h0));
+  const pw = Math.max(MIN, w0 * k), ph = Math.max(MIN, h0 * k);
+  const gw = side ? n * pw + (n - 1) * G : pw, gh = side ? ph : n * ph + (n - 1) * G;
+  const ox = (14 - gw) / 2, oy = (18 - gh) / 2;
+  const panes = Array.from({ length: n }, (_, i) => ({
+    x: ox + (side ? i * (pw + G) : 0), y: oy + (side ? 0 : i * (ph + G)), w: pw, h: ph,
+  }));
+  return (
+    <svg {...svgProps}>
+      {panes.map((p, i) => (t.shape === 'round'
+        ? <circle key={i} cx={p.x + p.w / 2} cy={p.y + p.h / 2} r={p.w / 2} fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
+        : t.shape === 'diamond'
+          ? <path key={i} d={`M${p.x + p.w / 2} ${p.y} L${p.x + p.w} ${p.y + p.h / 2} L${p.x + p.w / 2} ${p.y + p.h} L${p.x} ${p.y + p.h / 2} Z`} fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />
+          : <rect key={i} x={p.x} y={p.y} width={p.w} height={p.h} rx="0.8" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1" />))}
+    </svg>
+  );
+}
+
+// The live preview: the leaf outline 120 px high, seen from the pull side (the
+// hinge edge on the hinge side, a thick line with the hinges on it), the lever
+// rose at the spindle and the engine's panes (fd.vp.panes: x from the leaf top,
+// y from the hinge edge; a rectangle with its corner radius, a circle, a
+// diamond turned 45).
+function FdVpPreview({ fd, hingeSide }) {
+  const W = Number(fd?.leaf?.width) || 0, H = Number(fd?.leaf?.height) || 0;
+  if (!(W > 0) || !(H > 0)) return null;
+  const hingeLeft = (fd?.handing?.hingeSide || hingeSide) !== 'right';
+  const sx = (y, w) => (hingeLeft ? y : W - y - w);
+  const m = Math.round(H * 0.03);
+  const vbW = W + 2 * m, vbH = H + 2 * m;
+  const pxH = 120, pxW = Math.max(30, Math.round(pxH * vbW / vbH));
+  const frosted = fd?.vp?.glass?.type === 'frosted';
+  const paneFill = frosted ? 'rgba(226, 232, 240, 0.75)' : 'rgba(125, 185, 235, 0.45)';
+  const ns = { vectorEffect: 'non-scaling-stroke' };
+  const hingeX = hingeLeft ? 0 : W;
+  const spindle = fd?.lock?.spindle;
+  return (
+    <svg data-firedoor-vp-preview width={pxW} height={pxH} viewBox={`${-m} ${-m} ${vbW} ${vbH}`} className="shrink-0 text-ink-300">
+      <rect x="0" y="0" width={W} height={H} fill="rgba(160, 160, 160, 0.08)" stroke="currentColor" strokeWidth="1" {...ns} />
+      <line x1={hingeX} y1="0" x2={hingeX} y2={H} stroke="currentColor" strokeWidth="3" {...ns} data-vp-hinge-edge={hingeLeft ? 'left' : 'right'} />
+      {(fd?.hinges?.positions || []).map((h) => (
+        <rect key={h.i} x={hingeLeft ? -m * 0.7 : W} y={h.top} width={m * 0.7} height={Math.max(1, (h.bottom ?? h.top) - h.top)} fill="currentColor" />
+      ))}
+      {spindle && Number.isFinite(Number(spindle.fromTop)) && (
+        <circle cx={hingeLeft ? W - Number(spindle.fromLockEdge || 0) : Number(spindle.fromLockEdge || 0)} cy={Number(spindle.fromTop)} r={Math.max(12, m * 0.8)} fill="none" stroke="currentColor" strokeWidth="1" {...ns} data-vp-handle />
+      )}
+      {(fd?.vp?.panes || []).map((p) => {
+        const bw = Number(p.box?.w) || Number(p.w) || 0, bh = Number(p.box?.h) || Number(p.h) || 0;
+        const x = sx(Number(p.y) || 0, bw), y = Number(p.x) || 0;
+        if (p.shape === 'round') return <circle key={p.i} cx={x + bw / 2} cy={y + bh / 2} r={Number(p.w) / 2} fill={paneFill} stroke="currentColor" strokeWidth="1" {...ns} data-vp-pane="round" />;
+        if (p.shape === 'diamond') return <path key={p.i} d={`M${x + bw / 2} ${y} L${x + bw} ${y + bh / 2} L${x + bw / 2} ${y + bh} L${x} ${y + bh / 2} Z`} fill={paneFill} stroke="currentColor" strokeWidth="1" {...ns} data-vp-pane="diamond" />;
+        return <rect key={p.i} x={x} y={y} width={bw} height={bh} rx={Number(p.radius) || 0} fill={paneFill} stroke="currentColor" strokeWidth="1" {...ns} data-vp-pane="rect" />;
+      })}
+    </svg>
   );
 }
 

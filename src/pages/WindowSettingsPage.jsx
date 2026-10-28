@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { uploadBsuiteProgram, removeBsuiteProgram } from '../services/bsuitePrograms.js';
 import { useWindowProfileStore } from '../stores/windowProfileStore.js';
-import { kgPerM, VARIANT_ORDER, casementGlassDeductions, DEFAULT_DOOR_PROFILE, DEFAULT_PARTITION_PROFILE, DEFAULT_FIREDOOR_PROFILE, FIREDOOR_CLOSER_KINDS, FIREDOOR_CLOSER_LABELS } from '../engine/profile.js';
+import { kgPerM, VARIANT_ORDER, casementGlassDeductions, DEFAULT_DOOR_PROFILE, DEFAULT_PARTITION_PROFILE, DEFAULT_FIREDOOR_PROFILE, FIREDOOR_CLOSER_KINDS, FIREDOOR_CLOSER_LABELS, FIREDOOR_VP_SHAPES, FIREDOOR_VP_ACROSS, FIREDOOR_VP_DOWN, FIREDOOR_VP_ARRANGE } from '../engine/profile.js';
 import NumInput from '../components/NumInput.jsx';
 import { CONSTANTS, deriveWindowData } from '../engine/calculations.js';
 import { buildArchPlan, ArchError } from '../engine/arch.js';
@@ -1936,12 +1936,52 @@ const FD_SET_HANDS = [['left', 'Hinge left'], ['right', 'Hinge right']];
 const FD_SET_LOCKS = [['latch', 'Latch'], ['euro', 'Sashlock euro'], ['bathroom', 'Bathroom']];
 // v1.1: the closer is a kind (none / surface / built in), one default for fire doors and one for non-fire doors; no swing
 const FD_SET_CLOSERS = FIREDOOR_CLOSER_KINDS.map((k) => [k, FIREDOOR_CLOSER_LABELS[k] || k]);
+// v1.2 (owner 28.10.2026): the vision panel vocabularies of the types table and
+// the position default (the engine's FIREDOOR_VP_* lists, worded for the user)
+const FD_SET_VP_SHAPE_LABEL = { none: 'None', rect: 'Rectangle', round: 'Round', diamond: 'Diamond' };
+const FD_SET_VP_SHAPES = FIREDOOR_VP_SHAPES.map((k) => [k, FD_SET_VP_SHAPE_LABEL[k] || k]);
+const FD_SET_VP_ARRANGE_LABEL = { stack: 'One above another', side: 'Side by side' };
+const FD_SET_VP_ARRANGE = FIREDOOR_VP_ARRANGE.map((k) => [k, FD_SET_VP_ARRANGE_LABEL[k] || k]);
+const FD_SET_VP_ACROSS_LABEL = { centre: 'Centred', hinge: 'From the hinge edge', lock: 'From the lock edge' };
+const FD_SET_VP_ACROSS = FIREDOOR_VP_ACROSS.map((k) => [k, FD_SET_VP_ACROSS_LABEL[k] || k]);
+const FD_SET_VP_ACROSS_FIELD = { centre: 'Shift (+ towards the lock edge)', hinge: 'From the hinge edge', lock: 'From the lock edge' };
+const FD_SET_VP_DOWN_LABEL = { top: 'Top from the leaf top', centre: 'Centre above the leaf bottom', bottom: 'Bottom above the leaf bottom' };
+const FD_SET_VP_DOWN = FIREDOOR_VP_DOWN.map((k) => [k, FD_SET_VP_DOWN_LABEL[k] || k]);
+const FD_SET_VP_DOWN_FIELD = { top: 'Top below the leaf top', centre: 'Centre above the leaf bottom', bottom: 'Bottom above the leaf bottom' };
+// the closer drawing symbol sizes (v1.2): [key, label, hint]
+const FD_SET_CLOSER_SURFACE = [
+  ['bodyLength', 'Body length', ''], ['bodyHeight', 'Body height', ''], ['bodyDepth', 'Body depth', 'off the leaf face'],
+  ['fromHingeEdge', 'From the hinge edge', 'to the body'], ['belowLeafTop', 'Below the leaf top', 'to the body'],
+  ['armLength', 'Arm length', 'to the shoe'], ['armWidth', 'Arm width', ''], ['shoeLength', 'Shoe length', 'on the head face'], ['shoeHeight', 'Shoe height', ''],
+];
+const FD_SET_CLOSER_BUILTIN = [
+  ['bodyLength', 'Body length', ''], ['bodyWidth', 'Body width', 'centred on the leaf thickness'], ['bodyDepth', 'Body depth', 'down into the leaf'],
+  ['fromHingeEdge', 'From the hinge edge', 'body and track'], ['trackLength', 'Track length', 'in the head soffit'], ['trackWidth', 'Track width', ''], ['trackDepth', 'Track depth', ''],
+];
+
+// A text field that commits on blur / Enter (trimmed, never empty; an empty
+// field goes back to the stored text), re-synced from the profile when not focused.
+function TextCommitInput({ value, onCommit, ...rest }) {
+  const text = String(value ?? '');
+  const [draft, setDraft] = useState(text);
+  const focused = useRef(false);
+  useEffect(() => { if (!focused.current) setDraft(text); }, [text]);
+  return (
+    <input type="text" value={draft}
+      onFocus={() => { focused.current = true; }}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => { focused.current = false; const v = draft.trim(); if (v && v !== text) onCommit(v); setDraft(v || text); }}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+      {...rest} />
+  );
+}
 
 function FireDoorSettings() {
   const firedoor = useWindowProfileStore((s) => s.firedoor) || DEFAULT_FIREDOOR_PROFILE;
   const setPath = useWindowProfileStore((s) => s.setFireDoorPath);
   const setList = useWindowProfileStore((s) => s.setFireDoorList);
   const setBsuiteTargets = useWindowProfileStore((s) => s.setFireDoorBsuiteTargets);
+  const setColours = useWindowProfileStore((s) => s.setFireDoorColours);
   const resetFireDoor = useWindowProfileStore((s) => s.resetFireDoorToDefaults);
   const p = firedoor;
   const L = p.leaf || DEFAULT_FIREDOOR_PROFILE.leaf, FR = p.frame || DEFAULT_FIREDOOR_PROFILE.frame;
@@ -1951,6 +1991,10 @@ function FireDoorSettings() {
   const DF = p.defaults || DEFAULT_FIREDOOR_PROFILE.defaults;
   const FO = LK.forend || {}, CS = LK.case || {}, KPK = KP.pocket || {}, LIM = L.limits || {}, TBR = L.thicknessByRating || {};
   const DW = FR.dowels || DEFAULT_FIREDOOR_PROFILE.frame.dowels, SBR = IN.stripsByRating || DEFAULT_FIREDOOR_PROFILE.intumescent.stripsByRating;
+  // v1.2: the glasses, the strip colours, the closer drawing symbols
+  const GL = VP.glass || DEFAULT_FIREDOOR_PROFILE.vp.glass;
+  const COLS = Array.isArray(IN.colours) && IN.colours.length ? IN.colours : DEFAULT_FIREDOOR_PROFILE.intumescent.colours;
+  const CLS = p.closer?.surface || DEFAULT_FIREDOOR_PROFILE.closer.surface, CLB = p.closer?.builtin || DEFAULT_FIREDOOR_PROFILE.closer.builtin;
   // the sample door: the reference door of brief 3.10 (the profile defaults), its leaf size typed as the override and its rating editable here
   const [sampleW, setSampleW] = useState(() => Number(DEFAULT_FIREDOOR_PROFILE.leaf.defaultWidth));
   const [sampleH, setSampleH] = useState(() => Number(DEFAULT_FIREDOOR_PROFILE.leaf.defaultHeight));
@@ -1966,6 +2010,13 @@ function FireDoorSettings() {
   const [intuLock, setIntuLock] = useState(true);
   const [bsuiteLock, setBsuiteLock] = useState(true);
   const [defaultsLock, setDefaultsLock] = useState(true);
+  // v1.2: the glass card, the closer symbols card; the sample door's vision
+  // panel type (a preset of the types table, so an edit there moves the
+  // sample) and its closer kind ('' = the defaults card's fire / non-fire kind)
+  const [glassLock, setGlassLock] = useState(true);
+  const [closerLock, setCloserLock] = useState(true);
+  const [sampleVpType, setSampleVpType] = useState('standard');
+  const [sampleCloser, setSampleCloser] = useState('');
   const W = Number(sampleW) || Number(DEFAULT_FIREDOOR_PROFILE.leaf.defaultWidth);
   const Hh = Number(sampleH) || Number(DEFAULT_FIREDOOR_PROFILE.leaf.defaultHeight);
   const Dd = Number(sampleDepth) || Number(DEFAULT_FIREDOOR_PROFILE.frame.defaultDepth);
@@ -1991,11 +2042,16 @@ function FireDoorSettings() {
       // v1.1: the sample leaf is typed as the override (the engine reports the
       // opening it needs); the closer, the intumescent and the handing follow
       // the profile defaults (no swing, no intumescent style)
+      // v1.2: the sample's vision panel is a type only ({ type }): the engine
+      // fills its shape, size, panes and gap from that preset of the types table
+      // and the position from the position default, so an edit there moves it
       const ws = normaliseToWindowSpec({
         name: 'SAMPLE', width: W, height: Hh, windowCategory: 'firedoor',
         firedoorFire: sampleFire, firedoorRating: sampleRating, firedoorLeafWidth: W, firedoorLeafHeight: Hh, firedoorFrameDepth: Dd,
         firedoorHingeSide: DF.hingeSide, firedoorLockType: DF.lockType,
         firedoorVpStyle: DF.vpStyle, firedoorLeadEdge: DF.leadEdge, glassType: 'double',
+        ...(sampleVpType ? { firedoorVp: { type: sampleVpType } } : {}),
+        ...(sampleCloser ? { firedoorCloser: sampleCloser } : {}),
       });
       const derived = deriveWindowData(ws);
       if (!derived?.firedoor) throw new Error('The engine returned no fire door data');
@@ -2004,7 +2060,7 @@ function FireDoorSettings() {
       console.error('WindowSettings fire door sample derive failed:', err);
       return { ws: null, derived: null, error: err?.message || String(err) };
     }
-  }, [W, Hh, Dd, sampleRating, sampleFire, p]);
+  }, [W, Hh, Dd, sampleRating, sampleFire, sampleVpType, sampleCloser, p]);
   const fd = sample?.derived?.firedoor || null;
   const fdFrame = fd?.frame || null;
   const fdHinges = fd?.hinges?.positions || [];
@@ -2256,38 +2312,166 @@ function FireDoorSettings() {
             </fieldset>
           </div>
 
-          {/* ══ Vision panel ══ */}
-          <div className={`card p-4 mb-4 ${vpLock ? '' : 'ring-1 ring-amber-500/40'}`}>
+          {/* ══ Vision panel (v1.2, owner 28.10.2026) ══ */}
+          <div className={`card p-4 mb-4 ${vpLock ? '' : 'ring-1 ring-amber-500/40'}`} data-fd-vp-card>
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs font-semibold text-ink-200">Vision panel
-                <span className="text-ink-500 font-normal"> · the placement the sheets and the 3D use (ASSUMPTION: the macro placement is not decoded, the export sends the style id); the style table is the macro's, read only</span>
+                <span className="text-ink-500 font-normal"> · v1.2: the types are the chips of the configurator (a shape, the pane size, the panes and their gap); the user then changes the size and places the panel centred, from the hinge edge or from the lock edge, and from the leaf top or above the leaf bottom</span>
               </div>
               <LockToggle locked={vpLock} onToggle={() => setVpLock((x) => !x)} />
             </div>
             <fieldset disabled={vpLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${vpLock ? 'opacity-60' : ''}`}>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Types (round: the width is the diameter; diamond: the width is the side, turned 45)</div>
+              <table className="w-full text-[11px] mb-3" data-fd-vp-types>
+                <thead>
+                  <tr className="text-ink-500 text-left">
+                    <th className="pr-2 font-medium">type</th><th className="pr-2 font-medium">label (the chip)</th><th className="pr-2 font-medium">shape</th>
+                    <th className="pr-2 font-medium">width</th><th className="pr-2 font-medium">height</th><th className="pr-2 font-medium">panes</th>
+                    <th className="pr-2 font-medium">arrangement</th><th className="font-medium">gap</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(VP.types || []).map((t, i) => {
+                    const at = (k) => ['vp', 'types', i, k];
+                    const none = t.shape === 'none';
+                    const oneSize = t.shape === 'round' || t.shape === 'diamond';
+                    const numCls = 'w-16 px-1.5 py-1 bg-surface-800 border border-surface-500 text-ink-50 rounded text-xs';
+                    return (
+                      <tr key={t.id} className="text-ink-300 border-t border-surface-500/40 align-middle" data-fd-vp-type-row={t.id}>
+                        <td className="pr-2 py-1 font-mono text-ink-500">{t.id}</td>
+                        <td className="pr-2 py-1">
+                          <TextCommitInput value={t.label} onCommit={(v) => setPath(at('label'), v)} data-fd-vp-type-field="label"
+                            className="w-44 px-1.5 py-1 bg-surface-800 border border-surface-500 text-ink-50 rounded text-xs" />
+                        </td>
+                        <td className="pr-2 py-1">
+                          {t.id === 'none' ? <span className="text-ink-500">none</span> : (
+                            <select value={t.shape} onChange={(e) => setPath(at('shape'), e.target.value)} data-fd-vp-type-field="shape"
+                              className="px-1.5 py-1 bg-surface-800 border border-surface-500 text-ink-50 rounded text-xs">
+                              {FD_SET_VP_SHAPES.filter(([v]) => v !== 'none').map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                            </select>
+                          )}
+                        </td>
+                        <td className="pr-2 py-1">{none ? '' : <NumInput value={t.width} onCommit={(v) => setPath(at('width'), v)} data-fd-vp-type-field="width" className={numCls} />}</td>
+                        <td className="pr-2 py-1">{none ? '' : oneSize ? <span className="text-ink-500">= width</span> : <NumInput value={t.height} onCommit={(v) => setPath(at('height'), v)} data-fd-vp-type-field="height" className={numCls} />}</td>
+                        <td className="pr-2 py-1">{none ? '' : <NumInput value={t.count} onCommit={(v) => setPath(at('count'), v)} data-fd-vp-type-field="count" className={numCls} />}</td>
+                        <td className="pr-2 py-1">
+                          {none ? '' : (
+                            <select value={t.arrange === 'side' ? 'side' : 'stack'} onChange={(e) => setPath(at('arrange'), e.target.value)} data-fd-vp-type-field="arrange"
+                              className="px-1.5 py-1 bg-surface-800 border border-surface-500 text-ink-50 rounded text-xs">
+                              {FD_SET_VP_ARRANGE.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                            </select>
+                          )}
+                        </td>
+                        <td className="py-1">{none ? '' : <NumInput value={t.gap} onCommit={(v) => setPath(at('gap'), v)} data-fd-vp-type-field="gap" className={numCls} />}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Position of a new panel (the configurator starts here; a type chip keeps the position)</div>
               <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
-                <PathField label="Top rail" value={VP.topRail} onCommit={(v) => setPath(['vp', 'topRail'], v)} hint="leaf top to the first pane (D_TOP_RAIL)" />
-                <PathField label="Mid rail" value={VP.midRail} onCommit={(v) => setPath(['vp', 'midRail'], v)} hint="the A/B pair gap (D_MID_RAIL)" />
+                <div>
+                  <div className="text-ink-400 mb-1">Across the leaf</div>
+                  <select value={VP.position?.across || 'centre'} onChange={(e) => setPath(['vp', 'position', 'across'], e.target.value)} className={selectCls} data-fd-vp-position="across">
+                    {FD_SET_VP_ACROSS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                </div>
+                <PathField label={FD_SET_VP_ACROSS_FIELD[VP.position?.across] || FD_SET_VP_ACROSS_FIELD.centre} value={VP.position?.acrossOffset} onCommit={(v) => setPath(['vp', 'position', 'acrossOffset'], v)} />
+                <div>
+                  <div className="text-ink-400 mb-1">Up / down the leaf</div>
+                  <select value={VP.position?.down || 'top'} onChange={(e) => setPath(['vp', 'position', 'down'], e.target.value)} className={selectCls} data-fd-vp-position="down">
+                    {FD_SET_VP_DOWN.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                </div>
+                <PathField label={FD_SET_VP_DOWN_FIELD[VP.position?.down] || FD_SET_VP_DOWN_FIELD.top} value={VP.position?.downOffset} onCommit={(v) => setPath(['vp', 'position', 'downOffset'], v)} />
+              </div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <PathField label="Minimum timber round a panel" value={VP.minEdge} onCommit={(v) => setPath(['vp', 'minEdge'], v)} hint="ASSUMPTION: less = a warning on the door, never a block" />
+                <PathField label="Corner radius" value={VP.cornerRadius} onCommit={(v) => setPath(['vp', 'cornerRadius'], v)} hint="rectangle panes (round: half the diameter)" />
+                <PathField label="Bead faces" value={VP.beadFaces} onCommit={(v) => setPath(['vp', 'beadFaces'], v)} hint="bead metres = perimeter x this" />
+              </div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Master_Door placement defaults (D_TOP_RAIL, D_MID_RAIL, D_SIDE_MARGIN; the reading of a door saved with a Master_Door style)</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <PathField label="Top rail" value={VP.topRail} onCommit={(v) => setPath(['vp', 'topRail'], v)} hint="D_TOP_RAIL" />
+                <PathField label="Mid rail" value={VP.midRail} onCommit={(v) => setPath(['vp', 'midRail'], v)} hint="D_MID_RAIL" />
                 <PathField label="Side margin" value={VP.sideMargin} onCommit={(v) => setPath(['vp', 'sideMargin'], v)} hint="D_SIDE_MARGIN" />
                 <PathField label="Stack gap" value={VP.stackGap} onCommit={(v) => setPath(['vp', 'stackGap'], v)} hint="the nNo styles" />
-                <PathField label="Corner radius" value={VP.cornerRadius} onCommit={(v) => setPath(['vp', 'cornerRadius'], v)} />
-                <PathField label="Bead faces" value={VP.beadFaces} onCommit={(v) => setPath(['vp', 'beadFaces'], v)} hint="bead metres = perimeter x this" />
-                <PathField label="Glass thickness" value={VP.glassThickness} onCommit={(v) => setPath(['vp', 'glassThickness'], v)} hint="fire glass and toughened" />
+                <PathField label="Glass thickness" value={VP.glassThickness} onCommit={(v) => setPath(['vp', 'glassThickness'], v)} hint="fallback only: each glass has its own (Glass card)" />
               </div>
             </fieldset>
-            <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">VP_STYLE table (ids 1:1 with the macro)</div>
-            <table className="w-full text-[11px]">
-              <thead><tr className="text-ink-500 text-left"><th className="pr-2 font-medium">id</th><th className="pr-2 font-medium">label</th><th className="pr-2 font-medium">pane</th><th className="pr-2 font-medium">count</th><th className="font-medium">arrange</th></tr></thead>
-              <tbody>
-                {(VP.styles || []).map((s) => (
-                  <tr key={s.id} className="text-ink-300 border-t border-surface-500/40">
-                    <td className="pr-2 py-0.5 font-mono">{s.id}</td><td className="pr-2 py-0.5">{s.label}</td>
-                    <td className="pr-2 py-0.5">{s.panes ? s.panes.map((q) => `${q.w} × ${q.h}`).join(' + ') : (s.count ? `${s.w} × ${s.h}` : '')}</td>
-                    <td className="pr-2 py-0.5">{s.count || ''}</td><td className="py-0.5">{s.arrange}</td>
-                  </tr>
+            <div className="flex flex-wrap items-center gap-2 mb-1 text-xs">
+              <span className="text-ink-400">Sample vision panel</span>
+              <select value={sampleVpType} onChange={(e) => setSampleVpType(e.target.value)} className={selectCls} data-fd-sample-vp-type>
+                {(VP.types || []).map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+              </select>
+            </div>
+            <div className="text-ink-300 text-[11px] mb-2" data-fd-sample-vp>
+              {fd ? (fd.vp?.panes?.length
+                ? (<>sample <span className="text-accent-400 font-medium">{fd.vp.label}</span><span className="text-ink-500"> · {fd.vp.positionLabel} · {fd.vp.panes.length} pane(s) · {fmt(fd.vp.glassSqm)} m² · VP_STYLE {fmt(fd.vp.style)}</span></>)
+                : 'sample door: no vision panel') : 'n/a'}
+              {(fd?.vp?.warnings || []).map((w, i) => <div key={i} className="text-amber-400">{w}</div>)}
+            </div>
+            <details className="text-[11px]" data-fd-vp-styles>
+              <summary className="text-[10px] uppercase tracking-wide text-ink-500 cursor-pointer select-none">Master_Door styles (export only)</summary>
+              <div className="text-[10px] text-ink-500 my-1">The old macro's VP_STYLE table, ids 1:1, read only. A panel that matches a style exactly (centred, the top at the top rail) goes out with that VP_STYLE; any other panel goes out as the VP_* variables of the new macro. A door saved with a style is read into the type model.</div>
+              <table className="w-full">
+                <thead><tr className="text-ink-500 text-left"><th className="pr-2 font-medium">id</th><th className="pr-2 font-medium">label</th><th className="pr-2 font-medium">pane</th><th className="pr-2 font-medium">count</th><th className="font-medium">arrange</th></tr></thead>
+                <tbody>
+                  {(VP.styles || []).map((s) => (
+                    <tr key={s.id} className="text-ink-300 border-t border-surface-500/40">
+                      <td className="pr-2 py-0.5 font-mono">{s.id}</td><td className="pr-2 py-0.5">{s.label}</td>
+                      <td className="pr-2 py-0.5">{s.panes ? s.panes.map((q) => `${q.w} × ${q.h}`).join(' + ') : (s.count ? `${s.w} × ${s.h}` : '')}</td>
+                      <td className="pr-2 py-0.5">{s.count || ''}</td><td className="py-0.5">{s.arrange}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </details>
+          </div>
+
+          {/* ══ Glass (v1.2, owner 28.10.2026: three glasses only) ══ */}
+          <div className={`card p-4 mb-4 ${glassLock ? '' : 'ring-1 ring-amber-500/40'}`} data-fd-glass-card>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-ink-200">Glass
+                <span className="text-ink-500 font-normal"> · v1.2: the only vision panel glasses (FD30 standard, FD insulated, Frosted), the default one by rating; the door picks another in the configurator; each has its Assign Materials row</span>
+              </div>
+              <LockToggle locked={glassLock} onToggle={() => setGlassLock((x) => !x)} />
+            </div>
+            <fieldset disabled={glassLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${glassLock ? 'opacity-60' : ''}`}>
+              <table className="text-[11px] mb-3">
+                <thead><tr className="text-ink-500 text-left"><th className="pr-3 font-medium">glass</th><th className="pr-3 font-medium">label</th><th className="pr-3 font-medium">thickness</th><th className="font-medium">Assign Materials row</th></tr></thead>
+                <tbody>
+                  {(GL.types || []).map((g, i) => (
+                    <tr key={g.id} className="text-ink-300 border-t border-surface-500/40" data-fd-glass-row={g.id}>
+                      <td className="pr-3 py-1 font-mono text-ink-500">{g.id}</td>
+                      <td className="pr-3 py-1">
+                        <TextCommitInput value={g.label} onCommit={(v) => setPath(['vp', 'glass', 'types', i, 'label'], v)} data-fd-glass-field="label"
+                          className="w-40 px-1.5 py-1 bg-surface-800 border border-surface-500 text-ink-50 rounded text-xs" />
+                      </td>
+                      <td className="pr-3 py-1">
+                        <NumInput value={g.thickness} onCommit={(v) => setPath(['vp', 'glass', 'types', i, 'thickness'], v)} data-fd-glass-field="thickness"
+                          className="w-16 px-1.5 py-1 bg-surface-800 border border-surface-500 text-ink-50 rounded text-xs" />
+                      </td>
+                      <td className="py-1 font-mono text-ink-500">{g.slot}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Default glass by rating (a door that has not picked one)</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-2">
+                {[['FD30', 'FD30'], ['FD60', 'FD60'], ['none', 'Non-fire']].map(([r, l]) => (
+                  <div key={r}>
+                    <div className="text-ink-400 mb-1">{l}</div>
+                    <select value={GL.defaultByRating?.[r] || ''} onChange={(e) => setPath(['vp', 'glass', 'defaultByRating', r], e.target.value)} className={selectCls} data-fd-glass-default={r}>
+                      {(GL.types || []).map((g) => <option key={g.id} value={g.id}>{g.label}</option>)}
+                    </select>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+              <div className="text-ink-300 text-[11px]" data-fd-sample-glass>
+                {fd?.vp?.glass ? (<>sample glass <span className="text-accent-400 font-medium">{fd.vp.glass.label} {fd.vp.glass.thickness} mm</span><span className="text-ink-500"> · {fmt(fd.vp.glassSqm)} m² · row {fd.vp.glass.slot}</span></>) : 'n/a'}
+              </div>
+            </fieldset>
           </div>
 
           {/* ══ Intumescent ══ */}
@@ -2311,12 +2495,84 @@ function FireDoorSettings() {
                 <PathField label="FD60" value={SBR.FD60} onCommit={(v) => setPath(['intumescent', 'stripsByRating', 'FD60'], v)} />
                 <PathField label="Two-strip offset" value={IN.twoStripOffset} onCommit={(v) => setPath(['intumescent', 'twoStripOffset'], v)} hint="ASSUMPTION: the two grooves at LPZ / 2 +- this" />
               </div>
+              {/* v1.2 (owner 28.10.2026): the strip colour is picked on the door; the list and the default here */}
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Strip colours (the configurator chips; the order line and the 3D colour)</div>
+              <div className="space-y-1.5 mb-2" data-fd-intu-colours>
+                {COLS.map((c, i) => {
+                  const isDefault = (DEFAULT_FIREDOOR_PROFILE.intumescent.colours || []).some((d) => d.id === c.id);
+                  return (
+                    <div key={c.id} className="flex items-center gap-2" data-fd-intu-colour-row={c.id}>
+                      <span className="w-4 h-4 rounded border border-surface-400 shrink-0" style={{ backgroundColor: c.hex }} />
+                      <span className="font-mono text-ink-500 w-20 truncate">{c.id}</span>
+                      <TextCommitInput value={c.label} onCommit={(v) => setPath(['intumescent', 'colours', i, 'label'], v)} data-fd-intu-colour-field="label"
+                        className="w-36 px-1.5 py-1 bg-surface-800 border border-surface-500 text-ink-50 rounded text-xs" />
+                      <input type="color" value={/^#[0-9a-f]{6}$/i.test(String(c.hex || '')) ? c.hex : '#cccccc'} onChange={(e) => setPath(['intumescent', 'colours', i, 'hex'], e.target.value)}
+                        data-fd-intu-colour-field="hex" title="The strip colour (the 3D and the swatch)"
+                        className="w-8 h-6 p-0 bg-transparent border border-surface-500 rounded cursor-pointer" />
+                      <span className="font-mono text-ink-500 text-[10px]">{c.hex}</span>
+                      {!isDefault && (
+                        <button type="button" onClick={() => setColours(COLS.filter((x) => x.id !== c.id))}
+                          className="text-[11px] text-ink-500 hover:text-red-400" title="Remove this colour">remove</button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <button type="button" data-fd-intu-colour-add
+                  onClick={() => { const id = `colour-${Date.now().toString(36)}`; setColours([...COLS, { id, label: `Colour ${COLS.length + 1}`, hex: '#cccccc' }]); }}
+                  className="px-2.5 py-1 text-[11px] rounded-lg border border-dashed border-surface-500 text-ink-300 hover:text-ink-50 hover:border-surface-400">+ add colour</button>
+                <div>
+                  <div className="text-ink-400 mb-1">Default colour (a door that has not picked one)</div>
+                  <select value={DF.intuColour || ''} onChange={(e) => setPath(['defaults', 'intuColour'], e.target.value)} className={selectCls} data-fd-intu-colour-default>
+                    {COLS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                  </select>
+                </div>
+                <div className="text-[10px] text-ink-500">The five standard colours stay (they can be renamed and recoloured); an added colour can be removed.</div>
+              </div>
               <div className="text-ink-300 text-[11px] mb-1" data-fd-sample-intu>
                 {fd ? (fd.intumescent
-                  ? (<>sample <span className="text-accent-400 font-medium">{fd.intumescent.label}</span> · groove {fd.intumescent.groove?.width} × {fd.intumescent.groove?.depth} = <span className="text-accent-400 font-medium">{fd.intumescent.metres} m</span> · INTU_STYLE {fd.intumescent.macroStyle}</>)
+                  ? (<>sample <span className="text-accent-400 font-medium">{fd.intumescent.label}</span> · groove {fd.intumescent.groove?.width} × {fd.intumescent.groove?.depth} = <span className="text-accent-400 font-medium">{fd.intumescent.metres} m</span> · INTU_STYLE {fd.intumescent.macroStyle}{fd.intumescent.colour ? ` · ${fd.intumescent.colour.label}` : ''}</>)
                   : 'sample door: non-fire, no intumescent') : 'n/a'}
               </div>
             </fieldset>
+          </div>
+
+          {/* ══ Closer symbols (v1.2, owner 28.10.2026: "I do not see the self closer") ══ */}
+          <div className={`card p-4 mb-4 ${closerLock ? '' : 'ring-1 ring-amber-500/40'}`} data-fd-closer-card>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-ink-200">Closer symbols
+                <span className="text-ink-500 font-normal"> · drawing symbols only, no machining (the sheets, the 3D and the DXF)</span>
+              </div>
+              <LockToggle locked={closerLock} onToggle={() => setCloserLock((x) => !x)} />
+            </div>
+            <fieldset disabled={closerLock} className={`text-xs border-0 p-0 m-0 min-w-0 ${closerLock ? 'opacity-60' : ''}`}>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Surface closer (an overhead body on the leaf face, the arm to a shoe on the frame head; ASSUMPTION sizes)</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                <div>
+                  <div className="text-ink-400 mb-1">Face</div>
+                  <StringChips value={CLS.face === 'push' ? 'push' : 'pull'} options={[['pull', 'Pull side (standard arm)'], ['push', 'Push side']]} onPick={(v) => setPath(['closer', 'surface', 'face'], v)} />
+                </div>
+                {FD_SET_CLOSER_SURFACE.map(([k, l, h]) => <PathField key={k} label={l} value={CLS[k]} onCommit={(v) => setPath(['closer', 'surface', k], v)} hint={h} />)}
+              </div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Built in closer (a concealed body in the leaf top and the slide track in the head soffit; ASSUMPTION sizes)</div>
+              <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
+                {FD_SET_CLOSER_BUILTIN.map(([k, l, h]) => <PathField key={k} label={l} value={CLB[k]} onCommit={(v) => setPath(['closer', 'builtin', k], v)} hint={h} />)}
+              </div>
+            </fieldset>
+            <div className="flex flex-wrap items-center gap-1.5 mb-1 text-xs">
+              <span className="text-ink-400 mr-1">Sample closer</span>
+              {[['', 'Default of the door'], ['surface', 'Surface'], ['builtin', 'Built in']].map(([v, l]) => (
+                <button key={v || 'default'} type="button" onClick={() => setSampleCloser(v)} className={chip(sampleCloser === v)} data-fd-sample-closer={v || 'default'}>{l}</button>
+              ))}
+            </div>
+            <div className="text-ink-300 text-[11px]" data-fd-sample-closer-line>
+              {fd ? (fd.closer?.symbol
+                ? (fd.closer.symbol.kind === 'surface'
+                  ? (<>sample <span className="text-accent-400 font-medium">{fd.closer.label}</span><span className="text-ink-500"> on the {fd.closer.symbol.face} face · body {fmt(fd.closer.symbol.body?.length)} × {fmt(fd.closer.symbol.body?.height)} × {fmt(fd.closer.symbol.body?.depth)}, {fmt(fd.closer.symbol.body?.y)} from the hinge edge, {fmt(fd.closer.symbol.body?.x)} below the leaf top · arm {fmt(fd.closer.symbol.arm?.length)} · shoe {fmt(fd.closer.symbol.shoe?.length)} × {fmt(fd.closer.symbol.shoe?.height)}</span></>)
+                  : (<>sample <span className="text-accent-400 font-medium">{fd.closer.label}</span><span className="text-ink-500"> · body {fmt(fd.closer.symbol.body?.length)} × {fmt(fd.closer.symbol.body?.width)} × {fmt(fd.closer.symbol.body?.depth)} deep, {fmt(fd.closer.symbol.body?.y)} from the hinge edge · track {fmt(fd.closer.symbol.track?.length)} × {fmt(fd.closer.symbol.track?.width)} × {fmt(fd.closer.symbol.track?.depth)}</span></>))
+                : 'sample door: no closer') : 'n/a'}
+            </div>
           </div>
 
           {/* ══ bSuite ══ */}
@@ -2514,13 +2770,13 @@ function FireDoorSettings() {
               </div>
               <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-3">
                 <div>
-                  <div className="text-ink-400 mb-1">Vision panel style</div>
+                  <div className="text-ink-400 mb-1">Vision panel of a new door (a Master_Door style, read into a type)</div>
                   <select value={DF.vpStyle ?? 0} onChange={(e) => setPath(['defaults', 'vpStyle'], e.target.value)} className={selectCls}>
                     {(VP.styles || []).map((s) => <option key={s.id} value={s.id}>{s.id} · {s.label}</option>)}
                   </select>
                 </div>
               </div>
-              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Custom vision panel (style 14) defaults</div>
+              <div className="text-[10px] uppercase tracking-wide text-ink-500 mb-1">Custom vision panel (style 14) defaults (the reading of a door saved with style 14)</div>
               <div className="flex flex-wrap gap-x-5 gap-y-3 items-end mb-2">
                 <PathField label="Length" value={DF.vpCustom?.length} onCommit={(v) => setPath(['defaults', 'vpCustom', 'length'], v)} />
                 <PathField label="Width" value={DF.vpCustom?.width} onCommit={(v) => setPath(['defaults', 'vpCustom', 'width'], v)} />
@@ -2563,7 +2819,8 @@ function FireDoorSettings() {
                 ['Keep centre', `${fmt(fd.keep?.centreFromFoot)} above the jamb foot · KEEP ${fmt(fd.keep?.macroKeep)}`],
                 ['Closer', fd.closer ? fmt(fd.closer.label) : 'none'],
                 ['Vision panel', `${fmt(fd.vp?.label)}${fd.vp?.panes?.length ? ` · ${fd.vp.panes.length} pane(s) · ${fmt(fd.vp?.glassSqm)} m²` : ''}`],
-                ['Intumescent', fd.intumescent ? `${fmt(fd.intumescent.label)} · ${fmt(fd.intumescent.metres)} m` : 'none (non-fire)'],
+                ...(fd.vp?.panes?.length ? [['VP position', fmt(fd.vp.positionLabel)], ['Glass', `${fmt(fd.vp.glass?.label)} ${fmt(fd.vp.glass?.thickness)} mm`]] : []),
+                ['Intumescent', fd.intumescent ? `${fmt(fd.intumescent.label)} · ${fmt(fd.intumescent.metres)} m${fd.intumescent.colour ? ` · ${fd.intumescent.colour.label}` : ''}` : 'none (non-fire)'],
                 ['Paint area', `${fmt(fd.paintAreaSqm)} m²`],
               ].map(([l, v]) => (
                 <div key={l} className="flex justify-between gap-3 py-0.5 border-b border-surface-500/30 last:border-0">
