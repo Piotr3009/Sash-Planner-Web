@@ -28,6 +28,11 @@
  * (the head's left end, the jambs' top end). The rebate section (the finished
  * 50 x depth with the 15 x 47 notch) is drawn enlarged beside the head, then
  * the op table and the notes.
+ * v1.2 (28.10.2026): the keep plate and the keep pocket drawn as slots with
+ * the engine's full radius ends (op.radius), the radius in the notes; a
+ * built in closer's track (derived.firedoor.closer.symbol.track, never
+ * machined) dashed on the head's rebate cheek over the leaf, centred on the
+ * closer body, with its caption and note.
  * Member coordinates as fireDoor.js: x along the length from the top long
  * point (the left long point of the head), y across the thickness from the
  * wall face, z along the depth from the outside face. A multi-detail sheet:
@@ -38,7 +43,7 @@ import { useMemo } from 'react';
 import { DimH, DimV, DimChainH, DimChainV, Label, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
 import { NS, fmt, fmtGlass, safely, NoSheet, SheetTitle } from './doorSheetParts.jsx';
-import { num, fireDoorFrameMembers, opTableRows, hingeWord, pullFaceNote, ratingWord, wrapLines } from './fireDoorDrawUtils.js';
+import { num, fireDoorFrameMembers, opTableRows, closerWord, hingeWord, pullFaceNote, ratingWord, wrapLines } from './fireDoorDrawUtils.js';
 import { OpTable, opTableMetrics } from './FireDoorLeaf2D.jsx';
 
 const C = { band: 'rgba(148,163,184,0.05)', cheek: 'rgba(14,165,233,0.07)', recess: 'rgba(14,165,233,0.14)', pocket: 'rgba(239,68,68,0.10)', cut: 'rgba(239,68,68,0.10)', dowel: '#F59E0B' };
@@ -171,6 +176,24 @@ export default function FireDoorFrame2D({ windowSpec, derived, projectNumber, wi
     return atStart ? pts : pts.map(([x, z]) => [L - x, z]);
   };
 
+  // ── v1.2: a built in closer's track in the head soffit (never machined): along the head
+  // from the outside elevation's left (the head's left long point), the leaf edge
+  // faceOut + gapSide in, the track `y` from the hinge edge; across the cheek
+  // (z from the outside face, where the leaf's pull face closes) centred on the
+  // closer body (body.z + body.width / 2) ──
+  const sym = fd.closer?.symbol;
+  const track = sym?.kind === 'builtin' && sym.track ? (() => {
+    const t = sym.track, bd = sym.body || {};
+    const leafW = num(fd.leaf?.width, 0), leafX = faceOut + num(fr.gaps?.side, 0);
+    const len = num(t.length, 0), wid = num(t.width, 0);
+    const x0 = fd.handing?.hingeSide === 'right' ? leafX + leafW - num(t.y, 0) - len : leafX + num(t.y, 0);
+    const zc = num(bd.z, 0) + num(bd.width, 0) / 2;
+    return { x0, len, z0: zc - wid / 2, wid, depth: num(t.depth, 0) };
+  })() : null;
+
+  // the keep pocket op (its full radius ends, the engine's radius)
+  const keepPocketOp = members.flatMap((m) => m.ops || []).find((o) => o.kind === 'keepPocket') || null;
+
   // ── the table, the notes ──
   const tableRows = [];
   let no = 1;
@@ -190,7 +213,8 @@ export default function FireDoorFrame2D({ windowSpec, derived, projectNumber, wi
     `Frame ${fmt(thk)} x ${fmt(D)} finished from ${fmt(fr.rawThickness)} x ${fmt(fr.rawWidth)} raw; rebate ${fmt(rebW)} x ${fmt(rebD)} from solid along every member on the opening side (${fmt(faceOut)} face outside, ${fmt(thk)} inside); overall ${fmt(fr.overall?.width)} x ${fmt(fr.overall?.height)} (leaf + ${fmt(fr.overall?.width - fd.leaf?.width)} / + ${fmt(fr.overall?.height - fd.leaf?.height)})`,
     `Each member seen from the opening with its outside face unfolded above and its inside face below (the wall edge at the far side of each band); x from the top long point (the left long point of the head), the head mitred 45 both ends, the jambs mitred at the top and square at the foot: the cheek ends ${fmt(faceOut)} and the lip ${fmt(thk)} short of the long point`,
     `Hinge jamb: recesses ${fmt(hg.recess?.length)} x ${fmt(hg.recess?.width)} x ${fmt(hg.recess?.depth)} R${fmt(hg.recess?.radius)} on the rebate cheek from the outside face, hinge tops at ${(hg.positions || []).map((p) => fmt(p.jambTop)).join(' / ')} from the top long point (${fmt(faceOut)} + ${fmt(fr.gaps?.head)} + the leaf positions ${(hg.positions || []).map((p) => fmt(p.top)).join(' / ')})`,
-    `Lock jamb: keep plate ${fmt(keep.plate?.millLength)} x ${fmt(keep.plate?.millWidth)} x ${fmt(keep.plate?.depth)} (full radius ends) centred ${fmt(keep.centreFromFoot)} above the foot (${fmt(keep.centreFromTop)} from the top long point) on the cheek, centred on the leaf thickness; bolt pocket ${fmt(keep.pocket?.length)} x ${fmt(keep.pocket?.width)} x ${fmt(keep.pocket?.depth)} centred on the plate`,
+    `Lock jamb: keep plate ${fmt(keep.plate?.millLength)} x ${fmt(keep.plate?.millWidth)} x ${fmt(keep.plate?.depth)} R${fmt(keep.plate?.radius)} (full radius ends) centred ${fmt(keep.centreFromFoot)} above the foot (${fmt(keep.centreFromTop)} from the top long point) on the cheek, centred on the leaf thickness; bolt pocket ${fmt(keep.pocket?.length)} x ${fmt(keep.pocket?.width)} x ${fmt(keep.pocket?.depth)} ${keepPocketOp ? ` R${fmt(keepPocketOp.radius)}` : ''} centred on the plate`,
+    track ? `Head: ${closerWord(fd)}: its track ${fmt(track.len)} x ${fmt(track.wid)} x ${fmt(track.depth)} in the soffit over the leaf, ${fmt(sym.track.y)} from the hinge edge of the leaf, centred ${fmt(track.z0 + track.wid / 2)} from the outside face; concealed, not machined yet (drawn dashed)` : '',
     hasDowels
       ? `Corner dowels ${fmt(dw.dia)} x ${fmt(dw.length)}, ${fmt(dw.perJoint)} per corner, bored square to the mitre, ${fmt(dw.boreDepth)} deep in each piece (${fmt(dw.count)} dowels per frame): on every mitred end at ${dowelZ.map(fmt).join(' / ')} along the depth from the outside face, ${fmt(dw.yCentre)} across the thickness (the mitre face detail)`
       : 'No corner dowels',
@@ -251,7 +275,7 @@ export default function FireDoorFrame2D({ windowSpec, derived, projectNumber, wi
                   return <rect key={k} x={X(num(op.x, 0))} y={b.stripTop + num(op.z, 0)} width={num(op.length, 0)} height={num(op.width, 0)} rx={num(op.radius, 0)} fill={C.recess} stroke={COLORS.sash} strokeWidth={STROKES.sash} {...NS} />;
                 }
                 if (op.kind === 'keepPocket') {
-                  return <rect key={k} x={X(num(op.x, 0))} y={b.stripTop + num(op.z, 0)} width={num(op.length, 0)} height={num(op.width, 0)} fill={`url(#${hatchId})`} stroke={COLORS.sash} strokeWidth={STROKES.sash} {...NS} />;
+                  return <rect key={k} x={X(num(op.x, 0))} y={b.stripTop + num(op.z, 0)} width={num(op.length, 0)} height={num(op.width, 0)} rx={num(op.radius, 0)} fill={`url(#${hatchId})`} stroke={COLORS.sash} strokeWidth={STROKES.sash} {...NS} />;
                 }
                 return null;
               })}
@@ -260,6 +284,13 @@ export default function FireDoorFrame2D({ windowSpec, derived, projectNumber, wi
               ))}
               {m.role === 'jambLock' && plate && (
                 <Label x={X(num(plate.x, 0) + num(plate.length, 0) / 2)} y={b.labelsY} text={`KEEP ${fmt(keep.centreFromFoot)} from the foot`} vbw={svgW} />
+              )}
+              {/* v1.2: the built in closer's track in the head soffit (never machined), dashed */}
+              {m.role === 'head' && track && (
+                <>
+                  <rect x={X(track.x0)} y={b.stripTop + track.z0} width={track.len} height={track.wid} fill="none" stroke={COLORS.label} strokeWidth={STROKES.sash} {...NS} strokeDasharray={dash(6, 4)} />
+                  <Label x={X(track.x0 + track.len / 2)} y={b.labelsY} text="CLOSER TRACK" vbw={svgW} />
+                </>
               )}
               {/* the corner dowels (v1.1): at each mitred end the mitre line of the opening view carries the
                   perJoint bore circles (dia at the engine's positions along the depth); the bore centre

@@ -36,20 +36,40 @@
  * What is drawn:
  *   frame   three members as L sections: the wall part (the 35 face, full
  *           depth) and the stop part (the 15 of the rebate width behind the
- *           47 rebate depth); the jambs full height, the head between them
- *           (the mitre is implied, look only)
+ *           47 rebate depth). v1.2 (owner 28.10.2026, "the top edge in the
+ *           rebate has a gap"): the head's wall part runs between the jambs'
+ *           wall parts (faceOut .. W - faceOut) and the jambs' stop parts
+ *           start under it (y faceOut ..), so the rebate runs clean round both
+ *           top corners with no notch; no two boxes overlap (the mitre is
+ *           implied, look only)
  *   leaf    one extruded rectangle w x h x t with a hole per vision panel
- *           pane (the diamond as a rotated square), set in the rebate 3
- *           behind the pull face plane, 3 off the cheeks, floorGap above
- *           the frame feet; a glass pane and glazing beads in every hole; a
- *           forend plate on the lock edge
+ *           pane by its shape (v1.2: a rect with its corner radius, a circle,
+ *           the diamond as a turned square), set in the rebate 3 behind the
+ *           pull face plane, 3 off the cheeks, floorGap above the frame feet;
+ *           a glass pane (a disc in a round hole) and glazing beads (a ring
+ *           round a round pane) in every hole; the glass clear, or white and
+ *           rough when the engine's vision panel glass is Frosted
+ *   strips  (v1.2) the intumescent strips in the leaf's top edge and both
+ *           long edges, one per engine centre across the thickness, the
+ *           strip's width wide, flush with the edge (a hair proud, no
+ *           z-fighting), in the engine's strip colour; they open with the leaf
+ *   closer  (v1.2, the engine's symbol, never machined) surface: the body on
+ *           the leaf's pull or push face (it opens with the leaf), the shoe on
+ *           the frame head face, and the arm as two links from the body's
+ *           spindle to the shoe solved for the current open angle (each link
+ *           ARM_LINK of the engine's arm length, the elbow outward from the
+ *           face, the way a standard arm folds; look only); built in: a dark
+ *           slot on the leaf top edge (it opens with the leaf) and a dark
+ *           track in the head soffit, seen when the leaf is open
  *   hinges  three knuckles at the engine's hinge positions, the leaf swings
  *           about the knuckle axis by openAngle toward the pull side
  *   handle  a lever on a rose at the spindle on both faces, pointing toward
  *           the hinge; a euro cylinder escutcheon or a bathroom thumbturn
  *           below it when the lock has one
- *   keep    a keep plate on the lock jamb's rebate cheek at the engine's
- *           keep centre
+ *   lock    the forend plate on the lock edge as a slot with full radius
+ *           ends (v1.2, the engine's radius)
+ *   keep    the keep plate on the lock jamb's rebate cheek at the engine's
+ *           keep centre, a slot with full radius ends (v1.2)
  */
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
@@ -70,10 +90,21 @@ const CYLINDER_PROUD = 3;
 const THUMBTURN = { r: 14, t: 3, barL: 22, barW: 6, barH: 5 };
 const BEAD = { w: 15, proud: 4 };   // glazing bead ring around a pane
 const PLATE_T = 1.5;        // forend and keep plates proud of their face
+const STRIP_PROUD = 0.4;    // the intumescent strip a hair proud of the leaf edge (no z-fighting)
+const SLOT_T = 1;           // the built in closer's slot plate and head track plate
+const SLOT_PROUD = 0.8;     // ... proud of their face (over the strip)
+const SHOE_D = 18;          // the surface closer shoe proud of the head face
+const ARM_T = 8;            // the closer arm bar thickness
+const ARM_LINK = 0.6;       // each of the two arm links, a share of the engine's arm length
+const PIVOT_R = 9;          // the spindle cap on the closer body
+const CLOSER_BODY = '#a7abb0';   // a silver closer body
+const CLOSER_DARK = '#26282b';   // the built in closer's slot and track
 const FINISH = {
   brass: '#d4af37', chrome: '#e8eaec', stainless: '#c8c8c8',
   antique_brass: '#9c7722', black: '#1a1a1a', white: '#f0f0f0',
 };
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+const X_AXIS = new THREE.Vector3(1, 0, 0);
 
 // Rotate the leaf about the knuckle axis (px, pz in the leaf group, metres).
 function Swing({ px, pz, angle, children }) {
@@ -107,8 +138,54 @@ function LeverOnRose({ out, dir, mat }) {
   );
 }
 
-// The leaf body: one extruded rectangle with a hole per pane (metres, leaf
-// centred on the origin, x right, y up, z through the thickness).
+// A bar (box) from point a to point b (metres, the parent's frame), w x t across.
+function Bar({ a, b, w, t, mat, name }) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
+  const len = Math.hypot(dx, dy, dz);
+  if (!(len > 0)) return null;
+  const q = new THREE.Quaternion().setFromUnitVectors(X_AXIS, new THREE.Vector3(dx / len, dy / len, dz / len));
+  return (
+    <mesh name={name} castShadow material={mat} position={[(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2]} quaternion={q}>
+      <boxGeometry args={[len, w, t]} />
+    </mesh>
+  );
+}
+
+// A rounded rectangle (r > 0) or a plain one on a path, centred at (cx, cy).
+function rectPath(path, cx, cy, w, h, r) {
+  const x0 = cx - w / 2, x1 = cx + w / 2, y0 = cy - h / 2, y1 = cy + h / 2;
+  const rr = Math.max(0, Math.min(r || 0, w / 2, h / 2));
+  if (!(rr > 0)) {
+    path.moveTo(x0, y0); path.lineTo(x1, y0); path.lineTo(x1, y1); path.lineTo(x0, y1);
+    path.closePath();
+    return path;
+  }
+  path.moveTo(x0 + rr, y0);
+  path.lineTo(x1 - rr, y0);
+  path.absarc(x1 - rr, y0 + rr, rr, -Math.PI / 2, 0, false);
+  path.lineTo(x1, y1 - rr);
+  path.absarc(x1 - rr, y1 - rr, rr, 0, Math.PI / 2, false);
+  path.lineTo(x0 + rr, y1);
+  path.absarc(x0 + rr, y1 - rr, rr, Math.PI / 2, Math.PI, false);
+  path.lineTo(x0, y0 + rr);
+  path.absarc(x0 + rr, y0 + rr, rr, Math.PI, Math.PI * 1.5, false);
+  path.closePath();
+  return path;
+}
+
+// A slot plate (full radius ends: a rounded rectangle with r = half its width)
+// lying in the y-z plane, `len` along y and `wid` along z, `t` thick from x = 0
+// toward `out` (+1 / -1 in x). Metres.
+function slotGeometry(len, wid, r, t, out) {
+  const shape = rectPath(new THREE.Shape(), 0, 0, wid, len, r);
+  const g = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false, curveSegments: 16 });
+  g.rotateY(out >= 0 ? Math.PI / 2 : -Math.PI / 2);   // the extrusion (+z) turns to +x / -x, the shape's x to z
+  g.computeVertexNormals();
+  return g;
+}
+
+// The leaf body: one extruded rectangle with a hole per pane by its shape
+// (metres, leaf centred on the origin, x right, y up, z through the thickness).
 function leafGeometry(W3, H3, T3, panes) {
   const shape = new THREE.Shape();
   shape.moveTo(-W3 / 2, -H3 / 2);
@@ -118,24 +195,35 @@ function leafGeometry(W3, H3, T3, panes) {
   shape.closePath();
   for (const p of panes) {
     const hole = new THREE.Path();
-    if (p.rotated) {
-      // the pane rotated 45 degrees about its centre
-      const c = Math.SQRT1_2;
-      const corners = [[-p.w / 2, -p.h / 2], [p.w / 2, -p.h / 2], [p.w / 2, p.h / 2], [-p.w / 2, p.h / 2]]
-        .map(([x, y]) => [p.cx + x * c - y * c, p.cy + x * c + y * c]);
-      hole.moveTo(corners[0][0], corners[0][1]);
-      for (let i = 1; i < corners.length; i++) hole.lineTo(corners[i][0], corners[i][1]);
+    if (p.shape === 'round') {
+      hole.absarc(p.cx, p.cy, p.r, 0, Math.PI * 2, true);
+    } else if (p.shape === 'diamond') {
+      // the w x w square turned 45 degrees about its centre: the tips on the axes
+      const d = p.w * Math.SQRT1_2;
+      hole.moveTo(p.cx, p.cy - d);
+      hole.lineTo(p.cx + d, p.cy);
+      hole.lineTo(p.cx, p.cy + d);
+      hole.lineTo(p.cx - d, p.cy);
+      hole.closePath();
     } else {
-      hole.moveTo(p.cx - p.w / 2, p.cy - p.h / 2);
-      hole.lineTo(p.cx + p.w / 2, p.cy - p.h / 2);
-      hole.lineTo(p.cx + p.w / 2, p.cy + p.h / 2);
-      hole.lineTo(p.cx - p.w / 2, p.cy + p.h / 2);
+      rectPath(hole, p.cx, p.cy, p.w, p.h, p.r);
     }
-    hole.closePath();
     shape.holes.push(hole);
   }
-  const g = new THREE.ExtrudeGeometry(shape, { depth: T3, bevelEnabled: false });
+  const g = new THREE.ExtrudeGeometry(shape, { depth: T3, bevelEnabled: false, curveSegments: 24 });
   g.translate(0, 0, -T3 / 2);
+  g.computeVertexNormals();
+  return g;
+}
+
+// A flat ring (the glazing bead round a round pane), r0 inside, r1 outside, t thick from z = 0 to +t.
+function ringGeometry(r0, r1, t) {
+  const shape = new THREE.Shape();
+  shape.absarc(0, 0, r1, 0, Math.PI * 2, false);
+  const hole = new THREE.Path();
+  hole.absarc(0, 0, r0, 0, Math.PI * 2, true);
+  shape.holes.push(hole);
+  const g = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false, curveSegments: 48 });
   g.computeVertexNormals();
   return g;
 }
@@ -162,17 +250,26 @@ export default function FireDoor({
     color: metal, metalness: 1, roughness: 0.18, clearcoat: 0.55, clearcoatRoughness: 0.12, envMapIntensity: 1.2,
   }), [metal]);
   const hingeMat = useMemo(() => new THREE.MeshStandardMaterial({ color: metal, metalness: 0.7, roughness: 0.3 }), [metal]);
-  // the clear glass of the door glazing (DoorGlazing.jsx), a frosted tint when asked
+  const closerMat = useMemo(() => new THREE.MeshStandardMaterial({ color: CLOSER_BODY, metalness: 0.6, roughness: 0.35 }), []);
+  const darkMat = useMemo(() => new THREE.MeshStandardMaterial({ color: CLOSER_DARK, metalness: 0.2, roughness: 0.7 }), []);
+  // v1.2: the strip colour of the engine (intumescent.colour.hex)
+  const intuHex = g?.intumescent?.colour?.hex || null;
+  const intuMat = useMemo(() => (intuHex ? new THREE.MeshStandardMaterial({ color: intuHex, roughness: 0.9, metalness: 0 }) : null), [intuHex]);
+  // the glass: clear, or (v1.2) white, translucent and rough when the engine's
+  // vision panel glass is Frosted; a geo without a glass type keeps the
+  // window's glazing finish
   const glassT = Number(g?.vp?.glassThickness) > 0 ? Number(g.vp.glassThickness) : 6;
-  const glassMat = useMemo(() => new THREE.MeshPhysicalMaterial(glassFinish === 'clear' ? {
+  const vpGlassType = g?.vp?.glass?.type || null;
+  const frosted = vpGlassType ? vpGlassType === 'frosted' : glassFinish !== 'clear';
+  const glassMat = useMemo(() => new THREE.MeshPhysicalMaterial(frosted ? {
+    color: '#f4f6f7', roughness: 0.85, metalness: 0,
+    transmission: 0.25, transparent: true, opacity: 0.9,
+    ior: 1.52, thickness: mm(glassT), side: THREE.DoubleSide,
+  } : {
     color: '#d4e8f0', metalness: 0.05, roughness: 0.05,
     transmission: 0.92, transparent: true, opacity: 0.35,
     ior: 1.5, thickness: mm(glassT), side: THREE.DoubleSide,
-  } : {
-    color: '#c8dce8', roughness: 0.9, metalness: 0,
-    transmission: 0.2, transparent: true, opacity: 0.9,
-    ior: 1.52, thickness: mm(glassT), side: THREE.DoubleSide,
-  }), [glassFinish, glassT]);
+  }), [frosted, glassT]);
 
   // ─── the numbers (frame mm, pull-side frame) ───
   const W = valid ? Number(g.totalWidth) : 0;
@@ -197,21 +294,46 @@ export default function FireDoor({
   const W3 = mm(lw), H3 = mm(lh), T3 = mm(lt);
 
   // the panes in the leaf's own frame (metres, centred, y up): the engine
-  // gives x from the leaf TOP and y from the HINGE edge; only the diamond
-  // (angle 45) is drawn turned, a pane the engine turned to fit (angle 90)
-  // already carries its axis-aligned w x h
+  // gives x from the leaf TOP and y from the HINGE edge to the corner of the
+  // pane's bounding box (`box`; the diamond's is the turned square's); a
+  // pane the engine turned to fit (angle 90) already carries its axis-aligned
+  // w x h. v1.2: shape 'rect' (r = the corner radius) / 'round' (r = half
+  // the diameter) / 'diamond' (the w x w square turned 45)
   const panes = useMemo(() => (valid ? (g.vp?.panes || []) : []).map((p, i) => {
     const w = Number(p.w) || 0, h = Number(p.h) || 0;
+    const bw = Number(p.box?.w) || w, bh = Number(p.box?.h) || h;
     const top = Number(p.x) || 0, fromHinge = Number(p.y) || 0;
-    const left = hinge === 'left' ? fromHinge : lw - fromHinge - w;
+    const left = hinge === 'left' ? fromHinge : lw - fromHinge - bw;
+    const shape = p.shape === 'round' || p.shape === 'diamond' ? p.shape : (p.shape === 'rect' ? 'rect' : (Number(p.angle) === 45 ? 'diamond' : 'rect'));
     return {
-      i, w: mm(w), h: mm(h), rotated: Number(p.angle) === 45,
-      cx: -W3 / 2 + mm(left + w / 2),
-      cy: H3 / 2 - mm(top + h / 2),
+      i, shape, w: mm(w), h: mm(h), rotated: shape === 'diamond',
+      r: shape === 'round' ? mm(Number(p.radius) > 0 ? Number(p.radius) : w / 2) : mm(Number(p.radius) || 0),
+      cx: -W3 / 2 + mm(left + bw / 2),
+      cy: H3 / 2 - mm(top + bh / 2),
     };
   }), [valid, g, hinge, lw, W3, H3]);
 
   const leafGeo = useMemo(() => (valid && lw > 0 && lh > 0 && lt > 0 ? leafGeometry(W3, H3, T3, panes) : null), [valid, lw, lh, lt, W3, H3, T3, panes]);
+  // the round beads (one ring per face per round pane)
+  const ringGeos = useMemo(() => panes.map((p) => (p.shape === 'round' ? ringGeometry(p.r, p.r + mm(BEAD.w), mm(BEAD.proud)) : null)), [panes]);
+
+  // v1.2: the forend and keep plates as slots with full radius ends (the engine's radius)
+  const fo = g?.lock?.forend || null;
+  const lockEdgeRight = hinge === 'left';
+  const forendGeo = useMemo(() => {
+    const len = Number(fo?.length) || 0, wid = Number(fo?.width) || 0;
+    if (!(len > 0 && wid > 0)) return null;
+    const r = Number(fo?.radius) > 0 ? Number(fo.radius) : wid / 2;
+    return slotGeometry(mm(len), mm(wid), mm(r), mm(PLATE_T), lockEdgeRight ? 1 : -1);
+  }, [fo, lockEdgeRight]);
+  const keep = g?.keep || null;
+  const keepGeo = useMemo(() => {
+    const len = Number(keep?.plate?.length) || 0, wid = Number(keep?.plate?.width) || 0;
+    if (!(len > 0 && wid > 0)) return null;
+    const r = Number(keep?.plate?.radius) > 0 ? Number(keep.plate.radius) : wid / 2;
+    // the plate stands on the lock jamb's cheek toward the opening: -x for a lock jamb on the right
+    return slotGeometry(mm(len), mm(wid), mm(r), mm(PLATE_T), lockEdgeRight ? -1 : 1);
+  }, [keep, lockEdgeRight]);
 
   if (!valid || !leafGeo) return null;
 
@@ -224,17 +346,20 @@ export default function FireDoor({
   );
 
   // ─── frame: the L sections ───
+  // v1.2: the head's wall part runs faceOut .. W - faceOut (over the top of
+  // the jambs' stop parts) and the stop parts start at y = faceOut, so the
+  // rebate turns the top corners with no notch and no box overlaps another
   const hingeJambLeft = hinge === 'left';
   const jambName = (side) => (side === 'left') === hingeJambLeft ? 'jamb-hinge' : 'jamb-lock';
   const frameMeshes = [
-    // left jamb: wall part (the 35 face, full depth) and stop part (behind the rebate)
+    // left jamb: wall part (the 35 face, full depth) and stop part (behind the rebate, under the head)
     boxMesh({ k: 'jl-face', name: `frame-${jambName('left')}-face`, x0: 0, x1: faceOut, y0: 0, y1: H, z0: -d / 2, z1: d / 2, mat: woodMat }),
-    boxMesh({ k: 'jl-stop', name: `frame-${jambName('left')}-stop`, x0: faceOut, x1: thk, y0: 0, y1: H, z0: -d / 2, z1: d / 2 - rebD, mat: woodMat }),
+    boxMesh({ k: 'jl-stop', name: `frame-${jambName('left')}-stop`, x0: faceOut, x1: thk, y0: faceOut, y1: H, z0: -d / 2, z1: d / 2 - rebD, mat: woodMat }),
     // right jamb
     boxMesh({ k: 'jr-face', name: `frame-${jambName('right')}-face`, x0: W - faceOut, x1: W, y0: 0, y1: H, z0: -d / 2, z1: d / 2, mat: woodMat }),
-    boxMesh({ k: 'jr-stop', name: `frame-${jambName('right')}-stop`, x0: W - thk, x1: W - faceOut, y0: 0, y1: H, z0: -d / 2, z1: d / 2 - rebD, mat: woodMat }),
-    // head between the jambs
-    boxMesh({ k: 'hd-face', name: 'frame-head-face', x0: thk, x1: W - thk, y0: 0, y1: faceOut, z0: -d / 2, z1: d / 2, mat: woodMat }),
+    boxMesh({ k: 'jr-stop', name: `frame-${jambName('right')}-stop`, x0: W - thk, x1: W - faceOut, y0: faceOut, y1: H, z0: -d / 2, z1: d / 2 - rebD, mat: woodMat }),
+    // head: the wall part between the jambs' wall parts, the stop part between the jambs' stop parts
+    boxMesh({ k: 'hd-face', name: 'frame-head-face', x0: faceOut, x1: W - faceOut, y0: 0, y1: faceOut, z0: -d / 2, z1: d / 2, mat: woodMat }),
     boxMesh({ k: 'hd-stop', name: 'frame-head-stop', x0: thk, x1: W - thk, y0: faceOut, y1: thk, z0: -d / 2, z1: d / 2 - rebD, mat: woodMat }),
   ];
 
@@ -249,9 +374,16 @@ export default function FireDoor({
   // open toward the pull side (+z of the pull-side frame): the free edge of a
   // left hung leaf (+x) moves to +z under a negative rotation about Y
   const angle = THREE.MathUtils.degToRad(deg) * (hingeJambLeft ? -1 : 1);
+  // a point of the leaf group (metres) after the swing, in the frame group
+  const leafToFrame = (p) => {
+    const v = new THREE.Vector3(p[0] - px, p[1], p[2] - pz).applyAxisAngle(Y_AXIS, angle);
+    return [v.x + px + leafCx, v.y + leafCy, v.z + pz + mm(leafCz)];
+  };
+  // the leaf board system (x from the leaf top, y from the hinge edge) in the leaf group
+  const lx = (y) => (hingeJambLeft ? -W3 / 2 + mm(y) : W3 / 2 - mm(y));
+  const ly = (x) => H3 / 2 - mm(x);
 
   // ─── handle at the spindle ───
-  const lockEdgeRight = hingeJambLeft;
   const sp = g.lock?.spindle || {};
   const backset = Number(sp.fromLockEdge) || 0;
   const hx = lockEdgeRight ? W3 / 2 - mm(backset) : -W3 / 2 + mm(backset);
@@ -259,10 +391,8 @@ export default function FireDoor({
   const leverDir = lockEdgeRight ? -1 : 1;   // the lever points toward the hinge
   const cyl = g.lock?.cylinder || null;
   const cy = cyl ? -H3 / 2 + mm(Number(cyl.fromBottom) || 0) : 0;
-  const fo = g.lock?.forend || null;
 
   // ─── keep plate on the lock jamb cheek ───
-  const keep = g.keep || null;
   const keepCheekX = hingeJambLeft ? W - faceOut : faceOut;
   const keepCy = keep ? H - (Number(keep.centreFromFoot) || 0) : 0;
 
@@ -271,6 +401,72 @@ export default function FireDoor({
     centre: Number.isFinite(Number(p.centre)) ? Number(p.centre) : (Number(p.top) || 0) + (Number(g.hinges?.length) || 0) / 2,
   }));
   const hingeLen = Number(g.hinges?.length) || 0;
+
+  // ─── v1.2: the intumescent strips (leaf group, metres): top edge and both long edges ───
+  const intu = g.intumescent || null;
+  const stripW = mm(Number(intu?.width) || 0), stripT = mm(Number(intu?.thickness) || 0), proud = mm(STRIP_PROUD);
+  const strips = intu && intuMat && stripW > 0 && stripT > 0 ? (intu.centresZ || []).flatMap((cz, k) => {
+    const zc = T3 / 2 - mm(Number(cz) || 0);
+    const edgeH = H3 - stripT;   // the edge strips stop under the top strip
+    return [
+      { key: `t${k}`, pos: [0, H3 / 2 - stripT / 2 + proud / 2, zc], size: [W3, stripT + proud, stripW] },
+      { key: `l${k}`, pos: [-(W3 / 2 - stripT / 2 + proud / 2), -stripT / 2, zc], size: [stripT + proud, edgeH, stripW] },
+      { key: `r${k}`, pos: [W3 / 2 - stripT / 2 + proud / 2, -stripT / 2, zc], size: [stripT + proud, edgeH, stripW] },
+    ];
+  }) : [];
+
+  // ─── v1.2: the closer symbol ───
+  const csym = g.closer?.symbol || null;
+  let closerLeaf = null, closerFrame = null;
+  if (csym?.kind === 'surface' && csym.body) {
+    const b = csym.body, a = csym.arm || {}, s = csym.shoe || {};
+    const fs = csym.face === 'push' ? -1 : 1;           // +z = the pull face
+    const faceZ = fs * T3 / 2;
+    const bDepth = mm(Number(b.depth) || 0);
+    const bodyLeaf = {
+      pos: [lx((Number(b.y) || 0) + (Number(b.length) || 0) / 2), ly((Number(b.x) || 0) + (Number(b.height) || 0) / 2), faceZ + fs * bDepth / 2],
+      size: [mm(Number(b.length) || 0), mm(Number(b.height) || 0), bDepth],
+    };
+    const pivotLeaf = [lx(Number(a.from?.y) || 0), ly(Number(a.from?.x) || 0), faceZ + fs * bDepth];
+    // the shoe on the head face of that side (frame mm): x from the hinge edge, y above the leaf top (x < 0)
+    const shoeFx = hingeJambLeft ? leafX + (Number(s.y) || 0) : leafX + lw - (Number(s.y) || 0);
+    const shoeFy = leafY + (Number(s.x) || 0);
+    const shoeZ0 = fs * d / 2;
+    const shoe = { pos: [X(shoeFx), Y(shoeFy), mm(shoeZ0 + fs * SHOE_D / 2)], size: [mm(Number(s.length) || 0), mm(Number(s.height) || 0), mm(SHOE_D)] };
+    // the arm: two links from the spindle (on the body, after the swing) to the shoe, the elbow outward from the face
+    const A = new THREE.Vector3(...leafToFrame([pivotLeaf[0], pivotLeaf[1], pivotLeaf[2] + fs * mm(ARM_T / 2)]));
+    const B = new THREE.Vector3(X(shoeFx), Y(shoeFy), mm(shoeZ0 + fs * (SHOE_D + ARM_T / 2)));
+    const link = mm(Number(a.length) || 0) * ARM_LINK;
+    const AB = B.clone().sub(A);
+    const dist = AB.length();
+    let armPts = [A, B];
+    if (dist > 0 && dist < 2 * link) {
+      const u = AB.clone().normalize();
+      const out = new THREE.Vector3(0, 0, fs);
+      const n = out.clone().sub(u.clone().multiplyScalar(out.dot(u)));
+      if (n.lengthSq() < 1e-12) n.set(0, 1, 0);
+      n.normalize();
+      const elbow = A.clone().add(B).multiplyScalar(0.5).add(n.multiplyScalar(Math.sqrt(link * link - (dist / 2) ** 2)));
+      armPts = [A, elbow, B];
+    }
+    closerLeaf = { kind: 'surface', body: bodyLeaf, pivot: pivotLeaf, fs };
+    closerFrame = { kind: 'surface', shoe, arm: armPts.map((v) => [v.x, v.y, v.z]), armW: mm(Number(a.width) || 0) };
+  } else if (csym?.kind === 'builtin' && csym.body) {
+    const b = csym.body, t = csym.track || {};
+    const bw = Number(b.width) || 0, bz = Number(b.z) || 0;
+    closerLeaf = {
+      kind: 'builtin',
+      slot: { pos: [lx((Number(b.y) || 0) + (Number(b.length) || 0) / 2), H3 / 2 + mm(SLOT_PROUD) - mm(SLOT_T) / 2, T3 / 2 - mm(bz + bw / 2)], size: [mm(Number(b.length) || 0), mm(SLOT_T), mm(bw)] },
+    };
+    // the track in the head soffit over the leaf (frame mm, y down): the soffit is the head's wall part underside at y = faceOut
+    const tLen = Number(t.length) || 0;
+    const tx0 = hingeJambLeft ? leafX + (Number(t.y) || 0) : leafX + lw - (Number(t.y) || 0) - tLen;
+    const tzc = leafPullZ - bz - bw / 2;
+    closerFrame = {
+      kind: 'builtin',
+      track: { pos: [X(tx0 + tLen / 2), Y(faceOut + SLOT_PROUD - SLOT_T / 2), mm(tzc)], size: [mm(tLen), mm(SLOT_T), mm(Number(t.width) || 0)] },
+    };
+  }
 
   return (
     <group name="fire-door" rotation={[0, Math.PI, 0]}>
@@ -282,22 +478,60 @@ export default function FireDoor({
         <Swing px={px} pz={pz} angle={angle}>
           <mesh name="leaf-body" geometry={leafGeo} material={woodMat} castShadow receiveShadow />
 
-          {/* vision panel glass and beads */}
-          {panes.map((p) => (
+          {/* vision panel glass and beads, each pane by its shape */}
+          {panes.map((p, k) => (
             <group key={`vp-${p.i}`} name={`vp-${p.i}`} position={[p.cx, p.cy, 0]} rotation={[0, 0, p.rotated ? Math.PI / 4 : 0]}>
-              <mesh name="vp-glass" castShadow={false} receiveShadow material={glassMat}>
-                <boxGeometry args={[p.w, p.h, mm(glassT)]} />
-              </mesh>
-              {[1, -1].map((f) => (
+              {p.shape === 'round' ? (
+                <mesh name="vp-glass" castShadow={false} receiveShadow material={glassMat} rotation={[Math.PI / 2, 0, 0]}>
+                  <cylinderGeometry args={[p.r, p.r, mm(glassT), 64]} />
+                </mesh>
+              ) : (
+                <mesh name="vp-glass" castShadow={false} receiveShadow material={glassMat}>
+                  <boxGeometry args={[p.w, p.h, mm(glassT)]} />
+                </mesh>
+              )}
+              {[1, -1].map((f) => (p.shape === 'round' ? (
+                <group key={f} name="vp-beads" position={[0, 0, f > 0 ? T3 / 2 : -T3 / 2 - mm(BEAD.proud)]}>
+                  <mesh material={woodMat} geometry={ringGeos[k]} />
+                </group>
+              ) : (
                 <group key={f} name="vp-beads" position={[0, 0, f * (T3 / 2 + mm(BEAD.proud) / 2)]}>
                   <mesh material={woodMat} position={[0, p.h / 2 + mm(BEAD.w) / 2, 0]}><boxGeometry args={[p.w + 2 * mm(BEAD.w), mm(BEAD.w), mm(BEAD.proud)]} /></mesh>
                   <mesh material={woodMat} position={[0, -p.h / 2 - mm(BEAD.w) / 2, 0]}><boxGeometry args={[p.w + 2 * mm(BEAD.w), mm(BEAD.w), mm(BEAD.proud)]} /></mesh>
                   <mesh material={woodMat} position={[-p.w / 2 - mm(BEAD.w) / 2, 0, 0]}><boxGeometry args={[mm(BEAD.w), p.h, mm(BEAD.proud)]} /></mesh>
                   <mesh material={woodMat} position={[p.w / 2 + mm(BEAD.w) / 2, 0, 0]}><boxGeometry args={[mm(BEAD.w), p.h, mm(BEAD.proud)]} /></mesh>
                 </group>
-              ))}
+              )))}
             </group>
           ))}
+
+          {/* v1.2: the intumescent strips in the top edge and both long edges, the engine's colour */}
+          {strips.length > 0 && (
+            <group name="fd-intumescent">
+              {strips.map((s) => (
+                <mesh key={s.key} name="intu-strip" material={intuMat} position={s.pos} receiveShadow>
+                  <boxGeometry args={s.size} />
+                </mesh>
+              ))}
+            </group>
+          )}
+
+          {/* v1.2: the closer parts that open with the leaf (the surface body, the built in slot) */}
+          {closerLeaf?.kind === 'surface' && (
+            <group name="fd-closer-leaf">
+              <mesh name="closer-body" material={closerMat} position={closerLeaf.body.pos} castShadow>
+                <boxGeometry args={closerLeaf.body.size} />
+              </mesh>
+              <mesh name="closer-pivot" material={closerMat} position={[closerLeaf.pivot[0], closerLeaf.pivot[1], closerLeaf.pivot[2] + closerLeaf.fs * mm(ARM_T) / 2]} rotation={[Math.PI / 2, 0, 0]}>
+                <cylinderGeometry args={[mm(PIVOT_R), mm(PIVOT_R), mm(ARM_T), 20]} />
+              </mesh>
+            </group>
+          )}
+          {closerLeaf?.kind === 'builtin' && (
+            <mesh name="closer-slot" material={darkMat} position={closerLeaf.slot.pos}>
+              <boxGeometry args={closerLeaf.slot.size} />
+            </mesh>
+          )}
 
           {/* lever on a rose at the spindle, both faces */}
           <group position={[hx, hy, T3 / 2]}><LeverOnRose out={1} dir={leverDir} mat={metalMat} /></group>
@@ -328,12 +562,10 @@ export default function FireDoor({
             </group>
           ))}
 
-          {/* forend plate on the lock edge */}
-          {fo && Number(fo.length) > 0 && (
-            <mesh name="lock-forend" material={metalMat}
-              position={[lockEdgeRight ? W3 / 2 + mm(PLATE_T) / 2 : -W3 / 2 - mm(PLATE_T) / 2, H3 / 2 - mm(Number(fo.centreFromTop) || 0), 0]}>
-              <boxGeometry args={[mm(PLATE_T), mm(Number(fo.length)), mm(Number(fo.width) || lt / 2)]} />
-            </mesh>
+          {/* the forend plate on the lock edge: a slot with full radius ends (v1.2) */}
+          {forendGeo && (
+            <mesh name="lock-forend" material={metalMat} geometry={forendGeo}
+              position={[lockEdgeRight ? W3 / 2 : -W3 / 2, H3 / 2 - mm(Number(fo.centreFromTop) || 0), 0]} />
           )}
         </Swing>
       </group>
@@ -346,12 +578,29 @@ export default function FireDoor({
         </mesh>
       ))}
 
-      {/* ═══ Keep plate on the lock jamb's rebate cheek ═══ */}
-      {keep && Number(keep.plate?.length) > 0 && (
-        <mesh name="keep-plate" material={metalMat}
-          position={[X(hingeJambLeft ? keepCheekX - PLATE_T / 2 : keepCheekX + PLATE_T / 2), Y(keepCy), mm(leafCz)]}>
-          <boxGeometry args={[mm(PLATE_T), mm(Number(keep.plate.length)), mm(Number(keep.plate.width) || lt)]} />
-        </mesh>
+      {/* ═══ Keep plate on the lock jamb's rebate cheek: a slot with full radius ends (v1.2) ═══ */}
+      {keepGeo && (
+        <mesh name="keep-plate" material={metalMat} geometry={keepGeo}
+          position={[X(keepCheekX), Y(keepCy), mm(leafCz)]} />
+      )}
+
+      {/* ═══ v1.2: the closer parts on the frame: the surface closer's shoe and arm, the built in closer's head track ═══ */}
+      {closerFrame?.kind === 'surface' && (
+        <group name="fd-closer">
+          <mesh name="closer-shoe" material={closerMat} position={closerFrame.shoe.pos} castShadow>
+            <boxGeometry args={closerFrame.shoe.size} />
+          </mesh>
+          {closerFrame.arm.slice(0, -1).map((a, k) => (
+            <Bar key={k} name="closer-arm" a={a} b={closerFrame.arm[k + 1]} w={closerFrame.armW} t={mm(ARM_T)} mat={closerMat} />
+          ))}
+        </group>
+      )}
+      {closerFrame?.kind === 'builtin' && (
+        <group name="fd-closer">
+          <mesh name="closer-track" material={darkMat} position={closerFrame.track.pos}>
+            <boxGeometry args={closerFrame.track.size} />
+          </mesh>
+        </group>
       )}
     </group>
   );

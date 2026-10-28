@@ -37,6 +37,8 @@ import { exportCncJambsForWindow, canExportCncJambs, exportArchDxfForWindow, arc
 import { exportBsuiteFramesMerged, exportBsuiteFireDoorsMerged } from '../utils/bsuiteExport.js';
 // Fire doors (27.10.2026): the machine-neutral machining list (CSV + JSON) of one door
 import { exportFireDoorMachining } from '../utils/fireDoorMachiningExport.js';
+// Fire doors v1.2 (28.10.2026): the DXF of every element of one door (opens in AutoCAD and bSolid)
+import { downloadFireDoorDxf, FIREDOOR_DXF_TOOLTIP } from '../utils/fireDoorDxfExport.js';
 import { downloadBsuiteProgram } from '../services/bsuitePrograms.js';
 
 
@@ -257,6 +259,23 @@ export default function WindowDetailPage() {
               >
                 🛠 Fire door machining (CSV)
               </button>
+              {/* v1.2 (28.10.2026): every element of this door drawn in one DXF (the leaf
+                  faces and edges with the drawn hinges, the head and both jambs with the
+                  mitres, dowels, hinge recesses and keep), from derived.firedoor */}
+              <button
+                onClick={() => {
+                  try {
+                    const r = downloadFireDoorDxf({ name: label, derived });
+                    if (r.error) alert(`Fire door DXF unavailable: ${r.error}`);
+                  } catch (e) {
+                    alert(`Fire door DXF failed: ${e.message}`);
+                  }
+                }}
+                title={FIREDOOR_DXF_TOOLTIP}
+                className="btn text-sm bg-surface-600 text-ink-200 hover:bg-surface-500 hover:text-ink-50"
+              >
+                📐 Fire door DXF
+              </button>
             </>);
           })()}
           <Link to={editUrl} className="btn btn-primary text-sm">✏️ Edit Configuration</Link>
@@ -338,7 +357,8 @@ export default function WindowDetailPage() {
                   <SpecRow label="Wall depth" value={`${fd?.frame?.depth ?? inp.frameDepth} mm`} />
                   <SpecRow label="Lock" value={FIREDOOR_LOCK_LABELS[fd?.lock?.type || inp.lockType] || inp.lockType} />
                   <SpecRow label="Closer" value={closerText} />
-                  <SpecRow label="Vision panel" value={fd ? (fd.vp?.panes?.length ? fd.vp.label : 'none') : `style ${inp.vpStyle}`} />
+                  {/* v1.2: the panel type and size, then where it sits (fd.vp.positionLabel) */}
+                  <SpecRow label="Vision panel" value={fd ? (fd.vp?.panes?.length ? [fd.vp.label, fd.vp.positionLabel].filter(Boolean).join(' · ') : 'none') : `style ${inp.vpStyle}`} />
                   <SpecRow label="Intumescent" value={fd ? (fd.intumescent ? fd.intumescent.label : 'none (non-fire)') : (fire ? 'by rating' : 'none (non-fire)')} />
                   <SpecRow label="Leading edge" value={inp.leadEdge ? 'bevelled (macro LEAD_EDGE)' : 'square'} />
                 </SpecSection>
@@ -387,7 +407,8 @@ export default function WindowDetailPage() {
           )}
           {windowSpec?.category === 'firedoor' ? (
             // Fire doors (27.10.2026): the vision panel glass as the glass schedule rows
-            // carry it (fire glass or toughened, the profile thickness, no sealed unit);
+            // carry it (v1.2: the glass of the door, derived.firedoor.vp.glass: FD30
+            // standard / FD insulated / Frosted, its thickness; no sealed unit);
             // 'none' on a door without a vision panel
             <SpecSection title="Glass">
               {(() => {
@@ -395,8 +416,10 @@ export default function WindowDetailPage() {
                 if (!rows.length) return <SpecRow label="Vision panel" value="none" />;
                 const r0 = rows[0];
                 const panes = rows.reduce((a, g) => a + (Number(g.quantity) || 0), 0);
+                const vg = derived.firedoor?.vp?.glass;
+                const thick = Number(vg?.thickness) || r0.thickness;
                 return (<>
-                  <SpecRow label="Type" value={`${r0.type}${r0.thickness ? ` ${r0.thickness} mm` : ''}`} />
+                  <SpecRow label="Type" value={`${vg?.label || r0.spec || r0.type}${thick ? ` ${thick} mm` : ''}`} />
                   <SpecRow label="Panes" value={`${panes} · ${derived.firedoor?.vp?.glassSqm ?? ''} m²`} />
                   <SpecRow label="Finish" value={r0.finish} />
                 </>);
@@ -624,7 +647,8 @@ function GlassPanel({ item, windowSpec, derived, batch, settings, projectEntity,
                   <td className="px-4 py-2 text-right text-ink-200 font-mono">{g.width} mm</td>
                   <td className="px-4 py-2 text-right text-ink-200 font-mono">{g.height} mm</td>
                   <td className="px-4 py-2 text-right text-ink-200">{g.quantity}</td>
-                  <td className="px-4 py-2 text-ink-300">{g.type} / {g.spec}</td>
+                  {/* v1.2: a fire door pane names its glass (derived.firedoor.vp.glass), not the type id */}
+                  <td className="px-4 py-2 text-ink-300">{windowSpec?.category === 'firedoor' && derived?.firedoor?.vp?.glass ? `${derived.firedoor.vp.glass.label} ${derived.firedoor.vp.glass.thickness} mm` : `${g.type} / ${g.spec}`}</td>
                   <td className="px-4 py-2 text-ink-300">{g.makeup || '—'}</td>
                   <td className="px-4 py-2 text-ink-300">{g.coating === 'soft_coat' ? 'Soft Coat (Low-E)' : 'Standard'}</td>
                   <td className="px-4 py-2 text-ink-300">{g.gas ? 'Argon' : '—'}</td>
