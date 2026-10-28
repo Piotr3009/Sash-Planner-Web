@@ -27,6 +27,8 @@ numbering from the top, the handle 1000 from the floor, the recess as Weeke (3.2
 - The two agents (sheets / DXF; pages / t52) stopped on a usage limit before reporting; the lead finished from
   their trees: t53 brought to the new numbers (88 PASS), t51 sections 1 to 9 and the sheet, page, 3D checks (453
   PASS), t52 as the pages agent left it (146 PASS), the 0.1 sheet format.
+- Full suite on the final tree: 42 files, 5231 PASS, 0 FAIL (`psw-casement-layouts` exit 2 = no PSW checkout, as
+  before; t32 54 = the casement rows byte identical); `npm run build` OK.
 
 ---
 
