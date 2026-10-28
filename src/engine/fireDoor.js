@@ -427,6 +427,8 @@ function placeVisionPanelV12(V, vin, W, H, lockZone) {
  * note = why the old macro cannot cut it as placed (the new macro reads VP_*).
  */
 function masterDoorVpStyle(V, vin) {
+  // a v1 / v1.1 record keeps the style id it was saved with (the macro places it as before)
+  if (vin && vin.source === 'legacy') return { id: Number(vin.legacyStyle) || 0, note: '' };
   if (!vin || vin.shape === 'none' || !vin.count) return { id: 0, note: '' };
   const centredTop = vin.across === 'centre' && Number(vin.acrossOffset) === 0 && vin.down === 'top' && Number(vin.downOffset) === Number(V.topRail);
   if (centredTop && vin.arrange === 'stack') {
@@ -465,7 +467,7 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
   const vpStyle = Math.max(0, Math.round(Number(spec.vpStyle ?? D.vpStyle) || 0));
   const vpCustom = { ...D.vpCustom, ...(spec.vpCustom || {}) };
   // v1.2: the vision panel model (a stored vp block, else the legacy style read into it)
-  const vpIn = fireDoorVpInput(V, spec.vp, vpStyle, vpCustom);
+  let vpIn = fireDoorVpInput(V, spec.vp, vpStyle, vpCustom);
   const leadEdge = boolOf(spec.leadEdge, D.leadEdge);
 
   // ── the frame section (the fixed numbers the sizes are made of) ──
@@ -612,6 +614,18 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
     x0: Math.min(lock.forend.centreFromTop - millLength / 2, lock.case.topFromTop), x1: Math.max(lock.forend.centreFromTop + millLength / 2, lock.case.topFromTop + lock.case.pocketHeight),
     y0: W - Math.max(Number(lock.case.pocketDepth) || 0, backset), y1: W,
   };
+  // a legacy stack that does not fit the leaf height turns its panes when the
+  // turned stack fits (the v1 placement of the Master_Door styles, e.g. style 8
+  // 5No 200 x 500 on a 2040 leaf lies 500 x 200)
+  if (vpIn.source === 'legacy' && vpIn.shape === 'rect' && vpIn.count > 0) {
+    const sizes = Array.isArray(vpIn.paneSizes) && vpIn.paneSizes.length ? vpIn.paneSizes : Array.from({ length: vpIn.count }, () => ({ w: vpIn.width, h: vpIn.height }));
+    const stackH = (list) => list.reduce((a, q) => a + q.h, 0) + vpIn.gap * (list.length - 1);
+    const turned = sizes.map((q) => ({ w: q.h, h: q.w }));
+    const sideMargin = Number(V.sideMargin) || 0;
+    if (vpIn.downOffset + stackH(sizes) > H && vpIn.downOffset + stackH(turned) <= H && Math.max(...turned.map((q) => q.w)) <= W - 2 * sideMargin) {
+      vpIn = { ...vpIn, width: vpIn.height, height: vpIn.width, ...(vpIn.paneSizes ? { paneSizes: turned } : {}), turned: true };
+    }
+  }
   const vpPlaced = placeVisionPanelV12(V, vpIn, W, H, lockZone);
   const vpWords = fireDoorVpWords(V, vpIn);
   const vpMacro = masterDoorVpStyle(V, vpIn);
@@ -785,8 +799,11 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
     // INTU = the strip count (0 / 1 / 2, v1.1); INTU_STYLE = the Master_Door style the count maps to
     INTU: intuStrips, INTU_W: intumescent ? intumescent.width : 0, INTU_T: intumescent ? intumescent.thickness : 0, INTU_STYLE: intuStyle,
     VP_STYLE: vp.style,
-    // C_VP_* (Master_Door custom style 14): the v1.2 panel's pane size, count and gap (0 without a panel)
-    C_VP_L: vp.count ? vp.height : 0, C_VP_W: vp.count ? vp.width : 0, C_VP_NUM: vp.count, C_VP_RAIL: vp.count ? vp.gap : 0, C_VP_POS: 0,
+    // C_VP_* (Master_Door custom style 14): a v1 / v1.1 record writes its stored custom block as
+    // before; a v1.2 panel its pane size, count and gap (0 without a panel)
+    ...(vpIn.source === 'legacy'
+      ? { C_VP_L: Number(vpCustom.length) || 0, C_VP_W: Number(vpCustom.width) || 0, C_VP_NUM: Math.round(Number(vpCustom.count) || 0), C_VP_RAIL: Number(vpCustom.rail) || 0, C_VP_POS: Number(vpCustom.pos) === 90 ? 90 : 0 }
+      : { C_VP_L: vp.count ? vp.height : 0, C_VP_W: vp.count ? vp.width : 0, C_VP_NUM: vp.count, C_VP_RAIL: vp.count ? vp.gap : 0, C_VP_POS: 0 }),
     D_TOP_RAIL: Number(V.topRail), D_MID_RAIL: Number(V.midRail), D_SIDE_MARGIN: Number(V.sideMargin),
     // v1.2, the new macro: any panel. VP_SHAPE 0 none / 1 rect / 2 round / 3 diamond; VP_W x VP_H one
     // pane (round: the diameter); VP_ARR 0 one above another / 1 side by side; VP_X the group top from

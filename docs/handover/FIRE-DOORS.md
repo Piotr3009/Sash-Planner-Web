@@ -7,7 +7,20 @@
  * prohibited without prior written permission from Skylon Development Ltd.
 -->
 
-# Fire doors: internal door sets as built (v1 27.10.2026, v1.1 the same evening)
+# Fire doors: internal door sets as built (v1 27.10.2026, v1.1 the same evening, v1.2 28.10.2026)
+
+**v1.2 (28.10.2026 night, branch `claude/fire-doors-v1-2`, the owner's list of 00:53, coded unattended):** the
+vision panel is a TYPE (None, Standard (rectangle), Square, Narrow slot, Round (porthole), Diamond, Double), a size,
+a pane count arranged one above another or side by side with a gap, and a POSITION (across: centred with a shift,
+or a distance from the hinge or the lock edge; down: the top from the leaf top, the centre or the bottom above the
+leaf bottom), placed by PC (no more "layout per bSolid macro"); only three glasses (FD30 standard, FD insulated,
+Frosted); the intumescent strip has a colour; the closer is drawn (sheets, 3D, DXF); the forend and the keep are
+drawn with their radius ends; the 3D rebate runs clean round the head corners; a DXF of every element of a door
+(AutoCAD and bSolid open it; a true .dwg needs a converter). New profile keys: `vp.types`, `vp.position`,
+`vp.minEdge`, `vp.glass`, `intumescent.colours`, `defaults.intuColour`, `closer.surface`, `closer.builtin`. New
+leaf variables for the new macro: VP_SHAPE, VP_N, VP_W, VP_H, VP_GAP, VP_ARR, VP_X, VP_Y, VP_R. A door saved
+before v1.2 (a Master_Door style id) is read into the new model and exports exactly as before. Section 11 has the
+details; items for Piotr: `BLOCKERS.md` 37.x.
 
 **v1.1 (27.10.2026 evening, branch `claude/fire-doors-v1-1`, owner decisions in the chat after the v1 merge):**
 the STRUCTURAL OPENING is the size input (frame = opening - 5 a side / - 5 at the head, leaf = frame - 76 / - 43;

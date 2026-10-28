@@ -62,7 +62,7 @@ const opIs = (o, face, x, y, z, length, width, depth, radius) => !!o && o.face =
 // ═════════════════════════════════════════════════════════════════════════════
 section('1 - the fire door profile, its migration and withProfiles');
 {
-  ok(FP.schema === 1 && J(Object.keys(FP)) === J(['schema', 'leaf', 'frame', 'hinges', 'lock', 'keep', 'vp', 'intumescent', 'bsuite', 'defaults']),
+  ok(FP.schema === 1 && J(Object.keys(FP)) === J(['schema', 'leaf', 'frame', 'hinges', 'lock', 'keep', 'vp', 'intumescent', 'closer', 'bsuite', 'defaults']),
     `DEFAULT_FIREDOOR_PROFILE schema 1, blocks ${Object.keys(FP).join(' / ')}`);
   ok(J(FP.leaf.widthSuggestions) === J([626, 686, 726, 762, 826, 838, 926, 1056]) && FP.leaf.heightSuggestion === 2040 && FP.leaf.defaultWidth === 826 && FP.leaf.defaultHeight === 2040,
     'leaf: width suggestions 626 .. 1056, height 2040, defaults 826 x 2040');
@@ -91,14 +91,31 @@ section('1 - the fire door profile, its migration and withProfiles');
     && J(vpBy(2).panes) === J([{ w: 150, h: 760 }, { w: 150, h: 450 }]) && vpBy(2).arrange === 'stack' && vpBy(2).gap === 'midRail' && vpBy(12).gap === 'midRail'
     && [6, 7, 8, 13].every((id) => vpBy(id).arrange === 'stack' && vpBy(id).gap === 'stackGap') && J([vpBy(8).w, vpBy(8).h, vpBy(8).count]) === J([200, 500, 5]) && J([vpBy(11).w, vpBy(11).h]) === J([508, 1500]),
     'vp table: 1 single 450, 5 diamond, 14 custom, 2 a stack of 150 x 760 + 150 x 450 at the mid rail, 12 at the mid rail, 6 / 7 / 8 / 13 stacks at the stack gap, 8 = 5No 200 x 500, 11 = 508 x 1500');
-  ok(J(FP.intumescent) === J({ width: 15, thickness: 4, grooveWidth: 15.5, grooveDepth: 4, stripsByRating: { FD30: 1, FD60: 2 }, macroStyleByStrips: { 1: 1, 2: 4 }, twoStripOffset: 11 }) && !('styles' in FP.intumescent),
+  const { colours: intuColours, ...intuCore } = FP.intumescent;
+  ok(J(intuCore) === J({ width: 15, thickness: 4, grooveWidth: 15.5, grooveDepth: 4, stripsByRating: { FD30: 1, FD60: 2 }, macroStyleByStrips: { 1: 1, 2: 4 }, twoStripOffset: 11 }) && !('styles' in FP.intumescent),
     'intumescent v1.1: one strip 15 x 4 all around, groove 15.5 x 4, FD30 one strip / FD60 two, Master_Door styles 1 / 4, no style table');
+  ok(J(intuColours.map((c) => c.id)) === J(['white', 'black', 'brown', 'grey', 'magnolia']) && intuColours.every((c) => c.label && /^#[0-9a-f]{6}$/.test(c.hex)) && FP.defaults.intuColour === 'white',
+    'v1.2: the strip colours white / black / brown / grey / magnolia (label + hex), default white');
+  // v1.2 (owner 28.10.2026): the vision panel types, the position default, three glasses, the closer symbols
+  ok(J(FP.vp.types.map((t) => [t.id, t.label, t.shape, t.width, t.height, t.count])) === J([['none', 'None', 'none', 0, 0, 0], ['standard', 'Standard (rectangle)', 'rect', 450, 700, 1], ['square', 'Square', 'rect', 450, 450, 1], ['narrow', 'Narrow slot', 'rect', 150, 760, 1], ['round', 'Round (porthole)', 'round', 300, 300, 1], ['diamond', 'Diamond', 'diamond', 350, 350, 1], ['double', 'Double (2 panes)', 'rect', 150, 800, 2]])
+    && J(FP.vp.position) === J({ across: 'centre', acrossOffset: 0, down: 'top', downOffset: 150 }) && FP.vp.minEdge === 100,
+    'v1.2 vision panel types None / Standard / Square / Narrow slot / Round / Diamond / Double, the default position centred with the top 150 below the leaf top, minEdge 100');
+  ok(J(FP.vp.glass.types.map((t) => [t.id, t.label, t.thickness, t.slot])) === J([['fd30', 'FD30 standard', 6, 'fd_glass_fire'], ['insulated', 'FD insulated', 6, 'fd_glass_insulated'], ['frosted', 'Frosted', 6, 'fd_glass_frosted']]) && J(FP.vp.glass.defaultByRating) === J({ FD30: 'fd30', FD60: 'insulated', none: 'fd30' }),
+    'v1.2 glass: only FD30 standard / FD insulated / Frosted (6 thick each until the owner says), FD60 defaults to insulated');
+  ok(FP.closer.surface.face === 'pull' && FP.closer.surface.bodyLength === 250 && FP.closer.surface.armLength === 230 && FP.closer.builtin.bodyLength === 300 && FP.closer.builtin.trackLength === 420,
+    'v1.2 closer symbols: surface body 250 on the pull face, arm 230; built in body 300, head track 420');
+  ok(J(profile.FIREDOOR_VP_SHAPES) === J(['none', 'rect', 'round', 'diamond']) && J(profile.FIREDOOR_VP_ACROSS) === J(['centre', 'hinge', 'lock']) && J(profile.FIREDOOR_VP_DOWN) === J(['top', 'centre', 'bottom']) && J(profile.FIREDOOR_VP_ARRANGE) === J(['stack', 'side']),
+    'the VP shape / across / down / arrange lists');
+  const migV = profile.migrateFireDoorProfile({ vp: { types: [{ id: 'round', width: 250 }, { id: 'oval', label: 'Mine', shape: 'rect', width: 200, height: 400, count: 1 }], glass: { types: [{ id: 'frosted', thickness: 7 }] } }, intumescent: { colours: [{ id: 'red', label: 'Red', hex: '#aa0000' }] }, closer: { surface: { face: 'push' } } });
+  ok(migV.vp.types.length === 8 && migV.vp.types[4].width === 250 && migV.vp.types[4].label === 'Round (porthole)' && migV.vp.types[7].id === 'oval' && migV.vp.glass.types[2].thickness === 7 && migV.vp.glass.types[2].label === 'Frosted' && migV.vp.glass.types.length === 3
+    && migV.intumescent.colours.length === 6 && migV.intumescent.colours[5].id === 'red' && migV.closer.surface.face === 'push' && migV.closer.surface.bodyLength === 250 && migV.closer.builtin.trackLength === 420,
+    'v1.2 migration: the types, glass types and colours merge by id (an edit kept, an extra appended), the closer blocks merge over the default');
   const tgt = FP.bsuite.targets[0];
   ok(FP.bsuite.activeTarget === 'fd-machine' && tgt.id === 'fd-machine' && J(Object.keys(tgt.programs)) === J(['leaf', 'head', 'jambHinge', 'jambLock'])
     && tgt.programs.leaf.path === 'C:/Users/Xp600/Desktop/Biesse Piotr/FD_LEAF_MASTER_PIOTR.bSolid' && tgt.programs.head.path === '' && tgt.programs.jambHinge.path === '' && tgt.programs.jambLock.path === ''
     && FP.bsuite.stopRows === true && J(FP.bsuite.hand) === J({ left: 0, right: 1 }) && FP.bsuite.macroDefaults.SPY_H === 1450 && FP.bsuite.macroDefaults.REBATE === 0 && FP.bsuite.macroDefaults.REBATE_STYLE === 1,
     'bsuite: one target with leaf / head / jambHinge / jambLock, the leaf master path, empty frame paths, stop rows, hand left 0 / right 1, macro defaults');
-  ok(J(FP.defaults) === J({ fire: true, rating: 'FD30', hingeSide: 'left', lockType: 'latch', closerFire: 'surface', closerNonFire: 'none', vpStyle: 0, leadEdge: true, vpCustom: { length: 600, width: 150, count: 1, rail: 100, pos: 0 } }),
+  ok(J(FP.defaults) === J({ fire: true, rating: 'FD30', hingeSide: 'left', lockType: 'latch', closerFire: 'surface', closerNonFire: 'none', vpStyle: 0, leadEdge: true, vpCustom: { length: 600, width: 150, count: 1, rail: 100, pos: 0 }, intuColour: 'white' }),
     'defaults v1.1: fire FD30, hinge left (no swing), latch, closer surface on a fire door / none on a DR door, no VP, no intu style, lead edge, custom VP 600 x 150 x 1 rail 100 pos 0');
   ok(J(profile.FIREDOOR_CLOSER_KINDS) === J(['none', 'surface', 'builtin']) && J(profile.FIREDOOR_CLOSER_LABELS) === J({ none: 'None', surface: 'Surface closer', builtin: 'Built in closer' }), 'the closer kinds and labels');
   // migration: block by block, a stored value kept, every other key from the default
@@ -143,7 +160,7 @@ section('1 - the fire door profile, its migration and withProfiles');
 section('2 - the spec: the firedoor block, frame depth, glazing; no firedoor key on the other categories');
 {
   const { spec: s } = mk();
-  ok(s.category === 'firedoor' && J(s.firedoor) === J({ fire: true, rating: 'FD30', openingWidth: 0, openingHeight: 0, leafWidth: 0, leafHeight: 0, hingeSide: 'left', frameDepth: 100, lockType: 'latch', closer: 'surface', vpStyle: 0, vpCustom: { length: 600, width: 150, count: 1, rail: 100, pos: 0 }, leadEdge: true }),
+  ok(s.category === 'firedoor' && J(s.firedoor) === J({ fire: true, rating: 'FD30', openingWidth: 0, openingHeight: 0, leafWidth: 0, leafHeight: 0, hingeSide: 'left', frameDepth: 100, lockType: 'latch', closer: 'surface', vpStyle: 0, vpCustom: { length: 600, width: 150, count: 1, rail: 100, pos: 0 }, leadEdge: true, vp: null, glass: null, intuColour: null }),
     `spec.category firedoor, spec.firedoor at the defaults (v1.1: opening and leaf 0 = the engine decides, no swing, no intu style, closer surface) ${J(s.firedoor)}`);
   ok(s.frame.depth === 100 && s.glazing.thickness === 6, `frame depth ${s.frame.depth} (the block's frameDepth), glazing thickness ${s.glazing.thickness}`);
   const { spec: s2 } = mk({ firedoorLeafWidth: 686, firedoorFrameDepth: 150 }, 'FDR-02', { firedoorLeafWidth: 762, firedoorOpeningWidth: 1000, firedoorOpeningHeight: 2100, firedoorFire: false, firedoorRating: 'FD60', firedoorLockType: 'euro', firedoorHingeSide: 'right', firedoorSwing: 'out', firedoorVpStyle: 14, firedoorVpCustom: { length: 500, count: 2, pos: 90 }, firedoorIntuStyle: 4, firedoorLeadEdge: false });
@@ -158,6 +175,12 @@ section('2 - the spec: the firedoor block, frame depth, glazing; no firedoor key
   // projectStore (fireDoorItemFields) stores a vpCustom number that did not parse as null: the ?? rule gives the profile default, never Number(null) = 0
   const { spec: s4 } = mk({ firedoorVpStyle: 14, firedoorVpCustom: { length: null, width: null, count: null, rail: null, pos: null } });
   ok(J(s4.firedoor.vpCustom) === J({ length: 600, width: 150, count: 1, rail: 100, pos: 0 }) && s4.firedoor.vpStyle === 14, 'a stored vpCustom with null numbers reads the profile defaults (600 x 150 x 1, rail 100, pos 0), not zeros', J(s4.firedoor.vpCustom));
+  // v1.2: the vision panel block, the glass and the strip colour read by name (a JSON string block too; numbers that do not parse = null)
+  const { spec: s5 } = mk({ firedoorVp: { type: 'round', shape: 'round', width: '300', height: 300, count: 1, arrange: 'stack', gap: 'x', across: 'lock', acrossOffset: 100, down: 'centre', downOffset: 1500, junk: 1 }, firedoorGlass: 'frosted', firedoorIntuColour: 'black' });
+  ok(J(s5.firedoor.vp) === J({ type: 'round', shape: 'round', arrange: 'stack', across: 'lock', down: 'centre', width: 300, height: 300, count: 1, gap: null, acrossOffset: 100, downOffset: 1500 }) && s5.firedoor.glass === 'frosted' && s5.firedoor.intuColour === 'black',
+    `v1.2 spec: firedoorVp read into its eleven keys (unknown keys dropped, a bad number null), firedoorGlass, firedoorIntuColour ${J(s5.firedoor.vp)}`);
+  ok(J(specification.fireDoorVpField('{"type":"square","width":450}')) === J({ type: 'square', shape: null, arrange: null, across: null, down: null, width: 450, height: null, count: null, gap: null, acrossOffset: null, downOffset: null }) && specification.fireDoorVpField('nope') === null && specification.fireDoorVpField(null) === null,
+    'fireDoorVpField: a JSON string block parses, junk reads null');
   const cas = specification.normaliseToWindowSpec({ id: 'x', name: 'X', width: 1200, height: 1200 }, { fullConfig: { windowCategory: 'casement' } });
   const sash = specification.normaliseToWindowSpec({ id: 'x', name: 'X', width: 900, height: 1500 }, { fullConfig: {} });
   const door = specification.normaliseToWindowSpec({ id: 'x', name: 'X', width: 900, height: 2100 }, { fullConfig: { windowCategory: 'door', doorType: 'single-external' } });
@@ -203,17 +226,25 @@ const f = REF.derived.firedoor;
   ok(J(lk.forend) === J({ length: 235, width: 24, millLength: 236, millWidth: 25, depth: 4, centreFromBottom: 985, centreFromTop: 1055, radius: 12.5 }), `forend ${J(lk.forend)} (centre 1000 - 15)`);
   ok(J(lk.case) === J({ depth: 85, height: 150, pocketWidth: 17, pocketDepth: 87, pocketHeight: 153, topFromBottom: 1046.5, topFromTop: 993.5 }), `case ${J(lk.case)} (top 1000 + 46.5)`);
   const k = f.keep;
-  ok(k.macroKeep === 2 && k.keepStyle === 1 && J(k.plate) === J({ length: 175, width: 39, millLength: 176, millWidth: 40, depth: 3 }) && J(k.pocket) === J({ length: 120, width: 18, depth: 15 }) && k.centreFromFoot === 990 && k.centreFromTop === 1093,
-    'keep: KEEP 2, plate 175 x 39 milled 176 x 40 x 3, pocket 120 x 18 x 15, centre 990 above the jamb foot (5 + 1000 - 15), 1093 from the top');
-  ok(J(f.intumescent) === J({ strips: 1, width: 15, thickness: 4, groove: { width: 15.5, depth: 4 }, label: '1 x 15 x 4 all around', macroStyle: 1, metres: 4.906 }), 'intumescent v1.1: one 15 x 4 strip all around, groove 15.5 x 4, 4.906 m (2 x 2040 + 826)');
-  ok(J(f.closer) === J({ type: 'surface', label: 'Surface closer', machined: false }) && f.vp.style === 0 && f.vp.panes.length === 0 && f.vp.glassSqm === 0 && J(f.vp.warnings) === J([]), 'closer surface (the fire default), no vision panel');
+  ok(k.macroKeep === 2 && k.keepStyle === 1 && J(k.plate) === J({ length: 175, width: 39, millLength: 176, millWidth: 40, depth: 3, radius: 20 }) && J(k.pocket) === J({ length: 120, width: 18, depth: 15 }) && k.centreFromFoot === 990 && k.centreFromTop === 1093,
+    'keep: KEEP 2, plate 175 x 39 milled 176 x 40 x 3 with full radius ends (R20, v1.2), pocket 120 x 18 x 15, centre 990 above the jamb foot (5 + 1000 - 15), 1093 from the top');
+  ok(J(f.intumescent) === J({ strips: 1, width: 15, thickness: 4, groove: { width: 15.5, depth: 4 }, label: '1 x 15 x 4 all around', macroStyle: 1, metres: 4.906, colour: { id: 'white', label: 'White', hex: '#f1f1ec' }, centresZ: [22] }), 'intumescent v1.1: one 15 x 4 strip all around, groove 15.5 x 4, 4.906 m (2 x 2040 + 826); v1.2 colour white, the strip centre 22 from the pull face');
+  ok(J({ ...f.closer, symbol: undefined }) === J({ type: 'surface', label: 'Surface closer', machined: false }) && f.vp.style === 0 && f.vp.panes.length === 0 && f.vp.glassSqm === 0 && J(f.vp.warnings) === J([]) && f.vp.label === 'None' && f.vp.shape === 'none' && f.vp.group === null && J(f.vp.glass) === J({ type: 'fd30', label: 'FD30 standard', thickness: 6, slot: 'fd_glass_fire' }),
+    'closer surface (the fire default), no vision panel (label None, no group), the glass FD30 standard');
+  // v1.2: the surface closer symbol in the leaf system: the body 15 under the leaf top, 60 in from the hinge edge; the arm 230 from
+  // the spindle (42.5, 87.5) to the shoe on the head face 20.5 above the leaf top (3 + 35 / 2), run sqrt(230^2 - 63^2) = 221.2
+  const cs = f.closer.symbol;
+  ok(cs.kind === 'surface' && cs.face === 'pull' && J(cs.body) === J({ x: 15, y: 60, length: 250, height: 55, depth: 45 }) && J(cs.arm.from) === J({ x: 42.5, y: 87.5 }) && cs.arm.to.x === -20.5 && near(cs.arm.to.y, 308.7, 0.05) && J(cs.shoe) === J({ x: -20.5, y: cs.arm.to.y, length: 70, height: 25 }),
+    `v1.2 surface closer symbol ${J(cs)}`);
   ok(J(f.handing) === J({ hingeSide: 'left', label: 'Hinge left' }), `handing ${J(f.handing)} (v1.1: no swing)`);
-  ok(J(f.inputs) === J({ openingWidth: 912, openingHeight: 2088, leafWidth: 826, leafHeight: 2040, leafOverride: { width: false, height: false }, frameDepth: 100, hingeSide: 'left', lockType: 'latch', closer: 'surface', vpStyle: 0, vpCustom: { length: 600, width: 150, count: 1, rail: 100, pos: 0 }, leadEdge: true }), 'inputs echoed (the resolved opening and leaf, no override)');
+  ok(J({ ...f.inputs, vp: undefined }) === J({ openingWidth: 912, openingHeight: 2088, leafWidth: 826, leafHeight: 2040, leafOverride: { width: false, height: false }, frameDepth: 100, hingeSide: 'left', lockType: 'latch', closer: 'surface', vpStyle: 0, vpCustom: { length: 600, width: 150, count: 1, rail: 100, pos: 0 }, leadEdge: true, glass: 'fd30', intuColour: 'white' })
+    && f.inputs.vp.source === 'legacy' && f.inputs.vp.shape === 'none' && f.inputs.vp.legacyStyle === 0, 'inputs echoed (the resolved opening and leaf, no override; v1.2 the glass, the colour and the vision panel read from the v1 style 0)');
   // the macro variable table (4.7 plus the v1.1 names), names and key order 1:1
   const LV = f.bsuiteVars.leaf;
   ok(J(Object.keys(LV)) === J(['LPX', 'LPY', 'LPZ', 'HAND', 'LH', 'RH', 'HINGE', 'LOCK', 'LOCK_H', 'SPINDLE', 'EURO', 'KEEP', 'KEEP_STYLE', 'INTU', 'INTU_W', 'INTU_T', 'INTU_STYLE', 'VP_STYLE', 'C_VP_L', 'C_VP_W', 'C_VP_NUM', 'C_VP_RAIL', 'C_VP_POS',
-    'D_TOP_RAIL', 'D_MID_RAIL', 'D_SIDE_MARGIN', 'LEAD_EDGE', 'REBATE', 'REBATE_STYLE', 'SPY_ON', 'SPY_H', 'LBOX', 'L_BOX_H', 'DROP_CILL', 'PREM_DOOR', 'HINGE_1', 'HINGE_2', 'HINGE_3', 'HINGE_D', 'CLOSER']),
-    'leaf row: the variable names of 4.7 plus INTU / INTU_W / INTU_T (v1.1) in the write order');
+    'D_TOP_RAIL', 'D_MID_RAIL', 'D_SIDE_MARGIN', 'VP_SHAPE', 'VP_N', 'VP_W', 'VP_H', 'VP_GAP', 'VP_ARR', 'VP_X', 'VP_Y', 'VP_R', 'LEAD_EDGE', 'REBATE', 'REBATE_STYLE', 'SPY_ON', 'SPY_H', 'LBOX', 'L_BOX_H', 'DROP_CILL', 'PREM_DOOR', 'HINGE_1', 'HINGE_2', 'HINGE_3', 'HINGE_D', 'CLOSER']),
+    'leaf row: the variable names of 4.7 plus INTU / INTU_W / INTU_T (v1.1) and VP_SHAPE / VP_N / VP_W / VP_H / VP_GAP / VP_ARR / VP_X / VP_Y / VP_R (v1.2) in the write order');
+  ok(LV.VP_SHAPE === 0 && LV.VP_N === 0 && LV.VP_W === 0 && LV.VP_H === 0 && LV.VP_GAP === 0 && LV.VP_ARR === 0 && LV.VP_X === 0 && LV.VP_Y === 0 && LV.VP_R === 0, 'leaf row v1.2: no panel, every VP_* 0');
   ok(LV.LPX === 2040 && LV.LPY === 826 && LV.LPZ === 44 && LV.HAND === 0 && LV.LH === 1 && LV.RH === 0 && LV.HINGE === 1 && LV.LOCK === 2 && LV.LOCK_H === 1000 && LV.SPINDLE === 1 && LV.EURO === 0 && LV.KEEP === 0 && LV.KEEP_STYLE === 0,
     'leaf row: LPX 2040 LPY 826 LPZ 44, HAND 0 LH 1 RH 0, HINGE 1, LOCK 2, LOCK_H 1000, SPINDLE 1, EURO 0, KEEP 0, KEEP_STYLE 0');
   ok(LV.INTU === 1 && LV.INTU_W === 15 && LV.INTU_T === 4 && LV.INTU_STYLE === 1 && LV.VP_STYLE === 0 && LV.C_VP_L === 600 && LV.C_VP_W === 150 && LV.C_VP_NUM === 1 && LV.C_VP_RAIL === 100 && LV.C_VP_POS === 0 && LV.D_TOP_RAIL === 150 && LV.D_MID_RAIL === 450 && LV.D_SIDE_MARGIN === 150,
@@ -238,7 +269,7 @@ const f = REF.derived.firedoor;
   ok(near(d.weights.timber, 60.68) && d.weights.glass === 0 && near(d.weights.total, 63.72) && d.weights.leaves.length === 1 && d.weights.leaves[0].role === 'leaf' && near(d.weights.leaves[0].weightKg, 47.49),
     `weights timber ${d.weights.timber} (3 members 15.46 + leaf 45.22), total ${d.weights.total} (+5 %), leaf ${d.weights.leaves[0].weightKg}`);
   ok(J(d.paint) === J({ areaSqm: 3.8, primer: 5.07, topcoat: 2.53 }) && f.paintAreaSqm === 3.8, `paint ${J(d.paint)} (leaf both faces + 35 / 50 frame faces)`);
-  ok(J(d.consumables) === J({ glass: { type: 'fire', sqm: 0 }, hinges: { count: 3, product: 'fire' }, lock: { type: 'latch' }, keep: 1, closer: { type: 'surface', count: 1 }, dowels: { count: 6, dia: 8, length: 40 }, intumescent: { metres: 4.906, width: 15, thickness: 4, strips: 1 }, glazingBeads: { metres: 0 }, glazingIntumescent: { metres: 0 } }),
+  ok(J(d.consumables) === J({ glass: { type: 'fd30', label: 'FD30 standard', slot: 'fd_glass_fire', thickness: 6, sqm: 0 }, hinges: { count: 3, product: 'fire' }, lock: { type: 'latch' }, keep: 1, closer: { type: 'surface', count: 1 }, dowels: { count: 6, dia: 8, length: 40 }, intumescent: { metres: 4.906, width: 15, thickness: 4, strips: 1, colour: 'White' }, glazingBeads: { metres: 0 }, glazingIntumescent: { metres: 0 } }),
     `consumables ${J(d.consumables)}`);
   // the machining ops (the coordinate systems of the file header)
   const hr = opsOf(d, 'leaf', 'hingeRecess');
@@ -287,7 +318,7 @@ section('3b - FD60, non-fire DR, the 762 x 1981 leaf, hinge right, euro / bathro
     'FD60 leaf ops follow the 54 thickness (forend z 14.5, spindle through 54)');
   // v1.1: FD60 takes two 15 x 4 strips, 9.812 m, six grooves (two per edge) at LPZ / 2 +- twoStripOffset, never overlapping
   const tg = fd60.machining.leaf.filter((o) => o.kind === 'intuGroove');
-  ok(J(fd60.intumescent) === J({ strips: 2, width: 15, thickness: 4, groove: { width: 15.5, depth: 4 }, label: '2 x 15 x 4 all around', macroStyle: 4, metres: 9.812 }) && fd60.bsuiteVars.leaf.INTU === 2 && fd60.bsuiteVars.leaf.INTU_STYLE === 4
+  ok(J(fd60.intumescent) === J({ strips: 2, width: 15, thickness: 4, groove: { width: 15.5, depth: 4 }, label: '2 x 15 x 4 all around', macroStyle: 4, metres: 9.812, colour: { id: 'white', label: 'White', hex: '#f1f1ec' }, centresZ: [16, 38] }) && fd60.bsuiteVars.leaf.INTU === 2 && fd60.bsuiteVars.leaf.INTU_STYLE === 4
     && tg.length === 6 && tg.filter((o) => o.strip === 1).every((o) => near(o.z, R(27 - FP.intumescent.twoStripOffset - 7.75), 0.001)) && tg.filter((o) => o.strip === 2).every((o) => near(o.z, R(27 + FP.intumescent.twoStripOffset - 7.75), 0.001))
     && tg.every((o) => o.width === 15.5 && o.depth === 4) && tg.every((a) => tg.every((b) => a === b || a.face !== b.face || a.z + a.width <= b.z + 1e-6 || b.z + b.width <= a.z + 1e-6)),
     'FD60 intumescent: 2 x 15 x 4 all around, 9.812 m, INTU 2, INTU_STYLE 4, six 15.5 x 4 grooves at 27 +- 11 on the 54 leaf, never overlapping');
@@ -297,10 +328,13 @@ section('3b - FD60, non-fire DR, the 762 x 1981 leaf, hinge right, euro / bathro
     'non-fire DR: rating none, leaf 44, HINGE 0 standard, LOCK 1, KEEP 1, no closer by default');
   ok(fdr.intumescent === null && dr.consumables.intumescent === null && dr.consumables.closer === null && fdr.bsuiteVars.leaf.INTU === 0 && fdr.bsuiteVars.leaf.INTU_STYLE === 0 && fdr.bsuiteVars.leaf.HINGE === 0 && fdr.bsuiteVars.leaf.LOCK === 1 && fdr.bsuiteVars.leaf.CLOSER === 0 && fdr.bsuiteVars.jambLock.KEEP === 1 && fdr.bsuiteVars.head.HINGE === 0,
     'non-fire DR: no intumescent rows, INTU 0, INTU_STYLE 0, HINGE 0, LOCK 1, CLOSER 0, KEEP 1 on the lock jamb');
-  ok(opsOf(dr, 'leaf', 'intuGroove').length === 0 && dr.consumables.glass.type === 'toughened' && dr.consumables.hinges.product === 'standard' && dr.components.sash[0].notes === 'door blank non-fire',
-    'non-fire DR: no grooves, toughened glass slot, standard hinges, "door blank non-fire"');
+  ok(opsOf(dr, 'leaf', 'intuGroove').length === 0 && dr.consumables.glass.type === 'fd30' && dr.consumables.glass.slot === 'fd_glass_fire' && dr.consumables.hinges.product === 'standard' && dr.components.sash[0].notes === 'door blank non-fire',
+    'non-fire DR: no grooves, the glass FD30 standard (v1.2: three glasses only, no toughened), standard hinges, "door blank non-fire"');
+  ok(fd60.vp.glass.type === 'insulated' && fd60.vp.glass.slot === 'fd_glass_insulated' && mk({ firedoorRating: 'FD60', firedoorGlass: 'frosted' }).derived.firedoor.vp.glass.label === 'Frosted' && mk({ firedoorGlass: 'toughened' }).derived.firedoor.vp.glass.type === 'fd30',
+    'v1.2 glass: FD60 defaults to FD insulated, a picked Frosted wins, an unknown glass (toughened) falls to the rating default');
+  ok(mk({ firedoorIntuColour: 'black' }).derived.firedoor.intumescent.colour.label === 'Black' && mk({ firedoorIntuColour: 'pink' }).derived.firedoor.intumescent.colour.id === 'white', 'v1.2 strip colour: a picked black, an unknown colour falls to the default white');
   const drc = mk({ firedoorFire: false, firedoorCloser: true, firedoorIntuStyle: 4 }).derived.firedoor;
-  ok(J(drc.closer) === J({ type: 'builtin', label: 'Built in closer', machined: false }) && drc.bsuiteVars.leaf.CLOSER === 2 && drc.intumescent === null && drc.bsuiteVars.leaf.INTU === 0,
+  ok(J({ ...drc.closer, symbol: undefined }) === J({ type: 'builtin', label: 'Built in closer', machined: false }) && J(drc.closer.symbol) === J({ kind: 'builtin', body: { x: 0, y: 80, length: 300, width: 26, depth: 40, z: 9 }, track: { y: 80, length: 420, width: 20, depth: 30 } }) && drc.bsuiteVars.leaf.CLOSER === 2 && drc.intumescent === null && drc.bsuiteVars.leaf.INTU === 0,
     'non-fire with a v1 boolean closer true: built in, CLOSER 2; a stored intu style is ignored');
   const drs = mk({ firedoorCloser: 'surface' }).derived, drb = mk({ firedoorCloser: 'builtin' }).derived, drn = mk({ firedoorCloser: 'none' }).derived;
   ok(drs.firedoor.bsuiteVars.leaf.CLOSER === 1 && drb.firedoor.bsuiteVars.leaf.CLOSER === 2 && drn.firedoor.bsuiteVars.leaf.CLOSER === 0 && drn.firedoor.closer === null && J(drb.consumables.closer) === J({ type: 'builtin', count: 1 }) && drb.firedoor.closer.label === 'Built in closer',
@@ -346,16 +380,19 @@ section('3b - FD60, non-fire DR, the 762 x 1981 leaf, hinge right, euro / bathro
   // the vision panels
   const v1 = mk({ firedoorVpStyle: 1 }).derived;
   const p1 = v1.firedoor.vp.panes[0];
-  ok(v1.firedoor.vp.style === 1 && v1.firedoor.vp.label === '450mm Square' && v1.firedoor.vp.panes.length === 1 && J([p1.i, p1.w, p1.h, p1.x, p1.y, p1.rotated, p1.angle]) === J([1, 450, 450, 150, 188, false, 0]) && J(p1.box) === J({ w: 450, h: 450 }),
+  ok(v1.firedoor.vp.style === 1 && v1.firedoor.vp.label === 'Square: 450 x 450' && v1.firedoor.vp.positionLabel === 'centred, top 150 below the leaf top' && v1.firedoor.vp.panes.length === 1 && J([p1.i, p1.w, p1.h, p1.x, p1.y, p1.rotated, p1.angle]) === J([1, 450, 450, 150, 188, false, 0]) && J(p1.box) === J({ w: 450, h: 450 }),
     'VP style 1: one 450 x 450 pane, top 150 from the leaf top, 188 from the hinge edge ((826 - 450) / 2)');
   ok(near(v1.firedoor.vp.glassSqm, 0.2025) && near(v1.firedoor.vp.beadM, 3.6) && near(v1.firedoor.vp.intuM, 1.8) && v1.firedoor.vp.glassThickness === 6 && J(v1.firedoor.vp.warnings) === J([]),
     'VP style 1: glass 0.2025 m2, beads 3.6 m (perimeter x 2 faces), glazing intumescent 1.8 m');
-  ok(J(v1.customGlassUnits.map((u) => [u.width, u.height, u.qty, u.role, u.location, u.fire])) === J([[450, 450, 1, 'vp', 'vision panel 1', true]]) && /layout per bSolid macro/.test(v1.customGlassUnits[0].note),
-    'VP style 1: one glass unit 450 x 450, role vp, "vision panel 1", fire, noted "layout per bSolid macro"');
-  ok(J(v1.consumables.glass) === J({ type: 'fire', sqm: 0.2 }) && near(v1.consumables.glazingBeads.metres, 3.6) && near(v1.consumables.glazingIntumescent.metres, 1.8) && near(v1.weights.glass, 3.04),
-    'VP style 1: consumables fire glass 0.2 m2, beads 3.6, glazing intumescent 1.8; glass weight 3.04 kg (2.5 x 6 x 0.2025)');
+  ok(J(v1.customGlassUnits.map((u) => [u.width, u.height, u.qty, u.role, u.location, u.fire, u.shape, u.glassType])) === J([[450, 450, 1, 'vp', 'vision panel 1', true, 'rect', 'fd30']]) && v1.customGlassUnits[0].note === 'FD30 standard 6 · 450 x 450',
+    'VP style 1: one glass unit 450 x 450, role vp, "vision panel 1", fire, rect, the glass FD30 standard (v1.2: no "layout per bSolid macro", PC places the panel)');
+  ok(J(v1.consumables.glass) === J({ type: 'fd30', label: 'FD30 standard', slot: 'fd_glass_fire', thickness: 6, sqm: 0.2 }) && near(v1.consumables.glazingBeads.metres, 3.6) && near(v1.consumables.glazingIntumescent.metres, 1.8) && near(v1.weights.glass, 3.04),
+    'VP style 1: consumables glass FD30 standard 0.2 m2, beads 3.6, glazing intumescent 1.8; glass weight 3.04 kg (2.5 x 6 x 0.2025)');
   const vc = opsOf(v1, 'leaf', 'vpCutout');
-  ok(vc.length === 1 && opIs(vc[0], 'pull', 150, 188, 0, 450, 450, 44, 6) && vc[0].rotated === false && vc[0].pane === 1 && v1.firedoor.bsuiteVars.leaf.VP_STYLE === 1, 'VP style 1 cut-out through the pull face at x 150 y 188, 450 x 450 R6; VP_STYLE 1');
+  ok(vc.length === 1 && opIs(vc[0], 'pull', 150, 188, 0, 450, 450, 44, 6) && vc[0].rotated === false && vc[0].shape === 'rect' && vc[0].pane === 1 && v1.firedoor.bsuiteVars.leaf.VP_STYLE === 1, 'VP style 1 cut-out through the pull face at x 150 y 188, 450 x 450 R6, shape rect; VP_STYLE 1');
+  const L1 = v1.firedoor.bsuiteVars.leaf;
+  ok(J([L1.VP_SHAPE, L1.VP_N, L1.VP_W, L1.VP_H, L1.VP_GAP, L1.VP_ARR, L1.VP_X, L1.VP_Y, L1.VP_R]) === J([1, 1, 450, 450, 0, 0, 150, 188, 6]) && J([L1.C_VP_L, L1.C_VP_W, L1.C_VP_NUM, L1.C_VP_RAIL, L1.C_VP_POS]) === J([600, 150, 1, 100, 0]),
+    'VP style 1 (a v1 record): VP_SHAPE 1, VP_N 1, VP_W 450, VP_H 450, VP_X 150, VP_Y 188, VP_R 6 for the new macro; C_VP_* the stored custom block as v1.1 wrote it');
   const v2 = mk({ firedoorVpStyle: 2 }).derived.firedoor.vp;
   ok(J(v2.panes.map((p) => [p.w, p.h, p.x, p.y])) === J([[150, 760, 150, 338], [150, 450, 1360, 338]]), 'VP style 2: 150 x 760 at 150 then 150 x 450 at 1360 (760 + the 450 mid rail), both 338 from the hinge edge');
   const v7 = mk({ firedoorVpStyle: 7 }).derived.firedoor.vp;
@@ -365,12 +402,13 @@ section('3b - FD60, non-fire DR, the 762 x 1981 leaf, hinge right, euro / bathro
   ok(p5.w === 350 && p5.h === 350 && p5.rotated === true && p5.angle === 45 && near(p5.box.w, 495, 0.1) && near(p5.box.h, 495, 0.1) && p5.x === 150 && near(p5.y, 165.5, 0.1) && opsOf(v5, 'leaf', 'vpCutout')[0].rotated === true && near(opsOf(v5, 'leaf', 'vpCutout')[0].width, 495, 0.1),
     'VP style 5 diamond: a 350 square turned 45, bounding box 495 x 495 centred (y 165.5), the cut-out carries rotated and the box');
   const v8 = mk({ firedoorVpStyle: 8 }).derived.firedoor.vp;
-  ok(v8.panes.length === 5 && v8.panes.every((p) => p.w === 500 && p.h === 200 && p.rotated === true && p.angle === 90) && v8.panes[4].x === 1350 && J(v8.warnings) === J([]),
-    'VP style 8 (5No 200 x 500): the native stack 2900 does not fit 2040, so the panes turn 500 x 200 (last at 1350), no warning');
+  ok(v8.panes.length === 5 && v8.panes.every((p) => p.w === 500 && p.h === 200) && v8.panes[4].x === 1350 && v8.style === 8 && J(v8.warnings) === J([]),
+    'VP style 8 (5No 200 x 500, a v1 record): the native stack 2900 does not fit 2040, so the panes turn 500 x 200 (last at 1350), VP_STYLE 8 kept, no warning');
   const vw = mk({ firedoorVpStyle: 11, firedoorLeafWidth: 626 }).derived.firedoor.vp;
-  ok(vw.panes.length === 1 && vw.panes[0].w === 508 && vw.warnings.length === 1 && /508 wide/.test(vw.warnings[0]), 'VP style 11 on a 626 leaf: placed with a width warning, the door never fails');
+  ok(vw.panes.length === 1 && vw.panes[0].w === 508 && vw.warnings.some((w) => /only 59 of timber at the hinge edge \(minimum 100/.test(w)) && vw.warnings.some((w) => /only 59 of timber at the lock edge/.test(w)) && vw.warnings.some((w) => /runs into the lock/.test(w)),
+    'VP style 11 on a 626 leaf: placed with the edge warnings (59 of timber, minimum 100) and the lock clash, the door never fails');
   const vx = mk({ firedoorVpStyle: 3 }).derived.firedoor.vp;
-  ok(vx.style === 3 && vx.panes.length === 0 && vx.warnings.length === 1 && /unknown vision panel style 3/.test(vx.warnings[0]), 'an unknown style id (3) places nothing and warns');
+  ok(vx.style === 3 && vx.panes.length === 0 && vx.warnings.length === 1 && /unknown Master_Door style 3/.test(vx.warnings[0]), 'an unknown style id (3) places nothing and warns');
   const vcu = mk({ firedoorVpStyle: 14, firedoorVpCustom: { length: 600, width: 150, count: 2, rail: 100, pos: 0 } }).derived;
   ok(vcu.firedoor.vp.style === 14 && J(vcu.firedoor.vp.panes.map((p) => [p.w, p.h, p.x, p.y])) === J([[150, 600, 150, 338], [150, 600, 850, 338]]) && vcu.customGlassUnits.length === 2 && vcu.customGlassUnits[1].location === 'vision panel 2',
     'custom style 14, 600 x 150 x 2 rail 100 pos 0: two 150 x 600 panes at 150 and 850, two glass units');
@@ -378,6 +416,40 @@ section('3b - FD60, non-fire DR, the 762 x 1981 leaf, hinge right, euro / bathro
     'custom style 14: VP_STYLE 14, C_VP_L 600, C_VP_W 150, C_VP_NUM 2, C_VP_RAIL 100, C_VP_POS 0');
   const vch = mk({ firedoorVpStyle: 14, firedoorVpCustom: { length: 600, width: 150, count: 1, rail: 100, pos: 90 } }).derived.firedoor;
   ok(J(vch.vp.panes.map((p) => [p.w, p.h, p.x, p.y])) === J([[600, 150, 150, 113]]) && vch.bsuiteVars.leaf.C_VP_POS === 90, 'custom pos 90: the pane lies 600 wide x 150 high, C_VP_POS 90');
+  // v1.2 (owner 28.10.2026): the vision panel as a type, a size, a count and a position
+  const vpOf = (vp, extra = {}) => mk({ firedoorVp: vp, ...extra }).derived;
+  const sq = vpOf({ type: 'square' }).firedoor;
+  ok(sq.vp.source === 'v12' && sq.vp.type === 'square' && sq.vp.label === 'Square: 450 x 450' && sq.vp.style === 1 && J(sq.vp.panes.map((p) => [p.w, p.h, p.x, p.y, p.shape, p.radius])) === J([[450, 450, 150, 188, 'rect', 6]]) && J(sq.vp.group) === J({ x: 150, y: 188, w: 450, h: 450, fromTop: 150, fromBottom: 1440, fromHingeEdge: 188, fromLockEdge: 188 }),
+    'v1.2 Square: the preset 450 x 450 centred, top 150: the same pane as style 1, so VP_STYLE 1 for the old macro; the group 188 from both edges, 1440 above the bottom');
+  const rdd = vpOf({ type: 'round', width: 300, across: 'lock', acrossOffset: 100, down: 'centre', downOffset: 1500 });
+  const rf1 = rdd.firedoor;
+  ok(rf1.vp.label === 'Round (porthole): dia 300' && rf1.vp.positionLabel === '100 from the lock edge, centre 1500 above the leaf bottom' && J(rf1.vp.panes.map((p) => [p.w, p.h, p.x, p.y, p.shape, p.radius])) === J([[300, 300, 390, 426, 'round', 150]]) && rf1.vp.group.fromLockEdge === 100 && rf1.vp.group.fromBottom === 1350,
+    'v1.2 Round dia 300, 100 from the lock edge, centre 1500 above the bottom: x 2040 - 1500 - 150 = 390, y 826 - 100 - 300 = 426');
+  ok(rf1.vp.style === 0 && rf1.warnings.some((w) => /round panel: the old Master_Door macro has no round style/.test(w)) && near(rf1.vp.glassSqm, 0.071, 0.001) && near(rf1.vp.beadM, 1.885, 0.001) && near(rf1.vp.intuM, 0.942, 0.001),
+    'v1.2 Round: VP_STYLE 0 with the note for the new macro; glass pi x 150^2 = 0.071 m2, beads 2 x pi x 0.3 = 1.885 m, glazing intumescent 0.942 m');
+  const rc = opsOf(rdd, 'leaf', 'vpCutout')[0];
+  const RL = rf1.bsuiteVars.leaf;
+  ok(opIs(rc, 'pull', 390, 426, 0, 300, 300, 44, 150) && rc.shape === 'round' && /round dia 300/.test(rc.note) && J([RL.VP_SHAPE, RL.VP_N, RL.VP_W, RL.VP_H, RL.VP_X, RL.VP_Y, RL.VP_R, RL.C_VP_L, RL.C_VP_W, RL.C_VP_NUM]) === J([2, 1, 300, 300, 390, 426, 150, 300, 300, 1])
+    && rdd.customGlassUnits[0].shape === 'round' && rdd.customGlassUnits[0].note === 'FD30 standard 6 · round dia 300',
+    'v1.2 Round: the cut-out x 390 y 426, 300 x 300 R150 shape round; VP_SHAPE 2, VP_W / VP_H 300, VP_X 390, VP_Y 426, VP_R 150; the glass unit round');
+  const ds = vpOf({ type: 'double', arrange: 'side', gap: 80, acrossOffset: 50 }).firedoor;
+  ok(ds.vp.label === 'Double (2 panes): 2 x 150 x 800, side by side, gap 80' && ds.vp.positionLabel === 'centred, shifted 50 towards the lock edge, top 150 below the leaf top' && J(ds.vp.panes.map((p) => [p.x, p.y])) === J([[150, 273], [150, 503]]) && ds.vp.style === 14 && ds.bsuiteVars.leaf.VP_ARR === 1 && ds.bsuiteVars.leaf.VP_GAP === 80
+    && ds.warnings.some((w) => /this position needs the new macro/.test(w)),
+    'v1.2 Double side by side, gap 80, shifted 50 towards the lock: panes at y 273 and 503 ((826 - 380) / 2 + 50), VP_ARR 1, VP_STYLE 14 with the new macro note');
+  const hn = vpOf({ type: 'narrow', across: 'hinge', acrossOffset: 120, down: 'bottom', downOffset: 900 }).firedoor;
+  ok(J(hn.vp.panes.map((p) => [p.x, p.y, p.w, p.h])) === J([[380, 120, 150, 760]]) && hn.vp.group.fromBottom === 900 && hn.vp.positionLabel === '120 from the hinge edge, bottom 900 above the leaf bottom',
+    'v1.2 Narrow slot 150 x 760, 120 from the hinge edge, the bottom 900 above the leaf bottom: x 2040 - 900 - 760 = 380');
+  const dm = vpOf({ type: 'diamond' }).firedoor;
+  ok(dm.vp.style === 5 && dm.vp.panes[0].shape === 'diamond' && dm.vp.panes[0].rotated && near(dm.vp.panes[0].box.w, 495, 0.1) && dm.vp.panes[0].radius === 0, 'v1.2 Diamond 350 centred, top 150: the Master_Door 350 diamond (VP_STYLE 5), the 495 bounding box');
+  const st = vpOf({ type: 'standard' }).firedoor;
+  ok(st.vp.style === 9 && st.vp.label === 'Standard (rectangle): 450 x 700' && st.warnings.length === 0, 'v1.2 Standard 450 x 700 centred, top 150 = Master_Door style 9, no warning');
+  const big = vpOf({ type: 'standard', width: 760, height: 2000, down: 'top', downOffset: 100 }).firedoor;
+  ok(big.warnings.some((w) => /only 33 of timber at the hinge edge/.test(w)) && big.warnings.some((w) => /runs 60 past the leaf bottom/.test(w)) && big.warnings.some((w) => /runs into the lock/.test(w)) && big.vp.panes.length === 1,
+    'v1.2 a panel too big: the edge, past-the-leaf and lock clash warnings, the door never fails');
+  const none = vpOf({ type: 'none' }).firedoor;
+  ok(none.vp.panes.length === 0 && none.vp.label === 'None' && none.vp.style === 0 && none.bsuiteVars.leaf.VP_SHAPE === 0 && none.bsuiteVars.leaf.C_VP_NUM === 0 && none.bsuiteVars.leaf.C_VP_L === 0, 'v1.2 type None: no pane, VP_STYLE 0, VP_SHAPE 0, C_VP_* 0');
+  ok(J(fireDoor.fireDoorVpFromLegacy(FP.vp, 2, {}).paneSizes) === J([{ w: 150, h: 760 }, { w: 150, h: 450 }]) && fireDoor.fireDoorVpInput(FP.vp, { type: 'round', width: 280, height: 999 }).height === 280 && fireDoor.fireDoorVpInput(FP.vp, { type: 'double' }).count === 2,
+    'fireDoorVpFromLegacy keeps style 2 two sizes; fireDoorVpInput: a round height follows its diameter, a preset count fills in');
   // the frame depth (the dowels spread over it: 20 / 75 / 130 on 150)
   const dp = mk({ firedoorFrameDepth: 150 }).derived.firedoor;
   ok(dp.frame.depth === 150 && dp.frame.rawWidth === 155 && dp.frame.members[0].section === '50x150' && dp.frame.members[0].rawSection === '63x155' && dp.bsuiteVars.head.LPY === 150 && opsOf({ firedoor: dp }, 'head', 'mitre')[0].depth === 150
@@ -586,11 +658,14 @@ section('4 - the lists: cut list, grouped symbols, pre-cut, glass schedule, hard
   // glass schedule rows from the vision panels
   const g1 = mkB({ firedoorVpStyle: 1 });
   const rows = M.lists.buildGlassListForWindow(g1.derived, g1.spec);
-  ok(rows.length === 1 && rows[0].width === 450 && rows[0].height === 450 && rows[0].type === 'fire' && rows[0].bars === 'none' && /vision panel 1/.test(rows[0].location) && rows[0].thickness === 6,
-    `glass schedule style 1: one 450 x 450 fire row, bars none, thickness 6, location "${rows[0]?.location}"`);
+  ok(rows.length === 1 && rows[0].width === 450 && rows[0].height === 450 && rows[0].type === 'fd30' && rows[0].spec === 'FD30 standard' && rows[0].makeup === '6mm FD30 standard' && rows[0].shape === 'rect' && rows[0].finish === 'clear' && rows[0].bars === 'none' && /vision panel 1/.test(rows[0].location) && rows[0].thickness === 6,
+    `glass schedule style 1: one 450 x 450 FD30 standard row (v1.2), clear, rect, bars none, thickness 6, location "${rows[0]?.location}"`);
   ok(M.lists.buildGlassListForWindow(R.derived, R.spec).length === 0, 'glass schedule style 0: no rows');
   const gn = mkB({ firedoorVpStyle: 1, firedoorFire: false }, 'DR-01');
-  ok(M.lists.buildGlassListForWindow(gn.derived, gn.spec)[0]?.type === 'toughened', 'glass schedule non-fire: toughened');
+  ok(M.lists.buildGlassListForWindow(gn.derived, gn.spec)[0]?.type === 'fd30', 'glass schedule non-fire: FD30 standard (v1.2: three glasses only, no toughened)');
+  const gf = mkB({ firedoorVp: { type: 'round', width: 300 }, firedoorGlass: 'frosted' });
+  const rf = M.lists.buildGlassListForWindow(gf.derived, gf.spec);
+  ok(rf.length === 1 && rf[0].type === 'frosted' && rf[0].spec === 'Frosted' && rf[0].finish === 'frosted' && rf[0].shape === 'round' && rf[0].width === 300 && rf[0].height === 300, 'glass schedule v1.2: a round 300 Frosted pane, finish frosted, shape round');
   const g2 = mkB({ firedoorVpStyle: 2 });
   const r2 = M.lists.buildGlassListForWindow(g2.derived, g2.spec);
   ok(r2.length === 2 && r2[0].width === 150 && r2[0].height === 760 && r2[1].width === 150 && r2[1].height === 450, `glass schedule style 2: two rows 150 x 760 + 150 x 450 (${r2.map((r) => `${r.width}x${r.height}`).join(', ')})`);
@@ -643,7 +718,7 @@ section('5 - the BOM: slots per door, material lines, the merge, the Assign Mate
   ok(qs.fd_closer_surface?.qty === 1 && !qs.fd_closer, 'a surface closer: fd_closer_surface 1, no built in row');
   const q60s = M.bom.buildWindowPartQtys(mkB({ firedoorRating: 'FD60' }).derived, mkB({ firedoorRating: 'FD60' }).spec, {}, null);
   ok(near(q60s.fd_intu_15?.qty, 9.812), `FD60: fd_intu_15 ${q60s.fd_intu_15?.qty} m (two strips)`);
-  ok(q.fd_glass_fire?.qty === 0.2 && q.fd_glass_fire.unit === 'm²' && near(e.derived.firedoor.vp.glassSqm, 0.2025) && !q.fd_glass_toughened && !q.glass_double,
+  ok(q.fd_glass_fire?.qty === 0.2 && q.fd_glass_fire.unit === 'm²' && near(e.derived.firedoor.vp.glassSqm, 0.2025) && !q.fd_glass_toughened && !q.fd_glass_insulated && !q.fd_glass_frosted && !q.glass_double,
     `fd_glass_fire ${q.fd_glass_fire?.qty} m2 (consumables.glass.sqm rounded to 2 dp as the casement; vp.glassSqm ${e.derived.firedoor.vp.glassSqm}), no toughened / window glass rows`);
   ok(near(q.fd_glazing_bead?.qty, 3.6) && q.fd_glazing_bead.unit === 'm' && near(q.fd_glazing_intu?.qty, 1.8) && q.fd_glazing_intu.unit === 'm',
     `fd_glazing_bead ${q.fd_glazing_bead?.qty} m (perimeter 1.8 x 2 faces), fd_glazing_intu ${q.fd_glazing_intu?.qty} m (the perimeter)`);
@@ -653,8 +728,11 @@ section('5 - the BOM: slots per door, material lines, the merge, the Assign Mate
   ok(Object.keys(q).every((k) => ALL.has(k)), 'every quantity the BOM writes is a row of ALL_PARTS', Object.keys(q).filter((k) => !ALL.has(k)).join(','));
   const n = mkB({ firedoorFire: false, firedoorVpStyle: 1 }, 'DR-01');
   const qn = M.bom.buildWindowPartQtys(n.derived, n.spec, {}, null);
-  ok(qn.fd_blank_std?.qty === 1 && qn.fd_hinge_std?.qty === 3 && qn.fd_lock_latch?.qty === 1 && !qn.fd_closer && !qn.fd_closer_surface && !qn.fd_intu_15 && !qn.fd_intu_10 && !qn.fd_intu_20 && !qn.fd_glazing_intu && qn.fd_glass_toughened?.qty === 0.2 && !qn.fd_glass_fire && qn.fd_frame_dowel?.qty === 6,
-    'non-fire: fd_blank_std, fd_hinge_std 3, fd_lock_latch, no closer row, no fd_intu_* and no fd_glazing_intu rows, toughened glass 0.2, 6 dowels');
+  ok(qn.fd_blank_std?.qty === 1 && qn.fd_hinge_std?.qty === 3 && qn.fd_lock_latch?.qty === 1 && !qn.fd_closer && !qn.fd_closer_surface && !qn.fd_intu_15 && !qn.fd_intu_10 && !qn.fd_intu_20 && !qn.fd_glazing_intu && qn.fd_glass_fire?.qty === 0.2 && !qn.fd_glass_toughened && qn.fd_frame_dowel?.qty === 6,
+    'non-fire: fd_blank_std, fd_hinge_std 3, fd_lock_latch, no closer row, no fd_intu_* and no fd_glazing_intu rows, the FD30 standard glass 0.2 (v1.2, no toughened), 6 dowels');
+  const qi = M.bom.buildWindowPartQtys(mkB({ firedoorRating: 'FD60', firedoorVpStyle: 1 }).derived, mkB({ firedoorRating: 'FD60', firedoorVpStyle: 1 }).spec, {}, null);
+  const qf = M.bom.buildWindowPartQtys(mkB({ firedoorVpStyle: 1, firedoorGlass: 'frosted' }).derived, mkB({ firedoorVpStyle: 1, firedoorGlass: 'frosted' }).spec, {}, null);
+  ok(qi.fd_glass_insulated?.qty === 0.2 && !qi.fd_glass_fire && qf.fd_glass_frosted?.qty === 0.2 && !qf.fd_glass_fire, 'v1.2 glass rows: FD60 buys fd_glass_insulated, a Frosted pick buys fd_glass_frosted');
   const s60 = mkB({ firedoorRating: 'FD60' });
   const q60 = M.bom.buildWindowPartQtys(s60.derived, s60.spec, {}, null);
   ok(q60.fd_blank_fd60?.qty === 1 && !q60.fd_blank_fd30 && q60.fd_hinge_fire?.qty === 3, 'FD60: fd_blank_fd60 1, fire hinges');
@@ -679,16 +757,17 @@ section('5 - the BOM: slots per door, material lines, the merge, the Assign Mate
   // the Assign Materials rows, the registry, the ironmongery categories
   const ids = M.store.FIREDOOR_ALL_PARTS.map((p) => p.id);
   // v1.1: the 10 / 20 strips are gone, the surface closer and the frame dowels are appended at the end (the stored index-based assignment sets keep the v1 rows)
-  const WANT = ['fd_blank_fd30', 'fd_blank_fd60', 'fd_blank_std', 'fd_frame_timber', 'fd_hinge_fire', 'fd_hinge_std', 'fd_lock_latch', 'fd_lock_euro', 'fd_lock_bathroom', 'fd_cylinder_euro', 'fd_thumbturn', 'fd_handle_set', 'fd_keep', 'fd_closer', 'fd_intu_15', 'fd_glass_fire', 'fd_glass_toughened', 'fd_glazing_bead', 'fd_glazing_intu', 'fd_closer_surface', 'fd_frame_dowel'];
-  ok(ids.length === 21 && J(ids) === J(WANT), `FIREDOOR_ALL_PARTS: the 21 ids of v1.1 (${ids.length}; no fd_intu_10 / fd_intu_20; fd_closer_surface and fd_frame_dowel last)`, J(ids));
+  // v1.2: the toughened row is gone (three glasses only), FD insulated and Frosted appended at the end
+  const WANT = ['fd_blank_fd30', 'fd_blank_fd60', 'fd_blank_std', 'fd_frame_timber', 'fd_hinge_fire', 'fd_hinge_std', 'fd_lock_latch', 'fd_lock_euro', 'fd_lock_bathroom', 'fd_cylinder_euro', 'fd_thumbturn', 'fd_handle_set', 'fd_keep', 'fd_closer', 'fd_intu_15', 'fd_glass_fire', 'fd_glazing_bead', 'fd_glazing_intu', 'fd_closer_surface', 'fd_frame_dowel', 'fd_glass_insulated', 'fd_glass_frosted'];
+  ok(ids.length === 22 && J(ids) === J(WANT), `FIREDOOR_ALL_PARTS: the 22 ids of v1.2 (${ids.length}; no fd_intu_10 / fd_intu_20 / fd_glass_toughened; fd_closer_surface, fd_frame_dowel, fd_glass_insulated, fd_glass_frosted last)`, J(ids));
   const all = M.store.ALL_PARTS.map((p) => p.id);
-  ok(J(all.slice(-21)) === J(WANT) && new Set(all).size === all.length && WANT.every((id) => all.filter((x) => x === id).length === 1), 'the 21 ids are present once in ALL_PARTS and last');
+  ok(J(all.slice(-22)) === J(WANT) && new Set(all).size === all.length && WANT.every((id) => all.filter((x) => x === id).length === 1), 'the 22 ids are present once in ALL_PARTS and last');
   ok(all.indexOf('fd_blank_fd30') > all.indexOf(M.store.DOOR_ALL_PARTS[M.store.DOOR_ALL_PARTS.length - 1].id), 'after the last external door row');
   ok(M.store.FIREDOOR_ALL_PARTS.every((p) => p.windowType === 'firedoor' && p.name && p.unit && p.materialType && p.hint), 'every row has windowType firedoor, name, unit, materialType, hint');
   const byId = Object.fromEntries(M.store.FIREDOOR_ALL_PARTS.map((p) => [p.id, p]));
   ok(byId.fd_blank_fd30.section === '44mm' && byId.fd_blank_fd60.section === '54mm' && byId.fd_blank_std.section === '44mm' && byId.fd_frame_timber.section === '63 x (depth + 5)' && byId.fd_intu_15.section === '15 x 4' && byId.fd_glass_fire.section === '6mm',
     'row sections from the profile: 44mm / 54mm / 44mm, 63 x (depth + 5), 15 x 4, 6mm');
-  ok(['fd_blank_fd30', 'fd_blank_fd60', 'fd_blank_std', 'fd_frame_timber'].every((id) => byId[id].unit === (id === 'fd_frame_timber' ? 'm' : 'pcs')) && ['fd_intu_15', 'fd_glazing_bead', 'fd_glazing_intu'].every((id) => byId[id].unit === 'm') && byId.fd_glass_fire.unit === 'm²' && byId.fd_glass_toughened.unit === 'm²'
+  ok(['fd_blank_fd30', 'fd_blank_fd60', 'fd_blank_std', 'fd_frame_timber'].every((id) => byId[id].unit === (id === 'fd_frame_timber' ? 'm' : 'pcs')) && ['fd_intu_15', 'fd_glazing_bead', 'fd_glazing_intu'].every((id) => byId[id].unit === 'm') && byId.fd_glass_fire.unit === 'm²' && byId.fd_glass_insulated.unit === 'm²' && byId.fd_glass_frosted.unit === 'm²' && byId.fd_glass_fire.name === 'Glass FD30 standard' && byId.fd_glass_insulated.name === 'Glass FD insulated' && byId.fd_glass_frosted.name === 'Glass Frosted'
     && byId.fd_frame_dowel.unit === 'pcs' && byId.fd_frame_dowel.section === '8 x 40' && byId.fd_closer_surface.unit === 'pcs' && byId.fd_closer_surface.materialType === 'ironmongery' && byId.fd_closer_surface.defaultCategory === 'doorClosers' && /Built in/.test(byId.fd_closer.name),
     'units: blanks pcs, frame timber m, the strip and the beads m, glass m²; the dowel row pcs 8 x 40; the surface closer an ironmongery row on doorClosers; fd_closer named Built in');
   ok(!/[\u2013\u2014]/.test(J(M.store.FIREDOOR_ALL_PARTS)), 'no en / em dash in the fire door rows');
@@ -743,7 +822,7 @@ section('5 - the BOM: slots per door, material lines, the merge, the Assign Mate
   try {
     const buf = M.glassPdf.exportGlassPDF({ batch: { label: 't51' }, windowsData: [{ win: { name: 'FDR-01', _projectNumber: '115' }, windowSpec: e.spec, derived: e.derived }], projects: [{ number: '115', name: 't51' }], companySettings: { companyName: 'HARNESS' }, returnDoc: true });
     const txt = pdfStrings(buf);
-    ok(buf && buf.byteLength > 1000 && txt.some((x) => /450/.test(x)) && txt.some((x) => /fire/i.test(x)), `the glass PDF builds with the 450 x 450 fire pane (${buf?.byteLength} bytes)`);
+    ok(buf && buf.byteLength > 1000 && txt.some((x) => /450/.test(x)) && txt.some((x) => /FD30 standard/.test(x)), `the glass PDF builds with the 450 x 450 FD30 standard pane (v1.2) (${buf?.byteLength} bytes)`);
   } catch (err) { ok(false, 'the glass PDF builds for a fire door', String(err?.stack || err).slice(0, 300)); }
 }
 
@@ -1032,11 +1111,12 @@ const unzip = (buf) => {
   ok(L.vars.LPX === 2040 && L.vars.LPY === 826 && L.vars.LPZ === 44 && L.panelId === 1001 && L.panelName === 'P1001' && L.path === TGT.programs.leaf.path && L.element === 'FD_LEAF' && L.window === 'FDR-01' && /FD_LEAF 2040 x 826 x 44/.test(L.note),
     'the leaf row: panel LPX 2040 / LPY 826 / LPZ 44 on P1001, path, element FD_LEAF, window, note');
   // v1.1: INTU / INTU_W / INTU_T before INTU_STYLE; HINGE_2 769; CLOSER 0 / 1 / 2 (a v1 boolean true = built in 2)
-  const ORDER = ['HAND', 'LH', 'RH', 'HINGE', 'LOCK', 'LOCK_H', 'SPINDLE', 'EURO', 'KEEP', 'KEEP_STYLE', 'INTU', 'INTU_W', 'INTU_T', 'INTU_STYLE', 'VP_STYLE', 'C_VP_L', 'C_VP_W', 'C_VP_NUM', 'C_VP_RAIL', 'C_VP_POS', 'D_TOP_RAIL', 'D_MID_RAIL', 'D_SIDE_MARGIN', 'LEAD_EDGE', 'REBATE', 'REBATE_STYLE', 'SPY_ON', 'SPY_H', 'LBOX', 'L_BOX_H', 'DROP_CILL', 'PREM_DOOR', 'HINGE_1', 'HINGE_2', 'HINGE_3', 'HINGE_D', 'CLOSER'];
+  const ORDER = ['HAND', 'LH', 'RH', 'HINGE', 'LOCK', 'LOCK_H', 'SPINDLE', 'EURO', 'KEEP', 'KEEP_STYLE', 'INTU', 'INTU_W', 'INTU_T', 'INTU_STYLE', 'VP_STYLE', 'C_VP_L', 'C_VP_W', 'C_VP_NUM', 'C_VP_RAIL', 'C_VP_POS', 'D_TOP_RAIL', 'D_MID_RAIL', 'D_SIDE_MARGIN', 'VP_SHAPE', 'VP_N', 'VP_W', 'VP_H', 'VP_GAP', 'VP_ARR', 'VP_X', 'VP_Y', 'VP_R', 'LEAD_EDGE', 'REBATE', 'REBATE_STYLE', 'SPY_ON', 'SPY_H', 'LBOX', 'L_BOX_H', 'DROP_CILL', 'PREM_DOOR', 'HINGE_1', 'HINGE_2', 'HINGE_3', 'HINGE_D', 'CLOSER'];
   ok(rows.every((r) => J(Object.keys(r.docVars)) === J(ORDER)), 'every leaf row writes the document variables in the exact 4.7 + v1.1 order (LPX / LPY / LPZ on the panel node)', Object.keys(L.docVars).join());
-  const E1 = { HAND: 0, LH: 1, RH: 0, HINGE: 1, LOCK: 2, LOCK_H: 1000, SPINDLE: 1, EURO: 1, KEEP: 0, KEEP_STYLE: 0, INTU: 1, INTU_W: 15, INTU_T: 4, INTU_STYLE: 1, VP_STYLE: 1, C_VP_L: 600, C_VP_W: 150, C_VP_NUM: 1, C_VP_RAIL: 100, C_VP_POS: 0, D_TOP_RAIL: 150, D_MID_RAIL: 450, D_SIDE_MARGIN: 150, LEAD_EDGE: 1, REBATE: 0, REBATE_STYLE: 1, SPY_ON: 0, SPY_H: 1450, LBOX: 0, L_BOX_H: 1000, DROP_CILL: 0, PREM_DOOR: 0, HINGE_1: 150, HINGE_2: 769, HINGE_3: 1738, HINGE_D: 3, CLOSER: 2 };
-  const E2 = { ...E1, LOCK: 3, EURO: 0, INTU: 2, INTU_STYLE: 4, VP_STYLE: 0, CLOSER: 0 };
-  const E3 = { ...E1, HAND: 1, LH: 0, RH: 1, HINGE: 0, LOCK: 1, EURO: 0, INTU: 0, INTU_W: 0, INTU_T: 0, INTU_STYLE: 0, VP_STYLE: 0, CLOSER: 0 };
+  const E1 = { HAND: 0, LH: 1, RH: 0, HINGE: 1, LOCK: 2, LOCK_H: 1000, SPINDLE: 1, EURO: 1, KEEP: 0, KEEP_STYLE: 0, INTU: 1, INTU_W: 15, INTU_T: 4, INTU_STYLE: 1, VP_STYLE: 1, C_VP_L: 600, C_VP_W: 150, C_VP_NUM: 1, C_VP_RAIL: 100, C_VP_POS: 0, D_TOP_RAIL: 150, D_MID_RAIL: 450, D_SIDE_MARGIN: 150, VP_SHAPE: 1, VP_N: 1, VP_W: 450, VP_H: 450, VP_GAP: 0, VP_ARR: 0, VP_X: 150, VP_Y: 188, VP_R: 6, LEAD_EDGE: 1, REBATE: 0, REBATE_STYLE: 1, SPY_ON: 0, SPY_H: 1450, LBOX: 0, L_BOX_H: 1000, DROP_CILL: 0, PREM_DOOR: 0, HINGE_1: 150, HINGE_2: 769, HINGE_3: 1738, HINGE_D: 3, CLOSER: 2 };
+  const NOVP = { VP_SHAPE: 0, VP_N: 0, VP_W: 0, VP_H: 0, VP_GAP: 0, VP_ARR: 0, VP_X: 0, VP_Y: 0, VP_R: 0 };
+  const E2 = { ...E1, LOCK: 3, EURO: 0, INTU: 2, INTU_STYLE: 4, VP_STYLE: 0, ...NOVP, CLOSER: 0 };
+  const E3 = { ...E1, HAND: 1, LH: 0, RH: 1, HINGE: 0, LOCK: 1, EURO: 0, INTU: 0, INTU_W: 0, INTU_T: 0, INTU_STYLE: 0, VP_STYLE: 0, ...NOVP, CLOSER: 0 };
   const diff = (got, want) => Object.keys(want).filter((k) => got[k] !== want[k]).map((k) => `${k}=${got[k]} (exp ${want[k]})`);
   ok(diff(L.docVars, E1).length === 0 && J(L.docVars) === J(E1), 'FDR-01 (FD30 euro VP 1, a v1 closer true = built in): every value, INTU 1 / 15 / 4, INTU_STYLE 1, HINGE_2 769, CLOSER 2', diff(L.docVars, E1).join(', '));
   ok(diff(rows[1].docVars, E2).length === 0 && rows[1].vars.LPZ === 54, 'FDR-02 (FD60 latch no closer): LPZ 54, LOCK 3, EURO 0, INTU 2, INTU_STYLE 4, VP_STYLE 0, CLOSER 0, HINGE 1', diff(rows[1].docVars, E2).join(', '));
@@ -1115,7 +1195,7 @@ const unzip = (buf) => {
   const csv = M.machining.fireDoorMachiningCsv(mr);
   const lines = csv.split('\r\n').filter((l) => l.length);
   ok(lines[0] === 'door,element,op,face,x,y,z,length,width,depth,radius,angle,value,note' && lines.length === mr.length + 1, `the CSV header and ${lines.length - 1} lines (one per op)`);
-  ok(/FDR-01,FD-LEAF,hingeRecess,hingeEdge,149\.5,0,0,103,30,3,6,,,/.test(csv) && /"vision panel 1 450 x 450, layout per bSolid macro"/.test(csv) && /FDR-01,FD-HEAD,dowelBore,mitre,877,25,20,8,8,20,4,45,,/.test(csv), 'the CSV: numbers to 0.1, a note with commas quoted, a dowel bore line with the angle 45');
+  ok(/FDR-01,FD-LEAF,hingeRecess,hingeEdge,149\.5,0,0,103,30,3,6,,,/.test(csv) && /"lock forend, full radius ends"/.test(csv) && /,vpCutout,pull,150,188,0,450,450,44,6,0,,vision panel 1 450 x 450\r\n/.test(csv) && /FDR-01,FD-HEAD,dowelBore,mitre,877,25,20,8,8,20,4,45,,/.test(csv), 'the CSV: numbers to 0.1, a note with commas quoted, a dowel bore line with the angle 45');
   const json = M.machining.fireDoorMachiningJson(windows);
   let parsed = null;
   try { parsed = JSON.parse(json); } catch { parsed = null; }
@@ -1233,9 +1313,9 @@ const pageUrl = (path, pattern, Comp) => renderToStaticMarkup(h(M.MemoryRouter, 
   const mixed = [W.fdr01, W.sash, W.cas, W.door, W.wall, W.dr01];
   // overviewCells / winBarsLabel
   const c1 = M.PPP.overviewCells(W.fdr01), c2 = M.PPP.overviewCells(W.fdr02), c3 = M.PPP.overviewCells(W.dr01);
-  ok(c1.type === 'FD30' && c1.head === 'leaf 826 × 2040 × 44 · VP 450mm Square' && c1.opening === 'Hinge left · sashlock euro · Built in closer' && c1.box === 100,
-    'overviewCells FDR-01: FD30 / leaf 826 × 2040 × 44 · VP 450mm Square / Hinge left · sashlock euro · Built in closer (no swing) / box 100', J(c1));
-  ok(c2.type === 'FD60' && c2.head === 'leaf 826 × 2040 × 54 · VP 350mm Diamond' && c2.opening === 'Hinge right · bathroom' && c2.box === 150, 'overviewCells FDR-02: FD60 / leaf 54 · diamond / Hinge right · bathroom (no closer, a stored swing ignored) / box 150', J(c2));
+  ok(c1.type === 'FD30' && c1.head === 'leaf 826 × 2040 × 44 · VP Square: 450 x 450' && c1.opening === 'Hinge left · sashlock euro · Built in closer' && c1.box === 100,
+    'overviewCells FDR-01: FD30 / leaf 826 × 2040 × 44 · VP Square: 450 x 450 (v1.2 label) / Hinge left · sashlock euro · Built in closer (no swing) / box 100', J(c1));
+  ok(c2.type === 'FD60' && c2.head === 'leaf 826 × 2040 × 54 · VP Diamond: 350 x 350 turned 45' && c2.opening === 'Hinge right · bathroom' && c2.box === 150, 'overviewCells FDR-02: FD60 / leaf 54 · diamond (v1.2 label) / Hinge right · bathroom (no closer, a stored swing ignored) / box 150', J(c2));
   ok(c3.type === 'DR' && c3.head === 'leaf 826 × 2040 × 44 · no VP' && c3.opening === 'Hinge left · latch' && c3.box === 100, 'overviewCells DR-01 (a v1 record with the leaf only): DR / no VP / latch, no closer', J(c3));
   ok(W.dr01.derived.firedoor.opening.width === 912 && W.dr01.derived.firedoor.opening.source === 'leaf' && W.fdr01.derived.firedoor.opening.source === 'opening' && W.fdr01.derived.firedoor.leaf.width === 826, 'the v1 record derives its opening from the leaf (912, source leaf); the v1.1 record its leaf from the opening (826)');
   const cs = M.PPP.overviewCells(W.sash), cd = M.PPP.overviewCells(W.door), cw = M.PPP.overviewCells(W.wall);
