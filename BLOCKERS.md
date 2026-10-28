@@ -4,6 +4,77 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-10-28 night · FIRE DOORS v1.2, items for Piotr (branch `claude/fire-doors-v1-2`, from `claude/fire-doors-v1-1`)
+
+You asked at 00:53 for the list below and said "don't ask, just code, we fix later". Every reading I had to make
+is a profile key in Window Settings · Fire Doors, so a correction is a number, not a rework. Items 35.x and 36.x
+stay valid except where an item here says it replaces one.
+
+**37.1 DWG: delivered as DXF (owner check).** A true .dwg file cannot be written without a paid library or an
+outside converter (no new dependency is allowed), so PC writes DXF (R12), which AutoCAD and bSolid open directly;
+AutoCAD saves it as .dwg in one step if you need the .dwg itself. One DXF per door with every element: the leaf
+(pull face, hinge edge, lock edge, top edge), the head, the hinge jamb and the lock jamb (elevation with the
+mitres, the rebate cheek face, the unfolded mitre face with the dowels), drawn hinges over the recesses, the
+radius forend and keep, the vision panel cut-outs by shape, the grooves, the closer symbol, dimensions, a title
+block; one layer per operation with the depth in its name (FD_HINGE_RECESS_D3 and so on). Buttons: "Fire door DXF"
+on the window page, "Fire door DXF (zip)" in the production pack (one DXF per door plus the four element files).
+Layers (one per operation, the depth in the name, a decimal depth written D3P2 because an R12 layer
+name cannot hold a dot): FD_OUTLINE, FD_MITRE, FD_REBATE_15x47, FD_HINGE_RECESS_D3, FD_HINGE_DRAWING,
+FD_LOCK_FOREND_D4, FD_LOCK_CASE_D87 (+ _HIDDEN), FD_HOLE_THROUGH, FD_VP_CUTOUT_THROUGH, FD_INTU_GROOVE_D4,
+FD_KEEP_PLATE_D3, FD_KEEP_POCKET_D15, FD_DOWEL_8_D20 (+ _HIDDEN), FD_CLOSER_SYMBOL (+ _HIDDEN), FD_CENTRE, FD_DIM,
+FD_TEXT. The drawn hinge is a plate with three countersunk screws and a five-knuckle barrel over each R6 recess,
+on the leaf edge and on the hinge jamb (its plate 29 wide: the recess 30 less the same 1 mill oversize as the
+length; the profile has no plate width). OWNER CHECK: open one in bSolid and say whether the layer names should
+follow a bSolid import convention (a layer = a tool and a depth) so the import can turn them into workings.
+
+**37.2 Vision panels: type, size, position (applied; replaces 35.7).** The 14 macro styles are no
+longer the choice. The form offers seven plain types (None, Standard (rectangle) 450 x 700, Square 450, Narrow slot
+150 x 760, Round (porthole) dia 300, Diamond 350, Double (2 panes) 150 x 800), each a starting point you can change:
+the size, the number of panes (one above another or side by side) and the gap. Position across: centred (with a
+shift, + towards the lock edge), or a distance from the hinge edge, or from the lock edge ("100 from the edge").
+Position up / down: the top below the leaf top (default 150), the centre above the leaf bottom (e.g. 1500 eye
+level), or the bottom above the leaf bottom. PC places the cut-out itself now (no more "layout per bSolid macro").
+Warnings, never a failure: less than `vp.minEdge` 100 of timber round the panel (ZAŁOŻENIE), past the leaf edge,
+into the lock zone. A door saved before tonight keeps its macro style and exports exactly as before.
+
+**37.3 What your new leaf macro must read for the vision panel (new names).** VP_SHAPE (0 none, 1 rectangle,
+2 round, 3 diamond), VP_N (panes), VP_W / VP_H (one pane; round: the diameter in both), VP_GAP, VP_ARR (0 one
+above another, 1 side by side), VP_X (the panel group top from the leaf top), VP_Y (its edge from the hinge edge),
+VP_R (the corner radius; round: half the diameter). VP_STYLE still goes out for the old Master_Door when a panel is
+exactly one of its styles (centred, top 150); a round panel is VP_STYLE 0, any other rectangle 14 (custom), and the
+door carries a note that the old macro cannot place it as drawn.
+
+**37.4 Glass: only three (applied).** FD30 standard (row `fd_glass_fire`), FD insulated (`fd_glass_insulated`, new),
+Frosted (`fd_glass_frosted`, new); the toughened row is gone. Default FD30 / non-fire = FD30 standard, FD60 = FD
+insulated (`vp.glass.defaultByRating`). OWNER CHECK: (a) the thickness of each glass (`vp.glass.types[].thickness`,
+6 for all three until you give the products: it drives the glass weight and the drawings); (b) a non-fire DR door
+also gets these three (you said "no other choice"); (c) the round pane is bought as its circle (m2 = pi r2).
+
+**37.5 Intumescent colour (applied).** White (default), Black, Brown, Grey, Magnolia (`intumescent.colours`, label +
+the 3D colour). Shown in the form, the order line ("15 x 4, white"), the sheets and the 3D. OWNER CHECK: the colours
+your supplier stocks; add or rename them in Window Settings.
+
+**37.6 The closer is drawn (applied, still no machining).** Surface closer: the body on the PULL face (the hinge
+side, standard arm), 250 x 55, 60 in from the hinge edge, 15 under the leaf top, the arm 230 to a shoe on the frame
+head (`closer.surface`); built in: the body in the leaf top 300 long, 80 in from the hinge edge, and the track in
+the head soffit 420 long (`closer.builtin`). Sizes ZAŁOŻENIE (drawing symbols only). OWNER CHECK: pull or push face
+for the surface closer (`closer.surface.face`), and the closer you buy (the sizes). The built in pockets still wait
+for the two Weeke component files (36.4).
+
+**37.7 Locks with radius ends (applied).** The forend (236 x 25, R12.5) and the keep plate (176 x 40, R20) are drawn
+with full radius ends on the sheets, in the 3D and in the DXF, as the machining always cut them.
+
+**37.8 3D: the rebate runs clean round the head corners (applied).** The head's outer part now runs over the jamb
+rebate (35 face to 35 face), so there is no notch at the top corners.
+
+**37.9 Skipped, with the reason.** The real .dwg (37.1). The built in closer machining (the component files,
+36.4). Turning a v1.2 panel that does not fit (only a door saved before v1.2 turns its stacked panes as the old
+placement did; a new panel that does not fit gets a warning and you change it). The pack overview cell shows the
+panel type and size without the position (a narrow column, also in the PDF); the window page, the sheets, the
+DXF and the order lines carry the position.
+
+---
+
 ## 2026-10-27 evening · FIRE DOORS v1.1, items for Piotr (branch `claude/fire-doors-v1-1`, from main e42a092)
 
 The six changes you asked for in the chat after the v1 merge (opening as the input, no swing, one intumescent
