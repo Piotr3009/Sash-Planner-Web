@@ -1376,7 +1376,7 @@ const pageUrl = (path, pattern, Comp) => renderToStaticMarkup(h(M.MemoryRouter, 
     const html = pageUrl('/projects/p1/batches/b1/production-pack', '/projects/:projectId/batches/:batchId/production-pack', M.PPP.default);
     ok(has(html, 'bSuite fire doors') && has(html, 'Fire door machining (CSV)') && has(html, tgtName), `Pack page (firedoor batch): the "bSuite fire doors" and "Fire door machining (CSV)" buttons, the target "${tgtName}" named`);
     ok(!has(html, 'bSuite frames') && !has(html, 'CNC Jamb DXF'), 'Pack page (firedoor batch): no casement / sash export buttons');
-    ok(has(html, 'FD30') && has(html, 'FD60') && has(html, '>DR<') && has(html, 'Hinge left · sashlock euro · Built in closer') && !has(html, 'opens in') && has(html, '>100 mm<') && has(html, '>150 mm<'), 'Pack page overview: the type, opening and wall depth cells of the three doors');
+    ok(has(html, 'FD30') && has(html, 'FD60') && has(html, '>DR<') && has(html, 'Hinge left · sashlock euro · Built in closer') && !/opens (in|out)(?! AutoCAD)/.test(html) && has(html, 'Fire door DXF (zip)') && has(html, '>100 mm<') && has(html, '>150 mm<'), 'Pack page overview: the type, opening and wall depth cells of the three doors');
     ok(!/NaN|undefined|Infinity/.test(html), 'Pack page (firedoor batch): no NaN / undefined / Infinity');
     const sashPage = pageUrl('/projects/p1/batches/b2/production-pack', '/projects/:projectId/batches/:batchId/production-pack', M.PPP.default);
     ok(!has(sashPage, 'bSuite fire doors') && !has(sashPage, 'Fire door machining') && has(sashPage, 'CNC Jamb DXF'), 'Pack page (sash batch): no fire door buttons, the sash buttons stay');
@@ -1385,14 +1385,14 @@ const pageUrl = (path, pattern, Comp) => renderToStaticMarkup(h(M.MemoryRouter, 
   }
   {
     const html = pageUrl('/projects/p1/batches/b1/windows/fdr01', '/projects/:projectId/batches/:batchId/windows/:windowId', M.WDP.default);
-    ok(has(html, 'bSuite fire doors') && has(html, 'Fire door machining (CSV)') && !has(html, 'bSuite frames') && !has(html, 'CNC Jamb DXF') && has(html, 'Fire door</div>'), 'Window page FDR-01: the two fire door buttons, no casement / sash ones, the "Fire door" spec section');
+    ok(has(html, 'bSuite fire doors') && has(html, 'Fire door machining (CSV)') && has(html, 'Fire door DXF') && !has(html, 'bSuite frames') && !has(html, 'CNC Jamb DXF') && has(html, 'Fire door</div>'), 'Window page FDR-01: the two fire door buttons, no casement / sash ones, the "Fire door" spec section');
     const rowsW = [['Rating', 'FD30'], ['Structural opening', '912 × 2088 mm'], ['Leaf', '826 × 2040 × 44 mm'], ['Handing', 'Hinge left'], ['Wall depth', '100 mm'], ['Lock', 'sashlock euro'], ['Closer', 'Built in closer'],
-      ['Vision panel', '450mm Square'], ['Intumescent', '1 x 15 x 4 all around'], ['Leading edge', 'bevelled (macro LEAD_EDGE)'],
+      ['Vision panel', 'Square: 450 x 450 · centred, top 150 below the leaf top'], ['Intumescent', '1 x 15 x 4 all around'], ['Leading edge', 'bevelled (macro LEAD_EDGE)'],
       ['Width', '902 mm'], ['Height', '2083 mm'], ['Depth', '100 mm'],
       ['Frame overall', '902 × 2083 mm'], ['Head', '902 mm long point · mitred both ends'], ['Jamb hinge', '2083 mm long point · mitred top'], ['Jamb lock', '2083 mm long point · mitred top'],
       ['Member', '50 × 100 finished · 63 × 105 raw'], ['Rebate', '15 × 47 · faces 35 / 50'], ['Hinges', '3 × 102 · 150 / 769 / 1738 from the leaf top'], ['Jamb recesses', '188 / 807 / 1776 from the jamb top'],
       ['Spindle', '1000 above the leaf bottom · backset 60'], ['Cylinder', '928 above the leaf bottom'], ['Keep centre', '990 above the jamb foot'], ['Intumescent', '4.906 m'], ['VP glass', '0.203 m² · beads 3.6 m'],
-      ['Type', 'fire 6 mm'], ['Panes', '1 · 0.203 m²']];
+      ['Type', 'FD30 standard 6 mm'], ['Panes', '1 · 0.203 m²']];
     const missing = rowsW.filter(([label, value]) => !new RegExp(`${label}</span><span[^>]*>${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</span>`).test(html));
     ok(missing.length === 0, `Window page FDR-01: the ${rowsW.length} spec and calculated rows (Rating FD30 .. Panes 1 · 0.203 m²)`, missing.map(([l, v]) => `${l} = ${v}`).join(' | '));
     ok(!has(html, 'Sashes &amp; Bars') && !has(html, 'Trickle vent') && !has(html, 'Security') && !/NaN|undefined|Infinity/.test(html), 'Window page FDR-01: no Sashes & Bars section, no trickle vent / security rows, no NaN / undefined / Infinity');
@@ -1410,7 +1410,7 @@ const pageUrl = (path, pattern, Comp) => renderToStaticMarkup(h(M.MemoryRouter, 
   {
     const fd = W.fdr01;
     const html = renderR(h(M.WDP.GlassPanel, { item: fd.win, windowSpec: fd.windowSpec, derived: fd.derived, batch: batchFD, settings: {}, projectEntity: null, projectLabel: '064' }));
-    ok(has(html, 'vision panel 1') && has(html, '450 mm') && has(html, 'fire / fire') && has(html, '6mm fire'), 'GlassPanel FDR-01: the vision panel row (450, fire, 6mm fire)');
+    ok(has(html, 'vision panel 1') && has(html, '450 mm') && has(html, 'FD30 standard 6 mm') && !has(html, 'toughened'), 'GlassPanel FDR-01: the vision panel row (450, the glass FD30 standard 6 mm, v1.2)');
     ok(has(html, 'Glass DXF') && has(html, 'Glass Drawings PDF') && has(html, 'Vision panel glass 450 × 450 · ×1') && !has(html, 'Upper Glass') && !has(html, 'Lower Glass'), 'GlassPanel FDR-01: the DXF and drawings PDF buttons, the vision panel card, no sash glass cards');
     ok(count(html, /No data\./g) === 0 && !!html.match(/<td class="px-4 py-2 text-ink-300">none<\/td>/), 'GlassPanel FDR-01: the drawing card renders a drawing (no "No data."), the Bars cell prints none');
     const dr = renderR(h(M.WDP.GlassPanel, { item: W.dr01.win, windowSpec: W.dr01.windowSpec, derived: W.dr01.derived, batch: batchFD, settings: {}, projectEntity: null, projectLabel: '064' }));

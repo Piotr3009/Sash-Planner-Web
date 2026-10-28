@@ -57,8 +57,11 @@
  *           the leaf's pull or push face (it opens with the leaf), the shoe on
  *           the frame head face, and the arm as two links from the body's
  *           spindle to the shoe solved for the current open angle (each link
- *           ARM_LINK of the engine's arm length, the elbow outward from the
- *           face, the way a standard arm folds; look only); built in: a dark
+ *           ARM_LINK of the engine's arm length, the elbow out on the face
+ *           side; a vertical spindle post rises from the body top so the arm
+ *           swings level at the shoe's height, above the leaf top, clear of
+ *           the open leaf at any angle; look only, not a closer's real arm
+ *           geometry); built in: a dark
  *           slot on the leaf top edge (it opens with the leaf) and a dark
  *           track in the head soffit, seen when the leaf is open
  *   hinges  three knuckles at the engine's hinge positions, the leaf swings
@@ -96,7 +99,7 @@ const SLOT_PROUD = 0.8;     // ... proud of their face (over the strip)
 const SHOE_D = 18;          // the surface closer shoe proud of the head face
 const ARM_T = 8;            // the closer arm bar thickness
 const ARM_LINK = 0.6;       // each of the two arm links, a share of the engine's arm length
-const PIVOT_R = 9;          // the spindle cap on the closer body
+const PIVOT_R = 9;          // the closer's spindle post from the body top to the arm
 const CLOSER_BODY = '#a7abb0';   // a silver closer body
 const CLOSER_DARK = '#26282b';   // the built in closer's slot and track
 const FINISH = {
@@ -149,6 +152,27 @@ function Bar({ a, b, w, t, mat, name }) {
       <boxGeometry args={[len, w, t]} />
     </mesh>
   );
+}
+
+// The elbow of the closer's two link arm (frame metres): |E - A| = l1 (the
+// main arm from the spindle A), |E - B| = l2 (the forearm to the shoe B), E at
+// the shoe's height so the forearm runs level with the shoe, above the leaf
+// top, clear of an open leaf; of the two solutions the one further out along
+// `out` (the closer face's outward normal after the swing). Out of reach: the
+// elbow on the way from A to B (the forearm stretched).
+function armElbow(A, B, l1, l2, out) {
+  const dy = B.y - A.y;
+  const rA = l1 > Math.abs(dy) ? Math.sqrt(l1 * l1 - dy * dy) : 0;
+  const dx = B.x - A.x, dz = B.z - A.z;
+  const D = Math.hypot(dx, dz);
+  if (!(D > 0)) return new THREE.Vector3(A.x + out.x * rA, B.y, A.z + out.z * rA);
+  if (D >= rA + l2 || D <= Math.abs(rA - l2)) return new THREE.Vector3(A.x + (dx * rA) / D, B.y, A.z + (dz * rA) / D);
+  const a = (rA * rA - l2 * l2 + D * D) / (2 * D);
+  const h = Math.sqrt(Math.max(0, rA * rA - a * a));
+  const px = A.x + (dx * a) / D, pz = A.z + (dz * a) / D;
+  const e1 = new THREE.Vector3(px - (dz * h) / D, B.y, pz + (dx * h) / D);
+  const e2 = new THREE.Vector3(px + (dz * h) / D, B.y, pz - (dx * h) / D);
+  return e1.clone().sub(A).dot(out) >= e2.clone().sub(A).dot(out) ? e1 : e2;
 }
 
 // A rounded rectangle (r > 0) or a plain one on a path, centred at (cx, cy).
@@ -427,29 +451,27 @@ export default function FireDoor({
       pos: [lx((Number(b.y) || 0) + (Number(b.length) || 0) / 2), ly((Number(b.x) || 0) + (Number(b.height) || 0) / 2), faceZ + fs * bDepth / 2],
       size: [mm(Number(b.length) || 0), mm(Number(b.height) || 0), bDepth],
     };
-    const pivotLeaf = [lx(Number(a.from?.y) || 0), ly(Number(a.from?.x) || 0), faceZ + fs * bDepth];
+    // the overhead closer's vertical spindle at the engine's spindle point (arm.from,
+    // seen in elevation), mid depth of the body, rising from the body top to the
+    // arm plane: the shoe's height above the leaf top (shoe.x < 0), so the arm
+    // swings level over the leaf top and never meets the open leaf
+    const armY = ly(Number(s.x) || 0);
+    const bodyTopY = ly(Number(b.x) || 0);
+    const spindleLeaf = [lx(Number(a.from?.y) || 0), armY, faceZ + fs * bDepth / 2];
+    const post = armY > bodyTopY ? { pos: [spindleLeaf[0], (armY + bodyTopY) / 2, spindleLeaf[2]], h: armY - bodyTopY } : null;
     // the shoe on the head face of that side (frame mm): x from the hinge edge, y above the leaf top (x < 0)
     const shoeFx = hingeJambLeft ? leafX + (Number(s.y) || 0) : leafX + lw - (Number(s.y) || 0);
     const shoeFy = leafY + (Number(s.x) || 0);
     const shoeZ0 = fs * d / 2;
     const shoe = { pos: [X(shoeFx), Y(shoeFy), mm(shoeZ0 + fs * SHOE_D / 2)], size: [mm(Number(s.length) || 0), mm(Number(s.height) || 0), mm(SHOE_D)] };
-    // the arm: two links from the spindle (on the body, after the swing) to the shoe, the elbow outward from the face
-    const A = new THREE.Vector3(...leafToFrame([pivotLeaf[0], pivotLeaf[1], pivotLeaf[2] + fs * mm(ARM_T / 2)]));
-    const B = new THREE.Vector3(X(shoeFx), Y(shoeFy), mm(shoeZ0 + fs * (SHOE_D + ARM_T / 2)));
+    // the arm: two links from the spindle top (after the swing) to the shoe's
+    // front, the elbow out on the closer face's side (armElbow), all level
+    const A = new THREE.Vector3(...leafToFrame(spindleLeaf));
+    const B = new THREE.Vector3(X(shoeFx), Y(shoeFy), mm(shoeZ0 + fs * SHOE_D));
     const link = mm(Number(a.length) || 0) * ARM_LINK;
-    const AB = B.clone().sub(A);
-    const dist = AB.length();
-    let armPts = [A, B];
-    if (dist > 0 && dist < 2 * link) {
-      const u = AB.clone().normalize();
-      const out = new THREE.Vector3(0, 0, fs);
-      const n = out.clone().sub(u.clone().multiplyScalar(out.dot(u)));
-      if (n.lengthSq() < 1e-12) n.set(0, 1, 0);
-      n.normalize();
-      const elbow = A.clone().add(B).multiplyScalar(0.5).add(n.multiplyScalar(Math.sqrt(link * link - (dist / 2) ** 2)));
-      armPts = [A, elbow, B];
-    }
-    closerLeaf = { kind: 'surface', body: bodyLeaf, pivot: pivotLeaf, fs };
+    const armOut = new THREE.Vector3(0, 0, fs).applyAxisAngle(Y_AXIS, angle);   // the closer face's normal after the swing
+    const armPts = link > 0 ? [A, armElbow(A, B, link, link, armOut), B] : [A, B];
+    closerLeaf = { kind: 'surface', body: bodyLeaf, post, fs };
     closerFrame = { kind: 'surface', shoe, arm: armPts.map((v) => [v.x, v.y, v.z]), armW: mm(Number(a.width) || 0) };
   } else if (csym?.kind === 'builtin' && csym.body) {
     const b = csym.body, t = csym.track || {};
@@ -522,9 +544,11 @@ export default function FireDoor({
               <mesh name="closer-body" material={closerMat} position={closerLeaf.body.pos} castShadow>
                 <boxGeometry args={closerLeaf.body.size} />
               </mesh>
-              <mesh name="closer-pivot" material={closerMat} position={[closerLeaf.pivot[0], closerLeaf.pivot[1], closerLeaf.pivot[2] + closerLeaf.fs * mm(ARM_T) / 2]} rotation={[Math.PI / 2, 0, 0]}>
-                <cylinderGeometry args={[mm(PIVOT_R), mm(PIVOT_R), mm(ARM_T), 20]} />
-              </mesh>
+              {closerLeaf.post && (
+                <mesh name="closer-pivot" material={closerMat} position={closerLeaf.post.pos}>
+                  <cylinderGeometry args={[mm(PIVOT_R), mm(PIVOT_R), closerLeaf.post.h, 20]} />
+                </mesh>
+              )}
             </group>
           )}
           {closerLeaf?.kind === 'builtin' && (
