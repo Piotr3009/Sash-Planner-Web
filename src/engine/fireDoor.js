@@ -90,9 +90,11 @@
  *   `mitre` on face `end`, x = 0 (top / left) or x = length (the head's right
  *   end), angle 45, width = thickness, depth = frame depth. Dowels (v1.1): op
  *   `dowelBore` on face `mitre` per dowel per mitred end, x y z = the bore
- *   CENTRE on the mitre face (x = the end's long point, y = thickness / 2, z
- *   along the depth), length = width = the dowel diameter, depth = half the
- *   dowel length, angle 45 = the bore axis is square to the mitre face.
+ *   CENTRE on the mitre face: on a 45 mitre the point at y = thickness / 2 lies
+ *   thickness / 2 along the member from the long point, so x = 25 (top / left
+ *   end) or length - 25 (the head's right end), y = thickness / 2, z along the
+ *   depth; length = width = the dowel diameter, depth = half the dowel length,
+ *   angle 45 = the bore axis is square to the mitre face.
  */
 import { getFireDoorProfile, kgPerM } from './profile.js';
 import { round, createComponentRecord } from './records.js';
@@ -308,6 +310,16 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
   const axW = sizeAxis(spec.leafWidth, spec.openingWidth, L.defaultWidth, frameAddW, 2 * wallGapSide);
   const axH = sizeAxis(spec.leafHeight, spec.openingHeight, L.defaultHeight, frameAddH, wallGapHead);
   const W = axW.leaf, H = axH.leaf;
+  // the door's warnings (never a failure): a typed opening overridden by a typed leaf on the same axis
+  const warnings = [];
+  const axisWarn = (what, ax, openingIn) => {
+    const typed = Number(openingIn) || 0;
+    if (ax.source === 'leaf' && typed > 0 && Math.abs(typed - ax.opening) > 0.05) {
+      warnings.push(`${what}: the typed leaf ${ax.leaf} needs an opening ${ax.opening}; the typed opening ${typed} is ignored on this axis`);
+    }
+  };
+  axisWarn('width', axW, spec.openingWidth);
+  axisWarn('height', axH, spec.openingHeight);
   const opening = {
     width: axW.opening, height: axH.opening,
     wallGapSide, wallGapHead,
@@ -359,7 +371,7 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
   const topOffset = Number(HG.topOffset), bottomOffset = Number(HG.bottomOffset);
   const midAboveCentre = Number(HG.midAboveCentre) || 0;
   const lastTop = H - bottomOffset - hLen;
-  const step = (lastTop - topOffset) / (hCount - 1);   // the equal spacing (the old macro rule), kept for the sheets and count != 3
+  const step = (lastTop - topOffset) / (hCount - 1);   // the equal spacing (the old macro rule): the rule for count != 3, informational otherwise
   const hingeTops = Array.from({ length: hCount }, (_, i) => {
     if (i === 0) return topOffset;
     if (i === hCount - 1) return lastTop;
@@ -374,7 +386,7 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
   const recess = { length: Number(HG.recessLength), width: Number(HG.recessWidth), depth: Number(HG.recessDepth), radius: Number(HG.cornerRadius) };
   const hinges = {
     count: hCount, length: hLen, step: R(step), macroHinge: fire ? 1 : 0, product: fire ? 'fire' : 'standard',
-    // the rule's numbers travel with the positions so a sheet can print the rule it was cut by
+    // the rule's numbers travel with the positions so a sheet can print the rule it was cut by (step = the old equal spacing, informational)
     topOffset, bottomOffset, midAboveCentre,
     midCentreAboveLeafCentre: hCount === 3 ? R(H / 2 - hingePositions[1].centre) : null,
     recess, positions: hingePositions,
@@ -451,6 +463,9 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
   // positions along the frame depth (z, from the outside face), equal spacing between the margins
   const dowelZ = dowelPerJoint ? Array.from({ length: dowelPerJoint }, (_, k) => R(dowelPerJoint === 1 ? depth / 2 : dowelMargin + k * ((depth - 2 * dowelMargin) / (dowelPerJoint - 1)))) : [];
   const dowelJoints = 2;   // head to hinge jamb, head to lock jamb
+  // crowded dowels on a shallow frame: the bores need a wall between them
+  const dowelPitch = dowelZ.length > 1 ? R(dowelZ[1] - dowelZ[0]) : null;
+  if (dowelPitch !== null && dowelPitch < dowelDia + 4) warnings.push(`frame dowels: ${dowelPerJoint} bores of ${dowelDia} are only ${dowelPitch} apart on a ${depth} deep frame (margin ${dowelMargin}); fewer dowels or a smaller margin in Window Settings`);
   const dowels = {
     dia: dowelDia, length: dowelLen, perJoint: dowelPerJoint, margin: dowelMargin, joints: dowelJoints,
     count: dowelPerJoint * dowelJoints,
@@ -495,15 +510,17 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
     }
     if (m.mitreTop) ops.push(op('mitre', 'end', 0, 0, 0, 0, thickness, depth, 0, { angle: 45, note: m.role === 'head' ? 'left end' : 'top end' }));
     if (m.mitreBottom) ops.push(op('mitre', 'end', m.length, 0, 0, 0, thickness, depth, 0, { angle: 45, note: 'right end' }));
-    // the corner dowels: one bore per dowel on each mitred end, on face `mitre`,
-    // x = the end's long point (0 or length), y = the thickness centre, z along
-    // the depth; bored square to the mitre face (angle 45 to the member axis),
-    // dowelLen / 2 deep so the dowel sits half in each piece; x y = the bore centre
+    // the corner dowels: one bore per dowel on each mitred end, on face `mitre`;
+    // x y z = the bore CENTRE: on the 45 mitre the centre of the thickness sits
+    // yCentre along the member from the long point (x = 25 at the top / left end,
+    // length - 25 at the head's right end), y = the thickness centre, z along the
+    // depth; bored square to the mitre face (angle 45 to the member axis),
+    // dowelLen / 2 deep so the dowel sits half in each piece
     if (dowels.count) {
       const ends = [];
-      if (m.mitreTop) ends.push({ x: 0, label: m.role === 'head' ? 'left end' : 'top end' });
-      if (m.mitreBottom) ends.push({ x: m.length, label: 'right end' });
-      ends.forEach((e) => dowelZ.forEach((z, k) => ops.push(op('dowelBore', 'mitre', e.x, dowels.yCentre, z, dowels.dia, dowels.dia, dowels.boreDepth, dowels.dia / 2, { angle: 45, dowel: k + 1, note: `dowel ${dowels.dia} x ${dowels.length}, ${e.label}, bore square to the mitre, x y z = centre` }))));
+      if (m.mitreTop) ends.push({ x: dowels.yCentre, label: m.role === 'head' ? 'left end' : 'top end' });
+      if (m.mitreBottom) ends.push({ x: m.length - dowels.yCentre, label: 'right end' });
+      ends.forEach((e) => dowelZ.forEach((z, k) => ops.push(op('dowelBore', 'mitre', e.x, dowels.yCentre, z, dowels.dia, dowels.dia, dowels.boreDepth, dowels.dia / 2, { angle: 45, dowel: k + 1, note: `dowel ${dowels.dia} x ${dowels.length}, ${e.label}, bore square to the mitre, x y z = centre (${dowels.yCentre} along the member from the long point)` }))));
     }
     return ops;
   };
@@ -602,6 +619,7 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
       hinges, lock, keep, vp, intumescent, closer,
       machining, bsuiteVars,
       paintAreaSqm,
+      warnings,
     },
     components: { box, sash, beading: [] },
     customGlassUnits,

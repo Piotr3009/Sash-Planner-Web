@@ -118,7 +118,7 @@ export default function FireDoorElevation2D({ windowSpec, derived, projectNumber
     panes.length
       ? `Vision panel ${vp.label || vp.style}: ${panes.map((p) => `${fmt(p.paneW)} x ${fmt(p.paneH)}${p.diamond ? ' diamond' : ''}`).join(', ')}, layout per bSolid macro (drawn centred across the leaf, the first pane ${fmt(panes[0].y - leaf.y)} from the leaf top)${(vp.warnings || []).length ? `; ${vp.warnings.join('; ')}` : ''}`
       : 'No vision panel',
-    `${closerWord(fd)}; ${intu ? `intumescent ${intu.label || ''}, groove ${fmt(intu.groove?.width)} x ${fmt(intu.groove?.depth)} (${fmt(intu.metres)} m)` : 'no intumescent strip'}; door blank ${fmt(leaf.t)} thick (${ratingWord(fd)})`,
+    `${closerWord(fd)}; ${intu ? `intumescent ${intu.label || ''}, groove ${fmt(intu.groove?.width)} x ${fmt(intu.groove?.depth)} (${Number(intu.metres).toFixed(3)} m)` : 'no intumescent strip'}; door blank ${fmt(leaf.t)} thick (${ratingWord(fd)})`,
   ], svgW - 2 * 30 * ts, codeFs);
   const titleY = Y(FH) + mB * ts;
   // the subtitle wrapped at its own font size to the sheet width (30 text

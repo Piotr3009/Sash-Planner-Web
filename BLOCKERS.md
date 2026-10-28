@@ -34,7 +34,7 @@ T / 2 +- 11: 16 and 38 on the 54 leaf, 6.5 apart). Metres = strips x (2 x H + W)
 macro's "2No 15mm x 4mm"); your new macro can read INTU alone. OWNER CHECK: FD60 two strips of 15 (you said "2
 paski") rather than one 20: the engine follows `stripsByRating`.
 
-**36.4 The closer is a kind: none / surface / built in (applied; extends 35.12).** `defaults.closerFire 'surface'`,
+**36.4 The closer is a kind: none / surface / built in (applied; extends 35.12; CLOSER 0 / 1 / 2 replaces the CLOSER 0 / 1 of 35.10).** `defaults.closerFire 'surface'`,
 `defaults.closerNonFire 'none'`; CLOSER 0 / 1 / 2 in the leaf row; a slot and a hardware row per kind: `fd_closer`
 (now "Built in closer (concealed)", so a saved assignment on it survives; a v1 boolean closer true reads as built
 in) and the new `fd_closer_surface` ("Surface closer (overhead)"), both on the Door Closers category; one price
@@ -52,15 +52,16 @@ frame machining sheet, in the CSV / JSON (op `dowelBore`, angle 45, x y z = the 
 the margin 20 from each face and the bore on the thickness centre (a dowel in the rebate zone, z < 47, has 35 of
 wood: 21 to 29 on the 8 bore). `perJoint 0` switches the dowels off.
 
-**36.6 The middle hinge 200 above the leaf centre (applied; replaces the rule part of 35.13).**
+**36.6 The middle hinge 200 above the leaf centre (applied; replaces the macro rule of 35.4 and the rule part of 35.13).**
 `hinges.midAboveCentre 200`: the middle hinge CENTRE = H / 2 - 200 (2040: tops 150 / 769 / 1738, jamb 188 / 807 /
 1776; 2052: 150 / 775 / 1750). Top 150 from the top and bottom ending 200 above the bottom unchanged. This is PC's
 rule and goes out as HINGE_1..3; your new leaf macro must read HINGE_1..3 (the old Master_Door computes its own
 equal spacing and would put the middle hinge at 944).
 
-**36.7 The bSuite names for your new macro (summary).** Leaf row: LPX, LPY, LPZ, HAND (0 left / 1 right), HINGE
-(1 fire / 0 standard), LOCK (1 / 2 / 3), LOCK_H, EURO, HINGE_1, HINGE_2, HINGE_3, HINGE_D, INTU (0 / 1 / 2),
-INTU_W, INTU_T, VP_STYLE, C_VP_L, C_VP_W, C_VP_NUM, C_VP_RAIL, C_VP_POS, LEAD_EDGE, CLOSER (0 / 1 / 2). The
+**36.7 The bSuite names for your new macro (summary).** Leaf row: LPX, LPY, LPZ, HAND (0 left / 1 right), LH / RH
+(1 on the matching side), HINGE (1 fire / 0 standard), LOCK (1 / 2 / 3), LOCK_H, EURO, HINGE_1, HINGE_2, HINGE_3,
+HINGE_D, INTU (0 / 1 / 2), INTU_W, INTU_T, VP_STYLE, C_VP_L, C_VP_W, C_VP_NUM, C_VP_RAIL, C_VP_POS, LEAD_EDGE,
+CLOSER (0 / 1 / 2). The
 Master_Door extras (SPINDLE, KEEP, KEEP_STYLE, INTU_STYLE, D_*, REBATE*, SPY*, LBOX, L_BOX_H, DROP_CILL, PREM_DOOR)
 are still written for the old master and can be dropped from the export once your macro replaces it. Frame
 rows: LPX, LPY, LPZ, REB_W, REB_D, HAND, HINGE, HINGE_1..3 (hinge jamb), HINGE_D, KEEP / KEEP_STYLE / KEEP_Y

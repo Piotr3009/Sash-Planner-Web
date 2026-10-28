@@ -76,8 +76,8 @@ rows carry DOWEL_N / DOWEL_D / DOWEL_L / DOWEL_DEPTH / DOWEL_1..n. `perJoint 0` 
 150; the bottom hinge ends `hinges.bottomOffset` 200 above the leaf bottom (top edge = H - 200 - 102); with three
 hinges the middle one has its CENTRE `hinges.midAboveCentre` 200 above the leaf centre (top edge = H / 2 - 200 -
 51; 2040: 150 / 769 / 1738; 2052: 150 / 775 / 1750); with more than three the inner ones spread equally. The old
-equal spacing (the macro's `(lpx - 150 - 200 - w) / (repn - 1)`, 794 on 2040) is kept as `hinges.step` for the
-sheets only. Recess 103 x 30 x 3 with R6 corners (`hinges.recessLength / recessWidth / recessDepth /
+equal spacing (the macro's `(lpx - 150 - 200 - w) / (repn - 1)`, 794 on 2040) is still reported as `hinges.step`
+(the Master_Door value, for comparison only: no sheet, list or export places a hinge by it). Recess 103 x 30 x 3 with R6 corners (`hinges.recessLength / recessWidth / recessDepth /
 cornerRadius`, plate + 1, the 12 cutter) on the hinge edge from the pull face. On the hinge jamb the same recesses
 at the same heights shifted by the head: jambTop_i = (50 - 15) + gapHead 3 + top_i from the jamb top long point
 (2040: 188 / 807 / 1776). Macro HINGE 1 fire / 0 standard; the positions go out as HINGE_1..3.
@@ -419,7 +419,7 @@ them inside `Master_Door_PIOTR` (BLOCKERS 35.10). The reference FD30 826 x 2040,
 | | SPY_ON / SPY_H | 0 / 1450 | `macroDefaults` |
 | | LBOX / L_BOX_H | 0 / 1000 | `macroDefaults` |
 | | DROP_CILL / PREM_DOOR | 0 / 0 | `macroDefaults` |
-| | HINGE_1 / HINGE_2 / HINGE_3 | 150 / 944 / 1738 | top_i (one per hinge of `hinges.count`; new names, the owner adds them) |
+| | HINGE_1 / HINGE_2 / HINGE_3 | 150 / 769 / 1738 | top_i (v1.1 rule, one per hinge of `hinges.count`; new names, the owner adds them) |
 | | HINGE_D | 3 | `hinges.recessDepth` (new name) |
 | | CLOSER | 1 | (v1.1) 0 none, 1 surface, 2 built in |
 | FD_HEAD | LPX / LPY / LPZ | 902 / 100 / 50 | the long point length / the frame depth / 50 |
@@ -427,7 +427,7 @@ them inside `Master_Door_PIOTR` (BLOCKERS 35.10). The reference FD30 826 x 2040,
 | | HAND / HINGE / HINGE_D | 0 / 1 / 3 | as the leaf |
 | | MITRE_TOP / MITRE_BOTTOM | 1 / 1 | both ends mitred |
 | FD_JAMB_HINGE | LPX / LPY / LPZ, REB_W / REB_D, HAND / HINGE | 2083 / 100 / 50, 15 / 47, 0 / 1 | |
-| | HINGE_1 / HINGE_2 / HINGE_3 | 188 / 982 / 1776 | jambTop_i from the top long point |
+| | HINGE_1 / HINGE_2 / HINGE_3 | 188 / 807 / 1776 | jambTop_i from the top long point |
 | | HINGE_D | 3 | |
 | | MITRE_TOP / MITRE_BOTTOM | 1 / 0 | top mitred, bottom square |
 | FD_JAMB_LOCK | LPX / LPY / LPZ, REB_W / REB_D, HAND / HINGE / HINGE_D | 2083 / 100 / 50, 15 / 47, 0 / 1 / 3 | |
@@ -469,9 +469,10 @@ into the face.
   shows 50). The rebate occupies y in [35, 50] and z in [0, 47] along the full length: op `rebate` on face `opening`.
   The hinge recesses (FD-JAMB-H, x = jambTop_i - 0.5) and the keep plate / pocket (FD-JAMB-L, centred on the keep
   centre and on z = T / 2) sit on face `rebateCheek`, the face at y = 35 that meets the leaf edge. Mitres: op
-  `dowelBore` on face `mitre` (v1.1, x y z = the bore centre on the mitre face, 8 dia, 20 deep, angle 45),
   `mitre` on face `end`, x = 0 (top / left) or x = length (the head's right end), angle 45, width 50, depth = the
-  frame depth.
+  frame depth. Dowels (v1.1): op `dowelBore` on face `mitre`, x y z = the bore CENTRE (x = `dowels.yCentre` 25
+  along the member from the top / left long point, or length - 25 from the head's right end: the centre of the 50
+  thickness lies 25 along the member on the 45 cut; y 25; z 20 / 50 / 80), 8 dia, 20 deep, angle 45.
 
 Buttons: the Production Pack header "bSuite fire doors -> <target>" and "Fire door machining (CSV)" (shown on a fire
 door pack / batch or whenever the pack holds a fire door, every door under the batch's profile snapshot); the window
@@ -513,14 +514,16 @@ bundle the JSX sheets, the pages and the 3D with esbuild the way t50 does, `buil
 `node verify/parity/t52_fire_door_ui.mjs` drives the pages a user clicks in a real Chromium (the t39 pattern: one
 esbuild iife bundle of the live page with the stores per part, the Supabase client on an empty env, nothing on the
 network; it needs the Playwright of the global node install and exits 2 without it, not a failure): A, Window
-Settings · Fire Doors (the sample door readout 902 x 2083, the hinges 150 / 944 / 1738 and 188 / 982 / 1776, the
+Settings · Fire Doors (the sample door readout 902 x 2083, the hinges 150 / 769 / 1738 and 188 / 807 / 1776, the
 keep 990, the intumescent 4.906 m, the rebate 15 x 47, the members; the FD60 / non-fire sample chips; a typed top
 offset 145 moves the sample hinges; the width list sorted and cleaned; the defaults card; the bSuite card with the
 STOP rows, the path with its quotes stripped, add / fill / remove target, a macro default; the head joint select;
 the reset); B, the configurator on a fire door batch (the proposed name FDR-01, the Fire door section and no
 Dimensions / Ventilation / Horns, the live summary numbers, the slots, fire OFF renaming to DR-01 and a typed name
-kept, the free width 803, the 926 chip, a width 200 disabling Save with the geometry message, the closer / lock /
-VP controls, the save with the stored `firedoor*` keys and width = the frame overall, the second door FDR-02
+kept, a free opening 889 (leaf 803, no clamp), the "1012 (leaf 926)" chip, an opening 286 (leaf 200) disabling
+Save with the geometry message, the leaf override and its reset, the three closer chips, the lock / VP controls,
+the save with the stored `firedoor*` keys (the opening, the leaf 0 = derived) and width = the frame overall, the
+second door FDR-02
 prefilled from the first, DR-01, edit mode never renames); C, the project page (the Fire doors batch, the card
 902 x 2083 and its subtitle, Add Batch, Project Materials), the batch defaults page (the fire door slots, no sash
 rows), Material Assignments · Fire doors (the four sections and their rows), the dashboard (the type key, the new

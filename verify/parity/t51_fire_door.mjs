@@ -262,7 +262,7 @@ const f = REF.derived.firedoor;
   ok(jm.length === 1 && opIs(jm[0], 'end', 0, 0, 0, 0, 50, 100, 0) && jm[0].angle === 45 && jh.length === 8, 'hinge jamb: one mitre at the top (x 0, 45), 8 ops in all (rebate, 3 recesses, mitre, 3 dowel bores)');
   // v1.1: the dowel bores on the mitre face, x y z = the bore centre, square to the mitre (angle 45), 8 dia, 20 deep (half the 40 dowel)
   const jd = opsOf(d, 'jambHinge', 'dowelBore');
-  ok(jd.length === 3 && jd.every((o, k) => opIs(o, 'mitre', 0, 25, [20, 50, 80][k], 8, 8, 20, 4) && o.angle === 45 && o.dowel === k + 1), 'hinge jamb dowel bores on the mitre face at the top end: z 20 / 50 / 80, y 25, 8 dia, 20 deep, angle 45');
+  ok(jd.length === 3 && jd.every((o, k) => opIs(o, 'mitre', 25, 25, [20, 50, 80][k], 8, 8, 20, 4) && o.angle === 45 && o.dowel === k + 1), 'hinge jamb dowel bores on the mitre face at the top end: x 25 (the centre of the thickness lies 25 along the member on the 45 cut), y 25, z 20 / 50 / 80, 8 dia, 20 deep, angle 45');
   ok(opIs(opsOf(d, 'jambLock', 'keepPlate')[0], 'rebateCheek', 1005, 35, 2, 176, 40, 3, 20), 'lock jamb keep plate on the rebate cheek: x 1005 (1093 - 88), z 2 (22 - 20), 176 x 40 x 3 R20');
   ok(opIs(opsOf(d, 'jambLock', 'keepPocket')[0], 'rebateCheek', 1033, 35, 13, 120, 18, 15, 9), 'lock jamb keep pocket: x 1033 (1093 - 60), z 13 (22 - 9), 120 x 18 x 15');
   ok(opsOf(d, 'jambLock', 'mitre').length === 1 && opsOf(d, 'jambLock', 'hingeRecess').length === 0 && opsOf(d, 'jambLock', 'dowelBore').length === 3 && d.firedoor.machining.jambLock.length === 7, 'lock jamb: rebate, keep plate, keep pocket, one top mitre, 3 dowel bores');
@@ -270,7 +270,7 @@ const f = REF.derived.firedoor;
   const hd = opsOf(d, 'head', 'dowelBore');
   ok(opIs(opsOf(d, 'head', 'rebate')[0], 'opening', 0, 35, 0, 902, 15, 47, 0) && hm.length === 2 && opIs(hm[0], 'end', 0, 0, 0, 0, 50, 100, 0) && opIs(hm[1], 'end', 902, 0, 0, 0, 50, 100, 0) && d.firedoor.machining.head.length === 9,
     'head: rebate 902 long, mitres at x 0 and x 902, 9 ops (with 6 dowel bores)');
-  ok(hd.length === 6 && J(hd.map((o) => [o.x, o.z])) === J([[0, 20], [0, 50], [0, 80], [902, 20], [902, 50], [902, 80]]) && hd.every((o) => o.y === 25 && o.depth === 20 && o.angle === 45), 'head dowel bores: three at each mitred end (x 0 and x 902), z 20 / 50 / 80');
+  ok(hd.length === 6 && J(hd.map((o) => [o.x, o.z])) === J([[25, 20], [25, 50], [25, 80], [877, 20], [877, 50], [877, 80]]) && hd.every((o) => o.y === 25 && o.depth === 20 && o.angle === 45), 'head dowel bores: three at each mitred end (x 25 and x 877 = 902 - 25, the bore centres), z 20 / 50 / 80');
   const allOps = ['leaf', 'head', 'jambHinge', 'jambLock'].flatMap((g) => d.firedoor.machining[g]);
   ok(allOps.every((o) => ['id', 'kind', 'face', 'x', 'y', 'z', 'length', 'width', 'depth', 'radius'].every((key) => key in o) && [o.x, o.y, o.z, o.length, o.width, o.depth, o.radius].every((v) => Number.isFinite(v) && Math.abs(v * 10 - Math.round(v * 10)) < 1e-6))
     && new Set(allOps.map((o) => o.id)).size === allOps.length, `every op carries id, kind, face, x, y, z, length, width, depth, radius, rounded to 0.1, ids unique (${allOps.length} ops)`);
@@ -323,6 +323,11 @@ section('3b - FD60, non-fire DR, the 762 x 1981 leaf, hinge right, euro / bathro
   const ov = mk({ firedoorOpeningWidth: 1000, firedoorOpeningHeight: 2100, firedoorLeafWidth: 826 }).derived.firedoor;
   ok(ov.leaf.width === 826 && ov.leaf.height === 2052 && ov.frame.overall.width === 902 && J([ov.opening.width, ov.opening.height, ov.opening.source, ov.opening.sourceWidth, ov.opening.sourceHeight]) === J([912, 2100, 'mixed', 'leaf', 'opening']) && J(ov.inputs.leafOverride) === J({ width: true, height: false }),
     'a typed leaf width 826 overrides the opening on that axis (frame 902, opening reported 912 wide), the height still follows the opening (2052), source mixed');
+  ok(ov.warnings.length === 1 && /width: the typed leaf 826 needs an opening 912; the typed opening 1000 is ignored/.test(ov.warnings[0]) && fop.warnings.length === 0 && f.warnings.length === 0,
+    `the override disagreeing with the typed opening is a warning, never a failure ("${ov.warnings[0]}"); the plain doors carry none`);
+  ok(mk({ firedoorOpeningWidth: 912, firedoorLeafWidth: 826 }).derived.firedoor.warnings.length === 0, 'a typed opening that matches the typed leaf (912 for 826) gives no warning');
+  const shallow = mk({ firedoorFrameDepth: 50 }).derived.firedoor;
+  ok(J(shallow.frame.dowels.positionsAlongDepth) === J([20, 25, 30]) && shallow.warnings.length === 1 && /frame dowels: 3 bores of 8 are only 5 apart on a 50 deep frame/.test(shallow.warnings[0]), 'a 50 deep frame crowds the dowels (5 apart): a warning names it');
   ok(J(fireDoor.fireDoorOpeningForLeaf(FP, 826, 2040)) === J({ width: 912, height: 2088 }) && J(fireDoor.fireDoorLeafForOpening(FP, 1000, 2100)) === J({ width: 914, height: 2052 }) && J(fireDoor.fireDoorSizeRule(FP)) === J({ addWidth: 76, addHeight: 43, wallGapSide: 5, wallGapHead: 5 }),
     'the form helpers: opening for the leaf 826 x 2040 = 912 x 2088, leaf for the opening 1000 x 2100 = 914 x 2052, the rule 76 / 43 / 5 / 5');
   const rh = mk({ firedoorHingeSide: 'right', firedoorSwing: 'out' }).derived.firedoor;
@@ -856,9 +861,10 @@ section('7 - the sheets: six doors x five sheets, collisions, the dimension rule
     mut.firedoor.hinges.topOffset = 145; mut.firedoor.hinges.bottomOffset = 210; mut.firedoor.hinges.midAboveCentre = 180; mut.firedoor.frame.faces = { outside: 40, inside: 55 };
     const sheets = M.fdu.fireDoorSheetPlan(mut);
     const out = render(M.FireDoorSheet, { sheet: sheets[0], windowSpec: DOORS[0].spec, derived: mut, projectNumber: 'P-1', windowTag: tag });
+    const ins = render(M.FireDoorSheet, { sheet: sheets[1], windowSpec: DOORS[0].spec, derived: mut, projectNumber: 'P-1', windowTag: tag });
     const lf = render(M.FireDoorSheet, { sheet: sheets[3], windowSpec: DOORS[0].spec, derived: mut, projectNumber: 'P-1', windowTag: tag });
     const MUT = 'the rule: top 145 from the top, bottom 210 from the bottom, middle centre 180 above the leaf centre';
-    ok(has(joined(out), MUT) && has(joined(lf), MUT) && has(out, 'shows the 40 frame face') && has(out, 'the 55 face with the stop') && !has(joined(out), RULE) && !FACES.some((t) => has(out, t)),
+    ok(has(joined(out), MUT) && has(joined(ins), MUT) && has(joined(lf), MUT) && has(out, 'shows the 40 frame face') && has(out, 'the 55 face with the stop') && !has(joined(out), RULE) && !FACES.some((t) => has(out, t)),
       'a derived with offsets 145 / 210 / 180 and faces 40 / 55 renders those numbers in the notes (no 150 / 200 / 35 / 50 literal survives)');
   }
   ok(['Closed', 'Open 30', '826', '100'].every((t) => has(S('ref-fdplan'), t)), 'ref plan: Closed / Open 30 / 826 / 100');
@@ -866,7 +872,9 @@ section('7 - the sheets: six doors x five sheets, collisions, the dimension rule
     'ref leaf: the hinge chain 150 / 102 / 517 / 102 / 867 / 102 / 200, H1 150 / H2 769 / H3 1738, spindle 1000, euro 928, FOREND 236 × 25, CASE 17 × 153 × 87, backset 60, the op kinds');
   ok(['H1 188', 'H2 807', 'H3 1776', '188', '205', 'KEEP 990 from the foot', '902', '2083', 'depth 100', 'SECTION 4:1', 'rebate 15 × 47', 'mitre', 'keep plate', 'keep pocket', 'dowel bore', 'MITRE FACE 4:1', '8 x 40', '3 per corner', '20 deep'].every((t) => has(S('ref-fdframe'), t)),
     'ref frame: H1 188 / H2 807 / H3 1776, the chain 188 / 205, KEEP 990 from the foot, 902 / 2083, depth 100, SECTION 4:1, rebate 15 × 47, the op kinds, the dowel bores with the MITRE FACE 4:1 detail and the dowel note');
-  ok(count(S('ref-fdframe'), /dowel bore/g) === 12 && count(S('ref-fdframe'), /45 deg/g) >= 12, `ref frame: 12 "dowel bore" op rows with 45 deg (${count(S('ref-fdframe'), /dowel bore/g)})`);
+  ok(count(S('ref-fdframe'), /dowel bore/g) === 12 && count(S('ref-fdframe'), /45 deg/g) === 16, `ref frame: 12 "dowel bore" op rows with 45 deg (${count(S('ref-fdframe'), /dowel bore/g)}; 16 "45 deg" = 4 mitres + 12 bores: ${count(S('ref-fdframe'), /45 deg/g)})`);
+  ok(/along the cut \(25 across the thickness\)/.test(S('ref-fdframe')) && /35\.4/.test(S('ref-fdframe')), 'ref frame: the mitre face detail dimensions the bore centre 35.4 along the cut (25 across the thickness)');
+  ok(/\(4\.906 m\)/.test(S('ref-fdleaf')) && /\(4\.906 m\)/.test(S('ref-fdoutside')) && /\(9\.812 m\)/.test(S('fd60-bathroom-fdleaf')), 'the strip metres print unrounded (4.906 / 9.812 m) on the leaf and outside sheets');
   ok(['1000', '2100', 'opening 1000 x 2100', '990', '2095', '914', '2052', 'Surface closer', 'FDR-06'].every((t) => has(S('opening-1000-fdoutside'), t)) && ['H1 150', 'H2 775', 'H3 1750'].every((t) => has(S('opening-1000-fdleaf'), t)),
     'opening 1000 x 2100: the outside elevation prints the opening, the frame 990 x 2095 and the leaf 914 x 2052, the surface closer; the leaf sheet H1 150 / H2 775 / H3 1750');
   ok(/Hinge right - Outside/.test(S('right-fdoutside')) && /Hinge right - Inside/.test(S('right-fdinside')), 'hinge right: "Hinge right - Outside" / "Hinge right - Inside"');
@@ -875,7 +883,7 @@ section('7 - the sheets: six doors x five sheets, collisions, the dimension rule
     'non-fire latch: "non-fire", DR-01, no groove rows, "No intumescent strip", "no cylinder hole" (the ref leaf lists 3 grooves and a cylinder hole)');
   ok(/FD60/.test(S('fd60-bathroom-fdoutside')) && /bathroom 922/.test(S('fd60-bathroom-fdleaf')) && /rebate 15 × 57/.test(S('fd60-bathroom-fdframe')) && /diamond/.test(S('fd60-bathroom-fdleaf')) && /2 x 15 x 4 all around/.test(S('fd60-bathroom-fdleaf')) && count(S('fd60-bathroom-fdleaf'), /intumescent groove/g) === 6,
     'FD60 bathroom diamond: FD60, bathroom 922, rebate 15 × 57, diamond, two strips (6 groove rows)');
-  ok(['150', '102', '487.5', '200', 'H2 739.5', 'H3 1679'].every((t) => has(S('762x1981-fdleaf'), t)) && /838/.test(S('762x1981-fdoutside')) && /2024/.test(S('762x1981-fdoutside')), '762 x 1981: the chain 150 / 102 / 487.5 / 200, H2 739.5, H3 1679, frame 838 x 2024');
+  ok(['150', '102', '487.5', '837.5', '200', 'H2 739.5', 'H3 1679'].every((t) => has(S('762x1981-fdleaf'), t)) && /838/.test(S('762x1981-fdoutside')) && /2024/.test(S('762x1981-fdoutside')), '762 x 1981: the chain 150 / 102 / 487.5 / 102 / 837.5 / 102 / 200, H2 739.5, H3 1679, frame 838 x 2024');
   ok(/1056/.test(S('custom-vp-pos90-fdoutside')) && /1132/.test(S('custom-vp-pos90-fdoutside')) && /depth 150/.test(S('custom-vp-pos90-fdframe')) && count(S('custom-vp-pos90-fdleaf'), /vision panel/g) >= 3, 'custom VP pos 90 on a 1056 leaf: 1056 / 1132 on the outside, depth 150 on the frame sheet, three vision panel rows');
   // the Drawings panel for a fire door: the five tabs, never a sash / casement / door sheet
   {
@@ -1107,7 +1115,7 @@ const unzip = (buf) => {
   const csv = M.machining.fireDoorMachiningCsv(mr);
   const lines = csv.split('\r\n').filter((l) => l.length);
   ok(lines[0] === 'door,element,op,face,x,y,z,length,width,depth,radius,angle,value,note' && lines.length === mr.length + 1, `the CSV header and ${lines.length - 1} lines (one per op)`);
-  ok(/FDR-01,FD-LEAF,hingeRecess,hingeEdge,149\.5,0,0,103,30,3,6,,,/.test(csv) && /"vision panel 1 450 x 450, layout per bSolid macro"/.test(csv) && /FDR-01,FD-HEAD,dowelBore,mitre,902,25,20,8,8,20,4,45,,/.test(csv), 'the CSV: numbers to 0.1, a note with commas quoted, a dowel bore line with the angle 45');
+  ok(/FDR-01,FD-LEAF,hingeRecess,hingeEdge,149\.5,0,0,103,30,3,6,,,/.test(csv) && /"vision panel 1 450 x 450, layout per bSolid macro"/.test(csv) && /FDR-01,FD-HEAD,dowelBore,mitre,877,25,20,8,8,20,4,45,,/.test(csv), 'the CSV: numbers to 0.1, a note with commas quoted, a dowel bore line with the angle 45');
   const json = M.machining.fireDoorMachiningJson(windows);
   let parsed = null;
   try { parsed = JSON.parse(json); } catch { parsed = null; }

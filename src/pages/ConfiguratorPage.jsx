@@ -1781,6 +1781,8 @@ export default function ConfiguratorPage() {
           {/* Fire doors (27.10.2026): the live summary, every number from the engine's derived.firedoor */}
           {isFireDoor && <SG t="Fire Door">
             {fdLive?.error && <div className="px-4 py-1 text-[11px] text-amber-400" data-firedoor-error>{fdLive.geometry ? 'Geometry' : 'Error'}: {fdLive.error}</div>}
+            {/* v1.1: the engine's warnings (a typed opening overridden by a typed leaf, crowded dowels); never a block */}
+            {(fd?.warnings || []).map((w, i) => <div key={i} className="px-4 py-1 text-[11px] text-amber-400" data-firedoor-warning>Warning: {w}</div>)}
             {fd && <>
               <SR l="Name" v={winName || fdAutoName || 'n/a'} />
               <SR l="Rating" v={fd.fire ? fd.rating : 'Non-fire'} />

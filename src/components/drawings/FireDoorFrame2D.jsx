@@ -37,7 +37,7 @@
 import { useMemo } from 'react';
 import { DimH, DimV, DimChainH, DimChainV, Label, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
-import { NS, fmt, safely, NoSheet, SheetTitle } from './doorSheetParts.jsx';
+import { NS, fmt, fmtGlass, safely, NoSheet, SheetTitle } from './doorSheetParts.jsx';
 import { num, fireDoorFrameMembers, opTableRows, hingeWord, pullFaceNote, ratingWord, wrapLines } from './fireDoorDrawUtils.js';
 import { OpTable, opTableMetrics } from './FireDoorLeaf2D.jsx';
 
@@ -143,6 +143,8 @@ export default function FireDoorFrame2D({ windowSpec, derived, projectNumber, wi
   const mitW = thk * SQ2 * S, mitH = D * S;
   const mitCap = hasDowels ? `MITRE FACE ${S}:1 (unfolded) · dowels ${fmt(dw.dia)} × ${fmt(dw.length)}, ${fmt(dw.perJoint)} per corner, ${fmt(dw.boreDepth)} deep` : '';
   const mitCapW = mitCap.length * 0.55 * codeFs;
+  const mitNote = hasDowels ? `along the cut (${fmt(dw.yCentre)} across the thickness)` : '';
+  const mitNoteW = mitNote.length * 0.55 * SIZES.dimSmall * ts;
   const secCapX = Math.min(secLeft, svgW - 8 * ts - secCapW);
   const mitBesideLeft = Math.max(secLeft + secW + 80 * ts, secCapX + secCapW + 60 * ts);
   const mitBeside = hasDowels && mitBesideLeft + mitW + 64 * ts <= svgW - 8 * ts;
@@ -318,9 +320,9 @@ export default function FireDoorFrame2D({ windowSpec, derived, projectNumber, wi
             <text x={mitLeft - 6 * ts} y={mitTop + mitH - codeFs * 0.9} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor="end" fontWeight={WEIGHTS.subtitle}>inside</text>
             {/* the dowel positions along the depth from the outside face (the one chain of the sheet for them) */}
             <DimChainV x={mitLeft + mitW + 26 * ts} cuts={mitCuts.map((z) => mitTop + z * S)} extFrom={mitLeft + mitW + 4 * ts} vbw={svgW} labels={mitLabels} />
-            {/* the bore centre across the thickness, along the cut (yCentre x sqrt 2 on the unfolded face): its text to the right of the dimension, off the caption column */}
-            <DimH y={mitTop + mitH + 30 * ts} x1={mitLeft} x2={mitLeft + mitDowelU * S} extFrom={mitTop + mitH + 4 * ts} label="" small vbw={svgW} />
-            <text x={mitLeft + mitDowelU * S + 8 * ts} y={mitTop + mitH + 30 * ts + codeFs * 0.35} fill={COLORS.dim} fontSize={SIZES.dimSmall * ts} fontFamily={FONT_FAMILY} fontWeight={WEIGHTS.dim}>{`${fmt(dw.yCentre)} across the thickness`}</text>
+            {/* the bore centre along the cut (yCentre x sqrt 2 on the unfolded face, to 0.1 like a glass size: 35.4 for 25) with its note on the line below, kept inside the sheet */}
+            <DimH y={mitTop + mitH + 30 * ts} x1={mitLeft} x2={mitLeft + mitDowelU * S} extFrom={mitTop + mitH + 4 * ts} label={fmtGlass(mitDowelU)} small vbw={svgW} />
+            <text x={Math.min(mitLeft, svgW - 8 * ts - mitNoteW)} y={mitTop + mitH + 46 * ts} fill={COLORS.dim} fontSize={SIZES.dimSmall * ts} fontFamily={FONT_FAMILY} fontWeight={WEIGHTS.dim}>{mitNote}</text>
             <text x={Math.min(mitLeft, svgW - 8 * ts - mitCapW)} y={mitCapY} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} fontWeight={WEIGHTS.label}>{mitCap}</text>
           </g>
         )}

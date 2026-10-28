@@ -166,7 +166,7 @@ export default function FireDoorLeaf2D({ windowSpec, derived, projectNumber, win
       ? `Vision panel ${fd.vp?.label || fd.vp?.style}: ${panes.map((p) => `${fmt(p.paneW)} x ${fmt(p.paneH)}${p.diamond ? ' diamond' : ''}`).join(', ')} cut through, layout per bSolid macro (drawn centred, the first pane ${fmt(panes[0].x)} from the top)${(fd.vp?.warnings || []).length ? `; ${fd.vp.warnings.join('; ')}` : ''}`
       : 'No vision panel',
     intu
-      ? `Intumescent ${intu.label || ''}: ${fmt(intu.strips)} groove${intu.strips === 1 ? '' : 's'} ${fmt(intu.groove?.width)} x ${fmt(intu.groove?.depth)} per edge for the ${fmt(intu.width)} x ${fmt(intu.thickness)} strip on the top, hinge and lock edges (${fmt(intu.metres)} m)`
+      ? `Intumescent ${intu.label || ''}: ${fmt(intu.strips)} groove${intu.strips === 1 ? '' : 's'} ${fmt(intu.groove?.width)} x ${fmt(intu.groove?.depth)} per edge for the ${fmt(intu.width)} x ${fmt(intu.thickness)} strip on the top, hinge and lock edges (${Number(intu.metres).toFixed(3)} m)`
       : 'No intumescent strip (non-fire door): the edges are not grooved',
     closerWord(fd),
   ], svgW - 2 * 30 * ts, codeFs);

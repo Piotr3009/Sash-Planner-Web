@@ -428,27 +428,33 @@ export function fireDoorFrameMembers(derived) {
     title: titles[m.role] || String(m.role || m.id || '').toUpperCase(),
     ops: mach[m.role] || [],
     record: fireDoorRecord(derived, m.id),
-    dowelEnds: dowelEndsOf(mach[m.role] || []),
+    dowelEnds: dowelEndsOf(mach[m.role] || [], m.length),
   }));
 }
 
 /**
  * The dowel bores of a member grouped by mitred end (v1.1): the `dowelBore`
- * ops of face `mitre` share an x per end (0 = the top / left long point, the
- * member length = the head's right end). Returns [{ x, atStart, bores: [{ z,
- * dia, depth, angle, note }] }] in x order, [] without dowels. Every number
- * is the engine's (x, y, z = the bore centre on the mitre face).
+ * ops of face `mitre` share an x per end (the bore centre, yCentre along the
+ * member from the top / left long point, or length - yCentre from the head's
+ * right end). Returns [{ x, atStart, bores: [{ z, dia, depth, angle, note
+ * }] }] in x order, [] without dowels; atStart = the end nearer the top /
+ * left long point (x in the first half of the member length when the length
+ * is given, else the first end in x order). Every number is the engine's
+ * (x, y, z = the bore centre on the mitre face).
  */
-export function dowelEndsOf(ops) {
+export function dowelEndsOf(ops, length = null) {
   const ends = [];
+  const L = num(length, 0);
   (ops || []).filter((o) => o.kind === 'dowelBore').forEach((o) => {
     const x = num(o.x, 0);
     let e = ends.find((q) => Math.abs(q.x - x) < 0.05);
-    if (!e) { e = { x, atStart: x < 0.05, bores: [] }; ends.push(e); }
+    if (!e) { e = { x, atStart: L > 0 ? x < L / 2 : false, bores: [] }; ends.push(e); }
     e.bores.push({ z: num(o.z, 0), y: num(o.y, 0), dia: num(o.length, num(o.width, 0)), depth: num(o.depth, 0), angle: num(o.angle, 45), note: o.note || '' });
   });
   ends.forEach((e) => e.bores.sort((a, b) => a.z - b.z));
-  return ends.sort((a, b) => a.x - b.x);
+  ends.sort((a, b) => a.x - b.x);
+  if (!(L > 0) && ends.length) ends[0].atStart = true;
+  return ends;
 }
 
 /** The leaf ops grouped by kind: { hingeRecess: [], forendRecess: [], ... } (every kind present). */

@@ -51,12 +51,12 @@ the dowel bores, 12 per door) and JSON v2 (per door the opening, the closer, the
 swing). `bsuiteExport.js` needed no change: it copies every variable of the engine's objects in order.
 
 ### Stage 4: the harnesses (ad97d02, and the stage 5 / 6 commits)
-`t51_fire_door.mjs` on the v1.1 numbers: 415 PASS (v1: 397). New checks: the opening 1000 x 2100 door end to end
+`t51_fire_door.mjs` on the v1.1 numbers: 415 PASS (v1: 387). New checks: the opening 1000 x 2100 door end to end
 (engine, sheets, export), the leaf override and the mixed source, the form helpers, the hinge rule with the middle
 centre and its jamb mapping, the strip count by rating (FD60 two grooves at 27 +- 11 on the 54 leaf), the closer
 kinds (a v1 boolean true = built in), the dowel block, bores, rows, DOWEL_* variables and CSV lines, the dowels off,
 the migrations of a v1 profile, the v1 record on the pages (the leaf only, a boolean closer) deriving as before,
-no swing word on 35 sheets. `t52_fire_door_ui.mjs` in Chromium: 89 PASS (v1: 78): the opening inputs and chips, the
+no swing word on 35 sheets. `t52_fire_door_ui.mjs` in Chromium: 89 PASS (v1: 84): the opening inputs and chips, the
 override and its reset, the geometry error on the leaf of a small opening, the three closer chips, the saved keys,
 the settings cards. Both files keep every v1 check that still applies; the checks of removed features (the
 intumescent select, the swing, the 10 / 20 rows) are replaced by the checks of what replaced them.
@@ -104,6 +104,29 @@ Docs: `docs/handover/FIRE-DOORS.md` (the v1.1 banner, the opening, the hinge rul
 the reference table on the v1.1 numbers, the sheets, the lists, the export variables, the assumptions, the next
 steps), `BLOCKERS.md` 36.1 to 36.8 (the six changes applied, the owner checks, the closer component files still
 missing, the dowel margin and the thickness centre as the only new assumptions).
+
+### Stage 7: independent review and its fixes
+The review agent (had not seen the work; re-derived the opening, hinge, strip, closer and dowel numbers by hand,
+diffed both harnesses against v1, rendered ten sheets) found every hand number equal to the live engine, no check
+weakened except one, no blocker. Verdict: PASS WITH FINDINGS (16), fixed in this stage except 15:
+1. `dowelBore` x is now the bore CENTRE (25 / length - 25: the thickness centre lies 25 along the member on the 45
+   cut), so the op table, the CSV and the circles on the frame sheet agree (the CSV line `FD-HEAD,dowelBore,mitre,
+   877,25,20`); `dowelEndsOf` groups the ends by the member half.
+2. The strip metres on the outside elevation and the leaf sheet print to 3 dp (4.906 m, 9.812 m), not rounded to 0.5.
+3, 7, 8, 9. FIRE-DOORS.md: the section 7 hinge rows (150 / 769 / 1738, 188 / 807 / 1776), the section 8 t52 text,
+   the dowelBore sentence, `hinges.step` = the Master_Door value for comparison only.
+4. The v1 counts in Stage 4: t51 387 as the v1 entry records (378 when the review re-ran e42a092 here), t52 84.
+5. The mutated profile check covers the inside elevation again (`ins`).
+6, 12. `derived.firedoor.warnings` (never a failure): a typed opening ignored on an axis where the leaf is typed and
+   disagrees with it; dowels closer than dia + 4 on a shallow frame (depth 50: 5 apart). Shown under the
+   configurator summary.
+10, 11. BLOCKERS 36.6 replaces 35.4 too, 36.4 replaces the CLOSER 0 / 1 of 35.10, 36.7 lists LH / RH.
+13. The mitre face detail dimension reads 35.4 (along the cut) with "along the cut (25 across the thickness)" on
+    the line under it, inside the sheet.
+14. t51 checks the 837.5 gap, exactly 16 "45 deg" on the reference frame sheet (4 mitres + 12 bores), the 3 dp
+    metres; t52 the saved leaf height `=== 0`.
+15. Kept: the compat shims in lists.js (`FIREDOOR_INTUMESCENT_WIDTHS`, `fireDoorIntumescentPartId`), no removals.
+After the fixes: t51 420 PASS, t52 89 PASS (Chromium), t32 54 PASS (casement rows byte identical), `npm run build` OK.
 
 ---
 
