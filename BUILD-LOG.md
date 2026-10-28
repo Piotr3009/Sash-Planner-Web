@@ -4,6 +4,66 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-10-28 night · FIRE DOORS v1.2 (branch `claude/fire-doors-v1-2`, from `claude/fire-doors-v1-1` 65a4d79)
+
+The owner's list of 00:53 ("o nic nie pytaj poprostu koduj ... pozniej bedziemy poprawiac"), coded unattended by the lead with
+three parallel agents on disjoint files (configurator and Window Settings; sheets and 3D; DXF export, window page
+and pack buttons) over the lead's engine, then the harnesses, the docs, a full suite run and an independent review.
+Every reading is a profile key and a BLOCKERS 37 item.
+
+**The changes (BLOCKERS 37.1 to 37.8):** a DXF of every element of a door (R12 via the existing writer; AutoCAD and
+bSolid open it, a true .dwg needs a converter) with drawn hinges, radius forend / keep, the VP by shape, grooves,
+dowels, closer symbol, dimensions, one layer per operation; the vision panel as a type (None, Standard, Square,
+Narrow slot, Round, Diamond, Double) with its size, panes, arrangement, gap and a position across (centred with a
+shift, from the hinge edge, from the lock edge) and down (top from the leaf top, centre or bottom above the leaf
+bottom), placed by PC, VP_SHAPE / VP_N / VP_W / VP_H / VP_GAP / VP_ARR / VP_X / VP_Y / VP_R for the new macro, a
+v1 / v1.1 door read into it and exported as before; three glasses only (FD30 standard, FD insulated, Frosted; the
+toughened row gone, two rows appended); the strip colour; the closer drawn (sheets, 3D, DXF); the radius forend
+and keep on the sheets and in the 3D; the 3D rebate clean round the head corners.
+
+### Stage 1: engine, profile, spec, lists, BOM, slots (e47490c, 917b26c)
+`fireDoorVpInput`, `fireDoorVpFromLegacy`, `fireDoorVpWords`, `placeVisionPanelV12`, `masterDoorVpStyle` (the v1
+`placeVisionPanel` kept, no longer called); `vp.glass`, `intumescent.colour` and `centresZ`, `closer.symbol`,
+`keep.plate.radius`; the profile keys `vp.types / position / minEdge / glass`, `intumescent.colours`,
+`defaults.intuColour`, `closer.surface / builtin` with their migration (merge by id); the spec reads `firedoorVp`
+(`fireDoorVpField`), `firedoorGlass`, `firedoorIntuColour`; the glass rows by `consumables.glass.slot`; the glass
+schedule row by the glass type; the machining JSON version 3. A legacy door keeps its style id, its C_VP_* and
+the v1 turn of a stack that does not fit.
+
+### Stage 2: the configurator and Window Settings (6f99d75)
+`FdVisionPanel`: seven type chips with shape icons, the size fields by shape, panes 1 to 5 with the arrangement
+and gap, the position across and down with one mm field each (the field keeps the panel in place when the mode
+changes), a 120 px preview from the engine panes, the label and position line, the warnings; the three glass
+chips; the colour swatches; the summary rows. Window Settings: the types table, the position defaults, minEdge,
+the Master_Door styles collapsed (export only), the Glass card, the strip colours (add / remove the added), the
+Closer symbols card. `windowProfileStore`: `closer` editable, `setFireDoorColours`.
+
+### Stage 3: the DXF (3771dbc)
+`src/engine/cnc/fireDoorDxf.js` (pure, from the machining ops), `src/utils/fireDoorDxfExport.js` (one door, one
+element, the pack zip with 1 + 4 files a door), the fire door branch of `exportWindowToDXF`, the buttons "Fire
+door DXF" and "Fire door DXF (zip)"; the window page Vision panel / glass rows on the v1.2 labels. A sweep of
+11,988 configurations: no NaN, no overlapping views.
+
+### Stage 4: the sheets and the 3D (c497d07)
+The panes by shape with their position chains, the closer on its face (surface) or dashed (built in), the radius
+slots, the colour and the glass in the notes, no "layout per bSolid macro"; `DoorGlassDrawing2D` prints the glass
+label and draws a round pane as its circle (lead). 3D: the rebate corner, the strips, the closer (body, two-link
+arm, shoe; or slot and track), the radius plates, round and side by side panes, frosted glass, the diamond
+centred on its box (it sat about 72 off centre before).
+
+### Stage 5: harnesses, full suite, build, docs (5384a75, 3fb0230 and this entry)
+t51 446 PASS (v1.1: 420): the VP model, the legacy styles, the glasses, the colours, the closer symbols, the
+migration, 22 slot rows, the pages and sheets on the v1.2 labels; every changed `ok(` follows a v1.2 change
+(the profile block list, the defaults, the spec block, the closer object, the inputs, the leaf variable order, the
+consumables, the glass type and slot, the VP labels, the CSV note). t52 137 PASS (v1.1: 89). t53 86 PASS (new:
+four doors, the layers, the counts, the zip, ezdxf audit clean). Every `verify/arch/t*.mjs` (not the baseline
+generators) and `verify/parity/*.mjs` on the final tree, one pass each: 42 files, 5213 PASS, 0 FAIL
+(`psw-casement-layouts` exits 2 = no PSW checkout, as before; `render_door_samples` writes renders, no checks;
+t32 54 = the casement rows byte identical; t27 97 after the DXF constants moved off the banned 40). `npm run
+build` OK. Docs: `FIRE-DOORS.md` (the v1.2 banner, section 11, the superseded v1 wording marked), `BLOCKERS.md` 37.
+
+---
+
 ## 2026-10-27 evening · FIRE DOORS v1.1 (branch `claude/fire-doors-v1-1`, from main e42a092 = the v1 merge)
 
 The owner's six changes from the chat after the v1 merge, applied end to end in one evening session with three
