@@ -469,6 +469,11 @@ export function fireDoorVpField(v) {
   const out = {};
   for (const k of FIREDOOR_VP_STRING_KEYS) out[k] = o[k] == null || o[k] === '' ? null : String(o[k]);
   for (const k of FIREDOOR_VP_NUMBER_KEYS) out[k] = o[k] == null || o[k] === '' || !Number.isFinite(Number(o[k])) ? null : Number(o[k]);
+  // a legacy style of two different panes keeps its sizes (the engine drops them on a size edit)
+  if (Array.isArray(o.paneSizes)) {
+    const sizes = o.paneSizes.map((q) => ({ w: Number(q?.w), h: Number(q?.h) })).filter((q) => q.w > 0 && q.h > 0);
+    if (sizes.length) out.paneSizes = sizes;
+  }
   return out;
 }
 

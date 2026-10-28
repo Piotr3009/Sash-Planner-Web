@@ -860,7 +860,10 @@ export default function ConfiguratorPage() {
   }, [isFireDoor, fdVp, fd, fdProfile, fdVpStyle, fdVpCustom]);
   const patchFdVp = (patch) => {
     const base = fdVpView || {};
-    setFdVp(Object.fromEntries(FD_VP_KEYS.map((k) => [k, k in patch ? patch[k] : (base[k] ?? null)])));
+    const next = Object.fromEntries(FD_VP_KEYS.map((k) => [k, k in patch ? patch[k] : (base[k] ?? null)]));
+    // a legacy two-size style (style 2) carries its pane sizes; the engine keeps them only while the size is unchanged
+    if (Array.isArray(base.paneSizes) && base.paneSizes.length) next.paneSizes = base.paneSizes;
+    setFdVp(next);
   };
 
   // ── Fire door numbering (brief 3.2): FDR-01 / DR-01, counted per prefix over
@@ -1954,7 +1957,7 @@ function FdVisionPanel({ types, view, fd, hingeSide, onPatch, legacyStyle }) {
   };
   const pickDown = (mode) => {
     if (mode === v.down) return;
-    const off = !group ? v.downOffset : mode === 'top' ? group.fromTop : mode === 'bottom' ? group.fromBottom : Math.round(group.fromBottom + group.h / 2);
+    const off = !group ? v.downOffset : mode === 'top' ? group.fromTop : mode === 'bottom' ? group.fromBottom : group.centreFromBottom;
     onPatch({ down: mode, downOffset: off });
   };
   const sizeFields = shape === 'round' ? [['width', 'Diameter (mm)']] : shape === 'diamond' ? [['width', 'Size (mm, turned 45)']] : [['width', 'Width (mm)'], ['height', 'Height (mm)']];

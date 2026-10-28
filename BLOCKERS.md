@@ -22,7 +22,8 @@ Layers (one per operation, the depth in the name, a decimal depth written D3P2 b
 name cannot hold a dot): FD_OUTLINE, FD_MITRE, FD_REBATE_15x47, FD_HINGE_RECESS_D3, FD_HINGE_DRAWING,
 FD_LOCK_FOREND_D4, FD_LOCK_CASE_D87 (+ _HIDDEN), FD_HOLE_THROUGH, FD_VP_CUTOUT_THROUGH, FD_INTU_GROOVE_D4,
 FD_KEEP_PLATE_D3, FD_KEEP_POCKET_D15, FD_DOWEL_8_D20 (+ _HIDDEN), FD_CLOSER_SYMBOL (+ _HIDDEN), FD_CENTRE, FD_DIM,
-FD_TEXT. The drawn hinge is a plate with three countersunk screws and a five-knuckle barrel over each R6 recess,
+FD_TEXT. The units are mm (R12 has no units header); the _HIDDEN layers are continuous lines in the file (the
+writer has no line types: set them to DASHED in AutoCAD); the lever handle is not drawn. The drawn hinge is a plate with three countersunk screws and a five-knuckle barrel over each R6 recess,
 on the leaf edge and on the hinge jamb (its plate 29 wide: the recess 30 less the same 1 mill oversize as the
 length; the profile has no plate width). OWNER CHECK: open one in bSolid and say whether the layer names should
 follow a bSolid import convention (a layer = a tool and a depth) so the import can turn them into workings.
@@ -35,7 +36,12 @@ shift, + towards the lock edge), or a distance from the hinge edge, or from the 
 Position up / down: the top below the leaf top (default 150), the centre above the leaf bottom (e.g. 1500 eye
 level), or the bottom above the leaf bottom. PC places the cut-out itself now (no more "layout per bSolid macro").
 Warnings, never a failure: less than `vp.minEdge` 100 of timber round the panel (ZAŁOŻENIE), past the leaf edge,
-into the lock zone. A door saved before tonight keeps its macro style and exports exactly as before.
+into the lock zone. A door saved before tonight keeps its macro style: the same panes, VP_STYLE and C_VP_* as
+before (checked against v1.1 on every style); its leaf row gains the nine VP_* variables and its machining JSON is
+version 3. Editing only the position of an old style 2 door (150 x 760 + 150 x 450) keeps its two sizes; a size
+edit makes the panes equal. A door saved with the v1.1 glass finish Frosted reads as the Frosted glass. When a
+panel cannot be cut by the old Master_Door as drawn (round, off the centred top 150, side by side), the bSuite
+export names the door in its messages.
 
 **37.3 What your new leaf macro must read for the vision panel (new names).** VP_SHAPE (0 none, 1 rectangle,
 2 round, 3 diamond), VP_N (panes), VP_W / VP_H (one pane; round: the diameter in both), VP_GAP, VP_ARR (0 one
@@ -48,7 +54,10 @@ door carries a note that the old macro cannot place it as drawn.
 Frosted (`fd_glass_frosted`, new); the toughened row is gone. Default FD30 / non-fire = FD30 standard, FD60 = FD
 insulated (`vp.glass.defaultByRating`). OWNER CHECK: (a) the thickness of each glass (`vp.glass.types[].thickness`,
 6 for all three until you give the products: it drives the glass weight and the drawings); (b) a non-fire DR door
-also gets these three (you said "no other choice"); (c) the round pane is bought as its circle (m2 = pi r2).
+also gets these three (you said "no other choice"); (c) the round pane is bought as its circle (m2 = pi r2; the
+glass DXF and the glass schedule PDF send it as a circle). A material you had assigned to the old toughened row
+stays in Assign Materials data but nothing counts on it any more: assign the three glass rows. FD30 standard
+picked on an FD60 door gives a warning (not an error).
 
 **37.5 Intumescent colour (applied).** White (default), Black, Brown, Grey, Magnolia (`intumescent.colours`, label +
 the 3D colour). Shown in the form, the order line ("15 x 4, white"), the sheets and the 3D. OWNER CHECK: the colours

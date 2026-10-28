@@ -62,6 +62,33 @@ generators) and `verify/parity/*.mjs` on the final tree, one pass each: 42 files
 t32 54 = the casement rows byte identical; t27 97 after the DXF constants moved off the banned 40). `npm run
 build` OK. Docs: `FIRE-DOORS.md` (the v1.2 banner, section 11, the superseded v1 wording marked), `BLOCKERS.md` 37.
 
+### Stage 6: independent review and its fixes
+The review agent (had not seen the work; re-derived the round, double, narrow, glass, closer and radius numbers by
+hand; compared 26 legacy cases against 65a4d79; read every DXF with ezdxf and looked at 27 PNGs of the DXF, the
+sheets and the 3D) found every hand number equal to the live engine and the legacy placement, VP_STYLE and C_VP_*
+identical. Verdict: PASS WITH FINDINGS (13), fixed in this stage:
+1. A round pane went to the glazier as a 300 x 300 rectangle (the glass DXF and PDF read a shape object): the
+   round glass unit now carries `glassShape` (the circle glass outline of the circle windows) and the row's
+   `shape` is that circle; `paneShape` keeps rect / round / diamond. t51 checks the glass DXF unit is a circle.
+2. A v1.1 door saved with the glazing finish Frosted lost its frosted glass: with no glass picked, that finish
+   reads as the Frosted glass.
+3. A panel the old macro cannot place as drawn (round, off the centred top 150, side by side): the bSuite export
+   messages name the door (`vp.macroNote`).
+4. An old style 2 door lost its second pane size on any edit: `paneSizes` is kept with the block and by the
+   engine while the size is unchanged (a size edit makes the panes equal).
+5. The "exports exactly as before" wording corrected (the leaf row gains VP_*, the JSON is version 3, the notes);
+   the diamond cut-out keeps the cutter radius 6 (an R0 inside corner cannot be milled); a legacy turned stack keeps
+   rotated / angle 90 (t51 style 8 restored to the v1 assertion).
+6. FD30 standard on an FD60 door and an unknown glass id give a warning.
+7. One pane has no arrangement and no gap (VP_ARR 0, VP_GAP / C_VP_RAIL 0).
+8. The form reads the panel centre from the engine (`group.centreFromBottom`), no arithmetic in the component.
+9, 11. The dead ternary in lists.js removed; `FIREDOOR_GLASS_PART_ID.toughened` resolves to the FD30 standard row;
+   the orphaned toughened assignments are a BLOCKERS 37.4 note.
+10, 12. Owner checks (the closer face; the DXF hidden layers, units, the lever handle): BLOCKERS 37.1 / 37.6.
+13. The LOCK EDGE / HINGE EDGE captions on the leaf sheet move into the clear run between the lock and the last
+    hinge (they sat on the forend since v1).
+After the fixes: t51 452 PASS, t52 137, t53 86, t32 54, t27 97, t25 / t34 / t37 / t41 / t50 green, build OK.
+
 ---
 
 ## 2026-10-27 evening · FIRE DOORS v1.1 (branch `claude/fire-doors-v1-1`, from main e42a092 = the v1 merge)

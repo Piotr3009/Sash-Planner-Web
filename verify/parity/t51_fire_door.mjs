@@ -332,6 +332,17 @@ section('3b - FD60, non-fire DR, the 762 x 1981 leaf, hinge right, euro / bathro
     'non-fire DR: no grooves, the glass FD30 standard (v1.2: three glasses only, no toughened), standard hinges, "door blank non-fire"');
   ok(fd60.vp.glass.type === 'insulated' && fd60.vp.glass.slot === 'fd_glass_insulated' && mk({ firedoorRating: 'FD60', firedoorGlass: 'frosted' }).derived.firedoor.vp.glass.label === 'Frosted' && mk({ firedoorGlass: 'toughened' }).derived.firedoor.vp.glass.type === 'fd30',
     'v1.2 glass: FD60 defaults to FD insulated, a picked Frosted wins, an unknown glass (toughened) falls to the rating default');
+  const g60 = mk({ firedoorRating: 'FD60', firedoorVpStyle: 1, firedoorGlass: 'fd30' }).derived.firedoor;
+  const gx = mk({ firedoorVpStyle: 1, firedoorGlass: 'toughened' }).derived.firedoor;
+  ok(g60.vp.glass.type === 'fd30' && g60.warnings.some((w) => /glass: FD30 standard on an FD60 door \(the FD60 default is FD insulated\)/.test(w)) && gx.warnings.some((w) => /glass: 'toughened' is not one of FD30 standard \/ FD insulated \/ Frosted; FD30 standard used/.test(w)) && mk({ firedoorGlass: 'fd30', firedoorRating: 'FD60' }).derived.firedoor.warnings.length === 0,
+    'review: FD30 standard picked on an FD60 door warns, an unknown glass warns and falls back; no warning without a vision panel');
+  const one = mk({ firedoorVp: { type: 'double', arrange: 'side', count: 1 } }).derived.firedoor;
+  ok(one.vp.arrange === 'stack' && one.bsuiteVars.leaf.VP_ARR === 0 && one.bsuiteVars.leaf.VP_GAP === 0 && one.bsuiteVars.leaf.C_VP_RAIL === 0 && one.vp.group.centreFromBottom === 1490 && one.vp.group.centreFromHingeEdge === 413,
+    'review: one pane has no arrangement (side of 1 = stack, VP_ARR 0) and no gap (VP_GAP / C_VP_RAIL 0); the group centre 1490 above the bottom (2040 - 150 - 400), 413 from the hinge edge (the form reads it, never computes it)');
+  const l2 = fireDoor.fireDoorVpInput(FP.vp, { ...fireDoor.fireDoorVpFromLegacy(FP.vp, 2, {}), across: 'lock', acrossOffset: 200 });
+  const l2b = fireDoor.fireDoorVpInput(FP.vp, { ...fireDoor.fireDoorVpFromLegacy(FP.vp, 2, {}), width: 160 });
+  ok(J(l2.paneSizes) === J([{ w: 150, h: 760 }, { w: 150, h: 450 }]) && l2.acrossOffset === 200 && !('paneSizes' in l2b) && J(specification.fireDoorVpField({ type: 'double', paneSizes: [{ w: 150, h: 760 }, { w: 150, h: 450 }] }).paneSizes) === J([{ w: 150, h: 760 }, { w: 150, h: 450 }]),
+    'review: an old style 2 door keeps its two pane sizes through a position edit (stored with the block), a size edit makes the panes equal');
   ok(mk({ firedoorIntuColour: 'black' }).derived.firedoor.intumescent.colour.label === 'Black' && mk({ firedoorIntuColour: 'pink' }).derived.firedoor.intumescent.colour.id === 'white', 'v1.2 strip colour: a picked black, an unknown colour falls to the default white');
   const drc = mk({ firedoorFire: false, firedoorCloser: true, firedoorIntuStyle: 4 }).derived.firedoor;
   ok(J({ ...drc.closer, symbol: undefined }) === J({ type: 'builtin', label: 'Built in closer', machined: false }) && J(drc.closer.symbol) === J({ kind: 'builtin', body: { x: 0, y: 80, length: 300, width: 26, depth: 40, z: 9 }, track: { y: 80, length: 420, width: 20, depth: 30 } }) && drc.bsuiteVars.leaf.CLOSER === 2 && drc.intumescent === null && drc.bsuiteVars.leaf.INTU === 0,
@@ -402,7 +413,7 @@ section('3b - FD60, non-fire DR, the 762 x 1981 leaf, hinge right, euro / bathro
   ok(p5.w === 350 && p5.h === 350 && p5.rotated === true && p5.angle === 45 && near(p5.box.w, 495, 0.1) && near(p5.box.h, 495, 0.1) && p5.x === 150 && near(p5.y, 165.5, 0.1) && opsOf(v5, 'leaf', 'vpCutout')[0].rotated === true && near(opsOf(v5, 'leaf', 'vpCutout')[0].width, 495, 0.1),
     'VP style 5 diamond: a 350 square turned 45, bounding box 495 x 495 centred (y 165.5), the cut-out carries rotated and the box');
   const v8 = mk({ firedoorVpStyle: 8 }).derived.firedoor.vp;
-  ok(v8.panes.length === 5 && v8.panes.every((p) => p.w === 500 && p.h === 200) && v8.panes[4].x === 1350 && v8.style === 8 && J(v8.warnings) === J([]),
+  ok(v8.panes.length === 5 && v8.panes.every((p) => p.w === 500 && p.h === 200 && p.rotated === true && p.angle === 90) && v8.panes[4].x === 1350 && v8.style === 8 && J(v8.warnings) === J([]),
     'VP style 8 (5No 200 x 500, a v1 record): the native stack 2900 does not fit 2040, so the panes turn 500 x 200 (last at 1350), VP_STYLE 8 kept, no warning');
   const vw = mk({ firedoorVpStyle: 11, firedoorLeafWidth: 626 }).derived.firedoor.vp;
   ok(vw.panes.length === 1 && vw.panes[0].w === 508 && vw.warnings.some((w) => /only 59 of timber at the hinge edge \(minimum 100/.test(w)) && vw.warnings.some((w) => /only 59 of timber at the lock edge/.test(w)) && vw.warnings.some((w) => /runs into the lock/.test(w)),
@@ -419,7 +430,7 @@ section('3b - FD60, non-fire DR, the 762 x 1981 leaf, hinge right, euro / bathro
   // v1.2 (owner 28.10.2026): the vision panel as a type, a size, a count and a position
   const vpOf = (vp, extra = {}) => mk({ firedoorVp: vp, ...extra }).derived;
   const sq = vpOf({ type: 'square' }).firedoor;
-  ok(sq.vp.source === 'v12' && sq.vp.type === 'square' && sq.vp.label === 'Square: 450 x 450' && sq.vp.style === 1 && J(sq.vp.panes.map((p) => [p.w, p.h, p.x, p.y, p.shape, p.radius])) === J([[450, 450, 150, 188, 'rect', 6]]) && J(sq.vp.group) === J({ x: 150, y: 188, w: 450, h: 450, fromTop: 150, fromBottom: 1440, fromHingeEdge: 188, fromLockEdge: 188 }),
+  ok(sq.vp.source === 'v12' && sq.vp.type === 'square' && sq.vp.label === 'Square: 450 x 450' && sq.vp.style === 1 && J(sq.vp.panes.map((p) => [p.w, p.h, p.x, p.y, p.shape, p.radius])) === J([[450, 450, 150, 188, 'rect', 6]]) && J(sq.vp.group) === J({ x: 150, y: 188, w: 450, h: 450, fromTop: 150, fromBottom: 1440, fromHingeEdge: 188, fromLockEdge: 188, centreFromBottom: 1665, centreFromHingeEdge: 413 }),
     'v1.2 Square: the preset 450 x 450 centred, top 150: the same pane as style 1, so VP_STYLE 1 for the old macro; the group 188 from both edges, 1440 above the bottom');
   const rdd = vpOf({ type: 'round', width: 300, across: 'lock', acrossOffset: 100, down: 'centre', downOffset: 1500 });
   const rf1 = rdd.firedoor;
@@ -440,7 +451,7 @@ section('3b - FD60, non-fire DR, the 762 x 1981 leaf, hinge right, euro / bathro
   ok(J(hn.vp.panes.map((p) => [p.x, p.y, p.w, p.h])) === J([[380, 120, 150, 760]]) && hn.vp.group.fromBottom === 900 && hn.vp.positionLabel === '120 from the hinge edge, bottom 900 above the leaf bottom',
     'v1.2 Narrow slot 150 x 760, 120 from the hinge edge, the bottom 900 above the leaf bottom: x 2040 - 900 - 760 = 380');
   const dm = vpOf({ type: 'diamond' }).firedoor;
-  ok(dm.vp.style === 5 && dm.vp.panes[0].shape === 'diamond' && dm.vp.panes[0].rotated && near(dm.vp.panes[0].box.w, 495, 0.1) && dm.vp.panes[0].radius === 0, 'v1.2 Diamond 350 centred, top 150: the Master_Door 350 diamond (VP_STYLE 5), the 495 bounding box');
+  ok(dm.vp.style === 5 && dm.vp.panes[0].shape === 'diamond' && dm.vp.panes[0].rotated && near(dm.vp.panes[0].box.w, 495, 0.1) && dm.vp.panes[0].radius === 6, 'v1.2 Diamond 350 centred, top 150: the Master_Door 350 diamond (VP_STYLE 5), the 495 bounding box, the cutter radius 6 as v1 (review: an R0 inside corner cannot be milled)');
   const st = vpOf({ type: 'standard' }).firedoor;
   ok(st.vp.style === 9 && st.vp.label === 'Standard (rectangle): 450 x 700' && st.warnings.length === 0, 'v1.2 Standard 450 x 700 centred, top 150 = Master_Door style 9, no warning');
   const big = vpOf({ type: 'standard', width: 760, height: 2000, down: 'top', downOffset: 100 }).firedoor;
@@ -658,14 +669,25 @@ section('4 - the lists: cut list, grouped symbols, pre-cut, glass schedule, hard
   // glass schedule rows from the vision panels
   const g1 = mkB({ firedoorVpStyle: 1 });
   const rows = M.lists.buildGlassListForWindow(g1.derived, g1.spec);
-  ok(rows.length === 1 && rows[0].width === 450 && rows[0].height === 450 && rows[0].type === 'fd30' && rows[0].spec === 'FD30 standard' && rows[0].makeup === '6mm FD30 standard' && rows[0].shape === 'rect' && rows[0].finish === 'clear' && rows[0].bars === 'none' && /vision panel 1/.test(rows[0].location) && rows[0].thickness === 6,
+  ok(rows.length === 1 && rows[0].width === 450 && rows[0].height === 450 && rows[0].type === 'fd30' && rows[0].spec === 'FD30 standard' && rows[0].makeup === '6mm FD30 standard' && rows[0].paneShape === 'rect' && rows[0].shape === undefined && rows[0].finish === 'clear' && rows[0].bars === 'none' && /vision panel 1/.test(rows[0].location) && rows[0].thickness === 6,
     `glass schedule style 1: one 450 x 450 FD30 standard row (v1.2), clear, rect, bars none, thickness 6, location "${rows[0]?.location}"`);
   ok(M.lists.buildGlassListForWindow(R.derived, R.spec).length === 0, 'glass schedule style 0: no rows');
   const gn = mkB({ firedoorVpStyle: 1, firedoorFire: false }, 'DR-01');
   ok(M.lists.buildGlassListForWindow(gn.derived, gn.spec)[0]?.type === 'fd30', 'glass schedule non-fire: FD30 standard (v1.2: three glasses only, no toughened)');
   const gf = mkB({ firedoorVp: { type: 'round', width: 300 }, firedoorGlass: 'frosted' });
   const rf = M.lists.buildGlassListForWindow(gf.derived, gf.spec);
-  ok(rf.length === 1 && rf[0].type === 'frosted' && rf[0].spec === 'Frosted' && rf[0].finish === 'frosted' && rf[0].shape === 'round' && rf[0].width === 300 && rf[0].height === 300, 'glass schedule v1.2: a round 300 Frosted pane, finish frosted, shape round');
+  ok(rf.length === 1 && rf[0].type === 'frosted' && rf[0].spec === 'Frosted' && rf[0].finish === 'frosted' && rf[0].paneShape === 'round' && rf[0].shape?.kind === 'circle' && near(rf[0].shape.outline.radius, 150) && rf[0].width === 300 && rf[0].height === 300,
+    'glass schedule v1.2: a round 300 Frosted pane, finish frosted, paneShape round, the row shape the circle glass outline R150');
+  const rdx = M.glassDxf.glassDxfParamsForWindow(gf.spec, gf.derived, 'FDR-01');
+  const rdxText = J(M.glassDxf.buildGlassWindowEntities(rdx.params.units, 'FDR-01'));
+  ok(!rdx.skip && rdx.params.units.length === 1 && rdx.params.units[0].shape?.kind === 'circle' && rdx.params.units[0].rect === null && !/RECTANGULAR/.test(rdxText),
+    'glass DXF v1.2 (review): a round pane goes to the glazier as the circle unit, never a 300 x 300 rectangle');
+  // review: a door saved before v1.2 with the glazing finish Frosted keeps the frosted glass
+  const lf = mkB({ firedoorVpStyle: 1 });
+  const lfSpec = { ...lf.spec, glazing: { ...lf.spec.glazing, finish: 'frosted' } };
+  const lfDer = calculations.deriveWindowData(lfSpec, {});
+  ok(lfDer.firedoor.vp.glass.type === 'frosted' && M.lists.buildGlassListForWindow(lfDer, lfSpec)[0]?.finish === 'frosted' && calculations.deriveWindowData({ ...lfSpec, firedoor: { ...lfSpec.firedoor, glass: 'fd30' } }, {}).firedoor.vp.glass.type === 'fd30',
+    'review: a v1 / v1.1 door with the glazing finish Frosted (no glass picked) reads the Frosted glass, the row stays frosted; a picked glass wins');
   const g2 = mkB({ firedoorVpStyle: 2 });
   const r2 = M.lists.buildGlassListForWindow(g2.derived, g2.spec);
   ok(r2.length === 2 && r2[0].width === 150 && r2[0].height === 760 && r2[1].width === 150 && r2[1].height === 450, `glass schedule style 2: two rows 150 x 760 + 150 x 450 (${r2.map((r) => `${r.width}x${r.height}`).join(', ')})`);
@@ -1107,6 +1129,13 @@ const unzip = (buf) => {
     'default profile: 3 leaf rows labelled FDR-01 / FDR-02 / DR-01, quantity 1, no STOP');
   ok(skipped.length === 9 && skipped.every((s) => ['head', 'jambHinge', 'jambLock'].includes(s.key) && /FD_(HEAD|JAMB_HINGE|JAMB_LOCK): no program path/.test(s.reason) && /^(FDR|DR)-0\d$/.test(s.door)), `9 skipped frame rows naming door and member (${skipped.length})`, J(skipped));
   ok(messages.length === 3 && messages.every((m) => /FDR-01, FDR-02, DR-01/.test(m)) && /^FD_HEAD:/.test(messages[0]) && /^FD_JAMB_HINGE:/.test(messages[1]) && /^FD_JAMB_LOCK:/.test(messages[2]), `3 messages, one per missing key, listing the three doors`, messages.join(' | '));
+  // review: a v1.2 panel the old macro cannot place as drawn is named in the export messages (never a silent wrong cut)
+  const d4 = mkX('FDR-04', { firedoorVpStyle: 0, firedoorVp: { type: 'round', width: 300, across: 'lock', acrossOffset: 100 } });
+  const d5 = mkX('FDR-05', { firedoorVpStyle: 0, firedoorVp: { type: 'narrow', across: 'hinge', acrossOffset: 120, down: 'bottom', downOffset: 900 } });
+  const d6 = mkX('FDR-06', { firedoorVpStyle: 0, firedoorVp: { type: 'square' } });
+  const mv = X.buildBsuiteFireDoorRows([d4, d5, d6], prof).messages;
+  ok(mv.some((m) => /^FDR-04: vision panel VP_STYLE 0: a round panel/.test(m)) && mv.some((m) => /^FDR-05: vision panel VP_STYLE 14: the old Master_Door custom style places the panes centred/.test(m)) && !mv.some((m) => /^FDR-06/.test(m)),
+    'review: the export messages name the round panel (VP_STYLE 0) and the off-centre narrow slot (VP_STYLE 14); a centred square (VP_STYLE 1) gives none', mv.join(' | '));
   const L = rows[0];
   ok(L.vars.LPX === 2040 && L.vars.LPY === 826 && L.vars.LPZ === 44 && L.panelId === 1001 && L.panelName === 'P1001' && L.path === TGT.programs.leaf.path && L.element === 'FD_LEAF' && L.window === 'FDR-01' && /FD_LEAF 2040 x 826 x 44/.test(L.note),
     'the leaf row: panel LPX 2040 / LPY 826 / LPZ 44 on P1001, path, element FD_LEAF, window, note');

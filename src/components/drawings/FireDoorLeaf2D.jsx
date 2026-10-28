@@ -126,6 +126,11 @@ export default function FireDoorLeaf2D({ windowSpec, derived, projectNumber, win
   const ox = mL * ts, oy = mT * ts;
   const faceL = ox + T + gapB, faceR = faceL + W, faceT = oy + T + gapB, faceB = faceT + H;
   const bandRight = faceR + gapB + T;
+  // the edge band captions sit in the clear run between the lock (forend / case pocket) and the last hinge, so
+  // they never cover the forend slot or a hinge recess (review 28.10.2026); the leaf middle when there is no run
+  const lockBottom = Math.max(num(lock.forend?.centreFromTop, 0) + num(lock.forend?.millLength, 0) / 2, num(lock.case?.topFromTop, 0) + num(lock.case?.pocketHeight, 0));
+  const lastHingeTop = (hg.positions || []).length ? num(hg.positions[hg.positions.length - 1].top, H) : H;
+  const edgeCaptionX = lastHingeTop - lockBottom > 0.08 * H ? (lockBottom + lastHingeTop) / 2 : H / 2;
   const bandL = (z) => ox + T - z;                     // the left band: z = 0 next to the face
   const bandR = (z) => faceR + gapB + z;
   const bandT = (z) => oy + T - z;
@@ -238,10 +243,10 @@ export default function FireDoorLeaf2D({ windowSpec, derived, projectNumber, win
         ))}
         <rect x={faceL} y={bandT(T)} width={W} height={T} fill={C.band} stroke={COLORS.frame} strokeWidth={STROKES.sashLight} {...NS} strokeDasharray={dash(3, 3)} />
         <rect x={faceL} y={faceT} width={W} height={H} fill="rgba(148,163,184,0.03)" stroke={COLORS.sash} strokeWidth={STROKES.outer} {...NS} />
-        <text x={bandL(T / 2)} y={faceT + H / 2} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
-          transform={`rotate(-90, ${bandL(T / 2)}, ${faceT + H / 2})`}>{hingesLeft ? 'HINGE EDGE' : 'LOCK EDGE'}</text>
-        <text x={bandR(T / 2)} y={faceT + H / 2} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
-          transform={`rotate(-90, ${bandR(T / 2)}, ${faceT + H / 2})`}>{hingesLeft ? 'LOCK EDGE' : 'HINGE EDGE'}</text>
+        <text x={bandL(T / 2)} y={faceT + edgeCaptionX} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
+          transform={`rotate(-90, ${bandL(T / 2)}, ${faceT + edgeCaptionX})`}>{hingesLeft ? 'HINGE EDGE' : 'LOCK EDGE'}</text>
+        <text x={bandR(T / 2)} y={faceT + edgeCaptionX} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
+          transform={`rotate(-90, ${bandR(T / 2)}, ${faceT + edgeCaptionX})`}>{hingesLeft ? 'LOCK EDGE' : 'HINGE EDGE'}</text>
         <text x={topCaption.x} y={bandT(T / 2) + codeFs * 0.35} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor={topCaption.anchor} fontWeight={WEIGHTS.label}>TOP EDGE</text>
         <text x={faceL + W / 2} y={faceB - 10 * ts} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>PULL FACE</text>
 

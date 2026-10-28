@@ -174,7 +174,9 @@ Object.assign(ELEMENT_TO_PART_ID, {
 // The fire door glass rows (v1.2, owner 28.10.2026: three glasses only): the
 // row of the door's glass type, derived.consumables.glass.slot from fireDoor.js
 // (profile vp.glass.types[].slot). fire / toughened = the v1 keys, kept.
-export const FIREDOOR_GLASS_PART_ID = Object.freeze({ fire: 'fd_glass_fire', toughened: 'fd_glass_toughened', fd30: 'fd_glass_fire', insulated: 'fd_glass_insulated', frosted: 'fd_glass_frosted' });
+// toughened (the v1 non-fire key) resolves to the FD30 standard row: the
+// toughened row is gone in v1.2.
+export const FIREDOOR_GLASS_PART_ID = Object.freeze({ fire: 'fd_glass_fire', toughened: 'fd_glass_fire', fd30: 'fd_glass_fire', insulated: 'fd_glass_insulated', frosted: 'fd_glass_frosted' });
 // The fire door blank row by rating (FD30 44, FD60 54, non-fire 44).
 export const FIREDOOR_BLANK_PART_ID = Object.freeze({ FD30: 'fd_blank_fd30', FD60: 'fd_blank_fd60', none: 'fd_blank_std' });
 // Assign Materials row -> the ironmongery slot whose product that row buys on a

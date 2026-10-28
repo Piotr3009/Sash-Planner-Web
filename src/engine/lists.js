@@ -361,14 +361,17 @@ export function buildGlassListForWindow(derived, windowSpec) {
     const units = Array.isArray(derived.customGlassUnits) ? derived.customGlassUnits : [];
     const g = derived.firedoor?.vp?.glass || {};
     const thickness = Number(g.thickness) || Number(windowSpec?.glazing?.thickness) || Number(getFireDoorProfile()?.vp?.glassThickness) || 0;
-    const type = g.type || (derived.firedoor?.fire ? 'fd30' : 'fd30');
+    const type = g.type || 'fd30';
     const label = g.label || 'FD30 standard';
     return units.map((u, i) => {
       const row = buildGlassRow(windowSpec, u.width, u.height, u.location || `vision panel ${i + 1}`, u.qty || 1, type === 'frosted' ? 'frosted' : 'clear', u.role || 'vp');
       row.type = type;
       row.spec = label;
       row.thickness = thickness;
-      row.shape = u.shape || 'rect';
+      // paneShape = rect / round / diamond; a round pane's row.shape is the circle
+      // glass outline (kind 'circle') the glass DXF and PDF cut from
+      row.paneShape = u.shape || 'rect';
+      if (u.glassShape) row.shape = u.glassShape;
       row.makeup = thickness ? `${thickness}mm ${label}` : label;
       row.spacer = 'none';
       row.spacerType = 'none';

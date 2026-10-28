@@ -19,7 +19,8 @@ drawn with their radius ends; the 3D rebate runs clean round the head corners; a
 (AutoCAD and bSolid open it; a true .dwg needs a converter). New profile keys: `vp.types`, `vp.position`,
 `vp.minEdge`, `vp.glass`, `intumescent.colours`, `defaults.intuColour`, `closer.surface`, `closer.builtin`. New
 leaf variables for the new macro: VP_SHAPE, VP_N, VP_W, VP_H, VP_GAP, VP_ARR, VP_X, VP_Y, VP_R. A door saved
-before v1.2 (a Master_Door style id) is read into the new model and exports exactly as before. Section 11 has the
+before v1.2 (a Master_Door style id) is read into the new model with the same panes, VP_STYLE and C_VP_* (its
+leaf row gains the VP_* variables, the JSON is version 3). Section 11 has the
 details; items for Piotr: `BLOCKERS.md` 37.x.
 
 **v1.1 (27.10.2026 evening, branch `claude/fire-doors-v1-1`, owner decisions in the chat after the v1 merge):**
@@ -627,11 +628,19 @@ downOffset above the leaf bottom), bottom (the panel bottom downOffset above the
 fromBottom, fromHingeEdge, fromLockEdge }`, `panes[] { x, y, w, h, shape, radius, box }` (x from the leaf top, y
 from the hinge edge), `glass`, `glassSqm` (a round pane its circle), `beadM`, `intuM`, `warnings` (less than
 `vp.minEdge` 100 of timber at an edge, past the leaf, into the lock zone: never a failure). The `vpCutout` op
-carries `shape` and the radius (a round pane its half diameter).
+carries `shape` and the radius (a round pane its half diameter; a rectangle and a diamond the cutter radius
+`vp.cornerRadius`). One pane has no arrangement and no gap (VP_ARR 0, VP_GAP 0). `group.centreFromBottom` /
+`centreFromHingeEdge` give the form the panel centre. `vp.macroNote` (a panel the old macro cannot place as drawn)
+goes to the bSuite export messages. A round pane's glass unit carries `glassShape` (the circle glass outline of the
+circle windows) so the glass DXF and the glass schedule PDF cut a circle; the glass row has `paneShape`.
 
 **Old doors.** A door without `firedoorVp` (saved before v1.2) is read into the model from its Master_Door style
 (`fireDoorVpFromLegacy`: style 2 keeps its two pane sizes, a custom 14 its stored block, a stack that does not fit
-turns its panes as the v1 placement did) and keeps VP_STYLE and C_VP_* exactly as v1.1 wrote them. A v1.2 panel
+turns its panes as the v1 placement did, rotated with angle 90) and keeps VP_STYLE and C_VP_* exactly as v1.1
+wrote them (the review compared 26 legacy cases against 65a4d79); the leaf row gains the VP_* variables, the
+machining JSON is version 3 and the cut-out notes lose "layout per bSolid macro". A position edit of an old style 2
+door keeps its two pane sizes (`paneSizes`, stored with the block); a size edit makes the panes equal. With no
+glass picked, a door saved with the v1.1 glazing finish Frosted reads as the Frosted glass. A v1.2 panel
 writes VP_STYLE only when it is exactly a Master_Door style (centred, top 150): Square 450 = 1, Standard 450 x 700
 = 9, Diamond 350 = 5, ...; another rectangle 14 (C_VP_* from the panel), a round panel 0; the door then carries a
 note that the old macro cannot place it as drawn.

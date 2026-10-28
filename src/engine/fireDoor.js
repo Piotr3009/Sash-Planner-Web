@@ -113,6 +113,7 @@
  */
 import { getFireDoorProfile, kgPerM } from './profile.js';
 import { round, createComponentRecord } from './records.js';
+import { buildCircleGlassOutline, circleArcs, glassOutlinePoly } from './arch.js';
 
 export class FireDoorGeometryError extends Error {
   constructor(message, details) {
@@ -343,9 +344,16 @@ export function fireDoorVpInput(V, raw, legacyStyle, legacyCustom) {
   const width = Math.max(0, finiteOr(raw.width, finiteOr(preset?.width, 0)));
   const height = shape === 'round' || shape === 'diamond' ? width : Math.max(0, finiteOr(raw.height, finiteOr(preset?.height, 0)));
   const count = shape === 'none' ? 0 : Math.max(1, Math.min(10, Math.round(finiteOr(raw.count, finiteOr(preset?.count, 1)))));
+  // a legacy style of two different panes (style 2) keeps its sizes through an
+  // edit of the position; a size, count or shape edit makes the panes equal
+  const sizes = Array.isArray(raw.paneSizes) ? raw.paneSizes.map((q) => ({ w: Number(q?.w), h: Number(q?.h) })).filter((q) => q.w > 0 && q.h > 0) : [];
+  const keepSizes = shape === 'rect' && sizes.length === count && sizes.length > 1 && sizes[0].w === width && sizes[0].h === height;
+  const arrangeIn = VP_ARRANGE.includes(raw.arrange) ? raw.arrange : (VP_ARRANGE.includes(preset?.arrange) ? preset.arrange : 'stack');
   return {
     type, shape, width, height, count,
-    arrange: VP_ARRANGE.includes(raw.arrange) ? raw.arrange : (VP_ARRANGE.includes(preset?.arrange) ? preset.arrange : 'stack'),
+    ...(keepSizes ? { paneSizes: sizes } : {}),
+    // one pane has no arrangement (side by side of one = the same pane)
+    arrange: count > 1 ? arrangeIn : 'stack',
     gap: Math.max(0, finiteOr(raw.gap, finiteOr(preset?.gap, 0))),
     across: VP_ACROSS.includes(raw.across) ? raw.across : (VP_ACROSS.includes(P0.across) ? P0.across : 'centre'),
     acrossOffset: finiteOr(raw.acrossOffset, finiteOr(P0.acrossOffset, 0)),
@@ -401,12 +409,16 @@ function placeVisionPanelV12(V, vin, W, H, lockZone) {
     const x = side ? x0 + (gh - box.h) / 2 : x0 + run;
     const y = side ? y0 + run : y0 + (gw - box.w) / 2;
     run += (side ? box.w : box.h) + gap;
-    const radius = s === 'round' ? q.w / 2 : s === 'rect' ? (Number(V.cornerRadius) || 0) : 0;
-    return { i: i + 1, w: q.w, h: s === 'round' || s === 'diamond' ? q.w : q.h, x: R(x), y: R(y), shape: s, rotated: s === 'diamond', angle: s === 'diamond' ? 45 : 0, radius: R(radius), box };
+    // round: half the diameter; rect and diamond: the cutter corner radius (a milled cut-out has no sharp inside corner)
+    const radius = s === 'round' ? q.w / 2 : (Number(V.cornerRadius) || 0);
+    // a legacy stack the v1 placement turned keeps its v1 flags (rotated, angle 90)
+    const turned = !!vin.turned && s === 'rect';
+    return { i: i + 1, w: q.w, h: s === 'round' || s === 'diamond' ? q.w : q.h, x: R(x), y: R(y), shape: s, rotated: s === 'diamond' || turned, angle: s === 'diamond' ? 45 : (turned ? 90 : 0), radius: R(radius), box };
   });
   const group = {
     x: R(x0), y: R(y0), w: R(gw), h: R(gh),
     fromTop: R(x0), fromBottom: R(H - x0 - gh), fromHingeEdge: R(y0), fromLockEdge: R(W - y0 - gw),
+    centreFromBottom: R(H - x0 - gh / 2), centreFromHingeEdge: R(y0 + gw / 2),
   };
   const minEdge = Number(V.minEdge) || 0;
   const edges = [['top', group.fromTop], ['bottom', group.fromBottom], ['hinge edge', group.fromHingeEdge], ['lock edge', group.fromLockEdge]];
@@ -638,13 +650,19 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
   const GL = V.glass || {};
   const glassTypes = Array.isArray(GL.types) && GL.types.length ? GL.types : [{ id: 'fd30', label: 'FD30 standard', thickness: V.glassThickness, slot: 'fd_glass_fire' }];
   const glassDefault = GL.defaultByRating?.[fire ? rating : 'none'];
-  const glassPick = glassTypes.find((t) => t.id === spec.glass) || glassTypes.find((t) => t.id === glassDefault) || glassTypes[0];
+  // no glass picked on the door: a v1 / v1.1 door saved with the glazing finish
+  // Frosted (the generic finish chips of v1.1) reads as the Frosted glass
+  const legacyFrosted = !spec.glass && windowSpec?.glazing?.finish === 'frosted' && glassTypes.some((t) => t.id === 'frosted');
+  const glassPick = glassTypes.find((t) => t.id === spec.glass) || (legacyFrosted ? glassTypes.find((t) => t.id === 'frosted') : null) || glassTypes.find((t) => t.id === glassDefault) || glassTypes[0];
+  const glassWarnings = [];
+  if (spec.glass && !glassTypes.some((t) => t.id === spec.glass)) glassWarnings.push(`glass: '${spec.glass}' is not one of ${glassTypes.map((t) => t.label).join(' / ')}; ${glassPick.label} used`);
+  if (fire && rating === 'FD60' && glassPick.id === 'fd30') glassWarnings.push(`glass: ${glassPick.label} on an FD60 door (the FD60 default is ${(glassTypes.find((t) => t.id === GL.defaultByRating?.FD60) || {}).label || 'FD insulated'})`);
   const glass = { type: glassPick.id, label: glassPick.label, thickness: Number(glassPick.thickness) || Number(V.glassThickness) || 6, slot: glassPick.slot || 'fd_glass_fire' };
   const glassThickness = glass.thickness;
-  const vpWarnings = [...vpPlaced.warnings, ...(vpIn.legacyNote ? [`vision panel: ${vpIn.legacyNote}`] : []), ...(vpMacro.note && vpPlaced.panes.length ? [`vision panel: ${vpMacro.note}`] : [])];
+  const vpWarnings = [...vpPlaced.warnings, ...(vpIn.legacyNote ? [`vision panel: ${vpIn.legacyNote}`] : []), ...(vpMacro.note && vpPlaced.panes.length ? [`vision panel: ${vpMacro.note}`] : []), ...(vpPlaced.panes.length ? glassWarnings : [])];
   const vp = {
     // style = the Master_Door VP_STYLE this panel goes out as (v1 field name kept)
-    style: vpMacro.id, macroStyle: vpMacro.id,
+    style: vpMacro.id, macroStyle: vpMacro.id, macroNote: vpPlaced.panes.length ? vpMacro.note : '',
     type: vpIn.type, shape: vpIn.shape, width: vpIn.width, height: vpIn.height, count: vpPlaced.panes.length ? vpIn.count : 0,
     arrange: vpIn.arrange, gap: vpIn.gap,
     position: { across: vpIn.across, acrossOffset: vpIn.acrossOffset, down: vpIn.down, downOffset: vpIn.downOffset },
@@ -803,13 +821,13 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
     // before; a v1.2 panel its pane size, count and gap (0 without a panel)
     ...(vpIn.source === 'legacy'
       ? { C_VP_L: Number(vpCustom.length) || 0, C_VP_W: Number(vpCustom.width) || 0, C_VP_NUM: Math.round(Number(vpCustom.count) || 0), C_VP_RAIL: Number(vpCustom.rail) || 0, C_VP_POS: Number(vpCustom.pos) === 90 ? 90 : 0 }
-      : { C_VP_L: vp.count ? vp.height : 0, C_VP_W: vp.count ? vp.width : 0, C_VP_NUM: vp.count, C_VP_RAIL: vp.count ? vp.gap : 0, C_VP_POS: 0 }),
+      : { C_VP_L: vp.count ? vp.height : 0, C_VP_W: vp.count ? vp.width : 0, C_VP_NUM: vp.count, C_VP_RAIL: vp.count > 1 ? vp.gap : 0, C_VP_POS: 0 }),
     D_TOP_RAIL: Number(V.topRail), D_MID_RAIL: Number(V.midRail), D_SIDE_MARGIN: Number(V.sideMargin),
     // v1.2, the new macro: any panel. VP_SHAPE 0 none / 1 rect / 2 round / 3 diamond; VP_W x VP_H one
     // pane (round: the diameter); VP_ARR 0 one above another / 1 side by side; VP_X the group top from
     // the leaf top, VP_Y its edge from the hinge edge (the leaf board's x and y); VP_R the corner radius
     VP_SHAPE: vp.count ? ({ rect: 1, round: 2, diamond: 3 }[vp.shape] || 0) : 0, VP_N: vp.count,
-    VP_W: vp.count ? vp.width : 0, VP_H: vp.count ? vp.height : 0, VP_GAP: vp.count ? vp.gap : 0, VP_ARR: vp.arrange === 'side' ? 1 : 0,
+    VP_W: vp.count ? vp.width : 0, VP_H: vp.count ? vp.height : 0, VP_GAP: vp.count > 1 ? vp.gap : 0, VP_ARR: vp.arrange === 'side' ? 1 : 0,
     VP_X: vp.group ? vp.group.x : 0, VP_Y: vp.group ? vp.group.y : 0, VP_R: vp.panes.length ? vp.panes[0].radius : 0,
     LEAD_EDGE: leadEdge ? 1 : 0,
     REBATE: Number(MD.REBATE ?? 0), REBATE_STYLE: Number(MD.REBATE_STYLE ?? 1),
@@ -844,9 +862,17 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
   const sash = [leafRec];
 
   // ── glass units (one per pane) ──
+  // a round pane also carries the circle glass outline of the arched / circle
+  // windows (kind 'circle', poly, outline), so the glass DXF and the glass
+  // schedule PDF send the glazier a circle, not its bounding square
+  const roundGlassShape = (d) => {
+    const outline = buildCircleGlassOutline(circleArcs(d / 2));
+    return { kind: 'circle', archShape: 'circle', outline, poly: glassOutlinePoly(outline), springing: R(outline.springing), apex: R(outline.apex), rise: R(outline.rise), radii: outline.radii.map(R), area: outline.area, perimeter: outline.perimeter, bars: [], pattern: 'none', barCounts: { h: 0, v: 0 } };
+  };
   const customGlassUnits = vp.panes.map((p) => ({
     width: p.w, height: p.h, qty: 1, role: 'vp', location: `vision panel ${p.i}`, fire,
     shape: p.shape, glassType: glass.type, glassLabel: glass.label, slot: glass.slot,
+    ...(p.shape === 'round' ? { glassShape: roundGlassShape(p.w) } : {}),
     note: `${glass.label} ${glassThickness} · ${p.shape === 'round' ? `round dia ${p.w}` : p.shape === 'diamond' ? `diamond ${p.w} x ${p.w}` : `${p.w} x ${p.h}`}`,
   }));
 
