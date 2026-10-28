@@ -7,7 +7,21 @@
  * prohibited without prior written permission from Skylon Development Ltd.
 -->
 
-# Fire doors: internal door sets as built (v1 27.10.2026, v1.1 the same evening)
+# Fire doors: internal door sets as built (v1 27.10.2026, v1.1 the same evening, v1.2 28.10.2026)
+
+**v1.2 (28.10.2026 night, branch `claude/fire-doors-v1-2`, the owner's list of 00:53, coded unattended):** the
+vision panel is a TYPE (None, Standard (rectangle), Square, Narrow slot, Round (porthole), Diamond, Double), a size,
+a pane count arranged one above another or side by side with a gap, and a POSITION (across: centred with a shift,
+or a distance from the hinge or the lock edge; down: the top from the leaf top, the centre or the bottom above the
+leaf bottom), placed by PC (no more "layout per bSolid macro"); only three glasses (FD30 standard, FD insulated,
+Frosted); the intumescent strip has a colour; the closer is drawn (sheets, 3D, DXF); the forend and the keep are
+drawn with their radius ends; the 3D rebate runs clean round the head corners; a DXF of every element of a door
+(AutoCAD and bSolid open it; a true .dwg needs a converter). New profile keys: `vp.types`, `vp.position`,
+`vp.minEdge`, `vp.glass`, `intumescent.colours`, `defaults.intuColour`, `closer.surface`, `closer.builtin`. New
+leaf variables for the new macro: VP_SHAPE, VP_N, VP_W, VP_H, VP_GAP, VP_ARR, VP_X, VP_Y, VP_R. A door saved
+before v1.2 (a Master_Door style id) is read into the new model with the same panes, VP_STYLE and C_VP_* (its
+leaf row gains the VP_* variables, the JSON is version 3). Section 11 has the
+details; items for Piotr: `BLOCKERS.md` 37.x.
 
 **v1.1 (27.10.2026 evening, branch `claude/fire-doors-v1-1`, owner decisions in the chat after the v1 merge):**
 the STRUCTURAL OPENING is the size input (frame = opening - 5 a side / - 5 at the head, leaf = frame - 76 / - 43;
@@ -76,8 +90,8 @@ rows carry DOWEL_N / DOWEL_D / DOWEL_L / DOWEL_DEPTH / DOWEL_1..n. `perJoint 0` 
 150; the bottom hinge ends `hinges.bottomOffset` 200 above the leaf bottom (top edge = H - 200 - 102); with three
 hinges the middle one has its CENTRE `hinges.midAboveCentre` 200 above the leaf centre (top edge = H / 2 - 200 -
 51; 2040: 150 / 769 / 1738; 2052: 150 / 775 / 1750); with more than three the inner ones spread equally. The old
-equal spacing (the macro's `(lpx - 150 - 200 - w) / (repn - 1)`, 794 on 2040) is kept as `hinges.step` for the
-sheets only. Recess 103 x 30 x 3 with R6 corners (`hinges.recessLength / recessWidth / recessDepth /
+equal spacing (the macro's `(lpx - 150 - 200 - w) / (repn - 1)`, 794 on 2040) is still reported as `hinges.step`
+(the Master_Door value, for comparison only: no sheet, list or export places a hinge by it). Recess 103 x 30 x 3 with R6 corners (`hinges.recessLength / recessWidth / recessDepth /
 cornerRadius`, plate + 1, the 12 cutter) on the hinge edge from the pull face. On the hinge jamb the same recesses
 at the same heights shifted by the head: jambTop_i = (50 - 15) + gapHead 3 + top_i from the jamb top long point
 (2040: 188 / 807 / 1776). Macro HINGE 1 fire / 0 standard; the positions go out as HINGE_1..3.
@@ -102,7 +116,8 @@ apart, the nNo styles (6, 7, 8, 13) `vp.stackGap` 100 apart, a pane turned 90 wh
 height, the diamond (5) a square turned 45; every sheet and every unit note says "layout per bSolid macro"; the
 export sends only VP_STYLE and the C_VP_* values and the macro places the cut. Per pane: glass m2, beads = perimeter
 x `vp.beadFaces` 2, glazing intumescent = perimeter (fire only); glass 6 thick (`vp.glassThickness`), fire glass on a
-fire door, toughened otherwise; one Glass Schedule row per pane.
+fire door, toughened otherwise; one Glass Schedule row per pane. (v1.2: superseded by section 11: PC places
+the panel by type, size and position, and the glass is FD30 standard / FD insulated / Frosted.)
 
 **Intumescent (v1.1, fire only).** ONE strip size, `intumescent.width` 15 x `thickness` 4, all around (top,
 hinge and lock edges); the groove `grooveWidth` 15.5 x `grooveDepth` 4 (two passes of the 10 disk); strips by
@@ -149,7 +164,7 @@ The reference doors, every row from the live engine with the default profile and
 | **opening 1000 x 2100** | frame 990 x 2095, leaf 914 x 2052; hinges 150 / 775 / 1750; spindle 1052 from the top; LPX 2052 LPY 914, head 990, jambs 2095 | the owner's example |
 | opening 1000 x 2100 + leaf 826 typed | leaf 826 x 2052, frame 902 x 2095, opening reported 912 x 2100 (source mixed) | the leaf wins on its axis |
 | FD60 | leaf 54, rebate 15 x 57, REB_D 57, LOCK 3, KEEP 3; 2 x 15 x 4, 9.812 m, grooves at z 8.3 and 30.3 (16 / 38 +- 7.75); INTU 2, INTU_STYLE 4 | `leaf.thicknessByRating.FD60`, T / 2 +- 11 |
-| non-fire DR | HINGE 0, LOCK 1, KEEP 1, INTU 0, no intumescent, no closer, toughened glass | |
+| non-fire DR | HINGE 0, LOCK 1, KEEP 1, INTU 0, no intumescent, no closer, FD30 standard glass (v1.2; v1.1 toughened) | |
 | leaf 762 x 1981 | overall 838 x 2024 (opening 848 x 2029); hinges 150 / 739.5 / 1679; jamb 188 / 777.5 / 1717 | |
 | euro, VP style 1, hinge right | cylinder 928 from the bottom (bore 18), EURO 1, HAND 1 / RH 1; pane 450 x 450 at x 150, y 188; 0.203 m2, beads 3.6 m, glazing intumescent 1.8 m | |
 | bathroom | hole 922 from the bottom (bore 10) | |
@@ -320,7 +335,8 @@ sheets with chains under their members) and the reference strings (902, 2083, 82
   PDF). The pre-cut panel labels an FD- group 'Timber'.
 - **Glass schedule** (`buildGlassListForWindow`): one row per vision panel pane from `customGlassUnits` (type
   `fire` on a fire door, `toughened` otherwise, thickness 6 from the spec glazing block, no spacer, no gas, no bars,
-  location "vision panel n", the note "layout per bSolid macro"); style 0 gives no rows; the glass DXF export accepts
+  location "vision panel n", the note "layout per bSolid macro"; v1.2: the glass type / label of section 11, a
+  round pane shape round); style 0 gives no rows; the glass DXF export accepts
   the category.
 - **Hardware** (`buildHardwareList`, every line an `enginePart` with its Assign Materials row from the one table
   `FIREDOOR_HARDWARE`): Fire door hinge / Door hinge (3, the length, the positions from the leaf top and the handing),
@@ -419,7 +435,7 @@ them inside `Master_Door_PIOTR` (BLOCKERS 35.10). The reference FD30 826 x 2040,
 | | SPY_ON / SPY_H | 0 / 1450 | `macroDefaults` |
 | | LBOX / L_BOX_H | 0 / 1000 | `macroDefaults` |
 | | DROP_CILL / PREM_DOOR | 0 / 0 | `macroDefaults` |
-| | HINGE_1 / HINGE_2 / HINGE_3 | 150 / 944 / 1738 | top_i (one per hinge of `hinges.count`; new names, the owner adds them) |
+| | HINGE_1 / HINGE_2 / HINGE_3 | 150 / 769 / 1738 | top_i (v1.1 rule, one per hinge of `hinges.count`; new names, the owner adds them) |
 | | HINGE_D | 3 | `hinges.recessDepth` (new name) |
 | | CLOSER | 1 | (v1.1) 0 none, 1 surface, 2 built in |
 | FD_HEAD | LPX / LPY / LPZ | 902 / 100 / 50 | the long point length / the frame depth / 50 |
@@ -427,7 +443,7 @@ them inside `Master_Door_PIOTR` (BLOCKERS 35.10). The reference FD30 826 x 2040,
 | | HAND / HINGE / HINGE_D | 0 / 1 / 3 | as the leaf |
 | | MITRE_TOP / MITRE_BOTTOM | 1 / 1 | both ends mitred |
 | FD_JAMB_HINGE | LPX / LPY / LPZ, REB_W / REB_D, HAND / HINGE | 2083 / 100 / 50, 15 / 47, 0 / 1 | |
-| | HINGE_1 / HINGE_2 / HINGE_3 | 188 / 982 / 1776 | jambTop_i from the top long point |
+| | HINGE_1 / HINGE_2 / HINGE_3 | 188 / 807 / 1776 | jambTop_i from the top long point |
 | | HINGE_D | 3 | |
 | | MITRE_TOP / MITRE_BOTTOM | 1 / 0 | top mitred, bottom square |
 | FD_JAMB_LOCK | LPX / LPY / LPZ, REB_W / REB_D, HAND / HINGE / HINGE_D | 2083 / 100 / 50, 15 / 47, 0 / 1 / 3 | |
@@ -469,9 +485,10 @@ into the face.
   shows 50). The rebate occupies y in [35, 50] and z in [0, 47] along the full length: op `rebate` on face `opening`.
   The hinge recesses (FD-JAMB-H, x = jambTop_i - 0.5) and the keep plate / pocket (FD-JAMB-L, centred on the keep
   centre and on z = T / 2) sit on face `rebateCheek`, the face at y = 35 that meets the leaf edge. Mitres: op
-  `dowelBore` on face `mitre` (v1.1, x y z = the bore centre on the mitre face, 8 dia, 20 deep, angle 45),
   `mitre` on face `end`, x = 0 (top / left) or x = length (the head's right end), angle 45, width 50, depth = the
-  frame depth.
+  frame depth. Dowels (v1.1): op `dowelBore` on face `mitre`, x y z = the bore CENTRE (x = `dowels.yCentre` 25
+  along the member from the top / left long point, or length - 25 from the head's right end: the centre of the 50
+  thickness lies 25 along the member on the 45 cut; y 25; z 20 / 50 / 80), 8 dia, 20 deep, angle 45.
 
 Buttons: the Production Pack header "bSuite fire doors -> <target>" and "Fire door machining (CSV)" (shown on a fire
 door pack / batch or whenever the pack holds a fire door, every door under the batch's profile snapshot); the window
@@ -513,14 +530,16 @@ bundle the JSX sheets, the pages and the 3D with esbuild the way t50 does, `buil
 `node verify/parity/t52_fire_door_ui.mjs` drives the pages a user clicks in a real Chromium (the t39 pattern: one
 esbuild iife bundle of the live page with the stores per part, the Supabase client on an empty env, nothing on the
 network; it needs the Playwright of the global node install and exits 2 without it, not a failure): A, Window
-Settings · Fire Doors (the sample door readout 902 x 2083, the hinges 150 / 944 / 1738 and 188 / 982 / 1776, the
+Settings · Fire Doors (the sample door readout 902 x 2083, the hinges 150 / 769 / 1738 and 188 / 807 / 1776, the
 keep 990, the intumescent 4.906 m, the rebate 15 x 47, the members; the FD60 / non-fire sample chips; a typed top
 offset 145 moves the sample hinges; the width list sorted and cleaned; the defaults card; the bSuite card with the
 STOP rows, the path with its quotes stripped, add / fill / remove target, a macro default; the head joint select;
 the reset); B, the configurator on a fire door batch (the proposed name FDR-01, the Fire door section and no
 Dimensions / Ventilation / Horns, the live summary numbers, the slots, fire OFF renaming to DR-01 and a typed name
-kept, the free width 803, the 926 chip, a width 200 disabling Save with the geometry message, the closer / lock /
-VP controls, the save with the stored `firedoor*` keys and width = the frame overall, the second door FDR-02
+kept, a free opening 889 (leaf 803, no clamp), the "1012 (leaf 926)" chip, an opening 286 (leaf 200) disabling
+Save with the geometry message, the leaf override and its reset, the three closer chips, the lock / VP controls,
+the save with the stored `firedoor*` keys (the opening, the leaf 0 = derived) and width = the frame overall, the
+second door FDR-02
 prefilled from the first, DR-01, edit mode never renames); C, the project page (the Fire doors batch, the card
 902 x 2083 and its subtitle, Add Batch, Project Materials), the batch defaults page (the fire door slots, no sash
 rows), Material Assignments · Fire doors (the four sections and their rows), the dashboard (the type key, the new
@@ -586,5 +605,89 @@ apply):
 4. Pricing rates (`pricing.firedoor`) from PSW; the Settings > Pricing > Fire doors card holds them.
 5. Double doors (KIT_DOOR_DOUBLE: frame outer = leaves + 79, height + 43, centre gap 3, the active leaf rebated 12
    at the meeting edge, the handle leaf chosen from inside): the next tura (BLOCKERS 35.15).
-6. The vision panel placement decoded from the macro (today PC's own placement, "layout per bSolid macro" on the
-   sheets); the Weeke MPR export if the old machine is to cut leaves again (out of scope here).
+6. v1.2: PC places the vision panel itself (type, size, position; section 11) and sends VP_SHAPE / VP_N / VP_W /
+   VP_H / VP_GAP / VP_ARR / VP_X / VP_Y / VP_R for the owner's new leaf macro; the Weeke MPR export if the old
+   machine is to cut leaves again (out of scope here).
+7. v1.2: the DXF layer names against a bSolid import convention, if the owner wants the import to make the
+   workings from the layers (BLOCKERS 37.1).
+
+## 11. v1.2 (28.10.2026): vision panels, glass, strip colour, closer, radius locks, DXF
+
+**Vision panel model** (`fireDoorVpInput`, `placeVisionPanelV12`, `fireDoorVpWords`, `masterDoorVpStyle` in
+`src/engine/fireDoor.js`). Stored on the door as `firedoorVp` = `{ type, shape, width, height, count, arrange,
+gap, across, acrossOffset, down, downOffset }` (`specification.js` `fireDoorVpField`, `projectStore`
+`fireDoorItemFields`). type = a preset of `vp.types` (none, standard 450 x 700, square 450, narrow 150 x 760,
+round dia 300, diamond 350, double 2 x 150 x 800) that fills the shape and the sizes; shape rect / round /
+diamond (round and diamond take `width` as the diameter / side); count 1 to 10 (the form offers 1 to 5),
+arrange stack (one above another) or side (side by side), gap between panes. Position across: centre
+(acrossOffset = a shift, + towards the LOCK edge), hinge or lock (acrossOffset = the distance from that edge to
+the nearest pane edge); down: top (the panel top downOffset below the leaf top), centre (the panel centre
+downOffset above the leaf bottom), bottom (the panel bottom downOffset above the leaf bottom). Defaults
+`vp.position` centre 0 / top 150. Output `derived.firedoor.vp`: `label` ("Round (porthole): dia 300"),
+`positionLabel` ("100 from the lock edge, centre 1500 above the leaf bottom"), `group { x, y, w, h, fromTop,
+fromBottom, fromHingeEdge, fromLockEdge }`, `panes[] { x, y, w, h, shape, radius, box }` (x from the leaf top, y
+from the hinge edge), `glass`, `glassSqm` (a round pane its circle), `beadM`, `intuM`, `warnings` (less than
+`vp.minEdge` 100 of timber at an edge, past the leaf, into the lock zone: never a failure). The `vpCutout` op
+carries `shape` and the radius (a round pane its half diameter; a rectangle and a diamond the cutter radius
+`vp.cornerRadius`). One pane has no arrangement and no gap (VP_ARR 0, VP_GAP 0). `group.centreFromBottom` /
+`centreFromHingeEdge` give the form the panel centre. `vp.macroNote` (a panel the old macro cannot place as drawn)
+goes to the bSuite export messages. A round pane's glass unit carries `glassShape` (the circle glass outline of the
+circle windows) so the glass DXF and the glass schedule PDF cut a circle; the glass row has `paneShape`.
+
+**Old doors.** A door without `firedoorVp` (saved before v1.2) is read into the model from its Master_Door style
+(`fireDoorVpFromLegacy`: style 2 keeps its two pane sizes, a custom 14 its stored block, a stack that does not fit
+turns its panes as the v1 placement did, rotated with angle 90) and keeps VP_STYLE and C_VP_* exactly as v1.1
+wrote them (the review compared 26 legacy cases against 65a4d79); the leaf row gains the VP_* variables, the
+machining JSON is version 3 and the cut-out notes lose "layout per bSolid macro". A position edit of an old style 2
+door keeps its two pane sizes (`paneSizes`, stored with the block); a size edit makes the panes equal. With no
+glass picked, a door saved with the v1.1 glazing finish Frosted reads as the Frosted glass. A v1.2 panel
+writes VP_STYLE only when it is exactly a Master_Door style (centred, top 150): Square 450 = 1, Standard 450 x 700
+= 9, Diamond 350 = 5, ...; another rectangle 14 (C_VP_* from the panel), a round panel 0; the door then carries a
+note that the old macro cannot place it as drawn.
+
+**New leaf variables** (after D_SIDE_MARGIN, for the owner's new macro): VP_SHAPE (0 none, 1 rect, 2 round, 3
+diamond), VP_N, VP_W, VP_H, VP_GAP, VP_ARR (0 stack, 1 side), VP_X (the group top from the leaf top), VP_Y (the
+group edge from the hinge edge), VP_R. Reference square 450 at the default position: 1 / 1 / 450 / 450 / 0 / 0 /
+150 / 188 / 6; round dia 300 at 100 from the lock edge, centre 1500: 2 / 1 / 300 / 300 / 0 / 0 / 390 / 426 / 150.
+
+**Glass** (`vp.glass.types`): FD30 standard (`fd_glass_fire`, renamed "Glass FD30 standard"), FD insulated
+(`fd_glass_insulated`), Frosted (`fd_glass_frosted`), 6 thick each until the owner says; `defaultByRating` FD30
+and non-fire FD30 standard, FD60 FD insulated; the door's pick `firedoorGlass`. The toughened row is gone. The
+glass schedule row: type = the glass id, spec = its label, makeup "6mm FD30 standard", finish frosted for
+Frosted, shape round for a round pane; the glass drawing draws a round pane as its circle.
+
+**Strip colour** (`intumescent.colours`, `defaults.intuColour` white; the door's `firedoorIntuColour`):
+`intumescent.colour { id, label, hex }` and `centresZ` (the strip centres from the pull face); the order line "1 x
+15 x 4 all around, white", the sheets' notes, the 3D strips in the colour.
+
+**Closer symbols** (`closer.surface`, `closer.builtin`, drawing only): `derived.firedoor.closer.symbol`. Surface:
+the body on `face` (pull by default), 250 x 55 x 45, 60 in from the hinge edge, 15 under the leaf top; the arm 230
+from the spindle (42.5, 87.5) to the shoe on the head face 20.5 above the leaf top. Built in: the body 300 x 26 x
+40 in the leaf top 80 in from the hinge edge, the head track 420 x 20 x 30. Sheets: the surface closer on the
+elevation of its face, the built in one dashed on both; 3D: the body, a two-link arm and the shoe (look only), or
+a dark slot and track; DXF: FD_CLOSER_SYMBOL layers.
+
+**Radius ends.** `lock.forend.radius` 12.5 and `keep.plate.radius` 20 (new): the forend, the case pocket, the keep
+plate and pocket drawn as slots on the sheets, in the 3D and in the DXF (the machining ops always carried them).
+
+**3D rebate corner.** `FireDoor.jsx`: the head's outer part runs from the 35 face to the 35 face over the jamb
+rebates and the jamb stops start under it, so the rebate runs clean round the head corners (both handings).
+
+**DXF** (`src/engine/cnc/fireDoorDxf.js` builds the entities from the machining ops, `src/utils/fireDoorDxfExport.js`
+downloads; `writeDxf` R12 unchanged). One row per door: the leaf (pull face seen from the pull side, the hinge and
+lock edge views beside their edges, the top edge above), the head (elevation, soffit, both mitre faces), the hinge
+jamb and the lock jamb (elevation, opening face, the top mitre face); the jamb feet on Y 0 so every leaf hinge
+lines up with its jamb recess; dimensions and a title on every view, a title block under the row. Buttons:
+"Fire door DXF" (window page, one door), "Fire door DXF (zip)" (the pack: one DXF per door plus the four element
+files); `exportWindowToDXF` hands a fire door to it. Layers: BLOCKERS 37.1.
+
+**Verification.** t51 (`verify/parity/t51_fire_door.mjs`): the VP model end to end (square, round at the lock
+edge with the centre height, double side by side with the shift, narrow from the hinge edge with the bottom
+height, diamond, standard = style 9, a too big panel's warnings, None), the legacy styles 1 / 2 / 5 / 7 / 8 / 11 /
+14 as before, the three glasses (defaults, a pick, the BOM rows, the schedule rows, the glass PDF), the colours,
+the closer symbols, the migration of the new keys, the slot list (22 rows), the sheets and the pages on the v1.2
+labels. t52 (Chromium): the type chips and icons, the size, panes, arrangement and position controls, the
+preview circle at the engine position, the three glass chips, the colours, the saved keys, an old door read as
+Square, the new Window Settings cards. t53 (`verify/parity/t53_fire_door_dxf.mjs`, new): four doors, the layers,
+the counts (hinge recesses and drawn hinges, the forend and keep slots with bulges, the dowel circles, the round
+VP circle, the FD60 grooves), the zip (1 + 4 files a door), ezdxf reads every file with a clean audit.

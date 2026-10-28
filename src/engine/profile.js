@@ -1075,11 +1075,39 @@ export const DEFAULT_FIREDOOR_PROFILE = Object.freeze({
     pocket: { length: 120, width: 18, depth: 15 },   // ZAŁOŻENIE: one pocket for the latch and the bolt, centred on the plate
   },
   vp: {
-    // ZAŁOŻENIE: the macro placement is not decoded; the sheets and the 3D put
-    // the first pane top at topRail, the A/B pair styles midRail apart, the
-    // nNo styles stackGap apart, centred across the leaf; the export sends the
-    // style id and the macro places the cut. glassThickness 6 (fire and toughened).
+    // v1.2 (owner 28.10.2026): a vision panel is a TYPE (a plain name: None,
+    // Standard, Square, Narrow slot, Round, Diamond, Double) that fills a
+    // shape and sizes the user can then change, a pane count with its
+    // arrangement (one above another / side by side) and gap, and a POSITION:
+    // across the leaf centred (with a shift, + towards the lock edge) or a
+    // distance from the hinge edge or the lock edge; down the leaf the top
+    // edge from the leaf top, the centre or the bottom edge above the leaf
+    // bottom. The old Master_Door style table (`styles` below) stays only to
+    // write VP_STYLE for the old macro when a panel matches one of its styles.
+    // topRail / midRail / sideMargin / stackGap are the macro's own placement
+    // defaults (D_TOP_RAIL ...) and the v1 reading of the styles.
     topRail: 150, midRail: 450, sideMargin: 150, stackGap: 100, cornerRadius: 6, beadFaces: 2, glassThickness: 6,
+    minEdge: 100,                      // ZAŁOŻENIE: timber to keep round a panel (a warning below it, never a failure)
+    types: [
+      { id: 'none', label: 'None', shape: 'none', width: 0, height: 0, count: 0, arrange: 'stack', gap: 0 },
+      { id: 'standard', label: 'Standard (rectangle)', shape: 'rect', width: 450, height: 700, count: 1, arrange: 'stack', gap: 100 },
+      { id: 'square', label: 'Square', shape: 'rect', width: 450, height: 450, count: 1, arrange: 'stack', gap: 100 },
+      { id: 'narrow', label: 'Narrow slot', shape: 'rect', width: 150, height: 760, count: 1, arrange: 'stack', gap: 100 },
+      { id: 'round', label: 'Round (porthole)', shape: 'round', width: 300, height: 300, count: 1, arrange: 'stack', gap: 100 },
+      { id: 'diamond', label: 'Diamond', shape: 'diamond', width: 350, height: 350, count: 1, arrange: 'stack', gap: 100 },
+      { id: 'double', label: 'Double (2 panes)', shape: 'rect', width: 150, height: 800, count: 2, arrange: 'stack', gap: 100 },
+    ],
+    position: { across: 'centre', acrossOffset: 0, down: 'top', downOffset: 150 },
+    // v1.2 (owner 28.10.2026): only three glasses. thickness ZAŁOŻENIE (6 each
+    // until the owner gives the products); slot = the Assign Materials row.
+    glass: {
+      types: [
+        { id: 'fd30', label: 'FD30 standard', thickness: 6, slot: 'fd_glass_fire' },
+        { id: 'insulated', label: 'FD insulated', thickness: 6, slot: 'fd_glass_insulated' },
+        { id: 'frosted', label: 'Frosted', thickness: 6, slot: 'fd_glass_frosted' },
+      ],
+      defaultByRating: { FD30: 'fd30', FD60: 'insulated', none: 'fd30' },
+    },
     // the macro VP_STYLE table, ids 1:1 (no style 3 in the macro). arrange:
     // 'none' | 'single' | 'stack' | 'diamond' | 'custom'; a stack takes its gap
     // from the vp key named in `gap`; style 2 lists its two different panes.
@@ -1115,6 +1143,27 @@ export const DEFAULT_FIREDOOR_PROFILE = Object.freeze({
     // leaf, the 15.5 grooves 6.5 apart). The macro's lpz / 2 +- 2.75 samples are
     // the two passes of the 10 saw that make ONE 15.5 groove, not two strips.
     twoStripOffset: 11,
+    // v1.2: the strip colour (the order line and the 3D); hex = the 3D colour
+    colours: [
+      { id: 'white', label: 'White', hex: '#f1f1ec' },
+      { id: 'black', label: 'Black', hex: '#1e1e1e' },
+      { id: 'brown', label: 'Brown', hex: '#6a4a30' },
+      { id: 'grey', label: 'Grey', hex: '#8b8e91' },
+      { id: 'magnolia', label: 'Magnolia', hex: '#efe6d2' },
+    ],
+  },
+  // v1.2 (owner 28.10.2026: "nie widzę self closera"): the closer DRAWING
+  // symbols (sheets, 3D, DXF). Sizes ZAŁOŻENIE; neither kind is machined.
+  // surface: an overhead closer body on the leaf `face` (pull = the hinge
+  //   side, the standard arm), its body `fromHingeEdge` in from the hinge edge
+  //   and `belowLeafTop` under the leaf top, the arm `armLength` to a shoe on
+  //   the frame head face.
+  // builtin: a concealed body in the leaf top, `fromHingeEdge` in, `bodyDepth`
+  //   down into the leaf, centred on the leaf thickness, and the slide track in
+  //   the head soffit from the same point, `trackLength` long.
+  closer: {
+    surface: { face: 'pull', bodyLength: 250, bodyHeight: 55, bodyDepth: 45, fromHingeEdge: 60, belowLeafTop: 15, armLength: 230, armWidth: 20, shoeLength: 70, shoeHeight: 25 },
+    builtin: { bodyLength: 300, bodyWidth: 26, bodyDepth: 40, fromHingeEdge: 80, trackLength: 420, trackWidth: 20, trackDepth: 30 },
   },
   // paint: the casement / door rule of calculations.js paintFromAreaSqm (per
   // 1.5 m2 2 L primer + 1 L topcoat) on the leaf both faces + the frame visible
@@ -1147,8 +1196,13 @@ export const DEFAULT_FIREDOOR_PROFILE = Object.freeze({
   // (concealed in the leaf top and the head; no machining until the owner's
   // component files arrive, BLOCKERS 35). closerFire applies to fire doors,
   // closerNonFire to DR doors, until the user picks one on the door.
-  defaults: { fire: true, rating: 'FD30', hingeSide: 'left', lockType: 'latch', closerFire: 'surface', closerNonFire: 'none', vpStyle: 0, leadEdge: true, vpCustom: { length: 600, width: 150, count: 1, rail: 100, pos: 0 } },
+  defaults: { fire: true, rating: 'FD30', hingeSide: 'left', lockType: 'latch', closerFire: 'surface', closerNonFire: 'none', vpStyle: 0, leadEdge: true, vpCustom: { length: 600, width: 150, count: 1, rail: 100, pos: 0 }, intuColour: 'white' },
 });
+
+export const FIREDOOR_VP_SHAPES = ['none', 'rect', 'round', 'diamond'];
+export const FIREDOOR_VP_ACROSS = ['centre', 'hinge', 'lock'];
+export const FIREDOOR_VP_DOWN = ['top', 'centre', 'bottom'];
+export const FIREDOOR_VP_ARRANGE = ['stack', 'side'];
 
 export const FIREDOOR_CLOSER_KINDS = ['none', 'surface', 'builtin'];
 export const FIREDOOR_CLOSER_LABELS = { none: 'None', surface: 'Surface closer', builtin: 'Built in closer' };
@@ -1181,6 +1235,14 @@ function migrateFireDoorBsuite(stored, D) {
     hand: { ...D.hand, ...(stored?.hand || {}) },
     macroDefaults: { ...D.macroDefaults, ...(stored?.macroDefaults || {}) },
   };
+}
+
+/** A list of { id: string } merged by id over the default (v1.2): default order, a stored entry overrides its fields, extra stored ids follow. */
+function mergeListById(defaults, stored) {
+  if (!Array.isArray(stored) || !stored.length) return defaults.map((s) => ({ ...s }));
+  const out = defaults.map((s) => ({ ...s, ...(stored.find((x) => x && String(x.id) === s.id) || {}) }));
+  for (const s of stored) if (s && s.id != null && !defaults.some((d) => d.id === String(s.id))) out.push({ ...s, id: String(s.id) });
+  return out;
 }
 
 /** A styles table merged by id over the default: default order, a stored entry overrides its fields, extra stored ids follow. */
@@ -1219,8 +1281,22 @@ export function migrateFireDoorProfile(profile) {
       case: { ...D.lock.case, ...(P.lock?.case || {}) },
     },
     keep: { ...D.keep, ...(P.keep || {}), pocket: { ...D.keep.pocket, ...(P.keep?.pocket || {}) } },
-    vp: { ...D.vp, ...(P.vp || {}), styles: mergeStylesById(D.vp.styles, P.vp?.styles) },
+    vp: {
+      ...D.vp, ...(P.vp || {}),
+      styles: mergeStylesById(D.vp.styles, P.vp?.styles),
+      types: mergeListById(D.vp.types, P.vp?.types),
+      position: { ...D.vp.position, ...(P.vp?.position || {}) },
+      glass: {
+        ...D.vp.glass, ...(P.vp?.glass || {}),
+        types: mergeListById(D.vp.glass.types, P.vp?.glass?.types),
+        defaultByRating: { ...D.vp.glass.defaultByRating, ...(P.vp?.glass?.defaultByRating || {}) },
+      },
+    },
     intumescent: migrateFireDoorIntumescent(P.intumescent, D.intumescent),
+    closer: {
+      surface: { ...D.closer.surface, ...(P.closer?.surface || {}) },
+      builtin: { ...D.closer.builtin, ...(P.closer?.builtin || {}) },
+    },
     bsuite: migrateFireDoorBsuite(P.bsuite, D.bsuite),
     defaults: migrateFireDoorDefaults(P.defaults, D.defaults),
   };
@@ -1238,6 +1314,7 @@ function migrateFireDoorIntumescent(stored, D) {
     ...D, ...rest,
     stripsByRating: { ...D.stripsByRating, ...(stored?.stripsByRating || {}) },
     macroStyleByStrips: { ...D.macroStyleByStrips, ...(stored?.macroStyleByStrips || {}) },
+    colours: mergeListById(D.colours, stored?.colours),
   };
 }
 

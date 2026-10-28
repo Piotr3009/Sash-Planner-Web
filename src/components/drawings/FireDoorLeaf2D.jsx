@@ -26,6 +26,15 @@
  * spindle and cylinder heights from the leaf bottom on the right, the chain
  * of the panes, the spindle (its backset) along the bottom. The op table
  * (kind, face, x, y, z, length, width, depth, radius) follows, then the notes.
+ * v1.2 (28.10.2026): the vision panel cut-outs by their shape (a rect with
+ * its corner radius, a circle, the diamond), 'VP dia 300' on a round pane,
+ * the panel's across chain as a second row along the bottom (from the edge
+ * the position mode measures from; centred: both edges) and its down chain
+ * on the left ('dia' over a round pane); the forend recess and the case
+ * pocket as slots with their full radius ends; the closer symbol (never
+ * machined): the built in closer's pocket dashed on the top edge band and its
+ * depth hidden on the face, a surface closer's body dashed on the face, each
+ * with its note; the intumescent colour in the notes.
  * Board coordinates as the bSolid master and fireDoor.js: x down the height
  * from the leaf top, y across the width from the hinge edge, z through the
  * thickness from the pull face. Every number comes from derived.firedoor; the
@@ -35,7 +44,7 @@ import { useMemo } from 'react';
 import { DimH, DimV, DimChainH, DimChainV, Label, WindowTag } from './drawingUtils.jsx';
 import { COLORS, STROKES, SIZES, FONT_FAMILY, WEIGHTS, VIEWBOX_REF } from './drawingTheme.js';
 import { NS, fmt, safely, NoSheet, SheetTitle } from './doorSheetParts.jsx';
-import { num, leafOpsByKind, opTableRows, fireDoorRecord, diamondPoints, paneBox, isDiamond, hingeWord, closerWord, hingeRuleWord, pullFaceNote, ratingWord, wrapLines } from './fireDoorDrawUtils.js';
+import { num, leafOpsByKind, opTableRows, fireDoorRecord, diamondPoints, paneBox, paneShape, paneLabel, vpAcrossChain, hingeWord, closerWord, closerSymbolWord, closerSymbolDetail, hingeRuleWord, intuWord, pullFaceNote, ratingWord, vpGlassWord, wrapLines } from './fireDoorDrawUtils.js';
 
 const CHAR = 0.55;
 const C = { band: 'rgba(148,163,184,0.05)', recess: 'rgba(14,165,233,0.12)', pocket: 'rgba(239,68,68,0.10)', hole: '#F59E0B' };
@@ -117,6 +126,11 @@ export default function FireDoorLeaf2D({ windowSpec, derived, projectNumber, win
   const ox = mL * ts, oy = mT * ts;
   const faceL = ox + T + gapB, faceR = faceL + W, faceT = oy + T + gapB, faceB = faceT + H;
   const bandRight = faceR + gapB + T;
+  // the edge band captions sit in the clear run between the lock (forend / case pocket) and the last hinge, so
+  // they never cover the forend slot or a hinge recess (review 28.10.2026); the leaf middle when there is no run
+  const lockBottom = Math.max(num(lock.forend?.centreFromTop, 0) + num(lock.forend?.millLength, 0) / 2, num(lock.case?.topFromTop, 0) + num(lock.case?.pocketHeight, 0));
+  const lastHingeTop = (hg.positions || []).length ? num(hg.positions[hg.positions.length - 1].top, H) : H;
+  const edgeCaptionX = lastHingeTop - lockBottom > 0.08 * H ? (lockBottom + lastHingeTop) / 2 : H / 2;
   const bandL = (z) => ox + T - z;                     // the left band: z = 0 next to the face
   const bandR = (z) => faceR + gapB + z;
   const bandT = (z) => oy + T - z;
@@ -146,12 +160,24 @@ export default function FireDoorLeaf2D({ windowSpec, derived, projectNumber, win
   // ── the chains ──
   const uniq = (vals) => [...new Set(vals.map((v) => Math.round(v * 10) / 10))].sort((a, b) => a - b);
   const hingeCuts = uniq([0, H, ...(hg.positions || []).flatMap((p) => [num(p.top, 0), num(p.top, 0) + num(hg.length, 0)])]);
+  // the down chain of the panes (leaf top to the leaf bottom through every pane; 'dia' over a round pane)
   const vpCuts = uniq([0, H, ...panes.flatMap((p) => [p.x, p.x + p.h])]);
-  const bottomCuts = uniq([faceL, faceR, ...(spindleC ? [SX(spindleC.y)] : []), ...panes.flatMap((p) => [rectX(p.y, p.y + p.w), rectX(p.y, p.y + p.w) + p.w])]);
+  const vpCutLabels = vpCuts.slice(0, -1).map((c, k) => {
+    const d = vpCuts[k + 1];
+    const pane = panes.find((p) => Math.abs(p.x - c) < 0.05 && Math.abs(p.x + p.h - d) < 0.05);
+    return pane && pane.shape === 'round' ? `dia ${fmt(pane.paneW)}` : fmt(d - c);
+  });
+  // the bottom rows: the spindle backset; the vision panel across chain (v1.2) under it
+  const bottomCuts = uniq([faceL, faceR, ...(spindleC ? [SX(spindleC.y)] : [])]);
+  const vpPos = fd.vp?.position || {};
+  const vpAcross = panes.length
+    ? vpAcrossChain(panes.map((p) => ({ a: rectX(p.y, p.y + p.w), b: rectX(p.y, p.y + p.w) + p.w, shape: p.shape, paneW: p.paneW })),
+      hingesLeft ? faceL : faceR, hingesLeft ? faceR : faceL, ['hinge', 'lock'].includes(vpPos.across) ? vpPos.across : 'centre', fmt)
+    : null;
 
   // ── the table, the notes, the sheet height ──
   const tableRows = [{ header: `${rec?.code || rec?.elementName || 'FD-LEAF'} · ${rec?.section || `${fmt(T)}x${fmt(W)}`} x ${fmt(rec?.length ?? H)} · ${rec?.quantity ?? 1} off` }, ...opTableRows(ops, 'FD-LEAF')];
-  const tableTop = faceB + 64 * ts;
+  const tableTop = faceB + (vpAcross ? 94 : 64) * ts;
   const tableLeft = Math.min(ox, 16 * ts);
   const tableH = opTableMetrics(tableRows, ts).height;
   const titleY = tableTop + tableH + 30 * ts;
@@ -161,17 +187,45 @@ export default function FireDoorLeaf2D({ windowSpec, derived, projectNumber, win
   const notes = wrapLines([
     `${pullFaceNote(fd)}. Leaf ${fmt(W)} x ${fmt(H)} x ${fmt(T)} (${ratingWord(fd)} blank), seen from the PULL face with the hinge edge on the ${hingeSide}; the hinge, lock and top edges unfolded beside the face, the pull face side of each edge next to it. Board coordinates as the bSolid master: x down from the leaf top, y from the hinge edge, z from the pull face`,
     `Hinges: ${fmt(hg.count)} x ${fmt(hg.length)} ${hg.product || ''} at ${(hg.positions || []).map((p) => fmt(p.top)).join(' / ')} from the top (HINGE_1..${fmt(hg.count)}; the rule: ${hingeRuleWord(fd)}); recess ${fmt(hg.recess?.length)} x ${fmt(hg.recess?.width)} x ${fmt(hg.recess?.depth)} R${fmt(hg.recess?.radius)} on the hinge edge, from the pull face`,
-    `Lock ${lock.type || ''}: forend ${fmt(lock.forend?.millLength)} x ${fmt(lock.forend?.millWidth)} x ${fmt(lock.forend?.depth)} (full radius ends) and case pocket ${fmt(lock.case?.pocketWidth)} x ${fmt(lock.case?.pocketHeight)} x ${fmt(lock.case?.pocketDepth)} on the lock edge centred on the thickness, forend centre ${fmt(lock.forend?.centreFromBottom)} above the bottom; spindle ${fmt(lock.spindle?.fromBottom)} above the bottom, ${fmt(lock.backset)} from the lock edge, bore ${fmt(lock.spindle?.bore)} through; ${cylC ? `${cylC.kind} bore ${fmt(cylC.bore)} at ${fmt(lock.cylinder.fromBottom)}` : 'no cylinder hole'}${lead ? '; leading edge bevel on the lock edge (LEAD_EDGE)' : ''}`,
+    `Lock ${lock.type || ''}: forend ${fmt(lock.forend?.millLength)} x ${fmt(lock.forend?.millWidth)} x ${fmt(lock.forend?.depth)} R${fmt(lock.forend?.radius)} (full radius ends) and case pocket ${fmt(lock.case?.pocketWidth)} x ${fmt(lock.case?.pocketHeight)} x ${fmt(lock.case?.pocketDepth)}${casePocket ? ` R${fmt(casePocket.radius)}` : ''} on the lock edge centred on the thickness, forend centre ${fmt(lock.forend?.centreFromBottom)} above the bottom; spindle ${fmt(lock.spindle?.fromBottom)} above the bottom, ${fmt(lock.backset)} from the lock edge, bore ${fmt(lock.spindle?.bore)} through; ${cylC ? `${cylC.kind} bore ${fmt(cylC.bore)} at ${fmt(lock.cylinder.fromBottom)}` : 'no cylinder hole'}${lead ? '; leading edge bevel on the lock edge (LEAD_EDGE)' : ''}`,
     panes.length
-      ? `Vision panel ${fd.vp?.label || fd.vp?.style}: ${panes.map((p) => `${fmt(p.paneW)} x ${fmt(p.paneH)}${p.diamond ? ' diamond' : ''}`).join(', ')} cut through, layout per bSolid macro (drawn centred, the first pane ${fmt(panes[0].x)} from the top)${(fd.vp?.warnings || []).length ? `; ${fd.vp.warnings.join('; ')}` : ''}`
+      ? `Vision panel ${fd.vp?.label || fd.vp?.style}${fd.vp?.positionLabel ? `; ${fd.vp.positionLabel}` : ''}${fd.vp?.group ? ` (the panel ${fmt(fd.vp.group.w)} x ${fmt(fd.vp.group.h)} at x ${fmt(fd.vp.group.x)}, y ${fmt(fd.vp.group.y)})` : ''}; cut through (${panes[0].shape === 'round' ? 'round' : panes[0].shape === 'diamond' ? 'diamond, the square turned 45' : (panes[0].radius > 0 ? `corners R${fmt(panes[0].radius)}` : 'square corners')})${vpGlassWord(fd) ? `, glass ${vpGlassWord(fd)}` : ''}${(fd.vp?.warnings || []).length ? `; ${fd.vp.warnings.join('; ')}` : ''}`
       : 'No vision panel',
     intu
-      ? `Intumescent ${intu.label || ''}: ${fmt(intu.strips)} groove${intu.strips === 1 ? '' : 's'} ${fmt(intu.groove?.width)} x ${fmt(intu.groove?.depth)} per edge for the ${fmt(intu.width)} x ${fmt(intu.thickness)} strip on the top, hinge and lock edges (${fmt(intu.metres)} m)`
+      ? `Intumescent ${intuWord(fd)}: ${fmt(intu.strips)} groove${intu.strips === 1 ? '' : 's'} ${fmt(intu.groove?.width)} x ${fmt(intu.groove?.depth)} per edge for the ${fmt(intu.width)} x ${fmt(intu.thickness)} strip on the top, hinge and lock edges${(intu.centresZ || []).length ? `, centred ${intu.centresZ.map(fmt).join(' / ')} from the pull face` : ''} (${Number(intu.metres).toFixed(3)} m)`
       : 'No intumescent strip (non-fire door): the edges are not grooved',
-    closerWord(fd),
+    closerSymbolDetail(fd) ? `${closerWord(fd)}: ${closerSymbolDetail(fd)}` : closerWord(fd),
   ], svgW - 2 * 30 * ts, codeFs);
   const svgH = titleY + (44 + 18 * notes.length) * ts;
   const pts = (list) => list.map(([x, y]) => `${x},${y}`).join(' ');
+
+  // ── v1.2: the vision panel cut-outs by shape (the op's x / y is its bounding box corner) and their labels ──
+  const cutouts = vpOps.length
+    ? vpOps.map((op) => ({ x: num(op.x, 0), y: num(op.y, 0), w: num(op.width, 0), h: num(op.length, 0), shape: paneShape(op), r: num(op.radius, 0) }))
+    : panes.map((p) => ({ x: p.x, y: p.y, w: p.w, h: p.h, shape: p.shape, r: p.radius }));
+  const paneFs = SIZES.label * ts;
+  const paneTexts = panes.map((p, k) => {
+    const text = paneLabel(p, fmt);
+    const x = rectX(p.y, p.y + p.w) + p.w / 2, y = SY(p.x) + p.h / 2 + 5 * ts;
+    return { k, text, x, y, turned: text.length * 0.55 * paneFs > 0.92 * p.w && p.h > p.w };
+  });
+  // ── v1.2: the closer symbol (never machined): the built in closer's pocket on the top
+  // edge band and its depth hidden on the face; a surface closer's body on the face ──
+  const sym = fd.closer?.symbol || null;
+  const closerText = closerSymbolWord(fd);
+  let closerDraw = null;
+  if (sym?.kind === 'builtin' || sym?.kind === 'surface') {
+    const b = sym.body || {};
+    const y0 = num(b.y, 0), len = num(b.length, 0);
+    const x0 = rectX(y0, y0 + len);
+    closerDraw = sym.kind === 'builtin'
+      ? { kind: 'builtin', top: { x: x0, y: bandT(num(b.z, 0) + num(b.width, 0)), w: len, h: num(b.width, 0) }, face: { x: x0, y: faceT, w: len, h: num(b.depth, 0) }, textX: SX(y0), textY: faceT + num(b.depth, 0) + 1.4 * codeFs }
+      : { kind: 'surface', face: { x: x0, y: SY(num(b.x, 0)), w: len, h: num(b.height, 0) }, textX: SX(y0), textY: SY(num(b.x, 0) + num(b.height, 0)) + 1.4 * codeFs };
+  }
+  // the top edge caption moves to the lock end of its band when the built in closer's pocket is drawn there
+  const topCaption = closerDraw?.kind === 'builtin'
+    ? { x: hingesLeft ? faceR - 8 * ts : faceL + 8 * ts, anchor: hingesLeft ? 'end' : 'start' }
+    : { x: faceL + W / 2, anchor: 'middle' };
 
   return (
     <div className="w-full">
@@ -189,11 +243,11 @@ export default function FireDoorLeaf2D({ windowSpec, derived, projectNumber, win
         ))}
         <rect x={faceL} y={bandT(T)} width={W} height={T} fill={C.band} stroke={COLORS.frame} strokeWidth={STROKES.sashLight} {...NS} strokeDasharray={dash(3, 3)} />
         <rect x={faceL} y={faceT} width={W} height={H} fill="rgba(148,163,184,0.03)" stroke={COLORS.sash} strokeWidth={STROKES.outer} {...NS} />
-        <text x={bandL(T / 2)} y={faceT + H / 2} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
-          transform={`rotate(-90, ${bandL(T / 2)}, ${faceT + H / 2})`}>{hingesLeft ? 'HINGE EDGE' : 'LOCK EDGE'}</text>
-        <text x={bandR(T / 2)} y={faceT + H / 2} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
-          transform={`rotate(-90, ${bandR(T / 2)}, ${faceT + H / 2})`}>{hingesLeft ? 'LOCK EDGE' : 'HINGE EDGE'}</text>
-        <text x={faceL + W / 2} y={bandT(T / 2) + codeFs * 0.35} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>TOP EDGE</text>
+        <text x={bandL(T / 2)} y={faceT + edgeCaptionX} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
+          transform={`rotate(-90, ${bandL(T / 2)}, ${faceT + edgeCaptionX})`}>{hingesLeft ? 'HINGE EDGE' : 'LOCK EDGE'}</text>
+        <text x={bandR(T / 2)} y={faceT + edgeCaptionX} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}
+          transform={`rotate(-90, ${bandR(T / 2)}, ${faceT + edgeCaptionX})`}>{hingesLeft ? 'LOCK EDGE' : 'HINGE EDGE'}</text>
+        <text x={topCaption.x} y={bandT(T / 2) + codeFs * 0.35} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor={topCaption.anchor} fontWeight={WEIGHTS.label}>TOP EDGE</text>
         <text x={faceL + W / 2} y={faceB - 10 * ts} fill={COLORS.subtitle} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor="middle" fontWeight={WEIGHTS.label}>PULL FACE</text>
 
         {/* ── intumescent grooves along the edge bands ── */}
@@ -229,7 +283,7 @@ export default function FireDoorLeaf2D({ windowSpec, derived, projectNumber, win
         ); })()}
         {casePocket && (() => { const b = bandX(lockSide, num(casePocket.z, 0), num(casePocket.z, 0) + num(casePocket.width, 0)); return (
           <g>
-            <rect x={b.x} y={SY(num(casePocket.x, 0))} width={b.w} height={num(casePocket.length, 0)} fill={`url(#${hatchId})`} stroke={COLORS.sash} strokeWidth={STROKES.sash} {...NS} />
+            <rect x={b.x} y={SY(num(casePocket.x, 0))} width={b.w} height={num(casePocket.length, 0)} rx={num(casePocket.radius, 0)} fill={`url(#${hatchId})`} stroke={COLORS.sash} strokeWidth={STROKES.sash} {...NS} />
             <rect x={rectX(W - num(casePocket.depth, 0), W)} y={SY(num(casePocket.x, 0))} width={num(casePocket.depth, 0)} height={num(casePocket.length, 0)} fill="none" stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={dash(6, 4)} />
           </g>
         ); })()}
@@ -249,23 +303,42 @@ export default function FireDoorLeaf2D({ windowSpec, derived, projectNumber, win
             fill={C.hole} fillOpacity={0.5} stroke={C.hole} strokeWidth={STROKES.sash} {...NS} />
         ))}
 
-        {/* ── the vision panel cut-outs (the op's x / y is its bounding box corner, length along the height, width across) ── */}
-        {(vpOps.length ? vpOps.map((op) => ({ x: num(op.x, 0), y: num(op.y, 0), w: num(op.width, 0), h: num(op.length, 0), diamond: isDiamond(op), r: num(op.radius, 0) })) : panes).map((p, k) => {
+        {/* ── the vision panel cut-outs by shape (v1.2): the op's x / y is its bounding box corner, length along the height, width across ── */}
+        {cutouts.map((p, k) => {
           const r = { x: rectX(p.y, p.y + p.w), y: SY(p.x), w: p.w, h: p.h };
-          return p.diamond
-            ? <polygon key={`v${k}`} points={pts(diamondPoints(r))} fill={COLORS.glass} fillOpacity={COLORS.glassOpacity} stroke={COLORS.glass} strokeWidth={STROKES.glass} {...NS} />
-            : <rect key={`v${k}`} x={r.x} y={r.y} width={r.w} height={r.h} rx={p.r || 0} fill={COLORS.glass} fillOpacity={COLORS.glassOpacity} stroke={COLORS.glass} strokeWidth={STROKES.glass} {...NS} />;
+          const glass = { fill: COLORS.glass, fillOpacity: COLORS.glassOpacity, stroke: COLORS.glass, strokeWidth: STROKES.glass, ...NS };
+          if (p.shape === 'diamond') return <polygon key={`v${k}`} points={pts(diamondPoints(r))} {...glass} />;
+          if (p.shape === 'round') return <circle key={`v${k}`} cx={r.x + r.w / 2} cy={r.y + r.h / 2} r={p.r || r.w / 2} {...glass} />;
+          return <rect key={`v${k}`} x={r.x} y={r.y} width={r.w} height={r.h} rx={p.r || 0} {...glass} />;
         })}
-        {panes.map((p, k) => (
-          <Label key={`vl${k}`} x={rectX(p.y, p.y + p.w) + p.w / 2} y={SY(p.x) + p.h / 2 + 5 * ts} text={`VP ${fmt(p.paneW)} × ${fmt(p.paneH)}`} vbw={svgW} />
+        {paneTexts.map((t) => (
+          <text key={`vl${t.k}`} x={t.x} y={t.y} fill={COLORS.label} fontSize={paneFs} fontFamily={FONT_FAMILY} textAnchor="middle" fillOpacity={0.8} fontWeight={WEIGHTS.label}
+            transform={t.turned ? `rotate(-90, ${t.x}, ${t.y - 5 * ts})` : undefined}>{t.text}</text>
         ))}
+
+        {/* ── the closer symbol (v1.2, never machined): dashed ── */}
+        {closerDraw?.kind === 'builtin' && (
+          <g>
+            <rect x={closerDraw.top.x} y={closerDraw.top.y} width={closerDraw.top.w} height={closerDraw.top.h} fill="none" stroke={COLORS.label} strokeWidth={STROKES.sash} {...NS} strokeDasharray={dash(6, 4)} />
+            <rect x={closerDraw.face.x} y={closerDraw.face.y} width={closerDraw.face.w} height={closerDraw.face.h} fill="none" stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={dash(6, 4)} />
+          </g>
+        )}
+        {closerDraw?.kind === 'surface' && (
+          <rect x={closerDraw.face.x} y={closerDraw.face.y} width={closerDraw.face.w} height={closerDraw.face.h} fill="none" stroke={COLORS.meeting} strokeWidth={STROKES.center} {...NS} strokeDasharray={dash(6, 4)} />
+        )}
+        {closerDraw && closerText && (
+          <text x={closerDraw.textX} y={closerDraw.textY} fill={COLORS.label} fontSize={codeFs} fontFamily={FONT_FAMILY} textAnchor={hingesLeft ? 'start' : 'end'} fillOpacity={0.8} fontWeight={WEIGHTS.label}>{closerText}</text>
+        )}
 
         {/* ── dimensions ── */}
         <DimH y={oy - 30 * ts} x1={faceL} x2={faceR} extFrom={faceT} label={fmt(W)} vbw={svgW} />
-        <DimChainH y={faceB + 26 * ts} cuts={bottomCuts} extFrom={faceB + 4 * ts} vbw={svgW} fmt={fmt} />
+        {/* the bottom rows: the vision panel across chain next to the leaf (v1.2), then the spindle
+            backset, its extension lines starting under the first row so they never cross its texts */}
+        {vpAcross && <DimChainH y={faceB + 26 * ts} cuts={vpAcross.cuts} labels={vpAcross.labels} extFrom={faceB + 4 * ts} vbw={svgW} fmt={fmt} />}
+        <DimChainH y={faceB + (vpAcross ? 56 : 26) * ts} cuts={bottomCuts} extFrom={faceB + (vpAcross ? 30 : 4) * ts} vbw={svgW} fmt={fmt} />
         {leftCols.map((c, k) => (c === 'hinge'
           ? <DimChainV key={c} x={leftX(k)} cuts={hingeCuts.map(SY)} extFrom={ox - 4 * ts} vbw={svgW} fmt={fmt} />
-          : <DimChainV key={c} x={leftX(k)} cuts={vpCuts.map(SY)} extFrom={ox - 4 * ts} vbw={svgW} fmt={fmt} />))}
+          : <DimChainV key={c} x={leftX(k)} cuts={vpCuts.map(SY)} labels={vpCutLabels} extFrom={ox - 4 * ts} vbw={svgW} fmt={fmt} />))}
         {rightCols.map((c, k) => {
           if (c === 'hinge') return <DimChainV key={c} x={rightX(k)} cuts={hingeCuts.map(SY)} extFrom={bandRight + 4 * ts} vbw={svgW} fmt={fmt} />;
           if (c === 'spindle') return <DimV key={c} x={rightX(k)} y1={SY(spindleC.x)} y2={faceB} extFrom={faceR} label={`spindle ${fmt(lock.spindle.fromBottom)}`} small vbw={svgW} />;

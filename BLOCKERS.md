@@ -4,6 +4,86 @@ Open questions, missing inputs, and improvements deferred for review by Piotr.
 
 ---
 
+## 2026-10-28 night · FIRE DOORS v1.2, items for Piotr (branch `claude/fire-doors-v1-2`, from `claude/fire-doors-v1-1`)
+
+You asked at 00:53 for the list below and said "don't ask, just code, we fix later". Every reading I had to make
+is a profile key in Window Settings · Fire Doors, so a correction is a number, not a rework. Items 35.x and 36.x
+stay valid except where an item here says it replaces one.
+
+**37.1 DWG: delivered as DXF (owner check).** A true .dwg file cannot be written without a paid library or an
+outside converter (no new dependency is allowed), so PC writes DXF (R12), which AutoCAD and bSolid open directly;
+AutoCAD saves it as .dwg in one step if you need the .dwg itself. One DXF per door with every element: the leaf
+(pull face, hinge edge, lock edge, top edge), the head, the hinge jamb and the lock jamb (elevation with the
+mitres, the rebate cheek face, the unfolded mitre face with the dowels), drawn hinges over the recesses, the
+radius forend and keep, the vision panel cut-outs by shape, the grooves, the closer symbol, dimensions, a title
+block; one layer per operation with the depth in its name (FD_HINGE_RECESS_D3 and so on). Buttons: "Fire door DXF"
+on the window page, "Fire door DXF (zip)" in the production pack (one DXF per door plus the four element files).
+Layers (one per operation, the depth in the name, a decimal depth written D3P2 because an R12 layer
+name cannot hold a dot): FD_OUTLINE, FD_MITRE, FD_REBATE_15x47, FD_HINGE_RECESS_D3, FD_HINGE_DRAWING,
+FD_LOCK_FOREND_D4, FD_LOCK_CASE_D87 (+ _HIDDEN), FD_HOLE_THROUGH, FD_VP_CUTOUT_THROUGH, FD_INTU_GROOVE_D4,
+FD_KEEP_PLATE_D3, FD_KEEP_POCKET_D15, FD_DOWEL_8_D20 (+ _HIDDEN), FD_CLOSER_SYMBOL (+ _HIDDEN), FD_CENTRE, FD_DIM,
+FD_TEXT. The units are mm (R12 has no units header); the _HIDDEN layers are continuous lines in the file (the
+writer has no line types: set them to DASHED in AutoCAD); the lever handle is not drawn. The drawn hinge is a plate with three countersunk screws and a five-knuckle barrel over each R6 recess,
+on the leaf edge and on the hinge jamb (its plate 29 wide: the recess 30 less the same 1 mill oversize as the
+length; the profile has no plate width). OWNER CHECK: open one in bSolid and say whether the layer names should
+follow a bSolid import convention (a layer = a tool and a depth) so the import can turn them into workings.
+
+**37.2 Vision panels: type, size, position (applied; replaces 35.7).** The 14 macro styles are no
+longer the choice. The form offers seven plain types (None, Standard (rectangle) 450 x 700, Square 450, Narrow slot
+150 x 760, Round (porthole) dia 300, Diamond 350, Double (2 panes) 150 x 800), each a starting point you can change:
+the size, the number of panes (one above another or side by side) and the gap. Position across: centred (with a
+shift, + towards the lock edge), or a distance from the hinge edge, or from the lock edge ("100 from the edge").
+Position up / down: the top below the leaf top (default 150), the centre above the leaf bottom (e.g. 1500 eye
+level), or the bottom above the leaf bottom. PC places the cut-out itself now (no more "layout per bSolid macro").
+Warnings, never a failure: less than `vp.minEdge` 100 of timber round the panel (ZAŁOŻENIE), past the leaf edge,
+into the lock zone. A door saved before tonight keeps its macro style: the same panes, VP_STYLE and C_VP_* as
+before (checked against v1.1 on every style); its leaf row gains the nine VP_* variables and its machining JSON is
+version 3. Editing only the position of an old style 2 door (150 x 760 + 150 x 450) keeps its two sizes; a size
+edit makes the panes equal. A door saved with the v1.1 glass finish Frosted reads as the Frosted glass. When a
+panel cannot be cut by the old Master_Door as drawn (round, off the centred top 150, side by side), the bSuite
+export names the door in its messages.
+
+**37.3 What your new leaf macro must read for the vision panel (new names).** VP_SHAPE (0 none, 1 rectangle,
+2 round, 3 diamond), VP_N (panes), VP_W / VP_H (one pane; round: the diameter in both), VP_GAP, VP_ARR (0 one
+above another, 1 side by side), VP_X (the panel group top from the leaf top), VP_Y (its edge from the hinge edge),
+VP_R (the corner radius; round: half the diameter). VP_STYLE still goes out for the old Master_Door when a panel is
+exactly one of its styles (centred, top 150); a round panel is VP_STYLE 0, any other rectangle 14 (custom), and the
+door carries a note that the old macro cannot place it as drawn.
+
+**37.4 Glass: only three (applied).** FD30 standard (row `fd_glass_fire`), FD insulated (`fd_glass_insulated`, new),
+Frosted (`fd_glass_frosted`, new); the toughened row is gone. Default FD30 / non-fire = FD30 standard, FD60 = FD
+insulated (`vp.glass.defaultByRating`). OWNER CHECK: (a) the thickness of each glass (`vp.glass.types[].thickness`,
+6 for all three until you give the products: it drives the glass weight and the drawings); (b) a non-fire DR door
+also gets these three (you said "no other choice"); (c) the round pane is bought as its circle (m2 = pi r2; the
+glass DXF and the glass schedule PDF send it as a circle). A material you had assigned to the old toughened row
+stays in Assign Materials data but nothing counts on it any more: assign the three glass rows. FD30 standard
+picked on an FD60 door gives a warning (not an error).
+
+**37.5 Intumescent colour (applied).** White (default), Black, Brown, Grey, Magnolia (`intumescent.colours`, label +
+the 3D colour). Shown in the form, the order line ("15 x 4, white"), the sheets and the 3D. OWNER CHECK: the colours
+your supplier stocks; add or rename them in Window Settings.
+
+**37.6 The closer is drawn (applied, still no machining).** Surface closer: the body on the PULL face (the hinge
+side, standard arm), 250 x 55, 60 in from the hinge edge, 15 under the leaf top, the arm 230 to a shoe on the frame
+head (`closer.surface`); built in: the body in the leaf top 300 long, 80 in from the hinge edge, and the track in
+the head soffit 420 long (`closer.builtin`). Sizes ZAŁOŻENIE (drawing symbols only). OWNER CHECK: pull or push face
+for the surface closer (`closer.surface.face`), and the closer you buy (the sizes). The built in pockets still wait
+for the two Weeke component files (36.4).
+
+**37.7 Locks with radius ends (applied).** The forend (236 x 25, R12.5) and the keep plate (176 x 40, R20) are drawn
+with full radius ends on the sheets, in the 3D and in the DXF, as the machining always cut them.
+
+**37.8 3D: the rebate runs clean round the head corners (applied).** The head's outer part now runs over the jamb
+rebate (35 face to 35 face), so there is no notch at the top corners.
+
+**37.9 Skipped, with the reason.** The real .dwg (37.1). The built in closer machining (the component files,
+36.4). Turning a v1.2 panel that does not fit (only a door saved before v1.2 turns its stacked panes as the old
+placement did; a new panel that does not fit gets a warning and you change it). The pack overview cell shows the
+panel type and size without the position (a narrow column, also in the PDF); the window page, the sheets, the
+DXF and the order lines carry the position.
+
+---
+
 ## 2026-10-27 evening · FIRE DOORS v1.1, items for Piotr (branch `claude/fire-doors-v1-1`, from main e42a092)
 
 The six changes you asked for in the chat after the v1 merge (opening as the input, no swing, one intumescent
@@ -34,7 +114,7 @@ T / 2 +- 11: 16 and 38 on the 54 leaf, 6.5 apart). Metres = strips x (2 x H + W)
 macro's "2No 15mm x 4mm"); your new macro can read INTU alone. OWNER CHECK: FD60 two strips of 15 (you said "2
 paski") rather than one 20: the engine follows `stripsByRating`.
 
-**36.4 The closer is a kind: none / surface / built in (applied; extends 35.12).** `defaults.closerFire 'surface'`,
+**36.4 The closer is a kind: none / surface / built in (applied; extends 35.12; CLOSER 0 / 1 / 2 replaces the CLOSER 0 / 1 of 35.10).** `defaults.closerFire 'surface'`,
 `defaults.closerNonFire 'none'`; CLOSER 0 / 1 / 2 in the leaf row; a slot and a hardware row per kind: `fd_closer`
 (now "Built in closer (concealed)", so a saved assignment on it survives; a v1 boolean closer true reads as built
 in) and the new `fd_closer_surface` ("Surface closer (overhead)"), both on the Door Closers category; one price
@@ -52,15 +132,16 @@ frame machining sheet, in the CSV / JSON (op `dowelBore`, angle 45, x y z = the 
 the margin 20 from each face and the bore on the thickness centre (a dowel in the rebate zone, z < 47, has 35 of
 wood: 21 to 29 on the 8 bore). `perJoint 0` switches the dowels off.
 
-**36.6 The middle hinge 200 above the leaf centre (applied; replaces the rule part of 35.13).**
+**36.6 The middle hinge 200 above the leaf centre (applied; replaces the macro rule of 35.4 and the rule part of 35.13).**
 `hinges.midAboveCentre 200`: the middle hinge CENTRE = H / 2 - 200 (2040: tops 150 / 769 / 1738, jamb 188 / 807 /
 1776; 2052: 150 / 775 / 1750). Top 150 from the top and bottom ending 200 above the bottom unchanged. This is PC's
 rule and goes out as HINGE_1..3; your new leaf macro must read HINGE_1..3 (the old Master_Door computes its own
 equal spacing and would put the middle hinge at 944).
 
-**36.7 The bSuite names for your new macro (summary).** Leaf row: LPX, LPY, LPZ, HAND (0 left / 1 right), HINGE
-(1 fire / 0 standard), LOCK (1 / 2 / 3), LOCK_H, EURO, HINGE_1, HINGE_2, HINGE_3, HINGE_D, INTU (0 / 1 / 2),
-INTU_W, INTU_T, VP_STYLE, C_VP_L, C_VP_W, C_VP_NUM, C_VP_RAIL, C_VP_POS, LEAD_EDGE, CLOSER (0 / 1 / 2). The
+**36.7 The bSuite names for your new macro (summary).** Leaf row: LPX, LPY, LPZ, HAND (0 left / 1 right), LH / RH
+(1 on the matching side), HINGE (1 fire / 0 standard), LOCK (1 / 2 / 3), LOCK_H, EURO, HINGE_1, HINGE_2, HINGE_3,
+HINGE_D, INTU (0 / 1 / 2), INTU_W, INTU_T, VP_STYLE, C_VP_L, C_VP_W, C_VP_NUM, C_VP_RAIL, C_VP_POS, LEAD_EDGE,
+CLOSER (0 / 1 / 2). The
 Master_Door extras (SPINDLE, KEEP, KEEP_STYLE, INTU_STYLE, D_*, REBATE*, SPY*, LBOX, L_BOX_H, DROP_CILL, PREM_DOOR)
 are still written for the old master and can be dropped from the export once your macro replaces it. Frame
 rows: LPX, LPY, LPZ, REB_W, REB_D, HAND, HINGE, HINGE_1..3 (hinge jamb), HINGE_D, KEEP / KEEP_STYLE / KEEP_Y

@@ -4,6 +4,94 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-10-28 night · FIRE DOORS v1.2 (branch `claude/fire-doors-v1-2`, from `claude/fire-doors-v1-1` 65a4d79)
+
+The owner's list of 00:53 ("o nic nie pytaj poprostu koduj ... pozniej bedziemy poprawiac"), coded unattended by the lead with
+three parallel agents on disjoint files (configurator and Window Settings; sheets and 3D; DXF export, window page
+and pack buttons) over the lead's engine, then the harnesses, the docs, a full suite run and an independent review.
+Every reading is a profile key and a BLOCKERS 37 item.
+
+**The changes (BLOCKERS 37.1 to 37.8):** a DXF of every element of a door (R12 via the existing writer; AutoCAD and
+bSolid open it, a true .dwg needs a converter) with drawn hinges, radius forend / keep, the VP by shape, grooves,
+dowels, closer symbol, dimensions, one layer per operation; the vision panel as a type (None, Standard, Square,
+Narrow slot, Round, Diamond, Double) with its size, panes, arrangement, gap and a position across (centred with a
+shift, from the hinge edge, from the lock edge) and down (top from the leaf top, centre or bottom above the leaf
+bottom), placed by PC, VP_SHAPE / VP_N / VP_W / VP_H / VP_GAP / VP_ARR / VP_X / VP_Y / VP_R for the new macro, a
+v1 / v1.1 door read into it and exported as before; three glasses only (FD30 standard, FD insulated, Frosted; the
+toughened row gone, two rows appended); the strip colour; the closer drawn (sheets, 3D, DXF); the radius forend
+and keep on the sheets and in the 3D; the 3D rebate clean round the head corners.
+
+### Stage 1: engine, profile, spec, lists, BOM, slots (e47490c, 917b26c)
+`fireDoorVpInput`, `fireDoorVpFromLegacy`, `fireDoorVpWords`, `placeVisionPanelV12`, `masterDoorVpStyle` (the v1
+`placeVisionPanel` kept, no longer called); `vp.glass`, `intumescent.colour` and `centresZ`, `closer.symbol`,
+`keep.plate.radius`; the profile keys `vp.types / position / minEdge / glass`, `intumescent.colours`,
+`defaults.intuColour`, `closer.surface / builtin` with their migration (merge by id); the spec reads `firedoorVp`
+(`fireDoorVpField`), `firedoorGlass`, `firedoorIntuColour`; the glass rows by `consumables.glass.slot`; the glass
+schedule row by the glass type; the machining JSON version 3. A legacy door keeps its style id, its C_VP_* and
+the v1 turn of a stack that does not fit.
+
+### Stage 2: the configurator and Window Settings (6f99d75)
+`FdVisionPanel`: seven type chips with shape icons, the size fields by shape, panes 1 to 5 with the arrangement
+and gap, the position across and down with one mm field each (the field keeps the panel in place when the mode
+changes), a 120 px preview from the engine panes, the label and position line, the warnings; the three glass
+chips; the colour swatches; the summary rows. Window Settings: the types table, the position defaults, minEdge,
+the Master_Door styles collapsed (export only), the Glass card, the strip colours (add / remove the added), the
+Closer symbols card. `windowProfileStore`: `closer` editable, `setFireDoorColours`.
+
+### Stage 3: the DXF (3771dbc)
+`src/engine/cnc/fireDoorDxf.js` (pure, from the machining ops), `src/utils/fireDoorDxfExport.js` (one door, one
+element, the pack zip with 1 + 4 files a door), the fire door branch of `exportWindowToDXF`, the buttons "Fire
+door DXF" and "Fire door DXF (zip)"; the window page Vision panel / glass rows on the v1.2 labels. A sweep of
+11,988 configurations: no NaN, no overlapping views.
+
+### Stage 4: the sheets and the 3D (c497d07)
+The panes by shape with their position chains, the closer on its face (surface) or dashed (built in), the radius
+slots, the colour and the glass in the notes, no "layout per bSolid macro"; `DoorGlassDrawing2D` prints the glass
+label and draws a round pane as its circle (lead). 3D: the rebate corner, the strips, the closer (body, two-link
+arm, shoe; or slot and track), the radius plates, round and side by side panes, frosted glass, the diamond
+centred on its box (it sat about 72 off centre before).
+
+### Stage 5: harnesses, full suite, build, docs (5384a75, 3fb0230 and this entry)
+t51 446 PASS (v1.1: 420): the VP model, the legacy styles, the glasses, the colours, the closer symbols, the
+migration, 22 slot rows, the pages and sheets on the v1.2 labels; every changed `ok(` follows a v1.2 change
+(the profile block list, the defaults, the spec block, the closer object, the inputs, the leaf variable order, the
+consumables, the glass type and slot, the VP labels, the CSV note). t52 137 PASS (v1.1: 89). t53 86 PASS (new:
+four doors, the layers, the counts, the zip, ezdxf audit clean). Every `verify/arch/t*.mjs` (not the baseline
+generators) and `verify/parity/*.mjs` on the final tree, one pass each: 42 files, 5213 PASS, 0 FAIL
+(`psw-casement-layouts` exits 2 = no PSW checkout, as before; `render_door_samples` writes renders, no checks;
+t32 54 = the casement rows byte identical; t27 97 after the DXF constants moved off the banned 40). `npm run
+build` OK. Docs: `FIRE-DOORS.md` (the v1.2 banner, section 11, the superseded v1 wording marked), `BLOCKERS.md` 37.
+
+### Stage 6: independent review and its fixes
+The review agent (had not seen the work; re-derived the round, double, narrow, glass, closer and radius numbers by
+hand; compared 26 legacy cases against 65a4d79; read every DXF with ezdxf and looked at 27 PNGs of the DXF, the
+sheets and the 3D) found every hand number equal to the live engine and the legacy placement, VP_STYLE and C_VP_*
+identical. Verdict: PASS WITH FINDINGS (13), fixed in this stage:
+1. A round pane went to the glazier as a 300 x 300 rectangle (the glass DXF and PDF read a shape object): the
+   round glass unit now carries `glassShape` (the circle glass outline of the circle windows) and the row's
+   `shape` is that circle; `paneShape` keeps rect / round / diamond. t51 checks the glass DXF unit is a circle.
+2. A v1.1 door saved with the glazing finish Frosted lost its frosted glass: with no glass picked, that finish
+   reads as the Frosted glass.
+3. A panel the old macro cannot place as drawn (round, off the centred top 150, side by side): the bSuite export
+   messages name the door (`vp.macroNote`).
+4. An old style 2 door lost its second pane size on any edit: `paneSizes` is kept with the block and by the
+   engine while the size is unchanged (a size edit makes the panes equal).
+5. The "exports exactly as before" wording corrected (the leaf row gains VP_*, the JSON is version 3, the notes);
+   the diamond cut-out keeps the cutter radius 6 (an R0 inside corner cannot be milled); a legacy turned stack keeps
+   rotated / angle 90 (t51 style 8 restored to the v1 assertion).
+6. FD30 standard on an FD60 door and an unknown glass id give a warning.
+7. One pane has no arrangement and no gap (VP_ARR 0, VP_GAP / C_VP_RAIL 0).
+8. The form reads the panel centre from the engine (`group.centreFromBottom`), no arithmetic in the component.
+9, 11. The dead ternary in lists.js removed; `FIREDOOR_GLASS_PART_ID.toughened` resolves to the FD30 standard row;
+   the orphaned toughened assignments are a BLOCKERS 37.4 note.
+10, 12. Owner checks (the closer face; the DXF hidden layers, units, the lever handle): BLOCKERS 37.1 / 37.6.
+13. The LOCK EDGE / HINGE EDGE captions on the leaf sheet move into the clear run between the lock and the last
+    hinge (they sat on the forend since v1).
+After the fixes: t51 452 PASS, t52 137, t53 86, t32 54, t27 97. The full suite once more on the final tree: 42
+files, 5219 PASS, 0 FAIL (`psw-casement-layouts` exit 2 = no PSW checkout, as before); `npm run build` OK.
+
+---
+
 ## 2026-10-27 evening · FIRE DOORS v1.1 (branch `claude/fire-doors-v1-1`, from main e42a092 = the v1 merge)
 
 The owner's six changes from the chat after the v1 merge, applied end to end in one evening session with three
@@ -51,12 +139,12 @@ the dowel bores, 12 per door) and JSON v2 (per door the opening, the closer, the
 swing). `bsuiteExport.js` needed no change: it copies every variable of the engine's objects in order.
 
 ### Stage 4: the harnesses (ad97d02, and the stage 5 / 6 commits)
-`t51_fire_door.mjs` on the v1.1 numbers: 415 PASS (v1: 397). New checks: the opening 1000 x 2100 door end to end
+`t51_fire_door.mjs` on the v1.1 numbers: 415 PASS (v1: 387). New checks: the opening 1000 x 2100 door end to end
 (engine, sheets, export), the leaf override and the mixed source, the form helpers, the hinge rule with the middle
 centre and its jamb mapping, the strip count by rating (FD60 two grooves at 27 +- 11 on the 54 leaf), the closer
 kinds (a v1 boolean true = built in), the dowel block, bores, rows, DOWEL_* variables and CSV lines, the dowels off,
 the migrations of a v1 profile, the v1 record on the pages (the leaf only, a boolean closer) deriving as before,
-no swing word on 35 sheets. `t52_fire_door_ui.mjs` in Chromium: 89 PASS (v1: 78): the opening inputs and chips, the
+no swing word on 35 sheets. `t52_fire_door_ui.mjs` in Chromium: 89 PASS (v1: 84): the opening inputs and chips, the
 override and its reset, the geometry error on the leaf of a small opening, the three closer chips, the saved keys,
 the settings cards. Both files keep every v1 check that still applies; the checks of removed features (the
 intumescent select, the swing, the 10 / 20 rows) are replaced by the checks of what replaced them.
@@ -104,6 +192,29 @@ Docs: `docs/handover/FIRE-DOORS.md` (the v1.1 banner, the opening, the hinge rul
 the reference table on the v1.1 numbers, the sheets, the lists, the export variables, the assumptions, the next
 steps), `BLOCKERS.md` 36.1 to 36.8 (the six changes applied, the owner checks, the closer component files still
 missing, the dowel margin and the thickness centre as the only new assumptions).
+
+### Stage 7: independent review and its fixes
+The review agent (had not seen the work; re-derived the opening, hinge, strip, closer and dowel numbers by hand,
+diffed both harnesses against v1, rendered ten sheets) found every hand number equal to the live engine, no check
+weakened except one, no blocker. Verdict: PASS WITH FINDINGS (16), fixed in this stage except 15:
+1. `dowelBore` x is now the bore CENTRE (25 / length - 25: the thickness centre lies 25 along the member on the 45
+   cut), so the op table, the CSV and the circles on the frame sheet agree (the CSV line `FD-HEAD,dowelBore,mitre,
+   877,25,20`); `dowelEndsOf` groups the ends by the member half.
+2. The strip metres on the outside elevation and the leaf sheet print to 3 dp (4.906 m, 9.812 m), not rounded to 0.5.
+3, 7, 8, 9. FIRE-DOORS.md: the section 7 hinge rows (150 / 769 / 1738, 188 / 807 / 1776), the section 8 t52 text,
+   the dowelBore sentence, `hinges.step` = the Master_Door value for comparison only.
+4. The v1 counts in Stage 4: t51 387 as the v1 entry records (378 when the review re-ran e42a092 here), t52 84.
+5. The mutated profile check covers the inside elevation again (`ins`).
+6, 12. `derived.firedoor.warnings` (never a failure): a typed opening ignored on an axis where the leaf is typed and
+   disagrees with it; dowels closer than dia + 4 on a shallow frame (depth 50: 5 apart). Shown under the
+   configurator summary.
+10, 11. BLOCKERS 36.6 replaces 35.4 too, 36.4 replaces the CLOSER 0 / 1 of 35.10, 36.7 lists LH / RH.
+13. The mitre face detail dimension reads 35.4 (along the cut) with "along the cut (25 across the thickness)" on
+    the line under it, inside the sheet.
+14. t51 checks the 837.5 gap, exactly 16 "45 deg" on the reference frame sheet (4 mitres + 12 bores), the 3 dp
+    metres; t52 the saved leaf height `=== 0`.
+15. Kept: the compat shims in lists.js (`FIREDOOR_INTUMESCENT_WIDTHS`, `fireDoorIntumescentPartId`), no removals.
+After the fixes: t51 420 PASS, t52 89 PASS (Chromium), t32 54 PASS (casement rows byte identical), `npm run build` OK.
 
 ---
 

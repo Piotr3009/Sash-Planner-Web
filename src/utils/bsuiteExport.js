@@ -324,6 +324,13 @@ export function buildBsuiteFireDoorRows(windows, profile = getFireDoorProfile(),
   for (const k of FIREDOOR_ROW_KEYS) {
     if (noPath[k.key].length) messages.push(`${k.element}: no program path on target ${targetName} (Window Settings · Fire Doors · bSuite), rows skipped for ${noPath[k.key].join(', ')}`);
   }
+  // v1.2: a vision panel the old Master_Door macro cannot place as drawn (a
+  // round panel, a panel off the centred top 150 position, side by side): the
+  // engine's note, one message per door, so the list never cuts silently wrong
+  for (const w of windows || []) {
+    const note = w?.derived?.category === 'firedoor' ? w.derived.firedoor?.vp?.macroNote : '';
+    if (note) messages.push(`${String(w?.name || w?.windowSpec?.name || w.derived.firedoor?.name || 'FDR').trim()}: vision panel VP_STYLE ${w.derived.firedoor.vp.style}: ${note}`);
+  }
   if (!doors) messages.push('no fire doors in this selection');
   return { rows, skipped, messages };
 }
