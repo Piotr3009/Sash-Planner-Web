@@ -1352,7 +1352,7 @@ const pageUrl = (path, pattern, Comp) => renderToStaticMarkup(h(M.MemoryRouter, 
     const glassRows = (list) => list.flatMap(({ win, windowSpec, derived }) => M.lists.buildGlassListForWindow(derived, windowSpec).map((g) => ({ ...g, windowName: win.name, _projectNumber: win._projectNumber })));
     const html = renderR(h(M.PPP.GlassTab, { merged: { glass: glassRows(doorsOnly) }, windowsData: doorsOnly, isPPMode: false, batch: batchFD, pp: null, registerExport: noop, exportFormat: 'a3' }));
     ok(has(html, 'FDR-01: Vision panel glass 450 × 450 · ×1') && has(html, 'FDR-02: Vision panel glass 350 × 350 · ×1'), 'GlassTab: one vision panel card per door with glass (450 and 350)');
-    ok(!has(html, 'mb-2">DR-01:') && !has(html, 'Upper Glass') && !has(html, 'Lower Glass') && has(html, '450 mm') && has(html, 'fire'), 'GlassTab: no card for the door without a VP, no sash fallback card, the schedule lists the 450 fire pane');
+    ok(!has(html, 'mb-2">DR-01:') && !has(html, 'Upper Glass') && !has(html, 'Lower Glass') && has(html, '450 mm') && has(html, 'FD30 standard') && !has(html, 'toughened'), 'GlassTab: no card for the door without a VP, no sash fallback card, the schedule lists the 450 FD30 standard pane (v1.2)');
     ok(count(html, /No data\./g) === 0, 'GlassTab: the vision panel drawing cards render a drawing, never "No data." (DoorGlassDrawing2D accepts a fire door group)', `${count(html, /No data\./g)} "No data." card(s)`);
   }
   // SprayingTab

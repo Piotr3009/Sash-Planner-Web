@@ -45,6 +45,17 @@
  * is the page's left), z through the frame depth from the pull face (0, the
  * 35 face) to the push face (depth, the 50 face). The sheets put the pull
  * face at the BOTTOM of the page, so the open leaf swings down the page.
+ *
+ * v1.2 (owner 28.10.2026): the vision panel panes carry their shape (rect
+ * with its corner radius, round, diamond; paneShape / paneBox) and the
+ * elevation geometry the panel group (vpGroup) and the closer symbol
+ * (closer: the surface closer's body, arm and shoe, the built in closer's
+ * body and head track, from derived.firedoor.closer.symbol) in the view's
+ * coordinates; vpAcrossChain builds the panel's across chain from the edge
+ * its position mode measures from; closerSymbolWord / closerSymbolDetail,
+ * intuWord (the strip with its colour) and vpGlassWord (the glass type and
+ * thickness) are the note words. groupFireDoorGlass keys a group by the pane
+ * shape and the glass type too.
  */
 
 const R1 = (v) => Math.round(v * 10) / 10;
@@ -144,16 +155,17 @@ export function closerWord(fd) {
 }
 
 /**
- * The short note written beside the closer SYMBOL on a sheet (v1.2):
- * 'surface closer, pull face' / 'surface closer, push face' / 'built in
- * closer, concealed, not machined yet'; '' without a closer.
+ * The short note written beside the closer SYMBOL on a sheet (v1.2), from the
+ * engine's label: 'surface closer, pull face' / 'surface closer, push face' /
+ * 'built in closer, concealed, not machined yet'; '' without a closer.
  */
 export function closerSymbolWord(fd) {
   const c = fd?.closer;
   if (!c) return '';
-  if (c.type === 'surface') return `surface closer, ${c.symbol?.face === 'push' ? 'push' : 'pull'} face`;
-  if (c.type === 'builtin') return c.machined ? 'built in closer, concealed' : 'built in closer, concealed, not machined yet';
-  return String(c.label || 'closer').toLowerCase();
+  const label = String(c.label || (c.type === 'builtin' ? 'Built in closer' : c.type === 'surface' ? 'Surface closer' : 'Closer')).toLowerCase();
+  if (c.type === 'surface') return `${label}, ${c.symbol?.face === 'push' ? 'push' : 'pull'} face`;
+  if (c.type === 'builtin') return c.machined ? `${label}, concealed` : `${label}, concealed, not machined yet`;
+  return label;
 }
 
 /**
