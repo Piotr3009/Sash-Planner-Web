@@ -87,7 +87,8 @@ identical. Verdict: PASS WITH FINDINGS (13), fixed in this stage:
 10, 12. Owner checks (the closer face; the DXF hidden layers, units, the lever handle): BLOCKERS 37.1 / 37.6.
 13. The LOCK EDGE / HINGE EDGE captions on the leaf sheet move into the clear run between the lock and the last
     hinge (they sat on the forend since v1).
-After the fixes: t51 452 PASS, t52 137, t53 86, t32 54, t27 97, t25 / t34 / t37 / t41 / t50 green, build OK.
+After the fixes: t51 452 PASS, t52 137, t53 86, t32 54, t27 97. The full suite once more on the final tree: 42
+files, 5219 PASS, 0 FAIL (`psw-casement-layouts` exit 2 = no PSW checkout, as before); `npm run build` OK.
 
 ---
 
