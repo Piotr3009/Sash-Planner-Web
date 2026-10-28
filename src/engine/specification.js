@@ -449,7 +449,27 @@ function fireDoorBlockFromSpec(item, fc) {
       pos: Number(customRaw.pos) === 90 ? 90 : 0,
     },
     leadEdge: boolField(pick('firedoorLeadEdge'), D.leadEdge),
+    // v1.2: the vision panel block (type, shape, size, count, arrangement,
+    // position; null = a v1 / v1.1 door, the engine reads vpStyle / vpCustom),
+    // the glass (FD30 standard / FD insulated / Frosted; null = by the rating)
+    // and the intumescent strip colour (null = the profile default)
+    vp: fireDoorVpField(pick('firedoorVp')),
+    glass: pick('firedoorGlass') ? String(pick('firedoorGlass')) : null,
+    intuColour: pick('firedoorIntuColour') ? String(pick('firedoorIntuColour')) : null,
   };
+}
+
+/** The stored v1.2 vision panel block as a plain object of its eleven keys (numbers that do not parse = null), or null. */
+const FIREDOOR_VP_STRING_KEYS = ['type', 'shape', 'arrange', 'across', 'down'];
+const FIREDOOR_VP_NUMBER_KEYS = ['width', 'height', 'count', 'gap', 'acrossOffset', 'downOffset'];
+export function fireDoorVpField(v) {
+  let o = v;
+  if (typeof o === 'string') { try { o = JSON.parse(o); } catch { o = null; } }
+  if (!o || typeof o !== 'object') return null;
+  const out = {};
+  for (const k of FIREDOOR_VP_STRING_KEYS) out[k] = o[k] == null || o[k] === '' ? null : String(o[k]);
+  for (const k of FIREDOOR_VP_NUMBER_KEYS) out[k] = o[k] == null || o[k] === '' || !Number.isFinite(Number(o[k])) ? null : Number(o[k]);
+  return out;
 }
 
 /**

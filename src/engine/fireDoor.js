@@ -44,6 +44,20 @@
  *               FD30 one strip, FD60 two, a non-fire door none.
  *   closer      (v1.1) none / surface / built in; a row in the order and the
  *               CLOSER flag (0 / 1 / 2); the built in closer is not machined.
+ *               (v1.2) closer.symbol = the drawing symbol of the kind (the
+ *               surface body, arm and shoe; the built in body and head track).
+ *   vision      (v1.2) a TYPE (None / Standard / Square / Narrow slot / Round /
+ *   panel       Diamond / Double) filling a shape (rect / round / diamond), the
+ *               pane size, a count arranged one above another or side by side
+ *               with a gap, and a POSITION: across centred (+ shift towards the
+ *               lock edge) or a distance from the hinge / lock edge; down the
+ *               top edge from the leaf top, the centre or the bottom edge above
+ *               the leaf bottom. A v1 / v1.1 record (a Master_Door style id) is
+ *               read into the same model. Glass: FD30 standard / FD insulated /
+ *               Frosted only (vp.glass). VP_STYLE still goes out when the panel
+ *               matches a Master_Door style; VP_SHAPE / VP_N / VP_W / VP_H /
+ *               VP_GAP / VP_ARR / VP_X / VP_Y / VP_R carry any panel.
+ *   strips      (v1.2) intumescent.colour from intumescent.colours.
  *   lock        DIN lock: spindle spindleHeight above the leaf bottom, backset
  *               from the lock edge; forend centre forendCentreBelowSpindle under
  *               the spindle, case top caseTopAboveSpindle over it; euro / bathroom
@@ -71,8 +85,9 @@
  *   Kinds: hingeRecess (hingeEdge, x = top_i - (recessLength - length) / 2,
  *   z = 0), forendRecess and casePocket (lockEdge, centred on LPZ / 2),
  *   spindleHole and cylinderHole (pull, through), vpCutout per pane (pull,
- *   through, radius vp.cornerRadius; the diamond carries rotated true, angle
- *   45 and its bounding box), intuGroove per strip per edge (top, hingeEdge,
+ *   through, x y = the pane's bounding box corner; v1.2 `shape` rect (radius
+ *   vp.cornerRadius) / round (radius = half the diameter) / diamond (rotated
+ *   true, angle 45, the bounding box)), intuGroove per strip per edge (top, hingeEdge,
  *   lockEdge; fire only; groove 15.5 x 4), leadEdge (lockEdge, depth 0, value =
  *   the macro value).
  *
@@ -198,12 +213,15 @@ const boolOf = (v, def) => {
 };
 
 /**
- * The vision panel panes of a style on a leaf W x H (the ZAŁOŻENIE placement of
+ * v1 / v1.1 placement, kept as it was (not called since v1.2: a legacy style
+ * is read into the v1.2 model by fireDoorVpFromLegacy and placed by
+ * placeVisionPanelV12). The vision panel panes of a style on a leaf W x H (the ZAŁOŻENIE placement of
  * the brief, 3.7: the macro placement is not decoded, the export sends the
  * style id). Returns { style, label, panes, warnings }. A pane: { i, w, h, x
  * (leaf top to the pane top), y (hinge edge to the pane left), rotated, angle,
  * box: { w, h } (the bounding box; = w x h unless the diamond) }.
  */
+// eslint-disable-next-line no-unused-vars
 function placeVisionPanel(V, styleId, custom, W, H) {
   const warnings = [];
   const id = Number(styleId) || 0;
@@ -268,6 +286,166 @@ function placeVisionPanel(V, styleId, custom, W, H) {
   return { style: id, label: style.label, panes: placed, warnings };
 }
 
+const VP_SHAPES = ['none', 'rect', 'round', 'diamond'];
+const VP_ACROSS = ['centre', 'hinge', 'lock'];
+const VP_DOWN = ['top', 'centre', 'bottom'];
+const VP_ARRANGE = ['stack', 'side'];
+const finiteOr = (v, def) => { if (v === undefined || v === null || v === '') return def; const n = Number(v); return Number.isFinite(n) ? n : def; };
+
+/**
+ * A v1 / v1.1 vision panel (a Master_Door style id and the custom block) read
+ * into the v1.2 model: the style's pane size, count and gap, centred, the top
+ * at topRail. Style 2 (two different panes) reads as two of its first pane.
+ */
+export function fireDoorVpFromLegacy(V, styleId, custom) {
+  const id = Math.max(0, Math.round(Number(styleId) || 0));
+  const pos = { across: 'centre', acrossOffset: 0, down: 'top', downOffset: Number(V.topRail) || 0 };
+  const none = { type: 'none', shape: 'none', width: 0, height: 0, count: 0, arrange: 'stack', gap: 0, ...pos, source: 'legacy', legacyStyle: id, legacyNote: '' };
+  if (!id) return none;
+  const st = (Array.isArray(V.styles) ? V.styles : []).find((x) => Number(x.id) === id);
+  if (!st || st.arrange === 'none') return { ...none, legacyNote: `unknown Master_Door style ${id}` };
+  const typeFor = (w, h, n) => (n === 2 ? 'double' : (w === h ? 'square' : (w <= 200 ? 'narrow' : 'standard')));
+  if (st.arrange === 'custom') {
+    const c = custom || {};
+    const len = Number(c.length) || 0, wid = Number(c.width) || 0, n = Math.max(0, Math.round(Number(c.count) || 0));
+    const horizontal = Number(c.pos) === 90;
+    const w = horizontal ? len : wid, h = horizontal ? wid : len;
+    return { ...none, type: typeFor(w, h, n), shape: n && w && h ? 'rect' : 'none', width: w, height: h, count: n, gap: Number(c.rail) || 0 };
+  }
+  if (st.arrange === 'diamond') return { ...none, type: 'diamond', shape: 'diamond', width: Number(st.w), height: Number(st.w), count: 1 };
+  if (st.arrange === 'stack') {
+    const first = Array.isArray(st.panes) && st.panes.length ? st.panes[0] : { w: st.w, h: st.h };
+    const n = Math.max(1, Math.round(Number(st.count) || 1));
+    const differ = Array.isArray(st.panes) && st.panes.some((q) => Number(q.w) !== Number(first.w) || Number(q.h) !== Number(first.h));
+    // a style of different panes (style 2) keeps its own sizes, top to bottom
+    return {
+      ...none, type: typeFor(Number(first.w), Number(first.h), n), shape: 'rect', width: Number(first.w), height: Number(first.h), count: n,
+      gap: Number(V[st.gap] ?? V.stackGap) || 0,
+      ...(differ ? { paneSizes: st.panes.map((q) => ({ w: Number(q.w), h: Number(q.h) })), count: st.panes.length } : {}),
+    };
+  }
+  return { ...none, type: typeFor(Number(st.w), Number(st.h), 1), shape: 'rect', width: Number(st.w), height: Number(st.h), count: 1 };
+}
+
+/**
+ * The v1.2 vision panel input of a door: the stored block (spec.vp) over its
+ * type's preset and the profile's position default; without a stored block
+ * the legacy style is read (fireDoorVpFromLegacy). Round and diamond take the
+ * width as the diameter / side. Never throws.
+ */
+export function fireDoorVpInput(V, raw, legacyStyle, legacyCustom) {
+  if (!raw || typeof raw !== 'object') return fireDoorVpFromLegacy(V, legacyStyle, legacyCustom);
+  const types = Array.isArray(V.types) ? V.types : [];
+  const preset = types.find((t) => t.id === raw.type) || null;
+  const type = preset ? preset.id : (raw.type ? 'custom' : 'none');
+  const shape = VP_SHAPES.includes(raw.shape) ? raw.shape : (preset ? preset.shape : 'none');
+  const P0 = V.position || {};
+  const width = Math.max(0, finiteOr(raw.width, finiteOr(preset?.width, 0)));
+  const height = shape === 'round' || shape === 'diamond' ? width : Math.max(0, finiteOr(raw.height, finiteOr(preset?.height, 0)));
+  const count = shape === 'none' ? 0 : Math.max(1, Math.min(10, Math.round(finiteOr(raw.count, finiteOr(preset?.count, 1)))));
+  return {
+    type, shape, width, height, count,
+    arrange: VP_ARRANGE.includes(raw.arrange) ? raw.arrange : (VP_ARRANGE.includes(preset?.arrange) ? preset.arrange : 'stack'),
+    gap: Math.max(0, finiteOr(raw.gap, finiteOr(preset?.gap, 0))),
+    across: VP_ACROSS.includes(raw.across) ? raw.across : (VP_ACROSS.includes(P0.across) ? P0.across : 'centre'),
+    acrossOffset: finiteOr(raw.acrossOffset, finiteOr(P0.acrossOffset, 0)),
+    down: VP_DOWN.includes(raw.down) ? raw.down : (VP_DOWN.includes(P0.down) ? P0.down : 'top'),
+    downOffset: finiteOr(raw.downOffset, finiteOr(P0.downOffset, Number(V.topRail) || 0)),
+    source: 'v12', legacyStyle: null, legacyNote: '',
+  };
+}
+
+/** The vision panel in words: { label, sizeLabel, positionLabel }. */
+export function fireDoorVpWords(V, vin) {
+  if (!vin || vin.shape === 'none' || !vin.count) return { label: 'None', sizeLabel: '', positionLabel: '' };
+  const t = (Array.isArray(V.types) ? V.types : []).find((x) => x.id === vin.type);
+  const typeLabel = t ? t.label : 'Custom';
+  const one = vin.shape === 'round' ? `dia ${R(vin.width)}` : vin.shape === 'diamond' ? `${R(vin.width)} x ${R(vin.width)} turned 45` : `${R(vin.width)} x ${R(vin.height)}`;
+  const arr = `${vin.arrange === 'side' ? 'side by side' : 'one above another'}, gap ${R(vin.gap)}`;
+  const sizeLabel = Array.isArray(vin.paneSizes) && vin.paneSizes.length > 1
+    ? `${vin.paneSizes.map((q) => `${R(q.w)} x ${R(q.h)}`).join(' + ')}, ${arr}`
+    : (vin.count > 1 ? `${vin.count} x ${one}, ${arr}` : one);
+  const off = R(vin.acrossOffset);
+  const across = vin.across === 'hinge' ? `${off} from the hinge edge` : vin.across === 'lock' ? `${off} from the lock edge`
+    : (off ? `centred, shifted ${Math.abs(off)} towards the ${off > 0 ? 'lock' : 'hinge'} edge` : 'centred');
+  const dOff = R(vin.downOffset);
+  const down = vin.down === 'centre' ? `centre ${dOff} above the leaf bottom` : vin.down === 'bottom' ? `bottom ${dOff} above the leaf bottom` : `top ${dOff} below the leaf top`;
+  return { label: `${typeLabel}: ${sizeLabel}`, sizeLabel, positionLabel: `${across}, ${down}` };
+}
+
+/**
+ * The panes of a v1.2 vision panel on a leaf W x H in the leaf board system
+ * (x from the leaf top, y from the hinge edge). A pane: { i, w, h, x, y,
+ * shape, rotated, angle, radius, box: { w, h } } with x y = the bounding box
+ * corner. group = the bounding box of all panes with its four edge distances.
+ * Warnings (never a failure): a panel past the leaf, less than minEdge of
+ * timber, a panel running into the lock (the forend / case zone).
+ */
+function placeVisionPanelV12(V, vin, W, H, lockZone) {
+  const warnings = [];
+  if (!vin || vin.shape === 'none' || !vin.count || !(vin.width > 0) || !(vin.height > 0)) return { panes: [], group: null, warnings };
+  const s = vin.shape;
+  const n = vin.count, gap = vin.gap, side = vin.arrange === 'side';
+  // one size for every pane, or the legacy style's own sizes (paneSizes)
+  const sizes = Array.isArray(vin.paneSizes) && vin.paneSizes.length ? vin.paneSizes : Array.from({ length: n }, () => ({ w: vin.width, h: vin.height }));
+  const boxOf = (q) => (s === 'diamond' ? { w: R(q.w * Math.SQRT2), h: R(q.w * Math.SQRT2) } : { w: q.w, h: q.h });
+  const boxes = sizes.map(boxOf);
+  const gw = side ? boxes.reduce((a, b) => a + b.w, 0) + (boxes.length - 1) * gap : Math.max(...boxes.map((b) => b.w));
+  const gh = side ? Math.max(...boxes.map((b) => b.h)) : boxes.reduce((a, b) => a + b.h, 0) + (boxes.length - 1) * gap;
+  const y0 = vin.across === 'hinge' ? vin.acrossOffset : vin.across === 'lock' ? W - vin.acrossOffset - gw : (W - gw) / 2 + vin.acrossOffset;
+  const x0 = vin.down === 'centre' ? H - vin.downOffset - gh / 2 : vin.down === 'bottom' ? H - vin.downOffset - gh : vin.downOffset;
+  let run = 0;
+  const panes = sizes.map((q, i) => {
+    const box = boxes[i];
+    // stacked panes centred on the group's width, side by side on its height
+    const x = side ? x0 + (gh - box.h) / 2 : x0 + run;
+    const y = side ? y0 + run : y0 + (gw - box.w) / 2;
+    run += (side ? box.w : box.h) + gap;
+    const radius = s === 'round' ? q.w / 2 : s === 'rect' ? (Number(V.cornerRadius) || 0) : 0;
+    return { i: i + 1, w: q.w, h: s === 'round' || s === 'diamond' ? q.w : q.h, x: R(x), y: R(y), shape: s, rotated: s === 'diamond', angle: s === 'diamond' ? 45 : 0, radius: R(radius), box };
+  });
+  const group = {
+    x: R(x0), y: R(y0), w: R(gw), h: R(gh),
+    fromTop: R(x0), fromBottom: R(H - x0 - gh), fromHingeEdge: R(y0), fromLockEdge: R(W - y0 - gw),
+  };
+  const minEdge = Number(V.minEdge) || 0;
+  const edges = [['top', group.fromTop], ['bottom', group.fromBottom], ['hinge edge', group.fromHingeEdge], ['lock edge', group.fromLockEdge]];
+  edges.forEach(([what, d]) => {
+    if (d < 0) warnings.push(`vision panel: it runs ${R(-d)} past the leaf ${what}`);
+    else if (d < minEdge) warnings.push(`vision panel: only ${d} of timber at the ${what} (minimum ${minEdge}, Window Settings)`);
+  });
+  if (lockZone && x0 < lockZone.x1 && x0 + gh > lockZone.x0 && y0 + gw > lockZone.y0 && y0 < lockZone.y1) {
+    warnings.push(`vision panel: it runs into the lock (the case and forend zone ${R(lockZone.x0)} to ${R(lockZone.x1)} from the leaf top, ${R(W - lockZone.y0)} in from the lock edge)`);
+  }
+  return { panes, group, warnings };
+}
+
+/**
+ * The Master_Door VP_STYLE of a v1.2 panel: the id of the style it matches
+ * exactly (shape, count, pane size, gap, centred, the top at topRail), 14
+ * (custom) for another rectangle, 0 for none / round / an unmatched diamond.
+ * note = why the old macro cannot cut it as placed (the new macro reads VP_*).
+ */
+function masterDoorVpStyle(V, vin) {
+  if (!vin || vin.shape === 'none' || !vin.count) return { id: 0, note: '' };
+  const centredTop = vin.across === 'centre' && Number(vin.acrossOffset) === 0 && vin.down === 'top' && Number(vin.downOffset) === Number(V.topRail);
+  if (centredTop && vin.arrange === 'stack') {
+    for (const st of (Array.isArray(V.styles) ? V.styles : [])) {
+      if (st.arrange === 'single' && vin.shape === 'rect' && vin.count === 1 && Number(st.w) === vin.width && Number(st.h) === vin.height) return { id: Number(st.id), note: '' };
+      if (st.arrange === 'diamond' && vin.shape === 'diamond' && vin.count === 1 && Number(st.w) === vin.width) return { id: Number(st.id), note: '' };
+      if (st.arrange === 'stack' && vin.shape === 'rect' && Number(st.count) === vin.count && Number(V[st.gap] ?? V.stackGap) === vin.gap) {
+        const panes = Array.isArray(st.panes) && st.panes.length ? st.panes : Array.from({ length: Number(st.count) }, () => ({ w: st.w, h: st.h }));
+        const mine = Array.isArray(vin.paneSizes) && vin.paneSizes.length ? vin.paneSizes : panes.map(() => ({ w: vin.width, h: vin.height }));
+        if (panes.length === mine.length && panes.every((q, k) => Number(q.w) === mine[k].w && Number(q.h) === mine[k].h)) return { id: Number(st.id), note: '' };
+      }
+    }
+  }
+  if (vin.shape === 'round') return { id: 0, note: 'a round panel: the old Master_Door macro has no round style (VP_STYLE 0); the new macro reads VP_SHAPE 2' };
+  if (vin.shape === 'diamond') return { id: 0, note: 'this diamond is not the Master_Door 350 diamond (VP_STYLE 0); the new macro reads VP_SHAPE 3' };
+  const placedAsMacro = centredTop && vin.arrange === 'stack';
+  return { id: 14, note: placedAsMacro ? '' : 'the old Master_Door custom style places the panes centred, one above another, from D_TOP_RAIL: this position needs the new macro (VP_X / VP_Y / VP_ARR)' };
+}
+
 export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settings) {
   void frameWidth; void frameHeight;   // the stored overall is informational: the frame is recomputed from the leaf
   const P = getFireDoorProfile();
@@ -286,6 +464,8 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
   const closerKind = closerKindOf(spec.closer, fire ? D.closerFire : D.closerNonFire);
   const vpStyle = Math.max(0, Math.round(Number(spec.vpStyle ?? D.vpStyle) || 0));
   const vpCustom = { ...D.vpCustom, ...(spec.vpCustom || {}) };
+  // v1.2: the vision panel model (a stored vp block, else the legacy style read into it)
+  const vpIn = fireDoorVpInput(V, spec.vp, vpStyle, vpCustom);
   const leadEdge = boolOf(spec.leadEdge, D.leadEdge);
 
   // ── the frame section (the fixed numbers the sizes are made of) ──
@@ -422,38 +602,96 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
   const keepMillLength = R(Number(KP.length) + Number(KP.millOversize)), keepMillWidth = R(Number(KP.width) + Number(KP.millOversize));
   const keep = {
     macroKeep: macroLock, keepStyle: 1,
-    plate: { length: Number(KP.length), width: Number(KP.width), millLength: keepMillLength, millWidth: keepMillWidth, depth: Number(KP.plateDepth) },
+    plate: { length: Number(KP.length), width: Number(KP.width), millLength: keepMillLength, millWidth: keepMillWidth, depth: Number(KP.plateDepth), radius: R(keepMillWidth / 2) },
     pocket: { length: Number(KP.pocket.length), width: Number(KP.pocket.width), depth: Number(KP.pocket.depth) },
     centreFromFoot: keepCentreFromFoot, centreFromTop: R(jambLength - keepCentreFromFoot),
   };
 
-  // ── the vision panel ──
-  const vpPlaced = placeVisionPanel(V, vpStyle, vpCustom, W, H);
-  const paneArea = (p) => (p.w * p.h) / 1e6;
-  const panePerimM = (p) => (2 * (p.w + p.h)) / 1000;
+  // ── the vision panel (v1.2: type, size, count, position; glass of three) ──
+  const lockZone = {
+    x0: Math.min(lock.forend.centreFromTop - millLength / 2, lock.case.topFromTop), x1: Math.max(lock.forend.centreFromTop + millLength / 2, lock.case.topFromTop + lock.case.pocketHeight),
+    y0: W - Math.max(Number(lock.case.pocketDepth) || 0, backset), y1: W,
+  };
+  const vpPlaced = placeVisionPanelV12(V, vpIn, W, H, lockZone);
+  const vpWords = fireDoorVpWords(V, vpIn);
+  const vpMacro = masterDoorVpStyle(V, vpIn);
+  // a round pane: the circle area and circumference; a diamond: its own square
+  const paneArea = (p) => (p.shape === 'round' ? Math.PI * (p.w / 2) ** 2 : p.w * p.h) / 1e6;
+  const panePerimM = (p) => (p.shape === 'round' ? Math.PI * p.w : 2 * (p.w + p.h)) / 1000;
   const glassSqm = vpPlaced.panes.reduce((a, p) => a + paneArea(p), 0);
   const beadM = vpPlaced.panes.reduce((a, p) => a + panePerimM(p), 0) * (Number(V.beadFaces) || 0);
   const glazingIntuM = fire ? vpPlaced.panes.reduce((a, p) => a + panePerimM(p), 0) : 0;
-  const glassThickness = Number(V.glassThickness) || 6;
+  const GL = V.glass || {};
+  const glassTypes = Array.isArray(GL.types) && GL.types.length ? GL.types : [{ id: 'fd30', label: 'FD30 standard', thickness: V.glassThickness, slot: 'fd_glass_fire' }];
+  const glassDefault = GL.defaultByRating?.[fire ? rating : 'none'];
+  const glassPick = glassTypes.find((t) => t.id === spec.glass) || glassTypes.find((t) => t.id === glassDefault) || glassTypes[0];
+  const glass = { type: glassPick.id, label: glassPick.label, thickness: Number(glassPick.thickness) || Number(V.glassThickness) || 6, slot: glassPick.slot || 'fd_glass_fire' };
+  const glassThickness = glass.thickness;
+  const vpWarnings = [...vpPlaced.warnings, ...(vpIn.legacyNote ? [`vision panel: ${vpIn.legacyNote}`] : []), ...(vpMacro.note && vpPlaced.panes.length ? [`vision panel: ${vpMacro.note}`] : [])];
   const vp = {
-    style: vpPlaced.style, label: vpPlaced.label, panes: vpPlaced.panes,
+    // style = the Master_Door VP_STYLE this panel goes out as (v1 field name kept)
+    style: vpMacro.id, macroStyle: vpMacro.id,
+    type: vpIn.type, shape: vpIn.shape, width: vpIn.width, height: vpIn.height, count: vpPlaced.panes.length ? vpIn.count : 0,
+    arrange: vpIn.arrange, gap: vpIn.gap,
+    position: { across: vpIn.across, acrossOffset: vpIn.acrossOffset, down: vpIn.down, downOffset: vpIn.downOffset },
+    group: vpPlaced.group,
+    label: vpWords.label, sizeLabel: vpWords.sizeLabel, positionLabel: vpWords.positionLabel,
+    source: vpIn.source, legacyStyle: vpIn.legacyStyle,
+    panes: vpPlaced.panes,
+    glass,
     glassSqm: Math.round(glassSqm * 1000) / 1000, beadM: Math.round(beadM * 1000) / 1000, intuM: Math.round(glazingIntuM * 1000) / 1000,
-    glassThickness, warnings: vpPlaced.warnings,
+    glassThickness, warnings: vpWarnings,
   };
+  vpWarnings.forEach((w) => warnings.push(w));
 
   // ── the intumescent strips (v1.1: one size, 15 x 4 all around; FD30 one strip, FD60 two; none on a DR door) ──
   const intuStrips = fire ? Math.max(0, Math.round(Number(IN.stripsByRating?.[rating] ?? 1))) : 0;
   const intuStyle = intuStrips ? Number(IN.macroStyleByStrips?.[intuStrips] ?? IN.macroStyleByStrips?.[1] ?? 1) : 0;
+  // v1.2: the strip colour (intumescent.colours; the door's pick, else defaults.intuColour, else the first)
+  const intuColours = Array.isArray(IN.colours) && IN.colours.length ? IN.colours : [{ id: 'white', label: 'White', hex: '#f1f1ec' }];
+  const intuColourPick = intuColours.find((c) => c.id === spec.intuColour) || intuColours.find((c) => c.id === D.intuColour) || intuColours[0];
   const intumescent = intuStrips ? {
     strips: intuStrips, width: Number(IN.width), thickness: Number(IN.thickness),
     groove: { width: Number(IN.grooveWidth), depth: Number(IN.grooveDepth) },
     label: `${intuStrips} x ${Number(IN.width)} x ${Number(IN.thickness)} all around`,
     macroStyle: intuStyle,
     metres: Math.round(intuStrips * (2 * H + W)) / 1000,
+    colour: { id: intuColourPick.id, label: intuColourPick.label, hex: intuColourPick.hex || '#f1f1ec' },
+    // the strip centres across the leaf thickness (z from the pull face), the 3D and the DXF draw them here
+    centresZ: (intuStrips >= 2 ? [T / 2 - (Number(IN.twoStripOffset) || 0), T / 2 + (Number(IN.twoStripOffset) || 0)] : [T / 2]).map(R),
   } : null;
 
   // ── the closer (v1.1: a kind; the built in closer has no machining until the owner's component files arrive) ──
-  const closer = closerKind === 'none' ? null : { type: closerKind, label: CLOSER_LABELS[closerKind], machined: false };
+  // v1.2: the drawing symbol of the kind, in the leaf board system (x from the
+  // leaf top, negative = above it on the frame head; y from the hinge edge)
+  const CS = P.closer || {};
+  const closerSymbol = (() => {
+    if (closerKind === 'surface') {
+      const c = CS.surface || {};
+      const n = (k) => Number(c[k]) || 0;
+      const spindle = { x: R(n('belowLeafTop') + n('bodyHeight') / 2), y: R(n('fromHingeEdge') + n('bodyHeight') / 2) };
+      const shoeX = R(-(gapHead + faceOut / 2));
+      const rise = spindle.x - shoeX;
+      const run = n('armLength') > rise ? Math.sqrt(n('armLength') ** 2 - rise ** 2) : 0;
+      return {
+        kind: 'surface', face: c.face === 'push' ? 'push' : 'pull',
+        body: { x: n('belowLeafTop'), y: n('fromHingeEdge'), length: n('bodyLength'), height: n('bodyHeight'), depth: n('bodyDepth') },
+        arm: { from: spindle, to: { x: shoeX, y: R(spindle.y + run) }, length: n('armLength'), width: n('armWidth') },
+        shoe: { x: shoeX, y: R(spindle.y + run), length: n('shoeLength'), height: n('shoeHeight') },
+      };
+    }
+    if (closerKind === 'builtin') {
+      const c = CS.builtin || {};
+      const n = (k) => Number(c[k]) || 0;
+      return {
+        kind: 'builtin',
+        body: { x: 0, y: n('fromHingeEdge'), length: n('bodyLength'), width: n('bodyWidth'), depth: n('bodyDepth'), z: R(T / 2 - n('bodyWidth') / 2) },
+        track: { y: n('fromHingeEdge'), length: n('trackLength'), width: n('trackWidth'), depth: n('trackDepth') },
+      };
+    }
+    return null;
+  })();
+  const closer = closerKind === 'none' ? null : { type: closerKind, label: CLOSER_LABELS[closerKind], machined: false, symbol: closerSymbol };
   const closerFlag = closerKind === 'builtin' ? 2 : closerKind === 'surface' ? 1 : 0;
 
   // ── the corner dowels (v1.1): perJoint dowels per mitred corner, square to the mitre face ──
@@ -483,7 +721,10 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
   leafOps.push(op('casePocket', 'lockEdge', lock.case.topFromTop - (lock.case.pocketHeight - lock.case.height) / 2, W, T / 2 - lock.case.pocketWidth / 2, lock.case.pocketHeight, lock.case.pocketWidth, lock.case.pocketDepth, lock.case.pocketWidth / 2, { note: 'lock case pocket' }));
   leafOps.push(op('spindleHole', 'pull', H - spindleHeight, W - backset, 0, lock.spindle.bore, lock.spindle.bore, T, lock.spindle.bore / 2, { note: 'spindle, through, x y = centre' }));
   if (lock.cylinder) leafOps.push(op('cylinderHole', 'pull', H - lock.cylinder.fromBottom, W - backset, 0, lock.cylinder.bore, lock.cylinder.bore, T, lock.cylinder.bore / 2, { note: `${lockType} cylinder, through, x y = centre` }));
-  vp.panes.forEach((p) => leafOps.push(op('vpCutout', 'pull', p.x, p.y, 0, p.box.h, p.box.w, T, Number(V.cornerRadius) || 0, { rotated: p.rotated, angle: p.angle, pane: p.i, note: `vision panel ${p.i} ${p.w} x ${p.h}, layout per bSolid macro` })));
+  vp.panes.forEach((p) => leafOps.push(op('vpCutout', 'pull', p.x, p.y, 0, p.box.h, p.box.w, T, p.radius, {
+    shape: p.shape, rotated: p.rotated, angle: p.angle, pane: p.i,
+    note: p.shape === 'round' ? `vision panel ${p.i} round dia ${p.w}` : p.shape === 'diamond' ? `vision panel ${p.i} diamond ${p.w} x ${p.w} turned 45` : `vision panel ${p.i} ${p.w} x ${p.h}`,
+  })));
   if (intumescent) {
     const gw = intumescent.groove.width, gd = intumescent.groove.depth;
     const off = Number(IN.twoStripOffset) || 0;
@@ -544,8 +785,15 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
     // INTU = the strip count (0 / 1 / 2, v1.1); INTU_STYLE = the Master_Door style the count maps to
     INTU: intuStrips, INTU_W: intumescent ? intumescent.width : 0, INTU_T: intumescent ? intumescent.thickness : 0, INTU_STYLE: intuStyle,
     VP_STYLE: vp.style,
-    C_VP_L: Number(vpCustom.length) || 0, C_VP_W: Number(vpCustom.width) || 0, C_VP_NUM: Math.round(Number(vpCustom.count) || 0), C_VP_RAIL: Number(vpCustom.rail) || 0, C_VP_POS: Number(vpCustom.pos) === 90 ? 90 : 0,
+    // C_VP_* (Master_Door custom style 14): the v1.2 panel's pane size, count and gap (0 without a panel)
+    C_VP_L: vp.count ? vp.height : 0, C_VP_W: vp.count ? vp.width : 0, C_VP_NUM: vp.count, C_VP_RAIL: vp.count ? vp.gap : 0, C_VP_POS: 0,
     D_TOP_RAIL: Number(V.topRail), D_MID_RAIL: Number(V.midRail), D_SIDE_MARGIN: Number(V.sideMargin),
+    // v1.2, the new macro: any panel. VP_SHAPE 0 none / 1 rect / 2 round / 3 diamond; VP_W x VP_H one
+    // pane (round: the diameter); VP_ARR 0 one above another / 1 side by side; VP_X the group top from
+    // the leaf top, VP_Y its edge from the hinge edge (the leaf board's x and y); VP_R the corner radius
+    VP_SHAPE: vp.count ? ({ rect: 1, round: 2, diamond: 3 }[vp.shape] || 0) : 0, VP_N: vp.count,
+    VP_W: vp.count ? vp.width : 0, VP_H: vp.count ? vp.height : 0, VP_GAP: vp.count ? vp.gap : 0, VP_ARR: vp.arrange === 'side' ? 1 : 0,
+    VP_X: vp.group ? vp.group.x : 0, VP_Y: vp.group ? vp.group.y : 0, VP_R: vp.panes.length ? vp.panes[0].radius : 0,
     LEAD_EDGE: leadEdge ? 1 : 0,
     REBATE: Number(MD.REBATE ?? 0), REBATE_STYLE: Number(MD.REBATE_STYLE ?? 1),
     SPY_ON: Number(MD.SPY_ON ?? 0), SPY_H: Number(MD.SPY_H ?? 1450), LBOX: Number(MD.LBOX ?? 0), L_BOX_H: Number(MD.L_BOX_H ?? 1000),
@@ -581,7 +829,8 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
   // ── glass units (one per pane) ──
   const customGlassUnits = vp.panes.map((p) => ({
     width: p.w, height: p.h, qty: 1, role: 'vp', location: `vision panel ${p.i}`, fire,
-    note: `${fire ? 'fire glass' : 'toughened'} ${glassThickness} · ${vp.label}, layout per bSolid macro`,
+    shape: p.shape, glassType: glass.type, glassLabel: glass.label, slot: glass.slot,
+    note: `${glass.label} ${glassThickness} · ${p.shape === 'round' ? `round dia ${p.w}` : p.shape === 'diamond' ? `diamond ${p.w} x ${p.w}` : `${p.w} x ${p.h}`}`,
   }));
 
   // ── weights ──
@@ -604,6 +853,7 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
         openingWidth: opening.width, openingHeight: opening.height,
         leafWidth: W, leafHeight: H, leafOverride: { width: axW.source === 'leaf', height: axH.source === 'leaf' },
         frameDepth: depth, hingeSide, lockType, closer: closerKind, vpStyle, vpCustom, leadEdge,
+        vp: vpIn, glass: glass.type, intuColour: intumescent ? intumescent.colour.id : (spec.intuColour || D.intuColour || null),
       },
       opening,
       handing: { hingeSide, label: `Hinge ${hingeSide}` },
@@ -631,13 +881,13 @@ export function deriveFireDoorWindow(windowSpec, frameWidth, frameHeight, settin
     },
     paint,
     consumables: {
-      glass: { type: fire ? 'fire' : 'toughened', sqm: Math.round(glassSqm * 100) / 100 },
+      glass: { type: glass.type, label: glass.label, slot: glass.slot, thickness: glassThickness, sqm: Math.round(glassSqm * 100) / 100 },
       hinges: { count: hCount, product: hinges.product },
       lock: { type: lockType },
       keep: 1,
       closer: closer ? { type: closerKind, count: 1 } : null,
       dowels: dowels.count ? { count: dowels.count, dia: dowels.dia, length: dowels.length } : null,
-      intumescent: intumescent ? { metres: intumescent.metres, width: intumescent.width, thickness: intumescent.thickness, strips: intumescent.strips } : null,
+      intumescent: intumescent ? { metres: intumescent.metres, width: intumescent.width, thickness: intumescent.thickness, strips: intumescent.strips, colour: intumescent.colour.label } : null,
       glazingBeads: { metres: vp.beadM },
       glazingIntumescent: { metres: vp.intuM },
     },

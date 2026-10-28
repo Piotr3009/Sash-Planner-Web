@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { profileBoxDepth, getWindowProfile, getCasementProfile, getDoorProfile, getPartitionProfile, getFireDoorProfile } from '../engine/profile.js';
 import * as cloud from '../services/cloudSync.js';
+import { fireDoorVpField } from '../engine/specification.js';
 
 // ─── Production settings (preserved from original — used by calculations engine) ───
 const defaultSettings = {
@@ -157,7 +158,7 @@ const BATCH_STATUSES = ['preparation', 'in-production', 'complete'];
 // kind string ('none' | 'surface' | 'builtin'); no swing, no intumescent style.
 const FIREDOOR_ITEM_BOOLS = ['firedoorFire', 'firedoorLeadEdge'];
 const FIREDOOR_ITEM_NUMBERS = ['firedoorOpeningWidth', 'firedoorOpeningHeight', 'firedoorLeafWidth', 'firedoorLeafHeight', 'firedoorFrameDepth', 'firedoorVpStyle'];
-const FIREDOOR_ITEM_STRINGS = ['firedoorRating', 'firedoorHingeSide', 'firedoorLockType', 'firedoorCloser'];
+const FIREDOOR_ITEM_STRINGS = ['firedoorRating', 'firedoorHingeSide', 'firedoorLockType', 'firedoorCloser', 'firedoorGlass', 'firedoorIntuColour'];
 const FIREDOOR_VP_CUSTOM_KEYS = ['length', 'width', 'count', 'rail', 'pos'];
 export function fireDoorItemFields(windowConfig) {
   const c = windowConfig || {};
@@ -169,6 +170,8 @@ export function fireDoorItemFields(windowConfig) {
   out.firedoorVpCustom = vp && typeof vp === 'object'
     ? Object.fromEntries(FIREDOOR_VP_CUSTOM_KEYS.map((k) => [k, Number.isFinite(Number(vp[k])) ? Number(vp[k]) : null]))
     : null;
+  // v1.2: the vision panel block (type, shape, size, count, arrangement, position), plain keys only
+  out.firedoorVp = fireDoorVpField(c.firedoorVp);
   return out;
 }
 

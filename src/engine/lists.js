@@ -354,16 +354,22 @@ export function buildGlassListForWindow(derived, windowSpec) {
   // No bars on a vision panel: the row label reads 'none' as the engine row.
   // A door with vision panel style 0 has no units and no rows.
   if (derived.category === 'firedoor') {
+    // v1.2 (owner 28.10.2026): the glass is one of three (FD30 standard / FD
+    // insulated / Frosted, derived.firedoor.vp.glass); its thickness from the
+    // glass type of the profile; a round pane carries shape 'round' (its
+    // width = height = the diameter).
     const units = Array.isArray(derived.customGlassUnits) ? derived.customGlassUnits : [];
-    const fire = !!derived.firedoor?.fire;
-    const thickness = Number(windowSpec?.glazing?.thickness) || Number(getFireDoorProfile()?.vp?.glassThickness) || 0;
-    const type = fire ? 'fire' : 'toughened';
+    const g = derived.firedoor?.vp?.glass || {};
+    const thickness = Number(g.thickness) || Number(windowSpec?.glazing?.thickness) || Number(getFireDoorProfile()?.vp?.glassThickness) || 0;
+    const type = g.type || (derived.firedoor?.fire ? 'fd30' : 'fd30');
+    const label = g.label || 'FD30 standard';
     return units.map((u, i) => {
-      const row = buildGlassRow(windowSpec, u.width, u.height, u.location || `vision panel ${i + 1}`, u.qty || 1, undefined, u.role || 'vp');
+      const row = buildGlassRow(windowSpec, u.width, u.height, u.location || `vision panel ${i + 1}`, u.qty || 1, type === 'frosted' ? 'frosted' : 'clear', u.role || 'vp');
       row.type = type;
-      row.spec = type;
+      row.spec = label;
       row.thickness = thickness;
-      row.makeup = windowSpec?.glazing?.makeup || (thickness ? `${thickness}mm ${type}` : type);
+      row.shape = u.shape || 'rect';
+      row.makeup = thickness ? `${thickness}mm ${label}` : label;
       row.spacer = 'none';
       row.spacerType = 'none';
       row.gas = 'none';
@@ -749,12 +755,12 @@ export function buildHardwareList(windowSpec, derived = null) {
       const closerCount = Number(C.closer?.count) || 1;
       const detail = closer.type === 'builtin'
         ? `concealed, in the leaf top and the head · ${closer.machined ? 'machined' : 'no machining yet'}`
-        : 'overhead, on the push face of the leaf and the head';
+        : `overhead, the body on the ${closer.symbol?.face === 'push' ? 'push' : 'pull'} face of the leaf, the arm to the head`;
       list.push({ item: closer.label || c.item, detail, quantity: closerCount, enginePart: true, partId: c.partId });
     }
     const intu = fd.intumescent;
     if (fd.fire && intu && Number(intu.metres) > 0) {
-      list.push({ item: H.intumescent.item, detail: `${intu.label || `${intu.width} x ${intu.thickness}`} · ${intu.strips} per edge, top and both sides of the leaf`, quantity: Number(intu.metres), unit: 'm', enginePart: true, partId: fireDoorIntumescentPartId(intu.width) });
+      list.push({ item: H.intumescent.item, detail: `${intu.label || `${intu.width} x ${intu.thickness}`}${intu.colour?.label ? `, ${intu.colour.label.toLowerCase()}` : ''} · ${intu.strips} per edge, top and both sides of the leaf`, quantity: Number(intu.metres), unit: 'm', enginePart: true, partId: fireDoorIntumescentPartId(intu.width) });
     }
     const dw = C.dowels;
     const dowelRule = fd.frame?.dowels || {};

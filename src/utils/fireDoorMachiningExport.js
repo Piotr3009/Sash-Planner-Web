@@ -127,7 +127,10 @@ export function fireDoorMachiningCsv(rows) {
  * frame (overall, sections, rebate, the dowel rule, members), frameDowels (the frame dowel
  * block on its own for the 5-axis programmer), hinges, lock, keep, vp, intumescent (the
  * strip object or null), closer (v1.1: { type, label, machined } or null), bsuiteVars and
- * machining, all copied from derived.firedoor.
+ * machining, all copied from derived.firedoor. Version 3 (v1.2, 28.10.2026): vp carries the
+ * type, shape, size, count, arrangement, position, group box, glass ({ type, label,
+ * thickness, slot }) and the panes with their shape and radius; intumescent.colour; closer.symbol;
+ * warnings (the door's never-failing notes).
  */
 export function fireDoorMachiningJson(windows) {
   const doors = fireDoorsOf(windows).map(({ name, derived }) => {
@@ -140,9 +143,10 @@ export function fireDoorMachiningJson(windows) {
       hinges: FD.hinges, lock: FD.lock, keep: FD.keep,
       vp: FD.vp, intumescent: FD.intumescent ?? null, closer: FD.closer ?? null,
       bsuiteVars: FD.bsuiteVars, machining: FD.machining,
+      warnings: FD.warnings || [],
     };
   });
-  return JSON.stringify({ format: 'production-core-firedoor-machining', version: 2, coordinates: FIREDOOR_COORDINATE_NOTES, doors }, null, 2);
+  return JSON.stringify({ format: 'production-core-firedoor-machining', version: 3, coordinates: FIREDOOR_COORDINATE_NOTES, doors }, null, 2);
 }
 
 /**
