@@ -453,8 +453,10 @@ export default function WindowDetailPage() {
             (() => {
               const fd = derived.firedoor;
               const member = (role) => (fd.frame?.members || []).find((x) => x.role === role);
-              const tops = (fd.hinges?.positions || []).map((p) => p.top).join(' / ');
-              const jambTops = (fd.hinges?.positions || []).map((p) => p.jambTop).join(' / ');
+              // v1.3 (owner 28.10.2026): a hinge position is its LOWER edge above the
+              // leaf bottom (the Weeke way), H1 = the top hinge; on the jamb above the jamb foot
+              const fromBottoms = (fd.hinges?.positions || []).map((p) => p.fromBottom).join(' / ');
+              const jambFromFeet = (fd.hinges?.positions || []).map((p) => p.jambFromFoot).join(' / ');
               return (
                 <SpecSection title="Calculated">
                   <SpecRow label="Frame overall" value={`${fd.frame.overall.width} × ${fd.frame.overall.height} mm`} />
@@ -463,9 +465,10 @@ export default function WindowDetailPage() {
                   <SpecRow label="Jamb lock" value={`${member('jambLock')?.length} mm long point · mitred top`} />
                   <SpecRow label="Member" value={`${fd.frame.thickness} × ${fd.frame.depth} finished · ${fd.frame.rawThickness} × ${fd.frame.rawWidth} raw`} />
                   <SpecRow label="Rebate" value={`${fd.frame.rebate.width} × ${fd.frame.rebate.depth} · faces ${fd.frame.faces.outside} / ${fd.frame.faces.inside}`} />
-                  <SpecRow label="Hinges" value={`${fd.hinges.count} × ${fd.hinges.length} · ${tops} from the leaf top`} />
-                  <SpecRow label="Jamb recesses" value={`${jambTops} from the jamb top`} />
-                  <SpecRow label="Spindle" value={`${fd.lock.spindleHeight} above the leaf bottom · backset ${fd.lock.backset}`} />
+                  <SpecRow label="Hinges" value={`${fd.hinges.count} × ${fd.hinges.length} · ${fromBottoms} above the leaf bottom (lower edge, H1 = top)`} />
+                  <SpecRow label="Jamb recesses" value={`${jambFromFeet} above the jamb foot`} />
+                  {/* v1.3: the handle from the floor; LOCK_H (from the leaf bottom) in brackets */}
+                  <SpecRow label="Spindle" value={`${fd.lock.spindle?.fromFloor} above the floor (${fd.lock.spindle?.fromBottom} above the leaf bottom) · backset ${fd.lock.backset}`} />
                   {fd.lock.cylinder && <SpecRow label={fd.lock.cylinder.kind === 'bathroom' ? 'Thumbturn' : 'Cylinder'} value={`${fd.lock.cylinder.fromBottom} above the leaf bottom`} />}
                   <SpecRow label="Keep centre" value={`${fd.keep.centreFromFoot} above the jamb foot`} />
                   {fd.intumescent && <SpecRow label="Intumescent" value={`${fd.intumescent.metres} m`} />}

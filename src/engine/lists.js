@@ -733,21 +733,25 @@ export function buildHardwareList(windowSpec, derived = null) {
     const lock = fd.lock || {};
     const keep = fd.keep || {};
     const hingeCount = Number(hinges.count) || 0;
-    const tops = (hinges.positions || []).map((p) => p.top).join(' / ');
+    // v1.3 (owner 28.10.2026): a hinge position is its LOWER edge above the
+    // leaf bottom (the Weeke way), the first one the top hinge
+    const fromBottoms = (hinges.positions || []).map((p) => p.fromBottom).join(' / ');
     if (hingeCount > 0) {
       const h = fd.fire ? H.hingeFire : H.hingeStd;
-      list.push({ item: h.item, detail: `${hinges.length} long · ${tops} from the leaf top · ${fd.handing?.label || ''}`.trim(), quantity: hingeCount, enginePart: true, partId: h.partId });
+      list.push({ item: h.item, detail: `${hinges.length} long · ${fromBottoms} above the leaf bottom (lower edge) · ${fd.handing?.label || ''}`.trim(), quantity: hingeCount, enginePart: true, partId: h.partId });
     }
     const lockLine = lock.type === 'euro' ? H.lockEuro : lock.type === 'bathroom' ? H.lockBathroom : H.lockLatch;
     const rating = fd.fire ? (fd.rating || 'FD30') : 'standard';
-    list.push({ item: lockLine.item, detail: `${rating} · backset ${lock.backset} · spindle ${lock.spindleHeight} from the leaf bottom`, quantity: 1, enginePart: true, partId: lockLine.partId });
+    // v1.3: the handle spindle is set from the FLOOR; LOCK_H (from the leaf bottom) in brackets
+    const spindleWord = `spindle ${lock.spindle?.fromFloor ?? lock.spindleFromFloor ?? ''} above the floor (${lock.spindle?.fromBottom ?? lock.spindleHeight ?? ''} above the leaf bottom)`;
+    list.push({ item: lockLine.item, detail: `${rating} · backset ${lock.backset} · ${spindleWord}`, quantity: 1, enginePart: true, partId: lockLine.partId });
     if (lock.type === 'euro') {
       list.push({ item: H.cylinder.item, detail: `${lock.cylinder?.fromBottom ?? ''} from the leaf bottom (euro centres)`.trim(), quantity: 1, enginePart: true, partId: H.cylinder.partId });
     }
     if (lock.type === 'bathroom') {
       list.push({ item: H.thumbturn.item, detail: `${lock.cylinder?.fromBottom ?? ''} from the leaf bottom (bathroom centres)`.trim(), quantity: 1, enginePart: true, partId: H.thumbturn.partId });
     }
-    list.push({ item: H.handle.item, detail: `on rose, ${windowSpec?.hardware?.finish || 'stainless'} · spindle ${lock.spindleHeight} from the leaf bottom`, quantity: 1, enginePart: true, partId: H.handle.partId });
+    list.push({ item: H.handle.item, detail: `on rose, ${windowSpec?.hardware?.finish || 'stainless'} · ${spindleWord}`, quantity: 1, enginePart: true, partId: H.handle.partId });
     list.push({ item: H.keep.item, detail: `${rating} · ${keep.plate?.length ?? ''} x ${keep.plate?.width ?? ''} on the lock jamb · centre ${keep.centreFromFoot ?? ''} from the jamb foot`, quantity: 1, enginePart: true, partId: H.keep.partId });
     const closer = fd.closer;
     if (closer && closer.type) {

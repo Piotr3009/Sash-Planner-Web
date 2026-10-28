@@ -77,7 +77,7 @@ section('1 - the fire door profile, its migration and withProfiles');
     'frame v1.1: wall gap 5 a side / 5 at the head (opening 1000 -> frame 990 -> leaf 914), dowels 8 x 40, 3 per corner, 20 in from the faces');
   ok(J(FP.hinges) === J({ count: 3, length: 102, topOffset: 150, bottomOffset: 200, midAboveCentre: 200, recessLength: 103, recessWidth: 30, recessDepth: 3, cornerRadius: 6 }),
     'hinges: 3 x 102, 150 from the top, 200 from the bottom, the middle one 200 above the leaf centre (v1.1), recess 103 x 30 x 3 R6');
-  ok(FP.lock.spindleHeight === 1000 && FP.lock.backset === 60 && J(FP.lock.forend) === J({ length: 235, width: 24, millOversize: 1, depth: 4 })
+  ok(FP.lock.spindleFromFloor === 1000 && FP.lock.spindleHeight === 995 && FP.lock.backset === 60 && J(FP.lock.forend) === J({ length: 235, width: 24, millOversize: 1, depth: 4 })
     && J(FP.lock.case) === J({ depth: 85, height: 150, pocketWidth: 17, pocketDepth: 87, pocketHeight: 153 }) && FP.lock.euroCentres === 72 && FP.lock.bathroomCentres === 78
     && FP.lock.caseTopAboveSpindle === 46.5 && FP.lock.forendCentreBelowSpindle === 15 && FP.lock.spindleBore === 10 && FP.lock.euroBore === 18 && FP.lock.bathroomBore === 10,
     'lock: spindle 1000, backset 60, forend 235 x 24 (+1, 4 deep), case 85 x 150 pocket 17 x 87 x 153, euro 72, bathroom 78, case top +46.5, forend centre -15, bores 10 / 18 / 10');
@@ -213,21 +213,22 @@ const f = REF.derived.firedoor;
   ok(m.every((x) => x.section === '50x100' && x.rawSection === '63x105' && J(x.finished) === J({ w: 50, d: 100 }) && J(x.raw) === J({ w: 63, d: 105 }) && x.quantity === 1),
     'every member finished 50x100, raw 63x105, quantity 1');
   const h = f.hinges;
-  ok(h.count === 3 && h.length === 102 && h.step === 794 && h.macroHinge === 1 && h.product === 'fire' && J(h.recess) === J({ length: 103, width: 30, depth: 3, radius: 6 }),
+  ok(h.count === 3 && h.length === 102 && h.step === 788.5 && h.macroHinge === 1 && h.product === 'fire' && J(h.recess) === J({ length: 103, width: 30, depth: 3.2, radius: 6 }) && h.positionRef === 'bottom',
     'hinges: 3 x 102, equal spacing step 794 kept for the sheets, HINGE 1 fire, recess 103 x 30 x 3 R6');
-  // v1.1: the middle hinge CENTRE 200 above the leaf centre: 2040 / 2 - 200 - 51 = 769 (not the old equal spacing 944)
-  ok(J(h.positions.map((p) => p.top)) === J([150, 769, 1738]) && J(h.positions.map((p) => p.bottom)) === J([252, 871, 1840]) && J(h.positions.map((p) => p.centre)) === J([201, 820, 1789]),
-    'hinge tops 150 / 769 / 1738 from the leaf top (middle centre 820 = 1020 - 200), the last one ending 1840 = 2040 - 200');
-  ok(J(h.positions.map((p) => p.jambTop)) === J([188, 807, 1776]), 'jamb hinge recess tops 188 / 807 / 1776 from the jamb top (35 + 3 + top)');
-  ok(h.topOffset === 150 && h.bottomOffset === 200 && h.midAboveCentre === 200 && h.midCentreAboveLeafCentre === 200, 'hinges carry the rule numbers topOffset 150 / bottomOffset 200 / midAboveCentre 200 (the sheets print the rule from them, never a literal)');
+  // v1.3 (owner 28.10.2026, the Weeke rule): tops 145 / 700 / 1722 from the top; the POSITION is the lower edge above the leaf bottom 1793 / 1238 / 216
+  ok(J(h.positions.map((p) => p.top)) === J([145, 700, 1722]) && J(h.positions.map((p) => p.bottom)) === J([247, 802, 1824]) && J(h.positions.map((p) => p.centre)) === J([196, 751, 1773]),
+    'hinge tops 145 / 700 / 1722 from the leaf top (the Weeke numbers; middle centre 751 = 1020 - 269), the last one ending 1824 = 2040 - 216');
+  ok(J(h.positions.map((p) => p.fromBottom)) === J([1793, 1238, 216]) && J(h.positions.map((p) => p.jambFromFoot)) === J([1798, 1243, 221]), 'v1.3 positions = the hinge lower edge above the leaf bottom 1793 / 1238 / 216 (HINGE_1 = the top hinge); above the jamb foot + 5');
+  ok(J(h.positions.map((p) => p.jambTop)) === J([183, 738, 1760]), 'jamb hinge recess tops 183 / 738 / 1760 from the jamb top (35 + 3 + top)');
+  ok(h.topOffset === 145 && h.bottomOffset === 216 && h.midAboveCentre === 269 && h.midCentreAboveLeafCentre === 269, 'hinges carry the rule numbers topOffset 145 / bottomOffset 216 / midAboveCentre 269 (the sheets print the rule from them, never a literal)');
   const lk = f.lock;
-  ok(lk.type === 'latch' && lk.macroLock === 2 && lk.euro === false && lk.spindleHeight === 1000 && lk.backset === 60 && lk.cylinder === null, 'lock: latch, LOCK 2 (FD30), spindle 1000, backset 60, no cylinder');
-  ok(J(lk.spindle) === J({ fromBottom: 1000, fromTop: 1040, fromLockEdge: 60, bore: 10 }), `spindle ${J(lk.spindle)}`);
-  ok(J(lk.forend) === J({ length: 235, width: 24, millLength: 236, millWidth: 25, depth: 4, centreFromBottom: 985, centreFromTop: 1055, radius: 12.5 }), `forend ${J(lk.forend)} (centre 1000 - 15)`);
-  ok(J(lk.case) === J({ depth: 85, height: 150, pocketWidth: 17, pocketDepth: 87, pocketHeight: 153, topFromBottom: 1046.5, topFromTop: 993.5 }), `case ${J(lk.case)} (top 1000 + 46.5)`);
+  ok(lk.type === 'latch' && lk.macroLock === 2 && lk.euro === false && lk.spindleHeight === 995 && lk.spindleFromFloor === 1000 && lk.backset === 60 && lk.cylinder === null, 'lock: latch, LOCK 2 (FD30), the handle 1000 above the FLOOR = spindle 995 above the leaf bottom (v1.3), backset 60, no cylinder');
+  ok(J(lk.spindle) === J({ fromBottom: 995, fromFloor: 1000, fromTop: 1045, fromLockEdge: 60, bore: 10 }), `spindle ${J(lk.spindle)}`);
+  ok(J(lk.forend) === J({ length: 235, width: 24, millLength: 236, millWidth: 25, depth: 4, centreFromBottom: 980, centreFromTop: 1060, radius: 12.5 }), `forend ${J(lk.forend)} (centre 995 - 15)`);
+  ok(J(lk.case) === J({ depth: 85, height: 150, pocketWidth: 17, pocketDepth: 87, pocketHeight: 153, topFromBottom: 1041.5, topFromTop: 998.5 }), `case ${J(lk.case)} (top 995 + 46.5)`);
   const k = f.keep;
-  ok(k.macroKeep === 2 && k.keepStyle === 1 && J(k.plate) === J({ length: 175, width: 39, millLength: 176, millWidth: 40, depth: 3, radius: 20 }) && J(k.pocket) === J({ length: 120, width: 18, depth: 15 }) && k.centreFromFoot === 990 && k.centreFromTop === 1093,
-    'keep: KEEP 2, plate 175 x 39 milled 176 x 40 x 3 with full radius ends (R20, v1.2), pocket 120 x 18 x 15, centre 990 above the jamb foot (5 + 1000 - 15), 1093 from the top');
+  ok(k.macroKeep === 2 && k.keepStyle === 1 && J(k.plate) === J({ length: 175, width: 39, millLength: 176, millWidth: 40, depth: 3, radius: 20 }) && J(k.pocket) === J({ length: 120, width: 18, depth: 15 }) && k.centreFromFoot === 985 && k.centreFromTop === 1098,
+    'keep: KEEP 2, plate 175 x 39 milled 176 x 40 x 3 with full radius ends (R20, v1.2), pocket 120 x 18 x 15, centre 985 above the jamb foot (5 + 995 - 15 = the handle 1000 above the floor - 15), 1098 from the top');
   ok(J(f.intumescent) === J({ strips: 1, width: 15, thickness: 4, groove: { width: 15.5, depth: 4 }, label: '1 x 15 x 4 all around', macroStyle: 1, metres: 4.906, colour: { id: 'white', label: 'White', hex: '#f1f1ec' }, centresZ: [22] }), 'intumescent v1.1: one 15 x 4 strip all around, groove 15.5 x 4, 4.906 m (2 x 2040 + 826); v1.2 colour white, the strip centre 22 from the pull face');
   ok(J({ ...f.closer, symbol: undefined }) === J({ type: 'surface', label: 'Surface closer', machined: false }) && f.vp.style === 0 && f.vp.panes.length === 0 && f.vp.glassSqm === 0 && J(f.vp.warnings) === J([]) && f.vp.label === 'None' && f.vp.shape === 'none' && f.vp.group === null && J(f.vp.glass) === J({ type: 'fd30', label: 'FD30 standard', thickness: 6, slot: 'fd_glass_fire' }),
     'closer surface (the fire default), no vision panel (label None, no group), the glass FD30 standard');
@@ -251,11 +252,11 @@ const f = REF.derived.firedoor;
     'leaf row: INTU 1 (15 x 4), INTU_STYLE 1, VP_STYLE 0, C_VP 600 / 150 / 1 / 100 / 0, D_TOP_RAIL 150, D_MID_RAIL 450, D_SIDE_MARGIN 150');
   ok(LV.LEAD_EDGE === 1 && LV.REBATE === 0 && LV.REBATE_STYLE === 1 && LV.SPY_ON === 0 && LV.SPY_H === 1450 && LV.LBOX === 0 && LV.L_BOX_H === 1000 && LV.DROP_CILL === 0 && LV.PREM_DOOR === 0,
     'leaf row: LEAD_EDGE 1, REBATE 0, REBATE_STYLE 1, SPY_ON 0, SPY_H 1450, LBOX 0, L_BOX_H 1000, DROP_CILL 0, PREM_DOOR 0');
-  ok(LV.HINGE_1 === 150 && LV.HINGE_2 === 769 && LV.HINGE_3 === 1738 && LV.HINGE_D === 3 && LV.CLOSER === 1, 'leaf row: HINGE_1..3 150 / 769 / 1738, HINGE_D 3, CLOSER 1 (surface; 2 = built in)');
+  ok(LV.HINGE_1 === 1793 && LV.HINGE_2 === 1238 && LV.HINGE_3 === 216 && LV.HINGE_D === 3.2 && LV.CLOSER === 1 && LV.LOCK_H === 995, 'leaf row v1.3: HINGE_1..3 1793 / 1238 / 216 (the lower edge above the leaf bottom, HINGE_1 = top), HINGE_D 3.2, LOCK_H 995, CLOSER 1 (surface; 2 = built in)');
   const DOW = { DOWEL_N: 3, DOWEL_D: 8, DOWEL_L: 40, DOWEL_DEPTH: 20, DOWEL_1: 20, DOWEL_2: 50, DOWEL_3: 80 };
-  ok(J(f.bsuiteVars.head) === J({ LPX: 902, LPY: 100, LPZ: 50, REB_W: 15, REB_D: 47, HAND: 0, HINGE: 1, HINGE_D: 3, MITRE_TOP: 1, MITRE_BOTTOM: 1, ...DOW }), `head row ${J(f.bsuiteVars.head)}`);
-  ok(J(f.bsuiteVars.jambHinge) === J({ LPX: 2083, LPY: 100, LPZ: 50, REB_W: 15, REB_D: 47, HAND: 0, HINGE: 1, HINGE_1: 188, HINGE_2: 807, HINGE_3: 1776, HINGE_D: 3, MITRE_TOP: 1, MITRE_BOTTOM: 0, ...DOW }), `hinge jamb row ${J(f.bsuiteVars.jambHinge)}`);
-  ok(J(f.bsuiteVars.jambLock) === J({ LPX: 2083, LPY: 100, LPZ: 50, REB_W: 15, REB_D: 47, HAND: 0, HINGE: 1, HINGE_D: 3, KEEP: 2, KEEP_STYLE: 1, KEEP_Y: 990, MITRE_TOP: 1, MITRE_BOTTOM: 0, ...DOW }), `lock jamb row ${J(f.bsuiteVars.jambLock)}`);
+  ok(J(f.bsuiteVars.head) === J({ LPX: 902, LPY: 100, LPZ: 50, REB_W: 15, REB_D: 47, HAND: 0, HINGE: 1, HINGE_D: 3.2, MITRE_TOP: 1, MITRE_BOTTOM: 1, ...DOW }), `head row ${J(f.bsuiteVars.head)}`);
+  ok(J(f.bsuiteVars.jambHinge) === J({ LPX: 2083, LPY: 100, LPZ: 50, REB_W: 15, REB_D: 47, HAND: 0, HINGE: 1, HINGE_1: 1798, HINGE_2: 1243, HINGE_3: 221, HINGE_D: 3.2, MITRE_TOP: 1, MITRE_BOTTOM: 0, ...DOW }), `hinge jamb row (v1.3: the lower edge above the jamb foot) ${J(f.bsuiteVars.jambHinge)}`);
+  ok(J(f.bsuiteVars.jambLock) === J({ LPX: 2083, LPY: 100, LPZ: 50, REB_W: 15, REB_D: 47, HAND: 0, HINGE: 1, HINGE_D: 3.2, KEEP: 2, KEEP_STYLE: 1, KEEP_Y: 985, MITRE_TOP: 1, MITRE_BOTTOM: 0, ...DOW }), `lock jamb row ${J(f.bsuiteVars.jambLock)}`);
   // the records
   const box = d.components.box, sash = d.components.sash;
   ok(box.length === 3 && J(box.map((r) => [r.group, r.elementName, r.section, r.length, r.quantity, r.rawSection, r.mitreTop, r.mitreBottom, r.windowName])) === J([
@@ -273,11 +274,11 @@ const f = REF.derived.firedoor;
     `consumables ${J(d.consumables)}`);
   // the machining ops (the coordinate systems of the file header)
   const hr = opsOf(d, 'leaf', 'hingeRecess');
-  ok(hr.length === 3 && opIs(hr[0], 'hingeEdge', 149.5, 0, 0, 103, 30, 3, 6) && opIs(hr[1], 'hingeEdge', 768.5, 0, 0, 103, 30, 3, 6) && opIs(hr[2], 'hingeEdge', 1737.5, 0, 0, 103, 30, 3, 6),
-    'leaf hinge recesses on the hinge edge at x 149.5 / 768.5 / 1737.5 (top - 0.5), z 0, 103 x 30 x 3 R6');
-  ok(opIs(opsOf(d, 'leaf', 'forendRecess')[0], 'lockEdge', 937, 826, 9.5, 236, 25, 4, 12.5), 'leaf forend recess on the lock edge: x 937 (1055 - 118), z 9.5 (22 - 12.5), 236 x 25 x 4 R12.5');
-  ok(opIs(opsOf(d, 'leaf', 'casePocket')[0], 'lockEdge', 992, 826, 13.5, 153, 17, 87, 8.5), 'leaf case pocket on the lock edge: x 992 (993.5 - 1.5), z 13.5, 153 x 17 x 87');
-  ok(opIs(opsOf(d, 'leaf', 'spindleHole')[0], 'pull', 1040, 766, 0, 10, 10, 44, 5) && opsOf(d, 'leaf', 'cylinderHole').length === 0, 'leaf spindle hole through the pull face, centre x 1040 (2040 - 1000), y 766 (826 - 60), bore 10; no cylinder hole on a latch');
+  ok(hr.length === 3 && opIs(hr[0], 'hingeEdge', 144.5, 0, 0, 103, 30, 3.2, 6) && opIs(hr[1], 'hingeEdge', 699.5, 0, 0, 103, 30, 3.2, 6) && opIs(hr[2], 'hingeEdge', 1721.5, 0, 0, 103, 30, 3.2, 6),
+    'leaf hinge recesses on the hinge edge at x 144.5 / 699.5 / 1721.5 (top - 0.5; the ops stay in the board system from the top), z 0, 103 x 30 x 3.2 R6');
+  ok(opIs(opsOf(d, 'leaf', 'forendRecess')[0], 'lockEdge', 942, 826, 9.5, 236, 25, 4, 12.5), 'leaf forend recess on the lock edge: x 942 (1060 - 118), z 9.5 (22 - 12.5), 236 x 25 x 4 R12.5');
+  ok(opIs(opsOf(d, 'leaf', 'casePocket')[0], 'lockEdge', 997, 826, 13.5, 153, 17, 87, 8.5), 'leaf case pocket on the lock edge: x 997 (998.5 - 1.5), z 13.5, 153 x 17 x 87');
+  ok(opIs(opsOf(d, 'leaf', 'spindleHole')[0], 'pull', 1045, 766, 0, 10, 10, 44, 5) && opsOf(d, 'leaf', 'cylinderHole').length === 0, 'leaf spindle hole through the pull face, centre x 1045 (2040 - 995), y 766 (826 - 60), bore 10; no cylinder hole on a latch');
   const ig = opsOf(d, 'leaf', 'intuGroove');
   ok(ig.length === 3 && J(ig.map((o) => o.face)) === J(['top', 'hingeEdge', 'lockEdge']) && opIs(ig[0], 'top', 0, 0, 14.3, 826, 15.5, 4, 0) && opIs(ig[1], 'hingeEdge', 0, 0, 14.3, 2040, 15.5, 4, 0) && opIs(ig[2], 'lockEdge', 0, 826, 14.3, 2040, 15.5, 4, 0),
     'one intumescent groove 15.5 x 4 centred on the thickness (z 22 - 7.75 = 14.25, written 14.3 at the 0.1 rounding) on the top, hinge and lock edges');
@@ -287,15 +288,15 @@ const f = REF.derived.firedoor;
   const jh = d.firedoor.machining.jambHinge;
   ok(opIs(opsOf(d, 'jambHinge', 'rebate')[0], 'opening', 0, 35, 0, 2083, 15, 47, 0), 'hinge jamb rebate on the opening face: y 35, full length 2083, 15 x 47');
   const jr = opsOf(d, 'jambHinge', 'hingeRecess');
-  ok(jr.length === 3 && opIs(jr[0], 'rebateCheek', 187.5, 35, 0, 103, 30, 3, 6) && opIs(jr[1], 'rebateCheek', 806.5, 35, 0, 103, 30, 3, 6) && opIs(jr[2], 'rebateCheek', 1775.5, 35, 0, 103, 30, 3, 6),
-    'hinge jamb recesses on the rebate cheek at x 187.5 / 806.5 / 1775.5 (jamb top - 0.5), y 35, z 0');
+  ok(jr.length === 3 && opIs(jr[0], 'rebateCheek', 182.5, 35, 0, 103, 30, 3.2, 6) && opIs(jr[1], 'rebateCheek', 737.5, 35, 0, 103, 30, 3.2, 6) && opIs(jr[2], 'rebateCheek', 1759.5, 35, 0, 103, 30, 3.2, 6),
+    'hinge jamb recesses on the rebate cheek at x 182.5 / 737.5 / 1759.5 (jamb top - 0.5), y 35, z 0');
   const jm = opsOf(d, 'jambHinge', 'mitre');
   ok(jm.length === 1 && opIs(jm[0], 'end', 0, 0, 0, 0, 50, 100, 0) && jm[0].angle === 45 && jh.length === 8, 'hinge jamb: one mitre at the top (x 0, 45), 8 ops in all (rebate, 3 recesses, mitre, 3 dowel bores)');
   // v1.1: the dowel bores on the mitre face, x y z = the bore centre, square to the mitre (angle 45), 8 dia, 20 deep (half the 40 dowel)
   const jd = opsOf(d, 'jambHinge', 'dowelBore');
   ok(jd.length === 3 && jd.every((o, k) => opIs(o, 'mitre', 25, 25, [20, 50, 80][k], 8, 8, 20, 4) && o.angle === 45 && o.dowel === k + 1), 'hinge jamb dowel bores on the mitre face at the top end: x 25 (the centre of the thickness lies 25 along the member on the 45 cut), y 25, z 20 / 50 / 80, 8 dia, 20 deep, angle 45');
-  ok(opIs(opsOf(d, 'jambLock', 'keepPlate')[0], 'rebateCheek', 1005, 35, 2, 176, 40, 3, 20), 'lock jamb keep plate on the rebate cheek: x 1005 (1093 - 88), z 2 (22 - 20), 176 x 40 x 3 R20');
-  ok(opIs(opsOf(d, 'jambLock', 'keepPocket')[0], 'rebateCheek', 1033, 35, 13, 120, 18, 15, 9), 'lock jamb keep pocket: x 1033 (1093 - 60), z 13 (22 - 9), 120 x 18 x 15');
+  ok(opIs(opsOf(d, 'jambLock', 'keepPlate')[0], 'rebateCheek', 1010, 35, 2, 176, 40, 3, 20), 'lock jamb keep plate on the rebate cheek: x 1010 (1098 - 88), z 2 (22 - 20), 176 x 40 x 3 R20');
+  ok(opIs(opsOf(d, 'jambLock', 'keepPocket')[0], 'rebateCheek', 1038, 35, 13, 120, 18, 15, 9), 'lock jamb keep pocket: x 1038 (1098 - 60), z 13 (22 - 9), 120 x 18 x 15');
   ok(opsOf(d, 'jambLock', 'mitre').length === 1 && opsOf(d, 'jambLock', 'hingeRecess').length === 0 && opsOf(d, 'jambLock', 'dowelBore').length === 3 && d.firedoor.machining.jambLock.length === 7, 'lock jamb: rebate, keep plate, keep pocket, one top mitre, 3 dowel bores');
   const hm = opsOf(d, 'head', 'mitre');
   const hd = opsOf(d, 'head', 'dowelBore');
@@ -314,7 +315,7 @@ section('3b - FD60, non-fire DR, the 762 x 1981 leaf, hinge right, euro / bathro
     'FD60: leaf 54, rebate 15 x 57, the same overall 902 x 2083');
   ok(fd60.lock.macroLock === 3 && fd60.keep.macroKeep === 3 && fd60.bsuiteVars.leaf.LOCK === 3 && fd60.bsuiteVars.leaf.LPZ === 54 && fd60.bsuiteVars.jambLock.KEEP === 3 && fd60.bsuiteVars.head.REB_D === 57 && fd60.hinges.macroHinge === 1,
     'FD60: LOCK 3, KEEP 3, LPZ 54, REB_D 57, HINGE 1');
-  ok(opIs(opsOf({ firedoor: fd60 }, 'leaf', 'forendRecess')[0], 'lockEdge', 937, 826, 14.5, 236, 25, 4, 12.5) && opIs(opsOf({ firedoor: fd60 }, 'leaf', 'spindleHole')[0], 'pull', 1040, 766, 0, 10, 10, 54, 5),
+  ok(opIs(opsOf({ firedoor: fd60 }, 'leaf', 'forendRecess')[0], 'lockEdge', 942, 826, 14.5, 236, 25, 4, 12.5) && opIs(opsOf({ firedoor: fd60 }, 'leaf', 'spindleHole')[0], 'pull', 1045, 766, 0, 10, 10, 54, 5),
     'FD60 leaf ops follow the 54 thickness (forend z 14.5, spindle through 54)');
   // v1.1: FD60 takes two 15 x 4 strips, 9.812 m, six grooves (two per edge) at LPZ / 2 +- twoStripOffset, never overlapping
   const tg = fd60.machining.leaf.filter((o) => o.kind === 'intuGroove');
@@ -351,18 +352,18 @@ section('3b - FD60, non-fire DR, the 762 x 1981 leaf, hinge right, euro / bathro
   ok(drs.firedoor.bsuiteVars.leaf.CLOSER === 1 && drb.firedoor.bsuiteVars.leaf.CLOSER === 2 && drn.firedoor.bsuiteVars.leaf.CLOSER === 0 && drn.firedoor.closer === null && J(drb.consumables.closer) === J({ type: 'builtin', count: 1 }) && drb.firedoor.closer.label === 'Built in closer',
     'closer kinds: surface CLOSER 1, builtin CLOSER 2 (consumables builtin x 1), none CLOSER 0 and no row');
   const n = mk({ firedoorLeafWidth: 762, firedoorLeafHeight: 1981 }).derived.firedoor;
-  ok(n.hinges.step === 764.5 && J(n.hinges.positions.map((p) => p.top)) === J([150, 739.5, 1679]) && J(n.hinges.positions.map((p) => p.jambTop)) === J([188, 777.5, 1717]) && J(n.frame.overall) === J({ width: 838, height: 2024 }),
-    'leaf 762 x 1981: equal step 764.5 kept, hinges 150 / 739.5 / 1679 (middle centre 990.5 - 200 = 790.5), jamb 188 / 777.5 / 1717, frame 838 x 2024');
-  ok(n.bsuiteVars.leaf.HINGE_2 === 739.5 && n.bsuiteVars.jambHinge.HINGE_2 === 777.5 && n.lock.spindle.fromTop === 981 && n.keep.centreFromTop === 1034 && J(n.opening) === J({ width: 848, height: 2029, wallGapSide: 5, wallGapHead: 5, source: 'leaf', sourceWidth: 'leaf', sourceHeight: 'leaf' }),
-    '762 x 1981: HINGE_2 739.5 / 777.5, spindle 981 from the top, keep 1034 from the jamb top, the opening reported from the leaf 848 x 2029');
+  ok(n.hinges.step === 759 && J(n.hinges.positions.map((p) => p.top)) === J([145, 670.5, 1663]) && J(n.hinges.positions.map((p) => p.jambTop)) === J([183, 708.5, 1701]) && J(n.hinges.positions.map((p) => p.fromBottom)) === J([1734, 1208.5, 216]) && J(n.frame.overall) === J({ width: 838, height: 2024 }),
+    'leaf 762 x 1981: equal step 759 kept, hinge tops 145 / 670.5 / 1663 (middle centre 990.5 - 269 = 721.5), from the bottom 1734 / 1208.5 / 216, jamb 183 / 708.5 / 1701, frame 838 x 2024');
+  ok(n.bsuiteVars.leaf.HINGE_2 === 1208.5 && n.bsuiteVars.jambHinge.HINGE_2 === 1213.5 && n.lock.spindle.fromTop === 986 && n.keep.centreFromTop === 1039 && J(n.opening) === J({ width: 848, height: 2029, wallGapSide: 5, wallGapHead: 5, source: 'leaf', sourceWidth: 'leaf', sourceHeight: 'leaf' }),
+    '762 x 1981: HINGE_2 1208.5 / 1213.5 (from the bottom / the foot), spindle 986 from the top, keep 1039 from the jamb top, the opening reported from the leaf 848 x 2029');
   // v1.1: the structural opening as the input (the owner's example: 1000 -> 990 -> 914)
   const op = mk({ firedoorOpeningWidth: 1000, firedoorOpeningHeight: 2100 }).derived;
   const fop = op.firedoor;
   ok(J(fop.leaf) === J({ width: 914, height: 2052, thickness: 44, blank: { width: 914, height: 2052, thickness: 44, allowance: 0 } }) && J(fop.frame.overall) === J({ width: 990, height: 2095 }) && J(op.frame) === J({ width: 990, height: 2095 })
     && J(fop.opening) === J({ width: 1000, height: 2100, wallGapSide: 5, wallGapHead: 5, source: 'opening', sourceWidth: 'opening', sourceHeight: 'opening' }),
     'opening 1000 x 2100: frame 990 x 2095 (opening - 5 a side / - 5 head), leaf 914 x 2052 (frame - 76 / - 43)');
-  ok(J(fop.hinges.positions.map((p) => p.top)) === J([150, 775, 1750]) && fop.bsuiteVars.leaf.LPX === 2052 && fop.bsuiteVars.leaf.LPY === 914 && fop.bsuiteVars.head.LPX === 990 && fop.bsuiteVars.jambHinge.LPX === 2095 && fop.lock.spindle.fromTop === 1052,
-    'opening 1000 x 2100: hinges 150 / 775 / 1750 (centre 1026 - 200 - 51), LPX 2052 LPY 914, head 990, jambs 2095, spindle 1052 from the top');
+  ok(J(fop.hinges.positions.map((p) => p.top)) === J([145, 706, 1734]) && J(fop.hinges.positions.map((p) => p.fromBottom)) === J([1805, 1244, 216]) && fop.bsuiteVars.leaf.LPX === 2052 && fop.bsuiteVars.leaf.LPY === 914 && fop.bsuiteVars.head.LPX === 990 && fop.bsuiteVars.jambHinge.LPX === 2095 && fop.lock.spindle.fromTop === 1057,
+    'opening 1000 x 2100: hinge tops 145 / 706 / 1734 (centre 1026 - 269 - 51), from the bottom 1805 / 1244 / 216, LPX 2052 LPY 914, head 990, jambs 2095, spindle 1057 from the top');
   ok(J(fop.inputs.leafOverride) === J({ width: false, height: false }) && fop.inputs.openingWidth === 1000 && fop.inputs.leafWidth === 914 && fop.frame.members[0].length === 990 && op.components.box[0].length === 990 && op.components.sash[0].section === '44x914' && op.components.sash[0].length === 2052,
     'opening 1000 x 2100: inputs echo the derived leaf with no override, the records carry 990 / 2095 / 44x914 x 2052');
   const ov = mk({ firedoorOpeningWidth: 1000, firedoorOpeningHeight: 2100, firedoorLeafWidth: 826 }).derived.firedoor;
@@ -379,14 +380,14 @@ section('3b - FD60, non-fire DR, the 762 x 1981 leaf, hinge right, euro / bathro
   ok(rh.bsuiteVars.leaf.HAND === 1 && rh.bsuiteVars.leaf.LH === 0 && rh.bsuiteVars.leaf.RH === 1 && rh.bsuiteVars.head.HAND === 1 && rh.bsuiteVars.jambHinge.HAND === 1 && rh.bsuiteVars.jambLock.HAND === 1
     && J(rh.handing) === J({ hingeSide: 'right', label: 'Hinge right' }) && !('swing' in rh.inputs),
     'hinge right: HAND 1, LH 0, RH 1 on every row, label "Hinge right", no swing anywhere (a stored swing is ignored)');
-  ok(J(rh.hinges.positions.map((p) => p.top)) === J([150, 769, 1738]) && J(opsOf({ firedoor: rh }, 'leaf', 'hingeRecess').map((o) => o.x)) === J([149.5, 768.5, 1737.5]) && opsOf({ firedoor: rh }, 'leaf', 'spindleHole')[0].y === 766,
+  ok(J(rh.hinges.positions.map((p) => p.top)) === J([145, 700, 1722]) && J(opsOf({ firedoor: rh }, 'leaf', 'hingeRecess').map((o) => o.x)) === J([144.5, 699.5, 1721.5]) && opsOf({ firedoor: rh }, 'leaf', 'spindleHole')[0].y === 766,
     'handing never moves a leaf op (y from the hinge edge, z from the pull face)');
   const eu = mk({ firedoorLockType: 'euro' }).derived, ba = mk({ firedoorLockType: 'bathroom' }).derived;
-  ok(J(eu.firedoor.lock.cylinder) === J({ kind: 'euro', fromBottom: 928, fromTop: 1112, fromLockEdge: 60, bore: 18 }) && eu.firedoor.lock.euro === true && eu.firedoor.bsuiteVars.leaf.EURO === 1 && eu.firedoor.lock.macroLock === 2,
-    'euro: cylinder 928 from the bottom (1000 - 72), bore 18, EURO 1, LOCK 2');
-  ok(J(ba.firedoor.lock.cylinder) === J({ kind: 'bathroom', fromBottom: 922, fromTop: 1118, fromLockEdge: 60, bore: 10 }) && ba.firedoor.bsuiteVars.leaf.EURO === 0, 'bathroom: cylinder 922 from the bottom (1000 - 78), bore 10, EURO 0');
-  ok(opIs(opsOf(eu, 'leaf', 'cylinderHole')[0], 'pull', 1112, 766, 0, 18, 18, 44, 9) && opIs(opsOf(ba, 'leaf', 'cylinderHole')[0], 'pull', 1118, 766, 0, 10, 10, 44, 5) && eu.firedoor.machining.leaf.length === 11,
-    'the cylinder hole: euro centre x 1112 bore 18, bathroom x 1118 bore 10, through the leaf');
+  ok(J(eu.firedoor.lock.cylinder) === J({ kind: 'euro', fromBottom: 923, fromTop: 1117, fromLockEdge: 60, bore: 18 }) && eu.firedoor.lock.euro === true && eu.firedoor.bsuiteVars.leaf.EURO === 1 && eu.firedoor.lock.macroLock === 2,
+    'euro: cylinder 923 from the bottom (995 - 72), bore 18, EURO 1, LOCK 2');
+  ok(J(ba.firedoor.lock.cylinder) === J({ kind: 'bathroom', fromBottom: 917, fromTop: 1123, fromLockEdge: 60, bore: 10 }) && ba.firedoor.bsuiteVars.leaf.EURO === 0, 'bathroom: cylinder 917 from the bottom (995 - 78), bore 10, EURO 0');
+  ok(opIs(opsOf(eu, 'leaf', 'cylinderHole')[0], 'pull', 1117, 766, 0, 18, 18, 44, 9) && opIs(opsOf(ba, 'leaf', 'cylinderHole')[0], 'pull', 1123, 766, 0, 10, 10, 44, 5) && eu.firedoor.machining.leaf.length === 11,
+    'the cylinder hole: euro centre x 1117 bore 18, bathroom x 1123 bore 10, through the leaf');
   ok(J(eu.consumables.lock) === J({ type: 'euro' }) && J(ba.consumables.lock) === J({ type: 'bathroom' }), 'consumables.lock.type euro / bathroom');
   // the vision panels
   const v1 = mk({ firedoorVpStyle: 1 }).derived;
@@ -703,7 +704,7 @@ section('4 - the lists: cut list, grouped symbols, pre-cut, glass schedule, hard
   ok(J(hw.map((x) => x.partId)) === J(['fd_hinge_fire', 'fd_lock_euro', 'fd_cylinder_euro', 'fd_handle_set', 'fd_keep', 'fd_closer', 'fd_intu_15', 'fd_frame_dowel']) && hw.every((x) => x.enginePart === true),
     'hardware partIds fd_hinge_fire / fd_lock_euro / fd_cylinder_euro / fd_handle_set / fd_keep / fd_closer / fd_intu_15 / fd_frame_dowel, every line enginePart');
   ok(J(hw.map((x) => x.quantity)) === J([3, 1, 1, 1, 1, 1, 4.906, 6]) && hw[6].unit === 'm' && (hw[7].unit ?? 'pcs') === 'pcs', 'hardware quantities 3 / 1 / 1 / 1 / 1 / 1 / 4.906 m / 6 dowels (pcs)');
-  ok(/150 \/ 769 \/ 1738/.test(hw[0].detail) && /Hinge left/.test(hw[0].detail) && !/opens/.test(hw[0].detail), `the hinge detail carries the positions and the handing, no swing ("${hw[0].detail}")`);
+  ok(/1793 \/ 1238 \/ 216/.test(hw[0].detail) && /Hinge left/.test(hw[0].detail) && !/opens/.test(hw[0].detail), `the hinge detail carries the positions and the handing, no swing ("${hw[0].detail}")`);
   ok(/no machining yet/.test(hw[5].detail) && /1 x 15 x 4 all around/.test(hw[6].detail) && /8 x 40/.test(hw[7].detail) && /3 per mitred corner/.test(hw[7].detail), `the closer, strip and dowel details ("${hw[5].detail}" | "${hw[6].detail}" | "${hw[7].detail}")`);
   const sf = mkB({ firedoorCloser: 'surface' });
   const hs = M.lists.buildHardwareList(sf.spec, sf.derived);
@@ -1009,7 +1010,7 @@ section('8 - the 3D: fireDoorGeometryFromSpec and the model mounted headless');
   ok(geo.frame.overall.w === 902 && geo.frame.overall.h === 2083 && geo.totalWidth === 902 && geo.totalHeight === 2083 && geo.origin.x === 451 && geo.origin.y === 1041.5, 'geo frame overall 902 x 2083, origin at the frame centre (451, 1041.5)');
   ok(geo.frame.depth === 100 && geo.frame.thickness === 50 && geo.frame.rebate.w === 15 && geo.frame.rebate.d === 47 && geo.frame.faces.outside === 35 && geo.frame.faces.inside === 50 && geo.frame.gaps.floor === 5,
     'geo frame depth 100, thickness 50, rebate 15 x 47, faces 35 / 50, floor gap 5');
-  ok(J(geo.hinges.positions.map((p) => p.top)) === J([150, 769, 1738]) && geo.hinges.length === 102, 'geo hinges 150 / 769 / 1738, 102 long');
+  ok(J(geo.hinges.positions.map((p) => p.top)) === J([145, 700, 1722]) && J(geo.hinges.positions.map((p) => p.fromBottom)) === J([1793, 1238, 216]) && geo.hinges.length === 102, 'geo hinges tops 145 / 700 / 1722, from the bottom 1793 / 1238 / 216 (v1.3), 102 long');
   ok(geo.lock.spindle.fromBottom === 1000 && geo.lock.spindle.fromLockEdge === 60 && geo.lock.cylinder?.kind === 'euro' && geo.lock.cylinder.fromBottom === 928, 'geo spindle 1000 / 60, euro cylinder 928');
   ok(geo.vp.panes.length === 1 && geo.vp.panes[0].w === 450 && geo.vp.panes[0].h === 450 && !geo.vp.panes[0].rotated && geo.vp.glassThickness === 6, 'geo one VP pane 450 x 450, glass 6');
   ok(geo.handing.hingeSide === 'left' && geo.handing.label === 'Hinge left' && !('swing' in geo.handing) && geo.closer?.type === 'builtin' && geo.keep?.centreFromFoot === 990 && geo.keep.plate.length === 176 && geo.keep.plate.width === 40, 'geo handing left (no swing), closer built in, keep 990 from the foot, plate 176 x 40');
@@ -1081,7 +1082,7 @@ section('8 - the 3D: fireDoorGeometryFromSpec and the model mounted headless');
     ok(glass.length === 1 && near(w(glass[0]), 450, 0.02) && near(hh(glass[0]), 450, 0.02) && near(dd(glass[0]), 6, 0.02) && near(cx(glass[0]), 0, 0.02) && near(glass[0].max[1], 1003.5 - 150, 0.02),
       `the VP glass 450 x 450 x 6 centred across the leaf, its top 150 under the leaf top (${glass[0] ? `${w(glass[0])} x ${hh(glass[0])} x ${dd(glass[0])}, top ${glass[0].max[1]}` : 'missing'})`);
     const keep = ms.find((m) => hasN(m, 'keep-plate'));
-    ok(!!keep && near(hh(keep), 176, 0.02) && near(dd(keep), 40, 0.02) && near(cy(keep), -1041.5 + 990, 0.02), `the keep plate 176 x 40 centred 990 above the feet (y ${keep && cy(keep)})`);
+    ok(!!keep && near(hh(keep), 176, 0.02) && near(dd(keep), 40, 0.02) && near(cy(keep), -1041.5 + 985, 0.02), `the keep plate 176 x 40 centred 985 above the feet (y ${keep && cy(keep)})`);
     const roses = ms.filter((m) => hasN(m, 'fd-handle') && m.kind === 'CylinderGeometry' && near(w(m), 52, 0.02));
     ok(roses.length === 2 && roses.every((m) => near(cy(m), -36.5, 0.02) && near(Math.abs(cx(m)), 353, 0.02)), `2 handle roses at the spindle (y -36.5 = feet + 5 + 1000, |x| 353 = lock edge - 60)`);
     ok(ms.filter((m) => hasN(m, 'fd-euro')).length === 4 && ms.filter((m) => hasN(m, 'vp-beads')).length === 8, 'four euro escutcheons, eight glazing beads');
@@ -1142,12 +1143,12 @@ const unzip = (buf) => {
   // v1.1: INTU / INTU_W / INTU_T before INTU_STYLE; HINGE_2 769; CLOSER 0 / 1 / 2 (a v1 boolean true = built in 2)
   const ORDER = ['HAND', 'LH', 'RH', 'HINGE', 'LOCK', 'LOCK_H', 'SPINDLE', 'EURO', 'KEEP', 'KEEP_STYLE', 'INTU', 'INTU_W', 'INTU_T', 'INTU_STYLE', 'VP_STYLE', 'C_VP_L', 'C_VP_W', 'C_VP_NUM', 'C_VP_RAIL', 'C_VP_POS', 'D_TOP_RAIL', 'D_MID_RAIL', 'D_SIDE_MARGIN', 'VP_SHAPE', 'VP_N', 'VP_W', 'VP_H', 'VP_GAP', 'VP_ARR', 'VP_X', 'VP_Y', 'VP_R', 'LEAD_EDGE', 'REBATE', 'REBATE_STYLE', 'SPY_ON', 'SPY_H', 'LBOX', 'L_BOX_H', 'DROP_CILL', 'PREM_DOOR', 'HINGE_1', 'HINGE_2', 'HINGE_3', 'HINGE_D', 'CLOSER'];
   ok(rows.every((r) => J(Object.keys(r.docVars)) === J(ORDER)), 'every leaf row writes the document variables in the exact 4.7 + v1.1 order (LPX / LPY / LPZ on the panel node)', Object.keys(L.docVars).join());
-  const E1 = { HAND: 0, LH: 1, RH: 0, HINGE: 1, LOCK: 2, LOCK_H: 1000, SPINDLE: 1, EURO: 1, KEEP: 0, KEEP_STYLE: 0, INTU: 1, INTU_W: 15, INTU_T: 4, INTU_STYLE: 1, VP_STYLE: 1, C_VP_L: 600, C_VP_W: 150, C_VP_NUM: 1, C_VP_RAIL: 100, C_VP_POS: 0, D_TOP_RAIL: 150, D_MID_RAIL: 450, D_SIDE_MARGIN: 150, VP_SHAPE: 1, VP_N: 1, VP_W: 450, VP_H: 450, VP_GAP: 0, VP_ARR: 0, VP_X: 150, VP_Y: 188, VP_R: 6, LEAD_EDGE: 1, REBATE: 0, REBATE_STYLE: 1, SPY_ON: 0, SPY_H: 1450, LBOX: 0, L_BOX_H: 1000, DROP_CILL: 0, PREM_DOOR: 0, HINGE_1: 150, HINGE_2: 769, HINGE_3: 1738, HINGE_D: 3, CLOSER: 2 };
+  const E1 = { HAND: 0, LH: 1, RH: 0, HINGE: 1, LOCK: 2, LOCK_H: 995, SPINDLE: 1, EURO: 1, KEEP: 0, KEEP_STYLE: 0, INTU: 1, INTU_W: 15, INTU_T: 4, INTU_STYLE: 1, VP_STYLE: 1, C_VP_L: 600, C_VP_W: 150, C_VP_NUM: 1, C_VP_RAIL: 100, C_VP_POS: 0, D_TOP_RAIL: 150, D_MID_RAIL: 450, D_SIDE_MARGIN: 150, VP_SHAPE: 1, VP_N: 1, VP_W: 450, VP_H: 450, VP_GAP: 0, VP_ARR: 0, VP_X: 150, VP_Y: 188, VP_R: 6, LEAD_EDGE: 1, REBATE: 0, REBATE_STYLE: 1, SPY_ON: 0, SPY_H: 1450, LBOX: 0, L_BOX_H: 1000, DROP_CILL: 0, PREM_DOOR: 0, HINGE_1: 1793, HINGE_2: 1238, HINGE_3: 216, HINGE_D: 3.2, CLOSER: 2 };
   const NOVP = { VP_SHAPE: 0, VP_N: 0, VP_W: 0, VP_H: 0, VP_GAP: 0, VP_ARR: 0, VP_X: 0, VP_Y: 0, VP_R: 0 };
   const E2 = { ...E1, LOCK: 3, EURO: 0, INTU: 2, INTU_STYLE: 4, VP_STYLE: 0, ...NOVP, CLOSER: 0 };
   const E3 = { ...E1, HAND: 1, LH: 0, RH: 1, HINGE: 0, LOCK: 1, EURO: 0, INTU: 0, INTU_W: 0, INTU_T: 0, INTU_STYLE: 0, VP_STYLE: 0, ...NOVP, CLOSER: 0 };
   const diff = (got, want) => Object.keys(want).filter((k) => got[k] !== want[k]).map((k) => `${k}=${got[k]} (exp ${want[k]})`);
-  ok(diff(L.docVars, E1).length === 0 && J(L.docVars) === J(E1), 'FDR-01 (FD30 euro VP 1, a v1 closer true = built in): every value, INTU 1 / 15 / 4, INTU_STYLE 1, HINGE_2 769, CLOSER 2', diff(L.docVars, E1).join(', '));
+  ok(diff(L.docVars, E1).length === 0 && J(L.docVars) === J(E1), 'FDR-01 (FD30 euro VP 1, a v1 closer true = built in): every value, INTU 1 / 15 / 4, INTU_STYLE 1, HINGE_1..3 1793 / 1238 / 216 (v1.3 from the bottom), LOCK_H 995, CLOSER 2', diff(L.docVars, E1).join(', '));
   ok(diff(rows[1].docVars, E2).length === 0 && rows[1].vars.LPZ === 54, 'FDR-02 (FD60 latch no closer): LPZ 54, LOCK 3, EURO 0, INTU 2, INTU_STYLE 4, VP_STYLE 0, CLOSER 0, HINGE 1', diff(rows[1].docVars, E2).join(', '));
   ok(diff(rows[2].docVars, E3).length === 0 && rows[2].vars.LPZ === 44, 'DR-01 (non-fire bathroom hinge right): HAND 1, LH 0, RH 1, HINGE 0, LOCK 1, EURO 0, INTU 0, INTU_STYLE 0, CLOSER 0, LPZ 44', diff(rows[2].docVars, E3).join(', '));
   const sRow = X.buildBsuiteFireDoorRows([mkX('FDR-05', { firedoorCloser: 'surface' })], prof).rows[0];
@@ -1166,9 +1167,9 @@ const unzip = (buf) => {
   ok(J(F.rows.filter((r) => r.kind !== 'stop').map((r) => r.program)) === J([...Array(3).fill('FD_LEAF_MASTER_PIOTR.bSolid'), ...Array(3).fill('FD_HEAD.bSolid'), ...Array(3).fill('FD_JAMB_HINGE.bSolid'), ...Array(3).fill('FD_JAMB_LOCK.bSolid')]), '12 program rows, the program names per block');
   const head = F.rows[4], jh = F.rows[8], jl = F.rows[12];
   const DOW = { DOWEL_N: 3, DOWEL_D: 8, DOWEL_L: 40, DOWEL_DEPTH: 20, DOWEL_1: 20, DOWEL_2: 50, DOWEL_3: 80 };
-  ok(head.vars.LPX === 902 && head.vars.LPY === 100 && head.vars.LPZ === 50 && J(head.docVars) === J({ REB_W: 15, REB_D: 47, HAND: 0, HINGE: 1, HINGE_D: 3, MITRE_TOP: 1, MITRE_BOTTOM: 1, ...DOW }), `the head row FDR-01: panel 902 x 100 x 50, ${J(head.docVars)} (v1.1: the DOWEL_* names)`);
-  ok(jh.vars.LPX === 2083 && J(jh.docVars) === J({ REB_W: 15, REB_D: 47, HAND: 0, HINGE: 1, HINGE_1: 188, HINGE_2: 807, HINGE_3: 1776, HINGE_D: 3, MITRE_TOP: 1, MITRE_BOTTOM: 0, ...DOW }), `the hinge jamb row FDR-01: LPX 2083, ${J(jh.docVars)}`);
-  ok(jl.vars.LPX === 2083 && J(jl.docVars) === J({ REB_W: 15, REB_D: 47, HAND: 0, HINGE: 1, HINGE_D: 3, KEEP: 2, KEEP_STYLE: 1, KEEP_Y: 990, MITRE_TOP: 1, MITRE_BOTTOM: 0, ...DOW }), `the lock jamb row FDR-01: ${J(jl.docVars)}`);
+  ok(head.vars.LPX === 902 && head.vars.LPY === 100 && head.vars.LPZ === 50 && J(head.docVars) === J({ REB_W: 15, REB_D: 47, HAND: 0, HINGE: 1, HINGE_D: 3.2, MITRE_TOP: 1, MITRE_BOTTOM: 1, ...DOW }), `the head row FDR-01: panel 902 x 100 x 50, ${J(head.docVars)} (v1.1: the DOWEL_* names)`);
+  ok(jh.vars.LPX === 2083 && J(jh.docVars) === J({ REB_W: 15, REB_D: 47, HAND: 0, HINGE: 1, HINGE_1: 1798, HINGE_2: 1243, HINGE_3: 221, HINGE_D: 3.2, MITRE_TOP: 1, MITRE_BOTTOM: 0, ...DOW }), `the hinge jamb row FDR-01: LPX 2083, ${J(jh.docVars)}`);
+  ok(jl.vars.LPX === 2083 && J(jl.docVars) === J({ REB_W: 15, REB_D: 47, HAND: 0, HINGE: 1, HINGE_D: 3.2, KEEP: 2, KEEP_STYLE: 1, KEEP_Y: 985, MITRE_TOP: 1, MITRE_BOTTOM: 0, ...DOW }), `the lock jamb row FDR-01: ${J(jl.docVars)}`);
   ok(F.rows[13].docVars.KEEP === 3 && F.rows[13].docVars.REB_D === 57 && F.rows[5].docVars.REB_D === 57 && F.rows[14].docVars.KEEP === 1 && F.rows[14].docVars.HAND === 1 && F.rows[10].docVars.HAND === 1 && F.rows[10].docVars.HINGE === 0,
     'FDR-02 (FD60): KEEP 3, REB_D 57 on the head and the lock jamb; DR-01: KEEP 1, HAND 1, HINGE 0');
   ok(X.buildBsuiteFireDoorRows(windows, { ...full, bsuite: { ...full.bsuite, stopRows: false } }).rows.length === 12, 'stopRows false: the same 12 rows without STOP');
@@ -1191,9 +1192,9 @@ const unzip = (buf) => {
     'the XML item order: 3 programs, STOP, 3, STOP, 3, STOP, 3 (12 CadProgramWorklistItem)');
   ok(/Label="FDR-01" Quantity="1"/.test(xml) && /Label="DR-01" Quantity="1"/.test(xml) && xml.includes('ProgramUri="file:///C:/Users/Xp600/Desktop/Biesse Piotr/FD_LEAF_MASTER_PIOTR.bSolid"'), 'Label = the door name, Quantity 1, the leaf ProgramUri as file:///');
   ok(/<ProgramPanelNode Id="1001" Name="P1001">\r\n            <Variables>\r\n              <ParametricVariable TypeCode="Double" VariableName="LPX" Expression="2040" ExpressionValue="2040" MeasureUnit="mm" \/>/.test(xml)
-    && /TypeCode="String" VariableName="HAND" Expression="0"/.test(xml) && /TypeCode="String" VariableName="CLOSER" Expression="2"/.test(xml) && /TypeCode="String" VariableName="HINGE_3" Expression="1738"/.test(xml) && /TypeCode="String" VariableName="INTU" Expression="1"/.test(xml) && !/TypeCode="String" VariableName="LPX"/.test(xml),
+    && /TypeCode="String" VariableName="HAND" Expression="0"/.test(xml) && /TypeCode="String" VariableName="CLOSER" Expression="2"/.test(xml) && /TypeCode="String" VariableName="HINGE_3" Expression="216"/.test(xml) && /TypeCode="String" VariableName="HINGE_1" Expression="1793"/.test(xml) && /TypeCode="String" VariableName="LOCK_H" Expression="995"/.test(xml) && /TypeCode="String" VariableName="INTU" Expression="1"/.test(xml) && !/TypeCode="String" VariableName="LPX"/.test(xml),
     'the leaf row: LPX / LPY / LPZ as Double on the panel node, HAND .. CLOSER as String document variables (CLOSER 2, INTU 1)');
-  ok(/VariableName="KEEP_Y" Expression="990"/.test(xml) && /VariableName="HINGE_1" Expression="188"/.test(xml) && /VariableName="MITRE_BOTTOM" Expression="0"/.test(xml) && /VariableName="DOWEL_N" Expression="3"/.test(xml) && /VariableName="DOWEL_3" Expression="80"/.test(xml), 'the frame rows: KEEP_Y 990, HINGE_1 188, MITRE_BOTTOM 0, DOWEL_N 3, DOWEL_3 80 as document variables');
+  ok(/VariableName="KEEP_Y" Expression="985"/.test(xml) && /VariableName="HINGE_1" Expression="1798"/.test(xml) && /VariableName="MITRE_BOTTOM" Expression="0"/.test(xml) && /VariableName="DOWEL_N" Expression="3"/.test(xml) && /VariableName="DOWEL_3" Expression="80"/.test(xml), 'the frame rows: KEEP_Y 990, HINGE_1 188, MITRE_BOTTOM 0, DOWEL_N 3, DOWEL_3 80 as document variables');
   ok(xml.startsWith('<Worklist Description="" Version="4">\r\n') && xml.endsWith('  <Variables />\r\n</Worklist>') && !xml.includes('<?xml'), 'root and tail as the sample, CRLF, no xml header');
   const ids = F.rows.map((_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`);
   ok(X.writeWorklistXml(F.rows, { now, ids }) === X.writeWorklistXml(F.rows, { now, ids }) && X.writeWorklistXml(F.rows, { now, ids }).includes('<StopWorklistItem Id="00000000-0000-4000-8000-000000000003" Label="" />'), 'deterministic with fixed ids (the STOP rows take ids from the same list)');
@@ -1219,12 +1220,12 @@ const unzip = (buf) => {
   const h1 = mr.find((r) => r.door === 'FDR-01' && r.element === 'FD-LEAF' && r.op === 'hingeRecess');
   const jr = mr.find((r) => r.door === 'FDR-01' && r.element === 'FD-JAMB-H' && r.op === 'hingeRecess');
   const mt = mr.find((r) => r.door === 'FDR-01' && r.element === 'FD-HEAD' && r.op === 'mitre');
-  ok(h1 && h1.face === 'hingeEdge' && h1.x === 149.5 && h1.length === 103 && h1.width === 30 && h1.depth === 3 && h1.radius === 6 && jr && jr.x === 187.5 && mt && mt.angle === 45, 'the first leaf hinge recess x 149.5 (103 x 30 x 3 R6), the jamb recess x 187.5, the head mitre angle 45');
+  ok(h1 && h1.face === 'hingeEdge' && h1.x === 144.5 && h1.length === 103 && h1.width === 30 && h1.depth === 3.2 && h1.radius === 6 && jr && jr.x === 182.5 && mt && mt.angle === 45, 'the first leaf hinge recess x 144.5 (103 x 30 x 3.2 R6), the jamb recess x 182.5, the head mitre angle 45');
   ok(mr.filter((r) => r.door === 'DR-01' && r.op === 'intuGroove').length === 0 && mr.filter((r) => r.door === 'FDR-01' && r.op === 'intuGroove').length === 3 && mr.find((r) => r.door === 'FDR-01' && r.op === 'leadEdge')?.value === -8, 'DR-01 has no groove rows, FDR-01 three; the lead edge row carries value -8');
   const csv = M.machining.fireDoorMachiningCsv(mr);
   const lines = csv.split('\r\n').filter((l) => l.length);
   ok(lines[0] === 'door,element,op,face,x,y,z,length,width,depth,radius,angle,value,note' && lines.length === mr.length + 1, `the CSV header and ${lines.length - 1} lines (one per op)`);
-  ok(/FDR-01,FD-LEAF,hingeRecess,hingeEdge,149\.5,0,0,103,30,3,6,,,/.test(csv) && /"lock forend, full radius ends"/.test(csv) && /,vpCutout,pull,150,188,0,450,450,44,6,0,,vision panel 1 450 x 450\r\n/.test(csv) && /FDR-01,FD-HEAD,dowelBore,mitre,877,25,20,8,8,20,4,45,,/.test(csv), 'the CSV: numbers to 0.1, a note with commas quoted, a dowel bore line with the angle 45');
+  ok(/FDR-01,FD-LEAF,hingeRecess,hingeEdge,144\.5,0,0,103,30,3\.2,6,,,/.test(csv) && /"lock forend, full radius ends"/.test(csv) && /,vpCutout,pull,150,188,0,450,450,44,6,0,,vision panel 1 450 x 450\r\n/.test(csv) && /FDR-01,FD-HEAD,dowelBore,mitre,877,25,20,8,8,20,4,45,,/.test(csv), 'the CSV: numbers to 0.1, a note with commas quoted, a dowel bore line with the angle 45');
   const json = M.machining.fireDoorMachiningJson(windows);
   let parsed = null;
   try { parsed = JSON.parse(json); } catch { parsed = null; }

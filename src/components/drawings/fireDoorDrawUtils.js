@@ -56,6 +56,20 @@
  * intuWord (the strip with its colour) and vpGlassWord (the glass type and
  * thickness) are the note words. groupFireDoorGlass keys a group by the pane
  * shape and the glass type too.
+ *
+ * v1.3 (owner 28.10.2026, the Weeke rule): a hinge POSITION on every sheet is
+ * the hinge's LOWER edge above the LEAF BOTTOM (positions[i].fromBottom; on
+ * the hinge jamb above the jamb foot, jambFromFoot), the way the old Weeke
+ * program counted it (X = 0 at the bottom). H1 is still the TOP hinge (the
+ * numbering runs from the top, only the value is from the bottom). The hinge
+ * chains read from the bottom: hingeChainFromBottom / jambHingeChainFromFoot
+ * give the segments bottom to top (216 / 102 / 920 / 102 / 453 / 102 / 145
+ * on a 2040 leaf), hingePositionsWord / jambHingePositionsWord the note
+ * words, spindleWord the handle height ('spindle 1000 above the floor (995
+ * above the leaf bottom)', from lock.spindle.fromFloor / fromBottom). The
+ * elevation hinges carry fromBottom / jambFromFoot beside fromTop. The
+ * `top` of a position (from the leaf top) stays the board system of the
+ * machining ops, so the drawn geometry is unchanged.
  */
 
 const R1 = (v) => Math.round(v * 10) / 10;

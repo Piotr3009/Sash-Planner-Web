@@ -325,7 +325,7 @@ export const FIREDOOR_PARTS = {
   ],
   ironmongery: [
     fdRow({ id: FH.hingeFire.partId, name: 'Fire Door Hinge', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.hingeFire.slot,
-      hint: `${FP.hinges.count} per leaf on a fire door (FD30 / FD60), ${FP.hinges.length} long, at the macro positions (${FP.hinges.topOffset} from the leaf top, the last one ending ${FP.hinges.bottomOffset} above the bottom). Pieces.` }),
+      hint: `${FP.hinges.count} per leaf on a fire door (FD30 / FD60), ${FP.hinges.length} long, at the Weeke positions (the top hinge ${FP.hinges.topOffset} below the leaf top, the bottom one ending ${FP.hinges.bottomOffset} above the leaf bottom, the middle centre ${FP.hinges.midAboveCentre} above the leaf centre; positions counted to the hinge lower edge from the leaf bottom). Pieces.` }),
     fdRow({ id: FH.hingeStd.partId, name: 'Door Hinge (standard)', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.hingeStd.slot,
       hint: `${FP.hinges.count} per leaf on a non-fire internal door, the same positions as the fire hinge. Pieces.` }),
     fdRow({ id: FH.lockLatch.partId, name: 'Lock Case, Latch', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.lockLatch.slot,
@@ -339,7 +339,7 @@ export const FIREDOOR_PARTS = {
     fdRow({ id: FH.thumbturn.partId, name: 'Thumbturn and Release', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.thumbturn.slot,
       hint: 'One per bathroom door: the turn inside, the emergency release outside. Pieces.' }),
     fdRow({ id: FH.handle.partId, name: 'Lever Handle Set', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.handle.slot,
-      hint: `One set on roses per door, spindle ${FP.lock.spindleHeight} from the leaf bottom. Pieces.` }),
+      hint: `One set on roses per door, spindle ${FP.lock.spindleFromFloor} above the floor (the engine takes the floor gap off for LOCK_H from the leaf bottom). Pieces.` }),
     fdRow({ id: FH.keep.partId, name: 'Keep', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.keep.slot,
       hint: `One per door on the lock jamb: ${FP.keep.length} x ${FP.keep.width} plate, FD30 / FD60 / standard by the door. Pieces.` }),
     fdRow({ id: FH.closerBuiltin.partId, name: 'Built in closer (concealed)', materialType: 'ironmongery', unit: 'pcs', defaultCategory: FH.closerBuiltin.slot,

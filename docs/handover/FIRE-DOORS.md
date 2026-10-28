@@ -145,7 +145,10 @@ swing: in / out belongs to external doors, an internal door is handed by its hin
 elevation is the pull side, the inside elevation the 50 face, the plan opens the leaf out of the rebate).
 
 The reference doors, every row from the live engine with the default profile and asserted by
-`verify/parity/t51_fire_door.mjs` (v1.1 numbers):
+`verify/parity/t51_fire_door.mjs` (v1.1 numbers; v1.3 moved the hinges to 145 / 700 / 1722 from the top = 1793 / 1238
+/ 216 above the leaf bottom, jamb 183 / 738 / 1760 from the top = 1798 / 1243 / 221 above the foot, and the spindle to
+995 above the leaf bottom = 1000 above the floor, keep 985: section 11a; the rows below that carry the old hinge or
+spindle numbers read as superseded):
 
 | | FD30, leaf 826 x 2040 (nothing typed = the default leaf; opening 912 x 2088), depth 100, hinge left, latch | rule |
 |---|---|---|
@@ -610,6 +613,22 @@ apply):
    machine is to cut leaves again (out of scope here).
 7. v1.2: the DXF layer names against a bSolid import convention, if the owner wants the import to make the
    workings from the layers (BLOCKERS 37.1).
+
+## 11a. v1.3 (28.10.2026 afternoon): hinges counted from the leaf bottom, the Weeke rule; the handle from the floor
+
+Read with the owner from his old Weeke program `farrington_d01.mpr` (BLOCKERS 37.10 to 37.13). Rule
+(`hinges.topOffset 145`, `bottomOffset 216`, `midAboveCentre 269`, `recessDepth 3.2`): the top hinge 145 below the
+leaf top, the bottom hinge ending 216 above the leaf bottom, the middle hinge centre 269 above the leaf centre; 2040:
+tops 145 / 700 / 1722 from the top. A hinge POSITION is its LOWER edge above the LEAF BOTTOM (`positions[i].fromBottom`
+1793 / 1238 / 216; `hinges.positionRef 'bottom'`) and on the hinge jamb above the jamb foot (`jambFromFoot` 1798 /
+1243 / 221); `top`, `bottom`, `centre`, `jambTop` stay (the board system of the ops, from the top). HINGE_1 is the
+top hinge (numbering from the top): the leaf row HINGE_1..3 = 1793 / 1238 / 216, the hinge jamb row 1798 / 1243 /
+221; HINGE_D 3.2. The sheets, the pages, the lists and the DXF print the positions from the bottom; the machining
+ops, CSV and JSON keep x from the leaf top (recess tops 144.5 / 699.5 / 1721.5). The handle: `lock.spindleFromFloor`
+1000 above the floor, LOCK_H = `spindleHeight` = 1000 - floorGap = 995 above the leaf bottom (`lock.spindle.fromFloor`
+/ `fromBottom`); forend centre 980, case top 1041.5, euro 923, bathroom 917 above the leaf bottom; the keep centre
+985 above the jamb foot (KEEP_Y 985). The reference table of section 1 and the variable table of section 7 are
+superseded by these numbers where they differ (150 / 769 / 1738, 188 / 807 / 1776, LOCK_H 1000, KEEP_Y 990).
 
 ## 11. v1.2 (28.10.2026): vision panels, glass, strip colour, closer, radius locks, DXF
 
