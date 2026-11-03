@@ -42,6 +42,9 @@
  *      payload and save / edit, an unknown stored value; the estimate configurator
  *      price; the window detail page row and warning; the pack overview type cell;
  *      the estimate PDF type row
+ *  10  cottage-60-40 (Piotr 03.11.2026, the reverse of 40/60): the numbers, the mirror of
+ *      40/60, triple, weights, price, rules; the 3D line, the lower weights stopped at the
+ *      jamb bottom; standard, 40/60 and 1/3 derived and 3D byte-identical to main 49ddc7a
  * Bars: the engine reads upperBars / lowerBars from the window record (item), not
  * from fullConfig, so every barred case here puts them on the item.
  *
@@ -172,15 +175,19 @@ const TABLE = [
   [900, 'standard', 808, 387.5, 420.5, 310.5, 310.5],
   [900, 'cottage-40-60', 808, 323.2, 484.8, 246.2, 374.8],
   [900, 'cottage-1-3', 808, 269.333, 538.667, 192.33, 428.67],
+  [900, 'cottage-60-40', 808, 484.8, 323.2, 407.8, 213.2],
   [1400, 'standard', 1308, 637.5, 670.5, 560.5, 560.5],
   [1400, 'cottage-40-60', 1308, 523.2, 784.8, 446.2, 674.8],
   [1400, 'cottage-1-3', 1308, 436, 872, 359, 762],
+  [1400, 'cottage-60-40', 1308, 784.8, 523.2, 707.8, 413.2],
   [1800, 'standard', 1708, 837.5, 870.5, 760.5, 760.5],
   [1800, 'cottage-40-60', 1708, 683.2, 1024.8, 606.2, 914.8],
   [1800, 'cottage-1-3', 1708, 569.333, 1138.667, 492.33, 1028.67],
+  [1800, 'cottage-60-40', 1708, 1024.8, 683.2, 947.8, 573.2],
   [2000, 'standard', 1908, 937.5, 970.5, 860.5, 860.5],
   [2000, 'cottage-40-60', 1908, 763.2, 1144.8, 686.2, 1034.8],
   [2000, 'cottage-1-3', 1908, 636, 1272, 559, 1162],
+  [2000, 'cottage-60-40', 1908, 1144.8, 763.2, 1067.8, 653.2],
 ];
 for (const [H, p, total, top, bottom, gu, gl] of TABLE) {
   const { spec, derived: d } = mk(LIVE, 1000, H, {}, { sashProportion: p });
@@ -258,8 +265,8 @@ section('3 - import rules (the PSW contract) and the explicit error');
   ok(eff('cottage-40-60', { frameHeight: 899 }) === 'standard' && eff('cottage-40-60', { frameHeight: 900 }) === 'cottage-40-60' && eff('cottage-1-3', { frameHeight: 1400, arched: true }) === 'standard'
     && eff('standard', { frameHeight: 1400 }) === 'standard' && eff('', { frameHeight: 1400 }) === 'standard' && eff('cottage-30-70', { frameHeight: 1400 }) === 'cottage-30-70' && SP.COTTAGE_MIN_FRAME_HEIGHT === 900,
     'configurator rule: cottage from 900, standard on an arched sash, an unknown value passes through to the engine error');
-  ok(JSON.stringify(SP.SASH_PROPORTION_OPTIONS) === JSON.stringify([{ value: 'standard', label: 'Standard' }, { value: 'cottage-40-60', label: 'Cottage 40/60' }, { value: 'cottage-1-3', label: 'Cottage 1/3-2/3' }]),
-    'the three choices and their labels: Standard, Cottage 40/60, Cottage 1/3-2/3');
+  ok(JSON.stringify(SP.SASH_PROPORTION_OPTIONS) === JSON.stringify([{ value: 'standard', label: 'Standard' }, { value: 'cottage-40-60', label: 'Cottage 40/60' }, { value: 'cottage-60-40', label: 'Cottage 60/40' }, { value: 'cottage-1-3', label: 'Cottage 1/3-2/3' }]),
+    'the four choices and their labels: Standard, Cottage 40/60, Cottage 60/40, Cottage 1/3-2/3');
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -320,7 +327,7 @@ section('5 - pricing');
     glassType: 'double', glassSpec: 'toughened', glassFinish: 'clear', colorType: 'single', colorSingle: 'white', openingType: 'both', headType: 'flat', frameType: 'standard', sillExtension: 'none', pas24: 'no' };
   ok(P.DEFAULT_PRICING.cottageSash === 0.05 && P.resolvePricing({ basePricePerSqm: 900 }).cottageSash === 0.05, 'DEFAULT_PRICING.cottageSash 0.05; a tenant price list without it falls back to 0.05');
   const std = P.calculatePrice({ ...base });
-  for (const p of ['cottage-40-60', 'cottage-1-3']) {
+  for (const p of ['cottage-40-60', 'cottage-60-40', 'cottage-1-3']) {
     const c = P.calculatePrice({ ...base, sashProportion: p });
     ok(near(Number(c.breakdown.subtotal), Number(std.breakdown.subtotal) * 1.05, 0.01) && near(c.unitPrice, std.unitPrice * 1.05, 0.01) && near(Number(c.breakdown.cottageSurcharge), Number(std.breakdown.subtotal) * 0.05, 0.01),
       `${p}: ${c.unitPrice} = ${std.unitPrice} x 1.05, cottageSurcharge ${c.breakdown.cottageSurcharge}`);
@@ -592,7 +599,7 @@ for (const [label, w, h, fc] of [['gothic arched 700 x 1800', 700, 1800, { sashT
 }
 {
   const fmt05 = (n) => { const r = Math.round(n * 2) / 2; return Number.isInteger(r) ? String(r) : r.toFixed(1); };
-  for (const [H, p] of [[1400, 'cottage-40-60'], [900, 'cottage-1-3'], [2000, 'cottage-40-60']]) {
+  for (const [H, p] of [[1400, 'cottage-40-60'], [900, 'cottage-1-3'], [2000, 'cottage-40-60'], [1400, 'cottage-60-40'], [900, 'cottage-60-40']]) {
     const { spec, derived: d } = mk(LIVE, 1000, H, {}, { sashProportion: p });
     const S = sheetsOf(LIVE, spec, d);
     const tU = texts(S.upper), tL = texts(S.lower), gU = texts(S.glassUpper), gL = texts(S.glassLower), vs = texts(S.vsection).join(' ');
@@ -668,7 +675,7 @@ for (const [label, w, h, fc] of [['gothic arched 700 x 1800', 700, 1800, { sashT
     ok(fromPane.length === wantV.length && fromPane.every((x, j) => near(x, wantV[j], 0.02)),
       `canvas elevation, standard 1400 ${bars}: vertical bars at ${fromPane.join(' / ')} mm from the pane edge = derived.bars ${wantV.join(' / ')}`);
   }
-  for (const [p, bars, n] of [['cottage-40-60', '4x4', 1], ['cottage-1-3', '9x9', 2]]) {
+  for (const [p, bars, n] of [['cottage-40-60', '4x4', 1], ['cottage-1-3', '9x9', 2], ['cottage-60-40', '4x4', 1], ['cottage-60-40', '9x9', 2]]) {
     const item = { id: 'c', name: 'C', width: 1000, height: 1400, sashProportion: p, upperBars: bars, lowerBars: bars };
     const calls = drawCalls(LIVE, item);
     const d = mk(LIVE, 1000, 1400, {}, item).derived;
@@ -700,6 +707,145 @@ for (const [label, w, h, fc] of [['gothic arched 700 x 1800', 700, 1800, { sashT
   const t = pdfText(LIVE.overview.exportOverviewPDF(info(withProportion)));
   ok((t.match(/Cottage 40\/60/g) || []).length === 1 && pdfText(LIVE.overview.exportOverviewPDF(info([row('W1', 'double', { proportion: '' })]))) === pdfText(START.overview.exportOverviewPDF(info([row('W1', 'double')]))),
     'overview PDF: "Cottage 40/60" printed once (under the Type of the cottage row); a standard row with an empty proportion prints as START');
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+section('10 - cottage-60-40 (Piotr 03.11.2026): the reverse of 40/60');
+{
+  // main before this change: standard, 40/60 and 1/3 must not move (engine and 3D)
+  const preHash = '49ddc7a817baec317a1c304c47c08dfd7c67d016';
+  const preTree = resolve(AUDIT, 't43-pre6040-tree');
+  rmSync(preTree, { recursive: true, force: true });
+  mkdirSync(preTree, { recursive: true });
+  execFileSync('sh', ['-c', `git archive ${preHash} src | tar -x -C "${preTree}"`], { cwd: ROOT, stdio: 'inherit' });
+  const PRE = await bundleEngine(resolve(preTree, 'src'), 't43-pre6040');
+  const P3 = await bundle3D(resolve(preTree, 'src'), 't43-pre6040-3d');
+  const P3T = await bundle3D(resolve(preTree, 'src'), 't43-pre6040-3d-triple', true);
+  const P = 'cottage-60-40';
+
+  // the numbers: top = total x 0.6, bottom = total - top; the exact mirror of 40/60
+  for (const H of [900, 1000, 1400, 1401, 1800, 2000, 2400]) {
+    const a = mk(LIVE, 1000, H, {}, { sashProportion: P }).derived, b = mk(LIVE, 1000, H, {}, { sashProportion: 'cottage-40-60' }).derived;
+    ok(a.sashHeight === b.sashHeight && a.topSashHeight === a.sashHeight * 0.6 && a.bottomSashHeight === a.sashHeight - a.topSashHeight
+      && near(a.topSashHeight, b.bottomSashHeight, 1e-9) && near(a.bottomSashHeight, b.topSashHeight, 1e-9) && near(a.meetingFraction, (a.bottomSashHeight - 21.5) / (a.sashHeight - 43), 1e-12),
+      `${H} 60/40: top ${+a.topSashHeight.toFixed(3)} / bottom ${+a.bottomSashHeight.toFixed(3)} = 40/60 swapped (${+b.topSashHeight.toFixed(3)} / ${+b.bottomSashHeight.toFixed(3)}), meeting ${a.meetingFraction.toFixed(4)}`);
+  }
+  ok(near(CA.meetingFractionFor(1400, P), 0.3966, 5e-5), `1400: meetingFraction ${CA.meetingFractionFor(1400, P).toFixed(4)} (box 0.3966)`);
+
+  // triple 1800 x 1400: the centre and both FIX lights on one line
+  {
+    const { spec, derived: d } = mk(LIVE, 1800, 1400, { sashType: 'triple' }, { sashProportion: P });
+    const g = LI.buildGlassListForWindow(d, spec);
+    const all = g.map((r) => r.height);
+    ok(near(d.topSashHeight, 784.8, 1e-9) && near(d.bottomSashHeight, 523.2, 1e-9) && g.length === 6 && all.filter((h) => near(h, 707.8, 0.01)).length === 3 && all.filter((h) => near(h, 413.2, 0.01)).length === 3,
+      `triple 1800 x 1400 60/40: ${+d.topSashHeight.toFixed(1)} / ${+d.bottomSashHeight.toFixed(1)}, six glass rows ${all.join(' / ')}`);
+  }
+
+  // weights: the top sash heavier than standard, the bottom one lighter; window totals equal standard
+  for (const H of [900, 1400, 2000]) {
+    const c = mk(LIVE, 1000, H, {}, { sashProportion: P }), s = mk(LIVE, 1000, H);
+    const wc = CA.sashWeightsFor(c.spec, c.derived), ws = CA.sashWeightsFor(s.spec, s.derived);
+    ok(wc.upperKg > ws.upperKg && wc.lowerKg < ws.lowerKg && c.derived.weights.total === s.derived.weights.total && c.derived.consumables.glass.sqm === s.derived.consumables.glass.sqm,
+      `${H} 60/40: top sash ${wc.upperKg} kg > standard ${ws.upperKg}, bottom ${wc.lowerKg} kg < ${ws.lowerKg}; window ${c.derived.weights.total} kg, glass ${c.derived.consumables.glass.sqm} m2 as standard`);
+  }
+
+  // the rules of the other cottage values
+  const eff = SP.effectiveSashProportion;
+  ok(SP.isCottageProportion(P) && eff(P, { frameHeight: 899 }) === 'standard' && eff(P, { frameHeight: 900 }) === P && eff(P, { frameHeight: 1400, arched: true }) === 'standard'
+    && SP.SASH_PROPORTION_LABELS[P] === 'Cottage 60/40', '60/40: a cottage value (label "Cottage 60/40"), from a 900 frame, standard on an arched sash');
+  for (const [label, fc] of [['PSW arched-group', { sashType: 'arched-group', archShape: 'gothic-arch' }], ['PC frameShape arched', { frameShape: 'arched', archShape: 'gothic-arch' }]]) {
+    const e = throwsName(() => mk(LIVE, 1000, 1600, fc, { sashProportion: P }));
+    ok(e && e.name === 'SashProportionError' && /arched/.test(e.message), `${label} + 60/40: ${e?.name}: ${e?.message}`);
+  }
+
+  // standard, 40/60 and 1/3: derived, glass, cut list and BOM byte-identical to main before this change
+  {
+    let same = 0, diff = [];
+    const cases = [];
+    for (const H of [800, 900, 1000, 1400, 1401, 1800, 2000, 2400]) for (const p of ['standard', 'cottage-40-60', 'cottage-1-3', undefined]) {
+      cases.push([1000, H, {}, p ? { sashProportion: p } : {}]);
+      cases.push([1800, H, { sashType: 'triple' }, p ? { sashProportion: p } : {}]);
+      cases.push([1000, H, { headType: 'arch' }, p ? { sashProportion: p } : {}]);
+      cases.push([1000, H, {}, { ...(p ? { sashProportion: p } : {}), upperBars: '4x4', lowerBars: '9x9' }]);
+    }
+    for (const [w, h, fc, extra] of cases) {
+      const a = mk(LIVE, w, h, fc, extra), b = mk(PRE, w, h, fc, extra);
+      const la = JSON.stringify([a.spec, a.derived, LI.buildGlassListForWindow(a.derived, a.spec)]);
+      const lb = JSON.stringify([b.spec, b.derived, PRE.lists.buildGlassListForWindow(b.derived, b.spec)]);
+      if (la === lb) same += 1; else diff.push(`${w}x${h} ${JSON.stringify(fc)} ${JSON.stringify(extra)}`);
+    }
+    ok(diff.length === 0, `standard / 40/60 / 1/3 (double, triple, glazing arch, bars; 800 to 2400): ${same} of ${cases.length} windows spec, derived and glass list byte-identical to main`, diff.slice(0, 3).join(' | '));
+    const prices = [];
+    for (const p of [undefined, 'standard', 'cottage-40-60', 'cottage-1-3']) for (const st of ['double', 'triple']) {
+      const cfg = { windowType: 'sash', sashType: st, width: 1200, height: 1500, actualFrameWidth: 1200, actualFrameHeight: 1500, upperBars: '4x4', lowerBars: 'none', quantity: 2,
+        glassType: 'double', glassSpec: 'toughened', glassFinish: 'clear', colorType: 'single', colorSingle: 'custom', openingType: 'both', headType: 'arch', frameType: 'standard', sillExtension: 'none', pas24: 'no', ...(p ? { sashProportion: p } : {}) };
+      prices.push(JSON.stringify(LIVE.pricing.calculatePrice(cfg)) === JSON.stringify(PRE.pricing.calculatePrice(cfg)));
+    }
+    ok(prices.every(Boolean), `prices of standard / 40/60 / 1/3 (double, triple) byte-identical to main (${prices.filter(Boolean).length} of ${prices.length})`);
+  }
+
+  // 3D: standard, 40/60 and 1/3 byte-identical to main, closed and fully open, double and triple
+  {
+    const bad = [];
+    let n = 0;
+    for (const H of [900, 1400, 2000]) for (const p of ['standard', 'cottage-40-60', 'cottage-1-3']) for (const open of [{}, { opening: 5000, upperOpening: 5000 }]) {
+      const cfg = { ...cfgFor(H, p), ...open };
+      const a = await meshes(L3, cfg), b = await meshes(P3, cfg);
+      n += 1; if (!(a.length === b.length && a.every((m, i) => key(m) === key(b[i])))) bad.push(`double ${H} ${p} ${open.opening ? 'open' : 'closed'}`);
+      const t = { ...cfgFor(H, p, 1800), sashType: 'triple', splitRatio: '1/4-1/2-1/4', ...open };
+      const c = await meshes(L3T, t), d = await meshes(P3T, t);
+      n += 1; if (!(c.length === d.length && c.every((m, i) => key(m) === key(d[i])))) bad.push(`triple ${H} ${p} ${open.opening ? 'open' : 'closed'}`);
+    }
+    ok(bad.length === 0, `3D standard / 40/60 / 1/3: ${n - bad.length} of ${n} models (double and triple, 900 / 1400 / 2000, closed and fully open) mesh for mesh identical to main`, bad.join(', '));
+  }
+
+  // 3D 60/40: the line, the two opening limits, the weights
+  const weightsOf = (ms) => ms.filter((m) => m.kind === 'BoxGeometry' && near(mw(m), 45, 0.05) && near(mh(m), 180, 0.05));
+  for (const H of [900, 1400, 2000]) {
+    const cfg = cfgFor(H, P);
+    const closed = meetingOf(await meshes(L3, cfg), 938);
+    const A = closed.top - closed.bottom, meet = Number(closed.mids[0]);
+    const f = CA.meetingFractionFor(H, P);
+    ok(cfg.sashProportion === P && cfg.meetingFraction === f && closed.rails.length === 4 && closed.mids.length === 1 && Math.abs(meet - (closed.bottom + A * f)) <= 0.5,
+      `3D ${H} 60/40: meeting rail at ${((meet - closed.bottom) / A).toFixed(4)} of the opening (engine ${f.toFixed(4)})`);
+    const lim = L3.PSW.sashOpeningLimits(cfg.height, cfg.meetingFraction);
+    ok(near(lim.lowerLift, closed.top - meet - 120, 0.05) && near(lim.upperDrop, meet - closed.bottom - 120, 0.05) && lim.lowerLift > lim.upperDrop,
+      `3D ${H} 60/40: the lower sash rises up to ${lim.lowerLift.toFixed(1)}, the upper drops up to ${lim.upperDrop.toFixed(1)} (the reverse of 40/60)`);
+    const jambTop = 58.414 - 23 + H / 2, jambBottom = 58.414 - 23 - H / 2;
+    const open = weightsOf(await meshes(L3, { ...cfg, opening: 5000, upperOpening: 5000 })).sort((a, b) => a.min[1] - b.min[1]);
+    const freeLow = meet - 90 - lim.lowerLift, freeUpTop = meet + lim.upperDrop + 90;
+    ok(open.length === 4 && near(open[0].min[1], open[1].min[1], 0.01) && near(open[0].min[1], Math.max(freeLow, jambBottom), 0.05) && freeLow < jambBottom
+      && near(open[3].max[1], freeUpTop, 0.05) && freeUpTop < jambTop,
+      `3D ${H} 60/40 fully open: lower weights stop with their bottom at the jamb bottom ${open[0].min[1]} (${jambBottom.toFixed(2)}; free would be ${freeLow.toFixed(2)}, through the sill); upper weights free at ${open[3].max[1]}`);
+  }
+  {
+    // triple 60/40: one line, the centre weights stopped at the jamb bottom
+    const H = 1400;
+    const t = { ...cfgFor(H, P, 1800), sashType: 'triple', splitRatio: '1/4-1/2-1/4' };
+    const ms = await meshes(L3T, t);
+    const rails = ms.filter((m) => m.kind === 'ExtrudeGeometry' && near(mh(m), 43, 0.05) && mw(m) > 150);
+    const m = meetingOf(ms, null);
+    const mids = [...new Set(rails.map((r) => midY(r).toFixed(2)))];
+    ok(rails.length === 12 && mids.length === 1 && Math.abs(Number(mids[0]) - (m.bottom + (m.top - m.bottom) * CA.meetingFractionFor(H, P))) <= 0.5,
+      `3D triple 1800 x 1400 60/40: ${rails.length} meeting rail members on one line at ${((Number(mids[0]) - m.bottom) / (m.top - m.bottom)).toFixed(4)} of the opening`);
+    const ws = weightsOf(await meshes(L3T, { ...t, opening: 5000 }));
+    const jambBottom = 58.414 - 23 - H / 2;
+    const lift = L3.PSW.sashOpeningLimits(t.height, t.meetingFraction).lowerLift;
+    const free = Number(mids[0]) - lift - 180;
+    ok(ws.length === 2 && ws.every((w) => near(w.min[1], jambBottom, 0.05)) && free < jambBottom,
+      `3D triple 60/40 fully open: both centre weights stop at the jamb bottom (${ws.map((w) => w.min[1]).join(' / ')}; free would be ${free.toFixed(2)})`);
+  }
+  // the lower weight stop never binds on standard, 40/60 or 1/3, any height, both 3D paths (preview h = H; configurator h = H - 87)
+  {
+    let worst = Infinity;
+    for (let H = 600; H <= 3000; H += 25) for (const h of [H, H - 87]) for (const p of ['standard', 'cottage-40-60', 'cottage-1-3']) {
+      const f = CA.meetingFractionFor(H, p);
+      const lim = L3.PSW.sashOpeningLimits(h, f);
+      const meeting = -h / 2 + 61.414 + (h - 57) * f;
+      worst = Math.min(worst, (meeting - 90 - lim.lowerLift) - (58.414 - 23 - h / 2));
+    }
+    ok(worst > 0, `standard / 40/60 / 1/3 frames 600 to 3000, both paths: the lower weight stop stays ${worst.toFixed(1)} mm or more below the full lift (never binds)`);
+  }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -783,8 +929,8 @@ if (!chromium) {
   // ── configurator: the control, the 900 rule, the 3D payload ──
   await mount(cfgUrl);
   await waitText('Sash proportions');
-  const labels = await Promise.all(['Standard', 'Cottage 40/60', 'Cottage 1/3-2/3'].map((l) => pchip(l).count()));
-  ok(labels.every((n) => n === 1), `configurator: a "Sash proportions" row with Standard / Cottage 40/60 / Cottage 1/3-2/3 (${labels.join(' / ')})`);
+  const labels = await Promise.all(['Standard', 'Cottage 40/60', 'Cottage 60/40', 'Cottage 1/3-2/3'].map((l) => pchip(l).count()));
+  ok(labels.every((n) => n === 1), `configurator: a "Sash proportions" row with Standard / Cottage 40/60 / Cottage 60/40 / Cottage 1/3-2/3 (${labels.join(' / ')})`);
   await heightInput().fill('1400'); await heightInput().blur(); await page.waitForTimeout(200);
   await pchip('Cottage 40/60').click(); await page.waitForTimeout(300);
   let pl = await lastPayload();
@@ -792,10 +938,16 @@ if (!chromium) {
   ok(pl && pl.sashProportion === 'cottage-40-60' && pl.meetingFraction === f4060 && pl.extHeight === 1400,
     `1400 + Cottage 40/60: the 3D gets sashProportion ${pl?.sashProportion}, meetingFraction ${pl?.meetingFraction} (engine ${f4060})`);
   ok((await specRow('Proportions').innerText()).includes('Cottage 40/60'), 'the spec panel shows "Proportions Cottage 40/60"');
+  await pchip('Cottage 60/40').click(); await page.waitForTimeout(300);
+  pl = await lastPayload();
+  const f6040 = LIVE.calculations.meetingFractionFor(1400, 'cottage-60-40');
+  ok(pl && pl.sashProportion === 'cottage-60-40' && pl.meetingFraction === f6040 && pl.extHeight === 1400 && (await specRow('Proportions').innerText()).includes('Cottage 60/40'),
+    `1400 + Cottage 60/40: the 3D gets sashProportion ${pl?.sashProportion}, meetingFraction ${pl?.meetingFraction} (engine ${f6040}); the spec panel shows "Cottage 60/40"`);
+  await pchip('Cottage 40/60').click(); await page.waitForTimeout(300);
   await heightInput().fill('800'); await heightInput().blur(); await page.waitForTimeout(300);
   pl = await lastPayload();
-  const disabled = await Promise.all(['Cottage 40/60', 'Cottage 1/3-2/3', 'Standard'].map((l) => pchip(l).isDisabled()));
-  ok(disabled[0] && disabled[1] && !disabled[2] && (await page.locator('text=Cottage needs a frame height of 900 mm or more.').count()) === 1,
+  const disabled = await Promise.all(['Cottage 40/60', 'Cottage 1/3-2/3', 'Standard', 'Cottage 60/40'].map((l) => pchip(l).isDisabled()));
+  ok(disabled[0] && disabled[1] && !disabled[2] && disabled[3] && (await page.locator('text=Cottage needs a frame height of 900 mm or more.').count()) === 1,
     'frame 800: the cottage chips are disabled with the note "Cottage needs a frame height of 900 mm or more."');
   ok(pl && pl.sashProportion === 'standard' && pl.meetingFraction === LIVE.calculations.meetingFractionFor(800, 'standard') && (await specRow('Proportions').innerText()).includes('Standard'),
     `a committed height below 900 sets the value back to standard (3D ${pl?.sashProportion}, ${pl?.meetingFraction})`);
@@ -904,7 +1056,7 @@ if (!chromium) {
   const oddRecord = () => page.evaluate(([x, w]) => window.__store.getState().projects.find((p) => p.id === x.p).batches.find((b) => b.id === x.b).windows.find((y) => y.id === w), [ids, oddId]);
   const before = JSON.stringify(await oddRecord());
   const looksOff = async () => /cursor-not-allowed/.test(await updateBtn.getAttribute('class'));
-  ok((await page.locator('text=Unknown sash proportion "cottage-30-70": choose one of the three.').count()) === 1 && (await looksOff()) && pageErrors.length === errsBefore,
+  ok((await page.locator('text=Unknown sash proportion "cottage-30-70": choose one of the four.').count()) === 1 && (await looksOff()) && pageErrors.length === errsBefore,
     'edit ODD (cottage-30-70): the configurator says "Unknown sash proportion ...", Update shows as blocked, no page error');
   await updateBtn.click(); await page.waitForTimeout(300);
   ok(JSON.stringify(await oddRecord()) === before && (await page.locator('text=Sash proportions').count()) === 1, 'clicking Update saves nothing and stays on the configurator');

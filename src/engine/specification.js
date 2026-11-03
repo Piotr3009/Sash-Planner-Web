@@ -100,11 +100,16 @@ export const DOOR_LEAF_DEPTH = DEFAULT_DOOR_PROFILE.leafDepth;
 export const DOOR_FRAME_DEPTH = DEFAULT_DOOR_PROFILE.frameDepth;
 export const glassGas = (type) => (type === 'single' || type === 'passive') ? '' : 'argon';
 
-// Sash proportions (cottage, Piotr 09.10.2026). The field name and the three
-// values are the contract with PSW: `sashProportion`, saved in the estimate
-// fullConfig like `splitRatio`; a missing, null or empty value is 'standard'.
+// Sash proportions (cottage, Piotr 09.10.2026). The field name and the values
+// are the contract with PSW: `sashProportion`, saved in the estimate fullConfig
+// like `splitRatio`; a missing, null or empty value is 'standard'.
+// 'cottage-60-40' (Piotr 03.11.2026) is the reverse of 'cottage-40-60': the top
+// sash 60 % of the sum, the bottom one 40 %; everything else as cottage-40-60.
+// PC only for now (PSW sends the first three).
 // The split itself is computed in ONE place: calculations.js sashHeightsFor().
-export const SASH_PROPORTIONS = Object.freeze(['standard', 'cottage-40-60', 'cottage-1-3']);
+export const SASH_PROPORTIONS = Object.freeze(['standard', 'cottage-40-60', 'cottage-60-40', 'cottage-1-3']);
+/** Top sash share of the total sash height for each cottage value (the bottom sash takes the rest). */
+export const COTTAGE_TOP_SHARE = Object.freeze({ 'cottage-40-60': 0.4, 'cottage-60-40': 0.6, 'cottage-1-3': 1 / 3 });
 
 // Triple sash opening (Piotr 13.10.2026): the middle section opens, bottom sash only; the
 // fixed sections and the middle upper sash never move. The normaliser forces the type,
@@ -119,12 +124,13 @@ export function sashOpeningLabel(windowSpec) {
 export const SASH_PROPORTION_LABELS = Object.freeze({
   standard: 'Standard',
   'cottage-40-60': 'Cottage 40/60',
+  'cottage-60-40': 'Cottage 60/40',
   'cottage-1-3': 'Cottage 1/3-2/3',
 });
 // The configurator offers cottage from this frame height up; a stored cottage
 // window below it still derives (the detail page shows a warning line).
 export const COTTAGE_MIN_FRAME_HEIGHT = 900;
-export const isCottageProportion = (value) => value === 'cottage-40-60' || value === 'cottage-1-3';
+export const isCottageProportion = (value) => Object.prototype.hasOwnProperty.call(COTTAGE_TOP_SHARE, value);
 /** The configurator chips (value + label), in the contract order. */
 export const SASH_PROPORTION_OPTIONS = Object.freeze(SASH_PROPORTIONS.map((value) => Object.freeze({ value, label: SASH_PROPORTION_LABELS[value] })));
 /**

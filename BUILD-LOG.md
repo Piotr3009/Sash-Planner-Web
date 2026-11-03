@@ -4,6 +4,22 @@ Verdicts per phase, in execution order.
 
 ---
 
+## 2026-11-03 · COTTAGE 60/40, the reverse of 40/60 (chat change, branch `claude/cottage-60-40`, from main 49ddc7a)
+
+Owner (Piotr, 03.11.2026): a sash option with the top sash 60 % and the bottom one 40 % (today's Cottage 40/60 is top 40, bottom 60). Same logic as 40/60, only the two heights swap; the sashes themselves (profile, rails, stiles, glass rule) do not change.
+
+### Verdict ✅ `cottage-60-40` in PC; standard, 40/60 and 1/3 byte-identical to main (engine, prices, 3D); t43 299 / 0
+
+- `specification.js`: new value `cottage-60-40`, label "Cottage 60/40", between 40/60 and 1/3 in the chips; `COTTAGE_TOP_SHARE` (0.4 / 0.6 / 1/3) is now the one table of top shares and `isCottageProportion` reads it, so the +5 % price, the 900 mm minimum, standard on an arched sash, the arched error, the per-pane bars, the sheets, the pack and the PDF labels all take 60/40 with no other change.
+- `calculations.js` `sashHeightsFor`: cottage top = total x share (1/3 stays `total / 3`, so its numbers keep every bit). Frame 1400 (sum 1308): 784.8 / 523.2, glass 707.8 / 413.2, meeting line 0.3966 of the opening.
+- 3D `ParametricSashWindow.jsx`: the meeting line sits below half, so the lower sash lifts further and its weights would drop out through the sill (1400: 222 mm below the jamb bottom). Mirror of the 09.10 upper weight stop: the lower weights stop with their bottom at the jamb bottom (double), and the triple centre weights the same when the line is below half. Never binds on standard, 40/60 or 1/3 (88 mm or more of room, 600 to 3000, both 3D paths).
+- Configurators: the unknown value message says "choose one of the four".
+- Not changed: PSW (it sends the first three values; the PC engine accepts the fourth). If PSW should offer 60/40, its `sash-proportions.js`, 3D and renderer need the same value.
+
+Proof: `verify/parity/t43_sash_proportions.mjs` 299 passed, 0 failed. New section 10: the 60/40 numbers at seven heights (exact mirror of 40/60), triple, weights (top heavier, totals equal standard), rules and arched error, the 3D line and opening limits, the lower weights stopped at the jamb bottom (double and triple); and against main 49ddc7a: 128 standard / 40/60 / 1/3 windows (double, triple, glazing arch, bars, 800 to 2400) spec, derived and glass list byte-identical, 8 prices byte-identical, 36 3D models (double and triple, closed and fully open) mesh for mesh identical. The table, pricing, sheets, canvas bars and browser checks gained 60/40 rows (configurator chip, 3D payload, the 800 mm disable). vite build green.
+
+---
+
 ## 2026-10-28 afternoon · FIRE DOORS v1.3: hinges from the leaf bottom (the Weeke rule), the handle from the floor
 
 Read with the owner from his old Weeke program `farrington_d01.mpr` (WoodWOP, 2040 x 726 x 45): the hinge

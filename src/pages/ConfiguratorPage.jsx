@@ -635,7 +635,7 @@ export default function ConfiguratorPage() {
   const cottageAllowed = !isArchedSash && extH >= COTTAGE_MIN_FRAME_HEIGHT;
   const sashProp = effectiveSashProportion(sashProportion, { frameHeight: extH, arched: isArchedSash });
   // a stored value the engine does not know (e.g. a newer PSW one): said next to the control, not saved, no 3D line from it
-  const proportionError = SASH_PROPORTIONS.includes(sashProp) ? null : `Unknown sash proportion "${sashProp}": choose one of the three.`;
+  const proportionError = SASH_PROPORTIONS.includes(sashProp) ? null : `Unknown sash proportion "${sashProp}": choose one of the four.`;
   useEffect(() => { if (isArchedSash) setSashProportion('standard'); }, [isArchedSash]);
   // the circle's height is its diameter — the height input follows the width
   useEffect(() => {

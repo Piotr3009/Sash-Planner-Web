@@ -1570,8 +1570,10 @@ function PulleySet({
 }) {
   const pulleyCordRadius = mm(18.8);
   const pulleyTravel = mm(travel);
-  // the weight end of the cord stops at weightTravelMax (mm); without it, the whole travel
-  const weightTravel = travel > weightTravelMax ? mm(weightTravelMax) : pulleyTravel;
+  // the weight end of the cord stops at weightTravelMax (mm) either way (the upper set's
+  // travel is positive, the lower set's negative); without it, the whole travel
+  const weightTravel = travel > weightTravelMax ? mm(weightTravelMax)
+    : travel < -weightTravelMax ? -mm(weightTravelMax) : pulleyTravel;
 
   const cordPoints = buildPulleyCordPoints({
     center: [0, 0],
@@ -1644,6 +1646,7 @@ function JambWithPartingBead({
   weightStartY = -mm(646),
   sashDropY = -mm(556),
   upperWeightTravelMax = Infinity,
+  lowerWeightTravelMax = Infinity,
 }) {
   const jambDepth = mm(130);
   const jambHalf = mm(65);
@@ -1688,7 +1691,7 @@ function JambWithPartingBead({
       {showPulleyTestCutout && pulleyMaterial && (
         <>
           <PulleySet x={pulleyLocalX} y={pulleyLocalY} z={mm(pulleyCutoutZCenter)} travel={pulleyUpperTravel} material={pulleyMaterial} showMarker={false} showAxes={false} plateOffsetX={mm(-10)} mirrorX={pulleyMirrorX} weightStartY={weightStartY} sashDropY={sashDropY} weightTravelMax={upperWeightTravelMax} />
-          <PulleySet x={pulleyLocalX} y={pulleyLocalY} z={-mm(pulleyCutoutZCenter)} travel={pulleyLowerTravel} material={pulleyMaterial} showMarker={false} showAxes={false} plateOffsetX={mm(-10)} mirrorX={pulleyMirrorX} weightStartY={weightStartY} sashDropY={sashDropY} />
+          <PulleySet x={pulleyLocalX} y={pulleyLocalY} z={-mm(pulleyCutoutZCenter)} travel={pulleyLowerTravel} material={pulleyMaterial} showMarker={false} showAxes={false} plateOffsetX={mm(-10)} mirrorX={pulleyMirrorX} weightStartY={weightStartY} sashDropY={sashDropY} weightTravelMax={lowerWeightTravelMax} />
         </>
       )}
 
@@ -2192,6 +2195,10 @@ export default function ParametricSashWindow({
   // through the head, so it stops with its top at the jamb top (the 180 weight's
   // centre 90 below). A standard window never reaches that height, so it moves as before.
   const upperWeightTravelMax = Math.max(0, (jambOriginY + h / 2 - mm(90) - meetingY) * 1000);
+  // The mirror for the lower weights (cottage 60/40, Piotr 03.11.2026): a lowered line and
+  // the longer lift would drop them out through the sill, so they stop with their bottom at
+  // the jamb bottom. Standard, 40/60 and 1/3 never reach it (their line sits above half).
+  const lowerWeightTravelMax = Math.max(0, (meetingY - mm(90) - (jambOriginY - h / 2)) * 1000);
   const pulleyLocalY_calc = h / 2 - mm(100) - mm(64);
   const weightStartY = meetingY_inJamb - pulleyLocalY_calc;
   // linka do sashki: od pulley (y=0 w lokalnych) do meeting railu
@@ -2654,7 +2661,12 @@ export default function ParametricSashWindow({
 
           // Weight Y (counterbalance — drops as sash rises)
           const weightBaseY = meetingY;
-          const weightGlobalY = weightBaseY - mm(centerLowerLift) - mm(90); // center of weight
+          // A meeting line below half (cottage 60/40, Piotr 03.11.2026) and its longer lift would
+          // drop the weights out through the sill: they stop with their bottom at the jamb bottom.
+          // Only for a line below half, so standard, 40/60 and 1/3 draw exactly as before.
+          const weightDropMax = usableMeetingFraction(meetingFraction) < 0.5
+            ? Math.max(0, (meetingY - mm(180) - (jambOriginY - h / 2)) * 1000) : Infinity;
+          const weightGlobalY = weightBaseY - mm(Math.min(centerLowerLift, weightDropMax)) - mm(90); // center of weight
 
           // Jamb X positions (centers of outer jambs)
           const leftJambX = -w / 2 + jambThickness / 2;
@@ -2828,6 +2840,7 @@ export default function ParametricSashWindow({
         weightStartY={weightStartY}
         sashDropY={sashDropY}
         upperWeightTravelMax={upperWeightTravelMax}
+        lowerWeightTravelMax={lowerWeightTravelMax}
       />
 
       <JambWithPartingBead
@@ -2849,6 +2862,7 @@ export default function ParametricSashWindow({
         weightStartY={weightStartY}
         sashDropY={sashDropY}
         upperWeightTravelMax={upperWeightTravelMax}
+        lowerWeightTravelMax={lowerWeightTravelMax}
       />
 
       <JambWithPartingBead
